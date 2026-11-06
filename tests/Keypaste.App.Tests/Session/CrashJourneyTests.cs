@@ -3,7 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
 using Avalonia.Input;
-using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
 using Keypaste.App.Tests.Clipboard;
@@ -17,7 +16,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// The crash-report choice and its link to the terms on the unlock screen, and what an exception on the UI thread does to a launched app.
+/// The one first-launch screen on a launched app, and what an exception on the UI thread does to it.
 /// </summary>
 /// <remarks>
 /// The app is launched as <see cref="ClosingTheMainWindowTests"/> launches it, with crash reports composed for its home
@@ -34,7 +33,7 @@ public sealed class CrashJourneyTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public Task A_fresh_home_opens_on_the_unlock_screen_with_the_link_and_two_equal_choices_and_never_asks_again() =>
+    public Task A_fresh_home_opens_on_the_terms_screen_and_once_continued_never_shows_it_again() =>
         HeadlessSession.On(async () =>
         {
             using var fixture = new TempVault();
@@ -51,41 +50,26 @@ public sealed class CrashJourneyTests
             WindowInput.Drain();
             var root = main.FindControl<ContentControl>("Root")!;
 
-            // No terms screen: the unlock screen asks, below everything else, and takes no Return.
-            var unlock = Assert.IsType<UnlockViewModel>(Assert.IsType<UnlockView>(root.Content).DataContext);
-            var first = Assert.IsType<CrashChoiceViewModel>(unlock.CrashChoice);
-            Assert.Equal("unlock", crashes.Screen);
-            Assert.DoesNotContain(TermsOfUse.Carried.Title, Texts(main));
-            Assert.Contains("Crash reports", Texts(main));
-            Assert.True(main.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "OpenTerms").IsEffectivelyVisible);
-
-            var send = main.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SendCrashReports");
-            var dontSend = main.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "DontSend");
-            Assert.Equal(send.Classes, dontSend.Classes);
-            Assert.DoesNotContain("primary", send.Classes);
-            Assert.False(send.IsDefault || dontSend.IsDefault);
-            Assert.False(send.IsFocused || dontSend.IsFocused);
-            Key(main, PhysicalKey.Enter);
-            Assert.True(first.IsAsking);
-            var asked = AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home));
-            Assert.Equal((TermsOfUse.Carried.Version, null, null), (asked.CrashChoiceAsked, asked.SendCrashReports, asked.CrashChoiceTerms));
+            Assert.IsType<FirstLaunchView>(root.Content);
+            Assert.Equal("keypaste", main.Title);
             Assert.False(crashes.IsOn);
+            Assert.False(File.Exists(KeypasteHome.SettingsPath(fixture.Home)));
 
-            first.DontSendCommand.Press();
+            Key(main, PhysicalKey.Enter);
 
             Assert.IsType<UnlockView>(root.Content);
-            Assert.False(first.IsAsking);
+            Assert.True(crashes.IsOn);
             var saved = AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home));
-            Assert.Equal((false, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.CrashChoiceTerms));
+            Assert.Equal((true, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.TermsAgreed));
 
-            // A lock or a close into the tray rebuilds the unlock screen, and an answered choice is not asked again.
+            // A lock or a close into the tray rebuilds the unlock screen, and nothing asks again.
             app.CloseToTray();
             await Until(() => root.Content is UnlockView);
             app.OpenWindow();
-            Assert.Null(Assert.IsType<UnlockViewModel>(Assert.IsType<UnlockView>(root.Content).DataContext).CrashChoice);
+            Assert.IsType<UnlockView>(root.Content);
 
             using var again = new CrashReporting(fixture.Home, new DesktopPreferences(fixture.Home), endpoint: null);
-            Assert.False(again.AsksThisRun);
+            Assert.False(again.AsksTerms);
         });
 
     [Fact]
@@ -133,7 +117,7 @@ public sealed class CrashJourneyTests
             Assert.Contains("\"count\":2", Assert.Single(crashed.Crashes.Waiting()).Text, StringComparison.Ordinal);
         });
 
-    /// <summary>A launched app whose person answered the first run, unlocked with a password copied, then an exception on the UI thread.</summary>
+    /// <summary>A launched app whose person agreed to the terms or turned reports off, unlocked with a password copied, then an exception on the UI thread.</summary>
     private static async Task<Crashed> CrashedAsync(bool send)
     {
         var crashed = new Crashed();
@@ -185,9 +169,6 @@ public sealed class CrashJourneyTests
             return exception;
         }
     }
-
-    private static List<string> Texts(Window window) =>
-        [.. window.GetVisualDescendants().OfType<TextBlock>().Where(text => text.IsEffectivelyVisible).Select(text => text.Text ?? string.Empty)];
 
     private static void Key(Window window, PhysicalKey key)
     {

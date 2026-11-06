@@ -235,44 +235,44 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     internal bool HasCrashReports => Crashes is not null;
 
-    /// <summary>Whether the switch shows: the person has answered under these terms, here or on the unlock screen.</summary>
-    internal bool ShowsCrashSwitch => Crashes is { HasAnswered: true };
+    /// <summary>Shows the one terms screen over this one; the view sets it.</summary>
+    internal Action<FirstLaunchViewModel>? AskTerms { get; set; }
 
-    /// <summary>The choice with its terms for someone who has not answered under them, since a switch alone would send under terms it does not point to.</summary>
-    internal CrashChoiceViewModel? CrashChoice =>
-        _crashChoice ??= Crashes is { HasAnswered: false }
-            ? new CrashChoiceViewModel(TermsOfUse.Carried, AnswerCrashReports)
-            : null;
-
-    internal bool HasCrashChoice => CrashChoice is not null;
-
-    private CrashChoiceViewModel? _crashChoice;
-
-    private bool AnswerCrashReports(bool send)
-    {
-        var saved = Crashes!.Choose(send);
-
-        // The next preference this screen writes starts from the choice, not from what it read when it opened.
-        _settings = _preferences.Current;
-        OnPropertyChanged(nameof(SendCrashReports));
-        OnPropertyChanged(nameof(ShowsCrashSwitch));
-        return saved;
-    }
-
-    /// <summary>Whether crash reports are sent; turning it off deletes the reports waiting.</summary>
+    /// <summary>Whether crash reports are sent; turning it off deletes the reports waiting, and turning it on under terms not agreed to asks first.</summary>
     internal bool SendCrashReports
     {
         get => Crashes?.IsOn == true;
         set
         {
-            if (Crashes is not { HasAnswered: true } crashes || value == crashes.IsOn)
+            if (Crashes is not { } crashes || value == crashes.IsOn)
             {
                 return;
             }
 
-            var saved = AnswerCrashReports(value);
+            if (value && !crashes.HasAgreed)
+            {
+                AskTerms?.Invoke(new FirstLaunchViewModel(TermsOfUse.Carried, () => TookAgreement(crashes)));
+                return;
+            }
+
+            var saved = crashes.SetSending(value);
+            CrashSwitchMoved();
             Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
         }
+    }
+
+    private void TookAgreement(CrashReporting crashes)
+    {
+        var saved = crashes.Agree();
+        CrashSwitchMoved();
+        Message = saved ? string.Empty : "Crash reports are on until you quit, because keypaste could not keep this in its settings file, app.toml.";
+    }
+
+    private void CrashSwitchMoved()
+    {
+        // The next preference this screen writes starts from the switch, not from what it read when it opened.
+        _settings = _preferences.Current;
+        OnPropertyChanged(nameof(SendCrashReports));
     }
 
     /// <summary>The entry that opens the app at login, or null where Settings offers none.</summary>

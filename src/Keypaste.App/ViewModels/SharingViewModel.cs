@@ -1,7 +1,6 @@
 using Avalonia.Data.Converters;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Terms;
 using Keypaste.Core;
 using Keypaste.Core.Sharing;
 
@@ -35,6 +34,11 @@ internal sealed record SharingRow(string Id, string What, string Recipient, stri
 
     /// <summary>A link that may still open is revoked; one that cannot is only forgotten.</summary>
     internal string RevokeLabel => Opens ? "Revoke" : "Remove";
+
+    /// <summary>Whether the row is asking to confirm its revoke, which cannot be undone.</summary>
+    internal bool IsConfirming { get; init; }
+
+    internal string ConfirmText => $"Revoke the link to {What}? It stops opening for good.";
 }
 
 /// <summary>
@@ -82,8 +86,6 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     /// <param name="unavailable">Why no link can be made from here at all, such as an endpoint that did not resolve, or null.</param>
     /// <param name="what">The entry an item's Share… opened this for, fixed for the dialog; null for Settings' list of links.</param>
     /// <param name="cancel">What the dialog's Cancel does.</param>
-    /// <param name="unseenTerms">The terms of use to link before a link can be made, when this person has not been through that step under them.</param>
-    /// <param name="termsSeen">Records that they were, when the person goes on from them.</param>
     internal SharingViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
@@ -91,9 +93,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         Action<string>? showToast = null,
         string? unavailable = null,
         string? what = null,
-        Action? cancel = null,
-        TermsOfUse? unseenTerms = null,
-        Action? termsSeen = null)
+        Action? cancel = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -107,29 +107,26 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         Passphrase = new SecretField(clipboard);
         CancelCommand = new RelayCommand(() => cancel?.Invoke());
 
-        Terms = unseenTerms;
-        ContinueCommand = new RelayCommand(
-            () =>
-            {
-                termsSeen?.Invoke();
-                IsReadingTerms = false;
-            },
-            () => IsReadingTerms);
-
-        CreateCommand = new AsyncRelayCommand(CreateAsync, () => !IsReadingTerms && SelectedWhat is not null && Unavailable is null);
+        CreateCommand = new AsyncRelayCommand(CreateAsync, () => SelectedWhat is not null && Unavailable is null);
         RevokeCommand = new AsyncRelayCommand(RevokeAsync, () => Selected is not null);
         RevokeRowCommand = new RelayCommand<SharingRow>(row =>
         {
-            Selected = row;
-            RevokeCommand.Press();
+            if (row is { Opens: true })
+            {
+                Confirm(row.Id);
+            }
+            else
+            {
+                Act(row);
+            }
         });
+        ConfirmRevokeCommand = new RelayCommand<SharingRow>(Act);
+        CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
         Unavailable = unavailable;
         SelectedWhat = what;
 
         _ = LoadAsync(online: false);
-
-        IsReadingTerms = unseenTerms is not null;
     }
 
     /// <summary>What the Expires control offers.</summary>
@@ -197,17 +194,6 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     internal partial bool RequirePassphrase { get; set; }
 
-    /// <summary>The terms of use this dialog links first; null once this person has been through that step under them.</summary>
-    internal TermsOfUse? Terms { get; }
-
-    /// <summary>Whether the step linking the terms is showing, during which no link can be made.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(CreateCommand))]
-    internal partial bool IsReadingTerms { get; private set; }
-
-    /// <summary>Goes on from the terms to the form.</summary>
-    internal RelayCommand ContinueCommand { get; }
-
     /// <summary>What Escape would lose, for the dialog: a recipient or a passphrase typed, or null.</summary>
     internal Func<string?> Draft => () => _recipient.Trim().Length > 0 || Passphrase.HasValue ? "this share link" : null;
 
@@ -244,8 +230,14 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     /// <summary>Revokes the selected link and forgets it.</summary>
     internal AsyncRelayCommand RevokeCommand { get; }
 
-    /// <summary>Revokes the link on the row it is pressed for.</summary>
+    /// <summary>Asks about the live link on the row it is pressed for, or forgets a link that no longer opens.</summary>
     internal RelayCommand<SharingRow> RevokeRowCommand { get; }
+
+    /// <summary>Revokes the link whose row asked.</summary>
+    internal RelayCommand<SharingRow> ConfirmRevokeCommand { get; }
+
+    /// <summary>Takes the question back.</summary>
+    internal RelayCommand CancelRevokeCommand { get; }
 
     /// <summary>Asks the share server how many views each link has left.</summary>
     internal AsyncRelayCommand RefreshCommand { get; }
@@ -332,6 +324,14 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     {
         Unavailable = null;
         return CreateAsync();
+    }
+
+    private void Confirm(string? id) => Rows = [.. Rows.Select(row => row with { IsConfirming = row.Id == id })];
+
+    private void Act(SharingRow? row)
+    {
+        Selected = row;
+        RevokeCommand.Press();
     }
 
     private async Task RevokeAsync()

@@ -91,7 +91,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         BeginDeleteGroupCommand = new RelayCommand(
             BeginDeleteGroup,
             () => !IsConfirmingGroupDelete && SelectedGroup is { IsEverything: false });
-        ConfirmDeleteGroupCommand = new RelayCommand(ConfirmDeleteGroup, () => IsConfirmingGroupDelete);
+        ConfirmDeleteGroupCommand = new RelayCommand(ConfirmDeleteGroup, () => IsConfirmingGroupDelete && GroupCanBeDeleted);
         CancelGroupCommand = new RelayCommand(
             CloseGroupForms,
             () => IsCreatingGroup || IsRenamingGroup || IsMovingGroup || IsConfirmingGroupDelete);
@@ -128,6 +128,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(RenameGroupPrompt));
                 OnPropertyChanged(nameof(MoveGroupPrompt));
                 OnPropertyChanged(nameof(GroupDeletePrompt));
+                OnPropertyChanged(nameof(GroupCanBeDeleted));
                 OnPropertyChanged(nameof(ShowsProjectRenameNote));
                 OnPropertyChanged(nameof(ProjectRenameNote));
                 BeginRenameGroupCommand.NotifyCanExecuteChanged();
@@ -538,7 +539,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>Whether the group delete confirmation is showing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(GroupDeletePrompt))]
+    [NotifyPropertyChangedFor(nameof(GroupDeletePrompt), nameof(GroupCanBeDeleted))]
     [NotifyCanExecuteChangedFor(nameof(BeginDeleteGroupCommand), nameof(ConfirmDeleteGroupCommand), nameof(CancelGroupCommand))]
     internal partial bool IsConfirmingGroupDelete { get; private set; }
 
@@ -573,11 +574,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             var count = _all.Count(row => group.Contains(row.GroupPath));
             var items = count == 1 ? "1 item" : Invariant($"{count} items");
 
-            return count == 0 && group.Children.Count == 0
+            return GroupCanBeDeleted
                 ? $"Delete {name}? This vault has no Trash, so there is no undo."
                 : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no Trash, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
         }
     }
+
+    /// <summary>Whether the selected group holds nothing, the only group a vault with no Trash can delete.</summary>
+    internal bool GroupCanBeDeleted =>
+        SelectedGroup is { IsEverything: false } group && group.Children.Count == 0 && !_all.Any(row => group.Contains(row.GroupPath));
 
     /// <summary>Opens the form that moves the selected group into another.</summary>
     internal RelayCommand BeginMoveGroupCommand { get; }
@@ -768,6 +773,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         OnPropertyChanged(nameof(RenameGroupPrompt));
         OnPropertyChanged(nameof(MoveGroupPrompt));
         OnPropertyChanged(nameof(GroupDeletePrompt));
+        OnPropertyChanged(nameof(GroupCanBeDeleted));
         OnPropertyChanged(nameof(ShowsProjectRenameNote));
         OnPropertyChanged(nameof(ProjectRenameNote));
         BeginRenameGroupCommand.NotifyCanExecuteChanged();

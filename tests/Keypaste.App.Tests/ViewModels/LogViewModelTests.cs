@@ -170,6 +170,15 @@ public sealed class LogViewModelTests : IDisposable
         Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
         Assert.Equal("Chain broken at seq 1", model.Verdict.Headline);
         Assert.Contains(AuditText.Describe(AuditChainFault.Altered), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
+
+        // The banner stands only until the verdict is open, and the verdict says what to do.
+        Assert.EndsWith("Verify chain says where.", model.Message, StringComparison.Ordinal);
+        Assert.True(model.HasNotice);
+        model.VerifyCommand.Press();
+        Assert.False(model.HasNotice);
+        Assert.Contains(model.Verdict!.Paragraphs, paragraph => paragraph.Contains("keypaste log verify --expect", StringComparison.Ordinal));
+        model.VerifyCommand.Press();
+        Assert.True(model.HasNotice);
     }
 
     /// <summary>

@@ -68,9 +68,6 @@ public sealed record AppSettings
     /// <summary>The section the window's layout is written under, apart from the preferences: every reader of the file holds a section to eight keys, and the preferences already take seven.</summary>
     public const string WindowSectionName = "window";
 
-    /// <summary>The section recording which terms of use the app has linked for the person, which says nothing of whether they opened them; a choice stays in the preferences, whose readers and files already hold it.</summary>
-    public const string TermsLinkedSectionName = "terms_linked";
-
     /// <summary>
     /// The three keys the section carries.
     /// </summary>
@@ -92,8 +89,6 @@ public sealed record AppSettings
     internal const string VaultKey = "vault";
     internal const string CrashReportsKey = "crash_reports";
     internal const string TermsKey = "terms";
-    internal const string CrashChoiceAskedKey = "crash_choice";
-    internal const string ShareTermsKey = "share";
     internal const string WindowBoundsKey = "bounds";
     internal const string WindowStateKey = "state";
     internal const string WindowListShareKey = "list_share";
@@ -106,8 +101,6 @@ public sealed record AppSettings
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
-
-    private static readonly string[] _knownTermsLinkedKeys = [CrashChoiceAskedKey, ShareTermsKey];
 
     private static readonly string[] _header =
     [
@@ -158,18 +151,12 @@ public sealed record AppSettings
     /// <remarks>A full path and never anything read from the vault.</remarks>
     public string? Vault { get; init; }
 
-    /// <summary>Whether the person chose to send the desktop app's crash reports; null until they answer.</summary>
+    /// <summary>Whether the desktop app's crash reports are sent: agreeing to the terms of use sets it, and Settings' switch changes it; null until either has.</summary>
     /// <remarks>Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/>.</remarks>
     public bool? SendCrashReports { get; init; }
 
-    /// <summary>The version of the terms of use in force when the person last made the crash-report choice, or null.</summary>
-    public string? CrashChoiceTerms { get; init; }
-
-    /// <summary>The version of the terms of use in force when the unlock screen asked the crash-report choice, or null until it has; it says nothing of any answer.</summary>
-    public string? CrashChoiceAsked { get; init; }
-
-    /// <summary>The version of the terms of use Share… last linked for the person, or null; it says nothing about crash reports.</summary>
-    public string? ShareTermsLinked { get; init; }
+    /// <summary>The version of the terms of use the person last agreed to or changed crash reports under, or null.</summary>
+    public string? TermsAgreed { get; init; }
 
     /// <summary>How the person left the desktop app's window, or null until it has been kept or when the file's bounds make no window.</summary>
     public WindowLayout? Window { get; init; }
@@ -247,11 +234,6 @@ public sealed record AppSettings
             settings = settings with { Window = ReadWindow(window) };
         }
 
-        if (document.Tables.FirstOrDefault(IsTermsLinkedSection) is { } linked)
-        {
-            settings = settings with { CrashChoiceAsked = TextOf(linked, CrashChoiceAskedKey), ShareTermsLinked = TextOf(linked, ShareTermsKey) };
-        }
-
         return true;
     }
 
@@ -308,9 +290,9 @@ public sealed record AppSettings
             writer.Number(CrashReportsKey, crashReports ? 1 : 0, "1 sends the app's crash reports to keypaste.com");
         }
 
-        if (settings.CrashChoiceTerms is { } terms && writer.CanWrite(TermsKey, terms))
+        if (settings.TermsAgreed is { } terms && writer.CanWrite(TermsKey, terms))
         {
-            writer.Text(TermsKey, terms, "the terms of use in force when that was chosen");
+            writer.Text(TermsKey, terms, "the terms of use agreed to");
         }
 
         if (!TryKeep(writer, Existing(path), settings))
@@ -366,8 +348,6 @@ public sealed record AppSettings
 
         // With no layout to write, a [[window]] whose bounds did not read stays as a hand edit left it, among the other sections.
         var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
-        var hasTermsLinked = settings.CrashChoiceAsked is not null || settings.ShareTermsLinked is not null;
-        var termsLinked = hasTermsLinked ? existing.Tables.FirstOrDefault(IsTermsLinkedSection) : null;
 
         try
         {
@@ -386,17 +366,7 @@ public sealed record AppSettings
                 }
             }
 
-            if (hasTermsLinked)
-            {
-                WriteTermsLinked(writer, settings);
-
-                if (termsLinked is not null && !TryWrite(writer, termsLinked.Pairs.Where(pair => !_knownTermsLinkedKeys.Contains(pair.Key, StringComparer.Ordinal))))
-                {
-                    return false;
-                }
-            }
-
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, termsLinked)))
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -445,21 +415,6 @@ public sealed record AppSettings
         }
     }
 
-    private static void WriteTermsLinked(TomlWriter writer, AppSettings settings)
-    {
-        writer.BlankLine().Table(TermsLinkedSectionName);
-
-        if (settings.CrashChoiceAsked is { } asked && writer.CanWrite(CrashChoiceAskedKey, asked))
-        {
-            writer.Text(CrashChoiceAskedKey, asked, "the terms of use in force when the unlock screen asked about crash reports");
-        }
-
-        if (settings.ShareTermsLinked is { } share && writer.CanWrite(ShareTermsKey, share))
-        {
-            writer.Text(ShareTermsKey, share, "the terms of use Share… last linked");
-        }
-    }
-
     private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
     {
         foreach (var pair in pairs)
@@ -489,8 +444,6 @@ public sealed record AppSettings
         new TomlWriter(TomlLimits.Paths).CanWrite(VaultKey, RecentVaults.Portable(vaultPath), _vaultComment);
 
     private static bool IsWindowSection(TomlTable table) => string.Equals(table.Name, WindowSectionName, StringComparison.Ordinal);
-
-    private static bool IsTermsLinkedSection(TomlTable table) => string.Equals(table.Name, TermsLinkedSectionName, StringComparison.Ordinal);
 
     private static string? TextOf(TomlTable table, string key) =>
         table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;
@@ -547,7 +500,7 @@ public sealed record AppSettings
         SendCrashReports = table.TryGet(CrashReportsKey, out var crashReports) && crashReports.Value.Kind == TomlValueKind.Number
             ? crashReports.Value.Number == 1
             : null,
-        CrashChoiceTerms = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
+        TermsAgreed = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
     };
 
     /// <summary>

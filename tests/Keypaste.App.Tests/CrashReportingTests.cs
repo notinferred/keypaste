@@ -10,8 +10,8 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// The app's crash reports for a run: kept only once the person chose Send crash reports under the terms
-/// this build carries, deleted when they choose not to, the run marker turned into a report at the next start, and the
+/// The app's crash reports for a run: kept only once the person agreed to the terms this build carries
+/// and while the switch is on, deleted when it is turned off, the run marker turned into a report at the next start, and the
 /// sender started only while on and only where an endpoint is named.
 /// </summary>
 /// <remarks>None of these sets the process's hooks, which <c>scripts/verify-crash-report.sh</c> drives in a process of its own.</remarks>
@@ -29,13 +29,13 @@ public sealed partial class CrashReportingTests : IDisposable
     public void Dispose() => _home.Dispose();
 
     [Fact]
-    public void Before_the_person_answers_the_first_run_waits_and_nothing_is_kept()
+    public void Before_the_person_agrees_the_first_launch_waits_and_nothing_is_kept()
     {
         using var crashes = Reporting();
 
         crashes.Start();
 
-        Assert.True(crashes.AsksThisRun);
+        Assert.True(crashes.AsksTerms);
         Assert.False(crashes.IsOn);
         Assert.False(crashes.Crash(Thrown("SENTINEL-UNANSWERED")));
         Assert.False(Directory.Exists(Folder));
@@ -43,16 +43,16 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Fact]
-    public void Send_crash_reports_is_saved_under_the_carried_terms_and_a_crash_is_kept_with_its_screen_and_uptime()
+    public void Agreeing_is_saved_under_the_carried_terms_and_a_crash_is_kept_with_its_screen_and_uptime()
     {
         const string message = "SENTINEL-KEPT-MESSAGE-41ac";
         using var crashes = Reporting();
 
-        Assert.True(crashes.Choose(send: true));
+        crashes.Agree();
 
         var saved = AppSettings.Load(SettingsFile);
-        Assert.Equal((true, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.CrashChoiceTerms));
-        Assert.False(crashes.AsksThisRun);
+        Assert.Equal((true, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.TermsAgreed));
+        Assert.False(crashes.AsksTerms);
         Assert.True(File.Exists(Marker));
 
         crashes.Screen = CrashReporting.ScreenOf(DestinationKind.AgentActivity);
@@ -72,7 +72,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public void A_catch_everything_block_is_reported_with_its_site()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: true);
+        crashes.Agree();
 
         crashes.Unexpected(Thrown("SENTINEL-UNEXPECTED"), CrashReporting.LockedNoticeSite);
 
@@ -84,7 +84,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public void An_exception_off_the_ui_thread_keeps_a_crash_report_that_stands_for_the_run_and_takes_its_marker()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: true);
+        crashes.Agree();
 
         crashes.OnUnhandled(null, new UnhandledExceptionEventArgs(Thrown("SENTINEL-THREAD"), isTerminating: true));
 
@@ -96,12 +96,12 @@ public sealed partial class CrashReportingTests : IDisposable
     public void An_exception_off_the_ui_thread_while_switched_off_keeps_nothing_and_a_thrown_non_exception_is_no_report()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: false);
+        crashes.SetSending(false);
 
         crashes.OnUnhandled(null, new UnhandledExceptionEventArgs(Thrown("SENTINEL-OFF-THREAD"), isTerminating: true));
         Assert.False(Directory.Exists(Folder));
 
-        crashes.Choose(send: true);
+        crashes.Agree();
         crashes.OnUnhandled(null, new UnhandledExceptionEventArgs("not an exception", isTerminating: true));
         Assert.Empty(crashes.Waiting());
         Assert.True(File.Exists(Marker));
@@ -111,7 +111,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public void A_failed_task_nobody_awaited_keeps_an_unobserved_task_report_and_the_marker()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: true);
+        crashes.Agree();
 
         crashes.OnUnobserved(null, new UnobservedTaskExceptionEventArgs(new AggregateException(Thrown("SENTINEL-UNOBSERVED"))));
 
@@ -125,7 +125,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public void A_crash_whose_failed_task_goes_unobserved_is_reported_once()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: true);
+        crashes.Agree();
         var crash = Thrown("SENTINEL-POSTED");
 
         // Work posted to the UI thread that throws is reported as the crash, and its task fails with that exception.
@@ -140,14 +140,14 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Fact]
-    public void Dont_send_is_saved_and_deletes_the_reports_waiting_and_the_marker()
+    public void Turning_it_off_is_saved_and_deletes_the_reports_waiting_and_the_marker()
     {
         using var crashes = Reporting();
-        crashes.Choose(send: true);
+        crashes.Agree();
         crashes.Crash(Thrown("SENTINEL-BEFORE-OFF"));
         Assert.Single(crashes.Waiting());
 
-        Assert.True(crashes.Choose(send: false));
+        Assert.True(crashes.SetSending(false));
 
         Assert.False(AppSettings.Load(SettingsFile).SendCrashReports);
         Assert.False(Directory.Exists(Folder));
@@ -157,22 +157,22 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Theory]
-    [InlineData("crash_reports = 1\nterms = \"2026-01-01\"\n", false, false)]
+    [InlineData("crash_reports = 1\nterms = \"2026-01-01\"\n", false, true)]
     [InlineData("crash_reports = 2\nterms = \"{terms}\"\n", false, false)]
     [InlineData("crash_reports = 0\nterms = \"{terms}\"\n", false, false)]
     [InlineData("crash_reports = 1\n", false, true)]
     [InlineData("crash_reports = 1\nterms = \"{terms}\"\n", true, false)]
-    public void Only_a_one_under_the_terms_this_build_carries_sends_and_only_no_answer_at_all_asks(string keys, bool on, bool asks)
+    public void Only_a_one_under_the_terms_this_build_carries_sends_and_anything_but_an_off_under_other_terms_asks(string keys, bool on, bool asks)
     {
         File.WriteAllText(SettingsFile, "[[settings]]\n" + keys.Replace("{terms}", TermsOfUse.Carried.Version, StringComparison.Ordinal));
 
         using var crashes = Reporting();
 
-        Assert.Equal((on, asks), (crashes.IsOn, crashes.AsksThisRun));
+        Assert.Equal((on, asks), (crashes.IsOn, crashes.AsksTerms));
     }
 
     [Fact]
-    public void A_file_that_does_not_read_is_not_asked_over_and_only_an_answer_in_Settings_replaces_it()
+    public void Only_the_switch_replaces_a_file_that_does_not_read_and_the_terms_screen_does_not_show_over_it()
     {
         const string handEdit = "[[settings]\nhalf an edit";
         Directory.CreateDirectory(_home.Path);
@@ -180,19 +180,17 @@ public sealed partial class CrashReportingTests : IDisposable
 
         using (var crashes = Reporting())
         {
-            Assert.False(crashes.AsksThisRun);
-            crashes.RememberAsked();
+            Assert.False(crashes.AsksTerms);
             Assert.Equal(handEdit, File.ReadAllText(SettingsFile));
 
-            Assert.True(crashes.Choose(send: false));
+            Assert.True(crashes.SetSending(false));
         }
 
-        Assert.Equal((false, TermsOfUse.Carried.Version), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).CrashChoiceTerms));
+        Assert.Equal((false, null), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsAgreed));
 
         using var next = Reporting();
 
-        Assert.False(next.AsksThisRun);
-        Assert.True(next.HasAnswered);
+        Assert.False(next.AsksTerms);
     }
 
     [Fact]
@@ -201,45 +199,26 @@ public sealed partial class CrashReportingTests : IDisposable
         var preferences = new DesktopPreferences(_home.Path);
         var older = preferences.Current;
 
-        preferences.Record(settings => settings with { CrashChoiceAsked = "2026-10-28", ShareTermsLinked = "2026-10-27" });
+        preferences.Record(settings => settings with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false) });
         preferences.Update(older with { LockWhenMinimized = true });
 
         var saved = AppSettings.Load(SettingsFile);
-        Assert.Equal(("2026-10-28", "2026-10-27", true), (saved.CrashChoiceAsked, saved.ShareTermsLinked, saved.LockWhenMinimized));
+        Assert.Equal((true, true), (saved.Window is not null, saved.LockWhenMinimized));
     }
 
     [Fact]
-    public void Asked_once_is_remembered_without_an_answer_holds_for_this_run_and_the_next_start_does_not_ask()
+    public void Leaving_the_screen_unagreed_writes_nothing_so_the_next_start_shows_it_again()
     {
-        using var crashes = Reporting();
+        using (var crashes = Reporting())
+        {
+            Assert.True(crashes.AsksTerms);
+        }
 
-        crashes.RememberAsked();
-
-        Assert.True(crashes.AsksThisRun);
-        Assert.False(crashes.IsOn);
-        var saved = AppSettings.Load(SettingsFile);
-        Assert.Equal((TermsOfUse.Carried.Version, null, null), (saved.CrashChoiceAsked, saved.SendCrashReports, saved.CrashChoiceTerms));
+        Assert.False(File.Exists(SettingsFile));
 
         using var next = Reporting();
 
-        Assert.False(next.AsksThisRun);
-        Assert.False(next.HasAnswered);
-        next.RememberAsked();
-        Assert.True(next.Choose(send: true));
-        Assert.True(next.IsOn);
-    }
-
-    [Fact]
-    public void An_answer_under_older_terms_is_not_asked_and_asking_writes_nothing()
-    {
-        const string written = "[[settings]]\ncrash_reports = 1\nterms = \"2026-01-01\"\n";
-        File.WriteAllText(SettingsFile, written);
-
-        using var crashes = Reporting();
-        crashes.RememberAsked();
-
-        Assert.False(crashes.AsksThisRun);
-        Assert.Equal(written, File.ReadAllText(SettingsFile));
+        Assert.True(next.AsksTerms);
     }
 
     [Fact]
@@ -252,11 +231,65 @@ public sealed partial class CrashReportingTests : IDisposable
         crashes.Start();
 
         Assert.False(crashes.IsOn);
-        Assert.False(crashes.AsksThisRun);
+        Assert.False(crashes.AsksTerms);
         Assert.False(crashes.Crash(Thrown("SENTINEL-UNREADABLE")));
-        crashes.RememberAsked();
         Assert.Equal(written, File.ReadAllText(SettingsFile));
         Assert.False(Directory.Exists(Folder));
+    }
+
+    [Theory]
+    [InlineData("[[settings]]\ncrash_reports = 0\nterms = \"2020-01-01\"\n")]
+    [InlineData("[[settings]]\ncrash_reports = 0\n")]
+    [InlineData("[[settings]\nhalf an edit")]
+    public void The_switch_alone_never_starts_reports_under_terms_not_agreed_to(string written)
+    {
+        File.WriteAllText(SettingsFile, written);
+        using var crashes = Reporting();
+        crashes.Start();
+        Assert.False(crashes.HasAgreed);
+
+        crashes.SetSending(true);
+
+        Assert.False(crashes.IsOn);
+        Assert.False(crashes.Crash(Thrown("SENTINEL-SWITCH-ALONE")));
+        Assert.NotEqual(TermsOfUse.Carried.Version, AppSettings.Load(SettingsFile).TermsAgreed);
+        Assert.False(Directory.Exists(Folder));
+    }
+
+    [Fact]
+    public void Agreeing_over_a_file_that_does_not_read_holds_for_the_run_and_leaves_the_file()
+    {
+        const string handEdit = "[[settings]\nhalf an edit";
+        File.WriteAllText(SettingsFile, handEdit);
+        using var crashes = Reporting();
+
+        Assert.False(crashes.Agree());
+
+        Assert.True(crashes.IsOn);
+        Assert.Equal(handEdit, File.ReadAllText(SettingsFile));
+    }
+
+    [Fact]
+    public void A_killed_run_under_older_terms_waits_past_a_start_without_Continue_and_is_reported_on_Continue()
+    {
+        File.WriteAllText(SettingsFile, "[[settings]]\ncrash_reports = 1\nterms = \"2020-01-01\"\n");
+        Assert.True(new CrashOutbox(Folder, _clock).MarkRunning());
+
+        using (var left = Reporting())
+        {
+            left.Start();
+            Assert.True(left.AsksTerms);
+        }
+
+        Assert.True(File.Exists(Marker));
+
+        using var next = Reporting();
+        next.Start();
+        Assert.Empty(next.Waiting());
+
+        next.Agree();
+
+        Assert.Contains("\"kind\":\"ended-unexpectedly\"", Assert.Single(next.Waiting()).Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -282,11 +315,11 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Fact]
-    public void A_start_after_dont_send_deletes_a_report_put_in_the_outbox()
+    public void A_start_while_switched_off_deletes_a_report_put_in_the_outbox()
     {
         using (var on = Reporting())
         {
-            on.Choose(send: true);
+            on.Agree();
             on.Crash(Thrown("SENTINEL-PLANTED"));
         }
 
@@ -305,7 +338,7 @@ public sealed partial class CrashReportingTests : IDisposable
         using var server = new FakeCrashServer();
         using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), CrashSender.KeypasteCom, _clock, () => new Forwarding(server));
 
-        crashes.Choose(send: true);
+        crashes.Agree();
         crashes.Crash(Thrown("SENTINEL-SENT"));
         var waiting = Assert.Single(crashes.Waiting());
 
@@ -326,10 +359,10 @@ public sealed partial class CrashReportingTests : IDisposable
 
         Assert.Empty(crashes.Waiting());
 
-        crashes.Choose(send: false);
-        crashes.Choose(send: true);
+        crashes.SetSending(false);
+        crashes.SetSending(true);
         crashes.Crash(Thrown("SENTINEL-AGAIN"));
-        crashes.Choose(send: false);
+        crashes.SetSending(false);
         _clock.Advance(TimeSpan.FromHours(2));
         Assert.Single(server.Requests);
     }
@@ -340,7 +373,7 @@ public sealed partial class CrashReportingTests : IDisposable
         using var server = new FakeCrashServer();
         using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), endpoint: null, _clock, () => new Forwarding(server));
 
-        crashes.Choose(send: true);
+        crashes.Agree();
         crashes.Crash(Thrown("SENTINEL-UNSENT"));
         _clock.Advance(TimeSpan.FromHours(2));
 

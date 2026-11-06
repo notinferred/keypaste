@@ -181,7 +181,6 @@ internal sealed class RenderedShell : IDisposable
 
             case "SharePassphrase":
                 Shell.ShareCommand.Press("github");
-                Shell.Share!.ContinueCommand.Press();
                 Drain();
                 Shell.Share!.RequirePassphrase = true;
                 break;

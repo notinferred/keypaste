@@ -1,0 +1,60 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
+             x:Class="Keypaste.App.Views.FirstLaunchView"
+             x:DataType="vm:FirstLaunchViewModel"
+             Background="{DynamicResource KpBgApp}">
+
+  <!-- The lock screen's column on its hairline grid: the mark, what continuing means, the terms and one amber action. -->
+  <UserControl.Resources>
+    <DrawingBrush x:Key="FirstLaunchGrid" TileMode="Tile" DestinationRect="0,0,16,16" Stretch="None">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="{DynamicResource KpBgApp}" Geometry="M0,0 H16 V16 H0 Z" />
+          <GeometryDrawing Brush="{DynamicResource KpBgPanel}" Geometry="M0,0 H16 V1 H0 Z M0,1 H1 V16 H0 Z" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+  </UserControl.Resources>
+
+  <Border Background="{StaticResource FirstLaunchGrid}">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Width="360"
+                  Margin="24,48,24,32"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Spacing="16">
+        <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
+
+        <StackPanel Spacing="8">
+          <TextBlock Name="AgreementText"
+                     Classes="primary size-14"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     LineHeight="21"
+                     ctl:Announcer.Says="{Binding Opening}"
+                     Text="{x:Static res:Strings.ContinuingAgreesToTheTermsOfUse}" />
+          <TextBlock Classes="caption"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     LineHeight="18"
+                     Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
+        </StackPanel>
+
+        <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Center" />
+
+        <Button Name="Continue"
+                Classes="primary lg"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                IsDefault="True"
+                Content="{x:Static res:Strings.Continue}"
+                Command="{Binding ContinueCommand}" />
+      </StackPanel>
+    </ScrollViewer>
+  </Border>
+
+</UserControl>

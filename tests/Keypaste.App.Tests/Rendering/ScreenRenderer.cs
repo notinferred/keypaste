@@ -207,6 +207,7 @@ public sealed class ScreenRenderer
         DrawSecrets(demo, output);
         DrawLockAndImport(demo, output);
         DrawPrompts(output);
+        DrawGroupNoTrashCannotDelete(output);
         DrawTrashWithRows(demo, output);
         DrawHardwareKey(output);
         DrawSmallScreens(demo, output);
@@ -1157,12 +1158,31 @@ public sealed class ScreenRenderer
     }
 
     /// <summary>The env release and run prompts beside the credential one, each at its own size.</summary>
+    // A group that a vault with no Trash cannot delete, whose form offers only Cancel.
+    private static void DrawGroupNoTrashCannotDelete(string output)
+    {
+        using var noTrash = new RenderedShell(seed: vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "box", GroupPath = "servers" });
+            vault.SetRecyclesDeletedEntries(false);
+        });
+        var items = noTrash.Show<EntriesViewModel>(DestinationKind.Entries);
+        items.SelectedGroup = items.Groups.Single(group => group.Path == "servers");
+        items.BeginDeleteGroupCommand.Press();
+        Save(noTrash.Window, output, "12-items-group-not-empty-no-trash");
+    }
+
     private static void DrawTerms(string output)
     {
         var terms = new TermsWindow { DataContext = Terms.TermsOfUse.Carried };
         terms.Show();
         Save(terms, output, "00e-terms-window");
         terms.Close();
+
+        var asked = new TermsAgreementWindow { DataContext = new FirstLaunchViewModel(Terms.TermsOfUse.Carried, () => { }) };
+        asked.Show();
+        Save(asked, output, "00h-settings-terms-asked");
+        asked.Close();
     }
 
     private static void DrawPrompts(string output)
@@ -1321,11 +1341,9 @@ public sealed class ScreenRenderer
         DrawFirstRun(session, demo, output);
     }
 
-    /// <summary>The first run: the welcome with nothing found and with KeePassXC's databases, and a locked vault alone, with recent vaults and with Windows Hello, each asking the crash-report choice at the default window, then the terms window its link opens.</summary>
+    /// <summary>The first run: the welcome with nothing found and with KeePassXC's databases, and a locked vault alone, with recent vaults and with Windows Hello, after the terms screen at the default window, then the terms window its link opens.</summary>
     private static void DrawFirstRun(AppVaultSession session, DemoVault demo, string output)
     {
-        CrashChoiceViewModel Asking() => new(Terms.TermsOfUse.Carried, _ => true);
-
         using var empty = new TempHome();
         var database = Path.Combine(empty.Path, "personal.kdbx");
         using (var kept = Vault.Create(database, "first-run-demo"))
@@ -1336,9 +1354,9 @@ public sealed class ScreenRenderer
         var ini = Path.Combine(empty.Path, "keepassxc.ini");
         File.WriteAllText(ini, $"[General]\nLastActiveDatabase={database.Replace('\\', '/')}\n");
 
-        using var nothing = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
-        using var fromKeePassXc = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfigs: () => [ini]) { CrashChoice = Asking() };
-        using var locked = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
+        using var nothing = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { });
+        using var fromKeePassXc = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfigs: () => [ini]);
+        using var locked = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { });
 
         using var withRecents = new TempVault();
         var others = Enumerable.Range(1, 5).Select(number => Path.Combine(withRecents.Home, $"vault-{number}.kdbx")).ToList();
@@ -1346,7 +1364,7 @@ public sealed class ScreenRenderer
         Core.Recent.RecentVaults.Save(
             Core.Audit.KeypasteHome.RecentPath(withRecents.Home),
             [new Core.Recent.RecentVault(withRecents.Path_, DateTimeOffset.UtcNow), .. others.Select(other => new Core.Recent.RecentVault(other, DateTimeOffset.UtcNow.AddDays(-1)))]);
-        using var recents = new UnlockViewModel(session, withRecents.Home, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
+        using var recents = new UnlockViewModel(session, withRecents.Home, new FakeVaultFilePicker(), () => { });
 
         using var helloSession = new AppVaultSession(new ManualClock(AppClock.Start), home: withRecents.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockSigner());
 
@@ -1357,7 +1375,15 @@ public sealed class ScreenRenderer
 
         Assert.Equal(QuickUnlockOutcome.Done, helloSession.KeepForQuickUnlock());
         helloSession.Lock(VaultLockReason.Manual);
-        using var hello = new UnlockViewModel(helloSession, withRecents.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual) { CrashChoice = Asking() };
+        using var hello = new UnlockViewModel(helloSession, withRecents.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual);
+
+        var firstLaunch = new MainWindow { Width = WindowChrome.DefaultWidth, Height = WindowChrome.DefaultHeight };
+        firstLaunch.FindControl<ContentControl>("Root")!.Content = new FirstLaunchView { DataContext = new FirstLaunchViewModel(Terms.TermsOfUse.Carried, () => { }) };
+        firstLaunch.Show();
+        Save(firstLaunch, output, "00-first-launch");
+        firstLaunch.Width = 720;
+        Save(firstLaunch, output, "00-first-launch-720");
+        firstLaunch.Close();
 
         foreach (var (name, model) in new[]
         {
@@ -1382,14 +1408,22 @@ public sealed class ScreenRenderer
 
         DrawTerms(output);
 
-        // Settings until the person has answered: the choice in place of its switch.
+        // Settings' plain switch, and a waiting report's Delete asking first.
         var preferences = new DesktopPreferences(empty.Path);
         using var crashes = new CrashReporting(empty.Path, preferences, endpoint: null);
+        crashes.Agree();
+        crashes.Crash(new InvalidOperationException("demo"));
         using var settings = new SettingsViewModel(session, empty.Path, preferences, _ => { }) { Crashes = crashes };
         var settingsWindow = new MainWindow { Width = _width, Height = 2600 };
         settingsWindow.FindControl<ContentControl>("Root")!.Content = new SettingsView { DataContext = settings };
         settingsWindow.Show();
-        Save(settingsWindow, output, "00d-settings-crash-choice-whole");
+        Save(settingsWindow, output, "00d-settings-crash-switch-whole");
+        var diagnostics = new DiagnosticsViewModel(session, empty.Path, crashes);
+        settingsWindow.FindControl<ContentControl>("Root")!.Content = new DiagnosticsView { DataContext = diagnostics };
+        settingsWindow.Height = _height;
+        Save(settingsWindow, output, "95c-diagnostics-report");
+        diagnostics.Reports[0].AskDeleteCommand.Press();
+        Save(settingsWindow, output, "95c-diagnostics-report-delete");
         settingsWindow.Close();
     }
 
@@ -1701,15 +1735,17 @@ public sealed class ScreenRenderer
         Wait(sharing.RefreshCommand.PressAsync());
         Save(window, output, name);
 
+        sharing.RevokeRowCommand.Press(sharing.Rows.First(row => row.Opens));
+        Save(window, output, name + "-revoke");
+        var wideForRevoke = window.Width;
+        window.Width = 720;
+        Save(window, output, name + "-revoke-720");
+        window.Width = wideForRevoke;
+        sharing.CancelRevokeCommand.Press();
+
         shell.Current = Destinations.Of(DestinationKind.Entries);
         shell.ShareCommand.Press("Work/aws-console");
         var dialog = shell.Share!;
-        Save(window, output, "12-items-share-terms");
-        var wide = window.Width;
-        window.Width = 720;
-        Save(window, output, "12-items-share-terms-720");
-        window.Width = wide;
-        dialog.ContinueCommand.Press();
         dialog.Recipient = "sam@acme.dev";
         dialog.RequirePassphrase = true;
         Save(window, output, "12-items-share");

@@ -320,6 +320,24 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(before, shell.Current);
     });
 
+    [Fact]
+    public Task While_the_terms_screen_stands_nothing_opens_and_Clear_menu_still_empties_the_unlock_screen_behind_it() => HeadlessSession.On(() =>
+    {
+        _vault.RememberSelf();
+        using var locked = new AppVaultSession(new ManualClock(AppClock.Start));
+        using var unlock = new UnlockViewModel(locked, _vault.Home, new FakeVaultFilePicker(), () => { });
+        var commands = new AppCommands(new AppCommandHost { Session = locked, Shell = () => null, Unlock = () => unlock, AsksTerms = () => true, Home = _vault.Home });
+        var recent = commands.Menus.Single(menu => menu.Header == "File").Entries.OfType<AppSubmenu>().Single();
+        Assert.NotEmpty(unlock.Recent);
+
+        Assert.False(recent.Entries().OfType<AppCommand>().First().CanRun());
+        Assert.False(Find(commands, Resources.Strings.OpenVault).CanRun());
+
+        recent.Entries().OfType<AppCommand>().Single(command => command.Header == "Clear menu").Run();
+
+        Assert.Empty(unlock.Recent);
+    });
+
     private AppCommands Commands(
         ShellViewModel? shell,
         bool mac = true,

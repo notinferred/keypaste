@@ -1,7 +1,12 @@
 using System.Net;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
@@ -247,7 +252,7 @@ public sealed class SharingViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task RevokeRow_RevokesThatRow()
+    public async Task RevokeRow_OnALiveLink_AsksFirst_AndOnlyConfirmingRevokesThatRow()
     {
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
@@ -257,12 +262,51 @@ public sealed class SharingViewModelTests : IDisposable
         var target = screen.Rows[1];
 
         screen.RevokeRowCommand.Press(target);
+
+        Assert.True(screen.Rows[1].IsConfirming);
+        Assert.False(screen.Rows[0].IsConfirming);
+        Assert.Equal(2, _server.Shares.Count);
+
+        screen.CancelRevokeCommand.Press();
+        Assert.False(screen.Rows[1].IsConfirming);
+        Assert.Equal(2, _server.Shares.Count);
+
+        screen.RevokeRowCommand.Press(screen.Rows[1]);
+        screen.ConfirmRevokeCommand.Press(screen.Rows[1]);
         await Until(() => screen.Rows.Count == 1);
 
         Assert.DoesNotContain(screen.Rows, row => row.Id == target.Id);
         Assert.False(_server.Shares.ContainsKey(target.Id));
         Assert.Single(_server.Shares);
     }
+
+    [Fact]
+    public Task The_question_puts_Cancel_first_names_the_action_as_danger_and_Escape_takes_it_back() => HeadlessSession.On(async () =>
+    {
+        using var screen = Screen();
+        screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
+        await screen.CreateCommand.PressAsync();
+        var window = new Window { Width = 900, Height = 600, Content = new SharingView { DataContext = screen } };
+        window.Show();
+        Rendering.RenderedShell.Drain();
+
+        screen.RevokeRowCommand.Press(Assert.Single(screen.Rows));
+        Rendering.RenderedShell.Drain();
+
+        var buttons = window.GetVisualDescendants().OfType<Button>()
+            .Where(button => button.IsEffectivelyVisible && button.GetVisualAncestors().OfType<ItemsControl>().Any())
+            .ToList();
+        Assert.Equal(["Cancel", "Revoke link"], buttons.Select(button => button.Content as string));
+        Assert.Contains("danger", buttons[1].Classes);
+        Assert.True(buttons[0].IsFocused);
+
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Rendering.RenderedShell.Drain();
+
+        Assert.False(Assert.Single(screen.Rows).IsConfirming);
+        Assert.Single(_server.Shares);
+        window.Close();
+    });
 
     [Fact]
     public async Task Revoke_NetworkFailure_KeepsTheRow_AndSaysTheLinkStillOpens()

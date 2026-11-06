@@ -1,18 +1,18 @@
-// The terms of use the app links at Share… and the crash-report choice, the one copy of them. A line starting // is not shown, a line
+// The terms of use the first-launch screen agrees to and links, the one copy of them. A line starting // is not shown, a line
 // starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
-// new date stops crash reports until someone chooses Send under it, and shows Share…'s step again.
+// new date shows that screen once more and stops crash reports until it is agreed to, unless they are switched off.
 // DRAFT pending H-0027: not legal advice and not reviewed. The founder or a lawyer approves it before 1.0.0, filling in
 // each bracketed item: the legal entity, the limitation of liability and the governing law.
 keypaste terms of use
-Draft version 2026-10-28
+Draft version 2026-11-06
 ## What these terms cover
 keypaste is a password manager for KeePass files. [legal name] ("keypaste", "we") publishes it. These terms cover the services we run at keypaste.com, which are share links and crash reports, and what the keypaste app sends us.
 ## The software and its licence
-keypaste is free software under the GNU Affero General Public License, version 3 (AGPL-3.0). You don't have to accept these terms to run, study, change or share it, and nothing here limits the rights the licence gives you. Where these terms and the licence differ about the software, the licence applies.
+keypaste is free software under the GNU Affero General Public License, version 3 (AGPL-3.0). The licence lets you run, study, change and share it, and nothing here limits the rights the licence gives you. Where these terms and the licence differ about the software, the licence applies.
 ## Your vault stays yours
 Your vault is a file stored where you choose. We never receive your vault, your master password or your key file. Because we never have them, we can't recover them. Keep backups.
 ## Crash reports
-If the keypaste desktop app stops working or hits an error it didn't expect, it sends us a crash report so we can find and fix the bug. It does this only if you chose Send crash reports when you first opened it, or turned it on later in Settings. Reports are sent automatically, with no further question.
+If the keypaste desktop app stops working or hits an error it didn't expect, it sends us a crash report so we can find and fix the bug. It does this from when you continue past the first screen the app shows, which agrees to these terms, until you turn it off in Settings, and again if you turn it back on. Reports are sent automatically, with no further question.
 A report holds: keypaste's version and build; your operating system, its version number and your processor type; the .NET version; roughly how long the app had been running; which part of the app was open; the date; the type of error; and the names of keypaste's code functions involved, with their positions in the code.
 A report never holds: anything from your vault, including passwords, notes, fields and item or group names; your master password or key file; error messages; file names or paths; environment variables; agent or app names; your activity log; your user or computer name; or any identifier for you or your installation.
 Reports from the CLI and the MCP bridge are never sent. A report waits on your computer until it can be sent, and you can see it under Settings › Advanced › Diagnostics. To stop reports, turn off Send crash reports in Settings. While it's off, nothing is collected or sent, and reports waiting to be sent are deleted.

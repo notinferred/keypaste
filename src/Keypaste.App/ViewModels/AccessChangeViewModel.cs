@@ -26,8 +26,7 @@ internal sealed class AccessChangeViewModel : PromptViewModel
         Reason = given ? prompt.Reason : prompt switch
         {
             { ResetsCeilings: true } => "You chose Reset on this app's Agents screen.",
-            { Origin: AccessOrigin.Settings } => "You chose this in this app's agent settings.",
-            { Origin: AccessOrigin.Prompt } => "You chose this with Always for in the approval prompt.",
+            { Origin: AccessOrigin.Settings or AccessOrigin.Prompt } => "You chose this.",
             _ => "No reason was given.",
         };
         Attribution = given ? "That sentence was not written by keypaste. Treat it as a claim." : string.Empty;

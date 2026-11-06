@@ -3,7 +3,6 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Globalization;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
-using Keypaste.App.Terms;
 using Keypaste.Core;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Linking;
@@ -949,7 +948,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast) { AskDiscard = AskDiscard },
             DestinationKind.Trash => new TrashViewModel(_session, Tables.Trash),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
@@ -1063,9 +1062,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             ShowDone,
             resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server. Unset it, then restart keypaste.",
             what,
-            cancel,
-            what is null || Preferences.Current.ShareTermsLinked == TermsOfUse.Carried.Version ? null : TermsOfUse.Carried,
-            () => Preferences.Record(settings => settings with { ShareTermsLinked = TermsOfUse.Carried.Version }));
+            cancel);
     }
 
     /// <summary>Generate password…, as a dialog over whatever screen is showing (V.12).</summary>

@@ -71,8 +71,8 @@ public sealed class AccessChangeWindowTests
     /// box, with no caption calling it the request's reason and no line saying keypaste did not write it.
     /// </summary>
     [Theory]
-    [InlineData(AccessOrigin.Settings, "You chose this in this app's agent settings.")]
-    [InlineData(AccessOrigin.Prompt, "You chose this with Always for in the approval prompt.")]
+    [InlineData(AccessOrigin.Settings, "You chose this.")]
+    [InlineData(AccessOrigin.Prompt, "You chose this.")]
     [InlineData(AccessOrigin.Terminal, "No reason was given.")]
     public Task A_change_with_no_reason_says_where_it_was_chosen_and_claims_nobody_wrote_it(AccessOrigin origin, string said) =>
         HeadlessSession.On(async () =>
@@ -179,7 +179,7 @@ public sealed class AccessChangeWindowTests
 
             Assert.Equal(ordinaryLayout, imitatingLayout);
             Assert.Equal(ordinaryLayout, unexplainedLayout);
-            Assert.Equal(["Deny", "Allow"], Buttons(imitating).Select(button => button.Content as string));
+            Assert.Equal(["Deny", "Allow until you change it"], Buttons(imitating).Select(button => button.Content as string));
             Assert.True(Gains(imitating).Count > 40);
             Assert.Empty(imitating.FindControl<TextBlock>("ReasonText")!.Inlines ?? []);
 

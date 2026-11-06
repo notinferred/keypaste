@@ -13,8 +13,8 @@
 # once, as verify-keepassxc-first-run.sh has it do, so the first run offers it from KeePassXC's recent databases.
 #
 # The acts, in order, and the acts each needs:
-#   first-run      Don't send on the crash-report choice, then KeePassXC's database offered on the first run, chosen and
-#                  unlocked, and Diagnostics saying no crash report is kept
+#   first-run      Continue on the first-launch screen, then KeePassXC's database offered on the first run, chosen and
+#                  unlocked, and Diagnostics saying no crash report waits
 #   field          a key kept as a custom field from the item's pane                                  first-run
 #   notes-flag     a KEY=value line in notes flagged in Settings' Recommendations and moved to a field first-run
 #   project-run    the item tagged into a project, whose Run starts a child that receives the field   field
@@ -40,6 +40,8 @@
 #              PACKAGE_COMMIT   the commit the candidate was built from
 set -euo pipefail
 
+# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
 readonly ROOT
@@ -133,8 +135,8 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  elif [ "$crash" != 0 ]; then contradict "after Don't send, app.toml says crash_reports = ${crash:-nothing}"
-  else pass "the unlock screen asked the crash-report choice, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Don't send wrote crash_reports = 0"
+  elif [ "$crash" != 1 ]; then contradict "after Continue, app.toml says crash_reports = ${crash:-nothing}"
+  else pass "the first-launch screen showed, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Continue wrote crash_reports = 1"
   fi
 }
 
@@ -1064,8 +1066,8 @@ act_first_run() {
   if [ "$PLATFORM" = linux ]; then attempt accessibility enable_accessibility || return 1; fi
   attempt launch app_launch || return 1
   attempt window drive window 120 || return 1
-  # The welcome opens at once, with the crash-report choice.
-  attempt dont-send drive invoke "Don't send" || return 1
+  # The first-launch screen stands before the welcome.
+  attempt agree-terms drive invoke Continue || return 1
   attempt keepassxc-list drive find 'KEEPASSXC LAST OPENED' || return 1
   attempt choose drive select "$VAULT_NAME" || return 1
   # Choosing the database leaves the focus on its list, so the password field is clicked as a person does.
@@ -1077,11 +1079,11 @@ act_first_run() {
   attempt unlocked drive find 'Lock now' || return 1
   fact chosen_vault "$(chosen_vault)"
   fact crash_reports "$(sed -n 's/^crash_reports = \([0-9]*\).*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1)"
-  # Diagnostics says the switch is off and nothing is kept.
+  # Diagnostics says no report waits.
   attempt settings shortcut 4 || return 1
   attempt advanced drive invoke 'Open Advanced' || return 1
   attempt diagnostics drive invoke 'Open diagnostics' || return 1
-  attempt crash-reports-off drive find 'Send crash reports is off in Settings, so none are kept.' || return 1
+  attempt crash-reports-none drive find 'No crash reports are waiting to be sent.' || return 1
 }
 
 act_field() {
@@ -1369,7 +1371,7 @@ selftest() {
         '{"act":"setup","fact":"value2_sha256","value":"b2"}' \
         '{"act":"setup","fact":"note_sha256","value":"c3"}' \
         '{"act":"first-run","fact":"chosen_vault","value":"/home/runner/work/acts/vault/acts.kdbx"}' \
-        '{"act":"first-run","fact":"crash_reports","value":"0"}' \
+        '{"act":"first-run","fact":"crash_reports","value":"1"}' \
         '{"act":"first-run","fact":"unlock_ms","value":"2100"}' \
         '{"act":"first-run","fact":"database","value":"Cipher: AES 256-bit KDF: Argon2d (8 rounds, 65536 KB) Recycle bin is enabled."}' \
         '{"act":"field","fact":"save_ms","value":"420"}' \
@@ -1455,8 +1457,8 @@ selftest() {
   set_fact windows-spelling run platform windows
   set_fact windows-spelling setup vault 'D:\a\keypaste\keypaste\acts\vault\acts.kdbx'
   set_fact windows-spelling first-run chosen_vault 'd:/a/keypaste/keypaste/acts/vault/acts.kdbx'
-  passing crash-on
-  set_fact crash-on first-run crash_reports 1
+  passing crash-off
+  set_fact crash-off first-run crash_reports 0
   passing crash-unwritten
   drop_fact crash-unwritten first-run crash_reports
   passing field-other
@@ -1519,7 +1521,7 @@ selftest() {
   expect driver-gap timing unreached 'first-run did not pass'
   expect chose-other first-run contradiction 'other.kdbx'
   expect windows-spelling first-run pass
-  expect crash-on first-run contradiction 'crash_reports = 1'
+  expect crash-off first-run contradiction 'crash_reports = 0'
   expect crash-unwritten first-run contradiction 'crash_reports = nothing'
   expect field-other field contradiction 'not the typed'
   expect field-other project-run unreached 'field did not pass'

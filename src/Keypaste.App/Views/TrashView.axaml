@@ -69,6 +69,8 @@
     <!-- KpDanger marks the two ways to erase. A restore is ordinary; erasing a value is not. -->
     <Border Grid.Row="1"
             IsVisible="{Binding IsConfirmingPurge}"
+            ctl:ShowInView.OnShow="True"
+            ctl:FormKeys.Cancel="{Binding CancelPurgeCommand}"
             Margin="0,0,0,12"
             Classes="card"
             Background="{DynamicResource KpDangerTint}"
@@ -87,6 +89,8 @@
     <!-- Emptying the bin asks in the same place, naming how many items go. -->
     <Border Grid.Row="1"
             IsVisible="{Binding IsConfirmingEmpty}"
+            ctl:ShowInView.OnShow="True"
+            ctl:FormKeys.Cancel="{Binding CancelEmptyCommand}"
             Margin="0,0,0,12"
             Classes="card"
             Background="{DynamicResource KpDangerTint}"

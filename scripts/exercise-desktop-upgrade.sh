@@ -12,7 +12,7 @@
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
 # uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
 # first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
-# uninstall. The lower app starts first and is answered Don't send, since a first start with no answer writes
+# uninstall. The lower app starts first and is Continued past its first-launch screen, which writes
 # app.toml, as it is on Linux and macOS. The upgraded app then starts once and shows its window before the data is read, so what its first
 # start writes is compared too, as on Linux and macOS. On Linux the upgrade is a download left
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
@@ -53,6 +53,8 @@
 #              REHEARSAL  1 when <cli-dir> holds a CLI/MCP built from this commit, not a published release
 set -euo pipefail
 
+# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
 readonly ROOT
@@ -153,11 +155,11 @@ classify() {
   emit install-lower
 
   # On Linux the person links keypaste from the lower app's Settings before the baseline is taken, since the
-  # app's unlock writes its settings; on Windows the person only answers the crash-report choice, which writes them too.
+  # app's unlock writes its settings; on Windows the person only presses Continue on the first-launch screen, which writes them too.
   # A Settings step that could not be done is named before the baseline it would have completed.
   if judge fixture && judge baseline; then
     made="$detail"
-    if [ "$platform" = windows ] && ! { judge window && judge crash-choice; }; then :
+    if [ "$platform" = windows ] && ! { judge window && judge agree-terms; }; then :
     elif [ "$platform" = linux ] && ! { judge window && judge unlocked && judge settings && judge link-cli && judge linked \
       && terminal_runs fixture "$LOWER"; }; then :
     elif [ "$platform" = macos ] && ! { judge window && judge unlocked && judge settings && judge link-offered && judge link-made \
@@ -509,10 +511,10 @@ stop_app() {
   sleep 2
 }
 
-# The lower app answered once, so its asking and the answer are in app.toml before the baseline hashes it.
-answer_crash_choice() {
+# The lower app agreed to once, so the agreement is in app.toml before the baseline hashes it.
+agree_to_terms() {
   start_app "$APP" lower || true
-  { act window drive window 120 && act crash-choice drive invoke "Don't send"; } || true
+  { act window drive window 120 && act agree-terms drive invoke Continue; } || true
   stop_app
 }
 
@@ -520,9 +522,9 @@ answer_crash_choice() {
 link_from_settings() {
   if [ "$PLATFORM" = linux ]; then act accessibility enable_accessibility || return 0; fi
   start_app "$APP" lower || true
-  # A fresh home's unlock screen asks the crash-report choice.
+  # A fresh home opens on the first-launch screen.
   { act window drive window 120 \
-    && act crash-choice drive invoke "Don't send" && act password-focus drive focus id:Password \
+    && act agree-terms drive invoke Continue && act password-focus drive focus id:Password \
     && act unlocked drive type "$MASTER" && act unlocked-enter drive key Return && act unlocked drive find 'Lock now' \
     && act settings shortcut 4 && link_cli; } || true
   stop_app
@@ -886,7 +888,7 @@ run_all() {
   fi
 
   if act install-lower install_lower && act fixture fixture; then
-    if [ "$PLATFORM" = windows ]; then answer_crash_choice; else link_from_settings; fi
+    if [ "$PLATFORM" = windows ]; then agree_to_terms; else link_from_settings; fi
     if act baseline baseline && act upgrade upgrade; then
       act read-after-upgrade read_after upgrade || true
       if [ "$PLATFORM" = macos ]; then unlock_upgraded; fi
@@ -930,7 +932,7 @@ selftest() {
       '{"action":"install-lower","status":"ok","detail":"msiexec /i exited 0"}' \
       '{"action":"fixture","status":"ok","detail":"vault made"}' \
       '{"action":"window","status":"ok","detail":"window keypaste"}' \
-      '{"action":"crash-choice","status":"ok","detail":"invoked Don\u0027t send"}' \
+      '{"action":"agree-terms","status":"ok","detail":"invoked Continue"}' \
       '{"action":"baseline","status":"ok","detail":"vault made, 5 files"}' \
       '{"action":"upgrade","status":"ok","detail":"MajorUpgrade exited 0"}' \
       '{"action":"read-after-upgrade","status":"ok","detail":"read back"}' \
@@ -1053,7 +1055,7 @@ selftest() {
   passing fixture-incomplete
   set_fact fixture-incomplete baseline 'absent clients.toml'
   passing lower-not-answered
-  refuse_action lower-not-answered crash-choice "no button 'Don't send'"
+  refuse_action lower-not-answered agree-terms "no button 'Continue'"
   passing no-baseline
   refuse_action no-baseline baseline 'no audit record was written'
   passing upgrade-not-taken

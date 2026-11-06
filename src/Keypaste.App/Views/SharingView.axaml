@@ -89,7 +89,16 @@
                   <Border Padding="16,14"
                           BorderBrush="{DynamicResource KpBorderSubtle}"
                           BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                    <Panel>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}">
+                      <TextBlock Name="RevokeQuestion" Text="{Binding ConfirmText}" Classes="size-12-5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}" />
+                      <Button Grid.Column="2" Name="ConfirmRevoke" Classes="danger sm size-12" Content="{x:Static res:Strings.RevokeLink}" AutomationProperties.Name="{Binding What, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).ConfirmRevokeCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4" IsVisible="{Binding !IsConfirming}">
                       <TextBlock Grid.Row="0" Grid.Column="0"
                                  Classes="mono lg"
                                  Text="{Binding What}"
@@ -114,6 +123,7 @@
                               Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).RevokeRowCommand}"
                               CommandParameter="{Binding}" />
                     </Grid>
+                    </Panel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

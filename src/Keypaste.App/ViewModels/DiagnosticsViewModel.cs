@@ -7,13 +7,15 @@ using Keypaste.Core.CrashReports;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>A crash report waiting to be sent, shown as the exact bytes that would be sent.</summary>
-internal sealed class CrashReportRow
+internal sealed partial class CrashReportRow : ObservableObject
 {
     internal CrashReportRow(CrashReport report, Action<CrashReportRow> delete)
     {
         ArgumentNullException.ThrowIfNull(delete);
 
         Report = report;
+        AskDeleteCommand = new RelayCommand(() => IsConfirming = true);
+        CancelDeleteCommand = new RelayCommand(() => IsConfirming = false);
         DeleteCommand = new RelayCommand(() => delete(this));
     }
 
@@ -21,6 +23,16 @@ internal sealed class CrashReportRow
 
     /// <summary>The report's JSON, byte for byte what the request carries.</summary>
     internal string Json => Report.Text;
+
+    /// <summary>Whether the row is asking to confirm its delete, which cannot be undone.</summary>
+    [ObservableProperty]
+    internal partial bool IsConfirming { get; private set; }
+
+    /// <summary>Asks first.</summary>
+    internal RelayCommand AskDeleteCommand { get; }
+
+    /// <summary>Takes the question back.</summary>
+    internal RelayCommand CancelDeleteCommand { get; }
 
     /// <summary>Deletes it unsent.</summary>
     internal RelayCommand DeleteCommand { get; }

@@ -106,6 +106,7 @@ public static class Strings
     public static string ConnectValueAgain => Manager.GetString("ConnectValueAgain", CultureInfo.CurrentUICulture)!;
     public static string ConnectYourAIToolsAndChooseWhatXe237ce => Manager.GetString("ConnectYourAIToolsAndChooseWhatXe237ce", CultureInfo.CurrentUICulture)!;
     public static string Continue => Manager.GetString("Continue", CultureInfo.CurrentUICulture)!;
+    public static string ContinuingAgreesToTheTermsOfUse => Manager.GetString("ContinuingAgreesToTheTermsOfUse", CultureInfo.CurrentUICulture)!;
     public static string Copy => Manager.GetString("Copy", CultureInfo.CurrentUICulture)!;
     public static string CopyIntoThisGroup => Manager.GetString("CopyIntoThisGroup", CultureInfo.CurrentUICulture)!;
     public static string CopyLatestHash => Manager.GetString("CopyLatestHash", CultureInfo.CurrentUICulture)!;
@@ -147,6 +148,8 @@ public static class Strings
     public static string Decrypted => Manager.GetString("Decrypted", CultureInfo.CurrentUICulture)!;
     public static string Delete => Manager.GetString("Delete", CultureInfo.CurrentUICulture)!;
     public static string DeleteForGood => Manager.GetString("DeleteForGood", CultureInfo.CurrentUICulture)!;
+    public static string DeleteReport => Manager.GetString("DeleteReport", CultureInfo.CurrentUICulture)!;
+    public static string DeleteThisReportItWontBeSent => Manager.GetString("DeleteThisReportItWontBeSent", CultureInfo.CurrentUICulture)!;
     public static string DeleteValue => Manager.GetString("DeleteValue", CultureInfo.CurrentUICulture)!;
     public static string DeleteValueNow => Manager.GetString("DeleteValueNow", CultureInfo.CurrentUICulture)!;
     public static string DeleteValueXa92ece => Manager.GetString("DeleteValueXa92ece", CultureInfo.CurrentUICulture)!;
@@ -161,7 +164,6 @@ public static class Strings
     public static string Dismiss => Manager.GetString("Dismiss", CultureInfo.CurrentUICulture)!;
     public static string DismissValue => Manager.GetString("DismissValue", CultureInfo.CurrentUICulture)!;
     public static string Done => Manager.GetString("Done", CultureInfo.CurrentUICulture)!;
-    public static string DontSend => Manager.GetString("DontSend", CultureInfo.CurrentUICulture)!;
     public static string Duplicate => Manager.GetString("Duplicate", CultureInfo.CurrentUICulture)!;
     public static string ENVIRONMENT => Manager.GetString("ENVIRONMENT", CultureInfo.CurrentUICulture)!;
     public static string EXPIRESCapitals => Manager.GetString("EXPIRESCapitals", CultureInfo.CurrentUICulture)!;
@@ -260,7 +262,6 @@ public static class Strings
     public static string KeypasteHelp => Manager.GetString("KeypasteHelp", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHome => Manager.GetString("KeypasteHome", CultureInfo.CurrentUICulture)!;
     public static string KeypasteInATerminal => Manager.GetString("KeypasteInATerminal", CultureInfo.CurrentUICulture)!;
-    public static string KeypasteKeepsYourVaultOnThisComputerX3838cf => Manager.GetString("KeypasteKeepsYourVaultOnThisComputerX3838cf", CultureInfo.CurrentUICulture)!;
     public static string KeypasteOpensOnlyWebAddressesStartingHttpX58cb44 => Manager.GetString("KeypasteOpensOnlyWebAddressesStartingHttpX58cb44", CultureInfo.CurrentUICulture)!;
     public static string KeypasteRemembersThePathsOfVaultsYouXb13291 => Manager.GetString("KeypasteRemembersThePathsOfVaultsYouXb13291", CultureInfo.CurrentUICulture)!;
     public static string KeypasteWasAskedToOpenThisFileX50ed11 => Manager.GetString("KeypasteWasAskedToOpenThisFileX50ed11", CultureInfo.CurrentUICulture)!;
@@ -446,6 +447,7 @@ public static class Strings
     public static string ReviewAgain => Manager.GetString("ReviewAgain", CultureInfo.CurrentUICulture)!;
     public static string ReviewValueAgain => Manager.GetString("ReviewValueAgain", CultureInfo.CurrentUICulture)!;
     public static string Revoke => Manager.GetString("Revoke", CultureInfo.CurrentUICulture)!;
+    public static string RevokeLink => Manager.GetString("RevokeLink", CultureInfo.CurrentUICulture)!;
     public static string RevokeValue => Manager.GetString("RevokeValue", CultureInfo.CurrentUICulture)!;
     public static string Rotate => Manager.GetString("Rotate", CultureInfo.CurrentUICulture)!;
     public static string RotateLabel => Manager.GetString("RotateLabel", CultureInfo.CurrentUICulture)!;

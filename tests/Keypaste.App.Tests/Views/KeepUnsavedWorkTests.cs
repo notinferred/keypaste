@@ -9,6 +9,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -27,7 +28,7 @@ public sealed class KeepUnsavedWorkTests
     ];
 
     public static TheoryData<string> DangerForms =>
-        ["delete group", "delete item", "remove field", "remove key", "remove attachment", "revoke token", "change access"];
+        ["delete group", "delete item", "remove field", "remove key", "remove attachment", "revoke token", "change access", "delete .env file", "delete for good", "empty trash"];
 
     private static void Seed(Vault vault)
     {
@@ -47,6 +48,7 @@ public sealed class KeepUnsavedWorkTests
 
         if (name is "delete group" or "delete item")
         {
+            vault.CreateGroup(string.Empty, "empty", out _);
             vault.SetRecyclesDeletedEntries(false);
         }
     };
@@ -175,7 +177,7 @@ public sealed class KeepUnsavedWorkTests
                     () => entries.GroupMoveTarget = entries.MoveTargets.Single(group => group.Path == "other"));
 
             case "delete group":
-                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
+                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "empty");
                 entries.BeginDeleteGroupCommand.Press();
                 return new Form(() => entries.IsConfirmingGroupDelete, () => { }, IsDanger: true);
         }
@@ -273,9 +275,6 @@ public sealed class KeepUnsavedWorkTests
     [Theory]
     [MemberData(nameof(ConfirmingForms))]
     [MemberData(nameof(DangerForms))]
-    [InlineData("delete .env file")]
-    [InlineData("delete for good")]
-    [InlineData("empty trash")]
     [InlineData("forget recent")]
     public Task Every_confirmation_puts_Cancel_first_and_the_action_last(string name) => HeadlessSession.On(() =>
     {
@@ -375,7 +374,6 @@ public sealed class KeepUnsavedWorkTests
     {
         using var shell = new RenderedShell();
         shell.Shell.ShareCommand.Press("github");
-        shell.Shell.Share!.ContinueCommand.Press();
         RenderedShell.Drain();
         var dialog = shell.Named<Border>("ShareDialog");
         Assert.Same(shell.Shell.Share!.CreateCommand, FormKeys.GetConfirm(dialog));
@@ -436,6 +434,86 @@ public sealed class KeepUnsavedWorkTests
 
         Assert.False(shell.Shell.HasDiscardPrompt);
         Assert.Equal(DestinationKind.Settings, shell.Shell.Current.Kind);
+    });
+
+    [Fact]
+    public Task A_project_directory_or_command_not_saved_is_asked_about_on_leaving_and_kept_on_Cancel() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell();
+        var project = shell.OpenProject();
+        Assert.Null(project.UnsavedDraft);
+
+        project.Launch.Command = "npm start";
+        Assert.Equal("this project's directory and command", project.UnsavedDraft);
+
+        var settings = Destinations.All.First(place => place.Shortcut > 0 && place.Kind == DestinationKind.Settings);
+        Assert.True(shell.Shell.GoTo(settings.Shortcut));
+
+        Assert.True(shell.Shell.HasDiscardPrompt);
+        Assert.Equal(DestinationKind.EnvSets, shell.Shell.Current.Kind);
+        shell.Shell.KeepDraftCommand.Press();
+        Assert.Equal("npm start", project.Launch.Command);
+    });
+
+    // Only a vault with no Trash asks, and what its question costs is named on the button.
+    [Theory]
+    [InlineData("delete group")]
+    [InlineData("delete item")]
+    public Task A_delete_with_no_Trash_says_for_good_on_its_button(string name) => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(seed: SeedFor(name));
+        Open(shell, name);
+        RenderedShell.Drain();
+
+        var danger = shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && button.Classes.Contains("danger"));
+
+        Assert.Equal("Delete for good", danger.Content);
+    });
+
+    [Fact]
+    public Task A_group_no_Trash_cannot_delete_offers_only_Cancel_under_what_to_do() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(seed: SeedFor("delete group"));
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
+        entries.BeginDeleteGroupCommand.Press();
+        RenderedShell.Drain();
+
+        Assert.Contains("Move or delete what is in it first.", entries.GroupDeletePrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<Button>(), button => button.IsEffectivelyVisible && button.Classes.Contains("danger"));
+        Assert.False(entries.ConfirmDeleteGroupCommand.CanExecute(null));
+        Assert.True(shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "KeepGroup").IsEffectivelyVisible);
+    });
+
+    [Fact]
+    public Task The_title_s_project_dropdown_asks_before_discarding_and_Cancel_puts_it_back() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(seed: vault => ProjectVariables.Set(vault, "shop", "SHOP_KEY", "value"));
+        var project = shell.OpenProject();
+        RenderedShell.Drain();
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Shell.Content);
+        var picker = shell.Window.GetVisualDescendants().OfType<ComboBox>().Single(box => box.Classes.Contains("project") && box.Classes.Contains("title"));
+        project.Launch.Command = "npm start";
+
+        picker.SelectedItem = "shop";
+        RenderedShell.Drain();
+
+        Assert.Equal("Discard this project's directory and command?", shell.Shell.DiscardPrompt);
+        Assert.Same(project, env.OpenProject);
+
+        shell.Shell.KeepDraftCommand.Press();
+        RenderedShell.Drain();
+
+        Assert.Same(project, env.OpenProject);
+        Assert.Equal("billing", picker.SelectedItem);
+        Assert.Equal("npm start", project.Launch.Command);
+
+        picker.SelectedItem = "shop";
+        RenderedShell.Drain();
+        shell.Shell.ConfirmDiscardCommand.Press();
+        RenderedShell.Drain();
+
+        Assert.Equal("shop", env.OpenProject?.Name);
     });
 
     [Fact]

@@ -317,7 +317,7 @@
                 </Border>
 
                 <!-- Once imported, the file can be deleted, only while it still holds what was read; kept unless Delete is pressed. -->
-                <Border Classes="card" IsVisible="{Binding Import.IsOfferingDelete}" BorderBrush="{DynamicResource KpDanger}">
+                <Border Classes="card" IsVisible="{Binding Import.IsOfferingDelete}" BorderBrush="{DynamicResource KpDanger}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding Import.KeepSourceCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="body primary" Text="{Binding Import.Leftover, StringFormat={x:Static res:Strings.DeleteValue}}" TextWrapping="Wrap" />
                     <TextBlock Classes="caption" Text="{Binding Import.DeleteWarning}" TextWrapping="Wrap" />

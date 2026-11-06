@@ -1,5 +1,7 @@
 # Q.11 — Open on a first run anyone understands
 
+[Q.19](Q.19.md) replaces this record's crash-report card, Share…'s terms step and `[[terms_linked]]` with one first-launch screen, by the founder's direction of 2026-11-06. What follows is the history of what Q.11 built.
+
 Completed 2026-11-05 on `q11-first-run`; ci 42054926381 passed its fast tier at the code integrated, which differs from it only in this record and in H-0027's row in STEPS.
 
 ## Amendments

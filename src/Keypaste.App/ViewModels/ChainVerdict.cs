@@ -90,6 +90,7 @@ internal sealed class ChainVerdict
             Paragraphs =
             [
                 "Every record before the first break is still intact and verified. This file is not the file keypaste wrote.",
+                "Treat the rows from the first break on as unproven. If you kept a hash from an earlier check, run keypaste log verify --expect with it on the command line to see whether that record is still in the file.",
                 .. Forgiven(report),
             ],
         };

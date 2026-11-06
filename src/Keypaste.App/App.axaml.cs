@@ -58,7 +58,6 @@ internal sealed partial class App : Application, IDisposable
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
     private ISystemNotifications? _notifications;
-    private bool _crashChoicePassed;
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
@@ -190,15 +189,6 @@ internal sealed partial class App : Application, IDisposable
         {
             _unlock?.TakeHanded(handed);
         }
-
-        // Asked once, from when a window first shows the question: a start at login that opens none has not asked it.
-        _window.Opened += (_, _) =>
-        {
-            if (_unlock?.HasCrashChoice == true)
-            {
-                Crashes?.RememberAsked();
-            }
-        };
 
         _tray = new AppTray(OpenWindow, () => _ = _session?.LockAsync(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
         _tray.Show(_preferences.StaysInTray);
@@ -445,6 +435,7 @@ internal sealed partial class App : Application, IDisposable
             Session = session,
             Shell = () => _shell,
             Unlock = () => _unlock,
+            AsksTerms = () => Crashes is { AsksTerms: true },
             Window = () => _window,
             Focused = mac ? null : () => window.EditTarget,
             Home = home,
@@ -831,10 +822,7 @@ internal sealed partial class App : Application, IDisposable
             message,
             next is null ? reason : null,
             KeePassXcConfigs,
-            Clipboards(_window).TryPasteIntoAsync)
-        {
-            CrashChoice = AskCrashReports(),
-        };
+            Clipboards(_window).TryPasteIntoAsync);
 
         if (next is { } file)
         {
@@ -854,12 +842,6 @@ internal sealed partial class App : Application, IDisposable
         }
     }
 
-    // An answer never stands between someone and their vault, and having unlocked past it once, the next lock this run does not ask again.
-    private CrashChoiceViewModel? AskCrashReports() =>
-        Crashes is { AsksThisRun: true } crashes && !_crashChoicePassed
-            ? new CrashChoiceViewModel(TermsOfUse.Carried, crashes.Choose)
-            : null;
-
     private void ShowUnlockScreen()
     {
         if (_window is null || _unlock is null)
@@ -872,7 +854,15 @@ internal sealed partial class App : Application, IDisposable
             crashes.Screen = "unlock";
         }
 
-        _window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = _unlock };
+        _window.FindControl<ContentControl>("Root")!.Content = Crashes is { AsksTerms: true } asking
+            ? new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, () => AgreeToTerms(asking)) }
+            : new UnlockView { DataContext = _unlock };
+    }
+
+    private void AgreeToTerms(CrashReporting crashes)
+    {
+        _ = crashes.Agree();
+        ShowUnlockScreen();
     }
 
     private void OnUnlocked(int screen)
@@ -888,8 +878,6 @@ internal sealed partial class App : Application, IDisposable
             _session.Lock(VaultLockReason.Closed);
             return;
         }
-
-        _crashChoicePassed = true;
 
         _shell?.Dispose();
         _shell = new ShellViewModel(

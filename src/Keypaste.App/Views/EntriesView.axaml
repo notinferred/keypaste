@@ -365,7 +365,7 @@
           <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="KeepGroup" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="{x:Static res:Strings.Delete}" Command="{Binding ConfirmDeleteGroupCommand}" />
+            <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="{x:Static res:Strings.DeleteForGood}" IsVisible="{Binding GroupCanBeDeleted}" Command="{Binding ConfirmDeleteGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -891,7 +891,7 @@
                         <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
-                          <Button Classes="danger sm" Content="{x:Static res:Strings.Delete}" Command="{Binding ConfirmDeleteCommand}" />
+                          <Button Classes="danger sm" Content="{x:Static res:Strings.DeleteForGood}" Command="{Binding ConfirmDeleteCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>

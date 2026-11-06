@@ -60,6 +60,9 @@ internal sealed class AppCommandHost
     /// <summary>The unlock screen while it is the one showing.</summary>
     internal required Func<UnlockViewModel?> Unlock { get; init; }
 
+    /// <summary>Whether the terms screen stands before the unlock screen, which opens nothing until it is agreed to.</summary>
+    internal Func<bool> AsksTerms { get; init; } = static () => false;
+
     internal Func<Window?> Window { get; init; } = static () => null;
 
     /// <summary>The control the Edit commands act on; the window's focus unless the window keeps it while a menu is open.</summary>
@@ -345,7 +348,7 @@ internal sealed class AppCommands
 
     private bool CanOpenVault() =>
         _host.Shell() is null
-            ? _host.Unlock() is { } unlock && unlock.BrowseCommand.CanExecute(null)
+            ? !_host.AsksTerms() && _host.Unlock() is { } unlock && unlock.BrowseCommand.CanExecute(null)
             : Unmodal() is not null && _host.OpenAnother is not null;
 
     private void OpenVault(string? path)

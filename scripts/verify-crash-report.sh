@@ -3,26 +3,30 @@
 # start, crash reports composed as that start composes them, on a headless display, and stands in on loopback for
 # keypaste.com's /api/crash, where KEYPASTE_CRASH_URL points the app.
 #
-# A fresh home goes straight to the unlock screen, which asks the crash-report choice with a link to its terms, and Send crash reports writes
-# crash_reports = 1 to app.toml. With an item's password copied, an exception thrown on the UI thread clears the
+# A fresh home opens on the one first-launch screen, and Continue writes crash_reports = 1 and the terms' date to
+# app.toml. With an item's password copied, an exception thrown on the UI thread clears the
 # clipboard, locks and quits with exit code 70, prints nothing of its message and leaves one crash report and no run
 # marker: the report names the exception's types, Items and an uptime under a minute, and holds none of the vault's
 # name, the item's name or password, the exception's messages or the home's path. Started again, the app shows no first
-# run and sends that report's exact bytes to the endpoint, with no cookie, user agent or trace header, and the outbox
+# screen and sends that report's exact bytes to the endpoint, with no cookie, user agent or trace header, and the outbox
 # empties.
 #
-# Switched off: Don't send writes crash_reports = 0, and the same crash still clears, locks and quits but keeps no
-# folder; a report put in that home's outbox is deleted at the next start, and nothing from it reaches the endpoint
+# Switched off: a kept crash_reports = 0 is not asked, even under an older date, and the same crash still clears, locks
+# and quits but keeps no folder; a report put in that home's outbox is deleted at the next start, and nothing from it reaches the endpoint
 # while that app runs past the sender's first pass.
 #
 # Offline: with an endpoint that takes the connection and never answers, a lock and an unlock while the app's request
 # is held each finish within 8 seconds, quitting during it takes under 5, and the report is still waiting afterwards.
 #
+# Left without Continue, nothing is written or kept and the next start shows the screen again. A Send under an older
+# date shows the screen once more, with no run marker until Continue, and an app.toml that does not read shows no
+# screen, keeps nothing and is left as it is.
+#
 # An app killed while it runs, with no hook able to run, leaves its run marker, and the next start reports the run as
 # ended-unexpectedly with no exception, marks its own run, and removes the mark when it quits. A failed task nobody
 # awaited is reported as unobserved-task once collected, and the app runs on.
 #
-# NEGATIVE CONTROL: this fails if the first run is skipped or recorded wrongly, if a UI-thread exception leaves the
+# NEGATIVE CONTROL: this fails if the first-launch screen is skipped or recorded wrongly, if a UI-thread exception leaves the
 # clipboard holding the copy, the app running or its message on standard error, if a report holds a sentinel, a path,
 # another kind, screen or exception, or is not sent byte for byte, if any header but the content type identifies the
 # sender, if a report is kept or sent while switched off, if the held request delays an unlock or the quit or takes the
@@ -120,13 +124,17 @@ holds_nothing() {
   return 0
 }
 
-# A first start in home $1 on descriptor 6, answering the crash-report choice with $2 and crashing with an item's password copied.
+# A first start in home $1 on descriptor 6 that presses Continue, or with reports already switched off when $2 says off, and crashes with an item's password copied.
 crash_with_copy() {
-  local home="$1" answer="$2" url="${3:-}"
+  local home="$1" reports="$2" url="${3:-}"
+  if [ "$reports" = off ]; then
+    mkdir -p "$home"
+    printf '[[settings]]\ncrash_reports = 0\nterms = "2020-01-01"\n' >"$home/app.toml"
+  fi
   start_app 6 "$home" "$home.out" "$url"
-  wait_for '^crash choice asked' "$APP_OUT"
-  say 6 "crash-choice $answer"
-  wait_for '^crash choice answered' "$APP_OUT"
+  if [ "$reports" != off ]; then agree 6; fi
+  wait_for '^screen unlock' "$APP_OUT"
+  grep -q '^screen first-launch' "$APP_OUT" && [ "$reports" = off ] && die "the first-launch screen showed over a kept crash_reports = 0"
   say 6 "unlock $VAULT"
   wait_for '^screen shell' "$APP_OUT"
   say 6 "copy $ENTRY"
@@ -137,6 +145,12 @@ crash_with_copy() {
   grep -qF -- "$MESSAGE" "$APP_ERR" && die "a crash printed its message on standard error"
   holds_nothing "$APP_OUT" "the app's output"
   return 0
+}
+
+# Presses Continue on the first-launch screen of the app on descriptor $1, whose output is APP_OUT.
+agree() {
+  wait_for '^screen first-launch' "$APP_OUT"
+  say "$1" continue
 }
 
 # The app.toml in home $1 says crash_reports = $2 under a terms date.
@@ -165,9 +179,9 @@ wait_for '^listening on http://127.0.0.1:' "$SILENT_OUT"
 SILENT="$(sed -n 's/^listening on //p' "$SILENT_OUT" | tr -d '\r')"
 
 # ------------------------------------------------------------- sending: a UI-thread crash is reported
-step 'Send crash reports, then a crash on the UI thread with a password copied'
+step 'Continue, then a crash on the UI thread with a password copied'
 ON="$WORK/on"
-crash_with_copy "$ON" send "$ENDPOINT"
+crash_with_copy "$ON" on "$ENDPOINT"
 chose "$ON" 1
 [ "$(waiting "$ON" | wc -l | tr -d ' ')" = 1 ] || die "the crash left $(waiting "$ON" | wc -l | tr -d ' ') reports, not one: $(kinds "$ON")"
 REPORT="$(waiting "$ON")"
@@ -180,18 +194,17 @@ jq -e '.kind == "crash" and .site == null and .screen == "items" and .uptime == 
 [ -e "$ON/crash-reports/running" ] && die "the run a crash ended left its run marker, though its report was kept"
 [ -e "$WORK/received/1.json" ] && die "the report was sent before the sender's first pass"
 
-step "Don't send, then the same crash"
+step 'Switched off, then the same crash'
 OFF="$WORK/off"
-crash_with_copy "$OFF" dont-send "$ENDPOINT"
+crash_with_copy "$OFF" off "$ENDPOINT"
 chose "$OFF" 0
 [ -e "$OFF/crash-reports" ] && die "switched off, the crash left $(ls "$OFF/crash-reports")"
 
 step 'Sending, then a crash an endpoint that never answers will hold'
 HELD="$WORK/held-home"
 start_app 6 "$HELD" "$HELD.out" "$SILENT"
-wait_for '^crash choice asked' "$APP_OUT"
-say 6 'crash-choice send'
-wait_for '^crash choice answered' "$APP_OUT"
+agree 6
+wait_for '^screen unlock' "$APP_OUT"
 say 6 "unlock $VAULT"
 wait_for '^screen shell' "$APP_OUT"
 say 6 "crash $MESSAGE"
@@ -205,7 +218,7 @@ cp "$WORK/sent.json" "$OFF/crash-reports/$(basename "$REPORT")"
 start_app 7 "$OFF" "$OFF-2.out" "$ENDPOINT"
 OFF_OUT="$APP_OUT"
 wait_for '^screen unlock' "$OFF_OUT"
-grep -q '^crash choice asked' "$OFF_OUT" && die "the crash-report choice was asked again once Don't send was chosen"
+grep -q '^screen first-launch' "$OFF_OUT" && die "the first-launch screen showed again where reports are switched off"
 for _ in $(seq 1 50); do [ -e "$OFF/crash-reports" ] || break; sleep 0.2; done
 [ -e "$OFF/crash-reports" ] && die "switched off, the next start kept the outbox: $(ls "$OFF/crash-reports")"
 
@@ -213,7 +226,7 @@ step 'The next start sends the report'
 start_app 6 "$ON" "$ON-2.out" "$ENDPOINT"
 ON_OUT="$APP_OUT"
 wait_for '^screen unlock' "$ON_OUT"
-grep -q '^crash choice asked' "$ON_OUT" && die "the crash-report choice was asked again once Send crash reports was chosen"
+grep -q '^screen first-launch' "$ON_OUT" && die "the first-launch screen showed again once it was agreed to"
 
 step 'The next start where the endpoint holds the request'
 start_app 8 "$HELD" "$HELD-2.out" "$SILENT"
@@ -251,28 +264,51 @@ quit_app 7 0 "$OFF_OUT"
 [ -e "$WORK/received/2.json" ] && die "the endpoint received a second report, which only the switched-off home held"
 [ -e "$OFF/crash-reports" ] && die "switched off, the app wrote an outbox while it ran"
 
-# ------------------------------------------------------------- asked once, answered or not
-step 'Left unanswered, the choice is not asked at the next start and nothing is kept'
+# ------------------------------------------------------------- nothing before Continue
+step 'Left without Continue, nothing is written or kept, and the next start shows the screen again'
 PASSED="$WORK/passed"
 start_app 6 "$PASSED" "$PASSED.out" "$ENDPOINT"
-wait_for '^crash choice asked' "$APP_OUT"
-for _ in $(seq 1 50); do grep -q '^crash_choice = ' "$PASSED/app.toml" 2>/dev/null && break; sleep 0.2; done
-grep -Eq '^crash_choice = "[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$PASSED/app.toml" || die "the first start did not record having asked: $(cat "$PASSED/app.toml" 2>/dev/null)"
-grep -q '^crash_reports' "$PASSED/app.toml" && die "asking recorded an answer nobody gave: $(cat "$PASSED/app.toml")"
+wait_for '^screen first-launch' "$APP_OUT"
+[ -e "$PASSED/app.toml" ] && die "the screen wrote app.toml before Continue: $(cat "$PASSED/app.toml")"
+[ -e "$PASSED/crash-reports" ] && die "the app wrote an outbox before Continue: $(ls "$PASSED/crash-reports")"
 quit_app 6 0 "$APP_OUT"
 start_app 6 "$PASSED" "$PASSED-2.out" "$ENDPOINT"
+agree 6
 wait_for '^screen unlock' "$APP_OUT"
-grep -q '^crash choice asked' "$APP_OUT" && die "the crash-report choice was asked again though it was asked once"
-[ -e "$PASSED/crash-reports" ] && die "unanswered, the app wrote an outbox: $(ls "$PASSED/crash-reports")"
+chose "$PASSED" 1
+[ -e "$PASSED/crash-reports/running" ] || die "agreeing set no run marker"
 quit_app 6 0 "$APP_OUT"
+
+step 'A Send under an older date shows the screen once more, and sends nothing until Continue'
+OLDER="$WORK/older"
+mkdir -p "$OLDER"
+printf '[[settings]]\ncrash_reports = 1\nterms = "2020-01-01"\n' >"$OLDER/app.toml"
+start_app 6 "$OLDER" "$OLDER.out" "$ENDPOINT"
+wait_for '^screen first-launch' "$APP_OUT"
+[ -e "$OLDER/crash-reports/running" ] && die "the run marker was set before the new terms were agreed to"
+say 6 continue
+wait_for '^screen unlock' "$APP_OUT"
+chose "$OLDER" 1
+grep -q '^terms = "2020-01-01"' "$OLDER/app.toml" && die "Continue left the older date in app.toml"
+quit_app 6 0 "$APP_OUT"
+
+step 'An app.toml that does not read shows no screen, keeps nothing and is left as it is'
+BROKEN="$WORK/broken"
+mkdir -p "$BROKEN"
+printf '[[settings]\nhalf an edit\n' >"$BROKEN/app.toml"
+start_app 6 "$BROKEN" "$BROKEN.out" "$ENDPOINT"
+wait_for '^screen unlock' "$APP_OUT"
+grep -q '^screen first-launch' "$APP_OUT" && die "the first-launch screen showed over an app.toml that does not read"
+quit_app 6 0 "$APP_OUT"
+[ "$(cat "$BROKEN/app.toml")" = "$(printf '[[settings]\nhalf an edit')" ] || die "an app.toml that does not read was rewritten: $(cat "$BROKEN/app.toml")"
+[ -e "$BROKEN/crash-reports" ] && die "an app.toml that does not read kept an outbox: $(ls "$BROKEN/crash-reports")"
 
 # ------------------------------------------------------------- a run that ended with nothing able to report it
 step 'A killed run, reported at the next start'
 KILLED="$WORK/killed"
 start_app 6 "$KILLED" "$KILLED.out"
-wait_for '^crash choice asked' "$APP_OUT"
-say 6 'crash-choice send'
-wait_for '^crash choice answered' "$APP_OUT"
+agree 6
+wait_for '^screen unlock' "$APP_OUT"
 [ -e "$KILLED/crash-reports/running" ] || die "a run sending reports set no run marker"
 kill_process "$APP_PID"
 exec 6>&-
@@ -307,5 +343,5 @@ grep -q '^shut down' "$APP_OUT" && die "a failed task nobody awaited ended the a
 quit_app 6 0 "$APP_OUT"
 
 echo "ok: a UI-thread crash cleared the clipboard, locked, quit and was reported without a sentinel, then sent byte for byte;"
-echo "    switched off nothing was kept or sent; a held request delayed neither an unlock nor the quit and kept its report;"
+echo "    nothing was written, kept or marked before Continue; switched off nothing was kept or sent; a held request delayed neither an unlock nor the quit and kept its report;"
 echo "    a killed run was reported as ended-unexpectedly at the next start, and a failed task nobody awaited as unobserved"

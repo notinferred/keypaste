@@ -140,8 +140,6 @@ public sealed class FourPlacesJourneyTests
             Press(main, Named<ToggleButton>(main, "EntryMenu"));
             Press(main, Named<Button>(main, "ShareEntry"));
             Assert.True(shell.HasShare);
-            AmberElements.AssertOne(main, Named<Button>(main, "ContinueToShare"), "the share dialog's terms");
-            Press(main, Named<Button>(main, "ContinueToShare"));
             AmberElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
             Press(main, Named<Button>(main, "CreateLink"));
             await Until(() => !shell.HasShare);
@@ -187,6 +185,8 @@ public sealed class FourPlacesJourneyTests
             AmberElements.AssertOne(main, null, "share links");
             DrawnFrame.Capture(main);
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Classes.Contains("row-action")));
+            Assert.Single(server.Shares);
+            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConfirmRevoke", IsEffectivelyVisible: true }));
             await Until(() => server.Shares.Count == 0);
 
             // Trash, then the lock, before the window closes.

@@ -682,7 +682,6 @@
           </StackPanel>
         </Border>
 
-        <!-- Crash reports: the switch once the person has answered, and until then the choice with its terms. -->
         <Border Name="CrashReportsCard" Classes="card filled settings" IsVisible="{Binding HasCrashReports}">
           <StackPanel>
             <Border Classes="settings-head">
@@ -691,10 +690,7 @@
                 <TextBlock Classes="section" Text="{x:Static res:Strings.CrashReports}" />
               </StackPanel>
             </Border>
-            <Border Classes="settings-row" IsVisible="{Binding HasCrashChoice}">
-              <views:CrashChoiceView DataContext="{Binding CrashChoice}" />
-            </Border>
-            <Border Classes="settings-row" IsVisible="{Binding ShowsCrashSwitch}">
+            <Border Classes="settings-row">
               <StackPanel Spacing="4">
                 <ToggleSwitch Name="SendCrashReports"
                               Content="{x:Static res:Strings.SendCrashReports}"

@@ -92,6 +92,12 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     [ObservableProperty]
     internal partial string Command { get; set; } = string.Empty;
 
+    /// <summary>What leaving would lose: a directory or command that differs from the saved one, or null.</summary>
+    internal string? UnsavedDraft =>
+        Directory.Trim() == (Mapping?.Directory ?? string.Empty) && Command.Trim() == (Mapping?.Command ?? string.Empty)
+            ? null
+            : "this project's directory and command";
+
     /// <summary>The saved mapping Run and Open terminal use, or null until one is saved.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMapped))]

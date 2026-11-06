@@ -151,10 +151,6 @@
     <Style Selector="ListBox.recent">
       <Setter Property="MaxHeight" Value="180" />
     </Style>
-    <!-- Three rows, so that a long list leaves the crash-report answers below it in view at the default window. -->
-    <Style Selector="ListBox.recent.beside-question">
-      <Setter Property="MaxHeight" Value="102" />
-    </Style>
     <Style Selector="ListBox.recent > ListBoxItem">
       <Setter Property="MinHeight" Value="34" />
       <Setter Property="Padding" Value="10,0" />
@@ -330,8 +326,7 @@
                        AutomationProperties.Name="{x:Static res:Strings.KeePassXCsDatabases}"
                        Classes="recent"
                        ItemsSource="{Binding KeePassXc}"
-                       SelectedItem="{Binding SelectedKeePassXc}"
-                       Classes.beside-question="{Binding HasCrashChoice}">
+                       SelectedItem="{Binding SelectedKeePassXc}">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeePassXcDatabaseItem">
                     <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Location}">
@@ -667,23 +662,6 @@
                 IsVisible="{Binding IsRestoring}"
                 Content="{x:Static res:Strings.Back}"
                 Command="{Binding CloseRestoreCommand}" />
-
-        <!-- Below the password and the buttons, so it never stands over them or takes the keyboard, and above the recent vaults, so however many there are its answers stay in view. -->
-        <Border Name="CrashChoiceCard" Classes="card filled" Padding="16" Margin="0,6,0,0">
-          <Border.IsVisible>
-            <MultiBinding Converter="{x:Static BoolConverters.And}">
-              <Binding Path="IsOpening" />
-              <Binding Path="HasCrashChoice" />
-            </MultiBinding>
-          </Border.IsVisible>
-          <StackPanel Spacing="6">
-            <TextBlock Classes="section"
-                       AutomationProperties.HeadingLevel="2"
-                       Text="{x:Static res:Strings.CrashReports}"
-                       IsVisible="{Binding CrashChoice.IsAsking, FallbackValue=False}" />
-            <views:CrashChoiceView DataContext="{Binding CrashChoice}" />
-          </StackPanel>
-        </Border>
 
         <StackPanel Spacing="6" Margin="0,6,0,0">
           <StackPanel.IsVisible>

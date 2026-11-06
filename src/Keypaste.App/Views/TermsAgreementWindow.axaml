@@ -1,0 +1,47 @@
+<views:PromptWindow xmlns:res="using:Keypaste.App.Resources"
+                    xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.TermsAgreementWindow"
+                    x:DataType="vm:FirstLaunchViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="{x:Static res:Strings.TermsOfUse}"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- The first-launch screen's words, where Settings' switch finds the terms not agreed to. No button is the default: Enter agrees to nothing, and Escape cancels. -->
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+      <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+
+      <StackPanel Spacing="8">
+        <TextBlock Name="AgreementText"
+                   Classes="primary size-14"
+                   TextWrapping="Wrap"
+                   LineHeight="21"
+                   Text="{x:Static res:Strings.ContinuingAgreesToTheTermsOfUse}" />
+        <TextBlock Classes="prompt-note" Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
+      </StackPanel>
+
+      <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Left" />
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="{x:Static res:Strings.Cancel}" IsCancel="True" />
+        <Button Grid.Column="1" Name="Continue" Classes="prompt primary" Content="{x:Static res:Strings.Continue}"
+                HorizontalAlignment="Right" Command="{Binding ContinueCommand}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

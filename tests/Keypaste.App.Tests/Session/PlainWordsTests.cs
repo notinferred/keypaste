@@ -173,7 +173,7 @@ public sealed partial class PlainWordsTests
     });
 
     /// <summary>
-    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the crash-report choice
+    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first-launch screen
     /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with More options open, with
     /// Windows Hello offered, and after an access change, the create form, each step of the KeePass database import dialog,
     /// and each of the export import dialog's (9.1f).
@@ -184,8 +184,8 @@ public sealed partial class PlainWordsTests
         var said = new List<(string Where, string Text)>();
         var picker = new FakeVaultFilePicker();
 
-        var notice = Show(new CrashChoiceView { DataContext = new CrashChoiceViewModel(TermsOfUse.Carried, _ => true) });
-        said.AddRange(Shown(notice, "the crash-report choice"));
+        var notice = Show(new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, () => { }) });
+        said.AddRange(Shown(notice, "the first-launch screen"));
         notice.Close();
 
         var terms = new TermsWindow { DataContext = TermsOfUse.Carried };

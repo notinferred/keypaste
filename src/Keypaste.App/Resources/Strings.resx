@@ -114,6 +114,8 @@
   <data name="CopyUsername" xml:space="preserve"><value>Copy username</value></data>
   <data name="CopyValue" xml:space="preserve"><value>Copy {0}</value></data>
   <data name="CorrectTheTagOnTheItemInXafafd7" xml:space="preserve"><value>Correct the tag on the item in Items, or remove it.</value></data>
+  <data name="ContinuingAgreesToTheTermsOfUse" xml:space="preserve"><value>Continuing agrees to the terms of use, which include sending crash reports. You can turn crash reports off in Settings.</value></data>
+  <data name="DeleteThisReportItWontBeSent" xml:space="preserve"><value>Delete this report? It won't be sent.</value></data>
   <data name="CrashReports" xml:space="preserve"><value>Crash reports</value></data>
   <data name="Create" xml:space="preserve"><value>Create</value></data>
   <data name="CreateAKeyFile" xml:space="preserve"><value>Create a key file</value></data>
@@ -136,6 +138,7 @@
   <data name="Decrypted" xml:space="preserve"><value>Decrypted</value></data>
   <data name="Delete" xml:space="preserve"><value>Delete</value></data>
   <data name="DeleteForGood" xml:space="preserve"><value>Delete for good</value></data>
+  <data name="DeleteReport" xml:space="preserve"><value>Delete report</value></data>
   <data name="DeleteValue" xml:space="preserve"><value>Delete {0}?</value></data>
   <data name="DeleteValueNow" xml:space="preserve"><value>Delete {0} now</value></data>
   <data name="DeleteValueXa92ece" xml:space="preserve"><value>Delete {0}</value></data>
@@ -150,7 +153,6 @@
   <data name="Dismiss" xml:space="preserve"><value>Dismiss</value></data>
   <data name="DismissValue" xml:space="preserve"><value>Dismiss {0}</value></data>
   <data name="Done" xml:space="preserve"><value>Done</value></data>
-  <data name="DontSend" xml:space="preserve"><value>Don't send</value></data>
   <data name="Duplicate" xml:space="preserve"><value>Duplicate</value></data>
   <data name="ENVIRONMENT" xml:space="preserve"><value>ENVIRONMENT…</value></data>
   <data name="EXPIRESCapitals" xml:space="preserve"><value>EXPIRES</value></data>
@@ -246,7 +248,6 @@
   <data name="KeypasteHelp" xml:space="preserve"><value>keypaste help</value></data>
   <data name="KeypasteHome" xml:space="preserve"><value>keypaste home</value></data>
   <data name="KeypasteInATerminal" xml:space="preserve"><value>keypaste in a terminal</value></data>
-  <data name="KeypasteKeepsYourVaultOnThisComputerX3838cf" xml:space="preserve"><value>keypaste keeps your vault on this computer and never sends it anywhere. keypaste.com runs two services, share links and crash reports, which these terms cover. Running keypaste needs no agreement: its licence already lets you.</value></data>
   <data name="KeypasteOpensOnlyWebAddressesStartingHttpX58cb44" xml:space="preserve"><value>keypaste opens only web addresses starting http or https, so this one is text. Copy it to use it.</value></data>
   <data name="KeypasteRemembersThePathsOfVaultsYouXb13291" xml:space="preserve"><value>keypaste remembers the paths of vaults you have opened on this machine, where the key file each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material.</value></data>
   <data name="KeypasteWasAskedToOpenThisFileX50ed11" xml:space="preserve"><value>keypaste was asked to open this file. Nothing changes unless you say so.</value></data>
@@ -418,6 +419,7 @@
   <data name="ReviewAgain" xml:space="preserve"><value>Review again</value></data>
   <data name="ReviewValueAgain" xml:space="preserve"><value>Review {0} again</value></data>
   <data name="Revoke" xml:space="preserve"><value>Revoke</value></data>
+  <data name="RevokeLink" xml:space="preserve"><value>Revoke link</value></data>
   <data name="RevokeValue" xml:space="preserve"><value>Revoke {0}</value></data>
   <data name="Rotate" xml:space="preserve"><value>Rotate</value></data>
   <data name="Rotated" xml:space="preserve"><value>Rotated</value></data>

@@ -432,7 +432,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     internal bool HasNewKeyProblem => NewKeyProblem is not null;
 
     /// <summary>What leaving would lose: the first form here holding what was typed, or null.</summary>
-    internal string? UnsavedDraft => ProfileDraft() ?? KeyDraft() ?? ReplaceDraft();
+    internal string? UnsavedDraft => ProfileDraft() ?? KeyDraft() ?? ReplaceDraft() ?? Launch.UnsavedDraft;
 
     internal Func<string?> ProfileDraft => () => IsAddingProfile && NewProfile.Trim().Length > 0 ? "this new environment" : null;
 

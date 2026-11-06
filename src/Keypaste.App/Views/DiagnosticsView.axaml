@@ -51,11 +51,19 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CrashReportRow">
                 <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,12">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                    <SelectableTextBlock Grid.Column="0" Classes="fact-value" Text="{Binding Json}" />
-                    <Button Grid.Column="1" Classes="sm ghost" Content="{x:Static res:Strings.Delete}" VerticalAlignment="Top"
-                            Command="{Binding DeleteCommand}" />
-                  </Grid>
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                      <SelectableTextBlock Grid.Column="0" Classes="fact-value" Text="{Binding Json}" />
+                      <Button Grid.Column="1" Classes="sm ghost" Content="{x:Static res:Strings.Delete}" VerticalAlignment="Top"
+                              IsVisible="{Binding !IsConfirming}"
+                              Command="{Binding AskDeleteCommand}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelDeleteCommand}">
+                      <TextBlock Text="{x:Static res:Strings.DeleteThisReportItWontBeSent}" Classes="size-12-5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
+                      <Button Grid.Column="2" Name="ConfirmDeleteReport" Classes="danger sm size-12" Content="{x:Static res:Strings.DeleteReport}" Command="{Binding DeleteCommand}" />
+                    </Grid>
+                  </StackPanel>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

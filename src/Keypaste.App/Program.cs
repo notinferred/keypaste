@@ -129,7 +129,7 @@ internal static class Program
 
     /// <summary>
     /// The crash reports of a run under the home's claim, as every start of the app composes them: the process's hooks set,
-    /// an earlier run that ended unreported found by its marker, and the sender started while the person chose to send.
+    /// an earlier run that ended unreported found by its marker, and the sender started once the person has agreed and while the switch is on.
     /// Disposing it at the run's end removes the marker.
     /// </summary>
     /// <param name="preferences">The <c>app.toml</c> the run is composed from.</param>

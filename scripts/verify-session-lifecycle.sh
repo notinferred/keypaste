@@ -291,7 +291,7 @@ APP_HOME="$WORK/app-home"
 mkdir -p "$APP_HOME"
 APP_HOME_NATIVE="$(native "$APP_HOME")"
 APP_AUDIT="$APP_HOME/audit.jsonl"
-printf '[[settings]]\nstay_in_tray = 1\n' >"$APP_HOME/app.toml"
+printf '[[settings]]\nstay_in_tray = 1\ncrash_reports = 0\n' >"$APP_HOME/app.toml"
 
 # Starts the app as keypaste-app does, through the driver, with its input held open; sets APP_PID.
 start_app() {
@@ -408,6 +408,7 @@ grep -q '^window shown' "$APP_OUT" && die "an agent asking the locked app showed
 echo 'notice open' >&6
 wait_for '^locked-notice closed' "$APP_OUT"
 wait_for '^window shown' "$APP_OUT"
+[ "$(grep '^screen ' "$APP_OUT" | tail -n 1)" = 'screen unlock' ] || die "Open keypaste did not show the unlock screen"
 
 ask_app "$CHOSEN" "$WORK/notice-opened-stdout.txt" "$WORK/notice-opened-stderr.txt"
 refused_saying "the vault Open keypaste put on the unlock screen" "$LOCKED"

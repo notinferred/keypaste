@@ -134,7 +134,7 @@ internal static class Program
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
         "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed;\n" +
-        "             crash-choice send | dont-send; unlock <vault>; copy <title>; lock; crash <text>)\n" +
+        "             continue; unlock <vault>; copy <title>; lock; crash <text>)\n" +
         "       crash-endpoint <folder> [--silent]\n" +
         "            (answers crash reports on loopback 204 and keeps each in <folder>, or never answers, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +

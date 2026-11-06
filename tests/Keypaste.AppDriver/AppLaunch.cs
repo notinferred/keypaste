@@ -27,7 +27,7 @@ namespace Keypaste.AppDriver;
 /// <para>
 /// A start that runs the app prints <c>running as process &lt;pid&gt; on &lt;endpoint&gt;</c>, then
 /// <c>window shown</c> or <c>window hidden</c> for the main window as it is and each time that changes, and
-/// <c>screen unlock</c>, followed by <c>crash choice asked</c> when that screen asks it, or <c>screen shell</c> for what the window holds and each time that
+/// <c>screen first-launch</c>, <c>screen unlock</c> or <c>screen shell</c> for what the window holds and each time that
 /// changes; it quits as the app quits once standard input closes, printing <c>shut down with exit code &lt;n&gt;</c>.
 /// A start the running app took prints nothing.
 /// While the app is locked, the notice an agent's request raises prints <c>locked-notice shown</c> with its
@@ -35,7 +35,7 @@ namespace Keypaste.AppDriver;
 /// Open keypaste once armed, by a click the display routes to the button (G.4b).
 /// </para>
 /// <para>
-/// The lines <c>crash-choice send</c> and <c>crash-choice dont-send</c> press that button of the unlock screen's choice;
+/// The line <c>continue</c> presses the first-launch screen's Continue;
 /// <c>unlock &lt;vault&gt;</c> types <c>KEYPASTE_DRIVER_PASSWORD</c> on the unlock screen and presses Unlock;
 /// <c>copy &lt;title&gt;</c> copies that item's password from Items; <c>lock</c> locks; <c>crash &lt;text&gt;</c>
 /// throws on the UI thread an exception whose message and inner exception's message hold the text; and
@@ -131,8 +131,8 @@ internal static class AppLaunch
                     case ["notice", "open"]:
                         Act(() => PressOpenAsync(app));
                         break;
-                    case ["crash-choice", var answer]:
-                        Act(() => AnswerCrashChoice(root, answer));
+                    case ["continue"]:
+                        Act(() => ContinueAsync(root));
                         break;
                     case ["unlock", var vault]:
                         Act(() => UnlockAsync(root, vault));
@@ -173,15 +173,11 @@ internal static class AppLaunch
     {
         Console.Out.WriteLine(root.Content switch
         {
+            FirstLaunchView => "screen first-launch",
             UnlockView => "screen unlock",
             ShellView => "screen shell",
             _ => "screen none",
         });
-
-        if (root.Content is UnlockView { DataContext: UnlockViewModel { HasCrashChoice: true } })
-        {
-            Console.Out.WriteLine("crash choice asked");
-        }
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
@@ -237,20 +233,14 @@ internal static class AppLaunch
         PromptScreen.Click(notice, open);
     }
 
-    private static Task AnswerCrashChoice(ContentControl root, string answer)
+    private static Task ContinueAsync(ContentControl root)
     {
-        if (root.Content is not UnlockView { DataContext: UnlockViewModel { CrashChoice: { } choice } })
+        if (root.Content is not FirstLaunchView { DataContext: FirstLaunchViewModel screen })
         {
-            throw new DriverException("the crash-report choice is not on screen");
+            throw new DriverException("the first-launch screen is not on screen");
         }
 
-        Press(answer switch
-        {
-            "send" => choice.SendCommand,
-            "dont-send" => choice.DontSendCommand,
-            _ => throw new DriverException($"the crash-report choice offers send and dont-send, not {answer}"),
-        }, answer);
-        Console.Out.WriteLine("crash choice answered");
+        Press(screen.ContinueCommand, "continue");
         return Task.CompletedTask;
     }
 

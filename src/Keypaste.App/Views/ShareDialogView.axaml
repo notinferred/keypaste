@@ -74,52 +74,9 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- Share…, from an item's ⋯ menu. The first time, the terms of use show here before the form, and until then no link can be made. -->
-  <Panel>
-  <Border Name="ShareTerms"
-          Classes="dialog"
-          IsVisible="{Binding IsReadingTerms}"
-          ctl:FormKeys.Confirm="{Binding ContinueCommand}"
-          ctl:FormKeys.Cancel="{Binding CancelCommand}"
-          KeyboardNavigation.TabNavigation="Cycle"
-          Width="440"
-          MaxWidth="440"
-          HorizontalAlignment="Center"
-          VerticalAlignment="Center">
-    <StackPanel Spacing="14">
-      <Grid ColumnDefinitions="Auto,*">
-        <ctl:KpIcon Grid.Column="0" Icon="link" Size="16" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ShareALink}" VerticalAlignment="Center" />
-      </Grid>
-
-      <StackPanel Spacing="8">
-        <TextBlock Name="TermsNotice"
-                   Classes="caption"
-                   TextWrapping="Wrap"
-                   Text="{x:Static res:Strings.KeypasteKeepsYourVaultOnThisComputerX3838cf}" />
-        <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Left" />
-      </StackPanel>
-
-      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-        <Button x:Name="CancelTerms"
-                Classes="ghost lg"
-                Content="{x:Static res:Strings.Cancel}"
-                Command="{Binding CancelCommand}" />
-        <Button x:Name="ContinueToShare"
-                Grid.Column="1"
-                Classes="primary lg"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center"
-                Content="{x:Static res:Strings.Continue}"
-                Command="{Binding ContinueCommand}" />
-      </Grid>
-    </StackPanel>
-  </Border>
-
-  <!-- The link it makes goes to the clipboard and nowhere else on screen. -->
+  <!-- Share…, from an item's ⋯ menu. The link it makes goes to the clipboard and nowhere else on screen. -->
   <Border Name="ShareDialog"
           Classes="dialog"
-          IsVisible="{Binding !IsReadingTerms}"
           ctl:FormKeys.Confirm="{Binding CreateCommand}"
           ctl:FormKeys.Cancel="{Binding CancelCommand}"
           ctl:FormKeys.Draft="{Binding Draft}"
@@ -266,5 +223,4 @@
                  ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
     </StackPanel>
   </Border>
-  </Panel>
 </UserControl>

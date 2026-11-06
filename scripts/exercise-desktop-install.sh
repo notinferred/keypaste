@@ -31,6 +31,8 @@
 # Environment: REHEARSAL  the app.yml run whose -dryrun package <candidate-file> is, for a rehearsal
 set -euo pipefail
 
+# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
 readonly ROOT
@@ -416,8 +418,8 @@ first_session() {
   launch first > /dev/null
   act window drive window 120 || return 0
   act screenshot drive screenshot "$(native "$OUT/first-window.png")" || return 0
-  # A fresh home's unlock screen asks the crash-report choice.
-  act crash-choice drive invoke "Don't send" || return 0
+  # A fresh home opens on the first-launch screen.
+  act agree-terms drive invoke Continue || return 0
   act password-focus drive focus id:Password || return 0
   unlock unlocked || return 0
 

@@ -30,6 +30,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     private readonly Action<string, ToastTone>? _toast;
 
     private EnvProjectViewModel? _open;
+    private string? _askedProject;
 
     internal EnvSetsViewModel(
         AppVaultSession session,
@@ -60,6 +61,9 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     /// <inheritdoc/>
     public string? UnsavedDraft => NewProjectDraft() ?? OpenProject?.UnsavedDraft;
 
+    /// <summary>Asks about unsaved work before the header's project picker replaces it, then discards or keeps it.</summary>
+    internal Action<string, Action, Action?>? AskDiscard { get; init; }
+
     internal Func<string?> NewProjectDraft => () => IsAdding && NewProject.Trim().Length > 0 ? "this new project" : null;
 
     /// <summary>Every project in the vault, by name.</summary>
@@ -85,14 +89,32 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     /// <summary>The open project's name; setting it opens that project.</summary>
     internal string? SelectedProject
     {
-        get => _open?.Name;
+        get => _askedProject ?? _open?.Name;
         set
         {
-            if (value is not null && !string.Equals(value, _open?.Name, StringComparison.Ordinal))
+            if (value is null || string.Equals(value, _open?.Name, StringComparison.Ordinal))
             {
-                Open(value);
+                return;
             }
+
+            if (AskDiscard is { } ask && UnsavedDraft is { } draft)
+            {
+                // The picker holds the name asked about until the answer, as a binding puts back only a value that changed.
+                _askedProject = value;
+                OnPropertyChanged();
+                ask(draft, () => AnsweredAsked(() => Open(value)), () => AnsweredAsked(() => { }));
+                return;
+            }
+
+            Open(value);
         }
+    }
+
+    private void AnsweredAsked(Action answer)
+    {
+        _askedProject = null;
+        answer();
+        OnPropertyChanged(nameof(SelectedProject));
     }
 
     /// <summary>The project whose table is showing, or null.</summary>

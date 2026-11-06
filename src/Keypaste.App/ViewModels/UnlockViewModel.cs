@@ -182,11 +182,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         ? "Open a vault KeePassXC opened, another file, or a new vault."
         : "A vault is an encrypted file on this computer that keeps your passwords and keys, and its master password is the one password that opens it.";
 
-    /// <summary>The crash-report choice this screen asks, below every way in, while nobody has answered it; null otherwise.</summary>
-    internal CrashChoiceViewModel? CrashChoice { get; init; }
-
-    internal bool HasCrashChoice => CrashChoice is not null;
-
     /// <summary>The databases KeePassXC last opened, offered while no vault is selected.</summary>
     internal IReadOnlyList<KeePassXcDatabaseItem> KeePassXc { get; private set; } = [];
 

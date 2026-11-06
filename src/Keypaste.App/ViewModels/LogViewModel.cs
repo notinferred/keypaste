@@ -55,6 +55,8 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     private AuditHistory _history = new(AuditReadKind.Missing, [], [], string.Empty);
     private IReadOnlyList<LogRow> _all = [];
     private List<LogRow> _rows = [];
+    private const string _editedSince = "This log has been edited since keypaste wrote it.";
+
     private ChainVerdict? _verdict;
     private bool _unverifiedShown;
     private bool _unreadShown;
@@ -224,7 +226,8 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     /// <summary>One calm sentence about the file as a whole, or nothing: no log yet, unreadable, unchecked, or broken.</summary>
     internal string Message => _message;
 
-    internal bool HasMessage => _message.Length > 0;
+    /// <summary>Whether there is a message to draw; the open verdict of a broken log says it itself.</summary>
+    internal bool HasMessage => _message.Length > 0 && !(_verdictShown && IsBroken);
 
     /// <summary>Whether no log has been written yet, which the screen draws as its empty state rather than a notice.</summary>
     internal bool IsEmpty => _history.Kind == AuditReadKind.Missing;
@@ -252,7 +255,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
             AuditReadKind.Missing => NothingYet,
             AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
             AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
-            AuditReadKind.Broken => $"This log has been edited since keypaste wrote it. {ChainSays("where")}",
+            AuditReadKind.Broken => $"{_editedSince} {ChainSays("where")}",
             _ => string.Empty,
         };
 
@@ -380,5 +383,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
         _verdictShown = !_verdictShown;
         OnPropertyChanged(nameof(VerdictShown));
         OnPropertyChanged(nameof(VerifyLabel));
+        OnPropertyChanged(nameof(HasMessage));
+        OnPropertyChanged(nameof(HasNotice));
     }
 }

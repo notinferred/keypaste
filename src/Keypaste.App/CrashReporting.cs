@@ -9,8 +9,8 @@ using Keypaste.Core.Settings;
 namespace Keypaste.App;
 
 /// <summary>
-/// The desktop app's crash reports for one run: the hooks that catch what nothing else did, the reports kept while the
-/// person has chosen to send them, the run marker and the sender.
+/// The desktop app's crash reports for one run: the hooks that catch what nothing else did, the reports kept once the
+/// person has agreed to the terms of use and while Settings' switch is on, the run marker and the sender.
 /// </summary>
 /// <remarks>
 /// Nothing is kept or sent unless <c>app.toml</c>, read whole, says 1 under the terms this build carries. Every report is
@@ -43,7 +43,6 @@ internal sealed class CrashReporting : IDisposable
     private readonly long _started;
     private readonly Func<HttpMessageHandler> _transport;
     private readonly string _terms;
-    private readonly bool _isFirstAsk;
     private readonly Lock _gate = new();
     private readonly ConditionalWeakTable<Exception, object> _reported = new();
     private HttpMessageHandler? _handler;
@@ -54,11 +53,11 @@ internal sealed class CrashReporting : IDisposable
 
     /// <summary>Reports for one home.</summary>
     /// <param name="home">The value of <c>KEYPASTE_HOME</c>, or null for the default home.</param>
-    /// <param name="preferences">The <c>app.toml</c> the app runs from, which holds the person's choice.</param>
+    /// <param name="preferences">The <c>app.toml</c> the app runs from, which holds the agreement and the switch.</param>
     /// <param name="endpoint">Where reports go, from <see cref="EndpointFor"/>; null sends none.</param>
     /// <param name="clock">The clock reports are dated and the sender's passes timed on.</param>
     /// <param name="transport">Makes the sender's transport; <see cref="CrashSender.CreateTransport"/> unless a test gives another.</param>
-    /// <param name="terms">The terms' version a choice is made under; the carried terms' unless a test gives another.</param>
+    /// <param name="terms">The terms' version agreed to; the carried terms' unless a test gives another.</param>
     internal CrashReporting(
         string? home,
         DesktopPreferences preferences,
@@ -75,7 +74,6 @@ internal sealed class CrashReporting : IDisposable
         _started = _clock.GetTimestamp();
         _transport = transport ?? CrashSender.CreateTransport;
         _terms = terms ?? TermsOfUse.Carried.Version;
-        _isFirstAsk = preferences.Readable && preferences.Current is { CrashChoiceTerms: null, CrashChoiceAsked: null };
         Endpoint = endpoint;
     }
 
@@ -92,17 +90,17 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>The outbox's folder.</summary>
     internal string Folder => _outbox.Folder;
 
-    /// <summary>Whether reports are kept and sent: the person chose to under the terms this build carries.</summary>
-    internal bool IsOn => IsChosen(_preferences.Current, _terms);
-
-    /// <summary>Whether the person answered under the terms this build carries, so Settings shows its switch rather than the choice.</summary>
-    internal bool HasAnswered => _preferences.Current.CrashChoiceTerms == _terms;
+    /// <summary>Whether reports are kept and sent: the person agreed to the terms this build carries and the switch is on.</summary>
+    internal bool IsOn => IsSending(_preferences.Current, _terms);
 
     /// <summary>
-    /// Whether the unlock screen asks in this run: when it started, <c>app.toml</c> could take the answer and recorded neither an answer under any
-    /// terms nor having asked, and nobody has answered since. An older date is no new first ask, which PRODUCT §3.5's "at first run or in Settings" would not cover.
+    /// Whether the terms screen stands before the unlock screen: <c>app.toml</c> reads whole and would have the app send under terms the person has not agreed to.
+    /// Reports switched off send nothing, so a new date asks nothing of that person.
     /// </summary>
-    internal bool AsksThisRun => _isFirstAsk && !HasAnswered;
+    internal bool AsksTerms => _preferences.Readable && _preferences.Current.SendCrashReports != false && !HasAgreed;
+
+    /// <summary>Whether the person agreed to the terms this build carries, without which no switch starts reports.</summary>
+    internal bool HasAgreed => _preferences.Current.TermsAgreed == _terms;
 
     /// <summary>The app's name for the screen open, which a report carries.</summary>
     internal string? Screen
@@ -132,11 +130,11 @@ internal sealed class CrashReporting : IDisposable
     }
 
     /// <summary>Whether <paramref name="settings"/> sends reports under the terms whose version is <paramref name="terms"/>.</summary>
-    internal static bool IsChosen(AppSettings settings, string terms)
+    internal static bool IsSending(AppSettings settings, string terms)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        return settings.SendCrashReports == true && settings.CrashChoiceTerms == terms;
+        return settings.SendCrashReports == true && settings.TermsAgreed == terms;
     }
 
     /// <summary>A screen's name as a report carries it, the place the person sees.</summary>
@@ -156,28 +154,28 @@ internal sealed class CrashReporting : IDisposable
         _ => "other",
     };
 
-    /// <summary>Records in <c>app.toml</c> that the unlock screen has asked, so the next start does not, answered or not.</summary>
-    internal void RememberAsked()
+    /// <summary>Takes Continue on the terms screen: the person agreed to the terms this build carries, sending reports included.</summary>
+    /// <returns>Whether <c>app.toml</c> took it; the agreement holds for this run either way.</returns>
+    internal bool Agree()
     {
-        if (_isFirstAsk && _preferences.Current.CrashChoiceAsked is null)
-        {
-            _preferences.Record(settings => settings with { CrashChoiceAsked = _terms });
-        }
+        var saved = _preferences.Record(settings => settings with { SendCrashReports = true, TermsAgreed = _terms });
+        Apply(takeEnded: true);
+        return saved;
     }
 
-    /// <summary>Takes the person's choice, on the unlock screen or in Settings, under the terms this build carries.</summary>
+    /// <summary>Takes Settings' switch, which never agrees to anything: reports start only under terms <see cref="Agree"/> took.</summary>
     /// <param name="send">Whether to send reports.</param>
-    /// <returns>Whether <c>app.toml</c> took it; the choice holds for this run either way.</returns>
-    internal bool Choose(bool send)
+    /// <returns>Whether <c>app.toml</c> took it; the switch holds for this run either way.</returns>
+    internal bool SetSending(bool send)
     {
-        var saved = _preferences.Update(_preferences.Current with { SendCrashReports = send, CrashChoiceTerms = _terms });
+        var saved = _preferences.Update(_preferences.Current with { SendCrashReports = send });
         Apply(takeEnded: false);
         return saved;
     }
 
     /// <summary>
     /// Starts the run: while on, an earlier run that ended with nothing able to report it is reported, the marker is set and
-    /// the sender started; once the person chose not to send, whatever waits is deleted.
+    /// the sender started; once they are switched off, whatever waits is deleted.
     /// </summary>
     internal void Start() => Apply(takeEnded: true);
 
@@ -239,7 +237,12 @@ internal sealed class CrashReporting : IDisposable
             }
 
             StopSending();
-            _outbox.ClearRunning();
+
+            // Off under terms still to be agreed to, the marker is an earlier run's, which Continue reports.
+            if (IsOn)
+            {
+                _outbox.ClearRunning();
+            }
         }
     }
 
@@ -266,7 +269,7 @@ internal sealed class CrashReporting : IDisposable
 
             StopSending();
 
-            // An answer still to be given under new terms leaves what waits for it.
+            // Terms still to be agreed to leave what waits for them.
             if (_preferences.Current.SendCrashReports == false)
             {
                 _outbox.Clear();

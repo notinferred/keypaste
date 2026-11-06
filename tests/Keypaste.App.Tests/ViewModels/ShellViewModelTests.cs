@@ -376,7 +376,6 @@ public sealed class ShellViewModelTests : IDisposable
         var share = shell.Share!;
         Assert.Equal("env/billing/STRIPE_KEY", share.SelectedWhat);
 
-        share.ContinueCommand.Press();
         await share.CreateCommand.PressAsync();
 
         Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toasts.Shown.Last().Message);
