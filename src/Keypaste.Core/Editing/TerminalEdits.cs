@@ -423,7 +423,7 @@ public static class TerminalEdits
 
         List<string> changes =
         [
-            $"Imports {Count(plan.Created.Count + plan.Updated.Count, "variable")} into {Shown(where)}: {plan.Created.Count} new, {plan.Updated.Count} updated, {plan.Unchanged} unchanged.",
+            Invariant($"Imports {Count(plan.Created.Count + plan.Updated.Count, "variable")} into {Shown(where)}: {plan.Created.Count} new, {plan.Updated.Count} updated, {plan.Unchanged} unchanged."),
             .. plan.ToWrite.SelectMany(writes => Planting(
                 [.. writes.Select(key => new Written($"On {ApprovalPrompt.Shown(writes.Key)}, {Name(key.Key)}", plan.Value(key.Key), key.Field) { Item = "that item" })],
                 () => Held(vault, writes.Key, plan.Keys.Where(key => key.Entry == writes.Key).Select(key => key.Field)))),
@@ -716,7 +716,7 @@ public static class TerminalEdits
         _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
     };
 
-    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : Invariant($"{n} {noun}s");
 
     /// <summary>A value an edit writes to one item, and how a sentence about what it plants names it.</summary>
     /// <param name="Subject">How the sentence names the value, such as <c>Its new password</c>.</param>

@@ -289,7 +289,7 @@ public static class Toml
 
         if (bytes.Length > limits.Bytes)
         {
-            error = $"the file is larger than {limits.Bytes / 1024} KiB, which is not a policy file";
+            error = Invariant($"the file is larger than {limits.Bytes / 1024} KiB, which is not a policy file");
             return false;
         }
 
@@ -350,7 +350,7 @@ public static class Toml
 
         if (lines.Length > limits.Lines)
         {
-            error = $"the file has more than {limits.Lines} lines";
+            error = Invariant($"the file has more than {limits.Lines} lines");
             return false;
         }
 
@@ -366,7 +366,7 @@ public static class Toml
 
             if (line.Length > limits.LineLength)
             {
-                error = Problem(number, $"the line is longer than {limits.LineLength} characters");
+                error = Problem(number, Invariant($"the line is longer than {limits.LineLength} characters"));
                 return false;
             }
 
@@ -384,7 +384,7 @@ public static class Toml
                 // not on sections finished.
                 if (tables.Count + (pairs is null ? 0 : 1) == limits.Tables)
                 {
-                    error = Problem(number, $"at most {limits.Tables} sections are allowed");
+                    error = Problem(number, Invariant($"at most {limits.Tables} sections are allowed"));
                     return false;
                 }
 
@@ -426,7 +426,7 @@ public static class Toml
 
             if (pairs.Count == limits.Pairs)
             {
-                error = Problem(number, $"a section may set at most {limits.Pairs} keys");
+                error = Problem(number, Invariant($"a section may set at most {limits.Pairs} keys"));
                 return false;
             }
 
@@ -670,7 +670,7 @@ public static class Toml
 
         if (scan - start > limits.StringLength)
         {
-            error = Problem(number, $"a value may be at most {limits.StringLength} characters");
+            error = Problem(number, Invariant($"a value may be at most {limits.StringLength} characters"));
             return false;
         }
 
@@ -762,7 +762,7 @@ public static class Toml
 
             if (items.Count == limits.Items)
             {
-                error = Problem(number, $"an array may hold at most {limits.Items} items");
+                error = Problem(number, Invariant($"an array may hold at most {limits.Items} items"));
                 return false;
             }
 

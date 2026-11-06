@@ -163,7 +163,7 @@ public sealed class EntryExposure
             {
                 if (char.IsControl(c) || c == '\\')
                 {
-                    error = $"pattern {i + 1} contains a character that is not allowed in one";
+                    error = Invariant($"pattern {i + 1} contains a character that is not allowed in one");
                     return false;
                 }
             }
@@ -173,7 +173,7 @@ public sealed class EntryExposure
             {
                 if (!Selector.TryParse(glob, out var selector))
                 {
-                    error = $"pattern {i + 1} is a tag selector, which is {TagSelectorPrefix}{ProjectTag.Prefix}<project> or {TagSelectorPrefix}{ProjectTag.Prefix}<project>:<environment>";
+                    error = Invariant($"pattern {i + 1} is a tag selector, which is {TagSelectorPrefix}{ProjectTag.Prefix}<project> or {TagSelectorPrefix}{ProjectTag.Prefix}<project>:<environment>");
                     return false;
                 }
 

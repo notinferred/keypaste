@@ -366,7 +366,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool UsesHardwareKey => HardwareKeySlot is not null;
 
-    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
+    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? Invariant($"YubiKey, slot {slot}") : string.Empty;
 
     internal string OtherSlotLabel => HardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
 
@@ -808,7 +808,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         SelectedPath = full;
         Message = backups == 1
             ? $"{why}, but a backup of it is kept beside it. Restore it to get the vault back."
-            : $"{why}, but {backups} backups of it are kept beside it. Restore one to get the vault back.";
+            : Invariant($"{why}, but {backups} backups of it are kept beside it. Restore one to get the vault back.");
         return true;
     }
 
@@ -968,7 +968,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     private static string Describe(VaultRestoreReport report)
     {
         static string When(VaultBackup backup) =>
-            backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.CurrentCulture);
+            Keypaste.App.Globalization.PersonTime.Moment(backup.TakenAt.ToLocalTime());
 
         var kept = report switch
         {
@@ -1334,7 +1334,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and unlock again.",
         HardwareKeyFailure.MoreThanOne => "More than one YubiKey is plugged in. Leave only the one this vault uses.",
         HardwareKeyFailure.SlotNotConfigured =>
-            $"That YubiKey's slot {slot} isn't set up for challenge-response. If the vault uses the other slot, switch to it.",
+            Invariant($"That YubiKey's slot {slot} isn't set up for challenge-response. If the vault uses the other slot, switch to it."),
         HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Unlock again and touch it when it flashes.",
         HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. Nothing was opened.",
         _ => failure?.Message ?? "The YubiKey didn't answer. Plug it in again, then try again.",
@@ -1358,7 +1358,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass key file.",
         VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own key file. Choose another file.",
         VaultCreationOutcome.HardwareKeyNotFound =>
-            $"No YubiKey with slot {slot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager.",
+            Invariant($"No YubiKey with slot {slot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager."),
         _ => "That vault couldn't be created. Check that you can write to that folder, then try again.",
     };
 
@@ -1368,7 +1368,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and create the vault again.",
         HardwareKeyFailure.MoreThanOne => "More than one YubiKey is plugged in. Leave only the one the vault will use.",
         HardwareKeyFailure.SlotNotConfigured =>
-            $"That YubiKey's slot {slot} isn't set up for challenge-response. Program it in YubiKey Manager, or switch to the other slot.",
+            Invariant($"That YubiKey's slot {slot} isn't set up for challenge-response. Program it in YubiKey Manager, or switch to the other slot."),
         HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Create the vault again and touch it when it flashes.",
         HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. No vault was created.",
         _ => failure.Message,
@@ -1386,7 +1386,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The lock note for <paramref name="reason"/>, or empty where the screen already says why.</summary>
     internal static string DescribeLock(VaultLockReason reason, DateTimeOffset at, TimeSpan idleTimeout)
     {
-        var time = at.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        var time = Keypaste.App.Globalization.PersonTime.Clock(at);
 
         return reason switch
         {

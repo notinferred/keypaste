@@ -4,12 +4,24 @@
 
   <!-- The architecture rules the compiler holds (D-0675): each project's BannedSymbols.txt and the shared lists named here. -->
   <PropertyGroup>
-    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">NoNetwork</KeypasteBans>
+    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">NoNetwork;OneUpperCase</KeypasteBans>
+    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">OneUpperCase</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.App'">NoKeePassLib;NoNetwork;NoFileWrites</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Cli'">NoKeePassLib;NoCrashReports</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Mcp'">NoKeePassLib;NoCrashReports;NoVault</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">NoKeePassLib;NoCrashReports;NoVault</KeypasteBans>
   </PropertyGroup>
+
+  <!-- The desktop process has a real culture, and Core and Infrastructure run in it; .editorconfig turns on the culture rules this package adds to the SDK's. -->
+  <PropertyGroup>
+    <MeziantouAnalysisMode>None</MeziantouAnalysisMode>
+    <!-- The SDK's culture rules stay silent under invariant globalization. These two are libraries, so this reaches the analyzers and no program's runtime configuration. -->
+    <InvariantGlobalization Condition="'$(MSBuildProjectName)' == 'Keypaste.Core' Or '$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Keypaste.Core' Or '$(MSBuildProjectName)' == 'Keypaste.Infrastructure' Or '$(MSBuildProjectName)' == 'Keypaste.App'">
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <Using Include="System.FormattableString" Static="true" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />

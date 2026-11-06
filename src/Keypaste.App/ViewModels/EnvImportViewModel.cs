@@ -163,7 +163,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
         {
             var problems = document.Problems.Take(_problemsShown)
                 .Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text);
-            var more = document.Problems.Count > _problemsShown ? $" ({document.Problems.Count - _problemsShown} more not shown)" : string.Empty;
+            var more = document.Problems.Count > _problemsShown ? Invariant($" ({document.Problems.Count - _problemsShown} more not shown)") : string.Empty;
             _report($"{path} has problems, so nothing was imported: {string.Join("; ", problems)}{more}. Fix the file, then choose it again.");
             return;
         }
@@ -247,7 +247,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
             case WriteOutcome.Saved:
                 var written = write.Value.Plan.Created.Count + write.Value.Plan.Updated.Count;
                 var kept = OfferToDelete(path, read);
-                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}.{kept}", ToastTone.Success);
+                _announce($"Imported {(written == 1 ? "1 variable" : Invariant($"{written} variables"))} into {Where}.{kept}", ToastTone.Success);
                 Clear();
                 _imported();
                 return;

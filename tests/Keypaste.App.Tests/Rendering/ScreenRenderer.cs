@@ -86,6 +86,93 @@ public sealed class ScreenRenderer
         await DrawAgents(output);
     });
 
+    /// <summary>The whole app in a language that does not exist: right to left, and every word half as long again.</summary>
+    [Theory]
+    [InlineData("rtl", 100, "dark")]
+    [InlineData("rtl", 100, "light")]
+    [InlineData("rtl", 200, "dark")]
+    [InlineData("rtl", 200, "light")]
+    [InlineData("long", 100, "dark")]
+    [InlineData("long", 100, "light")]
+    [InlineData("long", 200, "dark")]
+    [InlineData("long", 200, "light")]
+    [InlineData("en-US", 100, "dark")]
+    [InlineData("en-US", 100, "light")]
+    [InlineData("de-DE", 100, "dark")]
+    public Task Every_screen_is_drawn_in_a_pseudo_locale(string locale, int percent, string palette) => HeadlessSession.On(() =>
+    {
+        using var pseudo = PseudoLocale.Named(locale);
+        DrawEveryScreen(Directory.CreateDirectory(Path.Combine(Prepare(palette, percent), locale)).FullName);
+    });
+
+    /// <summary>A long language must not push a control out of reach or a right-to-left one out of the window, at the sizes people use.</summary>
+    [Theory]
+    [InlineData("long", 100)]
+    [InlineData("long", 200)]
+    [InlineData("rtl", 100)]
+    [InlineData("rtl", 200)]
+    [InlineData("en-US", 100)]
+    [InlineData("de-DE", 100)]
+    public Task Every_screen_keeps_every_control_within_reach_in_a_pseudo_locale(string locale, int percent) => HeadlessSession.On(() =>
+    {
+        using var pseudo = PseudoLocale.Named(locale);
+        var output = Directory.CreateTempSubdirectory("keypaste-reach-").FullName;
+        _cutOff = [];
+
+        try
+        {
+            InterfaceZoom.Set(percent);
+            DrawEveryScreen(output);
+            Assert.True(_cutOff.Count == 0, string.Join('\n', _cutOff.Distinct()));
+        }
+        finally
+        {
+            _cutOff = null;
+            Directory.Delete(output, recursive: true);
+        }
+    });
+
+    [Theory]
+    [InlineData("dark")]
+    [InlineData("light")]
+    public Task Every_security_prompt_draws_the_same_under_right_to_left(string palette) => HeadlessSession.On(() =>
+    {
+        var english = Directory.CreateTempSubdirectory("keypaste-prompts-").FullName;
+        var rightToLeft = Directory.CreateTempSubdirectory("keypaste-prompts-rtl-").FullName;
+
+        try
+        {
+            PlatformTheme.Set(
+                palette == "light" ? Avalonia.Platform.PlatformThemeVariant.Light : Avalonia.Platform.PlatformThemeVariant.Dark,
+                Avalonia.Platform.ColorContrastPreference.NoPreference);
+            DrawEveryPrompt(english);
+
+            using (PseudoLocale.RightToLeft())
+            {
+                DrawEveryPrompt(rightToLeft);
+            }
+
+            var names = Directory.GetFiles(english, "*.png").Select(Path.GetFileName).ToList();
+            Assert.Contains("91-approval.png", names);
+            Assert.Contains("00e-terms-window.png", names);
+            Assert.All(names, name => Assert.True(
+                File.ReadAllBytes(Path.Combine(english, name!)).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(rightToLeft, name!))),
+                name + " changed under right to left"));
+        }
+        finally
+        {
+            Directory.Delete(english, recursive: true);
+            Directory.Delete(rightToLeft, recursive: true);
+        }
+    });
+
+    private static void DrawEveryPrompt(string output)
+    {
+        DrawApproval(output);
+        DrawPrompts(output);
+        DrawTerms(output);
+    }
+
     [Theory]
     [InlineData(100)]
     [InlineData(150)]
@@ -966,6 +1053,14 @@ public sealed class ScreenRenderer
     }
 
     /// <summary>The env release and run prompts beside the credential one, each at its own size.</summary>
+    private static void DrawTerms(string output)
+    {
+        var terms = new TermsWindow { DataContext = Terms.TermsOfUse.Carried };
+        terms.Show();
+        Save(terms, output, "00e-terms-window");
+        terms.Close();
+    }
+
     private static void DrawPrompts(string output)
     {
         var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "/home/maya/acme/api";
@@ -1181,10 +1276,7 @@ public sealed class ScreenRenderer
             window.Close();
         }
 
-        var terms = new TermsWindow { DataContext = Terms.TermsOfUse.Carried };
-        terms.Show();
-        Save(terms, output, "00e-terms-window");
-        terms.Close();
+        DrawTerms(output);
 
         // Settings until the person has answered: the choice in place of its switch.
         var preferences = new DesktopPreferences(empty.Path);

@@ -69,6 +69,7 @@ on:
       - 'scripts/build-macos-dmg.sh'
       - 'scripts/verify-macos-cli-link.sh'
       - 'scripts/verify-linux-appimage.sh'
+      - 'scripts/verify-no-icu.sh'
       - 'scripts/verify-publisher-metadata.sh'
       - 'scripts/publish-desktop-bridge.sh'
       - 'scripts/sign-windows.sh'
@@ -139,7 +140,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 13
+    timeout-minutes: 24
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -432,6 +433,11 @@ jobs:
           echo "native asset files: $found"
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
+      - name: Start the published app on a machine with no ICU
+        if: matrix.rid == 'linux-x64'
+        shell: bash
+        run: bash scripts/verify-no-icu.sh 'artifacts/app/${{ matrix.rid }}'
+
       # The headless selftest cannot exercise native libraries that load on first render. It does derive a vault's key,
       # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux (D-0523).
       - name: Start the published binary and run its selftest
@@ -625,6 +631,7 @@ jobs:
           bash scripts/apt-install.sh --no-install-recommends squashfs-tools desktop-file-utils file
           image="$(scripts/build-linux-appimage.sh artifacts/stage "$VERSION" artifacts/dist)"
           scripts/verify-linux-appimage.sh "$image" "$VERSION" "$REPORTED" artifacts/stage
+          scripts/verify-no-icu.sh "$image"
 
           name="$(basename "$image")"
           hash="$(sha256sum < "$image" | cut -d' ' -f1)"

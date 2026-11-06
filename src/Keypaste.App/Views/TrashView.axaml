@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -34,34 +35,34 @@
 
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,20">
       <StackPanel Grid.Column="0" Spacing="6">
-        <TextBlock Classes="h1" Text="Trash" />
+        <TextBlock Classes="h1" Text="{x:Static res:Strings.Trash}" />
         <TextBlock Classes="subtitle" Text="{Binding Note}" MaxWidth="620" HorizontalAlignment="Left" />
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEmpty}">
-            <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="Restore">
+            <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="{x:Static res:Strings.Restore}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="history" Size="14" />
-                <TextBlock Text="Restore" />
+                <TextBlock Text="{x:Static res:Strings.Restore}" />
               </StackPanel>
             </Button>
-            <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" AutomationProperties.Name="Delete for good">
+            <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" AutomationProperties.Name="{x:Static res:Strings.DeleteForGood}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="trash-2" Size="14" />
-                <TextBlock Text="Delete for good" />
+                <TextBlock Text="{x:Static res:Strings.DeleteForGood}" />
               </StackPanel>
             </Button>
           </StackPanel>
           <!-- Every row at once, so it stays in its place and is only greyed out while the bin is empty. -->
-          <Button Name="EmptyButton" Classes="ghost" Command="{Binding EmptyCommand}" AutomationProperties.Name="Empty Trash">
+          <Button Name="EmptyButton" Classes="ghost" Command="{Binding EmptyCommand}" AutomationProperties.Name="{x:Static res:Strings.EmptyTrash}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="trash-2" Size="14" />
-              <TextBlock Text="Empty Trash" />
+              <TextBlock Text="{x:Static res:Strings.EmptyTrash}" />
             </StackPanel>
           </Button>
         </StackPanel>
-        <TextBlock Classes="caption" Text="Select an item to restore or delete it" HorizontalAlignment="Right" IsVisible="{Binding AwaitsSelection}" />
+        <TextBlock Classes="caption" Text="{x:Static res:Strings.SelectAnItemToRestoreOrDeleteX69f78c}" HorizontalAlignment="Right" IsVisible="{Binding AwaitsSelection}" />
       </StackPanel>
     </Grid>
 
@@ -77,8 +78,8 @@
         <TextBlock Grid.Column="1" Text="{Binding PurgePrompt}" TextWrapping="Wrap" Classes="size-13"
                    VerticalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelPurgeCommand}" />
-          <Button Classes="danger" Content="Delete for good" Command="{Binding ConfirmPurgeCommand}" />
+          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelPurgeCommand}" />
+          <Button Classes="danger" Content="{x:Static res:Strings.DeleteForGood}" Command="{Binding ConfirmPurgeCommand}" />
         </StackPanel>
       </Grid>
     </Border>
@@ -95,8 +96,8 @@
         <TextBlock Grid.Column="1" Text="{Binding EmptyPrompt}" TextWrapping="Wrap" Classes="size-13"
                    VerticalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEmptyCommand}" />
-          <Button Classes="danger" Content="Empty Trash" Command="{Binding ConfirmEmptyCommand}" />
+          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelEmptyCommand}" />
+          <Button Classes="danger" Content="{x:Static res:Strings.EmptyTrash}" Command="{Binding ConfirmEmptyCommand}" />
         </StackPanel>
       </Grid>
     </Border>
@@ -161,7 +162,7 @@
         </StackPanel>
 
         <ListBox Grid.Row="1"
-                 AutomationProperties.Name="Deleted items"
+                 AutomationProperties.Name="{x:Static res:Strings.DeletedItems}"
                  Classes="table-body"
                  IsVisible="{Binding !IsEmpty}"
                  ItemsSource="{Binding Rows}"
@@ -179,10 +180,10 @@
                   </Grid>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                     <TextBlock Classes="mono muted size-12" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="secondary size-12" Text="comes back at the top level" TextTrimming="CharacterEllipsis"
+                    <TextBlock Classes="secondary size-12" Text="{x:Static res:Strings.ComesBackAtTheTopLevel}" TextTrimming="CharacterEllipsis"
                                IsVisible="{Binding !CameFromALiveGroup}" />
                   </StackPanel>
-                  <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding When}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding When}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding When}" VerticalAlignment="Center" />
                 </views:TrashColumns>
               </Border>
             </DataTemplate>

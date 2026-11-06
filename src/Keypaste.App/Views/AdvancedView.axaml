@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              x:Class="Keypaste.App.Views.AdvancedView"
@@ -30,8 +31,8 @@
   <ScrollViewer>
     <StackPanel Margin="32,12,32,28" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
       <StackPanel Spacing="6">
-        <TextBlock Classes="h1" Text="Advanced" />
-        <TextBlock Classes="subtitle" Text="What the everyday screens leave out, each on a screen of its own." />
+        <TextBlock Classes="h1" Text="{x:Static res:Strings.Advanced}" />
+        <TextBlock Classes="subtitle" Text="{x:Static res:Strings.WhatTheEverydayScreensLeaveOutEachX739fe5}" />
       </StackPanel>
 
       <Border Classes="card filled settings">
@@ -39,47 +40,47 @@
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="Activity log" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ActivityLog}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="Every agent request, allowance, token run and share on this machine, with a check that none was changed." />
+                           Text="{x:Static res:Strings.EveryAgentRequestAllowanceTokenRunAndX73000f}" />
               </StackPanel>
-              <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="Open" VerticalAlignment="Center"
-                      AutomationProperties.Name="Open the activity log"
+              <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      AutomationProperties.Name="{x:Static res:Strings.OpenTheActivityLog}"
                       Command="{Binding OpenActivityLogCommand}" />
             </Grid>
           </Border>
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="Share links" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ShareLinks}" />
                 <TextBlock Name="ShareLinksNote" Classes="caption" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
               </StackPanel>
-              <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="Open" VerticalAlignment="Center"
-                      AutomationProperties.Name="Open the share links"
+              <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      AutomationProperties.Name="{x:Static res:Strings.OpenTheShareLinks}"
                       Command="{Binding OpenShareLinksCommand}" />
             </Grid>
           </Border>
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="Scoped tokens" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ScopedTokens}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="Let a script or CI job run with a scoped set, without you or the vault's password." />
+                           Text="{x:Static res:Strings.LetAScriptOrCIJobRunX39c663}" />
               </StackPanel>
-              <Button Grid.Column="1" Name="OpenScopedTokens" Classes="sm" Content="Open" VerticalAlignment="Center"
-                      AutomationProperties.Name="Open the scoped tokens"
+              <Button Grid.Column="1" Name="OpenScopedTokens" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      AutomationProperties.Name="{x:Static res:Strings.OpenTheScopedTokens}"
                       Command="{Binding OpenScopedTokensCommand}" />
             </Grid>
           </Border>
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="Diagnostics" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.Diagnostics}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="The vault, the folder and the version this app is using, and the crash reports waiting to be sent." />
+                           Text="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXee7732}" />
               </StackPanel>
-              <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="Open" VerticalAlignment="Center"
-                      AutomationProperties.Name="Open diagnostics"
+              <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      AutomationProperties.Name="{x:Static res:Strings.OpenDiagnostics}"
                       Command="{Binding OpenDiagnosticsCommand}" />
             </Grid>
           </Border>

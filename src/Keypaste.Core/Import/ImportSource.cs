@@ -112,7 +112,7 @@ public sealed class ImportSource : IDisposable
 
                 for (var suffix = 2; Taken(path + "/" + name); suffix++)
                 {
-                    name = $"{renamed} ({suffix})";
+                    name = Invariant($"{renamed} ({suffix})");
                 }
 
                 reason ??= $"{KeePassInterop.RecycleBinName} is the Trash's name in a KeePass file";
@@ -208,7 +208,7 @@ public sealed class ImportSource : IDisposable
                     row.Index,
                     duplicates == 1
                         ? $"1 title in {where} names another item too; both are kept"
-                        : $"{duplicates} titles in {where} name another item too; all are kept",
+                        : Invariant($"{duplicates} titles in {where} name another item too; all are kept"),
                     Blocks: false));
             }
         }
@@ -365,7 +365,7 @@ public sealed class ImportSource : IDisposable
         var candidate = name;
         for (var suffix = 2; Taken(candidate); suffix++)
         {
-            candidate = $"{name} ({suffix})";
+            candidate = Invariant($"{name} ({suffix})");
         }
 
         return candidate;
@@ -406,7 +406,7 @@ public sealed class ImportSource : IDisposable
             prefix = prefix.Length == 0 ? segment : prefix + "/" + segment;
             if (groupCounts.GetValueOrDefault(prefix) > 1)
             {
-                return $"{prefix} names {groupCounts[prefix]} groups in this vault; rename one in KeePassXC";
+                return Invariant($"{prefix} names {groupCounts[prefix]} groups in this vault; rename one in KeePassXC");
             }
         }
 

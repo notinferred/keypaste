@@ -22,10 +22,12 @@
     <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
   </Style>
   <Style Selector="TextBox.mono">
+    <Setter Property="FlowDirection" Value="LeftToRight" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="12.5" />
   </Style>
   <Style Selector="AutoCompleteBox.mono">
+    <Setter Property="FlowDirection" Value="LeftToRight" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="12.5" />
   </Style>

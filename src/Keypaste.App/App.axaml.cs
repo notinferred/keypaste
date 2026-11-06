@@ -1,12 +1,15 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Globalization;
 using Keypaste.App.HardwareKeys;
 using Keypaste.App.Navigation;
 using Keypaste.App.Notifications;
@@ -69,6 +72,11 @@ internal sealed partial class App : Application, IDisposable
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+
+        if (ReadingDirection.Of(CultureInfo.CurrentUICulture) == FlowDirection.RightToLeft)
+        {
+            Styles.Insert(0, ReadingDirection.RightToLeftWindows());
+        }
 
         // macOS reads the app menu once, as the platform starts and before Launch, so it is made here and filled there (Q.2).
         if (OperatingSystem.IsMacOS())

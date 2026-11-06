@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Dates, times and table sorting in the desktop app now follow your language and region, and its layout runs right to left where your system reads that way. Keys, values, paths and `kp://` references stay left to right, the words are still English, and no language has been added. A Linux machine with no ICU starts as before, in plain ISO dates and code point order ([Q.16](docs/steps/Q.16.md)).
+
 The desktop app's Items, Trash and activity log tables now sort by a column's head, again to reverse, and their columns size by a drag or the arrow keys. Both last across runs, View › Reset table order and widths undoes them, and neither touches the vault or the audit log ([Q.15](docs/steps/Q.15.md)).
 
 The desktop app now uses the system's notifications. A request that arrives while keypaste is in the background still opens its prompt, and also posts a time-sensitive notification, naming no item, vault or agent, whose Show the prompt brings the prompt forward with focus on Deny; a notification never answers a request and is gone once the request is. On macOS and Linux the notice that an agent found the app locked is now an ordinary notification with Open keypaste; on Windows, and wherever the system cannot post one, it stays keypaste's own notice window ([Q.14](docs/steps/Q.14.md)).

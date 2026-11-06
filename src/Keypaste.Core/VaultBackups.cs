@@ -610,7 +610,7 @@ public static class VaultBackups
         var candidate = Path.Combine(directory, $"{stem}.{stamp}{extension}");
         for (var counter = 2; File.Exists(candidate); counter++)
         {
-            candidate = Path.Combine(directory, $"{stem}.{stamp}-{counter}{extension}");
+            candidate = Path.Combine(directory, Invariant($"{stem}.{stamp}-{counter}{extension}"));
         }
 
         return candidate;
@@ -632,7 +632,7 @@ public static class VaultBackups
         var middle = name[prefix.Length..^extension.Length];
         var counter = 1;
 
-        if (middle.IndexOf('-') is var dash and >= 0)
+        if (middle.IndexOf('-', StringComparison.Ordinal) is var dash and >= 0)
         {
             if (!int.TryParse(
                 middle[(dash + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out counter))

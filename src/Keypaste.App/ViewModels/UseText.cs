@@ -1,4 +1,6 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
 
@@ -15,8 +17,11 @@ internal static class UseText
     {
         ArgumentNullException.ThrowIfNull(use);
 
-        return use.State == EntryUseState.InUse ? "in use" : use.LastUsed is { } at ? Ago(at, now) : "never";
+        return use.State == EntryUseState.InUse ? Strings.TimeInUse : use.LastUsed is { } at ? Ago(at, now) : Strings.TimeNever;
     }
+
+    /// <summary>What the reveal button's tooltip says.</summary>
+    internal static string RevealFor(TimeSpan shownFor) => string.Format(CultureInfo.CurrentCulture, Strings.RevealForSeconds, shownFor.TotalSeconds);
 
     /// <summary>A time as how long ago it was, in its largest whole unit.</summary>
     /// <param name="at">The time.</param>
@@ -28,10 +33,10 @@ internal static class UseText
 
         return elapsed switch
         {
-            _ when elapsed < TimeSpan.FromMinutes(1) => "just now",
-            _ when elapsed < TimeSpan.FromHours(1) => string.Create(CultureInfo.InvariantCulture, $"{(int)elapsed.TotalMinutes}m ago"),
-            _ when elapsed < TimeSpan.FromDays(1) => string.Create(CultureInfo.InvariantCulture, $"{(int)elapsed.TotalHours}h ago"),
-            _ => string.Create(CultureInfo.InvariantCulture, $"{(int)elapsed.TotalDays}d ago"),
+            _ when elapsed < TimeSpan.FromMinutes(1) => Strings.TimeJustNow,
+            _ when elapsed < TimeSpan.FromHours(1) => string.Format(CultureInfo.CurrentCulture, Strings.TimeMinutesAgoShort, (int)elapsed.TotalMinutes),
+            _ when elapsed < TimeSpan.FromDays(1) => string.Format(CultureInfo.CurrentCulture, Strings.TimeHoursAgoShort, (int)elapsed.TotalHours),
+            _ => string.Format(CultureInfo.CurrentCulture, Strings.TimeDaysAgoShort, (int)elapsed.TotalDays),
         };
     }
 
@@ -59,19 +64,19 @@ internal static class UseText
         var days = (int)(now - when).TotalDays;
         var ago = days switch
         {
-            <= 0 => "today",
-            1 => "1 day ago",
-            _ => string.Create(CultureInfo.InvariantCulture, $"{days} days ago"),
+            <= 0 => Strings.DayToday,
+            1 => Strings.DayOneAgo,
+            _ => string.Format(CultureInfo.CurrentCulture, Strings.DaysAgo, days),
         };
 
-        return $"{when.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} · {ago}";
+        return $"{PersonTime.Date(when.ToLocalTime())} · {ago}";
     }
 
     /// <summary>A moment as the detail pane's expiry row shows it: <c>yyyy-MM-dd HH:mm</c>, local time.</summary>
     /// <param name="at">The time, or null.</param>
     /// <returns>The row's text, or empty.</returns>
     internal static string LocalMinute(DateTimeOffset? at) =>
-        at is { } moment ? moment.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : string.Empty;
+        at is { } moment ? PersonTime.Moment(moment.ToLocalTime()) : string.Empty;
 
     /// <summary>The Agent access card's one line.</summary>
     /// <param name="access">What the card shows.</param>

@@ -1,4 +1,5 @@
-<Window xmlns="https://github.com/avaloniaui"
+<Window xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="using:Keypaste.App.Views"
         xmlns:ctl="using:Keypaste.App.Controls"
@@ -36,8 +37,8 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Margin="8,6,0,0"
-            ToolTip.Tip="Menu"
-            AutomationProperties.Name="Menu"
+            ToolTip.Tip="{x:Static res:Strings.Menu}"
+            AutomationProperties.Name="{x:Static res:Strings.Menu}"
             WindowDecorationProperties.ElementRole="User">
       <ctl:KpIcon Icon="menu" Size="16" />
     </Button>

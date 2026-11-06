@@ -39,6 +39,7 @@ internal sealed class KpIcon : Control
     {
         AffectsRender<KpIcon>(DataProperty, IconProperty, SizeProperty, StrokeThicknessProperty, ForegroundProperty);
         AffectsMeasure<KpIcon>(SizeProperty);
+        IconProperty.Changed.AddClassHandler<KpIcon>((icon, _) => icon.InvalidateMirrorTransform());
     }
 
     internal Geometry? Data
@@ -70,6 +71,9 @@ internal sealed class KpIcon : Control
         get => GetValue(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
     }
+
+    /// <summary>Under right to left only an icon that points a way mirrors: a key or a lock reads the same either way.</summary>
+    protected override bool BypassFlowDirectionPolicies => Icon is not ("chevron-left" or "chevron-right" or "arrow-left" or "arrow-right" or "panel-left" or "external-link" or "file-input" or "folder-input" or "log-out");
 
     protected override Size MeasureOverride(Size availableSize) => new(Size, Size);
 

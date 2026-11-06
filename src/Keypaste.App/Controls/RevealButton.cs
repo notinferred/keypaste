@@ -3,6 +3,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
+using Keypaste.App.Resources;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
@@ -116,12 +117,12 @@ internal sealed class RevealButton : Button
     private void Say()
     {
         var showing = IsShowing;
-        var word = showing ? "Hide" : "Reveal";
+        var word = showing ? Strings.Hide : Strings.Reveal;
 
         _icon.Icon = showing ? "eye-off" : "eye";
         _word.Text = word;
         AutomationProperties.SetName(this, Subject is { Length: > 0 } subject ? $"{word} {subject}" : word);
-        ToolTip.SetTip(this, showing ? "Hide" : $"Reveal for {RevealedValue.ShownFor.TotalSeconds:0} seconds");
+        ToolTip.SetTip(this, showing ? Strings.Hide : UseText.RevealFor(RevealedValue.ShownFor));
         (Parent as Control)?.Classes.Set("shows-value", showing);
     }
 

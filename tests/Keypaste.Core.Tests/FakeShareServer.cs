@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -106,7 +107,7 @@ internal sealed class FakeShareServer : HttpMessageHandler
             expires,
             root.GetProperty("revoke_sha256").GetString()!);
 
-        return Json(HttpStatusCode.Created, $"{{\"id\":\"{id}\",\"expires_at\":\"{expires.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss.fff'Z'}\"}}");
+        return Json(HttpStatusCode.Created, string.Create(CultureInfo.InvariantCulture, $"{{\"id\":\"{id}\",\"expires_at\":\"{expires.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss.fff'Z'}\"}}"));
     }
 
     private static HttpResponseMessage NotFound() => Json(HttpStatusCode.NotFound, "{\"error\":\"not found\"}");

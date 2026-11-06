@@ -471,8 +471,16 @@ namespace KeePassLib.Cryptography
 			{
 				char ch = vPassword[i];
 
+#if KEYPASTE_INVARIANT_TEXT
+				vLower[i] = char.ToLowerInvariant(ch);
+#else
 				vLower[i] = char.ToLower(ch);
+#endif
+#if KEYPASTE_INVARIANT_TEXT
+				vLeet[i] = char.ToLowerInvariant(DecodeLeetChar(ch));
+#else
 				vLeet[i] = char.ToLower(DecodeLeetChar(ch));
+#endif
 			}
 
 			char chErased = default(char); // The value that Array.Clear uses

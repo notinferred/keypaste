@@ -88,7 +88,7 @@ public sealed class EnvWritePlan
     internal string Value(string key) => _values[key];
 
     internal static EnvWritePlan Refused(string project, string environment, string refusal) =>
-        new(project, environment, [], new Dictionary<string, string>(), string.Empty, false, refusal);
+        new(project, environment, [], new Dictionary<string, string>(StringComparer.Ordinal), string.Empty, false, refusal);
 
     private List<string> Named(EnvWriteChange change) =>
         [.. Keys.Where(key => key.Change == change).Select(key => key.Key)];

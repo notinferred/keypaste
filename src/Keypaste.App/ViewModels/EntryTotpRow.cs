@@ -56,7 +56,7 @@ internal sealed partial class EntryTotpRow : ObservableObject, IRevealSource, ID
     internal partial int SecondsLeft { get; private set; }
 
     /// <summary>The countdown as the pane draws it.</summary>
-    internal string Countdown => $"{SecondsLeft}s";
+    internal string Countdown => Invariant($"{SecondsLeft}s");
 
     /// <inheritdoc/>
     public string? Reveal() => _owner.ReadTotpCode();

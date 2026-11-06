@@ -216,7 +216,11 @@ namespace KeePassLib.Utility
 			Debug.Assert(dt.Kind != DateTimeKind.Unspecified);
 
 			string str = ToUtc(dt, false).ToString("s");
+#if KEYPASTE_INVARIANT_TEXT
+			if(!str.EndsWith("Z", StringComparison.Ordinal)) str += "Z";
+#else
 			if(!str.EndsWith("Z")) str += "Z";
+#endif
 			return str;
 		}
 
@@ -224,7 +228,11 @@ namespace KeePassLib.Utility
 		{
 			if(str == null) throw new ArgumentNullException("str");
 
+#if KEYPASTE_INVARIANT_TEXT
+			if(str.EndsWith("Z", StringComparison.Ordinal)) str = str.Substring(0, str.Length - 1);
+#else
 			if(str.EndsWith("Z")) str = str.Substring(0, str.Length - 1);
+#endif
 
 			bool bResult = StrUtil.TryParseDateTime(str, out dt);
 			if(bResult) dt = ToUtc(dt, true);

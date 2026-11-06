@@ -30,7 +30,7 @@ public sealed record ShareInfo(
     {
         get
         {
-            var rule = Views == 1 ? "1 view" : $"{Views} views";
+            var rule = Views == 1 ? "1 view" : Invariant($"{Views} views");
             rule += " · " + FormatTtl(Expires - Created);
             return Passphrase ? rule + " · passphrase" : rule;
         }
@@ -41,9 +41,9 @@ public sealed record ShareInfo(
     {
         var minutes = (long)Math.Round(ttl.TotalMinutes);
 
-        return minutes % 1440 == 0 && minutes > 1440 ? $"{minutes / 1440}d"
-            : minutes % 60 == 0 && minutes > 0 ? $"{minutes / 60}h"
-            : $"{minutes}m";
+        return minutes % 1440 == 0 && minutes > 1440 ? Invariant($"{minutes / 1440}d")
+            : minutes % 60 == 0 && minutes > 0 ? Invariant($"{minutes / 60}h")
+            : Invariant($"{minutes}m");
     }
 }
 

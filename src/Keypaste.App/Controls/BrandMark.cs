@@ -16,6 +16,9 @@ namespace Keypaste.App.Controls;
 /// </remarks>
 internal abstract class BrandOutline : Control
 {
+    /// <summary>The mark reads one way under every culture.</summary>
+    protected override bool BypassFlowDirectionPolicies => true;
+
     internal static readonly StyledProperty<Geometry?> InkGeometryProperty =
         AvaloniaProperty.Register<BrandOutline, Geometry?>(nameof(InkGeometry));
 
@@ -121,11 +124,17 @@ internal abstract class BrandOutline : Control
 /// <summary>The icon: "k" with its dot. Never set beside the wordmark.</summary>
 internal sealed class BrandMark : BrandOutline
 {
+    /// <summary>The mark reads one way under every culture.</summary>
+    protected override bool BypassFlowDirectionPolicies => true;
+
     protected override double DefaultHeight => 22;
 }
 
 /// <summary>The wordmark: "keypaste" with its dot. Never set beside the icon.</summary>
 internal sealed class BrandWordmark : BrandOutline
 {
+    /// <summary>The mark reads one way under every culture.</summary>
+    protected override bool BypassFlowDirectionPolicies => true;
+
     protected override double DefaultHeight => 20;
 }

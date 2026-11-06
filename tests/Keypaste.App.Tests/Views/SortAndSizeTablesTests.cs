@@ -299,7 +299,7 @@ public sealed class SortAndSizeTablesTests
         using var shell = LogShell("keypaste-table-log-widths-");
         var columns = Grip(shell, TableStates.Time).FindAncestorOfType<LogColumns>()!;
 
-        Assert.Equal(64, columns.DrawnWidths[0], 1d);
+        Assert.Equal(84, columns.DrawnWidths[0], 1d);
         Assert.Equal(110, columns.DrawnWidths[1], 1d);
         Assert.Equal(100, columns.DrawnWidths[2], 1d);
         Assert.Equal(100, columns.DrawnWidths[5], 1d);

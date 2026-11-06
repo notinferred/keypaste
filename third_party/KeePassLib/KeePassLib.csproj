@@ -57,9 +57,12 @@
                          keypaste's merge marked as moved there, until the entry's next backup,
                          so a version a merge displaced survives the vault's history limits.
 
-      All seven are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      KEYPASTE_INVARIANT_TEXT
+                         reads numbers and dates and compares text the same under every culture, since the
+                         desktop process has one and the CLI's is invariant.
+      All eight are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE;KEYPASTE_TWOFISH;KEYPASTE_KEPT_VERSIONS</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE;KEYPASTE_TWOFISH;KEYPASTE_KEPT_VERSIONS;KEYPASTE_INVARIANT_TEXT</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has

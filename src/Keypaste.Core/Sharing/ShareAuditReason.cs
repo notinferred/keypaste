@@ -23,7 +23,7 @@ public static class ShareAuditReason
     {
         ArgumentNullException.ThrowIfNull(info);
 
-        var views = info.Views == 1 ? "1 view" : $"{info.Views} views";
+        var views = info.Views == 1 ? "1 view" : Invariant($"{info.Views} views");
         var expires = info.Expires.UtcDateTime.ToString(_iso, CultureInfo.InvariantCulture);
         var passphrase = info.Passphrase ? _passphrase : string.Empty;
 

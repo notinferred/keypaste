@@ -13,9 +13,9 @@ internal readonly record struct SortValue(string? Text, long? Time = null)
 /// <summary>How every table compares what it sorts, in the one place the culture reaches it.</summary>
 internal static class TableSorting
 {
-    /// <summary>Text as the current culture orders it, ignoring case. <c>InvariantGlobalization</c> makes every culture invariant, so this is by code point until Q.16 lifts it.</summary>
+    /// <summary>Text as the current culture orders it, ignoring case and with "item 2" before "item 10". On a machine with no ICU, by code point, ignoring case, with numbers as text.</summary>
     internal static int CompareText(string left, string right) =>
-        CultureInfo.CurrentCulture.CompareInfo.Compare(left, right, CompareOptions.IgnoreCase);
+        CultureInfo.CurrentCulture.CompareInfo.Compare(left, right, CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 
     /// <summary>The rows under <paramref name="order"/>, or as they arrive with none.</summary>
     /// <param name="rows">What the search, the group or the filter kept.</param>

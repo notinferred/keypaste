@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -205,7 +206,7 @@ internal sealed partial class ShellView : UserControl
 
         if (selected is NavItem { IsExpandable: true } or GroupRow { HasChildren: true })
         {
-            _shell.Fold(selected, open: e.Key == Key.Right);
+            _shell.Fold(selected, open: e.Key == (FlowDirection == FlowDirection.RightToLeft ? Key.Left : Key.Right));
             e.Handled = true;
             Dispatcher.UIThread.Post(FocusChosenRow, DispatcherPriority.Loaded);
         }

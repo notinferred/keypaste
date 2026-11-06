@@ -83,7 +83,7 @@ public sealed class MessageFramer : IDisposable
         if (payload.Length > maximumFrameBytes - 1)
         {
             throw new InvalidOperationException(
-                $"a frame of {payload.Length} bytes is over the {maximumFrameBytes}-byte limit");
+                Invariant($"a frame of {payload.Length} bytes is over the {maximumFrameBytes}-byte limit"));
         }
 
         var buffer = ArrayPool<byte>.Shared.Rent(payload.Length + 1);
@@ -132,7 +132,7 @@ public sealed class MessageFramer : IDisposable
             if (end >= maximumFrameBytes)
             {
                 throw new InvalidOperationException(
-                    $"the peer sent a frame of {end + 1} bytes, over the {maximumFrameBytes}-byte limit");
+                    Invariant($"the peer sent a frame of {end + 1} bytes, over the {maximumFrameBytes}-byte limit"));
             }
 
             if (end >= 0)
@@ -147,7 +147,7 @@ public sealed class MessageFramer : IDisposable
             if (_pendingLength >= maximumFrameBytes)
             {
                 throw new InvalidOperationException(
-                    $"the peer sent {_pendingLength} bytes with no frame delimiter, over the {maximumFrameBytes}-byte limit");
+                    Invariant($"the peer sent {_pendingLength} bytes with no frame delimiter, over the {maximumFrameBytes}-byte limit"));
             }
 
             var chunk = ArrayPool<byte>.Shared.Rent(ReadChunkBytes);

@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:app="using:Keypaste.App"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -46,6 +47,7 @@
       <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
       <Setter Property="BoxShadow" Value="none" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
     <Style Selector="ToggleButton.tree">
@@ -170,8 +172,8 @@
             <!-- A group is renamed where its name is; the tree it is chosen from is the sidebar's. -->
             <Button x:Name="RenameGroup"
                     Classes="icon ghost sm"
-                    ToolTip.Tip="Rename group"
-                    AutomationProperties.Name="Rename group"
+                    ToolTip.Tip="{x:Static res:Strings.RenameGroup}"
+                    AutomationProperties.Name="{x:Static res:Strings.RenameGroup}"
                     IsVisible="{Binding CanRenameGroup}"
                     Command="{Binding BeginRenameGroupCommand}">
               <ctl:KpIcon Icon="folder-pen" Size="14" />
@@ -184,8 +186,8 @@
                    Margin="16,0,12,0"
                    VerticalAlignment="Center"
                    Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).Search, FallbackValue={x:Null}}"
-                   PlaceholderText="Search"
-                   AutomationProperties.Name="Search">
+                   PlaceholderText="{x:Static res:Strings.Search}"
+                   AutomationProperties.Name="{x:Static res:Strings.Search}">
             <TextBox.InnerLeftContent>
               <ctl:KpIcon Icon="search" Size="13" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
             </TextBox.InnerLeftContent>
@@ -202,11 +204,11 @@
                         Width="68"
                         Height="28"
                         Padding="10,0"
-                        ToolTip.Tip="New item, project or import"
-                        AutomationProperties.Name="New">
+                        ToolTip.Tip="{x:Static res:Strings.NewItemProjectOrImport}"
+                        AutomationProperties.Name="{x:Static res:Strings.New}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="plus" Size="13" />
-              <TextBlock Text="New" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
             </StackPanel>
           </ToggleButton>
         </Grid>
@@ -220,55 +222,55 @@
                   MinWidth="200"
                   IsVisible="{Binding #AddEntry.IsChecked}">
             <StackPanel Spacing="2">
-              <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="New item">
+              <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="{x:Static res:Strings.NewItem}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="key-round" Size="14" />
-                  <TextBlock Text="New item" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewItem}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="NewGroup"
                       Classes="ghost menu-item"
                       Command="{Binding BeginCreateGroupCommand}"
-                      AutomationProperties.Name="New group">
+                      AutomationProperties.Name="{x:Static res:Strings.NewGroup}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="folder-plus" Size="14" />
-                  <TextBlock Text="New group" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewGroup}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="NewGeneratedPassword"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Generate password">
+                      AutomationProperties.Name="{x:Static res:Strings.GeneratePassword}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="wand-2" Size="14" />
-                  <TextBlock Text="Generate password…" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.GeneratePasswordXf22f07}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="NewProject"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="New project">
+                      AutomationProperties.Name="{x:Static res:Strings.NewProject}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="folder-git-2" Size="14" />
-                  <TextBlock Text="New project" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewProject}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="ImportEnv"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import .env">
+                      AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-code" Size="14" />
-                  <TextBlock Text="Import .env" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportEnv}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="ImportKdbx"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import from another app">
+                      AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-input" Size="14" />
-                  <TextBlock Text="Import from another app" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherApp}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -290,7 +292,7 @@
                      Classes="secondary size-12" />
           <Button Grid.Column="1"
                   Classes="link"
-                  Content="Restore"
+                  Content="{x:Static res:Strings.Restore}"
                   Margin="10,0,0,0"
                   IsVisible="{Binding OffersRestore}"
                   Command="{Binding UndoCommand}" />
@@ -306,12 +308,12 @@
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
           <StackPanel Spacing="6">
-            <TextBlock Classes="label" Text="Group name" />
-            <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" AutomationProperties.Name="Group name" />
+            <TextBlock Classes="label" Text="{x:Static res:Strings.GroupName}" />
+            <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="{x:Static res:Strings.Servers}" AutomationProperties.Name="{x:Static res:Strings.GroupName}" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="CreateGroup" Classes="primary sm" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
+            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="CreateGroup" Classes="primary sm" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmCreateGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -319,7 +321,7 @@
       <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
-          <TextBox x:Name="RenameGroupName" AutomationProperties.Name="The group's new name" Text="{Binding DraftGroupName}" />
+          <TextBox x:Name="RenameGroupName" AutomationProperties.Name="{x:Static res:Strings.TheGroupsNewName}" Text="{Binding DraftGroupName}" />
           <TextBlock Classes="caption" Text="{Binding AccessNote}" />
           <!-- A group under env is where keypaste puts a project's new keys. -->
           <TextBlock x:Name="ProjectRenameNote"
@@ -327,8 +329,8 @@
                      IsVisible="{Binding ShowsProjectRenameNote}"
                      Text="{Binding ProjectRenameNote}" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="RenameGroupSave" Classes="primary sm" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
+            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="RenameGroupSave" Classes="primary sm" Content="{x:Static res:Strings.Rename}" Command="{Binding ConfirmRenameGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -337,7 +339,7 @@
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
-          <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="Move to"
+          <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="{x:Static res:Strings.MoveTo}"
                     HorizontalAlignment="Stretch"
                     ItemsSource="{Binding MoveTargets}"
                     SelectedItem="{Binding GroupMoveTarget}">
@@ -351,8 +353,8 @@
           </ComboBox>
           <TextBlock Classes="caption" Text="{Binding AccessNote}" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="MoveGroupSave" Classes="primary sm" Content="Move" Command="{Binding ConfirmMoveGroupCommand}" />
+            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="MoveGroupSave" Classes="primary sm" Content="{x:Static res:Strings.Move}" Command="{Binding ConfirmMoveGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -362,8 +364,8 @@
         <StackPanel Spacing="10">
           <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="KeepGroup" Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteGroupCommand}" />
+            <Button x:Name="KeepGroup" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="{x:Static res:Strings.Delete}" Command="{Binding ConfirmDeleteGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -407,23 +409,23 @@
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
               <Button Classes="sm"
                       Name="SearchAllItems"
-                      Content="Search all items"
+                      Content="{x:Static res:Strings.SearchAllItems}"
                       IsVisible="{Binding ListEmptyOffersSearchAll}"
                       Command="{Binding SearchAllItemsCommand}"
-                      AutomationProperties.Name="Search all items" />
+                      AutomationProperties.Name="{x:Static res:Strings.SearchAllItems}" />
               <Button Classes="sm"
                       Name="ClearSearch"
-                      Content="Clear search"
+                      Content="{x:Static res:Strings.ClearSearch}"
                       IsVisible="{Binding ListEmptyOffersClearSearch}"
                       Command="{Binding ClearSearchCommand}"
-                      AutomationProperties.Name="Clear search" />
+                      AutomationProperties.Name="{x:Static res:Strings.ClearSearch}" />
               <Button Classes="sm"
                       IsVisible="{Binding ListEmptyOffersNew}"
                       Command="{Binding BeginAddCommand}"
-                      AutomationProperties.Name="New item">
+                      AutomationProperties.Name="{x:Static res:Strings.NewItem}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="plus" Size="13" />
-                  <TextBlock Text="New item" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewItem}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <!-- The first run: a new vault is empty, and a person's first act may be to bring their items in from another app. -->
@@ -431,17 +433,17 @@
                       Classes="sm"
                       IsVisible="{Binding ListEmptyOffersImport}"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import from another app">
+                      AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="file-input" Size="13" />
-                  <TextBlock Text="Import from another app" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherApp}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
           </StackPanel>
 
           <ListBox Name="Rows"
-                   AutomationProperties.Name="Items"
+                   AutomationProperties.Name="{x:Static res:Strings.Items}"
                    Classes="rows table"
                    Padding="6,4"
                    ItemsSource="{Binding Rows}"
@@ -501,12 +503,12 @@
                     BorderBrush="{DynamicResource KpBorderSubtle}"
                     BorderThickness="0,0,0,1"
                     IsVisible="{Binding ShowsList}"
-                    AutomationProperties.Name="Resize the list and the preview" />
+                    AutomationProperties.Name="{x:Static res:Strings.ResizeTheListAndThePreview}" />
 
       <Panel Grid.Row="2">
 
         <TextBlock Classes="subtitle"
-                   Text="Choose an item to see it here."
+                   Text="{x:Static res:Strings.ChooseAnItemToSeeItHere}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    IsVisible="{Binding ShowsPlaceholder}" />
@@ -521,12 +523,12 @@
           </Grid.ColumnDefinitions>
           <StackPanel Spacing="24">
 
-            <TextBlock Classes="h1" Text="New item" />
+            <TextBlock Classes="h1" Text="{x:Static res:Strings.NewItem}" />
 
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
               <ListBox x:Name="NewItemTemplate"
-                       AutomationProperties.Name="Kind of item"
+                       AutomationProperties.Name="{x:Static res:Strings.KindOfItem}"
                        Classes="templates"
                        ItemsSource="{Binding Templates}"
                        SelectedItem="{Binding SelectedTemplate}">
@@ -547,8 +549,8 @@
 
               <Grid ColumnDefinitions="*,16,*">
                 <StackPanel Grid.Column="0" Spacing="8">
-                  <TextBlock Classes="label" Text="Title" />
-                  <TextBox x:Name="NewItemTitle" AutomationProperties.Name="Title" MinHeight="40" Text="{Binding Title}" PlaceholderText="github" />
+                  <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
+                  <TextBox x:Name="NewItemTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" MinHeight="40" Text="{Binding Title}" PlaceholderText="{x:Static res:Strings.Github}" />
                   <TextBlock x:Name="NewItemTitleProblem"
                              Classes="caption"
                              Foreground="{DynamicResource KpDanger}"
@@ -557,8 +559,8 @@
                              ctl:Announcer.Says="{Binding TitleProblem}" Text="{Binding TitleProblem}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="8">
-                  <TextBlock Classes="label" Text="Group" />
-                  <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="Group"
+                  <TextBlock Classes="label" Text="{x:Static res:Strings.Group}" />
+                  <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="{x:Static res:Strings.Group}"
                             MinHeight="40"
                             HorizontalAlignment="Stretch"
                             ItemsSource="{Binding Folders}"
@@ -575,55 +577,55 @@
               </Grid>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
-                <TextBlock Classes="label" Text="Key name" />
-                <TextBox x:Name="NewItemKeyName" AutomationProperties.Name="Key name" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.KeyName}" />
+                <TextBox x:Name="NewItemKeyName" AutomationProperties.Name="{x:Static res:Strings.KeyName}" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
                 <TextBlock x:Name="NewItemKeyNameProblem"
                            Classes="caption"
                            Foreground="{DynamicResource KpDanger}"
                            TextWrapping="Wrap"
                            IsVisible="{Binding HasKeyNameProblem}"
                            ctl:Announcer.Says="{Binding KeyNameProblem}" Text="{Binding KeyNameProblem}" />
-                <TextBlock Classes="caption" Text="The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment." />
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.TheNameAProjectReadsItUnderX9a2ebe}" />
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
-                <TextBlock Classes="label" Text="Key value" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.KeyValue}" />
                 <ctl:MaskedInput x:Name="NewItemKeyValue"
                                  AllowsPaste="True"
                                  Sink="{Binding KeyValue}"
                                  MaskedLength="{Binding KeyValue.MaskedLength}"
-                                 Placeholder="Key value" />
+                                 Placeholder="{x:Static res:Strings.KeyValue}" />
                 <TextBlock Classes="caption"
                            IsVisible="{Binding KeyValue.Note.Length}"
                            Text="{Binding KeyValue.Note}" />
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsHost}">
-                <TextBlock Classes="label" Text="Host" />
-                <TextBox x:Name="NewItemHost" AutomationProperties.Name="Host" Classes="mono" MinHeight="40" Text="{Binding Host}" PlaceholderText="db.example.com:5432" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.Host}" />
+                <TextBox x:Name="NewItemHost" AutomationProperties.Name="{x:Static res:Strings.Host}" Classes="mono" MinHeight="40" Text="{Binding Host}" PlaceholderText="db.example.com:5432" />
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUsername}">
-                <TextBlock Classes="label" Text="Username" />
-                <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="Username" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="Optional" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.Username}" />
+                <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="{x:Static res:Strings.Username}" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="{x:Static res:Strings.Optional}" />
               </StackPanel>
 
               <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
-                <TextBlock Classes="label" Text="Password" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.Password}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <ctl:MaskedInput x:Name="NewEntryPassword"
                                    Grid.Column="0"
                                    AllowsPaste="True"
                                    Sink="{Binding Password}"
                                    MaskedLength="{Binding Password.MaskedLength}"
-                                   Placeholder="Password" />
+                                   Placeholder="{x:Static res:Strings.Password}" />
                   <Button x:Name="NewEntryGenerate"
                           Grid.Column="1"
                           Classes="icon ghost"
                           VerticalAlignment="Center"
                           Command="{Binding GenerateCommand}"
-                          ToolTip.Tip="Generate a password"
-                          AutomationProperties.Name="Generate a password">
+                          ToolTip.Tip="{x:Static res:Strings.GenerateAPassword}"
+                          AutomationProperties.Name="{x:Static res:Strings.GenerateAPassword}">
                     <ctl:KpIcon Icon="wand-2" Size="16" />
                   </Button>
                 </Grid>
@@ -632,7 +634,7 @@
                 </Panel>
                 <TextBlock Classes="caption"
                            IsVisible="{Binding GeneratePassword}"
-                           Text="Generated. Type or paste to use your own instead." />
+                           Text="{x:Static res:Strings.GeneratedTypeOrPasteToUseYourX7a2ef9}" />
                 <TextBlock Classes="caption"
                            IsVisible="{Binding !GeneratePassword}"
                            Text="{x:Static app:ShortcutText.PastePassword}" />
@@ -642,13 +644,13 @@
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUrl}">
-                <TextBlock Classes="label" Text="Web address" />
-                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="Web address" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.WebAddress}" />
+                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.WebAddress}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
               </StackPanel>
 
               <StackPanel Spacing="8">
-                <TextBlock Classes="label" Text="Notes" />
-                <TextBox x:Name="NewItemNotes" AutomationProperties.Name="Notes"
+                <TextBlock Classes="label" Text="{x:Static res:Strings.Notes}" />
+                <TextBox x:Name="NewItemNotes" AutomationProperties.Name="{x:Static res:Strings.Notes}"
                          MinHeight="80"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -656,7 +658,7 @@
               </StackPanel>
 
               <StackPanel Spacing="8">
-                <TextBlock Classes="label" Text="Tags" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.Tags}" />
                 <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding Tags.Count}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -690,7 +692,7 @@
                                    FilterMode="ContainsOrdinal"
                                    PlaceholderText="env:project:prod"
                                    Width="220" />
-                  <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
+                  <Button Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
                 </StackPanel>
                 <TextBlock x:Name="NewItemTagProblem"
                            Classes="caption"
@@ -709,8 +711,8 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
-              <Button x:Name="CreateItem" Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
+              <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
+              <Button x:Name="CreateItem" Classes="primary" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
 
           </StackPanel>
@@ -747,22 +749,22 @@
                                    IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                        <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="Copy password">
+                        <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="copy" Size="13" />
-                            <TextBlock Text="Copy" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
-                        <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}" AutomationProperties.Name="Rotate">
+                        <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="refresh-cw" Size="13" />
-                            <TextBlock Text="Rotate" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static res:Strings.Rotate}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
                         <ToggleButton x:Name="EntryMenu"
                                       Classes="more"
-                                      ToolTip.Tip="More"
-                                      AutomationProperties.Name="More actions">
+                                      ToolTip.Tip="{x:Static res:Strings.More}"
+                                      AutomationProperties.Name="{x:Static res:Strings.MoreActions}">
                           <ctl:KpIcon Icon="ellipsis" Size="14" />
                         </ToggleButton>
                       </StackPanel>
@@ -778,28 +780,28 @@
                               MinWidth="200"
                               IsVisible="{Binding #EntryMenu.IsChecked}">
                         <StackPanel Spacing="2">
-                          <Button Classes="ghost menu-item" Command="{Binding EditCommand}" AutomationProperties.Name="Edit fields">
+                          <Button Classes="ghost menu-item" Command="{Binding EditCommand}" AutomationProperties.Name="{x:Static res:Strings.EditFields}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="pencil" Size="14" />
-                              <TextBlock Text="Edit fields" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.EditFields}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="OrganizeFromPane"
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
-                                  AutomationProperties.Name="Rename or move">
+                                  AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="folder-input" Size="14" />
-                              <TextBlock Text="Rename or move" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.RenameOrMove}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="DuplicateEntry"
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DuplicateCommand}"
-                                  AutomationProperties.Name="Duplicate">
+                                  AutomationProperties.Name="{x:Static res:Strings.Duplicate}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="copy" Size="14" />
-                              <TextBlock Text="Duplicate" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.Duplicate}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <!-- History is read when this asks for it, never on selection: one reading
@@ -808,10 +810,10 @@
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
                                   CommandParameter="{Binding Path}"
-                                  AutomationProperties.Name="Share…">
+                                  AutomationProperties.Name="{x:Static res:Strings.Share}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="share-2" Size="14" />
-                              <TextBlock Text="Share…" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.Share}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}" AutomationProperties.Name="{Binding History.ToggleLabel}">
@@ -823,7 +825,7 @@
                           <!-- What names the entry rather than what it holds, kept here out of the preview (N.5). -->
                           <Border Classes="divider" Margin="6,2" />
                           <StackPanel x:Name="EntryIdentity" Margin="10,4" Spacing="3">
-                            <TextBlock Classes="caption" Text="Reference" IsVisible="{Binding HasReference}" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Reference}" IsVisible="{Binding HasReference}" />
                             <TextBlock x:Name="ReferenceText"
                                        Classes="mono secondary size-12"
                                        MaxWidth="300"
@@ -831,8 +833,8 @@
                                        IsVisible="{Binding HasReference}"
                                        Text="{Binding Reference}"
                                        TextTrimming="CharacterEllipsis"
-                                       ToolTip.Tip="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
-                            <TextBlock Classes="caption" Text="KeePass item ID" Margin="0,4,0,0" />
+                                       ToolTip.Tip="{x:Static res:Strings.UseThisInEnvKeypasteWithKeypasteX22e6e9}" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.KeePassItemID}" Margin="0,4,0,0" />
                             <TextBlock x:Name="KdbxEntryText"
                                        Classes="mono secondary size-12"
                                        MaxWidth="300"
@@ -844,10 +846,10 @@
                                   Classes="ghost menu-item"
                                   IsVisible="{Binding HasReference}"
                                   Command="{Binding CopyReferenceCommand}"
-                                  AutomationProperties.Name="Copy the reference">
+                                  AutomationProperties.Name="{x:Static res:Strings.CopyTheReference}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="copy" Size="14" />
-                              <TextBlock Text="Copy the reference" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.CopyTheReference}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Border Classes="divider" Margin="6,2" />
@@ -855,10 +857,10 @@
                                   Classes="ghost menu-item danger"
                                   Foreground="{DynamicResource KpDanger}"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DeleteCommand}"
-                                  AutomationProperties.Name="Delete">
+                                  AutomationProperties.Name="{x:Static res:Strings.Delete}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="trash-2" Size="14" Foreground="{DynamicResource KpDanger}" />
-                              <TextBlock Text="Delete" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
+                              <TextBlock Text="{x:Static res:Strings.Delete}" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
                             </StackPanel>
                           </Button>
                         </StackPanel>
@@ -871,8 +873,8 @@
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelRotateCommand}" />
-                        <Button x:Name="ConfirmRotate" Classes="primary sm" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
+                        <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRotateCommand}" />
+                        <Button x:Name="ConfirmRotate" Classes="primary sm" Content="{x:Static res:Strings.Rotate}" Command="{Binding ConfirmRotateCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -888,8 +890,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelDeleteCommand}" />
-                          <Button Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                          <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
+                          <Button Classes="danger sm" Content="{x:Static res:Strings.Delete}" Command="{Binding ConfirmDeleteCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -903,13 +905,13 @@
                           DataContext="{Binding $parent[views:EntriesView].DataContext}"
                           IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
                     <StackPanel Spacing="10">
-                      <TextBlock Classes="section" Text="Rename or move" />
+                      <TextBlock Classes="section" Text="{x:Static res:Strings.RenameOrMove}" />
                       <TextBlock Text="{Binding OrganizePrompt}"
                                  Classes="mono sm muted"
                                  TextTrimming="CharacterEllipsis" />
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Title" />
-                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="Title" Classes="mono" Text="{Binding DraftTitle}" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
+                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Classes="mono" Text="{Binding DraftTitle}" />
                         <TextBlock x:Name="OrganizeTitleProblem"
                                    Classes="caption"
                                    Foreground="{DynamicResource KpDanger}"
@@ -918,8 +920,8 @@
                                    ctl:Announcer.Says="{Binding OrganizeTitleProblem}" Text="{Binding OrganizeTitleProblem}" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Group" />
-                        <ComboBox x:Name="OrganizeGroup" AutomationProperties.Name="Group"
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.Group}" />
+                        <ComboBox x:Name="OrganizeGroup" AutomationProperties.Name="{x:Static res:Strings.Group}"
                                   HorizontalAlignment="Stretch"
                                   ItemsSource="{Binding MoveTargets}"
                                   SelectedItem="{Binding MoveTarget}">
@@ -932,8 +934,8 @@
                       </StackPanel>
                       <TextBlock Classes="caption" Text="{Binding AccessNote}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelOrganizeCommand}" />
-                        <Button x:Name="OrganizeSave" Classes="primary sm" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
+                        <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelOrganizeCommand}" />
+                        <Button x:Name="OrganizeSave" Classes="primary sm" Content="{x:Static res:Strings.Save}" Command="{Binding ConfirmOrganizeCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -951,7 +953,7 @@
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="history" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Classes="section" Text="History" VerticalAlignment="Center" />
+                          <TextBlock Classes="section" Text="{x:Static res:Strings.History}" VerticalAlignment="Center" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="link" Content="{Binding History.ToggleLabel}" Command="{Binding History.ToggleCommand}" />
                       </Grid>
@@ -962,7 +964,7 @@
                                  Text="{Binding History.EmptyNote}" />
 
                       <ListBox x:Name="Revisions"
-                               AutomationProperties.Name="Earlier versions"
+                               AutomationProperties.Name="{x:Static res:Strings.EarlierVersions}"
                                MaxHeight="180"
                                ItemsSource="{Binding History.Rows}"
                                SelectedItem="{Binding History.Selected}">
@@ -988,11 +990,11 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
                                    Classes="caption"
-                                   Text="{Binding History.Selected.When, StringFormat='Then is the revision saved {0}. Now is the item as it is.'}"
+                                   Text="{Binding History.Selected.When, StringFormat={x:Static res:Strings.ThenIsTheRevisionSavedValueNowXc49899}}"
                                    TextWrapping="Wrap" />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Password" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" Text="Then" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Password}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" VerticalAlignment="Center" />
                         <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto,Auto">
                           <ctl:RevealedValue Grid.Column="0"
                                              x:Name="RevisionPassword"
@@ -1010,83 +1012,83 @@
                                             Target="{Binding #RevisionPassword}"
                                             ShowsWord="True"
                                             Subject="{Binding History.Selected.Subject}" />
-                          <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="Copy"
+                          <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="{x:Static res:Strings.Copy}"
                                   Command="{Binding History.Selected.CopyPasswordCommand}" />
                         </Grid>
-                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <TextBlock Grid.Row="3" Grid.Column="2" Classes="mono secondary" Text="{Binding PasswordMask}" Margin="0,4,0,0" />
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Username" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="caption" Text="Then" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Username}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
                         <Panel Grid.Row="5" Grid.Column="2">
                           <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
-                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <Panel Grid.Row="6" Grid.Column="2" Margin="0,4,0,0">
                           <TextBlock Classes="mono" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
-                        <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="URL" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="8" Grid.Column="0" Classes="caption" Text="Then" />
+                        <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.URL}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="8" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
                         <Panel Grid.Row="8" Grid.Column="2">
                           <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
-                        <TextBlock Grid.Row="9" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="9" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <Panel Grid.Row="9" Grid.Column="2" Margin="0,4,0,0">
                           <TextBlock Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
-                        <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Notes" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="Then" />
+                        <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Notes}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
                         <Panel Grid.Row="11" Grid.Column="2">
                           <TextBlock Classes="size-13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
-                        <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <Panel Grid.Row="12" Grid.Column="2" Margin="0,4,0,0">
                           <TextBlock Classes="size-13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
                         <!-- Custom fields by name and protection, and the tags: never a field's value. -->
-                        <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Custom fields" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="Then" />
+                        <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.CustomFields}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
                         <Panel Grid.Row="14" Grid.Column="2">
                           <TextBlock x:Name="RevisionFields" Classes="mono size-12" Text="{Binding History.Selected.FieldsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding History.Selected.FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
-                        <TextBlock Grid.Row="15" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="15" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <Panel Grid.Row="15" Grid.Column="2" Margin="0,4,0,0">
                           <TextBlock Classes="mono size-12" Text="{Binding FieldsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
-                        <TextBlock Grid.Row="16" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Tags" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="17" Grid.Column="0" Classes="caption" Text="Then" />
+                        <TextBlock Grid.Row="16" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Tags}" Margin="0,12,0,6" />
+                        <TextBlock Grid.Row="17" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
                         <Panel Grid.Row="17" Grid.Column="2">
                           <TextBlock x:Name="RevisionTags" Classes="mono size-12" Text="{Binding History.Selected.TagsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding History.Selected.TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
-                        <TextBlock Grid.Row="18" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                        <TextBlock Grid.Row="18" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
                         <Panel Grid.Row="18" Grid.Column="2" Margin="0,4,0,0">
                           <TextBlock Classes="mono size-12" Text="{Binding TagsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
                       </Grid>
 
                       <StackPanel Spacing="6" IsVisible="{Binding History.HasSelection}">
                         <Button x:Name="RestoreRevision"
                                 Classes="sm"
-                                Content="Restore this"
+                                Content="{x:Static res:Strings.RestoreThis}"
                                 Command="{Binding History.RestoreCommand}"
                                 HorizontalAlignment="Left" />
                         <TextBlock Classes="caption"
                                    TextWrapping="Wrap"
-                                   Text="Restoring makes these the item's values and drops any attachments, custom fields and custom data added since. The ones it replaces are kept here." />
+                                   Text="{x:Static res:Strings.RestoringMakesTheseTheItemsValuesAndX0e783d}" />
 
                         <!-- A restore that puts back other project tags is written only after the person has seen what
                              it does to the item's projects, as every tag change is. -->
@@ -1100,8 +1102,8 @@
                               </ItemsControl.ItemTemplate>
                             </ItemsControl>
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <Button Classes="ghost" Content="Cancel" Command="{Binding History.CancelRestoreCommand}" />
-                              <Button Classes="primary" Content="Restore" Command="{Binding History.ConfirmRestoreCommand}" />
+                              <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding History.CancelRestoreCommand}" />
+                              <Button Classes="primary" Content="{x:Static res:Strings.Restore}" Command="{Binding History.ConfirmRestoreCommand}" />
                             </StackPanel>
                           </StackPanel>
                         </Border>
@@ -1113,7 +1115,7 @@
                   <!-- The fields. A login leads with its username. -->
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="Username" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Username}" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock Grid.Column="0"
@@ -1124,10 +1126,10 @@
                           <Button Grid.Column="1"
                                   Classes="ghost in-field"
                                   Command="{Binding CopyUsernameCommand}"
-                                  AutomationProperties.Name="Copy username">
+                                  AutomationProperties.Name="{x:Static res:Strings.CopyUsername}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="copy" Size="13" />
-                              <TextBlock Text="Copy" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                         </Grid>
@@ -1135,7 +1137,7 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="Password" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Password}" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto,Auto">
                           <!-- Not a TextBlock: its automation peer publishes its text as the element's name.
@@ -1144,7 +1146,7 @@
                                              x:Name="CurrentPassword"
                                              Source="{Binding}"
                                              MaskedLength="{Binding MaskedLength}"
-                                             AutomationProperties.Name="The password"
+                                             AutomationProperties.Name="{x:Static res:Strings.ThePassword}"
                                              FontFamily="{DynamicResource KpMono}"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
@@ -1154,17 +1156,17 @@
                                             Classes="ghost in-field"
                                             Target="{Binding #CurrentPassword}"
                                             ShowsWord="True"
-                                            Subject="the password" />
+                                            Subject="{x:Static res:Strings.ThePasswordAsAnObject}" />
                           <!-- Generate opens Edit fields with a generated password; Save writes it and history keeps the old one (V.12). -->
                           <Button Grid.Column="2"
                                   x:Name="GeneratePassword"
                                   Classes="ghost in-field"
                                   Command="{Binding GeneratePasswordCommand}"
-                                  ToolTip.Tip="Generate a new password"
-                                  AutomationProperties.Name="Generate a new password">
+                                  ToolTip.Tip="{x:Static res:Strings.GenerateANewPassword}"
+                                  AutomationProperties.Name="{x:Static res:Strings.GenerateANewPassword}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="wand-2" Size="14" />
-                              <TextBlock Text="Generate" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.Generate}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                         </Grid>
@@ -1174,14 +1176,14 @@
                     <!-- The TOTP code is masked and computed at the reveal or the copy, as the password is read;
                          only the seconds until the next code are bound. -->
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotp}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.TOTP}" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                           <ctl:RevealedValue Grid.Column="0"
                                              x:Name="CurrentTotp"
                                              Source="{Binding Totp}"
                                              MaskedLength="{Binding Totp.MaskedLength}"
-                                             AutomationProperties.Name="The TOTP code"
+                                             AutomationProperties.Name="{x:Static res:Strings.TheTOTPCode}"
                                              FontFamily="{DynamicResource KpMono}"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
@@ -1191,23 +1193,23 @@
                                      x:Name="TotpCountdown"
                                      Classes="mono secondary"
                                      Text="{Binding Totp.Countdown}"
-                                     ToolTip.Tip="Seconds until the next code"
+                                     ToolTip.Tip="{x:Static res:Strings.SecondsUntilTheNextCode}"
                                      VerticalAlignment="Center"
                                      Margin="0,0,8,0" />
                           <ctl:RevealButton Grid.Column="2"
                                             Classes="ghost in-field"
                                             Target="{Binding #CurrentTotp}"
                                             ShowsWord="True"
-                                            Subject="the TOTP code" />
+                                            Subject="{x:Static res:Strings.TheTotpCodeAsAnObject}" />
                           <Button Grid.Column="3"
                                   x:Name="CopyTotp"
                                   Classes="ghost in-field"
                                   Command="{Binding Totp.CopyCommand}"
-                                  ToolTip.Tip="Copy the code; the clipboard clears itself"
-                                  AutomationProperties.Name="Copy the TOTP code">
+                                  ToolTip.Tip="{x:Static res:Strings.CopyTheCodeTheClipboardClearsItself}"
+                                  AutomationProperties.Name="{x:Static res:Strings.CopyTheTOTPCode}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="copy" Size="13" />
-                              <TextBlock Text="Copy" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                         </Grid>
@@ -1215,7 +1217,7 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotpProblem}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.TOTP}" VerticalAlignment="Top" />
                       <TextBlock Grid.Column="1"
                                  x:Name="TotpRefusal"
                                  Classes="caption"
@@ -1224,7 +1226,7 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Top" Margin="0,11,0,0" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.URL}" VerticalAlignment="Top" Margin="0,11,0,0" />
                       <!-- A web address opens in the browser; anything else is text and says why (N.5). -->
                       <StackPanel Grid.Column="1" Spacing="6">
                         <Border Classes="value">
@@ -1235,8 +1237,8 @@
                                     HorizontalAlignment="Left"
                                     IsVisible="{Binding OpensUrl}"
                                     Command="{Binding OpenUrlCommand}"
-                                    ToolTip.Tip="Open in your browser"
-                                    AutomationProperties.Name="Open the web address">
+                                    ToolTip.Tip="{x:Static res:Strings.OpenInYourBrowser}"
+                                    AutomationProperties.Name="{x:Static res:Strings.OpenTheWebAddress}">
                               <DockPanel>
                                 <ctl:KpIcon DockPanel.Dock="Right" Icon="external-link" Size="13" Margin="6,0,0,0" />
                                 <TextBlock Classes="mono lg"
@@ -1256,10 +1258,10 @@
                                     Grid.Column="1"
                                     Classes="ghost in-field"
                                     Command="{Binding CopyUrlCommand}"
-                                    AutomationProperties.Name="Copy the web address">
+                                    AutomationProperties.Name="{x:Static res:Strings.CopyTheWebAddress}">
                               <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ctl:KpIcon Icon="copy" Size="13" />
-                                <TextBlock Text="Copy" VerticalAlignment="Center" />
+                                <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                               </StackPanel>
                             </Button>
                           </Grid>
@@ -1268,7 +1270,7 @@
                                    Classes="caption"
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding ShowsUrlNote}"
-                                   Text="keypaste opens only web addresses starting http or https, so this one is text. Copy it to use it." />
+                                   Text="{x:Static res:Strings.KeypasteOpensOnlyWebAddressesStartingHttpX58cb44}" />
                       </StackPanel>
                     </Grid>
 
@@ -1279,7 +1281,7 @@
                           <Binding Path="ShowsNotes" />
                         </MultiBinding>
                       </Grid.IsVisible>
-                      <TextBlock Grid.Column="0" Classes="label" Text="Notes" VerticalAlignment="Top" Margin="0,11,0,0" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Notes}" VerticalAlignment="Top" Margin="0,11,0,0" />
                       <Border Grid.Column="1" Classes="value" Padding="12,10">
                         <TextBlock Text="{Binding DisplayNotes}"
                                    TextWrapping="Wrap"
@@ -1293,19 +1295,19 @@
                        it is revealed or its Copy is pressed, as the password is (V.7b). -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Classes="label" Text="Custom fields" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.CustomFields}" VerticalAlignment="Center" />
                       <Button Grid.Column="1"
                               x:Name="AddField"
                               Classes="ghost sm"
                               Command="{Binding BeginAddFieldCommand}"
-                              AutomationProperties.Name="Add field">
+                              AutomationProperties.Name="{x:Static res:Strings.AddField}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="plus" Size="13" />
-                          <TextBlock Text="Add field" VerticalAlignment="Center" />
+                          <TextBlock Text="{x:Static res:Strings.AddField}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
                     </Grid>
-                    <TextBlock Classes="caption" IsVisible="{Binding !HasFields}" Text="No custom fields." />
+                    <TextBlock Classes="caption" IsVisible="{Binding !HasFields}" Text="{x:Static res:Strings.NoCustomFields}" />
                     <ItemsControl ItemsSource="{Binding Fields}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryFieldRow">
@@ -1334,35 +1336,35 @@
                                 <ctl:RevealButton Classes="ghost row-action"
                                                   Target="{Binding #FieldValue}"
                                                   Subject="{Binding DisplayName}" />
-                                <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource FieldCopyGlyph}"
-                                    AutomationProperties.Name="{Binding DisplayName, StringFormat='Copy {0}'}"
-                                        ToolTip.Tip="Copy the value; the clipboard clears itself"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Copy}" ContentTemplate="{StaticResource FieldCopyGlyph}"
+                                    AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.CopyValue}}"
+                                        ToolTip.Tip="{x:Static res:Strings.CopyTheValueTheClipboardClearsItself}"
                                         Command="{Binding CopyValueCommand}" />
-                                <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource FieldReplaceGlyph}"
-                                    AutomationProperties.Name="{Binding DisplayName, StringFormat='Replace {0}'}"
-                                        ToolTip.Tip="Replace the value"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                    AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.ReplaceValue}}"
+                                        ToolTip.Tip="{x:Static res:Strings.ReplaceTheValue}"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding ReplaceCommand}" />
                                 <Button Classes="ghost row-action"
-                                        ToolTip.Tip="Generate a new value"
-                                        AutomationProperties.Name="{Binding DisplayName, StringFormat='Generate a new value for {0}'}"
+                                        ToolTip.Tip="{x:Static res:Strings.GenerateANewValue}"
+                                        AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.GenerateANewValueForValue}}"
                                         IsVisible="{Binding CanGenerate}"
                                         Command="{Binding GenerateCommand}">
                                   <ctl:KpIcon Icon="wand-2" Size="13" />
                                 </Button>
-                                <Button Classes="ghost row-action" Content="Rename" ContentTemplate="{StaticResource FieldRenameGlyph}"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Rename}" ContentTemplate="{StaticResource FieldRenameGlyph}"
                                         ToolTip.Tip="{Binding RenameLabel}"
                                         AutomationProperties.Name="{Binding RenameLabel}"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding RenameCommand}" />
-                                <Button Classes="ghost row-action" Content="Protection" ContentTemplate="{StaticResource FieldProtectGlyph}"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Protection}" ContentTemplate="{StaticResource FieldProtectGlyph}"
                                         ToolTip.Tip="{Binding ProtectionLabel}"
                                         AutomationProperties.Name="{Binding ProtectionLabel}"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding ToggleProtectionCommand}" />
-                                <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource FieldRemoveGlyph}"
-                                        AutomationProperties.Name="{Binding DisplayName, StringFormat='Remove {0}'}"
-                                        ToolTip.Tip="Remove this field"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                        AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.RemoveValue}}"
+                                        ToolTip.Tip="{x:Static res:Strings.RemoveThisField}"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding RemoveCommand}" />
                               </StackPanel>
@@ -1374,8 +1376,8 @@
 
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="10">
-                        <TextBlock Classes="section" Text="Add a field" />
-                        <TextBox x:Name="NewFieldName" AutomationProperties.Name="Field name"
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.AddAField}" />
+                        <TextBox x:Name="NewFieldName" AutomationProperties.Name="{x:Static res:Strings.FieldName}"
                                  Classes="mono"
                                  Text="{Binding DraftFieldName}"
                                  PlaceholderText="STRIPE_SECRET_KEY"
@@ -1387,14 +1389,14 @@
                                            Width="420"
                                            Sink="{Binding NewFieldValue}"
                                            MaskedLength="{Binding NewFieldValue.MaskedLength}"
-                                           Placeholder="Field value" />
+                                           Placeholder="{x:Static res:Strings.FieldValue}" />
                           <Button x:Name="NewFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
                                 Command="{Binding GenerateIntoCommand}"
                                 CommandParameter="{Binding NewFieldValue}"
-                                ToolTip.Tip="Generate a value"
-                                AutomationProperties.Name="Generate a value">
+                                ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
+                                AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
                         </StackPanel>
@@ -1408,8 +1410,8 @@
                                       OffContent="Plain" />
                         <TextBlock Classes="caption" Text="{x:Static app:ShortcutText.PasteProtected}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddFieldCommand}" />
-                          <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddFieldCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddFieldCommand}" />
+                          <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1423,14 +1425,14 @@
                                            Width="420"
                                            Sink="{Binding ReplacementFieldValue}"
                                            MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
-                                           Placeholder="New field value" />
+                                           Placeholder="{x:Static res:Strings.NewFieldValue}" />
                           <Button x:Name="ReplacementFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
                                 Command="{Binding GenerateIntoCommand}"
                                 CommandParameter="{Binding ReplacementFieldValue}"
-                                ToolTip.Tip="Generate a value"
-                                AutomationProperties.Name="Generate a value">
+                                ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
+                                AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
                         </StackPanel>
@@ -1438,10 +1440,10 @@
                           <views:GeneratorOptions DataContext="{Binding Generator}" />
                         </Panel>
                         <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
-                        <TextBlock Classes="caption" Text="The old value stays in the item's history." />
+                        <TextBlock Classes="caption" Text="{x:Static res:Strings.TheOldValueStaysInTheItemsX346d21}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceFieldCommand}" />
-                          <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceFieldCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceFieldCommand}" />
+                          <Button Classes="primary" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1451,12 +1453,12 @@
                     <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
-                        <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="New field name"
+                        <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="{x:Static res:Strings.NewFieldName}"
                                  Classes="mono"
                                  Text="{Binding DraftFieldRename}"
                                  Width="320"
                                  HorizontalAlignment="Left" />
-                        <TextBlock Classes="caption" Text="The value and its protection go with the new name, and the old name stays in the item's history." TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="{x:Static res:Strings.TheValueAndItsProtectionGoWithX9050e5}" TextWrapping="Wrap" />
                         <ItemsControl x:Name="FieldRenameLines" ItemsSource="{Binding FieldRenameLines}" IsVisible="{Binding IsConfirmingFieldRename}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
@@ -1465,8 +1467,8 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRenameFieldCommand}" />
-                          <Button x:Name="RenameFieldSave" Classes="primary" Content="Rename" Command="{Binding ConfirmRenameFieldCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRenameFieldCommand}" />
+                          <Button x:Name="RenameFieldSave" Classes="primary" Content="{x:Static res:Strings.Rename}" Command="{Binding ConfirmRenameFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1475,8 +1477,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveFieldCommand}" />
-                          <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveFieldCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveFieldCommand}" />
+                          <Button Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1486,19 +1488,19 @@
                        here opens or runs an attachment. -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Classes="label" Text="Attachments" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Attachments}" VerticalAlignment="Center" />
                       <Button Grid.Column="1"
                               x:Name="AddAttachment"
                               Classes="ghost sm"
                               Command="{Binding Attachments.AddCommand}"
-                              AutomationProperties.Name="Add attachment">
+                              AutomationProperties.Name="{x:Static res:Strings.AddAttachment}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="plus" Size="13" />
-                          <TextBlock Text="Add attachment" VerticalAlignment="Center" />
+                          <TextBlock Text="{x:Static res:Strings.AddAttachment}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
                     </Grid>
-                    <TextBlock Classes="caption" IsVisible="{Binding !Attachments.HasRows}" Text="No attachments." />
+                    <TextBlock Classes="caption" IsVisible="{Binding !Attachments.HasRows}" Text="{x:Static res:Strings.NoAttachments}" />
                     <ItemsControl x:Name="AttachmentRows" ItemsSource="{Binding Attachments.Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryAttachmentRow">
@@ -1507,16 +1509,16 @@
                               <TextBlock Grid.Column="0" Classes="mono" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                               <TextBlock Grid.Column="1" Classes="caption" Text="{Binding SizeText}" Margin="8,0" VerticalAlignment="Center" />
                               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Button Classes="ghost row-action" Content="Save" ContentTemplate="{StaticResource AttachmentSaveGlyph}"
-                                        ToolTip.Tip="Save a copy to a file"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Save}" ContentTemplate="{StaticResource AttachmentSaveGlyph}"
+                                        ToolTip.Tip="{x:Static res:Strings.SaveACopyToAFile}"
                                         AutomationProperties.Name="{Binding SaveLabel}"
                                         Command="{Binding SaveCommand}" />
-                                <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource FieldReplaceGlyph}"
-                                        ToolTip.Tip="Replace with another file"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                        ToolTip.Tip="{x:Static res:Strings.ReplaceWithAnotherFile}"
                                         AutomationProperties.Name="{Binding ReplaceLabel}"
                                         Command="{Binding ReplaceCommand}" />
-                                <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource FieldRemoveGlyph}"
-                                        ToolTip.Tip="Remove this attachment"
+                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                        ToolTip.Tip="{x:Static res:Strings.RemoveThisAttachment}"
                                         AutomationProperties.Name="{Binding RemoveLabel}"
                                         Command="{Binding RemoveCommand}" />
                               </StackPanel>
@@ -1535,8 +1537,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding Attachments.RemovePrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding Attachments.CancelRemoveCommand}" />
-                          <Button x:Name="RemoveAttachmentConfirm" Classes="danger" Content="Remove" Command="{Binding Attachments.ConfirmRemoveCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Attachments.CancelRemoveCommand}" />
+                          <Button x:Name="RemoveAttachmentConfirm" Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding Attachments.ConfirmRemoveCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1545,7 +1547,7 @@
                   <!-- The entry's own tags. A project tag reads as its project and environment, with a shield
                        when every agent request for the entry is asked about. -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
-                    <TextBlock Classes="label" Text="Tags" />
+                    <TextBlock Classes="label" Text="{x:Static res:Strings.Tags}" />
                     <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -1580,7 +1582,7 @@
                                        FilterMode="ContainsOrdinal"
                                        PlaceholderText="env:project:prod"
                                        Width="220" />
-                      <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
+                      <Button Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
                     </StackPanel>
 
                     <!-- A project tag is written only after the person has seen the environment and the fields it
@@ -1595,7 +1597,7 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelTagChangeCommand}" />
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelTagChangeCommand}" />
                           <Button Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                         </StackPanel>
                       </StackPanel>
@@ -1609,7 +1611,7 @@
                       <StackPanel Spacing="10">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="bot" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Classes="label" Text="Agent access" VerticalAlignment="Center" />
+                          <TextBlock Classes="label" Text="{x:Static res:Strings.AgentAccess}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock x:Name="AgentAccessSummary"
                                    Classes="mono size-12-5"
@@ -1626,7 +1628,7 @@
                         </ItemsControl>
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding HasBeenUsed}"
-                                   Text="{Binding LastUsedText, StringFormat='Last used {0}'}" />
+                                   Text="{Binding LastUsedText, StringFormat={x:Static res:Strings.LastUsedValue}}" />
                       </StackPanel>
                     </Border>
 
@@ -1636,7 +1638,7 @@
                       <StackPanel Spacing="10">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="layers" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Classes="label" Text="Environments" VerticalAlignment="Center" />
+                          <TextBlock Classes="label" Text="{x:Static res:Strings.Environments}" VerticalAlignment="Center" />
                         </StackPanel>
                         <ItemsControl ItemsSource="{Binding Environments}">
                           <ItemsControl.ItemTemplate>
@@ -1668,7 +1670,7 @@
                     <StackPanel>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="Created" />
+                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{x:Static res:Strings.Created}" />
                           <TextBlock Grid.Column="1" x:Name="CreatedText" Classes="primary size-12-5" Text="{Binding Created}" />
                         </Grid>
                       </Border>
@@ -1686,7 +1688,7 @@
                       </Border>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="Rotated" />
+                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{x:Static res:Strings.Rotated}" />
                           <TextBlock Grid.Column="1" x:Name="RotatedText" Classes="primary size-12-5" Text="{Binding Rotated}" />
                         </Grid>
                       </Border>
@@ -1695,51 +1697,51 @@
 
                   <Border Classes="form" IsVisible="{Binding IsEditing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding SaveCommand}" ctl:FormKeys.Cancel="{Binding CancelCommand}" ctl:FormKeys.Draft="{Binding EditDraft}">
                     <StackPanel Spacing="10">
-                      <TextBlock Classes="section" Text="Edit fields" />
+                      <TextBlock Classes="section" Text="{x:Static res:Strings.EditFields}" />
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Username" />
-                        <TextBox Classes="mono" Text="{Binding DraftUsername}" AutomationProperties.Name="Username" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.Username}" />
+                        <TextBox Classes="mono" Text="{Binding DraftUsername}" AutomationProperties.Name="{x:Static res:Strings.Username}" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="URL" />
-                        <TextBox Classes="mono" Text="{Binding DraftUrl}" AutomationProperties.Name="URL" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.URL}" />
+                        <TextBox Classes="mono" Text="{Binding DraftUrl}" AutomationProperties.Name="{x:Static res:Strings.URL}" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Notes" />
-                        <TextBox Text="{Binding DraftNotes}" AutomationProperties.Name="Notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.Notes}" />
+                        <TextBox Text="{Binding DraftNotes}" AutomationProperties.Name="{x:Static res:Strings.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Password" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.Password}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                           <ctl:MaskedInput x:Name="ReplacementPassword"
                                            Grid.Column="0"
                                            AllowsPaste="True"
                                            Sink="{Binding NewPassword}"
                                            MaskedLength="{Binding NewPassword.MaskedLength}"
-                                           Placeholder="New password" />
+                                           Placeholder="{x:Static res:Strings.NewPassword}" />
                           <Button x:Name="ReplacementPasswordGenerate"
                                   Grid.Column="1"
                                   Classes="icon ghost"
                                   VerticalAlignment="Center"
                                   Command="{Binding GenerateIntoCommand}"
                                   CommandParameter="{Binding NewPassword}"
-                                  ToolTip.Tip="Generate a password"
-                                  AutomationProperties.Name="Generate a password">
+                                  ToolTip.Tip="{x:Static res:Strings.GenerateAPassword}"
+                                  AutomationProperties.Name="{x:Static res:Strings.GenerateAPassword}">
                             <ctl:KpIcon Icon="wand-2" Size="16" />
                           </Button>
                         </Grid>
                         <Panel IsVisible="{Binding NewPassword.IsGenerated}">
                           <views:GeneratorOptions DataContext="{Binding Generator}" />
                         </Panel>
-                        <TextBlock Classes="caption" IsVisible="{Binding !NewPassword.IsGenerated}" Text="Leave this empty to keep the current password. A replacement keeps the old one in this item's history." TextWrapping="Wrap" />
-                        <TextBlock Classes="caption" IsVisible="{Binding NewPassword.IsGenerated}" Text="Generated. Save puts it in place of the current password, which stays in this item's history." TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" IsVisible="{Binding !NewPassword.IsGenerated}" Text="{x:Static res:Strings.LeaveThisEmptyToKeepTheCurrentX151c53}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" IsVisible="{Binding NewPassword.IsGenerated}" Text="{x:Static res:Strings.GeneratedSavePutsItInPlaceOfXefb5c1}" TextWrapping="Wrap" />
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding NewPassword.Note.Length}"
                                    Text="{Binding NewPassword.Note}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelCommand}" />
-                        <Button Classes="primary sm" Content="Save" Command="{Binding SaveCommand}" />
+                        <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+                        <Button Classes="primary sm" Content="{x:Static res:Strings.Save}" Command="{Binding SaveCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>

@@ -502,7 +502,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             var count = Matching().Count();
 
             return count == 0 ? "No other item matches."
-                : count > _shownCandidates ? $"{count - _shownCandidates} more. Type part of a path to narrow the list."
+                : count > _shownCandidates ? Invariant($"{count - _shownCandidates} more. Type part of a path to narrow the list.")
                 : string.Empty;
         }
     }

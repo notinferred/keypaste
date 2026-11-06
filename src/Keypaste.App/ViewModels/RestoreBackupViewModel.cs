@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.HardwareKeys;
 
@@ -11,7 +12,7 @@ internal sealed class BackupRow(VaultBackup backup, bool isDamaged)
     internal VaultBackup Backup { get; } = backup;
 
     internal string Taken { get; } =
-        backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+        PersonTime.Moment(backup.TakenAt.ToLocalTime());
 
     /// <summary>Whether the file has no KDBX header, which needs no password to find out.</summary>
     internal bool IsDamaged { get; } = isDamaged;
@@ -168,7 +169,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
     internal bool HasNote => HasMessage && !IsError;
 
     internal string Taken => Validated is { } summary
-        ? $"Backup taken {summary.Backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)}."
+        ? $"Backup taken {PersonTime.Moment(summary.Backup.TakenAt.ToLocalTime())}."
         : string.Empty;
 
     internal string Holds => Validated is { } summary
@@ -182,7 +183,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         { Replaces: null } => "There is no file at the vault's path now, so nothing is replaced.",
         { Replaces: { } facts } =>
             $"It replaces {DisplayTextSanitizer.Sanitize(Path.GetFileName(facts.Path)).Text}, {Size(facts.Length)}, last written " +
-            $"{facts.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)}" +
+            $"{PersonTime.Moment(facts.ModifiedAt.ToLocalTime())}" +
             (KdbxHeader.IsVaultFile(facts.Path) ? "." : ", which is not readable as a vault.") +
             " That file is kept as a backup first.",
     };

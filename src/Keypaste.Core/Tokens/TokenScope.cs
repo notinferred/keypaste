@@ -85,7 +85,7 @@ public sealed record TokenScope(string Project, string Profile, string? Key)
 
         var (project, profile, key) = (parts[0], parts[1], parts[2]);
 
-        if (!EnvConvention.IsValidProject(project, out error) || project.Contains(',') || project.Contains(':') || project == "*")
+        if (!EnvConvention.IsValidProject(project, out error) || project.Contains(',', StringComparison.Ordinal) || project.Contains(':', StringComparison.Ordinal) || project == "*")
         {
             error = $"'{Shown(text)}' does not name a project: {(error.Length > 0 ? error : "a project is one name, without ',', ':' or a wildcard")}";
             return false;

@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
@@ -51,9 +52,9 @@
         <StackPanel Grid.Column="0" Spacing="16" MinWidth="296">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel Grid.Column="0" Spacing="6">
-              <TextBlock Classes="h1" Text="Share links" />
+              <TextBlock Classes="h1" Text="{x:Static res:Strings.ShareLinks}" />
               <TextBlock Classes="subtitle"
-                         Text="Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it." />
+                         Text="{x:Static res:Strings.LinksYouMadeFromAnItemsMenuXfaa446}" />
             </StackPanel>
             <Button Grid.Column="1"
                     x:Name="CheckStatus"
@@ -61,20 +62,20 @@
                     VerticalAlignment="Top"
                     Margin="12,0,0,0"
                     IsVisible="{Binding !IsEmpty}"
-                    ToolTip.Tip="Ask the share server how many views each link has left"
+                    ToolTip.Tip="{x:Static res:Strings.AskTheShareServerHowManyViewsXbaa6a2}"
                     Command="{Binding RefreshCommand}"
-                    AutomationProperties.Name="Check status">
+                    AutomationProperties.Name="{x:Static res:Strings.CheckStatus}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="refresh-cw" Size="13" Classes.spinning="{Binding RefreshCommand.IsRunning}" />
-                <TextBlock Text="Check status" IsVisible="{Binding !RefreshCommand.IsRunning}" />
-                <TextBlock Text="Checking status…" IsVisible="{Binding RefreshCommand.IsRunning}" />
+                <TextBlock Text="{x:Static res:Strings.CheckStatus}" IsVisible="{Binding !RefreshCommand.IsRunning}" />
+                <TextBlock Text="{x:Static res:Strings.CheckingStatus}" IsVisible="{Binding RefreshCommand.IsRunning}" />
               </StackPanel>
             </Button>
           </Grid>
 
           <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,14">
             <TextBlock Classes="caption"
-                       Text="No links yet. Choose Share… in an item's ⋯ menu to make one; it appears here with its limits, and Check status asks how many views it has left." />
+                       Text="{x:Static res:Strings.NoLinksYetChooseShareInAnX8aa94b}" />
           </Border>
 
           <Border x:Name="Shares"
@@ -122,7 +123,7 @@
 
           <TextBlock Classes="caption"
                      IsVisible="{Binding HasUnchecked}"
-                     Text="Opening this screen asks the share server nothing. Check status asks how many views each link has left." />
+                     Text="{x:Static res:Strings.OpeningThisScreenAsksTheShareServerXdb6227}" />
         </StackPanel>
 
       </Grid>

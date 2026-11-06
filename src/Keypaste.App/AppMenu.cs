@@ -115,7 +115,7 @@ internal static class AppMenu
             var entries = submenu.Entries();
             var headers = entries.Select(Header).ToList();
 
-            if (!headers.SequenceEqual(shown))
+            if (!headers.SequenceEqual(shown, StringComparer.Ordinal))
             {
                 menu.Items.Clear();
 

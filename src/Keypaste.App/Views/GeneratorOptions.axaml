@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
@@ -12,27 +13,27 @@
   <StackPanel Spacing="10">
     <Border Classes="segmented inset" HorizontalAlignment="Left">
       <StackPanel Orientation="Horizontal">
-        <RadioButton Classes="segment" Content="Characters" IsChecked="{Binding UseCharacters}" />
-        <RadioButton Classes="segment" Content="Words" IsChecked="{Binding UseWords}" />
+        <RadioButton Classes="segment" Content="{x:Static res:Strings.Characters}" IsChecked="{Binding UseCharacters}" />
+        <RadioButton Classes="segment" Content="{x:Static res:Strings.Words}" IsChecked="{Binding UseWords}" />
       </StackPanel>
     </Border>
     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UseWords}">
       <StackPanel Spacing="6">
-        <TextBlock Classes="label" Text="Words" />
+        <TextBlock Classes="label" Text="{x:Static res:Strings.Words}" />
         <NumericUpDown Width="104"
                        Minimum="{Binding MinimumWords}"
                        Maximum="{Binding MaximumWords}"
                        Increment="1"
                        FormatString="0"
-                       AutomationProperties.Name="Words"
+                       AutomationProperties.Name="{x:Static res:Strings.Words}"
                        Value="{Binding WordCount}" />
       </StackPanel>
       <StackPanel Spacing="6">
-        <TextBlock Classes="label" Text="Separator" />
+        <TextBlock Classes="label" Text="{x:Static res:Strings.Separator}" />
         <TextBox Width="44"
                  MaxLength="1"
                  Classes="mono"
-                 AutomationProperties.Name="Separator"
+                 AutomationProperties.Name="{x:Static res:Strings.Separator}"
                  Text="{Binding Separator}" />
       </StackPanel>
     </StackPanel>

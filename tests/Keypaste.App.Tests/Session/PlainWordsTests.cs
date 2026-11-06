@@ -42,6 +42,16 @@ public sealed partial class PlainWordsTests
     private static partial Regex Interface();
 
     [Fact]
+    public void EveryLabelInTheResources_HoldsNoneOfTheRetiredWords()
+    {
+        var found = LanguageAndRegionTests.Labels()
+            .Where(label => Retired().IsMatch(Interface().Replace(label.Value, string.Empty)))
+            .Select(label => label.Key + ": " + label.Value);
+
+        Assert.Empty(found);
+    }
+
+    [Fact]
     public Task EveryScreen_HoldsNoneOfTheRetiredWords() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-plain-", vault =>

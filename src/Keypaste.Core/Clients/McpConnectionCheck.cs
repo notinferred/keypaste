@@ -194,7 +194,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new McpCheckListing([], $"the bridge did not answer within {StepTimeout.TotalSeconds:0} seconds");
+            return new McpCheckListing([], Invariant($"the bridge did not answer within {StepTimeout.TotalSeconds:0} seconds"));
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
@@ -243,7 +243,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         {
             return new McpCheckAnswer(
                 McpCheckOutcome.Failed,
-                $"no answer within {RequestTimeout.TotalSeconds:0} seconds");
+                Invariant($"no answer within {RequestTimeout.TotalSeconds:0} seconds"));
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {

@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:app="using:Keypaste.App"
              xmlns:vm="using:Keypaste.App.ViewModels"
@@ -76,8 +77,8 @@
       <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
 
         <StackPanel Spacing="6">
-          <TextBlock Classes="h1" Text="Settings" />
-          <TextBlock Classes="subtitle" Text="Saved on this machine, and in force as soon as you change them." />
+          <TextBlock Classes="h1" Text="{x:Static res:Strings.Settings}" />
+          <TextBlock Classes="subtitle" Text="{x:Static res:Strings.SavedOnThisMachineAndInForceX73265c}" />
         </StackPanel>
 
         <!-- Recommendations (C.2, V.11, V.9): keys left in notes, named by entry and key, never by value, project
@@ -91,16 +92,16 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="clipboard-check" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Recommendations" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Recommendations}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <TextBlock Classes="caption"
                          TextWrapping="Wrap"
-                         Text="Keys left in notes, passwords that are weak, reused or past their expiry date, and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
+                         Text="{x:Static res:Strings.KeysLeftInNotesPasswordsThatAreXc4a5b0}" />
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding IsEmpty}">
-              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes, no weak, reused or expired passwords, and no project tags dropped." />
+              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
             </Border>
             <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}" IsVisible="{Binding HasNoteKeys}">
               <ItemsControl.ItemTemplate>
@@ -112,7 +113,7 @@
                                 IsChecked="{Binding IsSelected}"
                                 IsEnabled="{Binding NeedsReview}"
                                 VerticalAlignment="Center"
-                                AutomationProperties.Name="{Binding Key, StringFormat='Select {0}'}" />
+                                AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.SelectValue}}" />
                       <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <TextBlock Name="RecommendationTokenKind"
@@ -134,9 +135,9 @@
                         <TextBlock Classes="caption" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="sm" Content="Move to a field" AutomationProperties.Name="{Binding Key, StringFormat='Move {0} to a field'}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
-                        <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Key, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                        <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Key, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                        <Button Classes="sm" Content="{x:Static res:Strings.MoveToAField}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.MoveValueToAField}}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -148,10 +149,10 @@
                 <TextBlock Grid.Column="0"
                            Classes="caption"
                            TextWrapping="Wrap"
-                           Text="Each value becomes a protected field named by its key, and its line leaves the notes, in one change to each item. The notes as they were stay in the item's history." />
+                           Text="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-                  <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="Select all" Command="{Binding SelectAllCommand}" />
-                  <Button Name="MoveSelected" Classes="sm" Content="Move selected" Command="{Binding MoveSelectedCommand}" />
+                  <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="{x:Static res:Strings.SelectAll}" Command="{Binding SelectAllCommand}" />
+                  <Button Name="MoveSelected" Classes="sm" Content="{x:Static res:Strings.MoveSelected}" Command="{Binding MoveSelectedCommand}" />
                 </StackPanel>
               </Grid>
             </Border>
@@ -177,9 +178,9 @@
                           <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                          <Button Classes="sm" Content="Restore tag" AutomationProperties.Name="{Binding Tag, StringFormat='Restore {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
-                          <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Tag, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                          <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Tag, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                          <Button Classes="sm" Content="{x:Static res:Strings.RestoreTag}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.RestoreValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
+                          <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                          <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                         </StackPanel>
                       </Grid>
                       <Border Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding CancelRestoreCommand}">
@@ -192,8 +193,8 @@
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Classes="sm ghost" Content="Cancel" Command="{Binding CancelRestoreCommand}" />
-                            <Button Classes="sm" Content="Add tag" Command="{Binding ConfirmRestoreCommand}" />
+                            <Button Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRestoreCommand}" />
+                            <Button Classes="sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding ConfirmRestoreCommand}" />
                           </StackPanel>
                         </StackPanel>
                       </Border>
@@ -224,10 +225,10 @@
                         <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="sm ghost" Content="Open item" Command="{Binding OpenCommand}"
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.OpenItem}" Command="{Binding OpenCommand}"
                                 AutomationProperties.Name="{Binding OpenLabel}" />
-                        <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Entry, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                        <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Entry, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -237,7 +238,7 @@
             <Border Classes="settings-row" IsVisible="{Binding HasPasswords}">
               <TextBlock Classes="caption"
                          TextWrapping="Wrap"
-                         Text="Replace a weak or reused password on its item in Items; a generated one is strong and used nowhere else. An expiry date is changed in KeePassXC or the app that set it." />
+                         Text="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}" />
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding HasMessage}">
               <TextBlock Name="RecommendationsMessage"
@@ -256,19 +257,19 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="shield" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Security" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Security}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Lock the vault after" />
+                  <TextBlock Classes="row-label" Text="{x:Static res:Strings.LockTheVaultAfter}" />
                   <TextBlock Classes="caption"
                              Text="{x:Static app:ShortcutText.IdleLock}" />
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding IdleChoices}"
-                          AutomationProperties.Name="Lock the vault after"
+                          AutomationProperties.Name="{x:Static res:Strings.LockTheVaultAfter}"
                           SelectedItem="{Binding Idle}"
                           MinWidth="160"
                           VerticalAlignment="Top">
@@ -282,12 +283,12 @@
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding MinimizeLockSupported}">
               <StackPanel Spacing="4">
-                <ToggleSwitch Content="Lock when the window is minimized"
+                <ToggleSwitch Content="{x:Static res:Strings.LockWhenTheWindowIsMinimized}"
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding LockWhenMinimized}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
-                           Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
+                           Text="{x:Static res:Strings.TakesEffectAtOnceAndAtEveryX7e38a2}" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -299,7 +300,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="rotate-cw" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Startup" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Startup}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -310,18 +311,18 @@
                               Classes="size-13-5"
                               IsChecked="{Binding StayInTray}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
-                           Text="Closing the window still locks the vault. Open, Lock and Quit are on the icon's menu. Some Linux desktops show no tray icon." />
+                           Text="{x:Static res:Strings.ClosingTheWindowStillLocksTheVaultX283e06}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding OpenAtLoginSupported}">
               <StackPanel Spacing="4">
                 <ToggleSwitch Name="OpenAtLogin"
-                              Content="Open keypaste at login"
+                              Content="{x:Static res:Strings.OpenKeypasteAtLogin}"
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding OpenAtLogin}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
-                           Text="It starts locked, and with no window when it stays in the tray. Only your own login is changed." />
+                           Text="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -333,17 +334,17 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="sun" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Appearance" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Appearance}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Theme" />
-                  <TextBlock Classes="caption" Text="System follows the operating system's light or dark setting." />
+                  <TextBlock Classes="row-label" Text="{x:Static res:Strings.Theme}" />
+                  <TextBlock Classes="caption" Text="{x:Static res:Strings.SystemFollowsTheOperatingSystemsLightOrXc00a47}" />
                 </StackPanel>
                 <ListBox Grid.Column="1"
-                         Name="ThemeChoice" AutomationProperties.Name="Theme"
+                         Name="ThemeChoice" AutomationProperties.Name="{x:Static res:Strings.Theme}"
                          Classes="segmented"
                          VerticalAlignment="Center"
                          ItemsSource="{Binding Themes}"
@@ -359,94 +360,94 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="key-round" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Vault access" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.VaultAccess}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <StackPanel Spacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="row-label" Text="Master password, key file and YubiKey" />
+                  <TextBlock Classes="row-label" Text="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}" />
                   <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
                              Foreground="{DynamicResource KpTextSecondary}" />
                 </StackPanel>
 
                 <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left" Width="420">
                   <StackPanel Spacing="6">
-                    <TextBlock Classes="label" Text="Current master password" />
+                    <TextBlock Classes="label" Text="{x:Static res:Strings.CurrentMasterPassword}" />
                     <ctl:MaskedInput x:Name="CurrentPassword"
                                      AllowsPaste="True"
                                      MaskedLength="{Binding CurrentMaskedLength}"
-                                     Placeholder="Current master password"
+                                     Placeholder="{x:Static res:Strings.CurrentMasterPassword}"
                                      IsEnabled="{Binding IsEditing}" />
                   </StackPanel>
 
-                  <CheckBox Content="Set a new master password"
+                  <CheckBox Content="{x:Static res:Strings.SetANewMasterPassword}"
                             IsChecked="{Binding SetPassword}"
                             IsEnabled="{Binding IsEditing}" />
                   <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
                     <StackPanel Spacing="6">
-                      <TextBlock Classes="label" Text="New master password" />
+                      <TextBlock Classes="label" Text="{x:Static res:Strings.NewMasterPassword}" />
                       <ctl:MaskedInput x:Name="AccessNewPassword"
                                        AllowsPaste="True"
                                        MaskedLength="{Binding NewMaskedLength}"
-                                       Placeholder="New master password"
+                                       Placeholder="{x:Static res:Strings.NewMasterPassword}"
                                        IsEnabled="{Binding IsEditing}" />
                     </StackPanel>
                     <StackPanel Spacing="6">
-                      <TextBlock Classes="label" Text="Confirm new master password" />
+                      <TextBlock Classes="label" Text="{x:Static res:Strings.ConfirmNewMasterPassword}" />
                       <ctl:MaskedInput x:Name="AccessConfirmPassword"
                                        AllowsPaste="True"
                                        MaskedLength="{Binding ConfirmMaskedLength}"
-                                       Placeholder="Confirm new master password"
+                                       Placeholder="{x:Static res:Strings.ConfirmNewMasterPassword}"
                                        IsEnabled="{Binding IsEditing}" />
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
 
                 <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}">
-                  <TextBlock Classes="label" Text="Key file" Margin="0,0,0,4" />
-                  <RadioButton GroupName="Keyfile" Content="Keep the key file as it is" IsChecked="{Binding KeepKeyfile}" />
+                  <TextBlock Classes="label" Text="{x:Static res:Strings.KeyFile}" Margin="0,0,0,4" />
+                  <RadioButton GroupName="Keyfile" Content="{x:Static res:Strings.KeepTheKeyFileAsItIs}" IsChecked="{Binding KeepKeyfile}" />
                   <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="28,4,0,4" IsVisible="{Binding AttachKeyfile}">
-                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="Choose key file…">
+                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="{x:Static res:Strings.ChooseKeyFile}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="file-key" Size="14" />
-                        <TextBlock Text="Choose key file…" />
+                        <TextBlock Text="{x:Static res:Strings.ChooseKeyFile}" />
                       </StackPanel>
                     </Button>
-                    <Button Classes="sm" Command="{Binding CreateKeyfileCommand}" AutomationProperties.Name="Create key file…">
+                    <Button Classes="sm" Command="{Binding CreateKeyfileCommand}" AutomationProperties.Name="{x:Static res:Strings.CreateKeyFile}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="plus" Size="14" />
-                        <TextBlock Text="Create key file…" />
+                        <TextBlock Text="{x:Static res:Strings.CreateKeyFile}" />
                       </StackPanel>
                     </Button>
                     <TextBlock Classes="mono secondary" Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
                                ToolTip.Tip="{Binding NewKeyfilePath}" />
                   </StackPanel>
-                  <RadioButton GroupName="Keyfile" Content="Stop using a key file"
+                  <RadioButton GroupName="Keyfile" Content="{x:Static res:Strings.StopUsingAKeyFile}"
                                IsVisible="{Binding HasKeyfile}"
                                IsChecked="{Binding RemoveKeyfile}" />
                 </StackPanel>
 
                 <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}" IsVisible="{Binding OffersHardwareKey}">
-                  <TextBlock Classes="label" Text="YubiKey" Margin="0,0,0,4" />
-                  <RadioButton GroupName="HardwareKey" Content="Keep the YubiKey as it is" IsChecked="{Binding KeepHardwareKey}" />
+                  <TextBlock Classes="label" Text="{x:Static res:Strings.YubiKey}" Margin="0,0,0,4" />
+                  <RadioButton GroupName="HardwareKey" Content="{x:Static res:Strings.KeepTheYubiKeyAsItIs}" IsChecked="{Binding KeepHardwareKey}" />
                   <RadioButton x:Name="AttachHardwareKey"
                                GroupName="HardwareKey"
                                Content="{Binding AttachHardwareKeyLabel}"
                                IsChecked="{Binding AttachHardwareKey}" />
                   <StackPanel Orientation="Horizontal" Spacing="16" Margin="28,4,0,4" IsVisible="{Binding AttachHardwareKey}">
-                    <RadioButton GroupName="HardwareKeySlot" Content="Slot 1" IsChecked="{Binding NewSlotOne}" />
-                    <RadioButton GroupName="HardwareKeySlot" Content="Slot 2" IsChecked="{Binding NewSlotTwo}" />
+                    <RadioButton GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot1}" IsChecked="{Binding NewSlotOne}" />
+                    <RadioButton GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot2}" IsChecked="{Binding NewSlotTwo}" />
                   </StackPanel>
                   <TextBlock Classes="caption" Margin="28,0,0,4" IsVisible="{Binding AttachHardwareKey}"
-                             Text="Plug in a YubiKey whose slot is programmed for HMAC-SHA1 challenge-response, as KeePassXC uses it. It is asked once, when the change is saved." />
-                  <RadioButton GroupName="HardwareKey" Content="Stop using the YubiKey"
+                             Text="{x:Static res:Strings.PlugInAYubiKeyWhoseSlotIsX754e43}" />
+                  <RadioButton GroupName="HardwareKey" Content="{x:Static res:Strings.StopUsingTheYubiKey}"
                                IsVisible="{Binding HasHardwareKey}"
                                IsChecked="{Binding RemoveHardwareKey}" />
                 </StackPanel>
 
-                <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
+                <Button Content="{x:Static res:Strings.Change}" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
                         IsVisible="{Binding IsEditing}" />
 
                 <Border IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelCommand}"
@@ -468,13 +469,13 @@
                                IsVisible="{Binding HasHardwareKeyWarning}"
                                Foreground="{DynamicResource KpTextPrimary}" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
-                      <Button Classes="danger" Content="Change access" Command="{Binding ConfirmCommand}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+                      <Button Classes="danger" Content="{x:Static res:Strings.ChangeAccess}" Command="{Binding ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
 
-                <TextBlock Classes="caption" Text="Changing…" IsVisible="{Binding Busy}" />
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.Changing}" IsVisible="{Binding Busy}" />
                 <TextBlock Name="AccessMessage"
                            Classes="caption"
                            ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
@@ -491,7 +492,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="history" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Backups" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Backups}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -517,16 +518,16 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="download" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Export" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.Export}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <TextBlock Grid.Column="0" Classes="caption" Text="{Binding ElsewhereAdvice}" />
-                <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top" AutomationProperties.Name="Export an encrypted copy…">
+                <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.ExportAnEncryptedCopy}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <ctl:KpIcon Icon="file-lock-2" Size="14" />
-                    <TextBlock Text="Export an encrypted copy…" />
+                    <TextBlock Text="{x:Static res:Strings.ExportAnEncryptedCopy}" />
                   </StackPanel>
                 </Button>
               </Grid>
@@ -540,7 +541,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="terminal" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Agents and the CLI" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.AgentsAndTheCLI}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -549,8 +550,8 @@
                   <TextBlock Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
                   <TextBlock Classes="caption" Text="{Binding ChosenVaultRule}" />
                 </StackPanel>
-                <Button Grid.Column="1" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="Use this vault for agents and the CLI">
-                  <TextBlock Text="Use this vault" />
+                <Button Grid.Column="1" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.UseThisVaultForAgentsAndTheXb47c9a}">
+                  <TextBlock Text="{x:Static res:Strings.UseThisVault}" />
                 </Button>
               </Grid>
             </Border>
@@ -558,16 +559,16 @@
               <StackPanel Spacing="12">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label" Text="keypaste in a terminal" />
+                    <TextBlock Classes="row-label" Text="{x:Static res:Strings.KeypasteInATerminal}" />
                     <TextBlock Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
                     <TextBlock Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
                   </StackPanel>
                   <Panel Grid.Column="1" VerticalAlignment="Top">
-                    <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="Link the keypaste command">
-                      <TextBlock Text="Link" />
+                    <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
+                      <TextBlock Text="{x:Static res:Strings.Link}" />
                     </Button>
-                    <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="Replace the other keypaste">
-                      <TextBlock Text="Replace…" />
+                    <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOtherKeypaste}">
+                      <TextBlock Text="{x:Static res:Strings.ReplaceX64ca19}" />
                     </Button>
                   </Panel>
                 </Grid>
@@ -575,8 +576,8 @@
                   <StackPanel Spacing="10">
                     <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Name="KeepCli" Classes="ghost sm" Content="Cancel" Command="{Binding CancelReplaceCliCommand}" />
-                      <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="Replace" Command="{Binding ConfirmReplaceCliCommand}" />
+                      <Button Name="KeepCli" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCliCommand}" />
+                      <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCliCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -591,22 +592,22 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="globe" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Browser fill" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.BrowserFill}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label" Text="Pair a browser" />
+                    <TextBlock Classes="row-label" Text="{x:Static res:Strings.PairABrowser}" />
                     <TextBlock Classes="caption" TextWrapping="Wrap"
-                               Text="KeePassXC-Browser pairs with keypaste as it pairs with KeePassXC. For the next 2 minutes, one browser can ask to pair, and you confirm it in a window keypaste shows." />
+                               Text="{x:Static res:Strings.KeePassXCBrowserPairsWithKeypasteAsItX779e5d}" />
                   </StackPanel>
                   <Panel Grid.Column="1" VerticalAlignment="Top">
-                    <Button Name="PairBrowser" Content="Pair a browser" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
-                            AutomationProperties.Name="Pair a browser" />
-                    <Button Name="StopPairing" Classes="ghost" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
-                            AutomationProperties.Name="Stop pairing" />
+                    <Button Name="PairBrowser" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
+                            AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
+                    <Button Name="StopPairing" Classes="ghost" Content="{x:Static res:Strings.Stop}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
+                            AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
                   </Panel>
                 </Grid>
                 <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
@@ -616,8 +617,8 @@
             </Border>
             <Border Classes="settings-row">
               <StackPanel Spacing="10">
-                <TextBlock Classes="row-label" Text="Paired browsers" />
-                <TextBlock Classes="caption" Text="No browser is paired with this vault." IsVisible="{Binding HasNoRows}" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.PairedBrowsers}" />
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.NoBrowserIsPairedWithThisVault}" IsVisible="{Binding HasNoRows}" />
                 <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PairingItem">
@@ -627,17 +628,17 @@
                           <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
-                                AutomationProperties.Name="{Binding Name, StringFormat='Remove the pairing {0}'}"
+                        <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Top"
+                                AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RemoveThePairingValue}}"
                                 IsVisible="{Binding !IsConfirmingRemove}"
                                 Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).AskRemoveCommand}"
                                 CommandParameter="{Binding}" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
                                     IsVisible="{Binding IsConfirmingRemove}" ctl:ShowInView.OnShow="True">
-                          <Button Classes="ghost sm" Content="Cancel"
+                          <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}"
                                   Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).CancelRemoveCommand}"
                                   CommandParameter="{Binding}" />
-                          <Button Classes="danger sm" Content="Remove" AutomationProperties.Name="{Binding Name, StringFormat='Confirm removing the pairing {0}'}"
+                          <Button Classes="danger sm" Content="{x:Static res:Strings.Remove}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.ConfirmRemovingThePairingValue}}"
                                   Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
                                   CommandParameter="{Binding}" />
                         </StackPanel>
@@ -656,23 +657,23 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="folder-open" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Recent vaults" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.RecentVaults}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
               <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <TextBlock Grid.Column="0" Classes="caption"
-                             Text="keypaste remembers the paths of vaults you have opened on this machine, where the key file each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
-                  <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="Forget them all" Command="{Binding AskForgetAllCommand}"
+                             Text="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}" />
+                  <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding AskForgetAllCommand}"
                           IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
                 </Grid>
                 <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
                   <StackPanel Spacing="10">
-                    <TextBlock Text="Forget every recent vault? The vaults themselves are not touched." TextWrapping="Wrap" Classes="primary size-12-5" />
+                    <TextBlock Text="{x:Static res:Strings.ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb}" TextWrapping="Wrap" Classes="primary size-12-5" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Name="CancelForgetAll" Classes="ghost sm" Content="Cancel" Command="{Binding CancelForgetAllCommand}" />
-                      <Button Name="ConfirmForgetAll" Classes="danger sm" Content="Forget them all" Command="{Binding ForgetAllCommand}" />
+                      <Button Name="CancelForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelForgetAllCommand}" />
+                      <Button Name="ConfirmForgetAll" Classes="danger sm" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding ForgetAllCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -687,7 +688,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Crash reports" />
+                <TextBlock Classes="section" Text="{x:Static res:Strings.CrashReports}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding HasCrashChoice}">
@@ -696,12 +697,12 @@
             <Border Classes="settings-row" IsVisible="{Binding ShowsCrashSwitch}">
               <StackPanel Spacing="4">
                 <ToggleSwitch Name="SendCrashReports"
-                              Content="Send crash reports"
+                              Content="{x:Static res:Strings.SendCrashReports}"
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding SendCrashReports}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0" TextWrapping="Wrap"
-                           Text="What failed and where in keypaste's code. Never anything from your vault, a path or who you are. Turning it off deletes the reports waiting to be sent, which Diagnostics lists." />
+                           Text="{x:Static res:Strings.WhatFailedAndWhereInKeypastesCodeX12c043}" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -713,12 +714,12 @@
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
               <ctl:KpIcon Grid.Column="0" Icon="layers" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Classes="row-label" Text="Advanced" />
+                <TextBlock Classes="row-label" Text="{x:Static res:Strings.Advanced}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="The activity log, share links, scoped tokens and diagnostics." />
+                           Text="{x:Static res:Strings.TheActivityLogShareLinksScopedTokensX927922}" />
               </StackPanel>
-              <Button Grid.Column="2" Name="OpenAdvanced" Classes="sm" Content="Open" VerticalAlignment="Center"
-                      AutomationProperties.Name="Open Advanced"
+              <Button Grid.Column="2" Name="OpenAdvanced" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      AutomationProperties.Name="{x:Static res:Strings.OpenAdvanced}"
                       Command="{Binding OpenAdvancedCommand}" />
             </Grid>
           </Border>

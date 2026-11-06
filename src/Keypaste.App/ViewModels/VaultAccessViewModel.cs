@@ -429,7 +429,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
 
     private static string Opens((bool Password, string? Keyfile, int? Slot) factors)
     {
-        var withKey = factors.Slot is { } used ? $" and the YubiKey in slot {used}" : string.Empty;
+        var withKey = factors.Slot is { } used ? Invariant($" and the YubiKey in slot {used}") : string.Empty;
 
         return factors switch
         {
@@ -437,7 +437,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
             (true, { } keyfile, _) => $"opens with its master password, the key file {Path.GetFileName(keyfile)}{withKey}.",
             (true, null, _) => $"opens with its master password{withKey}.",
             (false, { } keyfile, _) => $"opens with the key file {Path.GetFileName(keyfile)}{withKey}, and has no master password.",
-            (false, null, { } slot) => $"opens with the YubiKey in slot {slot} alone, and has no master password.",
+            (false, null, { } slot) => Invariant($"opens with the YubiKey in slot {slot} alone, and has no master password."),
             _ => "has no factor keypaste can name.",
         };
     }
@@ -461,7 +461,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
             VaultAccessOutcome.NoKeyfileToRemove => "This vault has no key file to remove. Nothing was changed.",
             VaultAccessOutcome.NoHardwareKeyToRemove => "This vault has no YubiKey to remove. Nothing was changed.",
             VaultAccessOutcome.HardwareKeyNotFound =>
-                $"No YubiKey with slot {NewSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed.",
+                Invariant($"No YubiKey with slot {NewSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed."),
             VaultAccessOutcome.KeyfileUnusable => $"{UnlockViewModel.ExplainKeyfile(result.Result.Keyfile.Outcome)} Nothing was changed.",
             VaultAccessOutcome.KeyfileIsFragile =>
                 "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass key file. Nothing was changed.",

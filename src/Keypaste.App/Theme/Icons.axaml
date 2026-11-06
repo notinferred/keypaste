@@ -13,6 +13,7 @@
   <StreamGeometry x:Key="Icon.bug">M 8 2 l 1.88 1.88 M 14.12 3.88 L 16 2 M 9 7.13 v -1 a 3.003 3.003 0 1 1 6 0 v 1 M 12 20 c -3.3 0 -6 -2.7 -6 -6 v -3 a 4 4 0 0 1 4 -4 h 4 a 4 4 0 0 1 4 4 v 3 c 0 3.3 -2.7 6 -6 6 M 12 20 v -9 M 6.53 9 C 4.6 8.8 3 7.1 3 5 M 6 13 H 2 M 3 21 c 0 -2.1 1.7 -3.9 3.8 -4 M 20.97 5 c 0 2.1 -1.6 3.8 -3.5 4 M 22 13 h -4 M 17.2 17 c 2.1 0.1 3.8 1.9 3.8 4</StreamGeometry>
   <StreamGeometry x:Key="Icon.check">M 20 6 L 9 17 l -5 -5</StreamGeometry>
   <StreamGeometry x:Key="Icon.chevron-down">M 6 9 l 6 6 6 -6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.chevron-left">M 15 18 l -6 -6 6 -6</StreamGeometry>
   <StreamGeometry x:Key="Icon.chevron-right">M 9 18 l 6 -6 -6 -6</StreamGeometry>
   <StreamGeometry x:Key="Icon.chevrons-up-down">M 7 15 l 5 5 5 -5 M 7 9 l 5 -5 5 5</StreamGeometry>
   <StreamGeometry x:Key="Icon.circle-check">M2 12 A10 10 0 1 0 22 12 A10 10 0 1 0 2 12 Z M 9 12 l 2 2 4 -4</StreamGeometry>

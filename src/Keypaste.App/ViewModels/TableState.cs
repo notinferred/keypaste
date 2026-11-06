@@ -1,15 +1,20 @@
 using System.Globalization;
+using Keypaste.App.Resources;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One column a table sorts and sizes.</summary>
 /// <param name="Key">How the column is named in code and in <c>app.toml</c>.</param>
-/// <param name="Name">How a person calls it, in sentence case; its head draws it in capitals.</param>
+/// <param name="Says">How a person calls it, in sentence case; its head draws it in capitals.</param>
 /// <param name="Width">Its width until the table is resized: a share of the room, or design pixels.</param>
 /// <param name="IsShare">Whether <paramref name="Width"/> is a share.</param>
 /// <param name="Least">The narrowest it goes, in design pixels, so its head and its text stay reachable.</param>
 /// <param name="IsTime">Whether it holds a time, whose first press shows the newest first.</param>
-internal sealed record TableColumn(string Key, string Name, double Width, bool IsShare, double Least, bool IsTime = false);
+internal sealed record TableColumn(string Key, Func<string> Says, double Width, bool IsShare, double Least, bool IsTime = false)
+{
+    internal string Name => Says();
+}
+
 
 /// <summary>A column and the direction its rows run in.</summary>
 /// <param name="Column">The column a head draws its arrow on.</param>
@@ -220,29 +225,29 @@ internal sealed class TableStates
 
     internal static readonly IReadOnlyList<TableColumn> ItemColumns =
     [
-        new(Title, "Title", 1.4, IsShare: true, Least: 64),
-        new(Username, "Username", 1, IsShare: true, Least: 64),
-        new(Url, "URL", 1, IsShare: true, Least: 56),
-        new(Kind, "Kind", 88, IsShare: false, Least: 56),
-        new(Group, "Group", 1, IsShare: true, Least: 56),
-        new(LastUsed, "Last used", 104, IsShare: false, Least: 88, IsTime: true),
+        new(Title, () => Strings.Title, 1.4, IsShare: true, Least: 64),
+        new(Username, () => Strings.Username, 1, IsShare: true, Least: 64),
+        new(Url, () => Strings.URL, 1, IsShare: true, Least: 56),
+        new(Kind, () => Strings.Kind, 88, IsShare: false, Least: 56),
+        new(Group, () => Strings.Group, 1, IsShare: true, Least: 56),
+        new(LastUsed, () => Strings.LastUsed, 104, IsShare: false, Least: 88, IsTime: true),
     ];
 
     internal static readonly IReadOnlyList<TableColumn> TrashColumns =
     [
-        new(Title, "Title", 1.3, IsShare: true, Least: 96),
-        new(DeletedFrom, "Deleted from", 1.3, IsShare: true, Least: 96),
-        new(Deleted, "Deleted", 160, IsShare: false, Least: 124, IsTime: true),
+        new(Title, () => Strings.Title, 1.3, IsShare: true, Least: 96),
+        new(DeletedFrom, () => Strings.DeletedFrom, 1.3, IsShare: true, Least: 96),
+        new(Deleted, () => Strings.Deleted, 160, IsShare: false, Least: 124, IsTime: true),
     ];
 
     internal static readonly IReadOnlyList<TableColumn> LogColumns =
     [
-        new(Time, "Time", 64, IsShare: false, Least: 64, IsTime: true),
-        new(Actor, "Actor", 110, IsShare: false, Least: 56),
-        new(Action, "Action", 100, IsShare: false, Least: 56),
-        new(Secrets, "Secrets", 1.6, IsShare: true, Least: 64),
-        new(Where, "Where", 1, IsShare: true, Least: 56),
-        new(Result, "Result", 100, IsShare: false, Least: 64),
+        new(Time, () => Strings.Time, 84, IsShare: false, Least: 84, IsTime: true),
+        new(Actor, () => Strings.Actor, 110, IsShare: false, Least: 56),
+        new(Action, () => Strings.Action, 100, IsShare: false, Least: 56),
+        new(Secrets, () => Strings.Secrets, 1.6, IsShare: true, Least: 64),
+        new(Where, () => Strings.Where, 1, IsShare: true, Least: 56),
+        new(Result, () => Strings.Result, 100, IsShare: false, Least: 64),
     ];
 
     internal TableState Items { get; } = NewItems();

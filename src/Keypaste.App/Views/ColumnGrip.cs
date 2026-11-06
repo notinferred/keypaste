@@ -118,7 +118,7 @@ internal sealed class ColumnGrip : Border
 
         if (e.KeyModifiers == KeyModifiers.None && e.Key is Key.Left or Key.Right && Columns is { } columns)
         {
-            TableColumns.GetTable(this)?.Resize(Column, e.Key == Key.Left ? -_keyStep : _keyStep, columns.DrawnWidths);
+            TableColumns.GetTable(this)?.Resize(Column, e.Key == (FlowDirection == FlowDirection.RightToLeft ? Key.Right : Key.Left) ? -_keyStep : _keyStep, columns.DrawnWidths);
             e.Handled = true;
         }
     }

@@ -104,7 +104,7 @@ public static class RequestRecords
         IReadOnlyList<string> exposure,
         string? session,
         string? vault) =>
-        Listing(client, AuditDecision.Granted, AuditMethod.Exposure, $"listed {count} item names", exposure, session, vault);
+        Listing(client, AuditDecision.Granted, AuditMethod.Exposure, Invariant($"listed {count} item names"), exposure, session, vault);
 
     /// <summary>The line for a request for one field of one entry.</summary>
     /// <param name="client">Who asked.</param>
@@ -426,7 +426,7 @@ public static class RequestRecords
     /// <summary>The longest reason a merge line keeps, the agents it names cut short past it.</summary>
     private const int _mergeReasonLength = 4096;
 
-    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : Invariant($"{n} {noun}s");
 
     /// <summary>The line for a <c>keypaste run --session</c> request.</summary>
     /// <param name="project">The project asked for.</param>

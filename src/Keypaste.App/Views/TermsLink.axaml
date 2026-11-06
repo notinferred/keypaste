@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Keypaste.App.Views.TermsLink">
 
@@ -6,8 +7,8 @@
           Classes="link"
           MinHeight="20"
           VerticalContentAlignment="Center"
-          AutomationProperties.Name="Terms of use">
-    <TextBlock Text="Terms of use" TextDecorations="Underline" />
+          AutomationProperties.Name="{x:Static res:Strings.TermsOfUse}">
+    <TextBlock Text="{x:Static res:Strings.TermsOfUse}" TextDecorations="Underline" />
   </Button>
 
 </UserControl>

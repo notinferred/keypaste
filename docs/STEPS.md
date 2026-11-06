@@ -8,8 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.14 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.16 — Read in any language and region.** Needs: none.
-  - Dates and times people read follow the current culture and machine text stays invariant; strings move to resources; right-to-left layout follows the culture, with a chevron-left icon for Back and secrets kept left to right.
 - [ ] **Q.17 — Finish the polish.** Needs: Q.5.
   - Window titles name the place; the pointing hand appears only on links; a prompt is drawn inactive while another window has focus and is disarmed again on activation; toasts sit under the titlebar; scroll bars follow the system's setting; End is drawn plain and End all confirms; a delete into Trash asks nothing once undo exists, while a delete for good still asks; buttons are named by their result ("Connect Claude Code", "Reset clients.toml") and every command that opens a form ends in an ellipsis; tooltips say what a control does, with Learn more beside selectors and token scopes; and Appearance's Theme gives way to the system's setting, kept only where a Linux desktop reports none.
 

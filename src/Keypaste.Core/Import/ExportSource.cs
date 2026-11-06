@@ -274,12 +274,12 @@ public sealed class ExportSource : IDisposable
 
         for (var more = 1; more < item.Urls.Count; more++)
         {
-            fields.Add(new FieldWrite($"{_moreUrlsField}{more}", item.Urls[more], Protect: false));
+            fields.Add(new FieldWrite(Invariant($"{_moreUrlsField}{more}"), item.Urls[more], Protect: false));
         }
 
         if (!string.IsNullOrWhiteSpace(item.Totp))
         {
-            using var readable = TotpSpec.Read(new Dictionary<string, string> { [TotpSpec.OtpField] = item.Totp }, out var refusal);
+            using var readable = TotpSpec.Read(new Dictionary<string, string>(StringComparer.Ordinal) { [TotpSpec.OtpField] = item.Totp }, out var refusal);
 
             if (readable is null)
             {
@@ -310,7 +310,7 @@ public sealed class ExportSource : IDisposable
 
         for (var more = 1; more < item.Passkeys.Count; more++)
         {
-            losses.Add(($"passkey {more + 1}", "KeePassXC keeps one passkey per item, so only the item's first lands"));
+            losses.Add((Invariant($"passkey {more + 1}"), "KeePassXC keeps one passkey per item, so only the item's first lands"));
         }
 
         losses.AddRange(item.Omitted.Select(omitted => (omitted.Part, omitted.Reason)));
@@ -359,7 +359,7 @@ public sealed class ExportSource : IDisposable
     {
         for (var suffix = 2; ; suffix++)
         {
-            var candidate = $"{title} ({suffix})";
+            var candidate = Invariant($"{title} ({suffix})");
             var path = Joined(group, candidate);
 
             if (!held.Contains(path) && !landed.Contains(path))

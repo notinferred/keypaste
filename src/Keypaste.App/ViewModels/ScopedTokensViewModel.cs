@@ -109,7 +109,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         get => _expiry;
         set
         {
-            if (value is not null && ExpiryOptions.Contains(value))
+            if (value is not null && ExpiryOptions.Contains(value, StringComparer.Ordinal))
             {
                 SetProperty(ref _expiry, value);
             }
@@ -338,7 +338,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
             : left.TotalHours >= 1 ? Plural((int)left.TotalHours, "hour")
             : Plural(Math.Max(1, (int)left.TotalMinutes), "minute");
 
-        static string Plural(int n, string unit) => $"{n} {unit}{(n == 1 ? string.Empty : "s")}";
+        static string Plural(int n, string unit) => Invariant($"{n} {unit}{(n == 1 ? string.Empty : "s")}");
     }
 }
 

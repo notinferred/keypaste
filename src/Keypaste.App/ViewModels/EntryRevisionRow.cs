@@ -1,4 +1,4 @@
-using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
@@ -70,7 +70,7 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// <summary>When this revision was current, in local time as the Activity, Trash and Backups screens show a time.</summary>
     /// <remarks>The kind is set because a reader may hand back an unspecified one, which <see cref="DateTime.ToLocalTime"/> would take as local.</remarks>
     internal string When =>
-        DateTime.SpecifyKind(ModifiedUtc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        PersonTime.MomentWithSeconds(new DateTimeOffset(DateTime.SpecifyKind(ModifiedUtc, DateTimeKind.Utc)).ToLocalTime());
 
     /// <summary>The title as the list draws it.</summary>
     internal string DisplayTitle => EntryNameSanitizer.Sanitize(Title).Text;

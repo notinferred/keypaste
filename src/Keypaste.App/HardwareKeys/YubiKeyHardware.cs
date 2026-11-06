@@ -76,7 +76,7 @@ internal sealed class YubiKeyHardware : IChallengeResponseDevice
 
         if (!(slot == 1 ? otp.IsShortPressConfigured : otp.IsLongPressConfigured))
         {
-            throw new HardwareKeyException(HardwareKeyFailure.SlotNotConfigured, $"Slot {slot} of this YubiKey is empty.");
+            throw new HardwareKeyException(HardwareKeyFailure.SlotNotConfigured, Invariant($"Slot {slot} of this YubiKey is empty."));
         }
 
         var touched = false;
@@ -98,7 +98,7 @@ internal sealed class YubiKeyHardware : IChallengeResponseDevice
             throw Volatile.Read(ref touched)
                 ? new HardwareKeyException(HardwareKeyFailure.TimedOut, "The YubiKey wasn't touched in time.", ex)
                 : new HardwareKeyException(
-                    HardwareKeyFailure.SlotNotConfigured, $"Slot {slot} of this YubiKey isn't set up for HMAC-SHA1 challenge-response.", ex);
+                    HardwareKeyFailure.SlotNotConfigured, Invariant($"Slot {slot} of this YubiKey isn't set up for HMAC-SHA1 challenge-response."), ex);
         }
     }
 

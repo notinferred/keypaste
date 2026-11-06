@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -63,7 +64,7 @@
   <StackPanel Spacing="16">
 
     <StackPanel Spacing="4">
-      <TextBlock Classes="dialog-title" Text="{Binding Agent, StringFormat='Settings for {0}'}" TextTrimming="CharacterEllipsis" />
+      <TextBlock Classes="dialog-title" Text="{Binding Agent, StringFormat={x:Static res:Strings.SettingsForValue}}" TextTrimming="CharacterEllipsis" />
       <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
     </StackPanel>
 
@@ -71,16 +72,16 @@
 
     <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="14">
 
-      <TextBlock Grid.Row="0" Classes="label" Text="Mode" Margin="0,6,0,0" />
+      <TextBlock Grid.Row="0" Classes="label" Text="{x:Static res:Strings.Mode}" Margin="0,6,0,0" />
       <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
         <Border Classes="segmented">
           <ItemsControl Name="ModeChoices" ItemsSource="{Binding ModeChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
-        <TextBlock Classes="caption" Text="Automatic releases what it can see without asking, and records each release in history. Commands always ask." TextWrapping="Wrap" />
+        <TextBlock Classes="caption" Text="{x:Static res:Strings.AutomaticReleasesWhatItCanSeeWithoutXd71d13}" TextWrapping="Wrap" />
         <TextBlock Classes="caption" Text="{Binding ProtectedNote}" TextWrapping="Wrap" />
       </StackPanel>
 
-      <TextBlock Grid.Row="1" Classes="label" Text="Can see" Margin="0,6,0,0" />
+      <TextBlock Grid.Row="1" Classes="label" Text="{x:Static res:Strings.CanSee}" Margin="0,6,0,0" />
       <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
         <Border Classes="segmented">
           <ItemsControl Name="SeeScopes" ItemsSource="{Binding SeeScopes}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
@@ -94,13 +95,13 @@
         </ItemsControl>
         <TextBlock Name="AlsoSeesText" Classes="caption" Text="{Binding AlsoSees}" IsVisible="{Binding HasAlsoSees}" TextWrapping="Wrap" />
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsOnly}">
-          <Button Name="ApplyPicks" Content="Apply" Command="{Binding ApplyPicksCommand}"
-                  AutomationProperties.Name="Let it see only the projects picked" />
+          <Button Name="ApplyPicks" Content="{x:Static res:Strings.Apply}" Command="{Binding ApplyPicksCommand}"
+                  AutomationProperties.Name="{x:Static res:Strings.LetItSeeOnlyTheProjectsPicked}" />
           <TextBlock Grid.Column="1" Name="PicksCaption" Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding PicksCaption}" />
         </Grid>
       </StackPanel>
 
-      <TextBlock Grid.Row="2" Classes="label" Text="May run commands" Margin="0,6,0,0" IsVisible="{Binding OffersRun}" />
+      <TextBlock Grid.Row="2" Classes="label" Text="{x:Static res:Strings.MayRunCommands}" Margin="0,6,0,0" IsVisible="{Binding OffersRun}" />
       <Border Grid.Row="2" Grid.Column="1" Classes="segmented" IsVisible="{Binding OffersRun}">
         <ItemsControl Name="RunChoices" ItemsSource="{Binding RunChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
       </Border>
@@ -108,46 +109,46 @@
     </Grid>
 
     <!-- An Expander, so a screen reader hears it open or closed. It will not close while anything inside is set: a setting never looks unset. -->
-    <Expander Name="MoreSettings" Header="More" IsExpanded="{Binding IsMoreOpen, Mode=TwoWay}"
-              AutomationProperties.Name="More settings: giving values, patterns, project rows and limits">
+    <Expander Name="MoreSettings" Header="{x:Static res:Strings.More}" IsExpanded="{Binding IsMoreOpen, Mode=TwoWay}"
+              AutomationProperties.Name="{x:Static res:Strings.MoreSettingsGivingValuesPatternsProjectRowsX451a25}">
       <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="14">
 
         <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Name="MoreHeldOpen" Classes="caption" TextWrapping="Wrap"
-                   IsVisible="{Binding IsMoreHeldOpen}" Text="This stays open while anything here is set." />
+                   IsVisible="{Binding IsMoreHeldOpen}" Text="{x:Static res:Strings.ThisStaysOpenWhileAnythingHereIsX9a6bbb}" />
 
-        <TextBlock Grid.Row="1" Classes="label" Text="Give values" Margin="0,6,0,0" />
+        <TextBlock Grid.Row="1" Classes="label" Text="{x:Static res:Strings.GiveValues}" Margin="0,6,0,0" />
         <Border Grid.Row="1" Grid.Column="1" Classes="segmented">
           <ItemsControl Name="ValueChoices" ItemsSource="{Binding ValueChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
 
-        <Expander Grid.Row="2" Grid.Column="1" Name="PatternsDisclosure" Header="Advanced: patterns" IsExpanded="{Binding IsAdvancedOpen, Mode=TwoWay}"
-                  AutomationProperties.Name="Advanced: patterns">
+        <Expander Grid.Row="2" Grid.Column="1" Name="PatternsDisclosure" Header="{x:Static res:Strings.AdvancedPatterns}" IsExpanded="{Binding IsAdvancedOpen, Mode=TwoWay}"
+                  AutomationProperties.Name="{x:Static res:Strings.AdvancedPatterns}">
           <StackPanel Spacing="6">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ctl:FormKeys.Confirm="{Binding ApplySeeCommand}">
-              <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="Patterns it can see" />
-              <Button Grid.Column="1" Content="Apply" Command="{Binding ApplySeeCommand}" />
+              <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="{x:Static res:Strings.PatternsItCanSee}" />
+              <Button Grid.Column="1" Content="{x:Static res:Strings.Apply}" Command="{Binding ApplySeeCommand}" />
             </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="What it can see, separated by commas: tag:env:billing is every environment of billing; a place pattern such as api/** reaches whole items." />
+                       Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
           </StackPanel>
         </Expander>
 
-        <TextBlock Grid.Row="3" Classes="label" Text="Project rows" Margin="0,5,0,0" />
+        <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.ProjectRows}" Margin="0,5,0,0" />
         <StackPanel Grid.Row="3" Grid.Column="1" Spacing="8">
-          <TextBlock Classes="caption" Text="A row beats the mode above for its project or environment; an item in several takes the strictest." TextWrapping="Wrap" />
+          <TextBlock Classes="caption" Text="{x:Static res:Strings.ARowBeatsTheModeAboveForXdf0cc4}" TextWrapping="Wrap" />
           <ItemsControl Name="SettingRows" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SettingRow">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4" Margin="0,0,0,10">
                   <TextBlock Classes="mono" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                  <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
+                  <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Top"
                           Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).RemoveRowCommand}"
                           CommandParameter="{Binding}"
-                          AutomationProperties.Name="{Binding Name, StringFormat='Remove the row for {0}'}" />
+                          AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RemoveTheRowForValue}}" />
                   <Border Grid.Row="1" Grid.ColumnSpan="2" Classes="segmented">
                     <ItemsControl ItemsSource="{Binding Modes}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
                   </Border>
-                  <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="caption" Text="{Binding Limit, StringFormat='Limit: {0}'}"
+                  <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="caption" Text="{Binding Limit, StringFormat={x:Static res:Strings.LimitValue}}"
                              IsVisible="{Binding Limit, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </Grid>
               </DataTemplate>
@@ -155,40 +156,40 @@
           </ItemsControl>
           <WrapPanel ItemSpacing="8" LineSpacing="8">
             <ComboBox ItemsSource="{Binding NewRowScopes}" SelectedItem="{Binding NewRowScope}" MinWidth="200"
-                      AutomationProperties.Name="Project or environment for a new row" />
-            <Button Content="Add a row" Command="{Binding AddRowCommand}" />
+                      AutomationProperties.Name="{x:Static res:Strings.ProjectOrEnvironmentForANewRow}" />
+            <Button Content="{x:Static res:Strings.AddARow}" Command="{Binding AddRowCommand}" />
           </WrapPanel>
         </StackPanel>
 
-        <TextBlock Grid.Row="4" Classes="label" Text="Limits" Margin="0,5,0,0" IsVisible="{Binding OffersLimits}" />
+        <TextBlock Grid.Row="4" Classes="label" Text="{x:Static res:Strings.Limits}" Margin="0,5,0,0" IsVisible="{Binding OffersLimits}" />
         <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6" IsVisible="{Binding OffersLimits}">
           <!-- Wraps, so the panel's narrowest column, inside a row of a table that clips, still shows Apply. -->
           <WrapPanel ItemSpacing="8" LineSpacing="8" ctl:FormKeys.Confirm="{Binding ApplyLimitCommand}">
             <StackPanel Spacing="6">
-              <TextBlock Classes="label" Text="Applies to" />
+              <TextBlock Classes="label" Text="{x:Static res:Strings.AppliesTo}" />
               <ComboBox ItemsSource="{Binding LimitTargets}" SelectedItem="{Binding LimitTarget}" MinWidth="160"
-                        AutomationProperties.Name="Where the limit applies" />
+                        AutomationProperties.Name="{x:Static res:Strings.WhereTheLimitApplies}" />
             </StackPanel>
             <StackPanel Spacing="6">
-              <TextBlock Classes="label" Text="Per hour" />
-              <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="per hour"
-                       AutomationProperties.Name="At most this many an hour" />
+              <TextBlock Classes="label" Text="{x:Static res:Strings.PerHour}" />
+              <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="{x:Static res:Strings.PerHourHint}"
+                       AutomationProperties.Name="{x:Static res:Strings.AtMostThisManyAnHour}" />
             </StackPanel>
             <StackPanel Spacing="6">
-              <TextBlock Classes="label" Text="Until" />
+              <TextBlock Classes="label" Text="{x:Static res:Strings.Until}" />
               <CalendarDatePicker Width="140" SelectedDate="{Binding UntilDate, Mode=TwoWay}" SelectedDateFormat="Custom" CustomDateFormatString="yyyy-MM-dd"
-                                  PlaceholderText="until" AutomationProperties.Name="Automatic until this day" />
+                                  PlaceholderText="{x:Static res:Strings.UntilXb310f4}" AutomationProperties.Name="{x:Static res:Strings.AutomaticUntilThisDay}" />
             </StackPanel>
             <StackPanel Spacing="6">
-              <TextBlock Classes="label" Text="Time" />
-              <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="end of day"
-                       AutomationProperties.Name="Automatic until this time of day" />
+              <TextBlock Classes="label" Text="{x:Static res:Strings.Time}" />
+              <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="{x:Static res:Strings.EndOfDay}"
+                       AutomationProperties.Name="{x:Static res:Strings.AutomaticUntilThisTimeOfDay}" />
             </StackPanel>
-            <Button Content="Apply" VerticalAlignment="Bottom" Command="{Binding ApplyLimitCommand}" />
+            <Button Content="{x:Static res:Strings.Apply}" VerticalAlignment="Bottom" Command="{Binding ApplyLimitCommand}" />
           </WrapPanel>
           <TextBlock Classes="caption" Text="{Binding LimitNow}" TextWrapping="Wrap" />
           <TextBlock Classes="caption" TextWrapping="Wrap"
-                     Text="Off by default. When a limit is reached, keypaste asks instead of refusing. Automatic ends on the day you pick, at the time of day you give, such as 18:00, or at its close, on this computer's clock; leave a field empty for no limit." />
+                     Text="{x:Static res:Strings.OffByDefaultWhenALimitIsX11e963}" />
         </StackPanel>
 
       </Grid>
@@ -197,7 +198,7 @@
     <Border Classes="card" IsVisible="{Binding IsHeldBack}">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <TextBlock Name="HeldBackText" Classes="body secondary" Text="{Binding HeldBack}" TextWrapping="Wrap" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Name="UseVault" Content="Use the vault's settings" VerticalAlignment="Center" Command="{Binding UseVaultCommand}" />
+        <Button Grid.Column="1" Name="UseVault" Content="{x:Static res:Strings.UseTheVaultsSettings}" VerticalAlignment="Center" Command="{Binding UseVaultCommand}" />
       </Grid>
     </Border>
 

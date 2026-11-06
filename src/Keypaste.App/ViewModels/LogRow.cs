@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
@@ -115,7 +116,7 @@ internal sealed record LogRow
 
         return new LogRow(entry)
         {
-            Time = local?.ToString("HH:mm:ss", CultureInfo.InvariantCulture) ?? _none,
+            Time = local is { } shown ? PersonTime.ClockWithSeconds(shown) : _none,
             Date = local?.Date,
             When = local?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? entry.Timestamp,
             Actor = byYou ? You : ActorOf(entry),
@@ -298,18 +299,18 @@ internal sealed record LogRow
         return minutes switch
         {
             <= 0 => null,
-            < 60 => $"{minutes}m",
-            _ when minutes % 1_440 == 0 && minutes >= 2_880 => $"{minutes / 1_440}d",
-            _ => $"{(int)Math.Round(minutes / 60.0)}h",
+            < 60 => Invariant($"{minutes}m"),
+            _ when minutes % 1_440 == 0 && minutes >= 2_880 => Invariant($"{minutes / 1_440}d"),
+            _ => Invariant($"{(int)Math.Round(minutes / 60.0)}h"),
         };
     }
 
     private static string Span(int seconds) => seconds switch
     {
-        >= 86_400 when seconds % 86_400 == 0 => $"{seconds / 86_400}d",
-        >= 3_600 when seconds % 3_600 == 0 => $"{seconds / 3_600}h",
-        >= 60 when seconds % 60 == 0 => $"{seconds / 60}m",
-        _ => $"{seconds}s",
+        >= 86_400 when seconds % 86_400 == 0 => Invariant($"{seconds / 86_400}d"),
+        >= 3_600 when seconds % 3_600 == 0 => Invariant($"{seconds / 3_600}h"),
+        >= 60 when seconds % 60 == 0 => Invariant($"{seconds / 60}m"),
+        _ => Invariant($"{seconds}s"),
     };
 
     private static string Title(string path)

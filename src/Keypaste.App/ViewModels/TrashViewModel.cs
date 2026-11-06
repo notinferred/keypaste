@@ -164,7 +164,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     {
         0 => string.Empty,
         1 => "Delete the one item in the trash and its history for good? This cannot be undone.",
-        var count => $"Delete all {count} items in the trash and their history for good? This cannot be undone.",
+        var count => Invariant($"Delete all {count} items in the trash and their history for good? This cannot be undone."),
     };
 
     /// <summary>The title a restore refused for a taken name can put the selected entry back under, or null.</summary>
@@ -212,7 +212,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         var back = rows.Count - left.Count;
 
         Report(
-            back == 0 ? null : back == 1 ? "1 item is back." : $"{back} items are back.",
+            back == 0 ? null : back == 1 ? "1 item is back." : Invariant($"{back} items are back."),
             left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Something else has the name, or it left the trash. Restore each one alone to see why.");
         SelectedRows.Clear();
         Load();
@@ -464,7 +464,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             case var removed:
-                Report($"The trash is empty. {removed} items and their history are gone.", null);
+                Report(Invariant($"The trash is empty. {removed} items and their history are gone."), null);
                 break;
         }
 

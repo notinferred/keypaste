@@ -703,7 +703,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
                 var value = Text(field, "value", fieldWhere);
                 var type = Text(field, "fieldType", fieldWhere) is { Length: > 0 } fieldType ? fieldType : Text(field, "type", fieldWhere);
 
-                switch (Text(field, "designation", fieldWhere).ToUpperInvariant())
+                switch (InvariantUpper.Of(Text(field, "designation", fieldWhere)))
                 {
                     case "USERNAME":
                         landing.Put("username", value, protect: false);

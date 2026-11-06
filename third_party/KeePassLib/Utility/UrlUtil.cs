@@ -343,7 +343,11 @@ namespace KeePassLib.Utility
 					return strTargetFile;
 
 				string str = sb.ToString();
+#if KEYPASTE_INVARIANT_TEXT
+				while(str.StartsWith(".\\", StringComparison.Ordinal)) str = str.Substring(2, str.Length - 2);
+#else
 				while(str.StartsWith(".\\")) str = str.Substring(2, str.Length - 2);
+#endif
 
 				return str;
 			}
@@ -586,7 +590,11 @@ namespace KeePassLib.Utility
 		{
 			if(strPath == null) throw new ArgumentNullException("strPath");
 
+#if KEYPASTE_INVARIANT_TEXT
+			return (strPath.StartsWith("\\\\", StringComparison.Ordinal) || strPath.StartsWith("//", StringComparison.Ordinal));
+#else
 			return (strPath.StartsWith("\\\\") || strPath.StartsWith("//"));
+#endif
 		}
 
 		public static string FilterFileName(string strName)

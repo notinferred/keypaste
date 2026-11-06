@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.App.Session;
 using Keypaste.Core.Ownership;
 
@@ -193,9 +194,9 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
 
     private static string Used(PairingRow row)
     {
-        var paired = row.Pairing.Created.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var paired = PersonTime.Date(row.Pairing.Created.ToLocalTime());
         var used = row.LastUsed is { } at
-            ? "last used " + at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            ? "last used " + PersonTime.Moment(at.ToLocalTime())
             : "not used since keypaste started";
 
         return $"Paired {paired} · {used}";

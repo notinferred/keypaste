@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:views="using:Keypaste.App.Views"
@@ -120,12 +121,12 @@
                   IsVisible="{Binding SidebarHidden}"
                   Command="{Binding ToggleSidebarCommand}"
                   ToolTip.Tip="{Binding SidebarWayBack, TargetNullValue='Show sidebar'}"
-                  AutomationProperties.Name="Show sidebar"
+                  AutomationProperties.Name="{x:Static res:Strings.ShowSidebar}"
                   AutomationProperties.HelpText="{Binding SidebarWayBack}"
                   WindowDecorationProperties.ElementRole="User">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="panel-left" Size="16" />
-              <TextBlock Text="Show sidebar" VerticalAlignment="Center" IsVisible="{Binding IsNarrow}" />
+              <TextBlock Text="{x:Static res:Strings.ShowSidebar}" VerticalAlignment="Center" IsVisible="{Binding IsNarrow}" />
             </StackPanel>
           </Button>
 
@@ -167,12 +168,12 @@
             <Button Grid.Column="2"
                     Classes="titlebar-lock"
                     Command="{Binding LockCommand}"
-                    ToolTip.Tip="Lock now"
-                    AutomationProperties.Name="Lock now"
+                    ToolTip.Tip="{x:Static res:Strings.LockNow}"
+                    AutomationProperties.Name="{x:Static res:Strings.LockNow}"
                     WindowDecorationProperties.ElementRole="User">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="lock" Size="12" />
-                <TextBlock Text="lock" VerticalAlignment="Center" />
+                <TextBlock Text="{x:Static res:Strings.Lock}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </Grid>
@@ -198,14 +199,14 @@
                     Height="40"
                     Margin="0,0,0,8"
                     Command="{Binding OpenSidebarOverlayCommand}"
-                    ToolTip.Tip="Show groups and projects"
+                    ToolTip.Tip="{x:Static res:Strings.ShowGroupsAndProjects}"
                     ToolTip.Placement="Right"
-                    AutomationProperties.Name="Show groups and projects">
+                    AutomationProperties.Name="{x:Static res:Strings.ShowGroupsAndProjects}">
               <ctl:KpIcon Icon="panel-left" Size="20" />
             </Button>
 
             <ListBox Name="RailNav"
-                     AutomationProperties.Name="Places"
+                     AutomationProperties.Name="{x:Static res:Strings.Places}"
                      Classes="nav rail"
                      ItemsSource="{Binding RailPlaces}"
                      SelectedItem="{Binding SelectedRailPlace}"
@@ -256,7 +257,7 @@
 
             <!-- Trash and Settings, quieter, at the bottom. -->
             <ListBox Name="FooterNav"
-                     AutomationProperties.Name="More places"
+                     AutomationProperties.Name="{x:Static res:Strings.MorePlaces}"
                      DockPanel.Dock="Bottom"
                      Classes="nav quiet"
                      Margin="0,12,0,0"
@@ -280,7 +281,7 @@
                  arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
                  tree. -->
             <ListBox Name="Nav"
-                     AutomationProperties.Name="Places"
+                     AutomationProperties.Name="{x:Static res:Strings.Places}"
                      Classes="nav"
                      ItemsSource="{Binding SidebarRows}"
                      SelectedItem="{Binding SelectedSidebarRow}"
@@ -382,10 +383,10 @@
                     Classes="ghost sm"
                     HorizontalAlignment="Left"
                     Margin="24,12,0,0"
-                    AutomationProperties.Name="{Binding BackTitle, StringFormat='Back to {0}'}"
+                    AutomationProperties.Name="{Binding BackTitle, StringFormat={x:Static res:Strings.BackToValue}}"
                     Command="{Binding BackCommand}">
               <StackPanel Orientation="Horizontal" Spacing="4">
-                <ctl:KpIcon Icon="chevron-right" Size="13" RenderTransform="rotate(180deg)" />
+                <ctl:KpIcon Icon="chevron-left" Size="13" />
                 <TextBlock Text="{Binding BackTitle}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
@@ -417,7 +418,7 @@
                 <Button Grid.Column="2"
                         Name="Reload"
                         Classes="sm"
-                        Content="Reload"
+                        Content="{x:Static res:Strings.Reload}"
                         Margin="12,0,0,0"
                         Command="{Binding ReloadCommand}" />
               </Grid>
@@ -441,7 +442,7 @@
                            Foreground="{DynamicResource KpTextSecondary}" />
                 <Button Grid.Column="2"
                         Classes="ghost sm"
-                        Content="Dismiss"
+                        Content="{x:Static res:Strings.Dismiss}"
                         Margin="12,0,0,0"
                         Command="{Binding DismissNoticeCommand}" />
               </Grid>
@@ -479,12 +480,12 @@
         <StackPanel Spacing="12">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <Border Classes="dot waiting" />
-            <TextBlock Text="Touch your YubiKey" Classes="size-14" FontWeight="SemiBold" VerticalAlignment="Center"
+            <TextBlock Text="{x:Static res:Strings.TouchYourYubiKey}" Classes="size-14" FontWeight="SemiBold" VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextPrimary}" />
           </StackPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"
-                     Text="The vault is saved once the key answers. Cancel leaves the change unsaved." />
-          <Button Classes="ghost" Content="Cancel" HorizontalAlignment="Left" Command="{Binding CancelTouchCommand}" />
+                     Text="{x:Static res:Strings.TheVaultIsSavedOnceTheKeyX6aa2e0}" />
+          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" HorizontalAlignment="Left" Command="{Binding CancelTouchCommand}" />
         </StackPanel>
       </Border>
     </Border>
@@ -499,10 +500,10 @@
               VerticalAlignment="Center">
         <StackPanel Spacing="14">
           <TextBlock Name="DiscardPrompt" Classes="dialog-title" TextWrapping="Wrap" Text="{Binding DiscardPrompt}" />
-          <TextBlock Classes="caption" TextWrapping="Wrap" Text="What you typed has not been saved." />
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.WhatYouTypedHasNotBeenSaved}" />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button Name="KeepDraft" Classes="ghost" Content="Cancel" Command="{Binding KeepDraftCommand}" />
-            <Button Name="ConfirmDiscard" Classes="danger" Content="Discard" Command="{Binding ConfirmDiscardCommand}" />
+            <Button Name="KeepDraft" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding KeepDraftCommand}" />
+            <Button Name="ConfirmDiscard" Classes="danger" Content="{x:Static res:Strings.Discard}" Command="{Binding ConfirmDiscardCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -522,10 +523,10 @@
         <StackPanel Spacing="14">
           <TextBlock Name="HandedPrompt" Classes="dialog-title" TextWrapping="Wrap" Text="{Binding HandedPrompt}" />
           <TextBlock Name="HandedLocation" Classes="mono muted size-12" TextWrapping="Wrap" Text="{Binding HandedLocation}" />
-          <TextBlock Classes="caption" TextWrapping="Wrap" Text="keypaste was asked to open this file. Nothing changes unless you say so." />
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.KeypasteWasAskedToOpenThisFileX50ed11}" />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button Name="KeepVault" Classes="ghost" Content="Cancel" Command="{Binding KeepVaultCommand}" />
-            <Button Name="LockAndOpen" Content="Lock and open" Command="{Binding LockAndOpenCommand}" />
+            <Button Name="KeepVault" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding KeepVaultCommand}" />
+            <Button Name="LockAndOpen" Content="{x:Static res:Strings.LockAndOpen}" Command="{Binding LockAndOpenCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -545,12 +546,12 @@
             <ctl:KpIcon Icon="clipboard-check" Size="15" Foreground="{DynamicResource KpOk}" />
             <TextBlock VerticalAlignment="Center"
                        IsVisible="{Binding Clipboard.IsCounting}"
-                       ctl:Announcer.Says="{Binding Clipboard.Label, StringFormat='{}{0} copied.'}"
-                       Text="{Binding Clipboard.Label, StringFormat='{}{0} copied.'}" />
+                       ctl:Announcer.Says="{Binding Clipboard.Label, StringFormat={x:Static res:Strings.ValueCopied}}"
+                       Text="{Binding Clipboard.Label, StringFormat={x:Static res:Strings.ValueCopied}}" />
             <TextBlock VerticalAlignment="Center"
                        Classes="muted"
                        IsVisible="{Binding Clipboard.IsCounting}"
-                       Text="{Binding Clipboard.SecondsLeft, StringFormat='Clears in {0}s'}" />
+                       Text="{Binding Clipboard.SecondsLeft, StringFormat={x:Static res:Strings.ClearsInValueS}}" />
             <TextBlock VerticalAlignment="Center"
                        TextWrapping="Wrap"
                        MaxWidth="320"
@@ -558,7 +559,7 @@
                        ctl:Announcer.Says="{Binding Clipboard.Failure}"
                        Text="{Binding Clipboard.Failure}" />
             <Button Classes="link"
-                    Content="Clear now"
+                    Content="{x:Static res:Strings.ClearNow}"
                     VerticalAlignment="Center"
                     IsVisible="{Binding Clipboard.IsCounting}"
                     Command="{Binding Clipboard.ClearNowCommand}" />
@@ -591,8 +592,8 @@
                         Classes="icon ghost sm"
                         VerticalAlignment="Top"
                         Command="{Binding CloseCommand}"
-                        ToolTip.Tip="Close"
-                        AutomationProperties.Name="Close this message">
+                        ToolTip.Tip="{x:Static res:Strings.Close}"
+                        AutomationProperties.Name="{x:Static res:Strings.CloseThisMessage}">
                   <ctl:KpIcon Icon="x" Size="12" />
                 </Button>
               </Grid>

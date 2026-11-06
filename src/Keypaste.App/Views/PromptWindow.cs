@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
@@ -14,9 +15,16 @@ internal abstract class PromptWindow : Window
     /// <summary>The transparent band around the card that its shadow is drawn in.</summary>
     private const double _shadowMargin = 24;
 
+    /// <summary>What a style selects a prompt by, since every window's style key is <see cref="Window"/>.</summary>
+    internal const string Class = "prompt-window";
+
     protected PromptWindow()
     {
         OpensOn = ScreenItOpensOn;
+        Classes.Add(Class);
+
+        // A security prompt keeps its layout under every culture, as ReadingDirection also holds for its text; its copy stays in English.
+        FlowDirection = FlowDirection.LeftToRight;
 
         Opened += (_, _) =>
         {

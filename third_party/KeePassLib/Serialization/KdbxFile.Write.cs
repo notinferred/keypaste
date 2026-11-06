@@ -895,7 +895,11 @@ namespace KeePassLib.Serialization
 #if !KeePassLibSD
 								chMapped = char.ToLowerInvariant(ch);
 #else
+#if KEYPASTE_INVARIANT_TEXT
+								chMapped = char.ToLowerInvariant(ch);
+#else
 								chMapped = char.ToLower(ch);
+#endif
 #endif
 							}
 						}

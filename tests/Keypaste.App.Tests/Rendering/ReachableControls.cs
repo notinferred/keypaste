@@ -52,7 +52,8 @@ internal static class ReachableControls
     {
         var box = InWindow(value, window);
         var scale = Scale(value, window);
-        var dots = new Rect(box.Left, box.Top, Math.Min(box.Width, value.MaskedLength * value.FontSize * _dotAdvance * scale), box.Height);
+        var width = Math.Min(box.Width, value.MaskedLength * value.FontSize * _dotAdvance * scale);
+        var dots = new Rect(value.HasMirrorTransform ? box.Right - width : box.Left, box.Top, width, box.Height);
 
         return value.FindAncestorOfType<Panel>()?.GetVisualDescendants().OfType<TextBlock>()
             .FirstOrDefault(block => block.IsEffectivelyVisible && !block.Classes.Contains("under") && block.Text is { Length: > 0 } && InWindow(block, window).Deflate(_slack).Intersects(dots.Deflate(_slack)));
@@ -72,7 +73,7 @@ internal static class ReachableControls
     };
 
     private static double Scale(Control control, TopLevel window) =>
-        control.TransformToVisual(window) is { } transform ? transform.M11 : 1;
+        control.TransformToVisual(window) is { } transform ? Math.Abs(transform.M11) : 1;
 
     private static Rect InWindow(Visual visual, TopLevel window) =>
         visual.TransformToVisual(window) is { } transform ? new Rect(visual.Bounds.Size).TransformToAABB(transform) : default;

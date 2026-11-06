@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -42,12 +43,12 @@
 
         <Grid ColumnDefinitions="Auto,*,Auto">
           <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
-          <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import another app's export" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ImportAnotherAppsExport}" VerticalAlignment="Center" />
           <Button Grid.Column="2"
                   Classes="icon ghost sm"
-                  ToolTip.Tip="Close"
+                  ToolTip.Tip="{x:Static res:Strings.Close}"
                   Command="{Binding CancelCommand}"
-                  AutomationProperties.Name="Close">
+                  AutomationProperties.Name="{x:Static res:Strings.Close}">
             <ctl:KpIcon Icon="x" Size="15" />
           </Button>
         </Grid>
@@ -76,17 +77,17 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsPreviewing}">
               <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock Classes="muted size-12" Text="Not encrypted" VerticalAlignment="Center" />
+              <TextBlock Classes="muted size-12" Text="{x:Static res:Strings.NotEncrypted}" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsImported}">
               <ctl:KpIcon Icon="circle-check" Size="13" Foreground="{DynamicResource KpOk}" />
-              <TextBlock Classes="ok size-12" Text="Imported" VerticalAlignment="Center" />
+              <TextBlock Classes="ok size-12" Text="{x:Static res:Strings.Imported}" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsUnreadable}">
               <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
-              <TextBlock Classes="danger size-12" Text="Can't read" VerticalAlignment="Center" />
+              <TextBlock Classes="danger size-12" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>
         </Panel>
@@ -94,28 +95,28 @@
         <!-- The preview: the group it lands under, the choice for names the vault already has, and every item's row. -->
         <StackPanel Spacing="16" IsVisible="{Binding IsPreviewing}">
           <StackPanel Spacing="8">
-            <TextBlock Classes="label" Text="Copy into this group" />
+            <TextBlock Classes="label" Text="{x:Static res:Strings.CopyIntoThisGroup}" />
             <TextBox x:Name="ExportInto"
                      Classes="mono size-12"
                      Text="{Binding Into}"
-                     AutomationProperties.Name="Group to copy into" />
+                     AutomationProperties.Name="{x:Static res:Strings.GroupToCopyInto}" />
           </StackPanel>
 
           <StackPanel Spacing="8" IsVisible="{Binding HasHeld}">
             <TextBlock Classes="label" Text="{Binding HeldLabel}" />
             <Border Classes="segmented inset">
               <StackPanel Orientation="Horizontal">
-                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="Keep both" IsChecked="{Binding KeepHeld}" />
-                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="Skip them" IsChecked="{Binding SkipHeld}" />
+                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.KeepBoth}" IsChecked="{Binding KeepHeld}" />
+                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.SkipThem}" IsChecked="{Binding SkipHeld}" />
               </StackPanel>
             </Border>
             <TextBlock Classes="caption"
                        TextWrapping="Wrap"
-                       Text="Keep both lands each beside yours under a numbered name, such as GitHub (2). Nothing in your vault is replaced." />
+                       Text="{x:Static res:Strings.KeepBothLandsEachBesideYoursUnderX77358f}" />
           </StackPanel>
 
           <StackPanel Spacing="8">
-            <TextBlock Classes="label" Text="Where each item lands" />
+            <TextBlock Classes="label" Text="{x:Static res:Strings.WhereEachItemLands}" />
             <Border BorderBrush="{DynamicResource KpBorderDefault}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource KpRadiusButton}"
@@ -220,11 +221,11 @@
                          FontWeight="SemiBold"
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource KpTextPrimary}"
-                         Text="{Binding FileName, StringFormat='Delete {0} now'}" />
+                         Text="{Binding FileName, StringFormat={x:Static res:Strings.DeleteValueNow}}" />
               <TextBlock
                          Classes="secondary size-12-5"
                          TextWrapping="Wrap"
-                         Text="It holds your passwords unencrypted, and keypaste does not delete it for you. Delete it, then empty the trash. Deleting does not overwrite the disk blocks it used: on an SSD, a copy-on-write file system or a volume with snapshots or backups, its contents can outlive it, as can a copy a sync service or backup made." />
+                         Text="{x:Static res:Strings.ItHoldsYourPasswordsUnencryptedAndKeypasteXdcf75b}" />
               <TextBlock Classes="mono muted size-12" TextWrapping="Wrap" Text="{Binding FilePath}" />
             </StackPanel>
           </Grid>
@@ -238,13 +239,13 @@
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
           <Button x:Name="ExportCancel"
                   Classes="ghost dialog-action"
-                  Content="Cancel"
+                  Content="{x:Static res:Strings.Cancel}"
                   IsVisible="{Binding !IsImported}"
                   Command="{Binding CancelCommand}" />
           <Button x:Name="ExportChooseAnother"
                   Classes="dialog-action"
                   IsVisible="{Binding CanChooseAnother}"
-                  Content="Choose another file…"
+                  Content="{x:Static res:Strings.ChooseAnotherFile}"
                   Command="{Binding ChooseAnotherCommand}" />
           <Button x:Name="ExportConfirm"
                   Classes="primary dialog-action"
@@ -254,7 +255,7 @@
           <Button x:Name="ExportDone"
                   Classes="primary dialog-action"
                   IsVisible="{Binding IsImported}"
-                  Content="Done"
+                  Content="{x:Static res:Strings.Done}"
                   Command="{Binding CancelCommand}" />
         </StackPanel>
 

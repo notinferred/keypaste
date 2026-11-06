@@ -640,7 +640,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseUShort(string str, out ushort u)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return ushort.TryParse(str, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out u);
+#else
 			return ushort.TryParse(str, out u);
+#endif
 #else
 			try { u = ushort.Parse(str); return true; }
 			catch(Exception) { u = 0; return false; }
@@ -650,7 +654,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseInt(string str, out int n)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return int.TryParse(str, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out n);
+#else
 			return int.TryParse(str, out n);
+#endif
 #else
 			try { n = int.Parse(str); return true; }
 			catch(Exception) { n = 0; }
@@ -678,7 +686,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseUInt(string str, out uint u)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return uint.TryParse(str, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out u);
+#else
 			return uint.TryParse(str, out u);
+#endif
 #else
 			try { u = uint.Parse(str); return true; }
 			catch(Exception) { u = 0; }
@@ -706,7 +718,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseLong(string str, out long n)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return long.TryParse(str, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out n);
+#else
 			return long.TryParse(str, out n);
+#endif
 #else
 			try { n = long.Parse(str); return true; }
 			catch(Exception) { n = 0; }
@@ -734,7 +750,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseULong(string str, out ulong u)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return ulong.TryParse(str, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out u);
+#else
 			return ulong.TryParse(str, out u);
+#endif
 #else
 			try { u = ulong.Parse(str); return true; }
 			catch(Exception) { u = 0; }
@@ -768,7 +788,11 @@ namespace KeePassLib.Utility
 		public static bool TryParseDateTime(string str, out DateTime dt)
 		{
 #if !KeePassLibSD
+#if KEYPASTE_INVARIANT_TEXT
+			return DateTime.TryParse(str, DateTimeFormatInfo.InvariantInfo, DateTimeStyles.None, out dt);
+#else
 			return DateTime.TryParse(str, out dt);
+#endif
 #else
 			try { dt = DateTime.Parse(str); return true; }
 			catch(Exception) { dt = DateTime.UtcNow; }
@@ -907,9 +931,17 @@ namespace KeePassLib.Utility
 				catch(Exception) { iPartCompare = string.Compare(strPartX, strPartY, true); }
 #else
 				ulong uX, uY;
+#if KEYPASTE_INVARIANT_TEXT
+				if(ulong.TryParse(strPartX, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out uX) && ulong.TryParse(strPartY, NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out uY))
+#else
 				if(ulong.TryParse(strPartX, out uX) && ulong.TryParse(strPartY, out uY))
+#endif
 					iPartCompare = uX.CompareTo(uY);
+#if KEYPASTE_INVARIANT_TEXT
+				else iPartCompare = string.Compare(strPartX, strPartY, StringComparison.OrdinalIgnoreCase);
+#else
 				else iPartCompare = string.Compare(strPartX, strPartY, true);
+#endif
 #endif
 
 				if(iPartCompare != 0) return iPartCompare;
@@ -927,8 +959,10 @@ namespace KeePassLib.Utility
 			Debug.Assert(strY != null);
 			if(strY == null) throw new ArgumentNullException("strY");
 
+#if !KEYPASTE_INVARIANT_TEXT
 			if(NativeMethods.SupportsStrCmpNaturally)
 				return NativeMethods.StrCmpNaturally(strX, strY);
+#endif
 
 			int cX = strX.Length;
 			int cY = strY.Length;
@@ -939,7 +973,11 @@ namespace KeePassLib.Utility
 			char chFirstY = strY[0];
 			bool bExpNum = ((chFirstX >= '0') && (chFirstX <= '9'));
 			bool bExpNumY = ((chFirstY >= '0') && (chFirstY <= '9'));
+#if KEYPASTE_INVARIANT_TEXT
+			if(bExpNum != bExpNumY) return string.Compare(strX, strY, StringComparison.OrdinalIgnoreCase);
+#else
 			if(bExpNum != bExpNumY) return string.Compare(strX, strY, true);
+#endif
 
 			int pX = 0;
 			int pY = 0;
@@ -1002,7 +1040,11 @@ namespace KeePassLib.Utility
 				}
 				if(bStrCmp)
 				{
+#if KEYPASTE_INVARIANT_TEXT
+					int c = string.Compare(strPartX, strPartY, StringComparison.OrdinalIgnoreCase);
+#else
 					int c = string.Compare(strPartX, strPartY, true);
+#endif
 					if(c != 0) return c;
 				}
 
@@ -1700,7 +1742,11 @@ namespace KeePassLib.Utility
 					string strSep = vSeps[i];
 					if(string.IsNullOrEmpty(strSep)) { Debug.Assert(false); continue; }
 
+#if KEYPASTE_INVARIANT_TEXT
+					int iIndex = (bCaseSensitive ? str.IndexOf(strSep, StringComparison.Ordinal) :
+#else
 					int iIndex = (bCaseSensitive ? str.IndexOf(strSep) :
+#endif
 						str.IndexOf(strSep, StrUtil.CaseIgnoreCmp));
 					if((iIndex >= 0) && (iIndex < minIndex))
 					{

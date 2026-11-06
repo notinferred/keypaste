@@ -571,7 +571,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
             var name = EntryNameSanitizer.SanitizePath(group.Path).Text;
             var count = _all.Count(row => group.Contains(row.GroupPath));
-            var items = count == 1 ? "1 item" : $"{count} items";
+            var items = count == 1 ? "1 item" : Invariant($"{count} items");
 
             return count == 0 && group.Children.Count == 0
                 ? $"Delete {name}? This vault has no Trash, so there is no undo."
@@ -1508,7 +1508,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 ? $"Deleted {name}. This vault has no Trash, so nothing can put it back."
                 : count == 0
                     ? $"Moved {name} to the trash."
-                    : $"Moved {name} and the {(count == 1 ? "1 item" : $"{count} items")} in it to the trash. Trash puts each one back.");
+                    : $"Moved {name} and the {(count == 1 ? "1 item" : Invariant($"{count} items"))} in it to the trash. Trash puts each one back.");
     }
 
     /// <summary>

@@ -38,6 +38,9 @@ namespace Keypaste.App.Controls;
 /// </remarks>
 internal sealed class MaskedInput : TemplatedControl
 {
+    public MaskedInput() => FlowDirection = Avalonia.Media.FlowDirection.LeftToRight;
+
+
     /// <summary>How many characters the buffer holds, which is all this control knows.</summary>
     internal static readonly StyledProperty<int> MaskedLengthProperty =
         AvaloniaProperty.Register<MaskedInput, int>(nameof(MaskedLength));

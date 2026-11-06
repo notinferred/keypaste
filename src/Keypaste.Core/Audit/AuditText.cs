@@ -145,7 +145,7 @@ public static class AuditText
 
         return filters.Count == 0
             ? $"{Count(total, "record")} in {path}"
-            : $"{Count(shown, "record")} of {total} in {path}, {string.Join(", ", filters)}";
+            : Invariant($"{Count(shown, "record")} of {total} in {path}, {string.Join(", ", filters)}");
     }
 
     /// <summary>Explains anything in a table that is not self-evident.</summary>
@@ -289,7 +289,7 @@ public static class AuditText
         {
             if (finding.IsBreak)
             {
-                yield return $"  line {finding.Line}{Named(finding)}: {Describe(finding.Fault)}";
+                yield return Invariant($"  line {finding.Line}{Named(finding)}: {Describe(finding.Fault)}");
             }
         }
     }
@@ -320,11 +320,11 @@ public static class AuditText
             switch (finding.Fault)
             {
                 case AuditChainFault.SequenceGap:
-                    yield return $"  line {finding.Line}: its position number does not follow the record before it.";
+                    yield return Invariant($"  line {finding.Line}: its position number does not follow the record before it.");
                     break;
 
                 case AuditChainFault.Torn:
-                    yield return $"  line {finding.Line}: a record that stops partway. An interrupted write, not an edit.";
+                    yield return Invariant($"  line {finding.Line}: a record that stops partway. An interrupted write, not an edit.");
                     break;
 
                 default:

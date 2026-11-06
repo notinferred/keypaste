@@ -33,6 +33,7 @@ public sealed class BanExemptionsTests
         ["src/Keypaste.Cli/Program.cs"] = 1,
         ["src/Keypaste.Core/CrashReports/CrashSender.cs"] = 1,
         ["src/Keypaste.Core/Internal/TestKeyDerivation.cs"] = 1,
+        ["src/Keypaste.Core/InvariantUpper.cs"] = 1,
         ["src/Keypaste.Core/Sharing/ShareClient.cs"] = 1,
         ["src/Keypaste.Core/Sharing/ShareService.cs"] = 1,
     };

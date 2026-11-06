@@ -3291,7 +3291,7 @@ public sealed class Vault : IDisposable
 
     /// <summary>A refused field name or tag, as a sentence.</summary>
     private static VaultException Refused(string error) =>
-        new(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
+        new(string.Concat(InvariantUpper.Of(error[0]).ToString(), error.AsSpan(1), "."));
 
     /// <summary>Whether a group path is <paramref name="groupPath"/> or lies inside it.</summary>
     private static bool IsBeneath(string candidate, string groupPath) =>

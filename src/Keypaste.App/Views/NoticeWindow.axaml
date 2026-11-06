@@ -1,10 +1,11 @@
-<views:PromptWindow xmlns="https://github.com/avaloniaui"
+<views:PromptWindow xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:views="using:Keypaste.App.Views"
                     xmlns:ctl="using:Keypaste.App.Controls"
                     x:Class="Keypaste.App.Views.NoticeWindow"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
-                    Title="keypaste: Always for did not take effect"
+                    Title="{x:Static res:Strings.KeypasteAlwaysForDidNotTakeEffect}"
                     Width="508"
                     SizeToContent="Height"
                     CanResize="False"
@@ -30,8 +31,8 @@
           <ctl:KpIcon Icon="info" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Classes="prompt-title" Text="Allowed once" />
-          <TextBlock Classes="prompt-sub" Text="Always for did not take effect" />
+          <TextBlock Classes="prompt-title" Text="{x:Static res:Strings.AllowedOnce}" />
+          <TextBlock Classes="prompt-sub" Text="{x:Static res:Strings.AlwaysForDidNotTakeEffect}" />
         </StackPanel>
       </Grid>
 
@@ -41,7 +42,7 @@
         <Button Name="OpenSettings" Classes="prompt" MaxWidth="340">
           <TextBlock Name="OpenSettingsText" TextTrimming="CharacterEllipsis" />
         </Button>
-        <Button Name="Dismiss" Classes="prompt ghost" Content="Close" IsCancel="True" IsDefault="True" />
+        <Button Name="Dismiss" Classes="prompt ghost" Content="{x:Static res:Strings.Close}" IsCancel="True" IsDefault="True" />
       </StackPanel>
 
     </StackPanel>

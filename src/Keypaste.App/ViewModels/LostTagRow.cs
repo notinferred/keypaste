@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Recommendations;
 
@@ -34,7 +35,7 @@ internal sealed partial class LostTagRow : ObservableObject
 
     internal string Where => string.Create(
         CultureInfo.InvariantCulture,
-        $"dropped from {Entry} in a change saved {Finding.LostUtc.ToLocalTime():yyyy-MM-dd HH:mm}{(Finding.Protects ? ", so agents are no longer asked live for it" : string.Empty)}");
+        $"dropped from {Entry} in a change saved {PersonTime.Moment(Finding.LostUtc.ToLocalTime())}{(Finding.Protects ? ", so agents are no longer asked live for it" : string.Empty)}");
 
     internal bool IsDismissed { get; }
 

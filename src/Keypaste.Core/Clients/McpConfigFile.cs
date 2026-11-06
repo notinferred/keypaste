@@ -516,7 +516,7 @@ public static class McpConfigFile
         }
         catch (JsonException ex)
         {
-            error = $"is not valid JSON at line {(ex.LineNumber ?? 0) + 1}, byte {(ex.BytePositionInLine ?? 0) + 1}";
+            error = Invariant($"is not valid JSON at line {(ex.LineNumber ?? 0) + 1}, byte {(ex.BytePositionInLine ?? 0) + 1}");
             return false;
         }
 
@@ -582,7 +582,7 @@ public static class McpConfigFile
     {
         var before = body[..offset];
 
-        return $"line {before.Count((byte)'\n') + 1}, byte {offset - before.LastIndexOf((byte)'\n')}";
+        return Invariant($"line {before.Count((byte)'\n') + 1}, byte {offset - before.LastIndexOf((byte)'\n')}");
     }
 
     private static bool HoldsAKeyTwice(List<Token> tokens, int[] closes)

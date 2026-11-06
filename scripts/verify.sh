@@ -19,7 +19,7 @@ scripts        Offline release/diagnostic fixtures and shell syntax, run in para
                credentials. On Windows they run in a Linux container, where they take a tenth of
                the time; VERIFY_SCRIPTS_NATIVE=1 keeps them in Git Bash.
 format         dotnet format over both solutions and the consistency project; nothing builds.
-backend        Locked restore, Release build and backend tests.
+backend        Locked restore, Release build and backend tests, and Core's again under Turkish, German and Arabic with ICU.
 integration    Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop        Prepare the desktop solution and the consistency project, and run their tests.
 desktop-gates  Prepare as desktop does, and drive the app, the CLI and an agent as real processes.
@@ -203,8 +203,17 @@ prepare_desktop() {
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
+# Core and Infrastructure also run in the desktop's process, which has ICU and a person's culture, so their tests answer under cultures that differ in casing, numbers and calendar (Q.16).
+test_cultures() {
+  local culture
+  for culture in tr-TR de-DE ar-SA; do
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 KEYPASTE_TEST_CULTURE="$culture" \
+      run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release
+  done
+}
 test_backend() {
   run_tests dotnet test keypaste.slnx --no-build -c Release
+  test_cultures
 }
 test_desktop() {
   run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120

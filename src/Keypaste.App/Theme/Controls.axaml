@@ -19,6 +19,7 @@
           <Panel>
             <TextBlock Text="{TemplateBinding Placeholder}"
                        IsVisible="{TemplateBinding IsEmpty}"
+                       TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Text="{TemplateBinding Display}"

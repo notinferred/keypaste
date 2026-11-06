@@ -158,7 +158,7 @@ public readonly record struct SecretRecipe
     /// </remarks>
     public string Describe(string characterNoun) => Kind switch
     {
-        SecretRecipeKind.Words => $"{_passphrase.WordCount}-word passphrase",
+        SecretRecipeKind.Words => Invariant($"{_passphrase.WordCount}-word passphrase"),
         _ => $"{_password.Length}-character {characterNoun}",
     };
 

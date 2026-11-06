@@ -124,7 +124,11 @@ namespace KeePassLib.Cryptography
 							sb.Remove(0, cc);
 						}
 					}
+#if KEYPASTE_INVARIANT_TEXT
+					else sb.Append(char.ToLowerInvariant(ch));
+#else
 					else sb.Append(char.ToLower(ch));
+#endif
 				}
 			}
 			catch(Exception) { Debug.Assert(false); }

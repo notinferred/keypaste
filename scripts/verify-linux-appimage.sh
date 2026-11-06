@@ -13,7 +13,7 @@
 #     keypaste linked from Settings runs (G.5), and through it the bridge a connected client starts
 #     as `~/.local/bin/keypaste mcp` (G.2).
 #
-# The image itself is never executed. The squashfs starts where the runtime's ELF ends, at its section
+# This script never executes the image; verify-no-icu.sh does. The squashfs starts where the runtime's ELF ends, at its section
 # header table's end, and `unsquashfs -o` reads it from there. Installing it is 4.7b.
 #
 # <version> names the package; <binary-version> is what the payload reports. They differ only on a

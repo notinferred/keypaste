@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <InvariantGlobalization>false</InvariantGlobalization>
     <OutputType>Exe</OutputType>
     <RootNamespace>Keypaste.App.Tests</RootNamespace>
     <AssemblyName>Keypaste.App.Tests</AssemblyName>

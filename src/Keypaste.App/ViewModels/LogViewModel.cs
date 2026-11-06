@@ -1,5 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.App.ViewModels;
@@ -289,11 +291,10 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
 
     private static string DayWords(DateTime? date, DateTime today) => date switch
     {
-        null => "Undated",
-        { } day when day == today => "Today",
-        { } day when day == today.AddDays(-1) => "Yesterday",
-        { } day when day.Year == today.Year => day.ToString("dddd, MMMM d", CultureInfo.InvariantCulture),
-        { } day => day.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture),
+        null => Strings.LogDayUndated,
+        { } day when day == today => Strings.LogDayToday,
+        { } day when day == today.AddDays(-1) => Strings.LogDayYesterday,
+        { } day => PersonTime.Day(day, today),
     };
 
     private void Apply()

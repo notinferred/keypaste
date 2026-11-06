@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 namespace Keypaste.App.Navigation;
 
 /// <summary>The screens the shell can show.</summary>
@@ -51,7 +52,7 @@ internal enum DestinationPlacement
 /// One screen, and everything the sidebar and the keyboard need to know about it.
 /// </summary>
 /// <param name="Kind">Which screen.</param>
-/// <param name="Title">What the sidebar, or the Back button of a screen under it, shows.</param>
+/// <param name="Says">What the sidebar, or the Back button of a screen under it, shows.</param>
 /// <param name="Icon">The Lucide icon's name, drawn from <c>Icon.&lt;name&gt;</c> in Theme/Icons.axaml.</param>
 /// <param name="Placement">Main list or footer, for a place.</param>
 /// <param name="OwnsHeader">
@@ -64,12 +65,14 @@ internal enum DestinationPlacement
 /// </param>
 internal sealed record Destination(
     DestinationKind Kind,
-    string Title,
+    Func<string> Says,
     string Icon,
     DestinationPlacement Placement = DestinationPlacement.Main,
     bool OwnsHeader = false,
     DestinationKind? Parent = null)
 {
+    internal string Title => Says();
+
     /// <summary>The digit that reaches it with the platform's command modifier, or 0 for a screen under a place.</summary>
     internal int Shortcut => Destinations.ShortcutOf(this);
 
@@ -83,17 +86,17 @@ internal static class Destinations
     /// <summary>Every screen the app has.</summary>
     internal static IReadOnlyList<Destination> All { get; } =
     [
-        new(DestinationKind.Entries, "Items", "vault", OwnsHeader: true),
-        new(DestinationKind.AgentActivity, "Agents", "bot", OwnsHeader: true),
-        new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
-        new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer, OwnsHeader: true),
-        new(DestinationKind.EnvSets, "Projects", "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
-        new(DestinationKind.AgentHistory, "History", "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
-        new(DestinationKind.Advanced, "Advanced", "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
-        new(DestinationKind.Log, "Activity log", "activity", OwnsHeader: true, Parent: DestinationKind.Advanced),
-        new(DestinationKind.Sharing, "Share links", "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
-        new(DestinationKind.Tokens, "Scoped tokens", "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),
-        new(DestinationKind.Diagnostics, "Diagnostics", "bug", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Entries, () => Strings.Items, "vault", OwnsHeader: true),
+        new(DestinationKind.AgentActivity, () => Strings.Agents, "bot", OwnsHeader: true),
+        new(DestinationKind.Trash, () => Strings.Trash, "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
+        new(DestinationKind.Settings, () => Strings.Settings, "settings", DestinationPlacement.Footer, OwnsHeader: true),
+        new(DestinationKind.EnvSets, () => Strings.Projects, "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
+        new(DestinationKind.AgentHistory, () => Strings.History, "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
+        new(DestinationKind.Advanced, () => Strings.Advanced, "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Log, () => Strings.ActivityLog, "activity", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Sharing, () => Strings.ShareLinks, "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Tokens, () => Strings.ScopedTokens, "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Diagnostics, () => Strings.Diagnostics, "bug", OwnsHeader: true, Parent: DestinationKind.Advanced),
     ];
 
     /// <summary>The four places, in the order the sidebar reads and the digits count.</summary>

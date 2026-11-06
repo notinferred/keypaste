@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 
 namespace Keypaste.App.Views;
@@ -26,7 +27,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
     {
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Open a keypaste vault",
+            Title = Strings.OpenAKeypasteVault,
             AllowMultiple = false,
             FileTypeFilter = [_vault],
         }).ConfigureAwait(true);
@@ -39,7 +40,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // All files as well: an export keeps whatever name its app or the person gave it.
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import from another app",
+            Title = Strings.ImportFromAnotherApp,
             AllowMultiple = false,
             FileTypeFilter = [_importable, FilePickerFileTypes.All],
         }).ConfigureAwait(true);
@@ -53,7 +54,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // platform dialog that asked "replace it?" would be offering something keypaste will not do.
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Create a keypaste vault",
+            Title = Strings.CreateAKeypasteVault,
             SuggestedFileName = "vault.kdbx",
             DefaultExtension = "kdbx",
             ShowOverwritePrompt = false,
@@ -68,7 +69,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No overwrite prompt, for PickNewAsync's reason: an export refuses an occupied path itself.
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export an encrypted copy of this vault",
+            Title = Strings.ExportAnEncryptedCopyOfThisVault,
             SuggestedFileName = suggestedName,
             DefaultExtension = "kdbx",
             ShowOverwritePrompt = false,
@@ -83,7 +84,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No type filter: KeePassXC's keyfiles are .keyx or .key, and older ones are any file at all.
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Choose a key file",
+            Title = Strings.ChooseAKeyFile,
             AllowMultiple = false,
         }).ConfigureAwait(true);
 
@@ -95,7 +96,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No overwrite prompt, for PickNewAsync's reason: a new keyfile never replaces a file.
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save a new key file",
+            Title = Strings.SaveANewKeyFile,
             SuggestedFileName = suggestedName,
             DefaultExtension = "keyx",
             ShowOverwritePrompt = false,
@@ -110,7 +111,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No type filter: .env, .env.local and env.production are all the same kind of file.
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import a .env file",
+            Title = Strings.ImportADotEnvFile,
             AllowMultiple = false,
         }).ConfigureAwait(true);
 
@@ -123,7 +124,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
 
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export .env.keypaste",
+            Title = Strings.ExportEnvKeypaste,
             SuggestedFileName = suggestedName,
             SuggestedStartLocation = start,
             ShowOverwritePrompt = true,
@@ -137,7 +138,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No type filter: an attachment can be any file.
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Choose a file to attach",
+            Title = Strings.ChooseAFileToAttach,
             AllowMultiple = false,
         }).ConfigureAwait(true);
 
@@ -150,7 +151,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // platform's dialog asks anyway, the screen explains why nothing was replaced.
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save a copy of the attachment",
+            Title = Strings.SaveACopyOfTheAttachment,
             SuggestedFileName = suggestedName,
             ShowOverwritePrompt = false,
         }).ConfigureAwait(true);
@@ -162,7 +163,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
     {
         var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Choose the project's directory",
+            Title = Strings.ChooseTheProjectsDirectory,
             AllowMultiple = false,
         }).ConfigureAwait(true);
 

@@ -2122,7 +2122,7 @@ internal sealed class KeePassInterop : IDisposable
         return OrganizeOutcome.Copied;
 
         static string CopyTitle(string title, int copies) =>
-            copies == 1 ? $"{title} (copy)" : $"{title} (copy {copies})";
+            copies == 1 ? $"{title} (copy)" : Invariant($"{title} (copy {copies})");
     }
 
     /// <summary>The one live group at this path, and the group holding it.</summary>
@@ -2438,7 +2438,7 @@ internal sealed class KeePassInterop : IDisposable
         return candidate;
 
         static string RestoredTitle(string title, int restores) =>
-            restores == 1 ? $"{title} (restored)" : $"{title} (restored {restores})";
+            restores == 1 ? $"{title} (restored)" : Invariant($"{title} (restored {restores})");
     }
 
     /// <summary>Removes one recycled entry and its history for good.</summary>

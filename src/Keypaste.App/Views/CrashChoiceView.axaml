@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:views="using:Keypaste.App.Views"
@@ -23,19 +24,21 @@
     <StackPanel Name="CrashChoice" Spacing="8" IsVisible="{Binding IsAsking}">
       <TextBlock Classes="caption"
                  LineHeight="18"
-                 Text="A report holds the version, system, screen and where the code failed, never your vault, a path or who you are." />
+                 Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
 
       <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,4,0,0">
         <Button Grid.Column="0"
                 Name="SendCrashReports"
                 Classes="equal ghost"
-                Content="Send crash reports"
-                Command="{Binding SendCommand}" />
+                Command="{Binding SendCommand}">
+          <TextBlock Text="{x:Static res:Strings.SendCrashReports}" TextWrapping="Wrap" TextAlignment="Center" />
+        </Button>
         <Button Grid.Column="1"
                 Name="DontSend"
                 Classes="equal ghost"
-                Content="Don't send"
-                Command="{Binding DontSendCommand}" />
+                Command="{Binding DontSendCommand}">
+          <TextBlock Text="{x:Static res:Strings.DontSend}" TextWrapping="Wrap" TextAlignment="Center" />
+        </Button>
       </Grid>
 
       <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Center" />

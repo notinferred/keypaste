@@ -93,6 +93,8 @@ internal sealed class RevealedValue : Control
     private ITimer? _timeout;
     private long _reveals;
 
+    public RevealedValue() => FlowDirection = FlowDirection.LeftToRight;
+
     static RevealedValue()
     {
         AffectsRender<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty, ForegroundProperty, RevealBackgroundProperty);
@@ -256,7 +258,8 @@ internal sealed class RevealedValue : Control
 
         if (_shown is null)
         {
-            context.DrawText(text, default);
+            // Inside a mirrored cell the mask keeps to the cell's start, as its note expects; only the letters stay left to right.
+            context.DrawText(text, HasMirrorTransform ? new Point(Math.Max(0, bounds.Width - text.Width), 0) : default);
             return;
         }
 

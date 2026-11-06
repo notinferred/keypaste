@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -37,12 +38,12 @@ internal static class MergeNotice
 
         if (more > 0)
         {
-            said.Append(more == 1 ? " One more was merged the same way." : $" {more} more were merged the same way.");
+            said.Append(more == 1 ? " One more was merged the same way." : Invariant($" {more} more were merged the same way."));
         }
 
         if (report.Agents.Count > 0)
         {
-            said.Append($" The other program's settings for {Listed([.. report.Agents.Select(Shown)])} now apply.");
+            said.Append(CultureInfo.InvariantCulture, $" The other program's settings for {Listed([.. report.Agents.Select(Shown)])} now apply.");
         }
 
         return said.ToString();
@@ -79,7 +80,7 @@ internal static class MergeNotice
 
         if (items.Count > _named)
         {
-            named.Add(items.Count == _named + 1 ? "1 more item" : $"{items.Count - _named} more items");
+            named.Add(items.Count == _named + 1 ? "1 more item" : Invariant($"{items.Count - _named} more items"));
         }
 
         if (carried.Count > items.Count)

@@ -87,6 +87,19 @@ KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstr
 | `PwEntry.cs` | Adds `KeptVersionKey`; `RemoveOldestBackup` skips a marked version and says whether it removed one, and `MaintainBackups` stops when it removed none; `CreateBackup` removes the marks from the entry's history before it backs the entry up |
 | `KeePassLib.csproj` | Defines the guard |
 
+### `KEYPASTE_INVARIANT_TEXT`
+
+KeePassLib sorts an entry's tags with `string.Compare` under the current culture, which orders them differently from one culture to another before they are written, and reads a KDBX 3.1 date, a number and a password's rating with the current culture too; an ISO date with its `T` read correctly under Arabic, Thai and Persian in a probe, and this stops relying on that. The desktop process has a real culture and the CLI's is invariant, so both must read and write alike (Q.16). This guard makes the parsing, comparing and casing on the paths keypaste calls say invariant or ordinal, which is what they already did under invariant globalization.
+
+| File | Change |
+|---|---|
+| `Utility/StrUtil.cs` | `TryParseUShort`, `TryParseInt`, `TryParseUInt`, `TryParseLong`, `TryParseULong` and `TryParseDateTime` read invariant; `CompareNaturally` compares ordinally, ignoring case, and skips Windows' `StrCmpLogicalW`, so a vault's tags are written in one order on every platform; `Split`'s case-sensitive search is ordinal |
+| `Utility/TimeUtil.cs` | `SerializeUtc` and `TryDeserializeUtc` look for the `Z` ordinally |
+| `Utility/UrlUtil.cs` | `IsUncPath` and the removal of leading `.\\` compare ordinally |
+| `Serialization/IOConnectionInfo.cs` | `IsLocalFile` searches ordinally |
+| `Serialization/KdbxFile.Write.cs`, `Cryptography/QualityEstimation.cs`, `Cryptography/PopularPasswords.cs` | Lower-case invariant, so a password rates the same under every culture |
+| `KeePassLib.csproj` | Defines the guard |
+
 ### Files excluded from compilation
 
 | Path | Reason |

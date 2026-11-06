@@ -42,6 +42,9 @@
       project's own code, which is the part worth gating today. See DECISIONS.md D-0044.
     -->
 
+    <!-- The one project with a real culture; everything else stays invariant under Directory.Build.props (Q.16). Globalization/IcuFallback.cs covers a Linux machine with no ICU. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <ApplicationIcon>Assets/keypaste.ico</ApplicationIcon>
   </PropertyGroup>
@@ -77,6 +80,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Resources.NeutralResourcesLanguageAttribute">
+      <_Parameter1>en</_Parameter1>
+    </AssemblyAttribute>
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
     <InternalsVisibleTo Include="Keypaste.App.Windows.Tests" />
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />

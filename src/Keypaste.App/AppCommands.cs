@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -98,8 +99,8 @@ internal sealed class AppCommandHost
 /// </remarks>
 internal sealed class AppCommands
 {
-    internal const string ImportHeader = "Import from another app…";
-    internal const string GenerateHeader = "Generate password…";
+    internal static string ImportHeader => Strings.ImportFromAnotherAppLabel;
+    internal static string GenerateHeader => Strings.GeneratePasswordXf22f07;
     internal const string HelpAddress = "https://keypaste.com/docs/";
     internal const string ProblemAddress = "https://github.com/notinferred/keypaste/issues";
 
@@ -129,50 +130,50 @@ internal sealed class AppCommands
         var command = Mac ? KeyModifiers.Meta : KeyModifiers.Control;
         KeyGesture[] Chord(Key key, KeyModifiers also = KeyModifiers.None) => [new(key, command | also)];
 
-        var about = new AppCommand("About keypaste", [], () => host.About is not null, () => host.About?.Invoke());
-        var settings = new AppCommand("Settings…", Chord(Key.OemComma), () => Unmodal() is not null, () => Go(DestinationKind.Settings));
-        var quit = new AppCommand("Quit keypaste", Chord(Key.Q), () => host.Quit is not null, () => host.Quit?.Invoke());
+        var about = new AppCommand(Strings.AboutKeypaste, [], () => host.About is not null, () => host.About?.Invoke());
+        var settings = new AppCommand(Strings.SettingsLabel, Chord(Key.OemComma), () => Unmodal() is not null, () => Go(DestinationKind.Settings));
+        var quit = new AppCommand(Strings.QuitKeypaste, Chord(Key.Q), () => host.Quit is not null, () => host.Quit?.Invoke());
         AppMenu = Mac
             ?
             [
                 about, _line, settings, _line,
-                new AppCommand("Hide keypaste", Chord(Key.H), () => host.Hide is not null, () => host.Hide?.Invoke()),
-                new AppCommand("Hide others", Chord(Key.H, KeyModifiers.Alt), () => host.HideOthers is not null, () => host.HideOthers?.Invoke()),
-                new AppCommand("Show all", [], () => host.ShowAll is not null, () => host.ShowAll?.Invoke()),
+                new AppCommand(Strings.HideKeypaste, Chord(Key.H), () => host.Hide is not null, () => host.Hide?.Invoke()),
+                new AppCommand(Strings.HideOthers, Chord(Key.H, KeyModifiers.Alt), () => host.HideOthers is not null, () => host.HideOthers?.Invoke()),
+                new AppCommand(Strings.ShowAll, [], () => host.ShowAll is not null, () => host.ShowAll?.Invoke()),
                 _line, quit,
             ]
             : [about, _line, settings, _line, quit];
 
-        _openVault = new AppCommand("Open vault…", Chord(Key.O), CanOpenVault, () => OpenVault(null));
-        var lockNow = new AppCommand("Lock", Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
-        _newGroup = new AppCommand("New group", [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
+        _openVault = new AppCommand(Strings.OpenVault, Chord(Key.O), CanOpenVault, () => OpenVault(null));
+        var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
+        _newGroup = new AppCommand(Strings.NewGroup, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var file = new AppMenuGroup("File",
         [
-            new AppCommand("New item", Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
+            new AppCommand(Strings.NewItem, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
             _newGroup,
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,
             _openVault,
             new AppSubmenu("Open recent", RecentEntries),
             _line,
-            new AppCommand("Close window", Chord(Key.W), () => host.Window() is { IsVisible: true }, () => host.Window()?.Close()),
+            new AppCommand(Strings.CloseWindow, Chord(Key.W), () => host.Window() is { IsVisible: true }, () => host.Window()?.Close()),
             lockNow,
             _line,
             new AppCommand(ImportHeader, [], CanImport, () => Unmodal()?.ImportCommand.Press()),
-            new AppCommand("Import .env…", [], () => Unmodal() is not null, () => Unmodal()?.ImportEnvCommand.Press()),
-            new AppCommand("Export…", [], () => Unmodal() is not null, Export),
+            new AppCommand(Strings.ImportEnvLabel, [], () => Unmodal() is not null, () => Unmodal()?.ImportEnvCommand.Press()),
+            new AppCommand(Strings.ExportLabel, [], () => Unmodal() is not null, Export),
         ]);
 
-        _delete = new AppCommand("Delete", Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete);
+        _delete = new AppCommand(Strings.Delete, Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete);
         var edit = new AppMenuGroup("Edit",
         [
-            new AppCommand("Undo", Chord(Key.Z), () => CanUndo(text: true), Undo) { ChordCanRun = () => CanUndo(text: false) },
-            new AppCommand("Redo", Chord(Key.Z, KeyModifiers.Shift), () => Text() is { CanRedo: true }, () => Text()?.Redo()) { ChordCanRun = static () => false },
+            new AppCommand(Strings.Undo, Chord(Key.Z), () => CanUndo(text: true), Undo) { ChordCanRun = () => CanUndo(text: false) },
+            new AppCommand(Strings.Redo, Chord(Key.Z, KeyModifiers.Shift), () => Text() is { CanRedo: true }, () => Text()?.Redo()) { ChordCanRun = static () => false },
             _line,
-            new AppCommand("Cut", Chord(Key.X), () => Text() is { CanCut: true }, () => Text()?.Cut()) { ChordCanRun = static () => false },
-            new AppCommand("Copy", Chord(Key.C), () => CanCopy(text: true), Copy) { ChordCanRun = () => CanCopy(text: false) },
-            new AppCommand("Paste", Chord(Key.V), CanPaste, Paste) { ChordCanRun = static () => false },
-            new AppCommand("Select all", Chord(Key.A), () => Text() is { Text.Length: > 0 }, () => Text()?.SelectAll()) { ChordCanRun = static () => false },
+            new AppCommand(Strings.Cut, Chord(Key.X), () => Text() is { CanCut: true }, () => Text()?.Cut()) { ChordCanRun = static () => false },
+            new AppCommand(Strings.Copy, Chord(Key.C), () => CanCopy(text: true), Copy) { ChordCanRun = () => CanCopy(text: false) },
+            new AppCommand(Strings.Paste, Chord(Key.V), CanPaste, Paste) { ChordCanRun = static () => false },
+            new AppCommand(Strings.SelectAll, Chord(Key.A), () => Text() is { Text.Length: > 0 }, () => Text()?.SelectAll()) { ChordCanRun = static () => false },
             _delete,
             _line,
             new AppCommand(
@@ -192,40 +193,40 @@ internal sealed class AppCommands
         ];
 
         // ⌃⌘S is macOS's own chord for this; Windows and Linux have none, and no chord there can hold Alt.
-        _sidebar = new AppCommand("Hide sidebar", Mac ? [new(Key.S, KeyModifiers.Meta | KeyModifiers.Control)] : Chord(Key.B), () => Unmodal() is not null, () => Unmodal()?.ToggleSidebar())
+        _sidebar = new AppCommand(Strings.HideSidebar, Mac ? [new(Key.S, KeyModifiers.Meta | KeyModifiers.Control)] : Chord(Key.B), () => Unmodal() is not null, () => Unmodal()?.ToggleSidebar())
         {
-            Says = () => host.Shell() is { SidebarHidden: true } ? "Show sidebar" : "Hide sidebar",
+            Says = () => host.Shell() is { SidebarHidden: true } ? Strings.ShowSidebar : Strings.HideSidebar,
         };
 
-        var groupsAndProjects = new AppCommand("Show groups and projects", [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
+        var groupsAndProjects = new AppCommand(Strings.ShowGroupsAndProjects, [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
-        var resetTable = new AppCommand("Reset table order and widths", [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
+        var resetTable = new AppCommand(Strings.ResetTableOrderAndWidths, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
 
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =
         [
-            new AppCommand("Zoom in", [new(Key.OemPlus, command), new(Key.OemPlus, command | KeyModifiers.Shift), new(Key.Add, command)], () => WindowShows() && InterfaceZoom.CanEnlarge, InterfaceZoom.Enlarge),
-            new AppCommand("Zoom out", [new(Key.OemMinus, command), new(Key.Subtract, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.Reduce),
-            new AppCommand("Actual size", [new(Key.D0, command), new(Key.NumPad0, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.ActualSize),
+            new AppCommand(Strings.ZoomIn, [new(Key.OemPlus, command), new(Key.OemPlus, command | KeyModifiers.Shift), new(Key.Add, command)], () => WindowShows() && InterfaceZoom.CanEnlarge, InterfaceZoom.Enlarge),
+            new AppCommand(Strings.ZoomOut, [new(Key.OemMinus, command), new(Key.Subtract, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.Reduce),
+            new AppCommand(Strings.ActualSize, [new(Key.D0, command), new(Key.NumPad0, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.ActualSize),
         ];
 
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         var view = new AppMenuGroup("View", Mac
             ? [.. places, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
-            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), resetTable, _line, .. zoom]);
+            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand(Strings.EnterFullScreen, [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), resetTable, _line, .. zoom]);
 
         var window = new AppMenuGroup("Window",
         [
-            new AppCommand("Minimize", Chord(Key.M), () => host.Window() is { IsVisible: true }, () => SetState(WindowState.Minimized)),
-            new AppCommand("Zoom", [], () => host.Window() is { IsVisible: true }, Zoom),
+            new AppCommand(Strings.Minimize, Chord(Key.M), () => host.Window() is { IsVisible: true }, () => SetState(WindowState.Minimized)),
+            new AppCommand(Strings.Zoom, [], () => host.Window() is { IsVisible: true }, Zoom),
             _line,
-            new AppCommand("Bring all to front", [], () => host.OpenWindow is not null, BringAllToFront),
+            new AppCommand(Strings.BringAllToFront, [], () => host.OpenWindow is not null, BringAllToFront),
         ]);
 
         var help = new AppMenuGroup("Help",
         [
-            new AppCommand("keypaste help", [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(HelpAddress))),
-            new AppCommand("Report a problem", [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(ProblemAddress))),
+            new AppCommand(Strings.KeypasteHelp, [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(HelpAddress))),
+            new AppCommand(Strings.ReportAProblem, [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(ProblemAddress))),
         ]);
 
         var copyUsername = Routed("Copy username", () => Items()?.Detail, detail => detail.CopyUsernameCommand);
@@ -377,7 +378,7 @@ internal sealed class AppCommands
     private IReadOnlyList<AppMenuEntry> RecentEntries()
     {
         var vaults = RecentVaults.Load(KeypasteHome.RecentPath(_host.Home));
-        var clear = new AppCommand("Clear menu", [], () => vaults.Count > 0, ClearRecent);
+        var clear = new AppCommand(Strings.ClearMenu, [], () => vaults.Count > 0, ClearRecent);
 
         return
         [

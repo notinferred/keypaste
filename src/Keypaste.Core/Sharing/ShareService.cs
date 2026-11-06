@@ -262,7 +262,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             var (status, failure) = await _client.WithEndpoint(endpoint).StatusAsync(info.Id, ct).ConfigureAwait(false);
             rows.Add(failure != ShareFailure.None || status is null ? (info, "unknown", null)
                 : !status.Exists ? (info, "gone", null)
-                : (info, status.ViewsLeft == 1 ? "1 view left" : $"{status.ViewsLeft} views left", status.ViewsLeft));
+                : (info, status.ViewsLeft == 1 ? "1 view left" : Invariant($"{status.ViewsLeft} views left"), status.ViewsLeft));
         }
 
         return rows;

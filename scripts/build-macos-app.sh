@@ -79,7 +79,10 @@ case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "the MCP server your AI 
 
 # LaunchServices, not a shell, reads Info.plist and starts the app from Finder or `open`; its exit code is not open's.
 : > "$work/launched"
-open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$unzipped/keypaste.app" --args --selftest
+# When the selftest ends before open starts watching it, open -W reports that and fails; what the app printed still decides.
+if ! open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$unzipped/keypaste.app" --args --selftest 2> "$work/open.err"; then
+  grep -q 'kevent() failed: No such process' "$work/open.err" || die "open could not start the bundle through LaunchServices: $(cat "$work/open.err")"
+fi
 grep -q '^keypaste-app: selftest ok ' "$work/launched" \
   || die "the bundle started through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
 grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \

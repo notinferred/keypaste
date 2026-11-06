@@ -141,7 +141,7 @@ public static class RunRequestRules
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        var upper = name.ToUpperInvariant();
+        var upper = InvariantUpper.Of(name);
         return upper.StartsWith("LD_", StringComparison.Ordinal)
             || upper.StartsWith("DYLD_", StringComparison.Ordinal)
             || upper.StartsWith("PYTHON", StringComparison.Ordinal)

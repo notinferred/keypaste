@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Globalization;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
@@ -1479,7 +1480,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         (VaultStatus, VaultStatusTone) = state.Status switch
         {
             VaultSaveStatus.Saved when _updatedAt is { } updated =>
-                ($"{VaultName} · updated {updated.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)}", StatusTone.Ok),
+                ($"{VaultName} · updated {PersonTime.Clock(updated.ToLocalTime())}", StatusTone.Ok),
             VaultSaveStatus.Saved => ($"{VaultName} · saved", StatusTone.Ok),
             VaultSaveStatus.Unsaved => ($"{VaultName} · unsaved changes", StatusTone.Accent),
             VaultSaveStatus.ChangedOnDisk => ($"{VaultName} · changed on disk", StatusTone.Danger),
@@ -1489,8 +1490,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         VaultStatusDetail = (state.Status, _updatedAt, state.SavedAt) switch
         {
             (VaultSaveStatus.Saved, { } updated, _) =>
-                $"Updated from another program's save at {updated.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}",
-            (_, _, { } saved) => $"Saved {saved.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}",
+                $"Updated from another program's save at {PersonTime.ClockWithSeconds(updated.ToLocalTime())} · {VaultPath}",
+            (_, _, { } saved) => $"Saved {PersonTime.ClockWithSeconds(saved.ToLocalTime())} · {VaultPath}",
             _ => VaultPath,
         };
 
@@ -1621,7 +1622,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         if (items.Count > 3)
         {
-            named.Add(items.Count == 4 ? "1 more item" : $"{items.Count - 3} more items");
+            named.Add(items.Count == 4 ? "1 more item" : Invariant($"{items.Count - 3} more items"));
         }
 
         if (unsaved.Count > items.Count)

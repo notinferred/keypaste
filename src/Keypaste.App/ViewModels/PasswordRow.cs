@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
@@ -40,7 +41,7 @@ internal sealed class PasswordRow
         PasswordProblem.Reused => $"on {Entry}, also on {Sharers()}",
         _ => string.Create(
             CultureInfo.InvariantCulture,
-            $"on {Entry}, whose expiry date {Finding.ExpiredUtc?.ToLocalTime():yyyy-MM-dd HH:mm} has passed"),
+            $"on {Entry}, whose expiry date {(Finding.ExpiredUtc is { } expired ? PersonTime.Moment(expired.ToLocalTime()) : string.Empty)} has passed"),
     };
 
     internal bool IsDismissed { get; }

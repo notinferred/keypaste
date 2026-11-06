@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
@@ -50,7 +51,7 @@ internal sealed class GroupNode
     /// <remarks>
     /// <see cref="Path"/> stays raw because it selects the group; only the label is drawn.
     /// </remarks>
-    internal string Label => IsEverything ? "All items" : EntryNameSanitizer.Sanitize(Name).Text;
+    internal string Label => IsEverything ? Strings.AllItems : EntryNameSanitizer.Sanitize(Name).Text;
 
     /// <summary>
     /// Builds the tree, flattened depth-first into the order a list should draw it.

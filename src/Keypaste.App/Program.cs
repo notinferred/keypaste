@@ -1,4 +1,5 @@
 using Avalonia;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Linking;
@@ -38,6 +39,8 @@ internal static class Program
     private static int Main(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
+
+        IcuFallback.Apply();
 
         if (TryRunHeadless(args, Console.Out, Console.Error, out var exitCode))
         {

@@ -498,14 +498,14 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     private static string OpenerFailure(string opener, ProcessResult opened) =>
         !opened.ToolFound ? $"{opener} could not be started"
         : opened.StandardError.Trim() is { Length: > 0 } said ? said
-        : $"{opener} exited with {opened.ExitCode}";
+        : Invariant($"{opener} exited with {opened.ExitCode}");
 
     /// <summary>The project and, for any profile but the default, the profile, as the confirmation names them.</summary>
     private string Source(string profile) => string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
         ? Shown(_project)
         : $"{Shown(_project)} ({Shown(profile)})";
 
-    private static string Count(int keys) => keys == 1 ? "1 variable" : $"{keys} variables";
+    private static string Count(int keys) => keys == 1 ? "1 variable" : Invariant($"{keys} variables");
 
     private static string Shown(string text) => DisplayTextSanitizer.Sanitize(text, 2048).Text;
 }

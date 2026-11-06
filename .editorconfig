@@ -80,3 +80,31 @@ dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = error
 [tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1861.severity = none
+
+# ---------------------------------------------------------------------------
+# Culture (Q.16): the desktop process has a real culture and these three projects run in it.
+# A rule, a name, a file or a hash reads the same under every culture, so each culture-sensitive call says which it means.
+# ---------------------------------------------------------------------------
+[src/{Keypaste.Core,Keypaste.Infrastructure,Keypaste.App}/**.cs]
+dotnet_diagnostic.CA1304.severity = error
+dotnet_diagnostic.CA1305.severity = error
+dotnet_diagnostic.CA1309.severity = error
+dotnet_diagnostic.CA1311.severity = error
+dotnet_diagnostic.MA0002.severity = error
+dotnet_diagnostic.MA0011.severity = error
+dotnet_diagnostic.MA0074.severity = error
+dotnet_diagnostic.MA0075.severity = error
+dotnet_diagnostic.MA0076.severity = error
+
+# A resource's format is read at each use; these formats run for a person's click, and caching one gains nothing.
+[src/Keypaste.App/**.cs]
+dotnet_diagnostic.CA1863.severity = none
+
+# These two hosts carry ICU as the app does and run under no culture; what they compare is their own test text.
+[tests/{Keypaste.App.Tests,Keypaste.AppDriver}/**.cs]
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1307.severity = none
+dotnet_diagnostic.CA1309.severity = none
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1311.severity = none

@@ -133,11 +133,11 @@ internal sealed class ChainVerdict
             switch (finding.Fault)
             {
                 case AuditChainFault.SequenceGap:
-                    yield return $"Line {finding.Line}: its position number does not follow the record before it.";
+                    yield return Invariant($"Line {finding.Line}: its position number does not follow the record before it.");
                     break;
 
                 case AuditChainFault.Torn:
-                    yield return $"Line {finding.Line}: a record that stops partway. An interrupted write, not an edit.";
+                    yield return Invariant($"Line {finding.Line}: a record that stops partway. An interrupted write, not an edit.");
                     break;
 
                 default:

@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="using:Keypaste.App.Views"
              xmlns:app="using:Keypaste.App"
@@ -189,14 +190,14 @@
         <!-- Header: the title, the project picker, and the file actions. -->
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
-            <TextBlock Classes="h1" Text="Projects" IsVisible="{Binding !HasOpenProject}" />
+            <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}" />
             <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
             <ComboBox Classes="project title" Margin="0,0,-32,0" HorizontalAlignment="Left"
                       IsVisible="{Binding HasOpenProject}"
                       ItemsSource="{Binding ProjectChoices}"
                       SelectedItem="{Binding SelectedProject}"
-                      ToolTip.Tip="Choose a project"
-                      AutomationProperties.Name="Project">
+                      ToolTip.Tip="{x:Static res:Strings.ChooseAProject}"
+                      AutomationProperties.Name="{x:Static res:Strings.Project}">
               <ComboBox.SelectionBoxItemTemplate>
                 <DataTemplate x:DataType="x:String">
                   <StackPanel Orientation="Horizontal" Spacing="8">
@@ -208,31 +209,31 @@
               </ComboBox.SelectionBoxItemTemplate>
             </ComboBox>
             <StackPanel Orientation="Horizontal" Spacing="0" IsVisible="{Binding HasOpenProject}">
-              <TextBlock Classes="subtitle" VerticalAlignment="Center" Text="One set of keys, a value per environment" />
+              <TextBlock Classes="subtitle" VerticalAlignment="Center" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
               <Button Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
-                      ToolTip.Tip="New project"
+                      ToolTip.Tip="{x:Static res:Strings.NewProject}"
                       Command="{Binding BeginAddCommand}"
                       IsVisible="{Binding !IsAdding}"
-                      AutomationProperties.Name="New project">
+                      AutomationProperties.Name="{x:Static res:Strings.NewProject}">
                 <ctl:KpIcon Icon="plus" Size="13" />
               </Button>
             </StackPanel>
             <TextBlock Classes="subtitle" IsVisible="{Binding !HasOpenProject}"
-                       Text="One set of keys per project, a value per environment." />
+                       Text="{x:Static res:Strings.OneSetOfKeysPerProjectAXb4239d}" />
           </StackPanel>
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom"
                       IsVisible="{Binding HasOpenProject}">
-            <Button Command="{Binding OpenProject.Import.ChooseCommand}" AutomationProperties.Name="Import .env">
+            <Button Command="{Binding OpenProject.Import.ChooseCommand}" AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-up" Size="13" />
-                <TextBlock Text="Import .env" />
+                <TextBlock Text="{x:Static res:Strings.ImportEnv}" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding OpenProject.ExportReferencesCommand}" AutomationProperties.Name="Export .env.keypaste">
+            <Button Command="{Binding OpenProject.ExportReferencesCommand}" AutomationProperties.Name="{x:Static res:Strings.ExportEnvKeypaste}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-down" Size="13" />
-                <TextBlock Text="Export .env.keypaste" />
+                <TextBlock Text="{x:Static res:Strings.ExportEnvKeypaste}" />
               </StackPanel>
             </Button>
           </StackPanel>
@@ -261,7 +262,7 @@
             <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,1,10,0" VerticalAlignment="Top"
                         Foreground="{DynamicResource KpTextMuted}" />
             <StackPanel Grid.Column="1" Spacing="6">
-              <TextBlock Classes="body primary" Text="Some tags put their item in no project" />
+              <TextBlock Classes="body primary" Text="{x:Static res:Strings.SomeTagsPutTheirItemInNoXd8ea51}" />
               <ItemsControl ItemsSource="{Binding MalformedTags}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:EnvTagProblemRow">
@@ -269,31 +270,31 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Classes="caption" Text="Correct the tag on the item in Items, or remove it." />
+              <TextBlock Classes="caption" Text="{x:Static res:Strings.CorrectTheTagOnTheItemInXafafd7}" />
             </StackPanel>
           </Grid>
         </Border>
 
         <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewProjectDraft}">
           <StackPanel Spacing="10">
-            <TextBlock Classes="section" Text="New project" />
+            <TextBlock Classes="section" Text="{x:Static res:Strings.NewProject}" />
             <TextBlock Classes="caption"
-                       Text="A project is the items in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first item or key." />
-            <TextBlock Classes="label" Text="Project name" />
+                       Text="{x:Static res:Strings.AProjectIsTheItemsInYourX9f49b8}" />
+            <TextBlock Classes="label" Text="{x:Static res:Strings.ProjectName}" />
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" AutomationProperties.Name="Project name" />
-              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
-              <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
+              <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" AutomationProperties.Name="{x:Static res:Strings.ProjectName}" />
+              <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
+              <Button Classes="primary" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
           </StackPanel>
         </Border>
 
         <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="20">
           <StackPanel Spacing="12">
-            <TextBlock Classes="section" Text="No projects yet" />
+            <TextBlock Classes="section" Text="{x:Static res:Strings.NoProjectsYet}" />
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left"
-                       Text="A project is the items in your vault tagged with its name, such as env:billing-api, with a value per environment. Tag an item in Items, run keypaste env set billing-api STRIPE_KEY, or choose New project." />
-            <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
+                       Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
+            <Button Content="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
                     HorizontalAlignment="Left" />
           </StackPanel>
         </Border>
@@ -306,7 +307,7 @@
                 <!-- The .env import: read and checked whole, previewed by name, written only on Import. -->
                 <Border Classes="card filled" IsVisible="{Binding Import.IsPreviewing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Import.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Import.CancelCommand}">
                   <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="{Binding Import.Source, StringFormat='Import {0}?'}" TextWrapping="Wrap" />
+                    <TextBlock Classes="section" Text="{Binding Import.Source, StringFormat={x:Static res:Strings.ImportValue}}" TextWrapping="Wrap" />
                     <ItemsControl ItemsSource="{Binding Import.Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="x:String">
@@ -316,8 +317,8 @@
                     </ItemsControl>
                     <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding Import.CancelCommand}" />
-                      <Button Classes="primary" Content="Import" Command="{Binding Import.ConfirmCommand}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Import.CancelCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -325,12 +326,12 @@
                 <!-- Once imported, the file can be deleted, only while it still holds what was read; kept unless Delete is pressed. -->
                 <Border Classes="card" IsVisible="{Binding Import.IsOfferingDelete}" BorderBrush="{DynamicResource KpDanger}">
                   <StackPanel Spacing="10">
-                    <TextBlock Classes="body primary" Text="{Binding Import.Leftover, StringFormat='Delete {0}?'}" TextWrapping="Wrap" />
+                    <TextBlock Classes="body primary" Text="{Binding Import.Leftover, StringFormat={x:Static res:Strings.DeleteValue}}" TextWrapping="Wrap" />
                     <TextBlock Classes="caption" Text="{Binding Import.DeleteWarning}" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding Import.KeepSourceCommand}" />
-                      <Button Classes="danger" Content="Delete" Command="{Binding Import.DeleteSourceCommand}"
-                              AutomationProperties.Name="{Binding Import.Leftover, StringFormat='Delete {0}'}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Import.KeepSourceCommand}" />
+                      <Button Classes="danger" Content="{x:Static res:Strings.Delete}" Command="{Binding Import.DeleteSourceCommand}"
+                              AutomationProperties.Name="{Binding Import.Leftover, StringFormat={x:Static res:Strings.DeleteValueXa92ece}}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -343,7 +344,7 @@
                     <StackPanel>
                       <Border Classes="table-head">
                         <Grid ColumnDefinitions="1.6*,3*,120">
-                          <TextBlock Grid.Column="0" Classes="th" Text="KEY" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="0" Classes="th" Text="{x:Static res:Strings.KEY}" VerticalAlignment="Center" />
                           <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}">
                             <ItemsControl.ItemsPanel>
                               <ItemsPanelTemplate>
@@ -353,7 +354,7 @@
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:EnvProfileColumn">
                                 <Button Classes="flat" Margin="12,0,0,0" Command="{Binding Select}"
-                                        ToolTip.Tip="{Binding Name, StringFormat='Edit, preview and run {0}'}"
+                                        ToolTip.Tip="{Binding Name, StringFormat={x:Static res:Strings.EditPreviewAndRunValue}}"
                                         AutomationProperties.Name="{Binding Name}">
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock Classes="th" Classes.selected="{Binding IsSelected}" Text="{Binding Header}" />
@@ -382,12 +383,12 @@
                           </ItemsControl>
                           <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right"
                                   Command="{Binding BeginAddProfileCommand}"
-                                  ToolTip.Tip="Add an environment, such as staging or prod"
-                                  AutomationProperties.Name="Add environment">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                              <ctl:KpIcon Icon="plus" Size="12" Foreground="{DynamicResource KpTextMuted}" />
-                              <TextBlock Classes="th" Text="ENVIRONMENT" />
-                            </StackPanel>
+                                  ToolTip.Tip="{x:Static res:Strings.AddAnEnvironmentSuchAsStagingOrXe62816}"
+                                  AutomationProperties.Name="{x:Static res:Strings.AddEnvironment}">
+                            <DockPanel>
+                              <ctl:KpIcon DockPanel.Dock="Left" Icon="plus" Size="12" Margin="0,0,4,0" Foreground="{DynamicResource KpTextMuted}" />
+                              <TextBlock Classes="th" TextTrimming="CharacterEllipsis" Text="{x:Static res:Strings.ENVIRONMENT}" />
+                            </DockPanel>
                           </Button>
                         </Grid>
                       </Border>
@@ -463,14 +464,14 @@
                                         <ctl:RevealButton Classes="ghost row-action"
                                                           TargetSource="{Binding}"
                                                           Subject="{Binding DisplayKey}" />
-                                        <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource CopyGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat='Copy {0}'}"
-                                                ToolTip.Tip="Copy the value; the clipboard clears itself"
+                                        <Button Classes="ghost row-action" Content="{x:Static res:Strings.Copy}" ContentTemplate="{StaticResource CopyGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.CopyValue}}"
+                                                ToolTip.Tip="{x:Static res:Strings.CopyTheValueTheClipboardClearsItself}"
                                                 Command="{Binding CopyValueCommand}" />
-                                        <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource ReplaceGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat='Replace {0}'}"
-                                                ToolTip.Tip="Replace the value"
+                                        <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource ReplaceGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.ReplaceValue}}"
+                                                ToolTip.Tip="{x:Static res:Strings.ReplaceTheValue}"
                                                 Command="{Binding ReplaceCommand}" />
-                                        <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource RemoveGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat='Remove {0}'}"
-                                                ToolTip.Tip="Remove this key from its item"
+                                        <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource RemoveGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.RemoveValue}}"
+                                                ToolTip.Tip="{x:Static res:Strings.RemoveThisKeyFromItsItem}"
                                                 Command="{Binding RemoveCommand}" />
                                       </StackPanel>
                                     </DataTemplate>
@@ -485,12 +486,12 @@
                       <Border Classes="table-row" Padding="16,8">
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock Classes="caption" VerticalAlignment="Center" IsVisible="{Binding !HasRows}"
-                                     Text="{Binding SelectedProfile, StringFormat='No keys yet. Add the first one to {0}.'}" />
+                                     Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.NoKeysYetAddTheFirstOneX0cbcf7}}" />
                           <Button Grid.Column="1" Classes="ghost sm" Command="{Binding BeginAddCommand}"
-                                  AutomationProperties.Name="{Binding SelectedProfile, StringFormat='Add a key to {0}'}">
+                                  AutomationProperties.Name="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="plus" Size="13" />
-                              <TextBlock Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
+                              <TextBlock Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
                             </StackPanel>
                           </Button>
                         </Grid>
@@ -499,31 +500,31 @@
                   </Border>
 
                   <TextBlock Classes="caption"
-                             Text="A row's eye button shows its value for 30 seconds. Click another environment's cell or header to work in that environment." />
+                             Text="{x:Static res:Strings.ARowsEyeButtonShowsItsValueXc068c4}" />
                 </StackPanel>
 
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->
                 <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddProfileCommand}" ctl:FormKeys.Cancel="{Binding CancelAddProfileCommand}" ctl:FormKeys.Draft="{Binding ProfileDraft}">
                   <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="New environment" />
+                    <TextBlock Classes="section" Text="{x:Static res:Strings.NewEnvironment}" />
                     <TextBlock Classes="caption"
-                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key or item creates it, and prod and production environments always ask before release." />
-                    <TextBlock Classes="label" Text="Environment name" />
+                               Text="{x:Static res:Strings.LowercaseLettersDigitsAndDashesSuchAsX8d843c}" />
+                    <TextBlock Classes="label" Text="{x:Static res:Strings.EnvironmentName}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" AutomationProperties.Name="Environment name" />
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddProfileCommand}" />
-                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
+                      <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" AutomationProperties.Name="{x:Static res:Strings.EnvironmentName}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddProfileCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
 
                 <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding KeyDraft}">
                   <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
+                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
                     <StackPanel Spacing="6">
-                      <TextBlock Classes="label" Text="Key name" />
+                      <TextBlock Classes="label" Text="{x:Static res:Strings.KeyName}" />
                       <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
-                               AutomationProperties.Name="New key" />
+                               AutomationProperties.Name="{x:Static res:Strings.NewKey}" />
                     </StackPanel>
                     <TextBlock x:Name="NewKeyProblem"
                                Classes="caption"
@@ -534,11 +535,11 @@
                     <!-- A new key is a protected field of the entry chosen here: the environment's home entry, or
                          one of the entries tagged into it (D-0413). -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Classes="caption" Text="On" VerticalAlignment="Center" />
+                      <TextBlock Classes="caption" Text="{x:Static res:Strings.On}" VerticalAlignment="Center" />
                       <ComboBox ItemsSource="{Binding EntryChoices}"
                                 SelectedItem="{Binding NewEntry}"
                                 MinWidth="320"
-                                AutomationProperties.Name="Item for the new key">
+                                AutomationProperties.Name="{x:Static res:Strings.ItemForTheNewKey}">
                         <ComboBox.ItemTemplate>
                           <DataTemplate x:DataType="vm:EnvEntryChoice">
                             <TextBlock Text="{Binding Display}" FontFamily="{DynamicResource KpMono}" />
@@ -552,13 +553,13 @@
                                        Width="420"
                                        Sink="{Binding NewValue}"
                                        MaskedLength="{Binding NewValue.MaskedLength}"
-                                       Placeholder="Value" />
+                                       Placeholder="{x:Static res:Strings.ValueLabel}" />
                       <Button x:Name="NewEnvGenerate"
                               Classes="icon ghost"
                               VerticalAlignment="Center"
                               Command="{Binding GenerateCommand}"
-                              ToolTip.Tip="Generate a value"
-                              AutomationProperties.Name="Generate a value">
+                              ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
+                              AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                         <ctl:KpIcon Icon="wand-2" Size="16" />
                       </Button>
                     </StackPanel>
@@ -566,14 +567,14 @@
                       <views:GeneratorOptions DataContext="{Binding Generator}" />
                     </Panel>
                     <TextBlock Classes="caption" IsVisible="{Binding GenerateValue}"
-                               Text="Generated. Type or paste to use your own instead." />
+                               Text="{x:Static res:Strings.GeneratedTypeOrPasteToUseYourX7a2ef9}" />
                     <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
                                Text="{x:Static app:ShortcutText.Paste}" />
                     <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
                                Text="{Binding NewValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
-                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -587,14 +588,14 @@
                                        Width="420"
                                        Sink="{Binding ReplacementValue}"
                                        MaskedLength="{Binding ReplacementValue.MaskedLength}"
-                                       Placeholder="New value" />
+                                       Placeholder="{x:Static res:Strings.NewValue}" />
                       <Button x:Name="ReplacementEnvGenerate"
                               Classes="icon ghost"
                               VerticalAlignment="Center"
                               Command="{Binding GenerateIntoCommand}"
                               CommandParameter="{Binding ReplacementValue}"
-                              ToolTip.Tip="Generate a value"
-                              AutomationProperties.Name="Generate a value">
+                              ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
+                              AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                         <ctl:KpIcon Icon="wand-2" Size="16" />
                       </Button>
                     </StackPanel>
@@ -604,8 +605,8 @@
                     <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}" />
-                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -614,8 +615,8 @@
                   <StackPanel Spacing="10">
                     <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveCommand}" />
-                      <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
+                      <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveCommand}" />
+                      <Button Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -624,7 +625,7 @@
                      entry puts its variables in. Add entry tags one and Remove takes the tag off, each after
                      saying what it reaches (D-0415); neither deletes an entry or a field. -->
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="label" Text="Items" />
+                  <TextBlock Classes="label" Text="{x:Static res:Strings.Items}" />
                   <Border Classes="table">
                     <ItemsControl ItemsSource="{Binding Environments}">
                       <ItemsControl.ItemTemplate>
@@ -638,11 +639,11 @@
                                               Foreground="{DynamicResource KpTextSecondary}" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Classes="ghost sm" Command="{Binding AddEntry}"
-                                        ToolTip.Tip="Tag an item from your vault into this environment"
+                                        ToolTip.Tip="{x:Static res:Strings.TagAnItemFromYourVaultIntoX85a64e}"
                                         AutomationProperties.Name="{Binding AddName}">
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <ctl:KpIcon Icon="plus" Size="13" />
-                                    <TextBlock Text="Add item" />
+                                    <TextBlock Text="{x:Static res:Strings.AddItem}" />
                                   </StackPanel>
                                 </Button>
                               </Grid>
@@ -666,7 +667,7 @@
                                       <StackPanel Grid.Column="2" Classes="row-actions" Orientation="Horizontal"
                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,-4">
                                         <Button Classes="ghost row-action" Command="{Binding Remove}"
-                                                ToolTip.Tip="Take this item out of the environment; the item and its fields stay"
+                                                ToolTip.Tip="{x:Static res:Strings.TakeThisItemOutOfTheEnvironmentX38da29}"
                                                 AutomationProperties.Name="{Binding RemoveName}">
                                           <ctl:KpIcon Icon="x" Size="13" />
                                         </Button>
@@ -685,11 +686,11 @@
                 <Border Classes="card filled" IsVisible="{Binding IsAddingEntry}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelAddEntryCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding AddEntryTitle}" />
-                    <TextBox Text="{Binding EntryFilter}" PlaceholderText="Find an item by its path" Width="420"
-                             HorizontalAlignment="Left" AutomationProperties.Name="Find an item" />
+                    <TextBox Text="{Binding EntryFilter}" PlaceholderText="{x:Static res:Strings.FindAnItemByItsPath}" Width="420"
+                             HorizontalAlignment="Left" AutomationProperties.Name="{x:Static res:Strings.FindAnItem}" />
                     <ListBox Name="EntryCandidates" ItemsSource="{Binding EntryCandidates}" SelectedItem="{Binding ChosenEntry}"
                              MaxHeight="240" Width="420" HorizontalAlignment="Left"
-                             AutomationProperties.Name="Items you can add">
+                             AutomationProperties.Name="{x:Static res:Strings.ItemsYouCanAdd}">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:EnvEntryCandidate">
                           <TextBlock Classes="mono" Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
@@ -697,7 +698,7 @@
                       </ListBox.ItemTemplate>
                     </ListBox>
                     <TextBlock Classes="caption" Text="{Binding CandidateNote}" IsVisible="{Binding CandidateNote.Length}" />
-                    <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddEntryCommand}"
+                    <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddEntryCommand}"
                             IsVisible="{Binding !IsConfirmingTagChange}" HorizontalAlignment="Left" />
                   </StackPanel>
                 </Border>
@@ -712,7 +713,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Name="CancelTagChange" Classes="ghost" Content="Cancel"
+                      <Button Name="CancelTagChange" Classes="ghost" Content="{x:Static res:Strings.Cancel}"
                               Command="{Binding CancelTagChangeCommand}" />
                       <Button Name="ConfirmTagChange" Classes.primary="{Binding TagChangeAdds}" Classes.danger="{Binding !TagChangeAdds}"
                               Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
@@ -729,7 +730,7 @@
                         <Grid ColumnDefinitions="Auto,*,Auto">
                           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <ctl:KpIcon Icon="file-code" Size="13" Foreground="{DynamicResource KpGrey5}" />
-                            <TextBlock Text=".env.keypaste" Classes="size-12" Foreground="{DynamicResource KpGrey5}"
+                            <TextBlock Text="{x:Static res:Strings.EnvKeypaste}" Classes="size-12" Foreground="{DynamicResource KpGrey5}"
                                        VerticalAlignment="Center" />
                           </StackPanel>
                           <Border Grid.Column="2" Background="{DynamicResource KpInk1}" CornerRadius="6" Padding="2"
@@ -769,7 +770,7 @@
                     <StackPanel Spacing="12">
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <ctl:KpIcon Icon="terminal" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-                        <TextBlock Classes="section" Text="Run with this environment" VerticalAlignment="Center" />
+                        <TextBlock Classes="section" Text="{x:Static res:Strings.RunWithThisEnvironment}" VerticalAlignment="Center" />
                       </StackPanel>
 
                       <Border Classes="terminal" CornerRadius="6" Padding="12,5,5,5" IsVisible="{Binding HasRunCommand}">
@@ -780,8 +781,8 @@
                                      TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                      ToolTip.Tip="{Binding RunCommand}" />
                           <Button Grid.Column="2" Classes="ghost row-action" Margin="8,0,0,0"
-                                  ToolTip.Tip="Copy the command" Command="{Binding CopyRunCommandCommand}"
-                                  AutomationProperties.Name="Copy the command">
+                                  ToolTip.Tip="{x:Static res:Strings.CopyTheCommand}" Command="{Binding CopyRunCommandCommand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.CopyTheCommand}">
                             <ctl:KpIcon Icon="copy" Size="13" />
                           </Button>
                         </Grid>
@@ -789,32 +790,32 @@
                       <TextBlock Classes="caption" Text="{Binding RunCommandNote}" IsVisible="{Binding !HasRunCommand}" />
 
                       <TextBlock Classes="body muted size-12-5" LineHeight="18.75"
-                                 Text="Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them." />
+                                 Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
                       <TextBlock Classes="body muted size-12-5" LineHeight="18.75"
-                                 Text="Through an agent or a token, a prod environment is asked about live every time and never kept in an allowance." />
+                                 Text="{x:Static res:Strings.ThroughAnAgentOrATokenAXbc5a7a}" />
 
                       <Border Classes="divider" Margin="0,2" />
 
-                      <TextBlock Classes="label" Text="On this machine" />
+                      <TextBlock Classes="label" Text="{x:Static res:Strings.OnThisMachine}" />
                       <Grid ColumnDefinitions="*,Auto">
                         <TextBox Grid.Column="0" Classes="mono" Text="{Binding Launch.Directory}"
-                                 PlaceholderText="Project directory" AutomationProperties.Name="Project directory" />
-                        <Button Grid.Column="1" Content="Choose…" Margin="8,0,0,0"
+                                 PlaceholderText="{x:Static res:Strings.ProjectDirectory}" AutomationProperties.Name="{x:Static res:Strings.ProjectDirectory}" />
+                        <Button Grid.Column="1" Content="{x:Static res:Strings.Choose}" Margin="8,0,0,0"
                                 Command="{Binding Launch.ChooseDirectoryCommand}" />
                       </Grid>
                       <Grid ColumnDefinitions="*,Auto">
                         <TextBox Grid.Column="0" Classes="mono" Text="{Binding Launch.Command}" PlaceholderText="npm start"
-                                 AutomationProperties.Name="Command" />
-                        <Button Grid.Column="1" Content="Save" Margin="8,0,0,0" Command="{Binding Launch.SaveCommand}" />
+                                 AutomationProperties.Name="{x:Static res:Strings.Command}" />
+                        <Button Grid.Column="1" Content="{x:Static res:Strings.Save}" Margin="8,0,0,0" Command="{Binding Launch.SaveCommand}" />
                       </Grid>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding Launch.RunProjectCommand}" AutomationProperties.Name="Run in a terminal">
+                        <Button Command="{Binding Launch.RunProjectCommand}" AutomationProperties.Name="{x:Static res:Strings.RunInATerminal}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="terminal" Size="13" />
-                            <TextBlock Text="Run in a terminal" />
+                            <TextBlock Text="{x:Static res:Strings.RunInATerminal}" />
                           </StackPanel>
                         </Button>
-                        <Button Classes="ghost" Content="Open terminal" Command="{Binding Launch.OpenTerminalCommand}" />
+                        <Button Classes="ghost" Content="{x:Static res:Strings.OpenTerminal}" Command="{Binding Launch.OpenTerminalCommand}" />
                       </StackPanel>
                       <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}" Text="{Binding Launch.UnsupportedReason}" />
 
@@ -824,13 +825,13 @@
                         <StackPanel Spacing="6">
                           <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
                           <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat={x:Static res:Strings.InValue}}" TextWrapping="Wrap" />
                           <TextBlock Classes="mono secondary size-12" Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="{Binding Launch.ConfirmSources}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="Everything run in that terminal can read these values." />
+                          <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
                           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Button Classes="ghost" Content="Cancel" Command="{Binding Launch.CancelLaunchCommand}" />
-                            <Button Classes="primary" Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                            <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
+                            <Button Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
                           </StackPanel>
                         </StackPanel>
                       </Border>

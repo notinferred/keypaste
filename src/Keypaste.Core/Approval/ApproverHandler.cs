@@ -294,7 +294,7 @@ public sealed class ApproverHandler
                         Value = live.Value.ToString(),
                     },
                     display,
-                    $"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)");
+                    Invariant($"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)"));
             }
         }
         finally
@@ -417,7 +417,7 @@ public sealed class ApproverHandler
                 },
                 display,
                 timed
-                    ? $"released {display} to {prompt.Client} for {grantSeconds}s"
+                    ? Invariant($"released {display} to {prompt.Client} for {grantSeconds}s")
                     : $"released {display} to {prompt.Client} once");
         }
     }

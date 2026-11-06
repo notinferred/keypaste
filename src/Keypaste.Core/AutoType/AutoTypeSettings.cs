@@ -89,7 +89,7 @@ internal sealed record AutoTypeSettings(
 
             if (filled.Value is not { } pattern)
             {
-                unmatched.Add($"association {number}'s window pattern {filled.Refusal}");
+                unmatched.Add(Invariant($"association {number}'s window pattern {filled.Refusal}"));
                 continue;
             }
 
@@ -99,10 +99,10 @@ internal sealed record AutoTypeSettings(
                     return new AutoTypeChoice(
                         association.Sequence.Length > 0 ? association.Sequence : effective, AutoTypeSource.Association, number, unmatched);
                 case PatternMatch.Unreadable:
-                    unmatched.Add($"association {number}'s window pattern is a regular expression keypaste cannot read");
+                    unmatched.Add(Invariant($"association {number}'s window pattern is a regular expression keypaste cannot read"));
                     break;
                 case PatternMatch.TimedOut:
-                    unmatched.Add($"association {number}'s window pattern took too long to match this title");
+                    unmatched.Add(Invariant($"association {number}'s window pattern took too long to match this title"));
                     break;
             }
         }

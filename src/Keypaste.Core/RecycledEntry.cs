@@ -98,7 +98,7 @@ public readonly record struct RecycledEntryId
             }
         }
 
-        id = new RecycledEntryId(text.ToUpperInvariant());
+        id = new RecycledEntryId(InvariantUpper.Of(text));
         return true;
     }
 
@@ -114,7 +114,7 @@ public readonly record struct RecycledEntryId
     {
         ArgumentException.ThrowIfNullOrEmpty(hex);
 
-        return new RecycledEntryId(hex.ToUpperInvariant());
+        return new RecycledEntryId(InvariantUpper.Of(hex));
     }
 
     /// <summary>The KDBX UUID this identity stands for, as hex.</summary>

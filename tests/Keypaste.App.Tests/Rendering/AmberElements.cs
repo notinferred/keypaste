@@ -154,7 +154,8 @@ internal static class AmberElements
 
                 case ListBoxItem { IsSelected: true } row when row.Bounds.Height > 0:
                     var edge = Bounds(row, window, scaling, inflate: 0);
-                    yield return new PixelRect(edge.X, edge.Y, (int)Math.Ceiling(3 * scaling * Keypaste.App.Views.InterfaceZoom.Factor), edge.Height);
+                    var bar = (int)Math.Ceiling(3 * scaling * Keypaste.App.Views.InterfaceZoom.Factor);
+                    yield return new PixelRect(row.FlowDirection == FlowDirection.RightToLeft ? edge.Right - bar : edge.X, edge.Y, bar, edge.Height);
                     break;
             }
         }
@@ -183,7 +184,7 @@ internal static class AmberElements
     {
         var transform = control.TransformToVisual(window) ?? Matrix.Identity;
         var pixels = PixelRect.FromRect(new Rect(control.Bounds.Size).TransformToAABB(transform), scaling);
-        var grow = (int)Math.Ceiling(inflate * scaling * transform.M11);
+        var grow = (int)Math.Ceiling(inflate * scaling * Math.Abs(transform.M11));
         return new PixelRect(pixels.X - grow, pixels.Y - grow, pixels.Width + (2 * grow), pixels.Height + (2 * grow));
     }
 

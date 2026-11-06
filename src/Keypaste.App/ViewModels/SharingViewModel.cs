@@ -314,7 +314,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         }
 
         var info = outcome.Info!;
-        _showToast($"Link copied. Expires in {ShareInfo.FormatTtl(info.Expires - info.Created)}, {(info.Views == 1 ? "1 view" : $"{info.Views} views")}.");
+        _showToast($"Link copied. Expires in {ShareInfo.FormatTtl(info.Expires - info.Created)}, {(info.Views == 1 ? "1 view" : Invariant($"{info.Views} views"))}.");
         Passphrase.Clear();
 
         if (Created is { } created)
@@ -407,7 +407,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
             ("gone", _) => ("Opened or revoked", ShareStatusTone.Muted, false),
             ("expired", _) => ("Expired", ShareStatusTone.Muted, false),
             (_, { } views) when views >= info.Views => ("Not opened yet", ShareStatusTone.Ok, true),
-            (_, { } views) => ($"{info.Views - views} of {info.Views} views used", ShareStatusTone.Info, true),
+            (_, { } views) => (Invariant($"{info.Views - views} of {info.Views} views used"), ShareStatusTone.Info, true),
             _ => (online ? "Status unknown" : "Not checked", ShareStatusTone.Muted, true),
         };
 

@@ -1,4 +1,5 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -17,14 +18,14 @@
         <!-- New token, Create token and Copy are never shown together, so each is this screen's one primary. -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
           <StackPanel Spacing="6">
-            <TextBlock Classes="h1" Text="Scoped tokens" />
-            <TextBlock Classes="subtitle" Text="A token lets a script or CI job run with a scoped set, without you or the vault's password. It only feeds keypaste run and never prints a value." />
+            <TextBlock Classes="h1" Text="{x:Static res:Strings.ScopedTokens}" />
+            <TextBlock Classes="subtitle" Text="{x:Static res:Strings.ATokenLetsAScriptOrCIX41bca7}" />
           </StackPanel>
           <Button Grid.Column="1" Name="NewToken" Classes="primary" Padding="12,0" Height="30" VerticalAlignment="Bottom"
-                  IsVisible="{Binding CanOpenForm}" Command="{Binding OpenFormCommand}" AutomationProperties.Name="New token">
+                  IsVisible="{Binding CanOpenForm}" Command="{Binding OpenFormCommand}" AutomationProperties.Name="{x:Static res:Strings.NewToken}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="plus" Size="13" />
-              <TextBlock Text="New token" />
+              <TextBlock Text="{x:Static res:Strings.NewToken}" />
             </StackPanel>
           </Button>
         </Grid>
@@ -32,33 +33,33 @@
         <Border Classes="card filled" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding CreateCommand}" ctl:FormKeys.Cancel="{Binding CancelFormCommand}" ctl:FormKeys.Draft="{Binding FormDraft}">
           <StackPanel Spacing="14">
             <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-              <TextBlock Classes="label" Text="Name" />
-              <TextBlock Grid.Column="1" Classes="label" Text="Scope" />
-              <TextBlock Grid.Column="2" Classes="label" Text="Expires" />
+              <TextBlock Classes="label" Text="{x:Static res:Strings.Name}" />
+              <TextBlock Grid.Column="1" Classes="label" Text="{x:Static res:Strings.Scope}" />
+              <TextBlock Grid.Column="2" Classes="label" Text="{x:Static res:Strings.Expires}" />
               <TextBox Grid.Row="1" Classes="mono" Text="{Binding Name}" PlaceholderText="ci-staging"
-                       AutomationProperties.Name="Token name" />
+                       AutomationProperties.Name="{x:Static res:Strings.TokenName}" />
               <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Scope}" PlaceholderText="read:acme-api/staging/*"
-                       AutomationProperties.Name="Token scope" />
+                       AutomationProperties.Name="{x:Static res:Strings.TokenScope}" />
               <Border Grid.Row="1" Grid.Column="2" Classes="segmented inset" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7 days"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="{x:Static res:Strings.N7Days}"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=7d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="7d" />
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30 days"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="{x:Static res:Strings.N30Days}"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=30d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="30d" />
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90 days"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="{x:Static res:Strings.N90Days}"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=90d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
                 </StackPanel>
               </Border>
             </Grid>
             <TextBlock Classes="caption"
-                       Text="read:project/environment/KEY, or * for the whole set; separate several with commas." />
+                       Text="{x:Static res:Strings.ReadProjectEnvironmentKEYOrForTheX9b0d4d}" />
             <TextBlock Classes="body danger" ctl:Announcer.Says="{Binding FormError}" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
-              <Button Name="CreateToken" Classes="primary" Content="Create token" Command="{Binding CreateCommand}" />
+              <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelFormCommand}" />
+              <Button Name="CreateToken" Classes="primary" Content="{x:Static res:Strings.CreateToken}" Command="{Binding CreateCommand}" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -69,7 +70,7 @@
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
               <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpTextSecondary}" VerticalAlignment="Top" Margin="0,2,0,0" />
               <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Classes="body strong" Text="Copy this token now. It will not be shown again." />
+                <TextBlock Classes="body strong" Text="{x:Static res:Strings.CopyThisTokenNowItWillNotX0f6e03}" />
                 <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
               </StackPanel>
             </Grid>
@@ -90,16 +91,16 @@
                                     VerticalAlignment="Center"
                                     Target="{Binding #MintedToken}"
                                     ShowsWord="True"
-                                    Subject="the token" />
+                                    Subject="{x:Static res:Strings.TheTokenAsAnObject}" />
                 </Grid>
               </Border>
-              <Button Grid.Column="1" Name="CopyToken" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="Copy token">
+              <Button Grid.Column="1" Name="CopyToken" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="{x:Static res:Strings.CopyToken}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="copy" Size="13" />
-                  <TextBlock Text="Copy" />
+                  <TextBlock Text="{x:Static res:Strings.Copy}" />
                 </StackPanel>
               </Button>
-              <Button Grid.Column="2" Name="DoneToken" Content="Done" Command="{Binding DoneMintedCommand}" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Name="DoneToken" Content="{x:Static res:Strings.Done}" Command="{Binding DoneMintedCommand}" VerticalAlignment="Center" />
             </Grid>
           </StackPanel>
         </Border>
@@ -118,22 +119,22 @@
                   <ColumnDefinition Width="0.6*" MinWidth="64" />
                   <ColumnDefinition Width="72" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Classes="th" Text="NAME" />
-                <TextBlock Grid.Column="1" Classes="th" Text="TOKEN" />
-                <TextBlock Grid.Column="2" Classes="th" Text="SCOPE" />
-                <TextBlock Grid.Column="3" Classes="th" Text="MODE" />
-                <TextBlock Grid.Column="4" Classes="th" Text="EXPIRES" />
+                <TextBlock Classes="th" Text="{x:Static res:Strings.NAMECapitals}" />
+                <TextBlock Grid.Column="1" Classes="th" Text="{x:Static res:Strings.TOKEN}" />
+                <TextBlock Grid.Column="2" Classes="th" Text="{x:Static res:Strings.SCOPECapitals}" />
+                <TextBlock Grid.Column="3" Classes="th" Text="{x:Static res:Strings.MODECapitals}" />
+                <TextBlock Grid.Column="4" Classes="th" TextTrimming="CharacterEllipsis" ToolTip.Tip="{x:Static res:Strings.EXPIRESCapitals}" Text="{x:Static res:Strings.EXPIRESCapitals}" />
               </Grid>
             </Border>
             <Border Classes="table-row" Padding="16,12" IsVisible="{Binding HasNoRows}">
               <StackPanel Orientation="Horizontal" Spacing="12">
-                <TextBlock Classes="caption" Text="No tokens yet." VerticalAlignment="Center" />
+                <TextBlock Classes="caption" Text="{x:Static res:Strings.NoTokensYet}" VerticalAlignment="Center" />
                 <Button Classes="sm"
                         Name="NewTokenFromEmpty"
-                        Content="New token"
+                        Content="{x:Static res:Strings.NewToken}"
                         IsVisible="{Binding CanOpenForm}"
                         Command="{Binding OpenFormCommand}"
-                        AutomationProperties.Name="New token" />
+                        AutomationProperties.Name="{x:Static res:Strings.NewToken}" />
               </StackPanel>
             </Border>
             <ItemsControl ItemsSource="{Binding Rows}">
@@ -143,9 +144,9 @@
                     <Panel>
                       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}">
                         <TextBlock Text="{Binding ConfirmText}" Classes="size-12-5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="ghost sm size-12" Content="Cancel" VerticalAlignment="Center"
+                        <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
-                        <Button Grid.Column="2" Classes="danger sm size-12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" VerticalAlignment="Center"
+                        <Button Grid.Column="2" Classes="danger sm size-12" Content="{x:Static res:Strings.Revoke}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>
@@ -167,7 +168,7 @@
                         </Border>
                         <TextBlock Grid.Column="4" Classes="size-12-5" Text="{Binding Expires}" VerticalAlignment="Center"
                                    Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
-                        <Button Grid.Column="5" Classes="danger sm size-12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        <Button Grid.Column="5" Classes="danger sm size-12" Content="{x:Static res:Strings.Revoke}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RevokeValue}}" HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>

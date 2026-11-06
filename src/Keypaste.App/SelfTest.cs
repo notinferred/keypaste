@@ -1,4 +1,6 @@
+using Keypaste.App.Globalization;
 using Keypaste.App.Notifications;
+using Keypaste.App.ViewModels;
 using Keypaste.Core;
 
 namespace Keypaste.App;
@@ -79,6 +81,11 @@ internal static class SelfTest
             stdout.WriteLine(CoreInfo.NativeArgon2 is { } library
                 ? $"keypaste-app: Argon2 derived natively by {library}"
                 : "keypaste-app: Argon2 derived by managed code, as no native libargon2 loaded");
+
+            // verify-no-icu.sh holds what a machine with no ICU reads, by the two calls a table and a date make.
+            var order = TableSorting.CompareText("item 2", "item 10") < 0 ? "item 2 before item 10" : "item 10 before item 2";
+            stdout.WriteLine($"keypaste-app: text sorts {order}");
+            stdout.WriteLine($"keypaste-app: a date reads {PersonTime.Moment(new DateTimeOffset(2026, 11, 5, 15, 4, 0, TimeSpan.Zero))}");
 
             // The macOS packaging job holds the bundle to reaching the notification center, where a mistake ends the process.
             if (OperatingSystem.IsMacOS() && MacNotifications.InBundle())

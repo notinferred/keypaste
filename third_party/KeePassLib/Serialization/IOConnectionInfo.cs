@@ -327,7 +327,11 @@ namespace KeePassLib.Serialization
 		public bool IsLocalFile()
 		{
 			// Not just ":/", see e.g. AppConfigEx.ChangePathRelAbs
+#if KEYPASTE_INVARIANT_TEXT
+			return (m_strUrl.IndexOf("://", StringComparison.Ordinal) < 0);
+#else
 			return (m_strUrl.IndexOf("://") < 0);
+#endif
 		}
 
 		public void ClearCredentials(bool bDependingOnRememberMode)

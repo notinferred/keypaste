@@ -927,7 +927,7 @@ public sealed class SessionAuthority : IApproverHandler
                 if (!preview.RequiresLiveApproval && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
                 {
                     environments.Narrate?.Invoke(
-                        $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` under an allowance ({(int)remaining.TotalSeconds}s left)");
+                        Invariant($"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` under an allowance ({(int)remaining.TotalSeconds}s left)"));
                     fromGrant = true;
                     return true;
                 }
@@ -1050,8 +1050,8 @@ public sealed class SessionAuthority : IApproverHandler
             // command line, not what the files it runs do (T-35).
             var command = EnvReleasePrompt.CommandLine(request.Command);
             _environments?.Narrate?.Invoke(answered.Method == AuditMethod.GrantCache
-                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` under an allowance ({answered.GrantedSeconds}s left)"
-                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` {(answered.GrantedSeconds > 0 ? $"for {answered.GrantedSeconds}s" : "once")}");
+                ? Invariant($"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` under an allowance ({answered.GrantedSeconds}s left)")
+                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` {(answered.GrantedSeconds > 0 ? Invariant($"for {answered.GrantedSeconds}s") : "once")}");
         }
         else if (delivered.Set.Outcome == EnvOutcome.Resolved)
         {

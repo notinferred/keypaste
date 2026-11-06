@@ -257,7 +257,7 @@ public sealed class MacCliLink : ICliLink
             _userCancelled => new CliLinkResult(CliLinkOutcome.Cancelled),
             _backupTaken => Refused(CliLinkRefusal.BackupExists),
             _notKeypaste => Refused(CliLinkRefusal.NotKeypaste),
-            _ => new CliLinkResult(CliLinkOutcome.Failed, Reason: message.Length > 0 ? message : $"{_osascript} exited with {result.ExitCode}"),
+            _ => new CliLinkResult(CliLinkOutcome.Failed, Reason: message.Length > 0 ? message : Invariant($"{_osascript} exited with {result.ExitCode}")),
         };
     }
 }

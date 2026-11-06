@@ -1,4 +1,4 @@
-using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
@@ -68,7 +68,7 @@ internal sealed class TrashRow
 
     /// <summary>When it was deleted, on this machine's clock as Settings dates a backup.</summary>
     internal string When =>
-        DateTime.SpecifyKind(DeletedUtc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+        PersonTime.Moment(new DateTimeOffset(DateTime.SpecifyKind(DeletedUtc, DateTimeKind.Utc)).ToLocalTime());
 
     /// <summary>What the row says under its name.</summary>
     internal string Summary => CameFromALiveGroup

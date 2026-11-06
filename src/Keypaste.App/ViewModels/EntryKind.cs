@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
@@ -32,9 +33,9 @@ internal static class EntryKinds
 
     internal static string Label(EntryKind kind) => kind switch
     {
-        EntryKind.Login => "Login",
+        EntryKind.Login => Strings.Login,
         EntryKind.Note => "Secure note",
-        _ => "Password",
+        _ => Strings.Password,
     };
 
     /// <summary>The Lucide icon the row draws.</summary>

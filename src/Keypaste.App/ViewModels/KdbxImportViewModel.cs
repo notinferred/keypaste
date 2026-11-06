@@ -185,7 +185,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
 
     internal bool UsesHardwareKey => HardwareKeySlot is not null;
 
-    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
+    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? Invariant($"YubiKey, slot {slot}") : string.Empty;
 
     internal string OtherSlotLabel => HardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
 
@@ -459,7 +459,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
         HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and unlock again.",
         HardwareKeyFailure.MoreThanOne => $"More than one YubiKey is plugged in. Leave only the one {FileName} uses.",
         HardwareKeyFailure.SlotNotConfigured =>
-            $"That YubiKey's slot {slot} isn't set up for challenge-response. If {FileName} uses the other slot, switch to it.",
+            Invariant($"That YubiKey's slot {slot} isn't set up for challenge-response. If {FileName} uses the other slot, switch to it."),
         HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Unlock again and touch it when it flashes.",
         HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. Nothing was opened.",
         _ => DisplayTextSanitizer.Sanitize(failure.Message).Text,

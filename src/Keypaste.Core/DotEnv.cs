@@ -286,7 +286,7 @@ public static class DotEnv
             string statement = text[keyStart.._index];
             SkipNewLine();
 
-            int equals = statement.IndexOf('=');
+            int equals = statement.IndexOf('=', StringComparison.Ordinal);
             if (equals < 0)
             {
                 Fail(startLine, "expected KEY=value");
@@ -318,7 +318,7 @@ public static class DotEnv
 
             if (_seen.TryGetValue(key, out int firstLine))
             {
-                Fail(startLine, $"'{key}' is set more than once (first on line {firstLine})");
+                Fail(startLine, Invariant($"'{key}' is set more than once (first on line {firstLine})"));
                 return;
             }
 
@@ -513,7 +513,7 @@ public static class DotEnv
         }
 
         private void Fail(int line, string message) =>
-            _problems.Add(new DotEnvProblem(line, $"line {line}: {message}"));
+            _problems.Add(new DotEnvProblem(line, Invariant($"line {line}: {message}")));
 
         /// <summary>Strips a leading <c>export</c> keyword, which must be followed by whitespace.</summary>
         /// <remarks>
@@ -532,7 +532,7 @@ public static class DotEnv
 
         private static bool LooksInterpolated(string value)
         {
-            int dollar = value.IndexOf('$');
+            int dollar = value.IndexOf('$', StringComparison.Ordinal);
             if (dollar < 0 || dollar + 1 >= value.Length)
             {
                 return false;

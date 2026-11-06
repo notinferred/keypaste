@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Globalization;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
@@ -516,7 +517,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     }
 
     private static string When(VaultBackup backup) =>
-        backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+        PersonTime.Moment(backup.TakenAt.ToLocalTime());
 
     private void UseThisVault()
     {
