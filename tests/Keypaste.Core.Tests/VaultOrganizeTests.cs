@@ -592,6 +592,61 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.All(names, name => Assert.Equal(ExposureReach.Entry, access.Reach(bridge, name, [])));
     }
 
+    [Fact]
+    public void A_move_names_the_agents_whose_view_it_changes()
+    {
+        using var vault = Seeded(NewVaultPath());
+        var store = new AgentAccessStore(vault);
+        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-dev", AgentAccess.Defaults with { See = See("env/dev/**") }));
+        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-billing", AgentAccess.Defaults with { See = See("env/billing/**") }));
+        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-all", AgentAccess.Defaults with { See = See("**") }));
+        vault.Save();
+        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
+
+        var change = AgentViewChange.OfMove(vault, _token, new EntryName("env/dev", _token.Title), clients);
+
+        Assert.Equal(["sees-dev"], change.Gaining);
+        Assert.Equal(["sees-billing"], change.Losing);
+        Assert.Equal($"sees-dev can now see {_token.Title}; sees-billing can no longer see {_token.Title}.", change.Describe(_token.Title));
+    }
+
+    [Fact]
+    public void A_move_that_changes_how_much_of_a_tagged_item_an_agent_sees_names_it()
+    {
+        using var vault = Seeded(NewVaultPath());
+        Assert.True(vault.AddTag(_token, "env:billing"));
+        var store = new AgentAccessStore(vault);
+        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-both", AgentAccess.Defaults with { See = See("tag:env:billing", "env/dev/**", "env/billing/**") }));
+        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-dev-too", AgentAccess.Defaults with { See = See("tag:env:billing", "env/dev/**") }));
+        vault.Save();
+        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
+
+        var intoDev = AgentViewChange.OfMove(vault, _token, new EntryName("env/dev", _token.Title), clients);
+        var toElsewhere = AgentViewChange.OfMove(vault, _token, new EntryName("elsewhere", _token.Title), clients);
+
+        Assert.Equal(["sees-dev-too"], intoDev.Widening);
+        Assert.Empty(intoDev.Narrowing);
+        Assert.Equal($"sees-dev-too can now see all of {_token.Title}.", intoDev.Describe(_token.Title));
+        Assert.Equal(["sees-both"], toElsewhere.Narrowing);
+        Assert.Empty(toElsewhere.Widening);
+        Assert.Empty(toElsewhere.Losing);
+        Assert.Equal($"sees-both can now see only the variables of {_token.Title}.", toElsewhere.Describe(_token.Title));
+    }
+
+    [Fact]
+    public void A_move_no_agents_view_depends_on_says_nothing()
+    {
+        using var vault = Seeded(NewVaultPath());
+        Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("sees-all", AgentAccess.Defaults with { See = See("**") }));
+        vault.Save();
+        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
+
+        var change = AgentViewChange.OfMove(vault, _token, new EntryName("elsewhere", _token.Title), clients);
+
+        Assert.False(change.Any);
+        Assert.Null(change.Describe(_token.Title));
+    }
+
     /// <summary>
     /// A project row follows the entry's tags and never its path, so moving or renaming where it lives
     /// changes nothing, and a project renamed in its tags leaves the row with nothing to release: it

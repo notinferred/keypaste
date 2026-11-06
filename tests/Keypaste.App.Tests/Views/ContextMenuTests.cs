@@ -91,7 +91,7 @@ public sealed class ContextMenuTests
         var env = shell.Shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env");
 
         var menu = RightClick(shell.Window, Container(nav, env));
-        Assert.Equal(["New group", "Rename group…", "Move group…", "-", "Delete group"], Headers(menu));
+        Assert.Equal(["New group…", "Rename group…", "Move group…", "-", "Delete group"], Headers(menu));
         Assert.Equal("env", Assert.IsType<EntriesViewModel>(shell.Shell.Content).SelectedGroup?.Path);
         Choose(menu, "Rename group…");
 
@@ -99,7 +99,7 @@ public sealed class ContextMenuTests
         Assert.True(shell.Named<TextBox>("RenameGroupName").IsFocused);
 
         Assert.IsType<EntriesViewModel>(shell.Shell.Content).CancelGroupCommand.Press();
-        Choose(FromTheKeyboard(shell.Window, Container(nav, env), PhysicalKey.F10, RawInputModifiers.Shift), "New group");
+        Choose(FromTheKeyboard(shell.Window, Container(nav, env), PhysicalKey.F10, RawInputModifiers.Shift), "New group…");
 
         Assert.True(Assert.IsType<EntriesViewModel>(shell.Shell.Content).IsCreatingGroup);
         Assert.True(shell.Named<TextBox>("NewGroupName").IsFocused);

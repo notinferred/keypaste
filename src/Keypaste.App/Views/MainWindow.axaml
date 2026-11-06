@@ -37,7 +37,7 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Margin="8,6,0,0"
-            ToolTip.Tip="{x:Static res:Strings.Menu}"
+            ToolTip.Tip="{x:Static res:Strings.ShowTheMenu}"
             AutomationProperties.Name="{x:Static res:Strings.Menu}"
             WindowDecorationProperties.ElementRole="User">
       <ctl:KpIcon Icon="menu" Size="16" />

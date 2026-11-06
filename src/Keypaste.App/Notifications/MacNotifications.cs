@@ -9,13 +9,12 @@ namespace Keypaste.App.Notifications;
 /// <remarks>
 /// <para>
 /// Only a process in an app bundle may ask for the center, which raises an Objective-C exception, ending the process,
-/// in any other; <see cref="InBundle"/> keeps a development build from asking. The first notice asks the person's
-/// permission. Permission refused, alerts turned off in the system's settings and an add the system answers with an
-/// error all count as unable to post.
+/// in any other; <see cref="InBundle"/> keeps a development build from asking. Only <see cref="AskPermission"/> asks the
+/// person, never a notice, so the system's dialog does not appear beside a prompt. Permission not yet given, permission
+/// refused, alerts turned off in the system's settings and an add the system answers with an error all count as unable to post.
 /// </para>
 /// <para>
-/// A notice marked time-sensitive breaks through Focus only under an entitlement the signed build must carry
-/// (<c>com.apple.developer.usernotifications.time-sensitive</c>); without it the system shows it as an ordinary one.
+/// The system shows a notice marked time-sensitive as an ordinary one: the entitlement that would let it pass Focus does not exist (Q.14).
 /// </para>
 /// </remarks>
 [SupportedOSPlatform("macos")]
@@ -44,7 +43,6 @@ internal sealed class MacNotifications : ISystemNotifications
     private static readonly DelegateMethod _onPresent = OnPresent;
 
     // The system answers each call and every answer in a burst says the same, so one block serves them all.
-    private static readonly ConcurrentQueue<TaskCompletionSource<bool>> _asking = new();
     private static readonly ConcurrentQueue<TaskCompletionSource<Permission>> _reading = new();
     private static readonly ConcurrentQueue<TaskCompletionSource<bool>> _adding = new();
     private static readonly ConcurrentDictionary<string, Action> _live = new(StringComparer.Ordinal);
@@ -116,11 +114,9 @@ internal sealed class MacNotifications : ISystemNotifications
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        var asked = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _asking.Enqueue(asked);
-        InPool(() => _ = Send(Center(), Sel("requestAuthorizationWithOptions:completionHandler:"), _alert, _authorizedBlock.Value));
+        PrepareOnce();
 
-        if (!await asked.Task.ConfigureAwait(false) || !(await ReadSettingsAsync().ConfigureAwait(false)).ShowsAlerts)
+        if (!(await ReadSettingsAsync().ConfigureAwait(false)).ShowsAlerts)
         {
             return null;
         }
@@ -135,6 +131,12 @@ internal sealed class MacNotifications : ISystemNotifications
         }
 
         return new Posted(id);
+    }
+
+    public void AskPermission()
+    {
+        PrepareOnce();
+        InPool(() => _ = Send(Center(), Sel("requestAuthorizationWithOptions:completionHandler:"), _alert, _authorizedBlock.Value));
     }
 
     public void Dispose()
@@ -310,12 +312,9 @@ internal sealed class MacNotifications : ISystemNotifications
         return block;
     }
 
+    // The next post reads the settings, which hold the answer.
     private static void OnAuthorized(nint block, byte granted, nint error)
     {
-        if (_asking.TryDequeue(out var asked))
-        {
-            asked.TrySetResult(granted != 0 && error == 0);
-        }
     }
 
     private static void OnSettings(nint block, nint settings)

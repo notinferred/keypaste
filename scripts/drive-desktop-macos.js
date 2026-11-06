@@ -21,7 +21,7 @@ ObjC.import('ApplicationServices');
 ObjC.import('stdlib');
 
 const TITLE = environment('DRIVE_WINDOW') || 'keypaste';
-const DEPTH = 40;
+const DEPTH = 80;
 const LIMIT = 4000;
 const FIELDS = new Set(['AXTextField', 'AXTextArea']);
 // Button takes in a tab, an AXRadioButton in Avalonia and in Qt, and a combo box's AXPopUpButton.
@@ -137,8 +137,13 @@ function windowsOf(pid) {
   return ax.children(application(pid)).filter(w => ax.text(w, 'AXRole') === 'AXWindow');
 }
 
+// The main window's title names the place it shows, as "Items - keypaste"; any other window is named exactly.
+function titled(name) {
+  return name === TITLE || (TITLE === 'keypaste' && String(name).endsWith(' - keypaste'));
+}
+
 function window(pid) {
-  return windowsOf(pid).find(w => ax.text(w, 'AXTitle') === TITLE) || null;
+  return windowsOf(pid).find(w => titled(ax.text(w, 'AXTitle'))) || null;
 }
 
 // Visits the window's elements in tree order until stop says so; returns those visited.
@@ -276,7 +281,7 @@ function windowNumber(pid) {
     const b = w.kCGWindowBounds || {};
     return Math.abs(b.X - frame.x) < 2 && Math.abs(b.Y - frame.y) < 2 && Math.abs(b.Width - frame.width) < 2 && Math.abs(b.Height - frame.height) < 2;
   });
-  return (same || every.find(w => w.kCGWindowName === TITLE) || own[0] || every[0]).kCGWindowNumber;
+  return (same || every.find(w => titled(w.kCGWindowName)) || own[0] || every[0]).kCGWindowNumber;
 }
 
 function colours(path) {
@@ -399,6 +404,11 @@ function act(pid, action, args) {
       const found = find(pid, node => node.texts.some(t => t.startsWith(args[0])), 30);
       if (!found) throw new Refused(`nothing starting '${args[0]}' appeared`);
       return found.node.texts.find(t => t.startsWith(args[0]));
+    }
+    case 'enabled': {
+      const found = located(pid, args[0]);
+      if (!found) throw new Refused(`nothing named '${args[0]}' to read`);
+      return ax.text(found.node.element, 'AXEnabled') === '0' ? 'not enabled' : 'enabled';
     }
     case 'read': {
       const found = located(pid, args[0]);

@@ -137,7 +137,7 @@ In source, `keypaste attachment save` and an attachment's Save in the app write 
 
 ## Audit limits
 
-The audit log, its chain hash and every rule on names read the same under every culture, in the desktop and the CLI ([T-52](THREATS.md)).
+The audit log, its chain hash, and the matching of exposure and access read the same under every culture, in the desktop and the CLI ([T-52](THREATS.md)).
 
 Keypaste appends agent-access records without rotating, trimming or rewriting the log. Hash chaining detects edits, removals, insertions and foreign records unless an attacker recomputes the chain. The chain has no secret, and deleting its tail leaves no following record to expose the deletion. `keypaste log verify --expect <hash>` checks an independently retained anchor; Keypaste does not store that anchor beside the log. The log grows without bound: to start a new one, close the app, `keypaste approve` and every bridge, keep the log's latest hash, and move the file aside, which `keypaste log verify --audit-log <file> --expect <hash>` still checks ([archiving it](docs/mcp-setup.md#archiving-it)). Linux and macOS create owner-readable logs; Windows inherits directory permissions. The append-only log, the manual anchor and Windows' inherited permissions are kept by founder decision 2026-10-22 (D-0515).
 

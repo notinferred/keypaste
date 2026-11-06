@@ -3,7 +3,7 @@ using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
-/// <summary>The columns the log's header and every row share, which give up Where under the rail.</summary>
+/// <summary>The columns the log's header and every row share, which give up Where where the content is tight.</summary>
 internal sealed class LogColumns : TableColumns
 {
     public static readonly StyledProperty<bool> ShowsWhereProperty = AvaloniaProperty.Register<LogColumns, bool>(nameof(ShowsWhere), defaultValue: true);

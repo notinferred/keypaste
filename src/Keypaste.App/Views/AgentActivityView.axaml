@@ -86,10 +86,19 @@
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
             <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="{x:Static res:Strings.Allowances}" VerticalAlignment="Center" />
-            <Button Grid.Column="2" Name="EndAllAllowances" Classes="danger sm size-12" Content="{x:Static res:Strings.EndAll}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                    IsVisible="{Binding HasGrants}" Command="{Binding EndAllCommand}"
+            <Button Grid.Column="2" Name="EndAllAllowances" Classes="sm size-12" Content="{x:Static res:Strings.EndAll}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    IsVisible="{Binding OffersEndAll}" Command="{Binding AskEndAllCommand}"
                     AutomationProperties.Name="{x:Static res:Strings.EndAllAllowances}" />
           </Grid>
+          <Border Name="EndAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingEndAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelEndAllCommand}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="{x:Static res:Strings.EndEveryAllowanceTheNextRequestAsksAgain}" TextWrapping="Wrap" Classes="primary size-12-5" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Name="CancelEndAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelEndAllCommand}" />
+                <Button Name="ConfirmEndAll" Classes="danger sm" Content="{x:Static res:Strings.EndAllAllowances}" Command="{Binding EndAllCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
           <TextBlock Classes="caption" IsVisible="{Binding NoGrants}"
                      Text="{x:Static res:Strings.NoAllowanceIsInForceSoTheX69bc1f}" />
           <Border Classes="table" IsVisible="{Binding HasGrants}">
@@ -106,7 +115,7 @@
                         <TextBlock Classes="mono sm secondary" Text="{Binding LeftText}" />
                         <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
                       </StackPanel>
-                      <Button Grid.Column="2" Name="EndAllowance" Classes="danger sm size-12" Content="{x:Static res:Strings.End}" VerticalAlignment="Center"
+                      <Button Grid.Column="2" Name="EndAllowance" Classes="sm size-12" Content="{x:Static res:Strings.End}" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).EndCommand}"
                               CommandParameter="{Binding}"
                               AutomationProperties.Name="{Binding EndName}" />
@@ -136,7 +145,7 @@
           <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
               <TextBlock Name="ClientsProblemText" Classes="body danger" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
-              <Button Grid.Column="1" Name="ResetClients" Content="{x:Static res:Strings.Reset}" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
+              <Button Grid.Column="1" Name="ResetClients" Content="{x:Static res:Strings.ResetClientsToml}" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
             </Grid>
           </Border>
           <Border Classes="table">
@@ -161,12 +170,13 @@
                         <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" TextWrapping="Wrap" />
                         <TextBlock Classes="caption" IsVisible="{Binding !HasSettings}" TextWrapping="Wrap" Text="{x:Static res:Strings.ConnectItFromThisListToGiveX2bd860}" />
                       </StackPanel>
-                      <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top"
-                              Content="{x:Static res:Strings.Connect}"
+                      <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top" MaxWidth="220"
                               IsVisible="{Binding OffersConnect}"
                               Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectCommand}"
                               CommandParameter="{Binding}"
-                              AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}" />
+                              AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}">
+                        <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}" />
+                      </Button>
 
                       <!-- The plan core composed, run only on Run it. -->
                       <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
@@ -255,11 +265,13 @@
                                 AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.SettingsForValue}}">
                         <StackPanel Spacing="14">
                           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OffersToolActions}">
-                            <Button Name="ConnectToolAgain" Content="{x:Static res:Strings.ConnectAgain}"
+                            <Button Name="ConnectToolAgain" MaxWidth="260"
                                     IsVisible="{Binding OffersConnectAgain}"
                                     Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectAgainCommand}"
                                     CommandParameter="{Binding}"
-                                    AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}" />
+                                    AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}">
+                              <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}" />
+                            </Button>
                             <Button Name="DisconnectTool" Classes="danger" Content="{x:Static res:Strings.Disconnect}"
                                     IsVisible="{Binding OffersDisconnect}"
                                     Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).DisconnectCommand}"

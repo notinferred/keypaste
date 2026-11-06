@@ -32,7 +32,6 @@
 
     <!-- A 16px check: the text colour with a tick in the ground's colour when on, a hairline square when off. -->
     <Style Selector="CheckBox.passphrase">
-      <Setter Property="Cursor" Value="Hand" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="Template">

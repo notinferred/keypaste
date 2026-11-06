@@ -86,7 +86,7 @@ internal static class Destinations
     /// <summary>Every screen the app has.</summary>
     internal static IReadOnlyList<Destination> All { get; } =
     [
-        new(DestinationKind.Entries, () => Strings.Items, "vault", OwnsHeader: true),
+        new(DestinationKind.Entries, () => Strings.Items, "key-round", OwnsHeader: true),
         new(DestinationKind.AgentActivity, () => Strings.Agents, "bot", OwnsHeader: true),
         new(DestinationKind.Trash, () => Strings.Trash, "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
         new(DestinationKind.Settings, () => Strings.Settings, "settings", DestinationPlacement.Footer, OwnsHeader: true),

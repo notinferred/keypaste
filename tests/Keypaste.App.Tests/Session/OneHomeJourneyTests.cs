@@ -138,6 +138,15 @@ public sealed class OneHomeJourneyTests
             AssertNamesNone(main, "Agents");
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
             AmberElements.AssertOne(main, null, "Agents");
+
+            // The clock here never ends a toast or the clipboard's countdown, which would lie over the row's middle where this presses.
+            shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
+            if (shell.Clipboard.ClearNowCommand.CanExecute(null))
+            {
+                shell.Clipboard.ClearNowCommand.Execute(null);
+            }
+
+            WindowInput.Drain();
             Press(main, Disclosure(main)!);
             await Until(
                 () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),

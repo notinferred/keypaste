@@ -69,7 +69,6 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Background="{TemplateBinding Background}">
@@ -121,7 +120,6 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Padding" Value="0,5" />
-    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Background="{TemplateBinding Background}"
@@ -183,7 +181,6 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Padding" Value="10,3" />
     <Setter Property="MinHeight" Value="0" />
-    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Name="Pill"

@@ -26,7 +26,6 @@
       <Setter Property="Padding" Value="8,0" />
       <Setter Property="Margin" Value="0,-4" />
       <Setter Property="FontSize" Value="12" />
-      <Setter Property="Cursor" Value="Hand" />
       <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
     <Style Selector="Button.row-action.quiet /template/ ContentPresenter#PART_ContentPresenter">

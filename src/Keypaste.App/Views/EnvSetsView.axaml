@@ -62,7 +62,6 @@
       <Setter Property="Padding" Value="0" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="HorizontalAlignment" Value="Left" />
-      <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.flat /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -127,7 +126,6 @@
       <Setter Property="Padding" Value="9,3" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.profile-segment /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -157,17 +155,11 @@
       <Setter Property="Foreground" Value="{DynamicResource KpPaper}" />
     </Style>
 
-    <!-- Each line of a cell is as tall as the mask, which sits on the first. Under the rail a note wraps at its words, so "same as" keeps the name it points to. -->
-    <Style Selector="WrapPanel.cell-lines">
-      <Setter Property="ItemHeight" Value="17" />
-    </Style>
-    <Style Selector="Grid.narrow-window WrapPanel.cell-lines">
-      <Setter Property="ItemHeight" Value="NaN" />
-    </Style>
-    <Style Selector="Grid.narrow-window TextBlock.cell-mask">
+    <!-- Each line of a cell is as tall as the mask, which sits on the first. A note that does not fit its cell wraps at its words, so "same as" keeps the name it points to. -->
+    <Style Selector="TextBlock.cell-mask">
       <Setter Property="Height" Value="17" />
     </Style>
-    <Style Selector="Grid.narrow-window TextBlock.cell-note">
+    <Style Selector="TextBlock.cell-note">
       <Setter Property="Margin" Value="0,1,0,0" />
       <Setter Property="LineHeight" Value="17" />
       <Setter Property="TextWrapping" Value="Wrap" />
@@ -188,7 +180,7 @@
       <StackPanel Grid.Column="0" Spacing="24">
 
         <!-- Header: the title, the project picker, and the file actions. -->
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
           <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
             <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}" />
             <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
@@ -208,16 +200,17 @@
                 </DataTemplate>
               </ComboBox.SelectionBoxItemTemplate>
             </ComboBox>
-            <StackPanel Orientation="Horizontal" Spacing="0" IsVisible="{Binding HasOpenProject}">
-              <TextBlock Classes="subtitle" VerticalAlignment="Center" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
-              <Button Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
+            <!-- Left-aligned, so the button stays beside the words, and a star column, so the words wrap before they reach Import. -->
+            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left" IsVisible="{Binding HasOpenProject}">
+              <TextBlock Classes="subtitle" VerticalAlignment="Center" TextWrapping="Wrap" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
+              <Button Grid.Column="1" Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
                       ToolTip.Tip="{x:Static res:Strings.NewProject}"
                       Command="{Binding BeginAddCommand}"
                       IsVisible="{Binding !IsAdding}"
                       AutomationProperties.Name="{x:Static res:Strings.NewProject}">
                 <ctl:KpIcon Icon="plus" Size="13" />
               </Button>
-            </StackPanel>
+            </Grid>
             <TextBlock Classes="subtitle" IsVisible="{Binding !HasOpenProject}"
                        Text="{x:Static res:Strings.OneSetOfKeysPerProjectAXb4239d}" />
           </StackPanel>
@@ -227,13 +220,13 @@
             <Button Command="{Binding OpenProject.Import.ChooseCommand}" AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-up" Size="13" />
-                <TextBlock Text="{x:Static res:Strings.ImportEnv}" />
+                <TextBlock Text="{x:Static res:Strings.ImportEnvLabel}" />
               </StackPanel>
             </Button>
             <Button Command="{Binding OpenProject.ExportReferencesCommand}" AutomationProperties.Name="{x:Static res:Strings.ExportEnvKeypaste}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-down" Size="13" />
-                <TextBlock Text="{x:Static res:Strings.ExportEnvKeypaste}" />
+                <TextBlock Text="{x:Static res:Strings.ExportEnvKeypasteLabel}" />
               </StackPanel>
             </Button>
           </StackPanel>
@@ -294,7 +287,7 @@
             <TextBlock Classes="section" Text="{x:Static res:Strings.NoProjectsYet}" />
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left"
                        Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
-            <Button Content="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
+            <Button Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
                     HorizontalAlignment="Left" />
           </StackPanel>
         </Border>
@@ -417,7 +410,7 @@
                                                 IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}"
                                                 AutomationProperties.Name="{Binding Label}">
                                           <!-- A narrow cell drops the note below the mask rather than cutting it to a stub. -->
-                                          <WrapPanel Classes="cell-lines" Orientation="Horizontal">
+                                          <WrapPanel Orientation="Horizontal">
                                             <TextBlock Classes="mono cell-mask" Margin="0,0,8,0" VerticalAlignment="Center"
                                                        Classes.secondary="{Binding IsSet}"
                                                        Classes.danger="{Binding IsMissing}"
@@ -491,7 +484,7 @@
                                   AutomationProperties.Name="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="plus" Size="13" />
-                              <TextBlock Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
+                              <TextBlock Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValueLabel}}" />
                             </StackPanel>
                           </Button>
                         </Grid>
@@ -812,7 +805,7 @@
                         <Button Command="{Binding Launch.RunProjectCommand}" AutomationProperties.Name="{x:Static res:Strings.RunInATerminal}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="terminal" Size="13" />
-                            <TextBlock Text="{x:Static res:Strings.RunInATerminal}" />
+                            <TextBlock Text="{x:Static res:Strings.RunInATerminalLabel}" />
                           </StackPanel>
                         </Button>
                         <Button Classes="ghost" Content="{x:Static res:Strings.OpenTerminal}" Command="{Binding Launch.OpenTerminalCommand}" />

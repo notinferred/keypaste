@@ -85,15 +85,20 @@ def name_of(element):
         return ""
 
 
+def titled(name):
+    """The main window's title names the place it shows, as "Items - keypaste"; any other window is named exactly."""
+    return name == TITLE or (TITLE == MAIN and name.endswith(f" - {MAIN}"))
+
+
 def window():
     for _, frame in frames():
-        if name_of(frame) == TITLE:
+        if titled(name_of(frame)):
             return frame
     return None
 
 
 def descendants(root, depth=0):
-    if root is None or depth > 60:
+    if root is None or depth > 80:
         return
     yield root
     for found in children(root):
@@ -215,7 +220,8 @@ def located(locator, predicate=lambda e: True, seconds=30, what=None):
 
 
 def xwindow():
-    ids = subprocess.run(["xdotool", "search", "--sync", "--name", f"^{re.escape(TITLE)}$"],
+    prefix = "(.* - )?" if TITLE == MAIN else ""
+    ids = subprocess.run(["xdotool", "search", "--sync", "--name", f"^{prefix}{re.escape(TITLE)}$"],
                          capture_output=True, text=True, timeout=30, check=True).stdout.split()
     if not ids:
         raise Refused(f"no X window named {TITLE}")
@@ -260,7 +266,7 @@ def act(action, args):
         return f"window '{name_of(frame)}' of {frame.get_application().get_name()}"
 
     if action == "windows":
-        apps = {app.get_process_id() for app, frame in frames() if name_of(frame).split(":")[0] == MAIN}
+        apps = {app.get_process_id() for app, frame in frames() if name_of(frame).split(":")[0] == MAIN or name_of(frame).endswith(f" - {MAIN}")}
         titles = [name_of(frame) for app, frame in frames() if app.get_process_id() in apps]
         if not titles:
             raise Refused("no application shows a window named keypaste")
@@ -302,6 +308,9 @@ def act(action, args):
             raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}")
         fastest, slowest = round(min(looks) * 1000), round(max(looks) * 1000)
         return f"found '{locator}' {elapsed} ms after {chord}\n{len(looks)} looks took {fastest} to {slowest} ms each"
+
+    if action == "enabled":
+        return "enabled" if state(located(args[0]), Atspi.StateType.ENABLED) else "not enabled"
 
     if action == "find":
         element = located(args[0])

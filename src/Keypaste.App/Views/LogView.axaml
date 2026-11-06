@@ -9,28 +9,34 @@
              views:TableColumns.Table="{Binding Table}"
              Background="{DynamicResource KpBgApp}">
 
-  <!-- Under the rail the table has no room to scroll to its Result, so Where gives way to it and moves to the Secrets cell's tooltip. -->
+  <!-- With the content tight the table has no room to scroll to its Result, so Where gives way to it and moves to the Secrets cell's tooltip. -->
   <UserControl.Styles>
     <Style Selector="StackPanel#LogTable">
       <Setter Property="MinWidth" Value="680" />
     </Style>
-    <Style Selector="Grid.narrow-window StackPanel#LogTable">
+    <Style Selector="Grid#LogPage">
+      <Setter Property="Margin" Value="32,12,32,28" />
+    </Style>
+    <Style Selector="Grid.tight-content Grid#LogPage">
+      <Setter Property="Margin" Value="16,12,16,28" />
+    </Style>
+    <Style Selector="Grid.tight-content StackPanel#LogTable">
       <Setter Property="MinWidth" Value="0" />
     </Style>
-    <Style Selector="Grid.narrow-window views|LogColumns">
+    <Style Selector="Grid.tight-content views|LogColumns">
       <Setter Property="ShowsWhere" Value="False" />
     </Style>
-    <Style Selector="Grid.narrow-window TextBlock.where, Grid.narrow-window Button.where, Grid.narrow-window views|ColumnGrip.where">
+    <Style Selector="Grid.tight-content TextBlock.where, Grid.tight-content Button.where, Grid.tight-content views|ColumnGrip.where">
       <Setter Property="IsVisible" Value="False" />
     </Style>
-    <Style Selector="Grid.narrow-window TextBlock.secrets">
+    <Style Selector="Grid.tight-content TextBlock.secrets">
       <Setter Property="ToolTip.Tip" Value="{ReflectionBinding SecretsAndWhere}" />
     </Style>
   </UserControl.Styles>
 
   <!-- The design's page: padding 28/32, content at most 1080 wide and left-aligned. -->
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid Margin="32,12,32,28">
+    <Grid Name="LogPage">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
       </Grid.ColumnDefinitions>
@@ -376,13 +382,15 @@
                          Foreground="{DynamicResource KpTextSecondary}"
                          Text="{Binding UnverifiedLegend}" />
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadNote}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasUnreadNote}">
               <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
-              <TextBlock Classes="size-12"
+              <TextBlock Grid.Column="1"
+                         Classes="size-12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
+                         TextWrapping="Wrap"
                          Text="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}" />
-            </StackPanel>
+            </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadableNote}">
               <ctl:KpIcon Icon="info" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
               <TextBlock Classes="size-12"

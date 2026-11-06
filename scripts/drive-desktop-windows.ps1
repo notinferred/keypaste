@@ -68,6 +68,12 @@ function TopWindows { @($Auto::RootElement.FindAll($Scope::Children, (New-Object
 
 # A dialog its owner holds, such as a wizard, a message box or a file dialog, sits under that window.
 function Window {
+  # The main window's title names the place it shows, as "Items - keypaste"; any other window is named exactly.
+  if ($Title -ceq 'keypaste') {
+    foreach ($top in (TopWindows)) {
+      if ($top.Current.Name -ceq $Title -or $top.Current.Name.EndsWith(" - $Title", [StringComparison]::Ordinal)) { return $top }
+    }
+  }
   $named = New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $Title)
   $top = $Auto::RootElement.FindFirst($Scope::Children, (New-Object System.Windows.Automation.AndCondition($Mine, $IsWindow, $named)))
   if ($top) { return $top }
@@ -333,6 +339,11 @@ switch ($Action) {
     $selection.Select()
     if (-not (Until 5 { if ($selection.Current.IsSelected) { $true } })) { Fail "item $index of '$First' did not become selected" }
     Write-Output "selected item $index of '$First'"
+  }
+  'enabled' {
+    $element = Until 30 { Named $First $Any }
+    if (-not $element) { Missing "nothing named '$First' to read" }
+    if ($element.Current.IsEnabled) { Write-Output 'enabled' } else { Write-Output 'not enabled' }
   }
   'invoke' {
     $element = Until 30 { Named $First $Invokable }

@@ -25,6 +25,12 @@ internal static class WindowChrome
     /// <summary>Under this width the sidebar collapses to the rail and Items drops its Username and URL columns; from here up, beside the sidebar, those columns keep room for a few characters.</summary>
     public const double NarrowBelow = 840;
 
+    /// <summary>Under this width the content is as tight as it is beside the rail: the log's table needs 744 to reach its Result, with a margin for a longer word.</summary>
+    public const double ContentTightBelow = 768;
+
+    /// <summary>Where toasts sit: under the titlebar and the row of Items' search and New.</summary>
+    public static Thickness ToastMargin { get; } = new(20, TitleBarHeight + 60, 20, 20);
+
     /// <summary>The sidebar's width, and the titlebar's first column while the sidebar shows.</summary>
     public const double SidebarWidth = 232;
 

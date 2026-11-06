@@ -43,7 +43,7 @@ public sealed class AppMenuTests : IDisposable
         var menus = bar.Items.OfType<NativeMenuItem>().ToDictionary(item => item.Header!, item => item.Menu!, StringComparer.Ordinal);
         Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], menus.Keys);
 
-        var newItem = Item(menus["File"], "New item");
+        var newItem = Item(menus["File"], "New item…");
         Assert.Equal(new KeyGesture(Key.N, KeyModifiers.Meta), newItem.Gesture);
         Assert.NotNull(menus["File"].Items.OfType<NativeMenuItem>().Single(item => item.Header == "Open recent").Menu);
         Assert.NotEmpty(menus["File"].Items.OfType<NativeMenuItemSeparator>());

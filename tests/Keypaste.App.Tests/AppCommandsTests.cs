@@ -140,7 +140,7 @@ public sealed class AppCommandsTests : IDisposable
         Find(commands, "Settings…").Run();
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
 
-        Find(commands, "New item").Run();
+        Find(commands, "New item…").Run();
         Assert.NotNull(Assert.IsType<EntriesViewModel>(shell.Content).NewItem);
 
         Find(commands, "Agents").Run();
@@ -165,7 +165,7 @@ public sealed class AppCommandsTests : IDisposable
     {
         var locked = Commands(shell: null);
         Assert.False(Find(locked, "Settings…").CanRun());
-        Assert.False(Find(locked, "New item").CanRun());
+        Assert.False(Find(locked, "New item…").CanRun());
         Assert.False(Find(locked, "Open vault…").CanRun());
 
         using var shell = NewShell();
@@ -174,7 +174,7 @@ public sealed class AppCommandsTests : IDisposable
 
         Assert.True(shell.HasImport);
 
-        foreach (var header in new[] { "Settings…", "New item", "Find", "Items", AppCommands.ImportHeader, "Export…", "Open vault…" })
+        foreach (var header in new[] { "Settings…", "New item…", "Find", "Items", AppCommands.ImportHeader, "Export…", "Open vault…" })
         {
             Assert.False(Find(commands, header).CanRun(), $"{header} is on behind the import dialog");
         }

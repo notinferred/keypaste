@@ -225,7 +225,7 @@
               <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="{x:Static res:Strings.NewItem}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="key-round" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewItem}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="NewGroup"
@@ -234,7 +234,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.NewGroup}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="folder-plus" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewGroup}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewGroupLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="NewGeneratedPassword"
@@ -252,7 +252,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.NewProject}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="folder-git-2" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewProject}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewProjectLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="ImportEnv"
@@ -261,7 +261,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-code" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.ImportEnv}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportEnvLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button x:Name="ImportKdbx"
@@ -270,7 +270,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-input" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherApp}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherAppLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -425,7 +425,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.NewItem}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="plus" Size="13" />
-                  <TextBlock Text="{x:Static res:Strings.NewItem}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <!-- The first run: a new vault is empty, and a person's first act may be to bring their items in from another app. -->
@@ -436,7 +436,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="file-input" Size="13" />
-                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherApp}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherAppLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -758,12 +758,12 @@
                         <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="refresh-cw" Size="13" />
-                            <TextBlock Text="{x:Static res:Strings.Rotate}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static res:Strings.RotateLabel}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
                         <ToggleButton x:Name="EntryMenu"
                                       Classes="more"
-                                      ToolTip.Tip="{x:Static res:Strings.More}"
+                                      ToolTip.Tip="{x:Static res:Strings.MoreActions}"
                                       AutomationProperties.Name="{x:Static res:Strings.MoreActions}">
                           <ctl:KpIcon Icon="ellipsis" Size="14" />
                         </ToggleButton>
@@ -783,7 +783,7 @@
                           <Button Classes="ghost menu-item" Command="{Binding EditCommand}" AutomationProperties.Name="{x:Static res:Strings.EditFields}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="pencil" Size="14" />
-                              <TextBlock Text="{x:Static res:Strings.EditFields}" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.EditFieldsLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="OrganizeFromPane"
@@ -792,7 +792,7 @@
                                   AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}">
                             <StackPanel Orientation="Horizontal" Spacing="10">
                               <ctl:KpIcon Icon="folder-input" Size="14" />
-                              <TextBlock Text="{x:Static res:Strings.RenameOrMove}" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.RenameOrMoveLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="DuplicateEntry"
@@ -1303,7 +1303,7 @@
                               AutomationProperties.Name="{x:Static res:Strings.AddField}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="plus" Size="13" />
-                          <TextBlock Text="{x:Static res:Strings.AddField}" VerticalAlignment="Center" />
+                          <TextBlock Text="{x:Static res:Strings.AddFieldLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
                     </Grid>
@@ -1496,7 +1496,7 @@
                               AutomationProperties.Name="{x:Static res:Strings.AddAttachment}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="plus" Size="13" />
-                          <TextBlock Text="{x:Static res:Strings.AddAttachment}" VerticalAlignment="Center" />
+                          <TextBlock Text="{x:Static res:Strings.AddAttachmentLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
                     </Grid>

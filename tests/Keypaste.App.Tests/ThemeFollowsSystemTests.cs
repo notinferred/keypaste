@@ -31,6 +31,8 @@ public sealed class ThemeFollowsSystemTests
         var app = Assert.IsType<App>(Application.Current);
         var preferences = new DesktopPreferences(fixture.Home);
         var window = new MainWindow { Width = 960, Height = 520 };
+        var reported = app.SystemReportsLightOrDark;
+        app.SystemReportsLightOrDark = false;
 
         try
         {
@@ -61,6 +63,7 @@ public sealed class ThemeFollowsSystemTests
         finally
         {
             window.Close();
+            app.SystemReportsLightOrDark = reported;
             PlatformTheme.Set(PlatformThemeVariant.Dark);
             app.ApplyTheme(AppTheme.System);
         }
@@ -70,6 +73,8 @@ public sealed class ThemeFollowsSystemTests
     public Task The_system_contrast_preference_holds_under_every_choice_in_Settings() => HeadlessSession.On(() =>
     {
         var app = Assert.IsType<App>(Application.Current);
+        var reported = app.SystemReportsLightOrDark;
+        app.SystemReportsLightOrDark = false;
 
         try
         {
@@ -89,6 +94,7 @@ public sealed class ThemeFollowsSystemTests
         }
         finally
         {
+            app.SystemReportsLightOrDark = reported;
             PlatformTheme.Set(PlatformThemeVariant.Dark);
             app.ApplyTheme(AppTheme.System);
         }

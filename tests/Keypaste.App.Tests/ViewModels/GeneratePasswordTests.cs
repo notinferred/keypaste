@@ -174,7 +174,7 @@ public sealed class GeneratePasswordTests : IDisposable
         shell.OpenGeneratorCommand.Execute(null);
         var dialog = shell.GeneratorDialog!;
 
-        Assert.False(commands.Menus.SelectMany(menu => menu.Entries).OfType<AppCommand>().Single(command => command.Header == "New item").CanRun());
+        Assert.False(commands.Menus.SelectMany(menu => menu.Entries).OfType<AppCommand>().Single(command => command.Header == "New item…").CanRun());
 
         var window = new Window { Content = new GeneratePasswordView { DataContext = dialog } };
         window.Show();

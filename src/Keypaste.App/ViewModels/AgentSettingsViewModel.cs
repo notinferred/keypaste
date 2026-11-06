@@ -170,10 +170,10 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     /// <summary>Every project, and each environment of one, it may be let see, each checked when picked.</summary>
     internal IReadOnlyList<SettingChoice> SeeChoices => _seeChoices;
 
-    /// <summary>What Apply does with the picks, said as a warning when none is picked and no pattern remains, since it then sees nothing.</summary>
+    /// <summary>What the button does with the picks, said as a warning when none is picked and no pattern remains, since it then sees nothing.</summary>
     internal string PicksCaption => !_offered.Any(_picked.Contains) && !Patterns().Any()
-        ? "Nothing picked: applying lets it see no items."
-        : "Pick the projects and environments it may see, then apply them as one change.";
+        ? "Nothing picked: this lets it see no items."
+        : "Pick the projects and environments it may see, which change as one when you press this.";
 
     /// <summary>What it sees by a pattern besides the projects, such as <c>api/**</c>, said so the picks are never read as all of it; or empty.</summary>
     internal string AlsoSees => Patterns().ToList() is { Count: > 0 } patterns ? $"It also sees, by pattern: {string.Join(", ", patterns)}." : string.Empty;

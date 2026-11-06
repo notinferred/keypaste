@@ -8,7 +8,7 @@ internal static class SystemNotifications
     /// <summary>
     /// What this platform offers: UserNotifications in a macOS bundle, a toast in the Windows build on Windows 10 2004 or
     /// later, whose earlier releases post nothing, and the desktop's notification server on a Linux session bus. None of
-    /// them is asked anything until a notice is posted.
+    /// them is asked anything until a notice is posted, or on macOS the moment <see cref="CalmPermission"/> offers.
     /// </summary>
     internal static ISystemNotifications ForThisProcess()
     {

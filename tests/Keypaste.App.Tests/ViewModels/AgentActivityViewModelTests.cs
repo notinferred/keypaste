@@ -17,6 +17,19 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </summary>
 public sealed class AgentActivityViewModelTests
 {
+    [Fact]
+    public void End_all_asks_first_and_Cancel_ends_nothing()
+    {
+        using var model = new AgentActivityViewModel(null, null, new ManualClock(AppClock.Start));
+
+        model.AskEndAllCommand.Press();
+        Assert.True(model.IsConfirmingEndAll);
+        Assert.False(model.OffersEndAll);
+
+        model.CancelEndAllCommand.Press();
+        Assert.False(model.IsConfirmingEndAll);
+    }
+
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

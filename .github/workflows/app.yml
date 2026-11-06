@@ -716,7 +716,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
+  # The one check a pull request needs green: a skipped job passes, and any result but success or skipped does not.
   ok:
     name: app ok
     if: always()
@@ -724,14 +724,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
-      - name: Fail when any job failed or was cancelled
+      - name: Fail unless every job succeeded or was skipped
         shell: bash
         env:
           RESULTS: ${{ toJSON(needs.*.result) }}
         run: |
           set -euo pipefail
           echo "$RESULTS"
-          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
-            echo "::error::a required job failed or was cancelled"
+          if ! jq -e 'all(.[]; . == "success" or . == "skipped")' <<< "$RESULTS" > /dev/null; then
+            echo "::error::a required job neither succeeded nor was skipped"
             exit 1
           fi

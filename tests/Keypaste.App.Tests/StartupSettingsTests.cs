@@ -148,6 +148,9 @@ public sealed class StartupSettingsTests
     private static Task Started(Action<TempVault> body) => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
+        var app = (App)Current;
+        var reported = app.SystemReportsLightOrDark;
+        app.SystemReportsLightOrDark = false;
 
         try
         {
@@ -155,7 +158,8 @@ public sealed class StartupSettingsTests
         }
         finally
         {
-            ((App)Current).ApplyTheme(AppTheme.System);
+            app.SystemReportsLightOrDark = reported;
+            app.ApplyTheme(AppTheme.System);
         }
     });
 }

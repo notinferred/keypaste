@@ -49,6 +49,9 @@ internal sealed class WindowApprovalChannel(
     private Showing? _showing;
     private PairingNoticeWindow? _pairingNotice;
 
+    // Requests asked on any thread whose prompts the UI thread has not yet taken up.
+    private int _queued;
+
     /// <summary>Raised on the UI thread once a prompt window, or a notice, is on screen.</summary>
     internal event EventHandler<Window>? Shown;
 
@@ -133,8 +136,8 @@ internal sealed class WindowApprovalChannel(
         });
     }
 
-    /// <summary>Whether a prompt waits for the person's answer on screen, which no file dropped on the main window goes ahead of.</summary>
-    internal bool IsAsking => _showing is { Request.IsAnswered: false };
+    /// <summary>Whether a prompt waits for the person's answer or is on its way to the screen, which no file dropped on the main window or system dialog goes ahead of.</summary>
+    internal bool IsAsking => Volatile.Read(ref _queued) > 0 || _showing is { Request.IsAnswered: false };
 
     /// <summary>
     /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
@@ -153,7 +156,7 @@ internal sealed class WindowApprovalChannel(
 
         showing.Request.Disarm();
         showing.Window.BringForward();
-        _ = ArmAsync(showing.Request, showing.Withdrawn);
+        _ = ArmAsync(showing.Request, showing.Window, showing.Withdrawn);
         return true;
     }
 
@@ -214,8 +217,13 @@ internal sealed class WindowApprovalChannel(
         using var countdown = _clock.CreateTimer(
             _ => UiThread.Post(() => request.Tick(Remaining())), null, _tick, _tick);
 
+        Interlocked.Increment(ref _queued);
+
         UiThread.Post(() =>
         {
+            // From here _showing says so; nothing before it on this thread reads the count.
+            Interlocked.Decrement(ref _queued);
+
             // Withdrawn once requested: a token is marked before its callbacks run, so before the tokens linked below it are.
             if (request.IsAnswered || cancellationToken.IsCancellationRequested || withdrawals.Any(token => token.IsCancellationRequested))
             {
@@ -229,10 +237,17 @@ internal sealed class WindowApprovalChannel(
 
                 // Before the prompt shows, because showing it can give keypaste the focus that decides whether this is in the background.
                 var earned = notices?.Earned() == true;
-                window.Show();
-                _showing = new Showing(request, window, cancellationToken);
-                Shown?.Invoke(this, window);
-                _ = ArmAsync(request, cancellationToken);
+                var shown = window;
+                shown.Show();
+                shown.Activated += (_, _) =>
+                {
+                    request.Disarm();
+                    _ = ArmAsync(request, shown, cancellationToken);
+                };
+                shown.Deactivated += (_, _) => request.Disarm();
+                _showing = new Showing(request, shown, cancellationToken);
+                Shown?.Invoke(this, shown);
+                _ = ArmAsync(request, shown, cancellationToken);
 
                 if (earned)
                 {
@@ -258,7 +273,8 @@ internal sealed class WindowApprovalChannel(
         }
     }
 
-    private async Task ArmAsync(PromptViewModel request, CancellationToken cancellationToken)
+    /// <summary>Arms the prompt a second from now, unless it has been disarmed since or has not got focus, when its activation arms it a second after that.</summary>
+    private async Task ArmAsync(PromptViewModel request, PromptWindow window, CancellationToken cancellationToken)
     {
         var arming = request.Arming;
 
@@ -271,7 +287,13 @@ internal sealed class WindowApprovalChannel(
             return;
         }
 
-        UiThread.Post(() => request.Arm(arming));
+        UiThread.Post(() =>
+        {
+            if (window.IsActive)
+            {
+                request.Arm(arming);
+            }
+        });
     }
 
     private static void OnUiThread(Action action)

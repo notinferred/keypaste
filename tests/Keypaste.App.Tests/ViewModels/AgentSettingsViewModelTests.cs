@@ -471,11 +471,11 @@ public sealed class AgentSettingsViewModelTests
     }
 
     /// <summary>
-    /// With nothing picked and no pattern left, the caption beside Apply says that applying lets the agent see
+    /// With nothing picked and no pattern left, the caption beside the button says that pressing it lets the agent see
     /// no items, and says how picks are applied again once one is picked; the choice itself stays available.
     /// </summary>
     [Fact]
-    public async Task Only_these_with_nothing_picked_says_applying_lets_it_see_nothing()
+    public async Task Only_these_with_nothing_picked_says_pressing_lets_it_see_nothing()
     {
         await using var app = await App.StartAsync();
         using var model = app.Settings();
@@ -484,13 +484,13 @@ public sealed class AgentSettingsViewModelTests
 
         await model.ChooseAsync(Choice(model.SeeScopes, "Only these"));
 
-        Assert.Equal("Nothing picked: applying lets it see no items.", model.PicksCaption);
+        Assert.Equal("Nothing picked: this lets it see no items.", model.PicksCaption);
         Assert.True(model.ApplyPicksCommand.CanExecute(null));
         Assert.Contains(nameof(AgentSettingsViewModel.PicksCaption), raised);
 
         await model.ChooseAsync(Choice(model.SeeChoices, "billing"));
 
-        Assert.Equal("Pick the projects and environments it may see, then apply them as one change.", model.PicksCaption);
+        Assert.Equal("Pick the projects and environments it may see, which change as one when you press this.", model.PicksCaption);
     }
 
     /// <summary>Choosing Only these and then All projects again, before applying anything, changes nothing.</summary>

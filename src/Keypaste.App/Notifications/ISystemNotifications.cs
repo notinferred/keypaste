@@ -8,6 +8,11 @@ internal interface ISystemNotifications : IDisposable
     /// <param name="pressed">Called on any thread when the person presses it.</param>
     /// <returns>What takes it down, or null when the system cannot or may not post it.</returns>
     Task<IPostedNotice?> PostAsync(SystemNotice notice, Action pressed);
+
+    /// <summary>Asks the person's permission where the system wants it, at a moment when nothing waits on the answer.</summary>
+    void AskPermission()
+    {
+    }
 }
 
 /// <summary>A notice the system accepted.</summary>

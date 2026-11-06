@@ -21,6 +21,7 @@
 #                                  sends the chord, then waits up to <seconds> for the locator, timed inside the
 #                                  driver; prints found '<locator>' <n> ms after <chord>
 #   find <locator>                 waits up to 30 s for it; prints found '<locator>' as <role>
+#   enabled <locator>              waits up to 30 s for it; prints enabled or not enabled, without waiting for either
 #   find-prefix <text>             waits up to 30 s for a name starting <text>; prints that whole name
 #   wait <locator> <seconds>       waits up to <seconds> for it; prints found '<locator>' as <role>
 #   wait-gone <locator> <seconds>  waits up to <seconds> until it is gone; prints gone '<locator>'

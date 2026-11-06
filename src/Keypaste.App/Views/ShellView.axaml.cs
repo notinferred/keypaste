@@ -71,6 +71,7 @@ internal sealed partial class ShellView : UserControl
         InterfaceZoom.Changed += PlaceSidebar;
         PlaceSidebar();
         Commands?.SidebarChanged();
+        NameTheWindow();
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -80,6 +81,20 @@ internal sealed partial class ShellView : UserControl
         if (_shell is not null)
         {
             _shell.IsNarrow = e.NewSize.Width < WindowChrome.NarrowBelow;
+            _shell.WindowWidth = e.NewSize.Width;
+        }
+    }
+
+    // Held so the title can go back once this has left the window, when the window can no longer be asked for.
+    private Window? _named;
+
+    private void NameTheWindow()
+    {
+        _named = TopLevel.GetTopLevel(this) as Window;
+
+        if (_named is { } window)
+        {
+            window.Title = _shell?.WindowTitle ?? ShellViewModel.BareWindowTitle;
         }
     }
 
@@ -170,6 +185,13 @@ internal sealed partial class ShellView : UserControl
         InterfaceZoom.Changed -= PlaceSidebar;
         _root?.RemoveHandler(KeyDownEvent, OnDiscardPromptEscape);
         _root = null;
+
+        if (_named is { } window)
+        {
+            window.Title = ShellViewModel.BareWindowTitle;
+            _named = null;
+        }
+
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -332,6 +354,7 @@ internal sealed partial class ShellView : UserControl
             _shell.SearchFocusRequested += OnSearchFocusRequested;
             _shell.PropertyChanged += OnShellChanged;
             _shell.IsNarrow = Bounds.Width > 0 && Bounds.Width < WindowChrome.NarrowBelow;
+            _shell.WindowWidth = Bounds.Width;
         }
 
         PlaceSidebar();
@@ -403,6 +426,11 @@ internal sealed partial class ShellView : UserControl
 
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ShellViewModel.WindowTitle))
+        {
+            NameTheWindow();
+        }
+
         if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays) or nameof(ShellViewModel.ShowsRail))
         {
             PlaceSidebar();

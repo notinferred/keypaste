@@ -102,6 +102,40 @@ public sealed class LinuxNotificationsTests
         Assert.Equal(["default", "Open keypaste", "press", "Open keypaste"], notified.Actions);
     }
 
+    [Theory]
+    [InlineData(1u, true)]
+    [InlineData(2u, true)]
+    [InlineData(0u, false)]
+    public async Task A_desktop_reports_light_or_dark_only_by_its_portal_saying_which(uint scheme, bool reports)
+    {
+        using var bus = PrivateBus.Start();
+        using var portal = await FakePortal.StartAsync(bus.Address, scheme);
+
+        Assert.Equal(reports, await SystemAppearance.LinuxReportsLightOrDarkAsync(bus.Address).WaitAsync(_wait, Token));
+    }
+
+    [Fact]
+    public async Task A_desktop_with_no_portal_or_no_bus_reports_neither()
+    {
+        using var bus = PrivateBus.Start();
+
+        Assert.False(await SystemAppearance.LinuxReportsLightOrDarkAsync(bus.Address).WaitAsync(_wait, Token));
+        Assert.False(await SystemAppearance.LinuxReportsLightOrDarkAsync(null).WaitAsync(_wait, Token));
+        Assert.False(await SystemAppearance.LinuxReportsLightOrDarkAsync("unix:path=/nonexistent/keypaste-q17-bus").WaitAsync(_wait, Token));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GNOMEs_overlay_setting_says_whether_scroll_bars_hide(bool overlay)
+    {
+        Assert.SkipUnless(OperatingSystem.IsLinux(), "Only Linux reads the portal for this.");
+        using var bus = PrivateBus.Start();
+        using var portal = await FakePortal.StartAsync(bus.Address, 0, overlay);
+
+        Assert.Equal(overlay, await SystemScrollBars.AutoHideAsync(bus.Address).WaitAsync(_wait, Token));
+    }
+
     private static async Task Until(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + _wait;
@@ -147,6 +181,72 @@ public sealed class LinuxNotificationsTests
             _daemon.WaitForExit();
             _daemon.Dispose();
         }
+    }
+
+    /// <summary>What a desktop's settings portal answers, each value in the variant within a variant its Read has always given.</summary>
+    private sealed class FakePortal : IDisposable, IPathMethodHandler
+    {
+        private readonly DBusConnection _connection;
+        private readonly uint _scheme;
+        private readonly bool _overlay;
+
+        private FakePortal(DBusConnection connection, uint scheme, bool overlay)
+        {
+            _connection = connection;
+            _scheme = scheme;
+            _overlay = overlay;
+        }
+
+        public string Path => "/org/freedesktop/portal/desktop";
+
+        public bool HandlesChildPaths => false;
+
+        internal static async Task<FakePortal> StartAsync(string address, uint scheme, bool overlay = true)
+        {
+            var connection = new DBusConnection(address);
+            await connection.ConnectAsync();
+            var portal = new FakePortal(connection, scheme, overlay);
+            connection.AddMethodHandler(portal);
+            await RequestNameAsync(connection);
+            return portal;
+        }
+
+        private static Task RequestNameAsync(DBusConnection connection)
+        {
+            using var writer = connection.GetMessageWriter();
+            writer.WriteMethodCallHeader("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "RequestName", "su");
+            writer.WriteString("org.freedesktop.portal.Desktop");
+            writer.WriteUInt32(0);
+            return connection.CallMethodAsync(writer.CreateMessage());
+        }
+
+        public ValueTask HandleMethodAsync(MethodContext context)
+        {
+            var reader = context.Request.GetBodyReader();
+            var space = reader.ReadString();
+            var key = reader.ReadString();
+
+            if (space == "org.freedesktop.appearance" && key == "color-scheme")
+            {
+                using var reply = context.CreateReplyWriter("v");
+                reply.WriteVariant(VariantValue.Variant(VariantValue.UInt32(_scheme)));
+                context.Reply(reply.CreateMessage());
+            }
+            else if (space == "org.gnome.desktop.interface" && key == "overlay-scrolling")
+            {
+                using var reply = context.CreateReplyWriter("v");
+                reply.WriteVariant(VariantValue.Variant(VariantValue.Bool(_overlay)));
+                context.Reply(reply.CreateMessage());
+            }
+            else
+            {
+                context.ReplyError("org.freedesktop.portal.Error.NotFound", "no such setting");
+            }
+
+            return ValueTask.CompletedTask;
+        }
+
+        public void Dispose() => _connection.Dispose();
     }
 
     private sealed record Notification(uint Id, string App, string Icon, string Title, string Body, string[] Actions, byte Urgency, int Expiry);

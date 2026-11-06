@@ -52,7 +52,7 @@ internal sealed class RenderedShell : IDisposable
     private ShellViewModel? _shell;
     private UnlockViewModel? _unlock;
 
-    internal RenderedShell(string directoryPrefix = "keypaste-drawn-", Action<Vault>? seed = null, string fileName = "vault.kdbx")
+    internal RenderedShell(string directoryPrefix = "keypaste-drawn-", Action<Vault>? seed = null, string fileName = "vault.kdbx", bool offersTheme = false)
     {
         _directory = Directory.CreateTempSubdirectory(directoryPrefix).FullName;
         var path = Path.Combine(_directory, fileName);
@@ -80,7 +80,7 @@ internal sealed class RenderedShell : IDisposable
         Window = new MainWindow { Height = 1000 };
         // Crash reports composed as launch composes them, so Settings shows their switch and Diagnostics their list.
         _crashes = new CrashReporting(_directory, new DesktopPreferences(_directory), endpoint: null);
-        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes };
+        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes, OffersTheme = offersTheme };
         _shortcuts = App.Bind(Window, Session, () => _unlock, () => _shell);
         Root.Content = new ShellView { DataContext = _shell, Commands = _shortcuts.Commands };
         Session.Locked += OnLocked;

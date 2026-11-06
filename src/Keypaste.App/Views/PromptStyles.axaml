@@ -20,6 +20,18 @@
     <Setter Property="BoxShadow" Value="none" />
   </Style>
 
+  <!-- Another window has focus: the card recedes by colour alone, so nothing moves, and the allows are disarmed. -->
+  <Style Selector=".inactive Border.prompt">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BoxShadow" Value="0 8 24 0 #59000000" />
+  </Style>
+  <Style Selector=".inactive TextBlock.prompt-title">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector=".inactive Border.prompt-tile">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+  </Style>
+
   <!-- The header is one fixed row of single lines, whatever the agent calls itself or wherever it
        runs: a title and a subtitle, or a third line where a window sets its height for one. -->
   <Style Selector="Grid.prompt-head">

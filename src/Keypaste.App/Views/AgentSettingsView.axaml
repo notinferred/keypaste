@@ -95,8 +95,7 @@
         </ItemsControl>
         <TextBlock Name="AlsoSeesText" Classes="caption" Text="{Binding AlsoSees}" IsVisible="{Binding HasAlsoSees}" TextWrapping="Wrap" />
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsOnly}">
-          <Button Name="ApplyPicks" Content="{x:Static res:Strings.Apply}" Command="{Binding ApplyPicksCommand}"
-                  AutomationProperties.Name="{x:Static res:Strings.LetItSeeOnlyTheProjectsPicked}" />
+          <Button Name="ApplyPicks" Content="{x:Static res:Strings.LetItSeeOnlyThese}" Command="{Binding ApplyPicksCommand}" />
           <TextBlock Grid.Column="1" Name="PicksCaption" Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding PicksCaption}" />
         </Grid>
       </StackPanel>
@@ -126,10 +125,30 @@
           <StackPanel Spacing="6">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ctl:FormKeys.Confirm="{Binding ApplySeeCommand}">
               <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="{x:Static res:Strings.PatternsItCanSee}" />
-              <Button Grid.Column="1" Content="{x:Static res:Strings.Apply}" Command="{Binding ApplySeeCommand}" />
+              <Button Grid.Column="1" Content="{x:Static res:Strings.LetItSeeThese}" Command="{Binding ApplySeeCommand}" />
             </Grid>
-            <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
+              <Button Grid.Column="1" Name="LearnMoreSeeing" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
+                      AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutWhatItCanSee}">
+                <Button.Flyout>
+                  <Flyout Placement="Bottom">
+                    <StackPanel MaxWidth="320" Spacing="10">
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironmentExample}" />
+                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironment}" />
+                      </StackPanel>
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItemExample}" />
+                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItem}" />
+                      </StackPanel>
+                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingIsCaseSensitiveAndHeldBack}" />
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
           </StackPanel>
         </Expander>
 
@@ -185,7 +204,7 @@
               <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="{x:Static res:Strings.EndOfDay}"
                        AutomationProperties.Name="{x:Static res:Strings.AutomaticUntilThisTimeOfDay}" />
             </StackPanel>
-            <Button Content="{x:Static res:Strings.Apply}" VerticalAlignment="Bottom" Command="{Binding ApplyLimitCommand}" />
+            <Button Content="{x:Static res:Strings.SetTheLimit}" VerticalAlignment="Bottom" Command="{Binding ApplyLimitCommand}" />
           </WrapPanel>
           <TextBlock Classes="caption" Text="{Binding LimitNow}" TextWrapping="Wrap" />
           <TextBlock Classes="caption" TextWrapping="Wrap"

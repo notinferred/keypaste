@@ -128,7 +128,6 @@
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="FontSize" Value="12.5" />
       <Setter Property="FontWeight" Value="Normal" />
-      <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.quiet /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -256,7 +255,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.UnlockWithAKeyFileToo}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-key" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.UnlockWithAKeyFileToo}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.UnlockWithAKeyFileTooLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
@@ -410,7 +409,7 @@
                         AutomationProperties.Name="{x:Static res:Strings.AddAKeyFile}">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <ctl:KpIcon Icon="file-key" Size="14" />
-                    <TextBlock Text="{x:Static res:Strings.AddAKeyFile}" VerticalAlignment="Center" />
+                    <TextBlock Text="{x:Static res:Strings.AddAKeyFileLabel}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
                 <Button Classes="quiet"
@@ -418,7 +417,7 @@
                         AutomationProperties.Name="{x:Static res:Strings.CreateAKeyFile}">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <ctl:KpIcon Icon="plus" Size="14" />
-                    <TextBlock Text="{x:Static res:Strings.CreateAKeyFile}" VerticalAlignment="Center" />
+                    <TextBlock Text="{x:Static res:Strings.CreateAKeyFileLabel}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
               </StackPanel>
@@ -432,7 +431,7 @@
                            VerticalAlignment="Center" />
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
-                        ToolTip.Tip="{x:Static res:Strings.NoKeyFile}"
+                        ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAKeyFile}"
                         Command="{Binding ClearKeyfileCommand}"
                         AutomationProperties.Name="{x:Static res:Strings.NoKeyFile}">
                   <ctl:KpIcon Icon="x" Size="12" />
@@ -460,7 +459,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.AddAYubiKey}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="usb" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.AddAYubiKey}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.AddAYubiKeyLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesHardwareKey}">
@@ -473,7 +472,7 @@
                         Command="{Binding SwitchSlotCommand}" />
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
-                        ToolTip.Tip="{x:Static res:Strings.NoYubiKey}"
+                        ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAYubiKey}"
                         Command="{Binding ClearHardwareKeyCommand}"
                         AutomationProperties.Name="{x:Static res:Strings.NoYubiKey}">
                   <ctl:KpIcon Icon="x" Size="12" />
@@ -541,7 +540,7 @@
                       AutomationProperties.Name="{x:Static res:Strings.ThatBackupsKeyFile}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-key" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.ThatBackupsKeyFile}" VerticalAlignment="Center" />
+                  <TextBlock Text="{x:Static res:Strings.ThatBackupsKeyFileLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
@@ -554,7 +553,7 @@
                            VerticalAlignment="Center" />
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
-                        ToolTip.Tip="{x:Static res:Strings.NoKeyFile}"
+                        ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAKeyFile}"
                         Command="{Binding ClearKeyfileCommand}"
                         AutomationProperties.Name="{x:Static res:Strings.NoKeyFile}">
                   <ctl:KpIcon Icon="x" Size="12" />
@@ -632,7 +631,7 @@
                   AutomationProperties.Name="{x:Static res:Strings.OpenAnotherVault}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="folder-open" Size="14" />
-              <TextBlock Text="{x:Static res:Strings.OpenAnotherVault}" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static res:Strings.OpenAnotherVaultLabel}" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Button Classes="quiet"
@@ -642,7 +641,7 @@
                   AutomationProperties.Name="{x:Static res:Strings.NewVault}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="plus" Size="14" />
-              <TextBlock Text="{x:Static res:Strings.NewVault}" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static res:Strings.NewVaultLabel}" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Button Classes="quiet"
@@ -652,7 +651,7 @@
                   AutomationProperties.Name="{x:Static res:Strings.RestoreABackup}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="history" Size="14" />
-              <TextBlock Text="{x:Static res:Strings.RestoreABackup}" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static res:Strings.RestoreABackupLabel}" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </WrapPanel>

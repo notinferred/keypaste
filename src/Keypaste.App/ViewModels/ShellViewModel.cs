@@ -192,14 +192,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Whether the person hid the sidebar with View › Hide sidebar; it stays hidden at every width and across locks.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
     internal partial bool SidebarHidden { get; private set; }
 
     /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar collapses to the rail and Items drops two columns.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
     [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
     [NotifyPropertyChangedFor(nameof(SidebarWayBack))]
     internal partial bool IsNarrow { get; set; }
 
@@ -207,7 +207,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
     [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
     private partial bool SidebarOpenedOver { get; set; }
 
     /// <summary>Whether the whole sidebar is on the screen.</summary>
@@ -215,6 +215,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the rail of icons stands in for the sidebar: a narrow window, unless the person hid it or it is open over the content.</summary>
     internal bool ShowsRail => IsNarrow && !SidebarHidden && !SidebarOpenedOver;
+
+    /// <summary>The window's width, in the design's pixels, which <see cref="ContentIsTight"/> is judged from.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ContentIsTight))]
+    internal partial double WindowWidth { get; set; }
+
+    /// <summary>Whether the content is under <see cref="Views.WindowChrome.ContentTightBelow"/> wide, where the log drops a column, whatever takes the rest of the window.</summary>
+    internal bool ContentIsTight =>
+        WindowWidth - (ShowsRail ? Views.WindowChrome.RailWidth : !IsNarrow && !SidebarHidden ? Views.WindowChrome.SidebarWidth : 0) < Views.WindowChrome.ContentTightBelow;
 
     /// <summary>What a narrow window's titlebar button adds to its name: every way back, the button being all that is left of the places there.</summary>
     internal string? SidebarWayBack => IsNarrow
@@ -289,6 +298,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>What agents did with this vault's entries, read every few seconds; null where nothing serves agents.</summary>
     internal EntryActivitySource? EntryActivity { get; }
+
+    /// <summary>Whether Settings offers a theme, which it does only where the system reports no light or dark of its own.</summary>
+    internal bool OffersTheme { get; init; }
+
+    /// <summary>Told when the person opens a place where a system dialog interrupts nothing.</summary>
+    internal Action? CalmMoment { get; init; }
 
     /// <summary>How a theme choice reaches the application object.</summary>
     /// <remarks>
@@ -753,6 +768,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         if (SetProperty(ref _current, destination, nameof(Current)))
         {
             OnPropertyChanged(nameof(CurrentTitle));
+            OnPropertyChanged(nameof(WindowTitle));
             OnPropertyChanged(nameof(ShowsHeader));
             OnPropertyChanged(nameof(HasBack));
             OnPropertyChanged(nameof(BackTitle));
@@ -760,6 +776,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(SelectedFooter));
             OnPropertyChanged(nameof(SelectedRailPlace));
             BackCommand.NotifyCanExecuteChanged();
+
+            if (destination.Kind is DestinationKind.AgentActivity or DestinationKind.Settings)
+            {
+                CalmMoment?.Invoke();
+            }
 
             if (destination.Kind != DestinationKind.EnvSets)
             {
@@ -846,6 +867,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The current destination's title, for the content header.</summary>
     internal string CurrentTitle => _current.Title;
 
+    /// <summary>The window's title with no screen in it, as on the unlock screen.</summary>
+    internal const string BareWindowTitle = "keypaste";
+
+    /// <summary>Only the screen's own fixed name, never a vault, group, project or item: the system's window list, taskbar and switcher all show it.</summary>
+    internal string WindowTitle => $"{CurrentTitle} - {BareWindowTitle}";
+
     /// <summary>Whether the shell draws the title above a screen that does not draw its own.</summary>
     internal bool ShowsHeader => !_current.OwnsHeader;
 
@@ -919,7 +946,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
@@ -941,7 +968,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard };
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());

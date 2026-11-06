@@ -65,6 +65,8 @@ internal sealed partial class App : Application, IDisposable
     private bool _quitting;
     private bool _crashed;
     private Core.Settings.WindowLayout? _untouchedLayout;
+    private const string _scrollBarsAutoHide = "KpScrollBarsAutoHide";
+
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
     private ColorContrastPreference _platformContrast = ColorContrastPreference.NoPreference;
@@ -124,6 +126,12 @@ internal sealed partial class App : Application, IDisposable
         _session.Locked += OnLocked;
         _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
         _notifications = Notifications ?? SystemNotifications.ForThisProcess();
+
+        if (OperatingSystem.IsLinux())
+        {
+            _ = AskTheDesktopAboutLightOrDarkAsync();
+        }
+
         var requestNotices = new RequestNotices(_notifications, TimeProvider.System, () => desktop.Windows.Any(window => window.IsActive));
         _authority = new AppAuthority(
             _session,
@@ -135,6 +143,7 @@ internal sealed partial class App : Application, IDisposable
         InterfaceZoom.Set(_preferences.Current.Window?.ZoomPercent ?? Core.Settings.WindowLayout.ActualSizePercent);
         InterfaceZoom.Changed += KeepWindowLayout;
         _window = new MainWindow();
+        _window.Activated += (_, _) => _ = FollowScrollBarsAsync();
 
         if (_preferences.Current.Window is { } left)
         {
@@ -898,6 +907,8 @@ internal sealed partial class App : Application, IDisposable
             WebLaunchers(_window))
         {
             ShareTransport = ShareTransport,
+            OffersTheme = !SystemReportsLightOrDark,
+            CalmMoment = _notifications is { } notifications ? new CalmPermission(notifications, () => _authority?.IsAsking == true).Offer : null,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
             Tools = ClientConnector.ForThisProcess,
@@ -910,8 +921,8 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// Applies a theme choice. <c>System</c> paints in the operating system's light or dark setting,
-    /// and keeps doing so as it changes.
+    /// Applies a theme choice where one counts. <c>System</c> paints in the operating system's light or
+    /// dark setting, and keeps doing so as it changes.
     /// </summary>
     /// <remarks>
     /// System is the platform's current variant set explicitly, not <see cref="ThemeVariant.Default"/>:
@@ -924,10 +935,21 @@ internal sealed partial class App : Application, IDisposable
         RequestedThemeVariant = ChosenVariant();
     }
 
-    /// <summary>Settings or the system says light or dark; only the system says high contrast, so a person who needs it keeps it under either choice.</summary>
+    /// <summary>Whether the system reports light or dark, when it wins over <c>app.toml</c>'s theme, which is then kept unread. macOS and Windows always do; a Linux desktop says, once <see cref="SystemAppearance"/> has asked it.</summary>
+    internal bool SystemReportsLightOrDark
+    {
+        get;
+        set
+        {
+            field = value;
+            RequestedThemeVariant = ChosenVariant();
+        }
+    } = !OperatingSystem.IsLinux();
+
+    /// <summary>The system says light or dark wherever it reports one, and Settings only where it does not; only the system says high contrast, so a person who needs it keeps it under either.</summary>
     private ThemeVariant ChosenVariant()
     {
-        var dark = _theme switch
+        var dark = (SystemReportsLightOrDark ? Core.Settings.AppTheme.System : _theme) switch
         {
             Core.Settings.AppTheme.Light => false,
             Core.Settings.AppTheme.Dark => true,
@@ -939,7 +961,25 @@ internal sealed partial class App : Application, IDisposable
             : (dark ? ThemeVariant.Dark : ThemeVariant.Light);
     }
 
-    /// <summary>Tracks the operating system's light or dark setting, followed while System is chosen, and its contrast preference, always followed.</summary>
+    /// <summary>Whether scroll bars hide until scrolled. The person may have changed the system's setting while away, so a window coming forward reads it again.</summary>
+    internal bool ScrollBarsAutoHide
+    {
+        set => Resources[_scrollBarsAutoHide] = value;
+    }
+
+    private async Task FollowScrollBarsAsync()
+    {
+        var autoHide = await SystemScrollBars.AutoHideAsync(Tmds.DBus.Protocol.DBusAddress.Session).ConfigureAwait(false);
+        UiThread.Post(() => ScrollBarsAutoHide = autoHide);
+    }
+
+    private async Task AskTheDesktopAboutLightOrDarkAsync()
+    {
+        var reports = await SystemAppearance.LinuxReportsLightOrDarkAsync(Tmds.DBus.Protocol.DBusAddress.Session).ConfigureAwait(false);
+        UiThread.Post(() => SystemReportsLightOrDark = reports);
+    }
+
+    /// <summary>Tracks the operating system's light or dark setting, followed unless Settings' choice counts, and its contrast preference, always followed.</summary>
     private void FollowPlatformTheme()
     {
         if (PlatformSettings is not { } settings)

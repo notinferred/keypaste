@@ -24,6 +24,11 @@ internal sealed class FakeNotifications : ISystemNotifications
 
     internal bool RemovalThrows { get; init; }
 
+    /// <summary>How many times the person's permission was asked for.</summary>
+    internal int PermissionAsks { get; private set; }
+
+    public void AskPermission() => PermissionAsks++;
+
     /// <summary>The notices given so far; a post reaches this from the thread pool, some time after it is asked for.</summary>
     internal IReadOnlyList<Post> Posts
     {

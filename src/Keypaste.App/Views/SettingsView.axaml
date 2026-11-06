@@ -329,7 +329,7 @@
         </Border>
 
         <!-- Appearance -->
-        <Border Classes="card filled settings">
+        <Border Classes="card filled settings" IsVisible="{Binding OffersTheme}">
           <StackPanel>
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
@@ -341,7 +341,7 @@
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="4">
                   <TextBlock Classes="row-label" Text="{x:Static res:Strings.Theme}" />
-                  <TextBlock Classes="caption" Text="{x:Static res:Strings.SystemFollowsTheOperatingSystemsLightOrXc00a47}" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ThisDesktopReportsNoLightOrDark}" />
                 </StackPanel>
                 <ListBox Grid.Column="1"
                          Name="ThemeChoice" AutomationProperties.Name="{x:Static res:Strings.Theme}"
@@ -606,7 +606,7 @@
                   <Panel Grid.Column="1" VerticalAlignment="Top">
                     <Button Name="PairBrowser" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
                             AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
-                    <Button Name="StopPairing" Classes="ghost" Content="{x:Static res:Strings.Stop}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
+                    <Button Name="StopPairing" Classes="ghost" Content="{x:Static res:Strings.StopPairing}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
                             AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
                   </Panel>
                 </Grid>

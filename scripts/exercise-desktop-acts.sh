@@ -20,7 +20,7 @@
 #   project-run    the item tagged into a project, whose Run starts a child that receives the field   field
 #   edit-rerun     the value replaced, and the next Run's child receives the new one                  project-run
 #   connect        Agents' Connect registers Claude Code without a vault path; that command answers   first-run
-#   approve-deny   its request allowed once in the app's prompt, and a second one denied              connect, field
+#   approve-deny   Allow disarmed without focus, its request allowed once, a second one denied            connect, field
 #   restore        a revision, an item from Trash and a backup restored                               field
 #   change-access  the master password changed in Settings: the old one refused, the new one unlocks  first-run
 #   lock-refused   Lock, and a request after it refused as the locked app's no-approver      connect
@@ -207,7 +207,11 @@ evidence_approve_deny() {
   local d="$1" expected allowed
   expected="$(fact_of "$d" approve-deny expected_sha256)"
   allowed="$(fact_of "$d" approve-deny allow_sha256)"
-  if [ "$(fact_of "$d" approve-deny allow_error)" != false ]; then contradict 'the request allowed once came back as an error'
+  if [ "$(fact_of "$d" approve-deny allow_unfocused)" != 'not enabled' ]; then
+    contradict "with focus on another window, past the arming delay, Allow once read '$(fact_of "$d" approve-deny allow_unfocused)', not 'not enabled'"
+  elif [ "$(fact_of "$d" approve-deny allow_activated)" != enabled ]; then
+    contradict "after activation and its second, Allow once read '$(fact_of "$d" approve-deny allow_activated)', not 'enabled'"
+  elif [ "$(fact_of "$d" approve-deny allow_error)" != false ]; then contradict 'the request allowed once came back as an error'
   elif [ "$allowed" != "$expected" ]; then contradict "the client received a value whose SHA-256 is ${allowed:-none}, not the field's $expected"
   elif [ "$(fact_of "$d" approve-deny allow_audit)" != granted/prompt ]; then
     contradict "the audit log records the allowed request as $(fact_of "$d" approve-deny allow_audit), not granted/prompt"
@@ -215,7 +219,7 @@ evidence_approve_deny() {
   elif [ "$(fact_of "$d" approve-deny deny_value)" != none ]; then contradict 'the denied request carried a value'
   elif [ "$(fact_of "$d" approve-deny deny_audit)" != denied/prompt ]; then
     contradict "the audit log records the denied request as $(fact_of "$d" approve-deny deny_audit), not denied/prompt"
-  else pass "Allow once released the field's value to the client and Deny released nothing, each read back from the client's reply and the audit log"
+  else pass "Allow once read not enabled without focus and enabled after activation and its second, then released the field's value to the client, and Deny released nothing, each read back from the client's reply and the audit log"
   fi
 }
 
@@ -671,6 +675,8 @@ keepassxc_create() {
     && kpxc_drive 'Save database as' key ctrl+a && kpxc_drive 'Save database as' type "$(native "$VAULT")" \
     && kpxc_drive 'Save database as' key Return \
     && wait_for_file "$VAULT" 30; then
+    # Inferred, as is the 2 s: the file appears before the save ends, and KeePassXC refuses a close during a save and locks the database instead.
+    sleep 2
     kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended by itself after saving$(crash_report "$maker/keepassxc.log")"; return 1; }
     close_keepassxc "$pid" || return 1
     echo "KeePassXC's Create Database window made $VAULT_NAME"
@@ -725,6 +731,8 @@ keepassxc_new_database() {
     echo "KeePassXC did not save the new database as $VAULT"
     return 1
   fi
+  # Inferred, as is the 2 s: the file appears before the save ends, and KeePassXC refuses a close during a save and locks the database instead.
+  sleep 2
   close_keepassxc "$pid" || return 1
   rm -rf "$scratch"
   echo "KeePassXC's new-database window made $VAULT_NAME"
@@ -817,13 +825,21 @@ close_keepassxc() {
   wait "$1" 2> /dev/null || true
 }
 
-# On Windows, the windows a KeePassXC that will not close still shows, with a screenshot of the first.
+# The windows a KeePassXC that will not close still shows, with a screenshot of the first.
 keepassxc_left() {
   local winpid titles
-  [ "$PLATFORM" = windows ] || return 0
-  winpid="$(cat "/proc/$1/winpid" 2> /dev/null)" || return 0
-  titles="$(APP_PID="$winpid" drive windows 2>&1 | tr -d "$CR")"
-  APP_PID="$winpid" screenshot keepassxc-left "$(head -n 1 <<< "$titles")"
+  case "$PLATFORM" in
+    windows)
+      winpid="$(cat "/proc/$1/winpid" 2> /dev/null)" || return 0
+      titles="$(APP_PID="$winpid" drive windows 2>&1 | tr -d "$CR")"
+      APP_PID="$winpid" screenshot keepassxc-left "$(head -n 1 <<< "$titles")"
+      ;;
+    linux)
+      titles="$(for id in $(xdotool search --onlyvisible --pid "$1" 2> /dev/null); do xdotool getwindowname "$id"; done; ps -o stat=,wchan= -p "$1")"
+      import -window root "$OUT/keepassxc-left.png"
+      ;;
+    *) return 0 ;;
+  esac
   printf '; it shows: %s' "$(tr '\n' ';' <<< "$titles")"
 }
 
@@ -1082,7 +1098,7 @@ act_field() {
 act_notes_flag() {
   attempt settings shortcut 4 || return 1
   attempt flagged drive find-prefix "$NOTE_KEY " || return 1
-  saved moved_ms move drive invoke 'Move to a field' || return 1
+  saved moved_ms move drive invoke "Move $NOTE_KEY to a field" || return 1
   fact field_sha256 "$(field_hash "$ENTRY_NOTES" "$NOTE_KEY")"
   fact notes_hold_line "$(notes_hold_line)"
 }
@@ -1105,11 +1121,10 @@ act_project_run() {
 act_edit_rerun() {
   attempt items shortcut 1 || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
-  # The item's one custom field's Replace, then the form's.
-  attempt replace drive invoke Replace || return 1
+  attempt replace drive invoke "Replace $FIELD" || return 1
   attempt value-focus drive focus id:ReplacementFieldValue || return 1
   attempt value drive type "$VALUE2" || return 1
-  saved replaced_ms confirm drive invoke 'Replace[2]' || return 1
+  saved replaced_ms confirm drive invoke Replace || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   attempt project open_project || return 1
   run_child
@@ -1135,6 +1150,17 @@ act_connect() {
   mcp_finish
 }
 
+# allow_reading <wanted> <seconds>: prints what Allow once reads, once it reads as wanted or the time is up.
+allow_reading() {
+  local reading end=$((SECONDS + $2))
+  while :; do
+    reading="$(drive --window "$PROMPT" enabled 'Allow once' 2>&1 | tail -n 1 | tr -d "$CR")"
+    if [ "$reading" = "$1" ] || [ "$SECONDS" -ge "$end" ]; then break; fi
+    sleep 0.2
+  done
+  printf '%s\n' "$reading"
+}
+
 act_approve_deny() {
   local mark
   fact expected_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
@@ -1143,6 +1169,14 @@ act_approve_deny() {
   mcp_request 3 'R.1a: a request a person allows once'
   attempt prompt drive --window "$PROMPT" window 60 || { mcp_finish; return 1; }
   screenshot approve-prompt "$PROMPT"
+  # A real click on the app's main window takes focus with no second app; the wait passes the arming delay, which a prompt without focus must not count.
+  attempt main-front drive click Places || { mcp_finish; return 1; }
+  allow_reading 'not enabled' 15 > /dev/null
+  sleep 2
+  fact allow_unfocused "$(allow_reading 'not enabled' 0)"
+  # A person's click on the disarmed allow activates it, and it arms a second later; macOS's accessibility focus moves no key window between one app's windows.
+  attempt prompt-front drive --window "$PROMPT" click 'Allow once' || { mcp_finish; return 1; }
+  fact allow_activated "$(allow_reading enabled 15)"
   attempt allow drive --window "$PROMPT" invoke 'Allow once' || { mcp_finish; return 1; }
   attempt allowed replied 60 3 || { mcp_finish; return 1; }
   fact allow_error "$(reply_of 3 '.result.isError // false')"
@@ -1175,8 +1209,7 @@ act_restore() {
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
   attempt scratch-actions drive toggle 'More actions' || return 1
-  attempt delete drive invoke id:DeleteEntry || return 1
-  saved deleted_ms confirm-delete drive invoke Delete || return 1
+  saved deleted_ms delete drive invoke id:DeleteEntry || return 1
   fact deleted_listed "$(listed "$ENTRY_SCRATCH")"
   attempt trash shortcut 3 || return 1
   attempt choose-trashed drive select "$ENTRY_SCRATCH" || return 1
@@ -1356,6 +1389,8 @@ selftest() {
         '{"act":"connect","fact":"server","value":"{\"name\":\"keypaste\"}"}' \
         '{"act":"connect","fact":"tools","value":"list_entries request_credential request_access_change"}' \
         '{"act":"approve-deny","fact":"expected_sha256","value":"b2"}' \
+        '{"act":"approve-deny","fact":"allow_unfocused","value":"not enabled"}' \
+        '{"act":"approve-deny","fact":"allow_activated","value":"enabled"}' \
         '{"act":"approve-deny","fact":"allow_error","value":"false"}' \
         '{"act":"approve-deny","fact":"allow_sha256","value":"b2"}' \
         '{"act":"approve-deny","fact":"allow_audit","value":"granted/prompt"}' \
@@ -1442,6 +1477,10 @@ selftest() {
   set_fact no-tool connect tools 'list_entries'
   passing automatic
   set_fact automatic approve-deny allow_audit granted/automatic
+  passing no-arming
+  set_fact no-arming approve-deny allow_unfocused enabled
+  passing never-armed
+  set_fact never-armed approve-deny allow_activated 'not enabled'
   passing deny-leaks
   set_fact deny-leaks approve-deny deny_value ab
   passing allow-other
@@ -1500,6 +1539,8 @@ selftest() {
   expect vault-path lock-refused unreached 'connect did not pass'
   expect no-tool connect contradiction 'request_credential'
   expect automatic approve-deny contradiction 'granted/automatic'
+  expect no-arming approve-deny contradiction "Allow once read 'enabled'"
+  expect never-armed approve-deny contradiction "Allow once read 'not enabled'"
   expect deny-leaks approve-deny contradiction 'carried a value'
   expect allow-other approve-deny contradiction 'not the field'
   expect backup-unchanged restore contradiction 'as it was'

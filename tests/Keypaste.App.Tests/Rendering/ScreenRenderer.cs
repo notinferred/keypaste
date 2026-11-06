@@ -211,6 +211,107 @@ public sealed class ScreenRenderer
         DrawHardwareKey(output);
         DrawSmallScreens(demo, output);
         DrawDrops(demo, output);
+        DrawPolish(demo, output);
+    }
+
+    /// <summary>What Q.17 drew: Settings' theme where it is offered, Learn more, toasts under the titlebar, the tight widths, the Items icon and the prompt without focus.</summary>
+    private static void DrawPolish(DemoVault demo, string output)
+    {
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+        }
+
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker()) { OffersTheme = true };
+        var window = new MainWindow { Width = _width * InterfaceZoom.Factor, Height = _height * InterfaceZoom.Factor };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.FirstOrDefault(row => row.Title == "github");
+        shell.ShowToast("Saved github.", ToastTone.Success);
+        shell.ShowToast("claude-code can no longer see github.", ToastTone.Information);
+        Save(window, output, "50-toasts-under-the-titlebar");
+
+        window.Width = 720 * InterfaceZoom.Factor;
+        window.Height = 520 * InterfaceZoom.Factor;
+        Save(window, output, "50b-toasts-720");
+        shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
+        Save(window, output, "50c-items-rail-720");
+
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        foreach (var width in new[] { 840, 900, 999 })
+        {
+            window.Width = width * InterfaceZoom.Factor;
+            window.Height = 680 * InterfaceZoom.Factor;
+            Save(window, output, $"51-env-{width}");
+        }
+
+        shell.Current = Destinations.Of(DestinationKind.Log);
+        foreach (var width in new[] { 840, 900, 999 })
+        {
+            window.Width = width * InterfaceZoom.Factor;
+            Save(window, output, $"52-log-{width}");
+        }
+
+        // What a person with macOS's or Windows' always-visible scroll bars gets, at the widths the tight treatment turns on.
+        var app = Assert.IsType<App>(Application.Current);
+        app.ScrollBarsAutoHide = false;
+        try
+        {
+            window.Height = 480 * InterfaceZoom.Factor;
+            foreach (var width in new[] { 840, 976, 1000 })
+            {
+                window.Width = width * InterfaceZoom.Factor;
+                Save(window, output, $"52b-log-{width}-bars");
+            }
+
+            shell.Current = Destinations.Of(DestinationKind.EnvSets);
+            foreach (var width in new[] { 840, 1000 })
+            {
+                window.Width = width * InterfaceZoom.Factor;
+                Save(window, output, $"51b-env-{width}-bars");
+            }
+        }
+        finally
+        {
+            app.ScrollBarsAutoHide = true;
+        }
+
+        window.Width = 1000 * InterfaceZoom.Factor;
+        window.Height = 680 * InterfaceZoom.Factor;
+        Save(window, output, "51-env-1000");
+        shell.Current = Destinations.Of(DestinationKind.Log);
+        Save(window, output, "52-log-1000");
+
+        window.Width = _width * InterfaceZoom.Factor;
+        window.Height = _height * InterfaceZoom.Factor;
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        Save(window, output, "53-settings-with-the-theme");
+
+        shell.Current = Destinations.Of(DestinationKind.Tokens);
+        var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
+        tokens.OpenFormCommand.Execute(null);
+        WindowInput.Drain();
+        Save(window, output, "54-token-form");
+        window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreScopes").Flyout!.ShowAt(window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreScopes"));
+        WindowInput.Drain();
+        Save(window, output, "54b-learn-more-scopes");
+
+        foreach (var (make, name) in new (Func<PromptWindow>, string)[]
+        {
+            (() => new ApprovalWindow(new ApprovalViewModel(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploying", 3600, "work laptop"))), "55-approval-inactive"),
+        })
+        {
+            var prompt = make();
+            ((PromptViewModel)prompt.DataContext!).Tick(TimeSpan.FromSeconds(28));
+            prompt.ShowActivated = false;
+            prompt.Show();
+            Save(prompt, output, name);
+            prompt.Close();
+        }
     }
 
     /// <summary>A drag's highlight on each surface that takes one, the rail's included, and what a file the system names says.</summary>
@@ -539,6 +640,9 @@ public sealed class ScreenRenderer
         window.Width = 720;
         window.Height = 520;
         Save(window, output, "29b-agents-720");
+        agents.AskEndAllCommand.Press();
+        Save(window, output, "29c-agents-720-end-all");
+        agents.CancelEndAllCommand.Press();
         window.Height = 1100;
         window.Width = _width;
         window.Height = 1500;
@@ -1525,6 +1629,21 @@ public sealed class ScreenRenderer
         Save(window, output, "27-agents-settings-closed");
         model.IsMoreOpen = true;
         Save(window, output, "27-agents-settings-more");
+        model.IsAdvancedOpen = true;
+        WindowInput.Drain();
+        var learnMore = settings.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreSeeing");
+        learnMore.BringIntoView();
+        learnMore.Flyout!.ShowAt(learnMore);
+        WindowInput.Drain();
+        Save(window, output, "27-agents-settings-learn-more");
+        learnMore.Flyout.Hide();
+        model.IsAdvancedOpen = false;
+        await model.ChooseAsync(model.SeeScopes.Single(choice => choice.Words == "Only these"));
+        Save(window, output, "27-agents-settings-only-these");
+        window.Width = 720;
+        Save(window, output, "27-agents-settings-only-these-narrow");
+        window.Width = width;
+        await model.ChooseAsync(model.SeeScopes.Single(choice => choice.Words == "All projects"));
         window.Width = 720;
         Save(window, output, "27-agents-settings-more-narrow");
         model.NewRowScope = model.NewRowScopes[0];

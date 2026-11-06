@@ -122,9 +122,12 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
-  <!-- Thin, dark scrollbars. -->
+  <!-- Thin, dark scrollbars, which hide or stay as the system says (SystemScrollBars). -->
+  <Style Selector="ScrollViewer">
+    <Setter Property="AllowAutoHide" Value="{DynamicResource KpScrollBarsAutoHide}" />
+  </Style>
   <Style Selector="ScrollBar">
-    <Setter Property="AllowAutoHide" Value="True" />
+    <Setter Property="AllowAutoHide" Value="{DynamicResource KpScrollBarsAutoHide}" />
   </Style>
 
   <Style Selector="ListBox.segmented > ListBoxItem">

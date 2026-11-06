@@ -136,6 +136,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// </remarks>
     internal IReadOnlyList<IdleChoice> IdleChoices { get; }
 
+    /// <summary>Whether Appearance shows, only where the system reports no light or dark of its own.</summary>
+    internal bool OffersTheme { get; init; }
+
     /// <summary>The three theme choices; System follows the operating system.</summary>
     internal static IReadOnlyList<AppTheme> Themes { get; } =
         [AppTheme.System, AppTheme.Light, AppTheme.Dark];

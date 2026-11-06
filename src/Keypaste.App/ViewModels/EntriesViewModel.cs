@@ -662,6 +662,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal string AccessNote => AccessNoteText;
 #pragma warning restore CA1822
 
+    /// <summary>Says what a drag did beyond the move, which has no form to carry <see cref="AccessNote"/>.</summary>
+    internal Action<string, ToastTone>? Toast { get; init; }
+
     /// <summary>The wording of <see cref="AccessNote"/>, for a test that has no screen.</summary>
     internal const string AccessNoteText =
         "What an agent can see by place is matched against paths, so this can take these items " +
@@ -1249,11 +1252,19 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (CanMove(row, group))
         {
-            Organize(row, new EntryName(group, row.Title));
+            var target = new EntryName(group, row.Title);
+
+            // Judged before the move, since the path is what it changes (T-13).
+            var forAgents = _session.Unlocked is { } vault ? _session.AgentViewChangeOfMove(vault, row.Name, target).Describe(row.Title) : null;
+
+            if (Organize(row, target) && forAgents is not null)
+            {
+                Toast?.Invoke(forAgents, ToastTone.Information);
+            }
         }
     }
 
-    private void Organize(EntryRow row, EntryName target)
+    private bool Organize(EntryRow row, EntryName target)
     {
         var write = _session.Write(
             vault => (Outcome: vault.Relocate(row.Name, target, out var relocated), Moved: relocated),
@@ -1262,13 +1273,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         if (write.Problem("make your change again") is { } problem)
         {
             Error = problem;
-            return;
+            return false;
         }
 
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
             Error = Refusal(write.Value.Outcome, target);
-            return;
+            return false;
         }
 
         var moved = write.Value.Moved!;
@@ -1280,6 +1291,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 () => FollowRelocated(row.Name)),
             Did(write.Value.Outcome, moved));
         FollowRelocated(moved);
+        return true;
     }
 
     private void FollowRelocated(EntryName moved)

@@ -45,7 +45,6 @@
   <data name="AnsweringAgentsFromThisApp" xml:space="preserve"><value>Answering agents from this app · </value></data>
   <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="AppliesTo" xml:space="preserve"><value>Applies to</value></data>
-  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
   <data name="AskForIt" xml:space="preserve"><value>Ask for it</value></data>
   <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask the share server how many views each link has left</value></data>
   <data name="AtLeast20CharactersSuchAsSixGeneratedWords" xml:space="preserve"><value>At least 20 characters, such as six generated words</value></data>
@@ -92,8 +91,6 @@
   <data name="ConfirmMasterPassword" xml:space="preserve"><value>Confirm master password</value></data>
   <data name="ConfirmNewMasterPassword" xml:space="preserve"><value>Confirm new master password</value></data>
   <data name="ConfirmRemovingThePairingValue" xml:space="preserve"><value>Confirm removing the pairing {0}</value></data>
-  <data name="Connect" xml:space="preserve"><value>Connect</value></data>
-  <data name="ConnectAgain" xml:space="preserve"><value>Connect again</value></data>
   <data name="ConnectItFromThisListToGiveX2bd860" xml:space="preserve"><value>Connect it from this list to give it settings of its own.</value></data>
   <data name="ConnectValue" xml:space="preserve"><value>Connect {0}</value></data>
   <data name="ConnectValueAgain" xml:space="preserve"><value>Connect {0} again</value></data>
@@ -155,7 +152,7 @@
   <data name="Done" xml:space="preserve"><value>Done</value></data>
   <data name="DontSend" xml:space="preserve"><value>Don't send</value></data>
   <data name="Duplicate" xml:space="preserve"><value>Duplicate</value></data>
-  <data name="ENVIRONMENT" xml:space="preserve"><value>ENVIRONMENT</value></data>
+  <data name="ENVIRONMENT" xml:space="preserve"><value>ENVIRONMENT…</value></data>
   <data name="EXPIRESCapitals" xml:space="preserve"><value>EXPIRES</value></data>
   <data name="EachValueBecomesAProtectedFieldNamedX966a34" xml:space="preserve"><value>Each value becomes a protected field named by its key, and its line leaves the notes, in one change to each item. The notes as they were stay in the item's history.</value></data>
   <data name="EarlierVersions" xml:space="preserve"><value>Earlier versions</value></data>
@@ -190,7 +187,7 @@
   <data name="ForgetThemAll" xml:space="preserve"><value>Forget them all</value></data>
   <data name="FoundOnThisComputerAndAnyAgentX88444b" xml:space="preserve"><value>Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's name.</value></data>
   <data name="FreeSoftwareUnderTheGNUAfferoGeneralXba93e5" xml:space="preserve"><value>Free software under the GNU Affero General Public License, version 3.</value></data>
-  <data name="Generate" xml:space="preserve"><value>Generate</value></data>
+  <data name="Generate" xml:space="preserve"><value>Generate…</value></data>
   <data name="GenerateANewPassword" xml:space="preserve"><value>Generate a new password</value></data>
   <data name="GenerateANewValue" xml:space="preserve"><value>Generate a new value</value></data>
   <data name="GenerateANewValueForValue" xml:space="preserve"><value>Generate a new value for {0}</value></data>
@@ -260,7 +257,6 @@
   <data name="LastUsedValue" xml:space="preserve"><value>Last used {0}</value></data>
   <data name="LeaveThisEmptyToKeepTheCurrentX151c53" xml:space="preserve"><value>Leave this empty to keep the current password. A replacement keeps the old one in this item's history.</value></data>
   <data name="LetAScriptOrCIJobRunX39c663" xml:space="preserve"><value>Let a script or CI job run with a scoped set, without you or the vault's password.</value></data>
-  <data name="LetItSeeOnlyTheProjectsPicked" xml:space="preserve"><value>Let it see only the projects picked</value></data>
   <data name="LimitValue" xml:space="preserve"><value>Limit: {0}</value></data>
   <data name="Limits" xml:space="preserve"><value>Limits</value></data>
   <data name="Link" xml:space="preserve"><value>Link</value></data>
@@ -407,7 +403,6 @@
   <data name="ReplaceX64ca19" xml:space="preserve"><value>Replace…</value></data>
   <data name="ReportAProblem" xml:space="preserve"><value>Report a problem</value></data>
   <data name="RequireAPassphraseSentSeparately" xml:space="preserve"><value>Require a passphrase, sent separately</value></data>
-  <data name="Reset" xml:space="preserve"><value>Reset</value></data>
   <data name="ResetTableOrderAndWidths" xml:space="preserve"><value>Reset table order and widths</value></data>
   <data name="ResizeTheListAndThePreview" xml:space="preserve"><value>Resize the list and the preview</value></data>
   <data name="Restore" xml:space="preserve"><value>Restore</value></data>
@@ -469,12 +464,10 @@
   <data name="SomeTagsPutTheirItemInNoXd8ea51" xml:space="preserve"><value>Some tags put their item in no project</value></data>
   <data name="Start" xml:space="preserve"><value>Start</value></data>
   <data name="Startup" xml:space="preserve"><value>Startup</value></data>
-  <data name="Stop" xml:space="preserve"><value>Stop</value></data>
   <data name="StopPairing" xml:space="preserve"><value>Stop pairing</value></data>
   <data name="StopUsingAKeyFile" xml:space="preserve"><value>Stop using a key file</value></data>
   <data name="StopUsingTheYubiKey" xml:space="preserve"><value>Stop using the YubiKey</value></data>
   <data name="StopWaitingForTheYubiKey" xml:space="preserve"><value>Stop waiting for the YubiKey</value></data>
-  <data name="SystemFollowsTheOperatingSystemsLightOrXc00a47" xml:space="preserve"><value>System follows the operating system's light or dark setting.</value></data>
   <data name="TOKEN" xml:space="preserve"><value>TOKEN</value></data>
   <data name="TOTP" xml:space="preserve"><value>TOTP</value></data>
   <data name="TagAnItemFromYourVaultIntoX85a64e" xml:space="preserve"><value>Tag an item from your vault into this environment</value></data>
@@ -557,4 +550,44 @@
   <data name="Zoom" xml:space="preserve"><value>Zoom</value></data>
   <data name="ZoomIn" xml:space="preserve"><value>Zoom in</value></data>
   <data name="ZoomOut" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="NewItemLabel" xml:space="preserve"><value>New item…</value></data>
+  <data name="NewGroupLabel" xml:space="preserve"><value>New group…</value></data>
+  <data name="NewProjectLabel" xml:space="preserve"><value>New project…</value></data>
+  <data name="NewTokenLabel" xml:space="preserve"><value>New token…</value></data>
+  <data name="NewVaultLabel" xml:space="preserve"><value>New vault…</value></data>
+  <data name="EditFieldsLabel" xml:space="preserve"><value>Edit fields…</value></data>
+  <data name="RenameOrMoveLabel" xml:space="preserve"><value>Rename or move…</value></data>
+  <data name="AddFieldLabel" xml:space="preserve"><value>Add field…</value></data>
+  <data name="AddAttachmentLabel" xml:space="preserve"><value>Add attachment…</value></data>
+  <data name="RotateLabel" xml:space="preserve"><value>Rotate…</value></data>
+  <data name="ExportEnvKeypasteLabel" xml:space="preserve"><value>Export .env.keypaste…</value></data>
+  <data name="RunInATerminalLabel" xml:space="preserve"><value>Run in a terminal…</value></data>
+  <data name="AddAKeyToValueLabel" xml:space="preserve"><value>Add a key to {0}…</value></data>
+  <data name="RestoreABackupLabel" xml:space="preserve"><value>Restore a backup…</value></data>
+  <data name="OpenAnotherVaultLabel" xml:space="preserve"><value>Open another vault…</value></data>
+  <data name="AddAKeyFileLabel" xml:space="preserve"><value>Add a key file…</value></data>
+  <data name="AddAYubiKeyLabel" xml:space="preserve"><value>Add a YubiKey…</value></data>
+  <data name="CreateAKeyFileLabel" xml:space="preserve"><value>Create a key file…</value></data>
+  <data name="ResetClientsToml" xml:space="preserve"><value>Reset clients.toml</value></data>
+  <data name="EndEveryAllowanceTheNextRequestAsksAgain" xml:space="preserve"><value>End every allowance? Each agent's next request asks you again.</value></data>
+  <data name="LearnMore" xml:space="preserve"><value>Learn more</value></data>
+  <data name="LearnMoreAboutWhatItCanSee" xml:space="preserve"><value>Learn more about what it can see</value></data>
+  <data name="LearnMoreAboutTokenScopes" xml:space="preserve"><value>Learn more about token scopes</value></data>
+  <data name="ShowTheMenu" xml:space="preserve"><value>Show the menu</value></data>
+  <data name="LetItSeeOnlyThese" xml:space="preserve"><value>Let it see only these</value></data>
+  <data name="LetItSeeThese" xml:space="preserve"><value>Let it see these</value></data>
+  <data name="SetTheLimit" xml:space="preserve"><value>Set the limit</value></data>
+  <data name="UnlockWithAKeyFileTooLabel" xml:space="preserve"><value>Unlock with a key file too…</value></data>
+  <data name="ThatBackupsKeyFileLabel" xml:space="preserve"><value>That backup's key file…</value></data>
+  <data name="SeeingOneEnvironment" xml:space="preserve"><value>One environment of a project, its variables and nothing else.</value></data>
+  <data name="SeeingOneItem" xml:space="preserve"><value>One whole item: its group, then its title.</value></data>
+  <data name="SeeingIsCaseSensitiveAndHeldBack" xml:space="preserve"><value>Patterns match capitals exactly. What it gets is also held to this computer's limits and what its connection was given.</value></data>
+  <data name="ScopeOfAWholeSet" xml:space="preserve"><value>Every key of billing's staging environment.</value></data>
+  <data name="ScopeOfOneKey" xml:space="preserve"><value>Only that key.</value></data>
+  <data name="ScopeNamesNoProtectedEnvironmentHere" xml:space="preserve"><value>A token made here cannot name a protected environment such as prod.</value></data>
+  <data name="ThisDesktopReportsNoLightOrDark" xml:space="preserve"><value>This desktop does not report light or dark, so choose here. System draws light.</value></data>
+  <data name="SeeingOneEnvironmentExample" xml:space="preserve"><value>tag:env:billing:staging</value></data>
+  <data name="SeeingOneItemExample" xml:space="preserve"><value>services/DEPLOY_KEY</value></data>
+  <data name="ScopeOfAWholeSetExample" xml:space="preserve"><value>read:billing/staging/*</value></data>
+  <data name="ScopeOfOneKeyExample" xml:space="preserve"><value>read:billing/staging/STRIPE_KEY</value></data>
 </root>

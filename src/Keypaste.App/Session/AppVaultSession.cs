@@ -295,6 +295,14 @@ internal sealed class AppVaultSession : IDisposable
     internal ProjectTagChange? PreviewTagChange(Vault vault, EntryName entry, IReadOnlyList<string> tags, bool adding) =>
         ProjectTagChange.Preview(vault, entry, tags, adding, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
 
+    /// <summary>Which agents moving an entry would bring it into the view of, or take it out of (T-13).</summary>
+    /// <param name="vault">The open vault, before the move.</param>
+    /// <param name="from">The entry where it is.</param>
+    /// <param name="to">The entry where it would go.</param>
+    /// <returns>The agents on each side.</returns>
+    internal AgentViewChange AgentViewChangeOfMove(Vault vault, EntryName from, EntryName to) =>
+        AgentViewChange.OfMove(vault, from, to, KeypasteHome.ClientsPath(_home));
+
     /// <summary>
     /// What restoring one of an entry's revisions does to the projects it is in, each change said as a tag change
     /// says it (D-0415); empty when the revision's project tags are the entry's own.

@@ -181,8 +181,8 @@
         </Grid>
       </Border>
 
-      <!-- The screens' own styles read narrow-window for what gives way under the rail. -->
-      <Grid Name="BodyColumns" Grid.Row="1" ColumnDefinitions="232,*" Classes.narrow-window="{Binding IsNarrow}">
+      <!-- The screens' own styles read tight-content for what gives way where the content has little room. -->
+      <Grid Name="BodyColumns" Grid.Row="1" ColumnDefinitions="232,*" Classes.tight-content="{Binding ContentIsTight}">
 
         <!-- The rail, under the titlebar and so clear of the traffic lights and the menu button. The places are one list, so the arrow keys walk them; what does not fit in icons opens from its button. -->
         <Border Name="Rail"
@@ -532,10 +532,11 @@
       </Border>
     </Border>
 
-    <!-- Toasts, bottom right. The clipboard countdown is one; Toasts says anything else. -->
-    <StackPanel HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
-                Margin="20"
+    <!-- Toasts, centred under the titlebar and clear of Items' search and New. The clipboard countdown is one; Toasts says anything else. -->
+    <StackPanel Name="ToastStack"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="{x:Static views:WindowChrome.ToastMargin}"
                 Spacing="8"
                 MaxWidth="420">
 
@@ -572,7 +573,7 @@
         </StackPanel>
       </Border>
 
-      <ItemsControl ItemsSource="{Binding Toasts.Shown}">
+      <ItemsControl ItemsSource="{Binding Toasts.Shown}" ClipToBounds="False">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <StackPanel Spacing="8" />

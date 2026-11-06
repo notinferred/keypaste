@@ -53,11 +53,11 @@ internal sealed partial class LogView : UserControl
 
     private void OnShellChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ShellViewModel.IsNarrow))
+        if (e.PropertyName == nameof(ShellViewModel.ContentIsTight))
         {
             ShowWhere();
         }
     }
 
-    private void ShowWhere() => (DataContext as LogViewModel)?.Table.Show(TableStates.Where, _shell?.IsNarrow != true);
+    private void ShowWhere() => (DataContext as LogViewModel)?.Table.Show(TableStates.Where, _shell?.ContentIsTight != true);
 }

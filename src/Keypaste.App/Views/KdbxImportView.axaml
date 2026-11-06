@@ -15,7 +15,6 @@
     <ControlTheme x:Key="Switch" TargetType="ToggleButton">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Cursor" Value="Hand" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="Template">
         <ControlTemplate>
@@ -60,7 +59,6 @@
 
     <!-- A 16px include box: hairline when off, a quiet filled box with a check when on. -->
     <ControlTheme x:Key="IncludeBox" TargetType="CheckBox">
-      <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Margin" Value="0,0,10,0" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Template">

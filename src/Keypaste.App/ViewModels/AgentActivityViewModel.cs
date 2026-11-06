@@ -243,6 +243,19 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>Ends every allowance given since this unlock.</summary>
     internal RelayCommand EndAllCommand { get; }
 
+    /// <summary>Whether End all waits on its confirmation: every allowance goes, and none comes back.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersEndAll))]
+    internal partial bool IsConfirmingEndAll { get; private set; }
+
+    internal bool OffersEndAll => HasGrants && !IsConfirmingEndAll;
+
+    [RelayCommand]
+    private void AskEndAll() => IsConfirmingEndAll = true;
+
+    [RelayCommand]
+    private void CancelEndAll() => IsConfirmingEndAll = false;
+
     private bool CanConnect => _connector is not null && _authority is not null && Connection is not { IsBusy: true };
 
     /// <summary>Reads the authority and the log again.</summary>
@@ -347,6 +360,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         Relist(_grants, grants);
         OnPropertyChanged(nameof(HasWaiting));
         OnPropertyChanged(nameof(HasGrants));
+        OnPropertyChanged(nameof(OffersEndAll));
+        IsConfirmingEndAll = IsConfirmingEndAll && _grants.Count > 0;
         OnPropertyChanged(nameof(FormsArePrimary));
         OnPropertyChanged(nameof(NothingWaiting));
         ShowPromptCommand.NotifyCanExecuteChanged();
@@ -818,6 +833,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     private void EndAll()
     {
+        IsConfirmingEndAll = false;
         _authority?.RevokeAll();
         Read(forceHistory: false);
         _toast("Ended every allowance.", ToastTone.Success);

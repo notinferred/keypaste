@@ -14,7 +14,7 @@ readonly ROOT
 readonly VERSION='2.8.0'
 # In-repo checksums remain independent of the download origin.
 readonly WINDOWS_SHA256='48ff4f088e9ce70e241da1270e5081528dba77c38b17dae4aa6690ffc50fc828'
-readonly MACOS_SHA256='223d5c71ae6c11d48192c69fd582fd5f10047e91ebcebc014de33a42539b9519'
+readonly MACOS_SHA256='85f0e75e258ef513f0fc7f5bf470cad0943b7d7e8191b2171f9898ad32e62b9c'
 readonly RELEASE="https://github.com/keepassxreboot/keepassxc/releases/download/$VERSION"
 
 die() { echo "::error::$*" >&2; exit 1; }
@@ -36,7 +36,8 @@ case "$(uname -s)" in
     ;;
   Darwin)
     [ "$(uname -m)" = arm64 ] || die 'the pinned macOS build is for Apple silicon'
-    dmg="KeePassXC-$VERSION-arm64.dmg"
+    # Upstream's rebuild: the first 2.8.0 image's Qt traps on its wait cursor on macOS 15.8.2 (keepassxc#13822).
+    dmg="KeePassXC-$VERSION-1-arm64.dmg"
     "$ROOT/scripts/fetch-pinned-asset.sh" "$RELEASE/$dmg" "$MACOS_SHA256" "$dest/$dmg" >&2
     mount="$dest/keepassxc-dmg"
     hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mount" "$dest/$dmg" >&2

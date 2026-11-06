@@ -25,7 +25,7 @@
                   IsVisible="{Binding CanOpenForm}" Command="{Binding OpenFormCommand}" AutomationProperties.Name="{x:Static res:Strings.NewToken}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="plus" Size="13" />
-              <TextBlock Text="{x:Static res:Strings.NewToken}" />
+              <TextBlock Text="{x:Static res:Strings.NewTokenLabel}" />
             </StackPanel>
           </Button>
         </Grid>
@@ -54,8 +54,28 @@
                 </StackPanel>
               </Border>
             </Grid>
-            <TextBlock Classes="caption"
-                       Text="{x:Static res:Strings.ReadProjectEnvironmentKEYOrForTheX9b0d4d}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="{x:Static res:Strings.ReadProjectEnvironmentKEYOrForTheX9b0d4d}" />
+              <Button Grid.Column="1" Name="LearnMoreScopes" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
+                      AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutTokenScopes}">
+                <Button.Flyout>
+                  <Flyout Placement="Bottom">
+                    <StackPanel MaxWidth="320" Spacing="10">
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfAWholeSetExample}" />
+                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfAWholeSet}" />
+                      </StackPanel>
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKeyExample}" />
+                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKey}" />
+                      </StackPanel>
+                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeNamesNoProtectedEnvironmentHere}" />
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
             <TextBlock Classes="body danger" ctl:Announcer.Says="{Binding FormError}" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
               <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelFormCommand}" />
@@ -131,7 +151,7 @@
                 <TextBlock Classes="caption" Text="{x:Static res:Strings.NoTokensYet}" VerticalAlignment="Center" />
                 <Button Classes="sm"
                         Name="NewTokenFromEmpty"
-                        Content="{x:Static res:Strings.NewToken}"
+                        Content="{x:Static res:Strings.NewTokenLabel}"
                         IsVisible="{Binding CanOpenForm}"
                         Command="{Binding OpenFormCommand}"
                         AutomationProperties.Name="{x:Static res:Strings.NewToken}" />

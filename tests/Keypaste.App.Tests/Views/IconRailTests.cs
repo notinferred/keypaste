@@ -57,7 +57,7 @@ public sealed class IconRailTests
 
         foreach (var (kind, name, icon) in new[]
         {
-            (DestinationKind.Entries, "Items", "vault"),
+            (DestinationKind.Entries, "Items", "key-round"),
             (DestinationKind.AgentActivity, "Agents", "bot"),
             (DestinationKind.Trash, "Trash", "trash-2"),
             (DestinationKind.Settings, "Settings", "settings"),

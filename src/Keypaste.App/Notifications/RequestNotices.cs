@@ -2,8 +2,7 @@ namespace Keypaste.App.Notifications;
 
 /// <summary>
 /// Decides whether a request whose prompt is about to appear also earns a notification, posted once the prompt is up: only while keypaste is in the
-/// background, and no more than one every <see cref="Spacing"/>, since a time-sensitive notice can break through
-/// the person's Focus and an agent chooses when it asks. The prompt appears either way.
+/// background, and no more than one every <see cref="Spacing"/>, since a notice interrupts the person and an agent chooses when it asks. The prompt appears either way.
 /// </summary>
 /// <param name="notifications">The platform's notifications.</param>
 /// <param name="clock">The clock the spacing runs on.</param>

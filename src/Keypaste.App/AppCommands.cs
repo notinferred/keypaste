@@ -146,10 +146,10 @@ internal sealed class AppCommands
 
         _openVault = new AppCommand(Strings.OpenVault, Chord(Key.O), CanOpenVault, () => OpenVault(null));
         var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
-        _newGroup = new AppCommand(Strings.NewGroup, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
+        _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var file = new AppMenuGroup("File",
         [
-            new AppCommand(Strings.NewItem, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
+            new AppCommand(Strings.NewItemLabel, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
             _newGroup,
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,

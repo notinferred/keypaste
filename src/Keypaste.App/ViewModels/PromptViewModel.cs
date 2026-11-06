@@ -14,8 +14,8 @@ namespace Keypaste.App.ViewModels;
 /// Every allow is armed only after the prompt has been up for <see cref="ArmingDelay"/>: the window
 /// can appear under a pointer that was about to click something else, and that click is not an
 /// approval (D-0326). Bringing the prompt forward from Agents disarms it for another
-/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing (D-0456). Denying needs no
-/// delay. The timed allow exists only when the prompt offers a timed grant.
+/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing (D-0456), and so does a click
+/// that brings it back from another window. Denying needs no delay. The timed allow exists only when the prompt offers a timed grant.
 /// </para>
 /// </remarks>
 internal abstract partial class PromptViewModel : ObservableObject

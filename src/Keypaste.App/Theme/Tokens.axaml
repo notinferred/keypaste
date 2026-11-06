@@ -3,9 +3,11 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime"
                     xmlns:app="using:Keypaste.App">
 
+  <sys:Boolean x:Key="KpScrollBarsAutoHide">True</sys:Boolean>
+
   <!--
     The design tokens from docs/design/tokens, in two first-class palettes: the app follows the
-    system's light or dark setting unless Settings chooses one. The single accent is amber, used once per
+    system's light or dark setting, and only a Linux desktop that reports none lets Settings choose. The single accent is amber, used once per
     view for the primary action or a live signal, and text on amber is always ink. Status colours
     share one oklch lightness and chroma in each palette; they are converted to sRGB here because Avalonia has no
     oklch. Depth is lightness, not shadow: shadows are for overlays only. On a light ground the accent as a line or
