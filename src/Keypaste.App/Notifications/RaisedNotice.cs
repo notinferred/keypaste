@@ -10,6 +10,9 @@ internal sealed class RaisedNotice
 {
     private readonly Lock _gate = new();
     private readonly Action _pressed;
+
+    // Taken where it is raised, on the UI thread: Dispatcher.UIThread, first read off that thread, makes the reader the UI thread.
+    private readonly Dispatcher _ui = Dispatcher.UIThread;
     private IPostedNotice? _posted;
     private bool _removed;
 
@@ -85,7 +88,7 @@ internal sealed class RaisedNotice
         }
     }
 
-    private void Press() => Dispatcher.UIThread.Post(() =>
+    private void Press() => _ui.Post(() =>
     {
         lock (_gate)
         {

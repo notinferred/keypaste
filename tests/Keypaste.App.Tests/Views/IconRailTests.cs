@@ -452,6 +452,7 @@ public sealed class IconRailTests
         var result = row.GetVisualDescendants().OfType<TextBlock>().Last(block => block.IsEffectivelyVisible);
         Assert.All(result.TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"{result.Text} is cut"));
         Assert.DoesNotContain(row.GetVisualDescendants().OfType<TextBlock>(), block => block.Classes.Contains("where") && block.IsEffectivelyVisible);
+        Assert.True(row.DrawnWidths[3] > 100, $"Secrets is {row.DrawnWidths[3]} wide with Where's room to take");
         Assert.Equal(log.Rows.First(entry => entry.Where.Length > 0).SecretsAndWhere, ToolTip.GetTip(row.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Classes.Contains("secrets"))));
 
         shell.Window.Width = 1000 * percent / 100d;

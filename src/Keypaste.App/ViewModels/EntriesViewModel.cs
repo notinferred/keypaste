@@ -48,7 +48,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         EntryActivitySource? activity = null,
         IWebLauncher? web = null,
         Action<Action>? post = null,
-        IVaultFilePicker? picker = null)
+        IVaultFilePicker? picker = null,
+        TableState? table = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -61,6 +62,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         _picker = picker;
 
         _session.Edited += OnVaultEdited;
+        Table = table ?? TableStates.NewItems();
+        Table.OrderChanged += OnOrderChanged;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         DeleteCommand = new RelayCommand(
@@ -153,7 +156,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Shows every item again, which widens the search to all of them.</summary>
     internal void ShowEveryItem() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything);
 
-    /// <summary>What matches the search and the selected group.</summary>
+    /// <summary>How the list is sorted and sized.</summary>
+    internal TableState Table { get; }
+
+    /// <summary>What matches the search and the selected group, in the table's order.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(Selected), nameof(DeletePrompt), nameof(OrganizePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
@@ -786,13 +792,21 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         var now = _session.Clock.GetUtcNow();
 
-        foreach (var row in _all)
+        foreach (var row in _all.Concat(Rows))
         {
             row.Apply(picture, now);
         }
 
         Detail?.Apply(picture);
+
+        if (Table.Order?.Column == TableStates.LastUsed && Listed() is var listed && !listed.Select(row => row.Name).SequenceEqual(Rows.Select(row => row.Name)))
+        {
+            Rows = listed;
+        }
     }
+
+    // A sort is no question about the vault: the selection, the pane and whatever an edit is holding in the list stay.
+    private void OnOrderChanged() => Rows = Listed();
 
     /// <summary>
     /// Drops the query, the result and everything typed into a form.
@@ -831,6 +845,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     public void Dispose()
     {
         _session.Edited -= OnVaultEdited;
+        Table.OrderChanged -= OnOrderChanged;
 
         if (_activity is not null)
         {
@@ -901,7 +916,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// Runs on every group change and every reselect as well as every keystroke, so the core search
     /// is cached against the query it answered: only a changed query costs a read of the vault.
     /// </remarks>
-    private void Filter()
+    private void Filter() => Rows = Listed();
+
+    private List<EntryRow> Listed()
     {
         var group = SelectedGroup;
         var query = Search.Trim();
@@ -910,12 +927,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         List<EntryRow> rows =
         [
-            .. _all
-                .Where(row => Shows(group, row.GroupPath))
-                .Where(row => query.Length == 0 || _matches.ContainsKey(row.Name))
-                .Select(row => query.Length == 0
-                    ? row
-                    : row with { Fields = _matches[row.Name].Fields, Tags = _matches[row.Name].Tags })
+            .. TableSorting.Sorted(
+                _all
+                    .Where(row => Shows(group, row.GroupPath))
+                    .Where(row => query.Length == 0 || _matches.ContainsKey(row.Name))
+                    .Select(row => query.Length == 0
+                        ? row
+                        : row with { Fields = _matches[row.Name].Fields, Tags = _matches[row.Name].Tags }),
+                Table.Order,
+                SortValueOf,
+                TieBetween)
         ];
 
         // An entry just renamed out of its own result stays where the person is looking at it. It is
@@ -928,7 +949,26 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             }
         }
 
-        Rows = rows;
+        return rows;
+    }
+
+    /// <summary>What a row shows in a column, so the list reads in the order its words do. Only names and times: a row holds no value to read.</summary>
+    private static SortValue SortValueOf(EntryRow row, string column) => column switch
+    {
+        TableStates.Title => new(row.DisplayTitle),
+        TableStates.Username => new(row.DisplayUsername),
+        TableStates.Url => new(row.DisplayUrl),
+        TableStates.Kind => new(row.KindLabel),
+        TableStates.Group => new(row.GroupPath.Length == 0 ? null : row.Where),
+        _ => SortValue.At(row.LastUsedTicks),
+    };
+
+    private static int TieBetween(EntryRow left, EntryRow right)
+    {
+        var compared = TableSorting.CompareText(left.DisplayTitle, right.DisplayTitle);
+        compared = compared != 0 ? compared : TableSorting.CompareText(left.GroupPath, right.GroupPath);
+        compared = compared != 0 ? compared : string.CompareOrdinal(left.Title, right.Title);
+        return compared != 0 ? compared : string.CompareOrdinal(left.GroupPath, right.GroupPath);
     }
 
     /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected: a folder lists its children's entries too.</summary>

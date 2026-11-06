@@ -101,8 +101,8 @@ public sealed class EntriesViewLayoutTests
                 Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
 
                 // The username and URL columns (D-0488) keep room for several characters each, side by side.
-                var username = Bounds(shell, shell.Named<TextBlock>("UsernameHead"));
-                var url = Bounds(shell, shell.Named<TextBlock>("UrlHead"));
+                var username = Bounds(shell, shell.Named<ColumnHead>("UsernameHead"));
+                var url = Bounds(shell, shell.Named<ColumnHead>("UrlHead"));
                 Assert.True(username.Width >= _columnMinimum, $"the username column is {username.Width:0} px wide at {at}");
                 Assert.True(url.Width >= _columnMinimum, $"the URL column is {url.Width:0} px wide at {at}");
                 Assert.True(username.Right <= url.Left, $"the username column {username} runs into the URL column {url} at {at}");
@@ -143,8 +143,8 @@ public sealed class EntriesViewLayoutTests
 
             Assert.Equal(width, shell.Window.Bounds.Width);
             Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible, $"the sidebar shows at {at}");
-            Assert.False(shell.Named<TextBlock>("UsernameHead").IsEffectivelyVisible, $"the username column shows at {at}");
-            Assert.False(shell.Named<TextBlock>("UrlHead").IsEffectivelyVisible, $"the URL column shows at {at}");
+            Assert.False(shell.Named<ColumnHead>("UsernameHead").IsEffectivelyVisible, $"the username column shows at {at}");
+            Assert.False(shell.Named<ColumnHead>("UrlHead").IsEffectivelyVisible, $"the URL column shows at {at}");
 
             var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
             var controls = new Dictionary<string, Rect>

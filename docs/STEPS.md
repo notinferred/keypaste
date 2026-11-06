@@ -8,8 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.14 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.15 — Sort and size the tables.** Needs: none.
-  - Items, Trash and the activity log sort by a column head, again to reverse, and resize their columns; heads stay in capitals (DESIGN).
 - [ ] **Q.16 — Read in any language and region.** Needs: none.
   - Dates and times people read follow the current culture and machine text stays invariant; strings move to resources; right-to-left layout follows the culture, with a chevron-left icon for Back and secrets kept left to right.
 - [ ] **Q.17 — Finish the polish.** Needs: Q.5.

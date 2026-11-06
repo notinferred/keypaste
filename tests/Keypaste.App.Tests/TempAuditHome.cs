@@ -47,6 +47,17 @@ internal sealed class TempAuditHome : IDisposable
         }
     }
 
+    /// <summary>Appends one granted record with the clock reading <paramref name="at"/>, which may be behind the last.</summary>
+    internal void AppendAt(DateTimeOffset at, string entry)
+    {
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(at), out var log, out var error), error);
+
+        using (log)
+        {
+            Assert.True(log.TryAppend(Record(entry), out var failure), failure);
+        }
+    }
+
     /// <summary>Appends the records given, in order, through the real writer.</summary>
     internal void Write(params AuditRecord[] records)
     {

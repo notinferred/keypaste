@@ -110,6 +110,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Preferences = preferences ?? new DesktopPreferences(home);
         SidebarHidden = Preferences.Current.Window?.SidebarHidden ?? false;
         ListShare = Preferences.Current.Window?.ListShare;
+        Tables = TableStates.Read(Preferences.Current.Window?.TableSorts, Preferences.Current.Window?.TableWidths);
         _clock = clock ?? TimeProvider.System;
         _post = post;
 
@@ -224,6 +225,18 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
     internal int? ListShare { get; set; }
+
+    /// <summary>How each table was sorted and sized, which outlives the screens drawing them and is kept with the window.</summary>
+    internal TableStates Tables { get; }
+
+    /// <summary>The table the place in view draws, or null.</summary>
+    internal TableState? TableInView => Content switch
+    {
+        EntriesViewModel => Tables.Items,
+        TrashViewModel => Tables.Trash,
+        LogViewModel => Tables.Log,
+        _ => null,
+    };
 
     /// <summary>View › Hide sidebar and Show sidebar, and the titlebar's button: the person's kept choice at every width, which hides the rail too.</summary>
     [RelayCommand]
@@ -903,13 +916,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
-            DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log),
+            DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
-            DestinationKind.Trash => new TrashViewModel(_session),
+            DestinationKind.Trash => new TrashViewModel(_session, Tables.Trash),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
             DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes),
@@ -927,7 +940,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker) { AskDiscard = AskDiscard };
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());

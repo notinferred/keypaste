@@ -321,6 +321,36 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(window, AppSettings.Load(SettingsFile).Window);
     }
 
+    [Fact]
+    public void A_table_nobody_touched_writes_no_key_and_one_touched_reads_back()
+    {
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false) }));
+        var text = File.ReadAllText(SettingsFile);
+        Assert.DoesNotContain("table_", text, StringComparison.Ordinal);
+
+        var window = new WindowLayout(1, 2, 800, 600, WindowMode.Maximized, 425, true, 150, "items:title:desc,log:actor:asc", "items:300,100,100,88,120,104;trash:210,190,160");
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window }));
+
+        Assert.Equal(window, AppSettings.Load(SettingsFile).Window);
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);
+        Assert.True(Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.WindowSectionName, StringComparison.Ordinal)).Pairs.Count <= Toml.MaximumPairs);
+    }
+
+    [Theory]
+    [InlineData("items:title:ASC")]
+    [InlineData("Items Title")]
+    [InlineData("")]
+    public void A_tables_hand_edited_text_reads_as_its_own_way_and_costs_nothing_else(string text)
+    {
+        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\ntable_sorts = \"{text}\"\ntable_widths = \"{text}\"\n");
+
+        var window = AppSettings.Load(SettingsFile).Window;
+
+        Assert.NotNull(window);
+        Assert.Null(window.TableSorts);
+        Assert.Null(window.TableWidths);
+    }
+
     [Theory]
     [InlineData("nonsense")]
     [InlineData("1,2,3")]

@@ -32,6 +32,9 @@ internal sealed record LogRow
 
     private const string _none = "—";
 
+    /// <summary>A cell's text, or null where it says it holds nothing, which sorts as blank.</summary>
+    internal static string? UnlessNone(string text) => text == _none ? null : text;
+
     private LogRow(AuditEntry source) => Source = source;
 
     /// <summary>The record this row was drawn from.</summary>

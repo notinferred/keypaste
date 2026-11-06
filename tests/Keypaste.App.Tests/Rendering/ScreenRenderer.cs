@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
@@ -1096,6 +1097,7 @@ public sealed class ScreenRenderer
         Save(window, output, "93a-trash-no-selection");
         trash.Selected = trash.Rows[0];
         Save(window, output, "93-trash-rows");
+        SaveSorted(window, shell, "93-trash-rows", output);
 
         trash.PurgeCommand.Press();
         Save(window, output, "94-trash-confirm");
@@ -1249,6 +1251,7 @@ public sealed class ScreenRenderer
             if (shell.Content is not SharingViewModel)
             {
                 Save(window, output, $"{ScreenName(destination)}-rail");
+                SaveSorted(window, shell, ScreenName(destination), output);
             }
         }
 
@@ -1287,6 +1290,8 @@ public sealed class ScreenRenderer
 
         window.Width = 960;
         Save(window, output, "04-settings-activity-log-narrow");
+        window.Width = 720;
+        SaveSorted(window, shell, "04-settings-activity-log", output);
         window.Width = _width;
 
         var path = KeypasteHome.AuditPath(home);
@@ -1638,6 +1643,53 @@ public sealed class ScreenRenderer
         focused.Focus();
         Save(window, output, "92-components", sheet: true);
         window.Close();
+    }
+
+    /// <summary>A table sorted by its second head with its first edge moved, narrow and then wide, then with the head and the edge in focus, then by its last head, then with every edge at its least.</summary>
+    private static void SaveSorted(Window window, ShellViewModel shell, string screen, string output)
+    {
+        if (shell.TableInView is not { } table)
+        {
+            return;
+        }
+
+        var heads = window.GetVisualDescendants().OfType<ColumnHead>().Where(head => head.IsEffectivelyVisible).ToList();
+        var grip = window.GetVisualDescendants().OfType<ColumnGrip>().First(candidate => candidate.IsEffectivelyVisible);
+        var widths = grip.FindAncestorOfType<TableColumns>()!.DrawnWidths;
+
+        table.Press(heads[1].Column);
+        table.Resize(grip.Column, 24, widths);
+        Save(window, output, $"{screen}-sorted-rail");
+
+        var width = window.Width;
+        window.Width = _width;
+        Save(window, output, $"{screen}-sorted");
+        heads[1].Focus(NavigationMethod.Tab);
+        Save(window, output, $"{screen}-sorted-head-focused");
+        grip.Focus(NavigationMethod.Tab);
+        Save(window, output, $"{screen}-sorted-grip-focused");
+
+        table.Reset();
+        heads[0].Focus(NavigationMethod.Pointer);
+        WindowInput.Drain();
+
+        var showing = window.GetVisualDescendants().OfType<ColumnHead>().Where(head => head.IsEffectivelyVisible).ToList();
+        table.Press(showing[^1].Column);
+        Save(window, output, $"{screen}-sorted-by-last");
+        table.Reset();
+
+        // Each edge in turn, so the columns right of it have room left to give.
+        table.Press(showing[1].Column);
+        foreach (var edge in window.GetVisualDescendants().OfType<ColumnGrip>().Where(candidate => candidate.IsEffectivelyVisible).ToList())
+        {
+            table.Resize(edge.Column, -_width, edge.FindAncestorOfType<TableColumns>()!.DrawnWidths);
+            WindowInput.Drain();
+        }
+
+        Save(window, output, $"{screen}-least");
+
+        window.Width = width;
+        table.Reset();
     }
 
     /// <param name="window">The window to draw.</param>

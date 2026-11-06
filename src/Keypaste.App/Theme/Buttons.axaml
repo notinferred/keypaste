@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
     Buttons. With no class a button is the design's secondary button (#2A2C30). Classes:
@@ -11,6 +12,7 @@
       more                          the 30px ⋯ toggle that opens a menu
       disclosure                    an Expander's header toggle: ghost, whether open or not
       menu-item                     a row in a menu (Border.menu); add danger for Delete
+      column-head                   a table's head: its text, nothing behind it until hovered
       sm / lg                       28px / 34px tall instead of 30px
     Put a KpIcon and a TextBlock in a StackPanel (Orientation Horizontal, Spacing 6) for an icon
     button; the icon takes the button's foreground.
@@ -211,6 +213,31 @@
   </Style>
   <Style Selector="Button.menu-item.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+  </Style>
+
+  <Style Selector="Button.column-head">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="MinHeight" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <!-- A button clips what the adorner layer draws for it, which is its focus ring, to its own bounds. -->
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button.column-head /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.column-head:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.column-head:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.column-head:pointerover TextBlock.th, Button.column-head.sorted TextBlock.th">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="Button.column-head ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
 </Styles>

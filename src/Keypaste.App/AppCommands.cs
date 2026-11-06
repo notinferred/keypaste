@@ -199,6 +199,8 @@ internal sealed class AppCommands
 
         var groupsAndProjects = new AppCommand("Show groups and projects", [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
+        var resetTable = new AppCommand("Reset table order and widths", [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
+
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =
         [
@@ -209,8 +211,8 @@ internal sealed class AppCommands
 
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         var view = new AppMenuGroup("View", Mac
-            ? [.. places, _line, _sidebar, groupsAndProjects, _line, .. zoom]
-            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), _line, .. zoom]);
+            ? [.. places, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
+            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), resetTable, _line, .. zoom]);
 
         var window = new AppMenuGroup("Window",
         [

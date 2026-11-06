@@ -43,6 +43,8 @@ internal sealed class WindowApprovalChannel(
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
+    // Taken as it is built, while the UI thread exists: Dispatcher.UIThread, first read off that thread, makes the reader the UI thread.
+    private readonly Dispatcher _ui = Dispatcher.UIThread;
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly TimeSpan _answerWindow = answerWindow;
 
@@ -109,7 +111,7 @@ internal sealed class WindowApprovalChannel(
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        Dispatcher.UIThread.Post(() =>
+        _ui.Post(() =>
         {
             // One is enough to say it; a browser asking again while it is up adds nothing to read.
             if (_pairingNotice is not null)
@@ -145,7 +147,7 @@ internal sealed class WindowApprovalChannel(
     /// <returns>False when no prompt is on screen or it is already answered.</returns>
     internal bool BringForward()
     {
-        Dispatcher.UIThread.VerifyAccess();
+        _ui.VerifyAccess();
 
         if (_showing is not { } showing || showing.Request.IsAnswered)
         {
@@ -162,7 +164,7 @@ internal sealed class WindowApprovalChannel(
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        Dispatcher.UIThread.Post(() =>
+        _ui.Post(() =>
         {
             try
             {
@@ -213,9 +215,9 @@ internal sealed class WindowApprovalChannel(
         });
 
         using var countdown = _clock.CreateTimer(
-            _ => Dispatcher.UIThread.Post(() => request.Tick(Remaining())), null, _tick, _tick);
+            _ => _ui.Post(() => request.Tick(Remaining())), null, _tick, _tick);
 
-        Dispatcher.UIThread.Post(() =>
+        _ui.Post(() =>
         {
             // Withdrawn once requested: a token is marked before its callbacks run, so before the tokens linked below it are.
             if (request.IsAnswered || cancellationToken.IsCancellationRequested || withdrawals.Any(token => token.IsCancellationRequested))
@@ -272,18 +274,18 @@ internal sealed class WindowApprovalChannel(
             return;
         }
 
-        Dispatcher.UIThread.Post(() => request.Arm(arming));
+        _ui.Post(() => request.Arm(arming));
     }
 
-    private static void OnUiThread(Action action)
+    private void OnUiThread(Action action)
     {
-        if (Dispatcher.UIThread.CheckAccess())
+        if (_ui.CheckAccess())
         {
             action();
         }
         else
         {
-            Dispatcher.UIThread.Post(action);
+            _ui.Post(action);
         }
     }
 

@@ -73,6 +73,9 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         }
     }
 
+    /// <summary>When it was last used, for sorting: in use is the latest there is, and never answered has no time.</summary>
+    internal long? LastUsedTicks { get; private set; }
+
     /// <summary>Takes this entry's use from the latest picture, without rebuilding the list.</summary>
     /// <param name="activity">The picture.</param>
     /// <param name="now">The time to measure from.</param>
@@ -83,6 +86,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         var use = activity.Use(Name);
         Use = use.State;
         LastUsedText = UseText.LastUsed(use, now);
+        LastUsedTicks = use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
     }
 
     /// <summary>Rows are the same row when they name the same entry, show the same fields and are found for the same reason; their use is not identity.</summary>

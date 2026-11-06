@@ -42,15 +42,18 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     private readonly AppVaultSession _session;
 
     private TrashRow? _selected;
+    private bool _sorting;
 
     /// <summary>The rows selected in the list, which Restore takes together when there are several.</summary>
     internal AvaloniaList<object> SelectedRows { get; } = [];
 
-    internal TrashViewModel(AppVaultSession session)
+    internal TrashViewModel(AppVaultSession session, TableState? table = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
+        Table = table ?? TableStates.NewTrash();
+        Table.OrderChanged += OnOrderChanged;
 
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null && !IsConfirming);
         RestoreAsCommand = new RelayCommand(RestoreAs, () => _selected is not null && RestoreAsTitle is not null && !IsConfirming);
@@ -67,7 +70,10 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         Load();
     }
 
-    /// <summary>What is in the bin, most recently deleted first.</summary>
+    /// <summary>How the list is sorted and sized.</summary>
+    internal TableState Table { get; }
+
+    /// <summary>What is in the bin, most recently deleted first until another order is chosen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(AwaitsSelection), nameof(EmptyPrompt))]
     [NotifyCanExecuteChangedFor(nameof(EmptyCommand))]
@@ -79,6 +85,11 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         get => _selected;
         set
         {
+            if (_sorting)
+            {
+                return;
+            }
+
             // A confirmation is armed for one row, and so is an offer of another title. Moving the
             // selection while either is showing would leave its button pointing at another entry.
             if (SetProperty(ref _selected, value))
@@ -241,13 +252,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         var wanted = _selected?.Id;
 
-        Rows =
-        [
-            .. vault.ReadRecycled()
-                .OrderByDescending(recycled => recycled.DeletedUtc)
-                .ThenBy(recycled => recycled.Title, StringComparer.Ordinal)
-                .Select(recycled => new TrashRow(recycled))
-        ];
+        Rows = [.. Arranged(vault.ReadRecycled().Select(recycled => new TrashRow(recycled)))];
 
         Selected = wanted is { } id ? Rows.FirstOrDefault(row => row.Id == id) : null;
 
@@ -256,9 +261,39 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(EmptyNote));
     }
 
+    private IEnumerable<TrashRow> Arranged(IEnumerable<TrashRow> rows) => TableSorting.Sorted(
+        rows,
+        Table.Order,
+        static (row, column) => column switch
+        {
+            TableStates.Title => new SortValue(row.DisplayTitle),
+            TableStates.DeletedFrom => new SortValue(row.Where),
+            _ => SortValue.At(row.DeletedUtc.Ticks),
+        },
+        static (left, right) =>
+        {
+            var compared = right.DeletedUtc.CompareTo(left.DeletedUtc);
+            return compared != 0 ? compared : string.CompareOrdinal(left.Title, right.Title);
+        });
+
+    /// <summary>A sort moves rows and nothing else: the list lets go of its selection as its rows change, and takes it back, so a confirmation armed for a row stays armed for it.</summary>
+    private void OnOrderChanged()
+    {
+        var chosen = SelectedRows.ToList();
+
+        _sorting = true;
+        Rows = [.. Arranged(Rows)];
+        _sorting = false;
+
+        SelectedRows.Clear();
+        SelectedRows.AddRange(chosen);
+        OnPropertyChanged(nameof(Selected));
+    }
+
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
     {
+        Table.OrderChanged -= OnOrderChanged;
         Rows = [];
         Selected = null;
         IsConfirmingPurge = false;

@@ -231,7 +231,7 @@ public sealed class WindowLayoutTests
         shell.Window.Width = 1280;
         shell.Show<EntriesViewModel>(DestinationKind.Entries);
         shell.Frame();
-        var head = shell.Named<TextBlock>("UsernameHead");
+        var head = shell.Named<ColumnHead>("UsernameHead");
         var before = shell.Named<ContentControl>("EntryPane").Bounds.Width;
         var commands = shell.Commands;
         var hide = commands.All.Single(command => command.Header == "Hide sidebar");
@@ -412,6 +412,60 @@ public sealed class WindowLayoutTests
         {
             Directory.Delete(home, recursive: true);
         }
+    });
+
+    [Fact]
+    public Task A_lock_keeps_each_tables_order_and_widths_and_the_next_unlock_opens_with_them() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        var vault = Path.Combine(fixture.Home, "tables.kdbx");
+
+        using (var created = Vault.Create(vault, TempVault.Password))
+        {
+            created.AddEntry(new VaultEntry { Title = "zeta", Password = "tables-secret" });
+            created.AddEntry(new VaultEntry { Title = "alpha", Password = "tables-secret" });
+            created.Save();
+        }
+
+        var settingsHome = Path.Combine(fixture.Home, "tables-home");
+        Directory.CreateDirectory(settingsHome);
+        var settingsPath = KeypasteHome.SettingsPath(settingsHome);
+        File.WriteAllText(settingsPath, "[[settings]]\nstay_in_tray = 1\n");
+
+        using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+        Attach(lifetime);
+        using var app = new App { Preferences = new DesktopPreferences(settingsHome) };
+        app.Launch(lifetime);
+        lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+
+        var main = lifetime.MainWindow!;
+        main.Width = 1100;
+        main.Height = 800;
+        main.Show();
+        var root = main.FindControl<ContentControl>("Root")!;
+
+        var shell = await Unlock(main, root, vault);
+        var columns = main.GetVisualDescendants().OfType<EntryColumns>().First();
+        shell.Tables.Items.Press(TableStates.Url);
+        shell.Tables.Items.Resize(TableStates.Title, 40, columns.DrawnWidths);
+        DrawnFrame.Capture(main);
+        var drawnTitle = columns.DrawnWidths[0];
+
+        app.Menus!.All.Single(command => command.Header == "Lock").Run();
+        await Until(() => root.Content is UnlockView);
+
+        Assert.True(AppSettings.TryLoad(settingsPath, out var kept));
+        Assert.Equal("items:url:asc", kept.Window!.TableSorts);
+        Assert.StartsWith("items:", kept.Window.TableWidths, StringComparison.Ordinal);
+
+        var reopened = await Unlock(main, root, vault);
+        Assert.NotSame(shell, reopened);
+        Assert.Equal(new TableOrder(TableStates.Url, false), reopened.Tables.Items.Order);
+        Assert.Equal(drawnTitle, main.GetVisualDescendants().OfType<EntryColumns>().First().DrawnWidths[0], 1.5);
+
+        app.Menus!.All.Single(command => command.Header == "Lock").Run();
+        await Until(() => root.Content is UnlockView);
+        main.Close();
     });
 
     [Fact]

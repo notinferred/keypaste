@@ -20,6 +20,29 @@ public sealed class SystemNotificationTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    /// <summary>
+    /// Between a headless session's dispatches no thread is the UI thread, and the first to read
+    /// <c>Dispatcher.UIThread</c> becomes it, so the next test's setup fails on its own thread with "a different thread owns it".
+    /// </summary>
+    [Fact]
+    public async Task A_late_press_from_another_thread_does_not_make_that_thread_the_UI_thread()
+    {
+        using var system = new FakeNotifications();
+        await HeadlessSession.On(async () =>
+        {
+            _ = RaisedNotice.Raise(system, SystemNotice.RequestWaiting, () => { });
+            await PromptedApp.UntilAsync(() => system.Posts.Count > 0);
+        });
+
+        var claimed = await Task.Run(() =>
+        {
+            system.Posts[0].Pressed();
+            return Avalonia.Threading.Dispatcher.FromThread(Thread.CurrentThread);
+        });
+
+        Assert.Null(claimed);
+    }
+
     [Fact]
     public Task A_background_request_posts_only_fixed_words_and_its_prompt_still_appears() =>
         HeadlessSession.On(async () =>

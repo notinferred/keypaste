@@ -24,7 +24,9 @@ public enum WindowMode
 /// <param name="ListShare">The list's share of the height it divides with the preview, in thousandths, or null until the divider is moved.</param>
 /// <param name="SidebarHidden">Whether View › Hide sidebar is in force.</param>
 /// <param name="ZoomPercent">How large the interface is drawn, from <see cref="ActualSizePercent"/> to <see cref="LargestZoomPercent"/>.</param>
-public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, int? ListShare, bool SidebarHidden, int ZoomPercent = WindowLayout.ActualSizePercent)
+/// <param name="TableSorts">The order each table the person sorted was left in, as the desktop app writes it, or null while every table keeps its own.</param>
+/// <param name="TableWidths">The widths of each table the person resized, likewise.</param>
+public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, int? ListShare, bool SidebarHidden, int ZoomPercent = WindowLayout.ActualSizePercent, string? TableSorts = null, string? TableWidths = null)
 {
     /// <summary>The interface as it was designed, and the smallest it goes: a masked field stays at 14px or larger.</summary>
     public const int ActualSizePercent = 100;
@@ -33,6 +35,7 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
     public const int LargestZoomPercent = 200;
 
     private const int _largestSide = 100_000;
+    private const int _longestTableText = 512;
 
     /// <summary>The bounds as one string, because the file's numbers cannot be negative and a screen left of the main one has negative positions.</summary>
     internal string BoundsText =>
@@ -48,7 +51,7 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
     internal string ZoomText => string.Create(CultureInfo.InvariantCulture, $"{ZoomPercent}%");
 
     /// <summary>Reads what the file holds; bounds that make no window read as none, and the app opens where it would with no file.</summary>
-    internal static WindowLayout? Read(string bounds, string? mode, int? listShare, bool sidebarHidden, string? zoom)
+    internal static WindowLayout? Read(string bounds, string? mode, int? listShare, bool sidebarHidden, string? zoom, string? tableSorts, string? tableWidths)
     {
         var parts = bounds.Split(',');
 
@@ -61,8 +64,14 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
             return null;
         }
 
-        return new WindowLayout(x, y, width, height, ModeOf(mode), listShare is > 0 and < 1000 ? listShare : null, sidebarHidden, ZoomOf(zoom));
+        return new WindowLayout(x, y, width, height, ModeOf(mode), listShare is > 0 and < 1000 ? listShare : null, sidebarHidden, ZoomOf(zoom), TableText(tableSorts), TableText(tableWidths));
     }
+
+    /// <summary>A table's order or widths names columns and sizes, so anything else is a hand edit that reads as the table's own.</summary>
+    private static string? TableText(string? text) =>
+        text is { Length: > 0 and <= _longestTableText } && text.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c is ':' or ',' or ';' or '-')
+            ? text
+            : null;
 
     /// <summary>A percentage out of range comes in at the nearer end, and anything else is actual size.</summary>
     private static int ZoomOf(string? text) =>

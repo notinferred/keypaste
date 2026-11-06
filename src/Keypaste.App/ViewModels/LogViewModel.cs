@@ -41,7 +41,7 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// inserted would read exactly like one keypaste wrote. The verdict's paragraphs wait to be asked for.
 /// </para>
 /// </remarks>
-internal sealed partial class LogViewModel : ObservableObject
+internal sealed partial class LogViewModel : ObservableObject, IDisposable
 {
     /// <summary>What an empty machine is told.</summary>
     internal const string NothingYet = "Nothing has asked keypaste for a credential on this machine yet.";
@@ -68,8 +68,11 @@ internal sealed partial class LogViewModel : ObservableObject
     /// Agents › History: the agent and token records only, with no filter to widen it. The whole
     /// log, with its filters, is Settings › Advanced's Activity log.
     /// </param>
-    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false)
+    /// <param name="table">How the table is sorted and sized, or null for its own way.</param>
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false, TableState? table = null)
     {
+        Table = table ?? TableStates.NewLog();
+        Table.OrderChanged += Apply;
         _path = KeypasteHome.AuditPath(home);
         _clock = clock ?? TimeProvider.System;
         _clipboard = clipboard;
@@ -81,6 +84,9 @@ internal sealed partial class LogViewModel : ObservableObject
 
         Refresh();
     }
+
+    /// <summary>How the table is sorted and sized. Sorting reads the rows already drawn: the chain, its verdict and the file are untouched.</summary>
+    internal TableState Table { get; }
 
     /// <summary>Whether this is Agents › History rather than the whole activity log.</summary>
     internal bool IsAgentHistory { get; }
@@ -162,7 +168,7 @@ internal sealed partial class LogViewModel : ObservableObject
         set => Choose(value, LogFilter.Denied);
     }
 
-    /// <summary>The records the filter keeps, newest first.</summary>
+    /// <summary>The records the filter keeps, newest first until another order is chosen.</summary>
     internal IReadOnlyList<LogRow> Rows => _rows;
 
     internal bool HasRows => _rows.Count > 0;
@@ -300,7 +306,7 @@ internal sealed partial class LogViewModel : ObservableObject
             _ => _ => true,
         };
 
-        _rows = Divide([.. _all.Where(keep)]);
+        _rows = Divide([.. TableSorting.Sorted(_all.Where(keep), Table.Order, SortValueOf, TieBetween)]);
         _unverifiedShown = _rows.Any(row => row.Unverified);
         _unreadShown = _rows.Any(row => row.ReasonUnread);
         _summary = HasTable ? Tally(_rows.Count, _history.Total, _filter.Words) : string.Empty;
@@ -314,6 +320,23 @@ internal sealed partial class LogViewModel : ObservableObject
         OnPropertyChanged(nameof(OffersShowAll));
         OnPropertyChanged(nameof(HasNotes));
     }
+
+    private static SortValue SortValueOf(LogRow row, string column) => column switch
+    {
+        TableStates.Actor => new(row.Actor),
+        TableStates.Action => new(row.Action),
+        TableStates.Secrets => new(LogRow.UnlessNone(row.Secrets)),
+        TableStates.Where => new(LogRow.UnlessNone(row.Where)),
+        TableStates.Result => new(row.Result),
+        _ => SortValue.At(row.Source.At?.UtcTicks),
+    };
+
+    /// <summary>Rows that tie stay newest first, by where the file has them, so a sorted table's days keep together; oldest first reverses them too.</summary>
+    private int TieBetween(LogRow left, LogRow right) => Table.Order is { Column: TableStates.Time, Descending: false }
+        ? left.Source.Line.CompareTo(right.Source.Line)
+        : right.Source.Line.CompareTo(left.Source.Line);
+
+    public void Dispose() => Table.OrderChanged -= Apply;
 
     /// <summary>Marks the first row of each day with its divider; a table of today alone needs none.</summary>
     private List<LogRow> Divide(List<LogRow> rows)

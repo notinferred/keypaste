@@ -18,7 +18,8 @@ SOURCE = ROOT / "third_party" / "lucide" / "icons"
 TARGET = ROOT / "src" / "Keypaste.App" / "Theme" / "Icons.axaml"
 
 ICONS = """
-activity alert-triangle arrow-right bot bug check chevron-down chevron-right chevrons-up-down
+activity alert-triangle arrow-down arrow-right arrow-up bot bug check chevron-down chevron-right
+chevrons-up-down
 circle-check circle-dot clipboard-check clock copy credit-card database download ellipsis
 external-link eye eye-off file-code file-down file-input file-key file-lock-2 file-up filter
 fingerprint folder folder-git-2 folder-input folder-open folder-pen folder-plus globe history

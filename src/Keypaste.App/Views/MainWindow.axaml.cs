@@ -89,13 +89,15 @@ internal sealed partial class MainWindow : Window
     /// <summary>How the window stands, at its own bounds under any maximize, or null before it has ever had bounds.</summary>
     /// <param name="listShare">The list's share of the height, which the shell holds.</param>
     /// <param name="sidebarHidden">Whether the sidebar is hidden, which the shell holds.</param>
-    internal WindowLayout? Layout(int? listShare, bool sidebarHidden)
+    /// <param name="tableSorts">Each table's order, which the shell holds.</param>
+    /// <param name="tableWidths">Each table's widths, which the shell holds.</param>
+    internal WindowLayout? Layout(int? listShare, bool sidebarHidden, string? tableSorts = null, string? tableWidths = null)
     {
         NoteBounds();
 
         return _normal is not var (position, size)
             ? null
-            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden, InterfaceZoom.Percent);
+            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden, InterfaceZoom.Percent, tableSorts, tableWidths);
     }
 
     private ScreenArea? ScreenInUse() =>

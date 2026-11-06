@@ -1,19 +1,16 @@
 using Avalonia;
-using Avalonia.Controls;
+using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
 /// <summary>The columns the log's header and every row share, which give up Where under the rail.</summary>
-internal sealed class LogColumns : Grid
+internal sealed class LogColumns : TableColumns
 {
     public static readonly StyledProperty<bool> ShowsWhereProperty = AvaloniaProperty.Register<LogColumns, bool>(nameof(ShowsWhere), defaultValue: true);
 
-    private const int _where = 4;
-
     public LogColumns()
+        : base(TableStates.LogColumns, spacing: 12)
     {
-        ColumnDefinitions = new ColumnDefinitions("64,110,100,1.6*,*,100");
-        ColumnSpacing = 12;
     }
 
     public bool ShowsWhere
@@ -22,13 +19,15 @@ internal sealed class LogColumns : Grid
         set => SetValue(ShowsWhereProperty, value);
     }
 
+    protected override bool Shows(string column) => column != TableStates.Where || ShowsWhere;
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
         if (change.Property == ShowsWhereProperty)
         {
-            ColumnDefinitions[_where].Width = change.GetNewValue<bool>() ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            ApplyWidths();
         }
     }
 }

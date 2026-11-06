@@ -109,7 +109,7 @@ internal sealed partial class EntriesView : UserControl
             return;
         }
 
-        EntryColumns.SetShowsContact(this, !shell.IsNarrow);
+        ShowContactColumns(!shell.IsNarrow);
 
         // Before the rows are watched, so setting them one at a time cannot read as a move of the divider.
         if (shell.ListShare is { } share)
@@ -138,8 +138,15 @@ internal sealed partial class EntriesView : UserControl
     {
         if (e.PropertyName == nameof(ShellViewModel.IsNarrow) && _shell is not null)
         {
-            EntryColumns.SetShowsContact(this, !_shell.IsNarrow);
+            ShowContactColumns(!_shell.IsNarrow);
         }
+    }
+
+    private void ShowContactColumns(bool shows)
+    {
+        EntryColumns.SetShowsContact(this, shows);
+        _entries?.Table.Show(TableStates.Username, shows);
+        _entries?.Table.Show(TableStates.Url, shows);
     }
 
     /// <summary>The divider, dragged or moved from the keyboard, gives each row a star length; the shell keeps their proportion.</summary>
@@ -170,6 +177,11 @@ internal sealed partial class EntriesView : UserControl
 
         TellEntriesAboutSearchFocus();
         PlaceList();
+
+        if (_shell is not null)
+        {
+            ShowContactColumns(!_shell.IsNarrow);
+        }
     }
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

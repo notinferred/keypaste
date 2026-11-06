@@ -397,7 +397,9 @@ internal sealed partial class App : Application, IDisposable
 
         var left = _preferences.Current.Window;
 
-        if (_window.Layout(_shell is { } shell ? shell.ListShare : left?.ListShare, _shell?.SidebarHidden ?? left?.SidebarHidden ?? false) is { } layout
+        var tables = _shell?.Tables;
+
+        if (_window.Layout(_shell is { } shell ? shell.ListShare : left?.ListShare, _shell?.SidebarHidden ?? left?.SidebarHidden ?? false, tables is null ? left?.TableSorts : tables.SortsText, tables is null ? left?.TableWidths : tables.WidthsText) is { } layout
             && (left is not null || layout != _untouchedLayout))
         {
             _preferences.KeepWindow(layout);

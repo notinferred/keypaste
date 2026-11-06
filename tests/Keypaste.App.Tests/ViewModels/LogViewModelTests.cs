@@ -27,7 +27,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.True(AuditReader.TryRead(_home.LogPath, out var entries, out _, out var error), error);
 
@@ -46,12 +46,12 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/A", "env/dev/B");
 
-        var model = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero)));
+        using var model = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero)));
 
         Assert.Equal("Yesterday", model.Rows[0].Day);
         Assert.Null(model.Rows[1].Day);
 
-        var same = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 28, 23, 0, 0, TimeSpan.Zero)));
+        using var same = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 28, 23, 0, 0, TimeSpan.Zero)));
 
         Assert.All(same.Rows, row => Assert.False(row.StartsDay));
     }
@@ -60,7 +60,7 @@ public sealed class LogViewModelTests : IDisposable
     [Fact]
     public void An_absent_log_is_a_sentence_rather_than_an_error()
     {
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.False(File.Exists(_home.LogPath));
         Assert.Empty(model.Rows);
@@ -78,7 +78,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.True(model.HasTable);
         Assert.True(model.HasRows);
@@ -93,7 +93,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         _home.Append("env/prod/GITHUB_TOKEN");
         Assert.Single(model.Rows);
@@ -110,7 +110,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
         _home.Append("env/prod/GITHUB_TOKEN");
 
         Assert.True(model.RefreshCommand.CanExecute(null));
@@ -125,7 +125,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.False(model.VerdictShown);
         Assert.NotNull(model.Verdict);
@@ -159,7 +159,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
         _home.Alter();
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.True(model.HasMessage);
         Assert.True(model.IsBroken);
@@ -182,7 +182,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
         _home.Alter();
 
-        var history = new LogViewModel(_home.Home, clipboard: null, agentsOnly: true);
+        using var history = new LogViewModel(_home.Home, clipboard: null, agentsOnly: true);
 
         Assert.False(history.OffersChainCheck);
         Assert.False(history.OffersVerify);
@@ -193,7 +193,7 @@ public sealed class LogViewModelTests : IDisposable
         Assert.EndsWith("The activity log in Settings › Advanced says why.", history.UnverifiedLegend, StringComparison.Ordinal);
         Assert.EndsWith("The activity log in Settings › Advanced says where.", history.Message, StringComparison.Ordinal);
 
-        var log = new LogViewModel(_home.Home);
+        using var log = new LogViewModel(_home.Home);
 
         Assert.True(log.OffersVerify);
         Assert.True(log.VerifyCommand.CanExecute(null));
@@ -222,7 +222,7 @@ public sealed class LogViewModelTests : IDisposable
                 Reason = "share abc: 1 view, expires 2026-07-29T09:12:44Z, to maya@acme.dev",
             });
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
 
         Assert.Equal(5, model.Rows.Count);
 
@@ -248,7 +248,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        var model = new LogViewModel(_home.Home);
+        using var model = new LogViewModel(_home.Home);
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.You);
 
         Assert.True(model.FilterEmpty);

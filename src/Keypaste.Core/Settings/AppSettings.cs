@@ -99,11 +99,13 @@ public sealed record AppSettings
     internal const string WindowListShareKey = "list_share";
     internal const string WindowSidebarHiddenKey = "sidebar_hidden";
     internal const string WindowZoomKey = "zoom";
+    internal const string WindowTableSortsKey = "table_sorts";
+    internal const string WindowTableWidthsKey = "table_widths";
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
-    private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey];
+    private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
 
     private static readonly string[] _knownTermsLinkedKeys = [CrashChoiceAskedKey, ShareTermsKey];
 
@@ -431,6 +433,16 @@ public sealed record AppSettings
         {
             writer.Text(WindowZoomKey, layout.ZoomText, "how large the interface is drawn, from 100% to 200%");
         }
+
+        if (layout.TableSorts is { } sorts)
+        {
+            writer.Text(WindowTableSortsKey, sorts, "the column each sorted table runs by");
+        }
+
+        if (layout.TableWidths is { } widths)
+        {
+            writer.Text(WindowTableWidthsKey, widths, "each resized table's column shares");
+        }
     }
 
     private static void WriteTermsLinked(TomlWriter writer, AppSettings settings)
@@ -490,7 +502,9 @@ public sealed record AppSettings
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
                 table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
                 table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
-                ZoomText(table))
+                ZoomText(table),
+                TextOf(table, WindowTableSortsKey),
+                TextOf(table, WindowTableWidthsKey))
             : null;
 
     // Written as a string, as the bounds are, so a hand edit such as "-50" stays this key's own problem: the file's reader refuses a bare negative number, and with it the whole file.

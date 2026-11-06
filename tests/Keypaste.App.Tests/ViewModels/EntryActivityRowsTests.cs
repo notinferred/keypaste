@@ -2,6 +2,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -53,6 +54,37 @@ public sealed class EntryActivityRowsTests
         Assert.Equal(recent, row.IsRecent);
         Assert.Equal(!recent, row.IsIdle);
         Assert.Equal(text, row.LastUsedText);
+    }
+
+    [Fact]
+    public async Task SortingByLastUsed_ReadsTimesNotWords_AndWhatWasNeverUsedStaysLast()
+    {
+        await using var app = await App.StartAsync();
+        var key = app.Authority.Session.Identity!.Key;
+        Assert.True(app.Authority.Session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { Title = "days" });
+                vault.AddEntry(new VaultEntry { Title = "minutes" });
+                vault.AddEntry(new VaultEntry { Title = "never" });
+                return true;
+            },
+            _ => true).Problem("add them") is null);
+        app.Audit("days", key, ago: TimeSpan.FromDays(3));
+        app.Audit("minutes", key, ago: TimeSpan.FromMinutes(30));
+        app.Person.Answer = ApprovalAnswer.Approved;
+        Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
+
+        using var screen = app.Screen();
+        var entries = screen.Entries;
+
+        entries.Table.Press(TableStates.LastUsed);
+        Assert.Equal(["example", "minutes", "days"], entries.Rows.Take(3).Select(row => row.Title));
+        Assert.Equal("never", entries.Rows[^1].Title);
+
+        entries.Table.Press(TableStates.LastUsed);
+        Assert.Equal(["days", "minutes", "example"], entries.Rows.Take(3).Select(row => row.Title));
+        Assert.Equal("never", entries.Rows[^1].Title);
     }
 
     /// <summary>

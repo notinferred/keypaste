@@ -5,7 +5,8 @@
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.EntriesView"
-             x:DataType="vm:EntriesViewModel">
+             x:DataType="vm:EntriesViewModel"
+             views:TableColumns.Table="{Binding Table}">
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
@@ -379,13 +380,18 @@
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
         <!-- The columns, as KeePassXC's entry table draws them: what an item is, its username and web
              address, and where it lives, never a password or a custom field's value (EntryRow). -->
-        <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,8,16,0">
-          <TextBlock Grid.Column="1" Classes="th" Text="TITLE" />
-          <TextBlock Grid.Column="2" x:Name="UsernameHead" Classes="th" Text="USERNAME" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
-          <TextBlock Grid.Column="3" x:Name="UrlHead" Classes="th" Text="URL" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
-          <TextBlock Grid.Column="4" Classes="th" Text="KIND" />
-          <TextBlock Grid.Column="5" Classes="th" Text="GROUP" />
-          <TextBlock Grid.Column="6" Classes="th" Text="LAST USED" HorizontalAlignment="Right" Margin="0,0,14,0" />
+        <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,6,16,0">
+          <views:ColumnHead Grid.Column="1" x:Name="TitleHead" Column="title" />
+          <views:ColumnGrip Grid.Column="1" Column="title" />
+          <views:ColumnHead Grid.Column="2" x:Name="UsernameHead" Column="username" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
+          <views:ColumnGrip Grid.Column="2" Column="username" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
+          <views:ColumnHead Grid.Column="3" x:Name="UrlHead" Column="url" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
+          <views:ColumnGrip Grid.Column="3" Column="url" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
+          <views:ColumnHead Grid.Column="4" x:Name="KindHead" Column="kind" />
+          <views:ColumnGrip Grid.Column="4" Column="kind" />
+          <views:ColumnHead Grid.Column="5" x:Name="GroupHead" Column="group" />
+          <views:ColumnGrip Grid.Column="5" Column="group" />
+          <views:ColumnHead Grid.Column="6" x:Name="LastUsedHead" Column="last-used" HorizontalContentAlignment="Right" />
         </views:EntryColumns>
         <Panel>
           <!-- An empty list says why, so a filter with no match does not read as a failed load. -->
@@ -466,7 +472,7 @@
                   <TextBlock Grid.Column="3" Classes="mono muted size-12" Text="{Binding DisplayUrl}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="muted size-12-5" Text="{Binding KindLabel}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="4" Classes="muted size-12-5" Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="5" Classes="mono muted size-12" Text="{Binding Where}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <!-- When an agent last received it: blue in use, green recent, grey idle. A time, never a value. Not amber:

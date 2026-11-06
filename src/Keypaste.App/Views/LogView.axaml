@@ -5,6 +5,7 @@
              xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.LogView"
              x:DataType="vm:LogViewModel"
+             views:TableColumns.Table="{Binding Table}"
              Background="{DynamicResource KpBgApp}">
 
   <!-- Under the rail the table has no room to scroll to its Result, so Where gives way to it and moves to the Secrets cell's tooltip. -->
@@ -18,7 +19,7 @@
     <Style Selector="Grid.narrow-window views|LogColumns">
       <Setter Property="ShowsWhere" Value="False" />
     </Style>
-    <Style Selector="Grid.narrow-window TextBlock.where">
+    <Style Selector="Grid.narrow-window TextBlock.where, Grid.narrow-window Button.where, Grid.narrow-window views|ColumnGrip.where">
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="Grid.narrow-window TextBlock.secrets">
@@ -219,14 +220,19 @@
             <!-- As wide as the table when it fits, so its star columns trim; at most 680 narrower, where it scrolls. -->
             <StackPanel Name="LogTable" Width="{Binding #TableScroll.Viewport.Width}">
 
-              <Border Classes="table-head">
+              <Border Classes="table-head" Padding="16,6">
                 <views:LogColumns>
-                  <TextBlock Grid.Column="0" Classes="th" Text="TIME" />
-                  <TextBlock Grid.Column="1" Classes="th" Text="ACTOR" />
-                  <TextBlock Grid.Column="2" Classes="th" Text="ACTION" />
-                  <TextBlock Grid.Column="3" Classes="th" Text="SECRETS" />
-                  <TextBlock Grid.Column="4" Classes="th where" Text="WHERE" />
-                  <TextBlock Grid.Column="5" Classes="th" Text="RESULT" />
+                  <views:ColumnHead Grid.Column="0" Column="time" />
+                  <views:ColumnGrip Grid.Column="0" Column="time" />
+                  <views:ColumnHead Grid.Column="1" Column="actor" />
+                  <views:ColumnGrip Grid.Column="1" Column="actor" />
+                  <views:ColumnHead Grid.Column="2" Column="action" />
+                  <views:ColumnGrip Grid.Column="2" Column="action" />
+                  <views:ColumnHead Grid.Column="3" Column="secrets" />
+                  <views:ColumnGrip Grid.Column="3" Column="secrets" />
+                  <views:ColumnHead Grid.Column="4" Classes="where" Column="where" />
+                  <views:ColumnGrip Grid.Column="4" Classes="where" Column="where" />
+                  <views:ColumnHead Grid.Column="5" Column="result" />
                 </views:LogColumns>
               </Border>
 
