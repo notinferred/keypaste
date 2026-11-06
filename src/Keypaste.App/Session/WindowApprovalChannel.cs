@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Threading;
 using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -43,8 +42,6 @@ internal sealed class WindowApprovalChannel(
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
-    // Taken as it is built, while the UI thread exists: Dispatcher.UIThread, first read off that thread, makes the reader the UI thread.
-    private readonly Dispatcher _ui = Dispatcher.UIThread;
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly TimeSpan _answerWindow = answerWindow;
 
@@ -111,7 +108,7 @@ internal sealed class WindowApprovalChannel(
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        _ui.Post(() =>
+        UiThread.Post(() =>
         {
             // One is enough to say it; a browser asking again while it is up adds nothing to read.
             if (_pairingNotice is not null)
@@ -147,7 +144,7 @@ internal sealed class WindowApprovalChannel(
     /// <returns>False when no prompt is on screen or it is already answered.</returns>
     internal bool BringForward()
     {
-        _ui.VerifyAccess();
+        UiThread.VerifyAccess();
 
         if (_showing is not { } showing || showing.Request.IsAnswered)
         {
@@ -164,7 +161,7 @@ internal sealed class WindowApprovalChannel(
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        _ui.Post(() =>
+        UiThread.Post(() =>
         {
             try
             {
@@ -215,9 +212,9 @@ internal sealed class WindowApprovalChannel(
         });
 
         using var countdown = _clock.CreateTimer(
-            _ => _ui.Post(() => request.Tick(Remaining())), null, _tick, _tick);
+            _ => UiThread.Post(() => request.Tick(Remaining())), null, _tick, _tick);
 
-        _ui.Post(() =>
+        UiThread.Post(() =>
         {
             // Withdrawn once requested: a token is marked before its callbacks run, so before the tokens linked below it are.
             if (request.IsAnswered || cancellationToken.IsCancellationRequested || withdrawals.Any(token => token.IsCancellationRequested))
@@ -274,18 +271,18 @@ internal sealed class WindowApprovalChannel(
             return;
         }
 
-        _ui.Post(() => request.Arm(arming));
+        UiThread.Post(() => request.Arm(arming));
     }
 
-    private void OnUiThread(Action action)
+    private static void OnUiThread(Action action)
     {
-        if (_ui.CheckAccess())
+        if (UiThread.IsCurrent)
         {
             action();
         }
         else
         {
-            _ui.Post(action);
+            UiThread.Post(action);
         }
     }
 

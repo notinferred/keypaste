@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Threading;
 using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -39,8 +38,6 @@ internal sealed class LockedNotice : IDisposable
     private UnlockViewModel? _screen;
     private RaisedNotice? _raised;
     private bool _told;
-    // Taken as it is built, on the UI thread: Dispatcher.UIThread, first read off that thread, makes the reader the UI thread.
-    private readonly Dispatcher _ui = Dispatcher.UIThread;
     private bool _disposed;
 
     /// <summary>Hears nothing until the first unlock screen is given to <see cref="Watch"/>.</summary>
@@ -117,9 +114,9 @@ internal sealed class LockedNotice : IDisposable
         Stop();
     }
 
-    private void OnOpened(object? sender, EventArgs e) => _ui.Post(Unlocked);
+    private void OnOpened(object? sender, EventArgs e) => UiThread.Post(Unlocked);
 
-    private void OnChoiceChanged(object? sender, FileSystemEventArgs e) => _ui.Post(Listen);
+    private void OnChoiceChanged(object? sender, FileSystemEventArgs e) => UiThread.Post(Listen);
 
     private void OnScreenChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -165,7 +162,7 @@ internal sealed class LockedNotice : IDisposable
         {
             // Owned by _listening from here, and disposed when no longer wanted, at an unlock and at quit. CA2000 cannot see a lifetime that leaves the method.
 #pragma warning disable CA2000
-            _listening[name] = LockedAppEndpoint.Listen(name, () => _ui.Post(() => Tell(name, vault)), _unreachable);
+            _listening[name] = LockedAppEndpoint.Listen(name, () => UiThread.Post(() => Tell(name, vault)), _unreachable);
 #pragma warning restore CA2000
         }
     }
@@ -215,7 +212,7 @@ internal sealed class LockedNotice : IDisposable
         if (!await raised.AcceptedWithinAsync(_systemAnswers, _clock).ConfigureAwait(false))
         {
             raised.Remove();
-            _ui.Post(() => ShowWindow(raised, name, vault));
+            UiThread.Post(() => ShowWindow(raised, name, vault));
         }
     }
 

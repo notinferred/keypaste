@@ -161,6 +161,29 @@ public sealed class DesktopApprovalTests
         });
 
     /// <summary>
+    /// The channel is built on whatever thread opened the vault, a pool thread in the app, and may be built
+    /// before any app is set up, as the driver's was on a slow runner; its prompt still reaches the screen.
+    /// </summary>
+    [Fact]
+    public async Task A_channel_built_before_the_display_is_up_still_shows_its_prompt()
+    {
+        var channel = await Task.Run(() => new WindowApprovalChannel(new ManualClock(AppClock.Start), ApprovalLimits.Default.Window), Token);
+
+        await HeadlessSession.On(async () =>
+        {
+            Window? shown = null;
+            channel.Shown += (_, window) => shown = window;
+            var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60);
+
+            var asking = channel.AskAsync(prompt, Token).AsTask();
+            await PromptedApp.UntilAsync(() => shown is not null);
+
+            shown!.Close();
+            Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
+        });
+    }
+
+    /// <summary>
     /// A request withdrawn before its prompt is drawn, as one a lock overtakes is, is refused at once
     /// and never drawn, rather than waiting on a window nobody should see.
     /// </summary>

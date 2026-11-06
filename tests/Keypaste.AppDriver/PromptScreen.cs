@@ -31,14 +31,25 @@ internal sealed class PromptScreen : IDisposable
 
     // The display runs its dispatcher only inside a dispatch, so one stays open for the screen's
     // life: that is the main loop the app's own posts, from the threads a request arrives on, run in.
-    internal PromptScreen() =>
+    // Waits for it, since a request has no UI thread to reach until then, and a failed setup would otherwise go unseen.
+    internal PromptScreen()
+    {
+        var setUp = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
         _running = _display.Dispatch(
             async () =>
             {
+                setUp.SetResult();
                 await _closing.Task.ConfigureAwait(true);
                 return true;
             },
             CancellationToken.None);
+
+        if (Task.WaitAny(setUp.Task, _running) == 1)
+        {
+            _running.GetAwaiter().GetResult();
+        }
+    }
 
     /// <summary>The display: the app, drawn by Skia with its own font, as the app's tests draw it.</summary>
     public static AppBuilder BuildAvaloniaApp() =>

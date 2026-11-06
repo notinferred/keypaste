@@ -44,6 +44,21 @@ public sealed class SystemNotificationTests
     }
 
     [Fact]
+    public async Task A_notice_raised_before_the_display_is_up_still_reaches_it_when_pressed()
+    {
+        using var system = new FakeNotifications();
+        var pressed = false;
+        _ = await Task.Run(() => RaisedNotice.Raise(system, SystemNotice.RequestWaiting, () => pressed = true), Token);
+        await PromptedApp.UntilAsync(() => system.Posts.Count > 0);
+
+        await HeadlessSession.On(async () =>
+        {
+            system.Posts[0].Pressed();
+            await PromptedApp.UntilAsync(() => pressed);
+        });
+    }
+
+    [Fact]
     public Task A_background_request_posts_only_fixed_words_and_its_prompt_still_appears() =>
         HeadlessSession.On(async () =>
         {

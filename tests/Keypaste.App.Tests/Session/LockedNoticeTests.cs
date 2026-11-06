@@ -67,6 +67,26 @@ public sealed class LockedNoticeTests
         });
 
     [Fact]
+    public async Task A_notice_built_before_the_display_is_up_still_shows_its_window()
+    {
+        using var home = new TempHome();
+        using var vault = new TempVault();
+        using var session = new AppVaultSession(TimeProvider.System, home: home.Path);
+        using var locked = await Task.Run(() => new LockedNotice(session, () => { }, TimeProvider.System, _ => { }), Token);
+
+        await HeadlessSession.On(async () =>
+        {
+            using var screen = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { });
+            Assert.True(screen.Offer(vault.Path_));
+            locked.Watch(screen);
+
+            Assert.True(await LockedAppEndpoint.TellAsync(LockedAppEndpoint.NameFor(VaultIdentity.Of(home.Path, vault.Path_)), Token));
+            await Until(() => locked.Showing is not null);
+            locked.Showing!.Close();
+        });
+    }
+
+    [Fact]
     public Task Only_a_press_of_Open_keypaste_shows_the_unlock_screen() =>
         HeadlessSession.On(async () =>
         {
