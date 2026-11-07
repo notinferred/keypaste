@@ -433,7 +433,8 @@ public sealed class VaultOrganizeTests : IDisposable
 
         var original = reopened.Find(_token)!;
         var cloned = reopened.Find(copyName)!;
-        Assert.Equal(original with { Title = copyName.Title }, cloned);
+        Assert.Equal(original with { Title = copyName.Title, Uuid = cloned.Uuid }, cloned);
+        Assert.NotEqual(original.Uuid, cloned.Uuid);
         Assert.Equal(reopened.Fields(_token), reopened.Fields(copyName));
         Assert.Equal("key-value", reopened.ReadField(copyName, "API_KEY"));
         Assert.Equal(["finance"], reopened.Tags(copyName));

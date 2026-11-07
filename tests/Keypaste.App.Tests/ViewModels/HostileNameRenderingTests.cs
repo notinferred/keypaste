@@ -84,7 +84,7 @@ public sealed class HostileNameRenderingTests : IDisposable
     {
         using var vault = Vault.Open(_vaultPath, _master);
         var entry = vault.ReadEntries().Single();
-        return new EntryRow(entry.Title, entry.GroupPath);
+        return new EntryRow(entry.Title, entry.GroupPath) { Uuid = "hostile" };
     }
 
     [Fact]

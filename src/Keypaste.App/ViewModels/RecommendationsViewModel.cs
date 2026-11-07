@@ -44,6 +44,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
     private IReadOnlyList<LostProjectTag> _lost = [];
     private IReadOnlyList<PasswordFinding> _weakReusedExpired = [];
+    private SameNameTells? _tells;
     private bool _disposed;
     private int _generation;
 
@@ -141,6 +142,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             _noteKeys = [];
             _lost = [];
             _weakReusedExpired = [];
+            _tells = null;
             Show();
             Checking = Task.CompletedTask;
             return;
@@ -180,7 +182,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         try
         {
-            return new Findings(check.Scan(vault), LostProjectTagCheck.Scan(vault), PasswordHealthCheck.Scan(vault, now));
+            return new Findings(check.Scan(vault), LostProjectTagCheck.Scan(vault), PasswordHealthCheck.Scan(vault, now), SameNameTells.Of(vault.ReadEntries()));
         }
         catch (ObjectDisposedException)
         {
@@ -205,6 +207,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _noteKeys = found.NoteKeys;
         _lost = found.Lost;
         _weakReusedExpired = found.Passwords;
+        _tells = found.Tells;
         Show();
     }
 
@@ -419,19 +422,19 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     private string VaultKey() => _session.Identity?.Key ?? string.Empty;
 
-    private static string Moved(int keys, IReadOnlyList<EntryName> entries)
+    private string Moved(int keys, IReadOnlyList<EntryName> entries)
     {
         var what = keys == 1 ? "1 key" : keys.ToString(CultureInfo.InvariantCulture) + " keys";
 
         return entries.Count == 1
-            ? $"Moved {what} from the notes of {Shown(entries[0])} into protected fields. The notes as they were stay in its history."
+            ? $"Moved {what} from the notes of {Named(entries[0])} into protected fields. The notes as they were stay in its history."
             : $"Moved {what} from the notes of {entries.Count} items into protected fields. The notes as they were stay in each item's history.";
     }
 
-    private static string Refused(IReadOnlyList<NoteKeyRefusal> refusals)
+    private string Refused(IReadOnlyList<NoteKeyRefusal> refusals)
     {
         var refusal = refusals[0];
-        var entry = Shown(refusal.Finding.Entry);
+        var entry = Named(refusal.Finding.Entry);
         var key = refusal.Finding.Field;
 
         return refusal.Reason switch
@@ -443,8 +446,11 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         };
     }
 
+    /// <summary>A finding's item as a sentence names it, which two of one name need to read apart.</summary>
+    internal string Named(EntryName entry) => _tells?.Named(entry) ?? Shown(entry);
+
     internal static string Shown(EntryName entry) =>
         EntryNameSanitizer.SanitizePath(entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title).Text;
 
-    private sealed record Findings(IReadOnlyList<NoteKeyFinding> NoteKeys, IReadOnlyList<LostProjectTag> Lost, IReadOnlyList<PasswordFinding> Passwords);
+    private sealed record Findings(IReadOnlyList<NoteKeyFinding> NoteKeys, IReadOnlyList<LostProjectTag> Lost, IReadOnlyList<PasswordFinding> Passwords, SameNameTells Tells);
 }

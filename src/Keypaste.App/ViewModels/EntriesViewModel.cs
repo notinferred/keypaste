@@ -40,7 +40,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private EntryDetailViewModel? _detail;
     private string _search = string.Empty;
     private string? _matchedQuery;
-    private Dictionary<EntryName, EntryMatch> _matches = [];
+    private Dictionary<(string Uuid, EntryName Name), EntryMatch> _matches = [];
     private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
@@ -250,7 +250,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The pane shows only what the list does, so the group or query just chosen closes an item it hid.</summary>
     private void ClosePaneTheListHid()
     {
-        if (_selection is { } name && !Rows.Any(row => row.Name == name))
+        if (_selection is { } item && !Rows.Any(row => row.Is(item)))
         {
             Select(null);
         }
@@ -259,7 +259,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The selected row, or null.</summary>
     /// <remarks>
     /// <para>
-    /// <b>Held as the entry's name rather than as the row object, so what the list does to its rows
+    /// <b>Held as the name that reaches the item rather than as the row object, so what the list does to its rows
     /// does not decide the selection.</b> The list writes null back into this property whenever the
     /// row it had selected leaves <see cref="Rows"/>. A null from the list is therefore ignored;
     /// <see cref="Select"/> is how the selection is deliberately dropped: by a query or group that
@@ -276,13 +276,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </remarks>
     internal EntryRow? Selected
     {
-        get => _selection is { } name && !IsAdding
-            ? Rows.FirstOrDefault(row => row.Name == name)
+        get => _selection is { } item && !IsAdding
+            ? Rows.FirstOrDefault(row => row.Is(item))
             : null;
         set
         {
             // The list writes the row it was just told to show, which is no choice to act on.
-            if (value is not { } row || (!IsAdding && row.Name == _selection))
+            if (value is not { } row || (!IsAdding && row.Is(_selection)))
             {
                 return;
             }
@@ -357,9 +357,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 return string.Empty;
             }
 
-            var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
-
-            return $"Delete {name}? There is no undo.";
+            return row.SharedNameTell is { Length: 0 }
+                ? $"Delete the open item, {row.DisplayPath}? Another item has this name. There is no undo."
+                : $"Delete {row.DisplayPath}? There is no undo.";
         }
     }
 
@@ -757,9 +757,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         var wantedGroup = _selectedGroup?.Path;
 
-        _all = [.. vault.ReadEntries()
+        var entries = vault.ReadEntries();
+        var tells = SameNameTells.Of(entries);
+        HashSet<string> heldTwice = [.. entries.GroupBy(entry => entry.Uuid!, StringComparer.Ordinal).Where(holders => holders.Count() > 1).Select(holders => holders.Key)];
+
+        _all = [.. entries
             .Select(entry => new EntryRow(entry.Title, entry.GroupPath)
             {
+                Uuid = entry.Uuid!,
+                SharesItsUuid = heldTwice.Contains(entry.Uuid!),
+                SharedNameTell = tells.Of(EntryName.Of(entry) with { Uuid = entry.Uuid }),
                 Kind = EntryKinds.Of(entry),
                 Username = entry.Username,
                 Url = entry.Url,
@@ -798,6 +805,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Filter();
 
         SelectIfListed(wanted);
+        TellPaneAboutItsName(Detail);
         ApplyActivity();
     }
 
@@ -820,7 +828,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Detail?.Apply(picture);
 
-        if (Table.Order?.Column == TableStates.LastUsed && Listed() is var listed && !listed.Select(row => row.Name).SequenceEqual(Rows.Select(row => row.Name)))
+        if (Table.Order?.Column == TableStates.LastUsed && Listed() is var listed && !listed.Select(row => row.Uuid).SequenceEqual(Rows.Select(row => row.Uuid), StringComparer.Ordinal))
         {
             Rows = listed;
         }
@@ -887,8 +895,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         VaultEntry? found;
         try
         {
-            // By name, not by path: two rows can share a path, and building the pane from the
-            // wrong one is what made its copy button serve a secret nobody selected.
+            // By the row's item, not its path or its title: two rows can share either, and building
+            // the pane from the wrong one is what made its copy button serve a secret nobody selected.
             found = _session.Unlocked?.Find(name);
         }
         catch (VaultException e)
@@ -904,14 +912,23 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard };
+        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard };
+        TellPaneAboutItsName(detail);
+        return detail;
+    }
+
+    /// <summary>Tells the pane whether another item has its name now, which a write elsewhere can change while it stays open.</summary>
+    private void TellPaneAboutItsName(EntryDetailViewModel? detail)
+    {
+        if (detail is not null && _all.FirstOrDefault(row => row.Is(detail.Name)) is { } row)
+        {
+            detail.ShowSharedName(row.SharesItsName, row.SharedNameTell is { Length: 0 });
+        }
     }
 
     /// <summary>Reads the list again and lands on the entry a restore left behind, unless a merge took it to Trash.</summary>
     /// <remarks>
-    /// <see cref="Reload"/> alone is not enough: it keeps the selection by path, and a restored
-    /// revision from before a rename gives the entry a different one. It is also not too much: an
-    /// <see cref="EntryRow"/> is a record, so reselecting an equal row changes nothing.
+    /// An <see cref="EntryRow"/> is a record, so reselecting an equal row changes nothing.
     /// </remarks>
     private void Reselect(EntryName name)
     {
@@ -922,9 +939,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Selects what the vault still holds, and holds it in the list until the next query or group, because an edit or another program's save is not the person hiding it.</summary>
     private void SelectIfListed(EntryName? name)
     {
-        Select(name is not null && _all.Any(row => row.Name == name) ? name : null);
+        Select(_all.FirstOrDefault(row => row.Is(name))?.Name);
 
-        if (_selection is { } selected && !Rows.Any(row => row.Name == selected))
+        if (_selection is { } selected && !Rows.Any(row => row.Is(selected)))
         {
             _pinned = selected;
             Filter();
@@ -950,10 +967,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             .. TableSorting.Sorted(
                 _all
                     .Where(row => Shows(group, row.GroupPath))
-                    .Where(row => query.Length == 0 || _matches.ContainsKey(row.Name))
+                    .Where(row => query.Length == 0 || _matches.ContainsKey((row.Uuid, row.Name)))
                     .Select(row => query.Length == 0
                         ? row
-                        : row with { Fields = _matches[row.Name].Fields, Tags = _matches[row.Name].Tags }),
+                        : row with { Fields = _matches[(row.Uuid, row.Name)].Fields, Tags = _matches[(row.Uuid, row.Name)].Tags }),
                 Table.Order,
                 SortValueOf,
                 TieBetween)
@@ -961,9 +978,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         // An entry just renamed out of its own result stays where the person is looking at it. It is
         // held only until the query changes, which is when they asked a different question.
-        if (_pinned is { } pin && !rows.Any(row => row.Name == pin))
+        if (_pinned is { } pin && !rows.Any(row => row.Is(pin)))
         {
-            if (_all.FirstOrDefault(row => row.Name == pin) is { } held)
+            if (_all.FirstOrDefault(row => row.Is(pin)) is { } held)
             {
                 rows.Insert(0, held);
             }
@@ -987,7 +1004,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         var compared = TableSorting.CompareText(left.DisplayTitle, right.DisplayTitle);
         compared = compared != 0 ? compared : TableSorting.CompareText(left.GroupPath, right.GroupPath);
         compared = compared != 0 ? compared : string.CompareOrdinal(left.Title, right.Title);
-        return compared != 0 ? compared : string.CompareOrdinal(left.GroupPath, right.GroupPath);
+        compared = compared != 0 ? compared : string.CompareOrdinal(left.GroupPath, right.GroupPath);
+        compared = compared != 0 ? compared : TableSorting.CompareText(left.DisplayUsername, right.DisplayUsername);
+        return compared != 0 ? compared : string.CompareOrdinal(left.Uuid, right.Uuid);
     }
 
     /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected: a folder lists its children's entries too.</summary>
@@ -1015,22 +1034,19 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        // Last write wins where a vault holds two entries of one name: the list draws both rows and
-        // either one being in the result is what puts the pair on screen.
-        Dictionary<EntryName, EntryMatch> found = [];
+        _matchedQuery = query;
+        _matches = [];
 
+        // A damaged file can hold one UUID under two names, or both under one, where the later match stands for both rows.
         foreach (var match in vault.Search(query))
         {
-            found[match.Name] = match;
+            _matches[(match.Uuid, match.Name)] = match;
         }
-
-        _matchedQuery = query;
-        _matches = found;
     }
 
     /// <summary>Moves the selection, or drops it, and rebuilds the pane when it moved.</summary>
     /// <remarks>
-    /// <b>Only a changed identity rebuilds the pane.</b> A reload that lands on the same entry —
+    /// <b>Only another item or a changed name rebuilds the pane.</b> A reload that lands on the same entry —
     /// which is every reload after an edit, a restore or an organize elsewhere — must leave the
     /// pane object alone: it keeps its own values current, and its history section is open because
     /// somebody opened it. Replacing it would dispose the pane in the middle of the interaction
@@ -1038,7 +1054,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </remarks>
     private void Select(EntryName? name)
     {
-        var moved = _selection != name;
+        var moved = _selection?.Uuid != name?.Uuid || _selection != name;
         _selection = name;
 
         if (moved)
@@ -1124,7 +1140,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        // The row is addressed by its name rather than its path: two entries can share a path.
         var firstDeleteNote = FirstDeleteNote();
         var write = _session.Write(
             vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
@@ -1146,7 +1161,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var (outcome, recycled) = write.Value;
-        var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
+        var name = row.DisplayPath;
 
         Select(null);
         Reload();
@@ -1155,13 +1170,32 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Offer(
             outcome == DeletionOutcome.Recycled
                 ? new Undoable(
-                    vault => vault.RestoreRecycled(recycled) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot,
-                    () => Reselect(row.Name),
+                    vault => PutBack(vault, recycled),
+                    () => ShowPutBack(row),
                     Restores: true)
                 : null,
             outcome == DeletionOutcome.Recycled
                 ? $"Moved {name} to the Trash.{firstDeleteNote}"
                 : $"Deleted {name}. This vault has no Trash, so nothing can put it back.");
+    }
+
+    /// <summary>Puts a deleted item back under its own title, or beside the other item of a pair, which core will not make, under a free one.</summary>
+    private static bool PutBack(Vault vault, RecycledEntryId recycled) =>
+        vault.RestoreRecycled(recycled) switch
+        {
+            RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot => true,
+            RestoreOutcome.DestinationOccupied => vault.RestoreRecycledRenamed(recycled, out _) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot,
+            _ => false,
+        };
+
+    private void ShowPutBack(EntryRow row)
+    {
+        Reselect(row.Name);
+
+        if (_selection is { } item && item.Title != row.Title)
+        {
+            Notice = $"Restored as {EntryNameSanitizer.Sanitize(item.Title).Text}, because another item here is called {row.DisplayTitle}.";
+        }
     }
 
     /// <summary>The format's one mention, for a first delete, which saves the file as KDBX 4.1 (D-0247); empty for a file there already.</summary>
@@ -1307,10 +1341,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         var moved = write.Value.Moved!;
 
         CloseOrganize();
+
+        // Renaming one of a pair leaves a name core will not give a second item, so that change has no way back to offer.
         Offer(
-            new Undoable(
-                vault => vault.Relocate(moved, row.Name, out _) is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved,
-                () => FollowRelocated(row.Name)),
+            _session.Unlocked?.RelocationRefusal(moved, row.Name) is null
+                ? new Undoable(
+                    vault => vault.Relocate(moved, row.Name, out _) is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved,
+                    () => FollowRelocated(row.Name))
+                : null,
             Did(write.Value.Outcome, moved));
         FollowRelocated(moved);
         return true;

@@ -4,7 +4,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// Enforced on write and never on read, as <see cref="VaultNameRules"/> is: a field KeePassXC wrote
 /// under any name stays listed and readable. A standard name is refused because KeePass keeps one
-/// of each and they are written through <see cref="Vault.UpdateEntry"/>. KeePassXC's own attributes
+/// of each and they are written through <see cref="Vault.UpdateEntry(VaultEntry)"/>. KeePassXC's own attributes
 /// are refused because KeePassXC gives them a meaning — a TOTP seed, a command to run, browser
 /// settings — that a value written here would change behind the person's back.
 /// </remarks>

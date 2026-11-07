@@ -1,3 +1,5 @@
+// A terminal names an item as a person or an agent does, so a name two items answer to stays refused there (F.75).
+P:Keypaste.Core.EntryName.Uuid;only the desktop reaches an item by its UUID
 // Only Program.cs names the bridge, so no verb, and no verb that opens a vault, runs the MCP SDK's code (D-0418, D-0419).
 N:Keypaste.Mcp;only Program.cs hands keypaste mcp to the bridge
 N:ModelContextProtocol;only Program.cs hands keypaste mcp to the bridge

@@ -164,6 +164,7 @@ internal static class Program
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
                 ["create", var vault, "--new-keyfile", var keyfile] => await driver.CreateAsync(vault, keyfile).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
+                ["edit", var vault, var entry, var notes, var url, "--username", var username] => await driver.EditAsync(vault, entry, notes, url, username).ConfigureAwait(true),
                 ["item-new", var vault, var template, var folder, var title, .. var options] => await driver.NewItemAsync(vault, template, folder, title, options).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "plain"] => await driver.AddFieldAsync(vault, entry, name, protect: false).ConfigureAwait(true),
@@ -426,10 +427,10 @@ internal sealed class Driver(string home)
         return session.IsUnlocked ? Did("created") : Refused(unlock.Message);
     }
 
-    internal Task<int> EditAsync(string vault, string entry, string notes, string url) =>
+    internal Task<int> EditAsync(string vault, string entry, string notes, string url, string? username = null) =>
         WithEntriesAsync(vault, entries =>
         {
-            var detail = Select(entries, entry);
+            var detail = Select(entries, entry, username);
 
             Press(detail.EditCommand, "Edit");
             detail.DraftNotes = notes;
@@ -2019,9 +2020,10 @@ internal sealed class Driver(string home)
         return unlock.HasKeyfile ? null : Refused(unlock.Message);
     }
 
-    private static EntryDetailViewModel Select(EntriesViewModel entries, string path)
+    /// <summary>Chooses the row of a path, which two items of one name need their usernames to tell apart.</summary>
+    private static EntryDetailViewModel Select(EntriesViewModel entries, string path, string? username = null)
     {
-        entries.Selected = entries.Rows.SingleOrDefault(row => row.Path == path)
+        entries.Selected = entries.Rows.SingleOrDefault(row => row.Path == path && (username is null || row.Username == username))
             ?? throw new DriverException($"no single '{path}' in the entry list");
         return entries.Detail ?? throw new DriverException($"'{path}' has no detail pane: {entries.Error}");
     }

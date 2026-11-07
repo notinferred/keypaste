@@ -180,7 +180,7 @@ internal sealed class RenderedShell : IDisposable
                 break;
 
             case "SharePassphrase":
-                Shell.ShareCommand.Press("github");
+                Shell.ShareCommand.Press(new EntryName(string.Empty, "github"));
                 Drain();
                 Shell.Share!.RequirePassphrase = true;
                 break;

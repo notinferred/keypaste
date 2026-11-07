@@ -299,7 +299,7 @@ internal sealed class AppCommands
         var editFields = Routed(Strings.EditFieldsLabel, Pane, detail => detail.EditCommand);
         var organize = Routed(Strings.RenameOrMoveLabel, ItemsInView, items => items.OrganizeCommand);
         var duplicate = Routed(Strings.Duplicate, ItemsInView, items => items.DuplicateCommand);
-        var share = Routed(Strings.Share, Unmodal, shell => shell.ShareCommand, _ => Pane()?.Path);
+        var share = Routed(Strings.Share, Unmodal, shell => shell.ShareCommand, _ => Pane()?.Name);
         var restore = Routed(Strings.Restore, Trash, trash => trash.RestoreCommand);
         var purge = Routed(Strings.DeleteForGood, Trash, trash => trash.PurgeCommand);
         var copyTotp = Routed(Strings.CopyTheTOTPCode, () => PaneOutOfEdit()?.Totp, totp => totp.CopyCommand);

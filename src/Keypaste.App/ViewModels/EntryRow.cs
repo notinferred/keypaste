@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Keypaste.App.Resources;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
 
@@ -32,6 +33,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
 {
     private EntryUseState _use;
     private string _lastUsedText = string.Empty;
+    private string? _lastUsedTip;
 
     /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -73,6 +75,20 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         }
     }
 
+    /// <summary>Why the time is not shown, on an item another shares a name with; null otherwise.</summary>
+    internal string? LastUsedTip
+    {
+        get => _lastUsedTip;
+        private set
+        {
+            if (!string.Equals(_lastUsedTip, value, StringComparison.Ordinal))
+            {
+                _lastUsedTip = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastUsedTip)));
+            }
+        }
+    }
+
     /// <summary>When it was last used, for sorting: in use is the latest there is, and never answered has no time.</summary>
     internal long? LastUsedTicks { get; private set; }
 
@@ -84,33 +100,62 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         ArgumentNullException.ThrowIfNull(activity);
 
         var use = activity.Use(Name);
-        Use = use.State;
-        LastUsedText = UseText.LastUsed(use, now);
-        LastUsedTicks = use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
+
+        // A line names a path, so of two items with one path it cannot say which an agent received.
+        var eitherItems = SharesItsName && (use.State == EntryUseState.InUse || use.LastUsed is not null);
+        Use = eitherItems ? EntryUseState.Idle : use.State;
+        LastUsedText = eitherItems ? "—" : UseText.LastUsed(use, now);
+        LastUsedTip = eitherItems ? Strings.SharedNameLastUsedTip : null;
+        LastUsedTicks = eitherItems ? null : use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
     }
 
-    /// <summary>Rows are the same row when they name the same entry, show the same fields and are found for the same reason; their use is not identity.</summary>
+    /// <summary>Rows are the same row when they are the same item, show the same fields and are found for the same reason; their use is not identity.</summary>
     /// <param name="other">The other row.</param>
     /// <returns>Whether they are equal.</returns>
     public bool Equals(EntryRow? other) =>
         other is not null
+        && string.Equals(Uuid, other.Uuid, StringComparison.Ordinal)
         && string.Equals(Title, other.Title, StringComparison.Ordinal)
         && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
         && string.Equals(Username, other.Username, StringComparison.Ordinal)
         && string.Equals(Url, other.Url, StringComparison.Ordinal)
+        && string.Equals(SharedNameTell, other.SharedNameTell, StringComparison.Ordinal)
         && Fields == other.Fields
         && Tags.SequenceEqual(other.Tags, StringComparer.Ordinal);
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Title, GroupPath, Fields);
 
-    /// <summary>The row's identity, which is what core reads and writes through.</summary>
+    /// <summary>The item's KDBX UUID, which tells this row from another of the same name.</summary>
+    internal required string Uuid { get; init; }
+
+    /// <summary>What core reads and writes this item through.</summary>
     /// <remarks>
     /// Carries the title the vault holds and is never sanitized. <see cref="Path"/> is the two
     /// joined, and joining is lossy: a title containing a separator and a group of that name
     /// produce the same string, so a mutation addressed by path can reach the wrong entry.
     /// </remarks>
-    internal EntryName Name => new(GroupPath, Title);
+    internal EntryName Name => new(GroupPath, Title) { Uuid = Uuid };
+
+    /// <summary>Whether another item holds this UUID too, which KeePass's format forbids and a damaged file can do.</summary>
+    internal bool SharesItsUuid { get; init; }
+
+    /// <summary>Whether <paramref name="item"/> reaches this row's item: its UUID, and its name too where the UUID alone cannot say.</summary>
+    /// <param name="item">A name carrying a UUID, or null.</param>
+    /// <returns>Whether it is this item.</returns>
+    internal bool Is(EntryName? item) =>
+        item is not null
+        && string.Equals(item.Uuid, Uuid, StringComparison.Ordinal)
+        && (!SharesItsUuid || item == Name);
+
+    /// <summary>Whether another item in this group has this title.</summary>
+    internal bool SharesItsName => SharedNameTell is not null;
+
+    /// <summary>What tells this item from the others of its name, empty when nothing does, or null when no other has it.</summary>
+    internal string? SharedNameTell { get; init; }
+
+    /// <summary>The path as a sentence names this item, with its tell when another item has the path too.</summary>
+    internal string DisplayPath => SameNameTells.WithTell(EntryNameSanitizer.SanitizePath(Path).Text, SharedNameTell);
 
     /// <summary>The entry's full path, as a person reads and types it.</summary>
     /// <remarks>
@@ -143,6 +188,12 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
 
     /// <summary>The URL column, scrubbed as the item's preview scrubs it.</summary>
     internal string DisplayUrl => DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
+
+    /// <summary>The username whole, for a cell that cuts it short; null with none, which a tooltip then does not open for.</summary>
+    internal string? UsernameTip => DisplayUsername.Length > 0 ? DisplayUsername : null;
+
+    /// <summary>The URL whole, as <see cref="UsernameTip"/>.</summary>
+    internal string? UrlTip => DisplayUrl.Length > 0 ? DisplayUrl : null;
 
     /// <summary>The entry's own tags the current query was in, or none when there is no query or it matched no tag.</summary>
     internal IReadOnlyList<string> Tags { get; init; } = [];

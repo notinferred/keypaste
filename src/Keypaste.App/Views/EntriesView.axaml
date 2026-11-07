@@ -481,15 +481,35 @@
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                IsVisible="{Binding Why.Length}" />
-                    <TextBlock Classes="row-title"
-                               Text="{Binding DisplayTitle}"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
+                    <!-- Held to its content, so the username follows the title and a long title gives way to it. -->
+                    <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+                      <TextBlock Classes="row-title"
+                                 Text="{Binding DisplayTitle}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <!-- Tells apart two items of one name while the Username column is away. -->
+                      <TextBlock Grid.Column="1"
+                                 Name="SharedNameTell"
+                                 Text="{Binding SharedNameTell}"
+                                 ToolTip.Tip="{Binding SharedNameTell}"
+                                 Classes="mono muted size-12"
+                                 Margin="8,0,0,0"
+                                 MaxWidth="180"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center">
+                        <TextBlock.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="SharesItsName" />
+                            <Binding Path="!$self.(views:EntryColumns.ShowsContact)" />
+                          </MultiBinding>
+                        </TextBlock.IsVisible>
+                      </TextBlock>
+                    </Grid>
                   </DockPanel>
-                  <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding DisplayUsername}"
+                  <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding DisplayUsername}" ToolTip.Tip="{Binding UsernameTip}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3" Classes="mono muted size-12" Text="{Binding DisplayUrl}"
+                  <TextBlock Grid.Column="3" Classes="mono muted size-12" Text="{Binding DisplayUrl}" ToolTip.Tip="{Binding UrlTip}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="4" Classes="mono muted size-12" Text="{Binding Where}"
@@ -501,6 +521,8 @@
                               Orientation="Horizontal"
                               HorizontalAlignment="Right"
                               Spacing="6"
+                              Background="Transparent"
+                              ToolTip.Tip="{Binding LastUsedTip}"
                               IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Classes="size-13 muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
                     <Border Classes="dot info" IsVisible="{Binding IsInUse}" />
@@ -793,6 +815,14 @@
                         </ToggleButton>
                       </StackPanel>
                     </ctl:HeaderRow>
+                    <StackPanel x:Name="NothingTellsItApart" Spacing="6" Margin="0,8,0,0" IsVisible="{Binding NothingTellsItApart}">
+                      <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.SharedNameNothingTells}" TextWrapping="Wrap" />
+                      <Button Classes="ghost sm"
+                              HorizontalAlignment="Left"
+                              Content="{x:Static res:Strings.RenameOrMoveLabel}"
+                              Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
+                              AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}" />
+                    </StackPanel>
 
                     <!-- The ⋯ menu. A canvas takes no room, so the open menu lies over the fields below
                          rather than pushing them down. -->
@@ -833,7 +863,7 @@
                           <Button x:Name="ShareEntry"
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
-                                  CommandParameter="{Binding Path}"
+                                  CommandParameter="{Binding Name}"
                                   AutomationProperties.Name="{x:Static res:Strings.Share}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="share-2" Size="14" />
@@ -1675,6 +1705,11 @@
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding HasBeenUsed}"
                                    Text="{Binding LastUsedText, StringFormat={x:Static res:Strings.LastUsedValue}}" />
+                        <TextBlock x:Name="SharedNameActivity"
+                                   Classes="caption"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding SharesItsName}"
+                                   Text="{x:Static res:Strings.SharedNameActivity}" />
                       </StackPanel>
                     </Border>
 

@@ -4,15 +4,6 @@ This plan owns the committed tasks, grouped by product track: each task's depend
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
-## T1 — Everyday vault use and recovery
-
-The founder's check of Q.2 on 2026-11-01 found these, and they gate 1.0.0 (D-0683).
-
-- [ ] **F.75 — Open two items that share a name.** Needs: none.
-  - The desktop reaches an item by its group path and title (`EntryRow`, `EntryName`), and `Vault.Find(EntryName)` refuses a name more than one entry answers to, so two items with one title in one group, such as two logins for one site, each show "More than one entry answers to that name" in place of their pane, at every `Find(name)` in `EntriesViewModel` and `EntryDetailViewModel`. KeePass and KeePassXC allow such a pair, and imported vaults often hold one.
-  - Rows, the pane and what it does (copy, reveal, history, edit, rename or move, delete), Trash, the agent-access card and Recommendations reach their entry by its KeePass UUID, and a row whose title another row in its group shares shows its username after the title. An agent's request that more than one entry answers to is F.76's.
-  - Accepted when tests over a vault holding two items with one title in one group open, copy, edit, rename, delete and restore each as itself.
-
 ## T3 — AI requests in the app
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.

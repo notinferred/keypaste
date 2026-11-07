@@ -115,7 +115,8 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         var what = EntryNameSanitizer.SanitizePath(Path(request.Entry)).Text;
         var matches = entries!
             .Where(entry => string.Equals(entry.GroupPath, request.Entry.GroupPath, StringComparison.Ordinal)
-                            && string.Equals(entry.Title, request.Entry.Title, StringComparison.Ordinal))
+                            && string.Equals(entry.Title, request.Entry.Title, StringComparison.Ordinal)
+                            && (request.Entry.Uuid is null || string.Equals(entry.Uuid, request.Entry.Uuid, StringComparison.Ordinal)))
             .Take(2)
             .ToList();
         if (matches.Count != 1)
@@ -123,7 +124,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused(matches.Count == 0 ? $"no item '{what}'" : $"more than one item is called '{what}'");
         }
 
-        var fields = Select(vault, matches[0], request.Field, out var unfilled);
+        var fields = Select(vault, request.Entry, matches[0], request.Field, out var unfilled);
         if (unfilled is { } refusal)
         {
             return Refused($"the {refusal.Field} of '{what}' {refusal.Reason}");
@@ -327,10 +328,9 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
     /// The fields to seal, each under its name with its own entry's placeholders filled in (D-0465), or null
     /// when a saved read found the vault changed or a field could not be filled in, which <paramref name="unfilled"/> then names.
     /// </summary>
-    private static List<ShareField>? Select(Vault vault, VaultEntry entry, string field, out (string Field, string Reason)? unfilled)
+    private static List<ShareField>? Select(Vault vault, EntryName name, VaultEntry entry, string field, out (string Field, string Reason)? unfilled)
     {
         unfilled = null;
-        var name = EntryName.Of(entry);
         (string Name, string Value)[] chosen;
 
         if (CredentialFields.IsCustom(field))

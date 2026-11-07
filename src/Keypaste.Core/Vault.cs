@@ -372,8 +372,7 @@ public sealed class Vault : IDisposable
 
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
     /// <see langword="null"/> if none has that name.</summary>
-    /// <remarks>For showing where an entry sits in the file, as KeePassXC knows it. keypaste
-    /// addresses entries by name, never by this.</remarks>
+    /// <remarks>For showing where an entry sits in the file, as KeePassXC knows it.</remarks>
     public string? EntryUuid(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -382,10 +381,20 @@ public sealed class Vault : IDisposable
         return _interop.EntryUuid(name);
     }
 
+    /// <summary>Whether more than one live entry answers to this name, which a <c>kp://</c> reference to it would then find refused.</summary>
+    /// <param name="name">The name, whatever UUID it carries.</param>
+    /// <returns>Whether the name is shared.</returns>
+    public bool NameIsShared(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.NameIsShared(name);
+    }
+
     /// <summary>The name a live item has now, found by the KDBX UUID a check such as Recommendations' carries.</summary>
     /// <param name="entryUuid">The UUID as hex, as <see cref="EntryUuid"/> writes it.</param>
-    /// <returns>The item's name, which a rename since the check changed; null when no item outside the recycle bin and keypaste's own groups has that UUID.</returns>
-    /// <remarks>So a finding opens the item it named; every operation still addresses the item by this name.</remarks>
+    /// <returns>The item's name now, a rename since the check having changed it, addressing that item alone; null when no item outside the recycle bin and keypaste's own groups has that UUID, or when two do, which a UUID then cannot tell apart.</returns>
     public EntryName? EntryNameOf(string entryUuid)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -720,7 +729,21 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entry);
 
-        return Change(() => _interop.UpdateEntry(entry) > 0, updated => updated ? VaultEdit.Of(EntryName.Of(entry)) : null);
+        return UpdateEntry(EntryName.Of(entry), entry);
+    }
+
+    /// <summary>Overwrites the fields of the item a name addresses, which a screen's name reaches by its UUID.</summary>
+    /// <param name="name">The item.</param>
+    /// <param name="values">Its new fields, the title and the group among them unchanged.</param>
+    /// <returns><see langword="true"/> if an entry was updated.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public bool UpdateEntry(EntryName name, VaultEntry values)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(values);
+
+        return Change(() => _interop.UpdateEntry(name, values) > 0, updated => updated ? VaultEdit.Of(name) : null);
     }
 
     /// <summary>The custom fields of the one entry with this name, by name and protection, never by value.</summary>
@@ -1215,11 +1238,13 @@ public sealed class Vault : IDisposable
                 List<NoteKeyRefusal> refusals = [];
                 List<(EntryName Entry, List<FieldWrite> Writes, string Notes)> planned = [];
 
-                foreach (var entry in findings.GroupBy(finding => finding.Entry))
+                foreach (var entry in findings.GroupBy(finding => (finding.EntryUuid, finding.Entry)))
                 {
-                    if (PlanNoteMove(check, entry.Key, [.. entry], refusals) is { } plan)
+                    var name = entry.Key.Entry;
+
+                    if (PlanNoteMove(check, name, [.. entry], refusals) is { } plan)
                     {
-                        planned.Add((entry.Key, plan.Writes, plan.Notes));
+                        planned.Add((name, plan.Writes, plan.Notes));
                     }
                 }
 
@@ -3242,7 +3267,8 @@ public sealed class Vault : IDisposable
         IReadOnlyList<NoteKeyFinding> findings,
         List<NoteKeyRefusal> refusals)
     {
-        if (_interop.ReadNotes(name) is not { } current || current.Uuid != findings[0].EntryUuid)
+        // The name is what the finding said, so one renamed since the check goes round again rather than moving under a name it no longer has.
+        if (_interop.ReadNotes(name) is not { } current || current.Uuid != findings[0].EntryUuid || !_interop.IsStillCalled(name))
         {
             refusals.AddRange(findings.Select(finding => new NoteKeyRefusal(finding, NoteKeyRefusalReason.EntryGone)));
             return null;

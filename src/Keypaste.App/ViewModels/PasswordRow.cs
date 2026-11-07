@@ -9,6 +9,8 @@ internal sealed class PasswordRow : IRecommendationRow
 {
     private const int _namedSharers = 3;
 
+    private readonly RecommendationsViewModel _owner;
+
     internal PasswordRow(RecommendationsViewModel owner, PasswordFinding finding, bool isDismissed)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -16,8 +18,9 @@ internal sealed class PasswordRow : IRecommendationRow
 
         Finding = finding;
         IsDismissed = isDismissed;
-        Entry = RecommendationsViewModel.Shown(finding.Entry);
+        Entry = owner.Named(finding.Entry);
 
+        _owner = owner;
         OpenCommand = new RelayCommand(() => owner.Open(this));
         DismissCommand = new RelayCommand(() => owner.Dismiss(this));
         ReviewAgainCommand = new RelayCommand(() => owner.ReviewAgain(this));
@@ -92,7 +95,7 @@ internal sealed class PasswordRow : IRecommendationRow
     /// <summary>The other items holding the password: every one up to three, or two and how many more.</summary>
     private string Sharers()
     {
-        List<string> names = [.. Finding.SharedWith.Select(RecommendationsViewModel.Shown).Order(StringComparer.Ordinal)];
+        List<string> names = [.. Finding.SharedWith.Select(_owner.Named).Order(StringComparer.Ordinal)];
 
         if (names.Count > _namedSharers)
         {

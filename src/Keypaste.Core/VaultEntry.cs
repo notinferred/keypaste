@@ -38,10 +38,13 @@ public sealed record VaultEntry
 
     /// <summary>When the entry expires, as its file records it, or null when it never does.</summary>
     /// <remarks>
-    /// Read only. KeePassXC sets expiry; <see cref="Vault.AddEntry"/> and <see cref="Vault.UpdateEntry"/>
+    /// Read only. KeePassXC sets expiry; <see cref="Vault.AddEntry"/> and <see cref="Vault.UpdateEntry(VaultEntry)"/>
     /// leave the file's value as it was.
     /// </remarks>
     public DateTimeOffset? Expires { get; init; }
+
+    /// <summary>The KDBX UUID as hex, on an entry read from a vault; null on one being written, whose UUID the vault mints.</summary>
+    public string? Uuid { get; init; }
 
     /// <summary>
     /// The entry's full path, as accepted by <see cref="Vault.Find(string)"/> and by

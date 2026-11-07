@@ -74,6 +74,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     private readonly Action<string> _showToast;
     private readonly bool _misconfigured;
     private Dictionary<string, EntryName> _entries = new(StringComparer.Ordinal);
+    private EntryName? _item;
 
     private string _field = "password";
     private string _recipient = string.Empty;
@@ -92,7 +93,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         ShareService service,
         Action<string>? showToast = null,
         string? unavailable = null,
-        string? what = null,
+        EntryName? what = null,
         Action? cancel = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -125,7 +126,8 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
         Unavailable = unavailable;
-        SelectedWhat = what;
+        _item = what;
+        SelectedWhat = what is null ? null : RecommendationsViewModel.Shown(what);
 
         _ = LoadAsync(online: false);
     }
@@ -249,6 +251,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         Rows = [];
         Candidates = [];
         _entries = new(StringComparer.Ordinal);
+        _item = null;
         Selected = null;
         SelectedWhat = null;
         Error = null;
@@ -265,7 +268,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (SelectedWhat is null || !_entries.TryGetValue(SelectedWhat, out var entry))
+        if (_item is not { } entry && (SelectedWhat is null || !_entries.TryGetValue(SelectedWhat, out entry)))
         {
             Error = "Choose what to share.";
             return;
@@ -376,12 +379,21 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
         Dictionary<string, EntryName> entries = new(StringComparer.Ordinal);
         HashSet<string> ambiguous = new(StringComparer.Ordinal);
-        foreach (var entry in vault.ReadEntries())
+        var read = vault.ReadEntries();
+        foreach (var entry in read)
         {
             if (!entries.TryAdd(entry.Path, EntryName.Of(entry)))
             {
                 ambiguous.Add(entry.Path);
             }
+        }
+
+        // The dialog's one line has to say which of two items it shares.
+        if (_item is { } item && SameNameTells.Of(read).Of(item) is { } tell)
+        {
+            SelectedWhat = tell.Length > 0
+                ? SameNameTells.WithTell(RecommendationsViewModel.Shown(item), tell)
+                : $"{RecommendationsViewModel.Shown(item)} (the open item; another has this name)";
         }
 
         foreach (var path in ambiguous)

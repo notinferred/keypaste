@@ -370,7 +370,7 @@ public sealed class ShellViewModelTests : IDisposable
             ShareTransport = server,
         };
 
-        shell.ShareCommand.Press("env/billing/STRIPE_KEY");
+        shell.ShareCommand.Press(new EntryName("env/billing", "STRIPE_KEY"));
         Assert.True(shell.HasShare);
         Assert.IsType<EntriesViewModel>(shell.Content);
         var share = shell.Share!;
@@ -393,7 +393,7 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.ShareCommand.Press("Work/github");
+        shell.ShareCommand.Press(new EntryName("Work", "github"));
         shell.Share!.CancelCommand.Press();
 
         Assert.False(shell.HasShare);

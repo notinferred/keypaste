@@ -51,6 +51,9 @@ public enum MatchedFields
 /// </remarks>
 public sealed record EntryMatch(EntryName Name, MatchedFields Fields)
 {
+    /// <summary>The KDBX UUID as hex, which tells apart two matches of one name.</summary>
+    public required string Uuid { get; init; }
+
     /// <summary>The entry's own tags the query was in, in the entry's order; empty unless <see cref="Fields"/> holds <see cref="MatchedFields.Tag"/>.</summary>
     public IReadOnlyList<string> Tags { get; init; } = [];
 }

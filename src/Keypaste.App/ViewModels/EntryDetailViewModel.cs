@@ -108,13 +108,15 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         _title = entry.Title;
         _groupPath = entry.GroupPath;
+        _uuid = entry.Uuid;
         Username = entry.Username;
         Url = entry.Url;
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
         Kind = EntryKinds.Of(entry);
 
-        Reference = KpReferences.ForEntry(Name);
+        // A reference names a path, and one two items answer to resolves to neither.
+        Reference = session.Unlocked?.NameIsShared(Name) == true ? null : KpReferences.ForEntry(Name);
 
         NewPassword = new SecretField(clipboard);
         NewFieldValue = new SecretField(clipboard);
@@ -784,14 +786,35 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal string GroupPath => _groupPath;
 
     /// <summary>
-    /// The entry this pane is looking at: its group and its title, which is what addresses it.
+    /// The item this pane is looking at, reached by its UUID.
     /// </summary>
     /// <remarks>
     /// The pane used to reach for <see cref="Path"/>, and two entries can answer to one of those —
     /// so a copy served a secret the person had not selected and an edit wrote to its neighbour
     /// (docs/STEPS.md F.1e). Every vault access below goes through this instead.
     /// </remarks>
-    internal EntryName Name => new(_groupPath, _title);
+    internal EntryName Name => new(_groupPath, _title) { Uuid = _uuid };
+
+    /// <summary>Whether another item has this name now, so what is recorded under it may be that item's.</summary>
+    [ObservableProperty]
+    internal partial bool SharesItsName { get; private set; }
+
+    /// <summary>Whether another item has this name and neither its username nor its URL tells them apart, which only a rename can then do.</summary>
+    [ObservableProperty]
+    internal partial bool NothingTellsItApart { get; private set; }
+
+    /// <summary>Takes what the list knows of this item's name, as another item arriving or leaving changes it.</summary>
+    /// <param name="shared">Whether another item has the name.</param>
+    /// <param name="nothingTells">Whether nothing the list draws tells them apart.</param>
+    internal void ShowSharedName(bool shared, bool nothingTells)
+    {
+        SharesItsName = shared;
+        NothingTellsItApart = nothingTells;
+        Reference = shared ? null : KpReferences.ForEntry(Name);
+        OnPropertyChanged(nameof(Reference));
+        OnPropertyChanged(nameof(HasReference));
+        CopyReferenceCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>The <c>kp://</c> reference that names this entry, or null for one no reference resolves.</summary>
     internal string? Reference { get; private set; }
@@ -1061,8 +1084,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         }
         catch (VaultException e)
         {
-            // Two entries with one title in one group. Copying either would put a secret nobody
-            // chose on the clipboard, and this pane never draws one, so nothing would show it.
             Report(e.Message);
             return;
         }
@@ -1467,8 +1488,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
                 // would put it in a local for no reason. A replacement is applied in the same
                 // UpdateEntry as the field edits, so the whole change costs one history item rather
                 // than two.
-                // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
-                // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
                 var updated = existing with
                 {
                     Username = DraftUsername,
@@ -1481,7 +1500,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
                     updated = updated with { Password = NewPassword.Compose() };
                 }
 
-                vault.UpdateEntry(updated);
+                vault.UpdateEntry(Name, updated);
                 return true;
             },
             updated => updated);

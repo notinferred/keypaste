@@ -302,7 +302,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         }
 
         // The revision's own title: restoring one from before a rename renames the entry back.
-        var restored = new EntryName(_owner.GroupPath, row.Title);
+        var restored = new EntryName(_owner.GroupPath, row.Title) { Uuid = _owner.Name.Uuid };
         var write = _session.Write(vault => TryRestore(vault, row, confirmed), attempt => attempt.Outcome == RevisionRestore.Restored);
 
         if (write.Problem("restore this again") is { } problem)

@@ -799,6 +799,27 @@ twofish "$db" || die "the app's save did not keep Twofish"
 expect "$db" env/tf/from-kpxc Password tf-app
 expect "$db" env/tf/deploy TOKEN tf-2
 
+step "same name: the app edits each of two items KeePassXC gave one title, and KeePassXC reads each back as itself"
+db="$dir/same-name.kdbx"
+cp "$dir/control.kdbx" "$db"
+cur_pw=$pw cur_kf= new_pw=
+kx add "$db" servers/pair -u alice -g -L 20 -l -U -n >/dev/null || die "KeePassXC could not add the first of the pair"
+kx add "$db" servers/pair2 -u bob -g -L 20 -l -U -n >/dev/null || die "KeePassXC could not add the second of the pair"
+kx edit "$db" servers/pair2 -t pair >/dev/null || die "KeePassXC could not give the second the first's title"
+same_name_row() {
+  kx export "$db" -f csv | grep -F "\"pair\",\"$1\"," || die "KeePassXC lists no pair item of $1"
+}
+for who in alice bob; do
+  other=bob; [ "$who" = alice ] || other=alice
+  other_was=$(same_name_row "$other")
+  new_pw="same-name-$who"
+  did "the app's edit of $who's item" app edit "$db" servers/pair "notes of $who" "https://$who.example" --username "$who"
+  new_pw=
+  same_name_row "$who" | grep -qF "\"same-name-$who\",\"https://$who.example\",\"notes of $who\"" \
+    || die "KeePassXC does not read the app's edit on $who's item"
+  [ "$(same_name_row "$other")" = "$other_was" ] || die "the app's edit of $who's item changed $other's"
+done
+
 # ---------------------------------------------------------------------------------------
 # Creation, through both front ends, read by KeePassXC.
 # ---------------------------------------------------------------------------------------

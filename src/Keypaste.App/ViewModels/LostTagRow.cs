@@ -15,7 +15,7 @@ internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
 
         Finding = finding;
         IsDismissed = isDismissed;
-        Entry = RecommendationsViewModel.Shown(finding.Entry);
+        Entry = owner.Named(finding.Entry);
         Tag = EntryNameSanitizer.Sanitize(finding.Tag).Text;
 
         RestoreCommand = new RelayCommand(() => owner.AskRestore(this));

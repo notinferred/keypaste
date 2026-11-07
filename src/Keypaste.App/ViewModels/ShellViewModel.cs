@@ -125,7 +125,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
         Toasts = new ToastStack(_clock, Post);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
-        ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && Share is null);
+        ShareCommand = new RelayCommand<EntryName>(OpenShare, item => item is not null && Share is null);
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
 
@@ -502,7 +502,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     internal string BackTitle => Destinations.UpOf(_current).Title;
 
     /// <summary>An item's ⋯ menu: Share…, as a dialog over the screen.</summary>
-    internal RelayCommand<string> ShareCommand { get; }
+    internal RelayCommand<EntryName> ShareCommand { get; }
 
     /// <summary>The share dialog while it is open, or null.</summary>
     [ObservableProperty]
@@ -1046,7 +1046,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private readonly CrashReporting? _crashes;
     private HttpMessageHandler? _ownShareTransport;
 
-    private SharingViewModel Sharing(string? what = null, Action? cancel = null)
+    private SharingViewModel Sharing(EntryName? what = null, Action? cancel = null)
     {
         var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
 #pragma warning disable RS0030 // The shell makes the share service's client.
@@ -1121,14 +1121,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Opens the share dialog on one entry, over whatever screen is showing.</summary>
-    internal void OpenShare(string? path)
+    internal void OpenShare(EntryName? item)
     {
-        if (_disposed || path is null || Share is not null)
+        if (_disposed || item is null || Share is not null)
         {
             return;
         }
 
-        var share = Sharing(path, CloseShare);
+        var share = Sharing(item, CloseShare);
         share.Created += (_, _) => CloseShare();
         Share = share;
     }
@@ -1209,7 +1209,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
             if (Content is EntriesViewModel entries)
             {
-                entries.Selected = entries.Rows.FirstOrDefault(row => row.Name == name);
+                entries.Selected = entries.Rows.FirstOrDefault(row => row.Is(name));
             }
         });
     }

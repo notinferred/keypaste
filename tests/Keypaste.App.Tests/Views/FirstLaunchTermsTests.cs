@@ -9,6 +9,7 @@ using Keypaste.App.Terms;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
 using Keypaste.Core.Tests;
@@ -300,7 +301,7 @@ public sealed class FirstLaunchTermsTests
     public Task Share_opens_on_its_form_with_no_terms_step_and_records_nothing_of_them() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
-        shell.Shell.ShareCommand.Press("github");
+        shell.Shell.ShareCommand.Press(new EntryName(string.Empty, "github"));
         RenderedShell.Drain();
 
         Assert.True(shell.Named<Border>("ShareDialog").IsEffectivelyVisible);

@@ -14,7 +14,7 @@ internal sealed class RecommendationRow : ObservableObject, IRecommendationRow
 
         Finding = finding;
         IsDismissed = isDismissed;
-        Entry = RecommendationsViewModel.Shown(finding.Entry);
+        Entry = owner.Named(finding.Entry);
 
         MoveCommand = new RelayCommand(() => owner.Move([this]));
         DismissCommand = new RelayCommand(() => owner.Dismiss(this));

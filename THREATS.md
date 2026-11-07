@@ -541,3 +541,13 @@ Every culture-sensitive call in Core, Infrastructure and the desktop says which 
 Evidence: `verify.sh backend` runs Core's tests invariant and under `tr-TR`, `de-DE` and `ar-SA` with ICU, where `CultureAgreementTests` holds protected names, name rules and what folds into ASCII to one literal list, an audit log byte-identical under five cultures, and a vault, a token and `app.toml` written under one culture and read back under another.
 
 Residuals: letters Unicode cased after the version .NET carries, such as U+A7CE, fold in a process whose ICU knows them and not in one that does not. Renaming a field is the one rule that meets them: its check that the new name is not taken compares with `OrdinalIgnoreCase` (`KeePassInterop.cs`), so the app and the CLI can differ on whether such a name is taken, and one refuses a rename the other allows. The audit log, its hash, and exposure and access matching are ordinal and do not differ, and a path that holds such a letter can only fail to find the owner's pipe. Other libraries in the desktop process, Avalonia, Yubico's SDK and Tmds.DBus, were not audited; they handle no vault, audit or rule text.
+
+## T-53 — What two items of one name did is recorded under the name they share
+
+KeePass and KeePassXC allow two items with one title in one group. The desktop opens and acts on each by its KeePass UUID, so a copy, an edit or a share reaches the item the person chose. An audit line names a path, not an item, so it cannot say which of the two it was about. A share from the desktop can send out either, and its line and its row under Share links name the path both have. Mitigations: the sealed value is the chosen item's; the share dialog says which by its username or URL, or as the open item where nothing differs; a row of such an item shows no last-used time, and its Agent access card says what is recorded may be the other's; an agent's request, a terminal verb and a typed name that two items answer to stay refused (law 3.7), so no release to an agent reaches either.
+
+A file holding one UUID twice, which the format forbids and opening does not refuse, reaches each holder only when its name agrees too; two holders of one name are refused.
+
+Evidence: `SameNameItemsTests` in both test projects and `ShareServiceTests.Create_OneOfTwoItemsOfOneName_SharesThatOneByItsUuidAndRefusesTheBareName`; `verify-keepassxc-workflows.sh` edits each of a pair KeePassXC made and reads both back.
+
+Residuals: the log cannot answer which of a pair a share or an earlier release was about. A release recorded before a pair existed shows on both panes' cards as possibly either's. Whether a line should name the item is in [BACKLOG](docs/BACKLOG.md).

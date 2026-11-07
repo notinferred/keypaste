@@ -93,6 +93,35 @@ public sealed class EntryActivityRowsTests
     /// settings do brings it, saying which agent can see the item (N.5).
     /// </summary>
     [Fact]
+    public async Task TwoItemsOfOneName_ClaimNoUseOnTheirRows_AndTheirPanesSayItMayBeTheOthers()
+    {
+        await using var app = await App.StartAsync();
+        var key = app.Authority.Session.Identity!.Key;
+        Assert.True(app.Authority.Session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { Title = "example", Username = "second" });
+                return true;
+            },
+            _ => true).Problem("add the second") is null);
+        app.Audit("example", key, ago: TimeSpan.FromMinutes(30));
+
+        using var screen = app.Screen();
+        var rows = screen.Entries.Rows.Where(entry => entry.Path == "example").ToList();
+
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("—", row.LastUsedText);
+            Assert.True(row.IsIdle);
+            Assert.NotNull(row.LastUsedTip);
+        });
+
+        screen.Entries.Selected = rows[0];
+        Assert.True(screen.Entries.Detail!.SharesItsName);
+    }
+
+    [Fact]
     public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
     {
         await using var app = await App.StartAsync();

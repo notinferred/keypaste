@@ -19,7 +19,7 @@ public enum RotateOutcome
 /// </summary>
 /// <remarks>
 /// It writes a new value into the vault only: a key a provider issued still has to be rotated at the
-/// provider and stored with <c>keypaste set</c>. The edit is an ordinary <see cref="Vault.UpdateEntry"/>,
+/// provider and stored with <c>keypaste set</c>. The edit is an ordinary <see cref="Vault.UpdateEntry(VaultEntry)"/>,
 /// so every grant naming the entry ends (D-0318).
 /// </remarks>
 public static class EntryRotation
@@ -49,7 +49,7 @@ public static class EntryRotation
         using var generated = new SecretBuffer();
         PasswordGenerator.Append(recipe, generated);
 
-        return vault.UpdateEntry(found with { Password = new string(generated.Value) })
+        return vault.UpdateEntry(name, found with { Password = new string(generated.Value) })
             ? RotateOutcome.Rotated
             : RotateOutcome.NotFound;
     }

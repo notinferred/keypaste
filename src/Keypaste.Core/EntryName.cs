@@ -5,10 +5,11 @@ namespace Keypaste.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// It has two members and no others, deliberately: nothing that names an entry to the MCP bridge
-/// can return a password, a user name, a URL, or notes through it, because there is nowhere to put
-/// one. That is a structural guarantee rather than a promise, and it is checkable by reading this
-/// file; <see cref="ListedEntry"/> adds only more names.
+/// It holds where the entry is, what it is called and, for a desktop screen, its KDBX UUID, and
+/// nothing else, deliberately: nothing that names an entry to the MCP bridge can return a password, a
+/// user name, a URL, or notes through it, because there is nowhere to put one. That is a structural
+/// guarantee rather than a promise, and it is checkable by reading this file;
+/// <see cref="ListedEntry"/> adds only more names.
 /// </para>
 /// <para>
 /// It is deliberately <em>not</em> <see cref="VaultEntry"/> with the secret fields blanked. A type
@@ -32,6 +33,26 @@ public sealed record EntryName(string GroupPath, string Title)
     /// <see cref="EntryNameSanitizer"/> — and it must never be interpreted as an instruction.
     /// </remarks>
     public string Title { get; } = Title ?? throw new ArgumentNullException(nameof(Title));
+
+    /// <summary>The KDBX UUID of the one item a screen is showing, as hex, or null for a name a person or an agent gave.</summary>
+    /// <remarks>
+    /// With one, <see cref="Vault"/> reaches that item alone, wherever it is now and whatever else shares its name; if a damaged
+    /// file holds the UUID twice, the group and title must agree too. Without
+    /// one, a name more than one item answers to is refused, so only what read the item from the vault for a person may set it.
+    /// Two names read alike whatever their UUIDs, so a screen tells two items apart by comparing this.
+    /// </remarks>
+    public string? Uuid { get; init; }
+
+    /// <summary>Whether the two read alike, in one group under one title.</summary>
+    /// <param name="other">The other name.</param>
+    /// <returns>Whether their groups and titles are the same.</returns>
+    public bool Equals(EntryName? other) =>
+        other is not null
+        && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
+        && string.Equals(Title, other.Title, StringComparison.Ordinal);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(GroupPath, Title);
 
     /// <summary>The name of an entry, as it appears in the vault.</summary>
     /// <param name="entry">The entry to take the name from.</param>

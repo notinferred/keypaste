@@ -247,35 +247,6 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal(new[] { ("env/dev", "KEEP"), ("env/dev/nested", "TOKEN") }, survivors);
     }
 
-    /// <summary>
-    /// Two entries with one title in one group. Deleting either would be a guess, so the screen
-    /// says so and writes nothing — asserted on the file's bytes, because <see cref="Vault.Save"/>
-    /// re-randomises salt and nonces and an unchanged digest is what proves no save happened.
-    /// </summary>
-    [Fact]
-    public void Deleting_a_name_two_entries_answer_to_is_refused_and_says_so()
-    {
-        var path = Path.Combine(_directory, "duplicated.kdbx");
-        using (var vault = Vault.Create(path, Master))
-        {
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/dev" });
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/dev" });
-            vault.Save();
-        }
-
-        var before = Digest(path);
-
-        using var context = new Context(path);
-        context.Entries.Selected = context.Entries.Rows[0];
-        context.Entries.DeleteCommand.Press();
-
-        Assert.NotNull(context.Entries.Error);
-        Assert.Equal(before, Digest(path), StringComparer.Ordinal);
-
-        using var reopened = Vault.Open(path, Master);
-        Assert.Equal(2, reopened.ReadEntries().Count);
-    }
-
     [Fact]
     public void Changing_the_mind_about_a_delete_keeps_the_entry()
     {

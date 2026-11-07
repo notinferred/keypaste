@@ -373,7 +373,7 @@ public sealed class KeepUnsavedWorkTests
     public Task The_share_dialog_has_Cancel_and_answers_Return_and_Escape() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
-        shell.Shell.ShareCommand.Press("github");
+        shell.Shell.ShareCommand.Press(new EntryName(string.Empty, "github"));
         RenderedShell.Drain();
         var dialog = shell.Named<Border>("ShareDialog");
         Assert.Same(shell.Shell.Share!.CreateCommand, FormKeys.GetConfirm(dialog));
@@ -390,7 +390,7 @@ public sealed class KeepUnsavedWorkTests
         RenderedShell.Drain();
         Assert.False(shell.Shell.HasShare);
 
-        shell.Shell.ShareCommand.Press("github");
+        shell.Shell.ShareCommand.Press(new EntryName(string.Empty, "github"));
         RenderedShell.Drain();
         Press(shell, PhysicalKey.Escape);
         Assert.False(shell.Shell.HasShare);

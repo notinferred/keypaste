@@ -437,20 +437,13 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Null(context.Entries.Error);
     }
 
-    /// <summary>
-    /// A name two entries answer to is refused, and does not read as "never changed".
-    /// </summary>
-    /// <remarks>
-    /// The pane itself cannot be built for an ambiguous name — <c>EntriesViewModel.Build</c> refuses
-    /// first — so the way this is reached is a second entry of that name arriving while the pane is
-    /// open, which is what a merge or another window will eventually do. Core refuses to guess, and
-    /// the section has to repeat that rather than show an empty list.
-    /// </remarks>
+    /// <summary>A second item of this name arriving while the pane is open leaves the section reading its own item.</summary>
     [Fact]
-    public void A_name_two_entries_answer_to_is_refused_rather_than_shown_empty()
+    public void A_second_item_of_one_name_leaves_the_history_on_its_own_item()
     {
         using var context = New();
         var history = Select("servers/production", context);
+        var revisions = context.Session.Unlocked!.ReadHistory(context.Entries.Detail!.Name)!.Count;
 
         context.Session.Unlocked!.AddEntry(new VaultEntry
         {
@@ -461,9 +454,8 @@ public sealed class EntryHistoryTests : IDisposable
 
         history.ToggleCommand.Press();
 
-        Assert.Empty(history.Rows);
-        Assert.False(history.ShowsEmptyNote);
-        Assert.NotNull(context.Entries.Error);
+        Assert.Equal(revisions, history.Rows.Count);
+        Assert.Null(context.Entries.Error);
     }
 
     [Fact]

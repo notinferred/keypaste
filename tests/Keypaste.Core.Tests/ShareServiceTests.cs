@@ -105,6 +105,28 @@ public sealed class ShareServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_OneOfTwoItemsOfOneName_SharesThatOneByItsUuidAndRefusesTheBareName()
+    {
+        using var vault = _fixture.Open();
+        var uuid = vault.Find(ShareFixture.Stripe)!.Uuid;
+        vault.AddEntry(new VaultEntry { GroupPath = ShareFixture.Stripe.GroupPath, Title = ShareFixture.Stripe.Title, Password = "the-other-one" });
+        vault.Save();
+
+        var pinned = ShareFixture.Request() with { Entry = ShareFixture.Stripe with { Uuid = uuid } };
+        var outcome = await _fixture.Service().CreateAsync(vault, pinned, CancellationToken.None);
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.True(ShareLink.TryParse(outcome.Link!, out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(_fixture.Server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out var error), error);
+        Assert.Equal(ShareFixture.StripeValue, Assert.Single(payload.Fields).Value);
+
+        var bare = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
+
+        Assert.False(bare.Ok);
+        Assert.Contains("more than one item", bare.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Create_Login_SharesTheNonEmptyLoginFields()
     {
         using var vault = _fixture.Open();

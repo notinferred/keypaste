@@ -620,11 +620,11 @@ internal sealed class KeePassInterop : IDisposable
     /// values in place.
     /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    internal int UpdateEntry(VaultEntry entry)
+    internal int UpdateEntry(EntryName name, VaultEntry entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Locate(EntryName.Of(entry)) is not { } found)
+        if (Locate(name) is not { } found)
         {
             return 0;
         }
@@ -697,7 +697,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Locate(name) is { } found ? Read(found.Entry, name.GroupPath) : null;
+        return Locate(name) is { } found ? Read(found.Entry, PathOf(found.Group)!) : null;
     }
 
     /// <summary>Returns every group path in the vault, excluding the root group.</summary>
@@ -1258,7 +1258,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Locate(name) is { } found ? PlaceholderFieldsOf(found.Entry, name.GroupPath) : null;
+        return Locate(name) is { } found ? PlaceholderFieldsOf(found.Entry, PathOf(found.Group)!) : null;
     }
 
     /// <summary>
@@ -1278,7 +1278,7 @@ internal sealed class KeePassInterop : IDisposable
         uint[] order = HistoryNewestFirst(found.Entry);
 
         return revision >= 0 && revision < order.Length
-            ? PlaceholderFieldsOf(found.Entry.History.GetAt(order[revision]), name.GroupPath)
+            ? PlaceholderFieldsOf(found.Entry.History.GetAt(order[revision]), PathOf(found.Group)!)
             : null;
     }
 
@@ -1995,7 +1995,7 @@ internal sealed class KeePassInterop : IDisposable
         var found = Locate(source)!.Value;
         var destination = LocateGroup(target.GroupPath)!.Value;
         bool moves = !ReferenceEquals(found.Group, destination.Group);
-        bool renames = !string.Equals(source.Title, target.Title, StringComparison.Ordinal);
+        bool renames = !string.Equals(ReadField(found.Entry, PwDefs.TitleField), target.Title, StringComparison.Ordinal);
 
         // The two halves of the move stay adjacent so an entry never belongs to no group.
         if (moves)
@@ -2014,7 +2014,7 @@ internal sealed class KeePassInterop : IDisposable
             MarkEdited(found.Entry);
         }
 
-        result = target;
+        result = target with { Uuid = source.Uuid };
 
         // A combined change is neither a rename nor a move on its own.
         return (renames, moves) switch
@@ -2038,7 +2038,7 @@ internal sealed class KeePassInterop : IDisposable
             return OrganizeOutcome.DestinationMissing;
         }
 
-        if (ReferenceEquals(found.Group, destination.Group) && string.Equals(source.Title, target.Title, StringComparison.Ordinal))
+        if (ReferenceEquals(found.Group, destination.Group) && string.Equals(ReadField(found.Entry, PwDefs.TitleField), target.Title, StringComparison.Ordinal))
         {
             return OrganizeOutcome.DestinationUnchanged;
         }
@@ -2074,7 +2074,10 @@ internal sealed class KeePassInterop : IDisposable
             return OrganizeOutcome.NothingMatched;
         }
 
-        if (!VaultNameRules.IsValidTitle(CopyTitle(source.Title, 1), out _))
+        string sourceTitle = ReadField(found.Entry, PwDefs.TitleField);
+        string groupPath = PathOf(found.Group)!;
+
+        if (!VaultNameRules.IsValidTitle(CopyTitle(sourceTitle, 1), out _))
         {
             return OrganizeOutcome.NameRefused;
         }
@@ -2085,8 +2088,8 @@ internal sealed class KeePassInterop : IDisposable
         // Each candidate is a distinct title, so at most one per entry in the vault can be taken.
         for (var copies = 1; ; copies++)
         {
-            title = CopyTitle(source.Title, copies);
-            projected.Add((source.GroupPath, title, true));
+            title = CopyTitle(sourceTitle, copies);
+            projected.Add((groupPath, title, true));
 
             if (RefuseCollision(projected) is null)
             {
@@ -2117,7 +2120,7 @@ internal sealed class KeePassInterop : IDisposable
         SetField(clone, PwDefs.TitleField, title);
         found.Group.AddEntry(clone, true, true);
 
-        copy = new EntryName(source.GroupPath, title);
+        copy = new EntryName(groupPath, title) { Uuid = source.Uuid is null ? null : clone.Uuid.ToHexString() };
         dropped = projectTags;
         return OrganizeOutcome.Copied;
 
@@ -2711,7 +2714,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             PwEntry revision = found.Entry.History.GetAt(order[index]);
             revisions[index] = new EntryRevision(
-                index, revision.LastModificationTime, Read(revision, name.GroupPath), [.. revision.Tags], FieldsOf(revision));
+                index, revision.LastModificationTime, Read(revision, PathOf(found.Group)!), [.. revision.Tags], FieldsOf(revision));
         }
 
         return revisions;
@@ -2779,11 +2782,6 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>The entry's KDBX UUID as hex, or null if no entry has that name.</summary>
-    /// <remarks>
-    /// A test seam. keypaste addresses an entry by name, and a public UUID
-    /// would be a second address form on the surface; V-V.2a still has to be able to say that a
-    /// restore mutated the entry rather than replacing it.
-    /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal string? EntryUuid(EntryName name)
     {
@@ -2797,16 +2795,26 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return FindLive(_database.RootGroup, string.Empty, uuidHex, Bin());
+        // Two items holding one UUID have no answer to which one it means, and only a name can say.
+        return LiveHolders(uuidHex) is [var found]
+            ? new EntryName(PathOf(found.Group)!, ReadField(found.Entry, PwDefs.TitleField)) { Uuid = uuidHex }
+            : null;
     }
 
-    private static EntryName? FindLive(PwGroup group, string groupPath, string uuidHex, PwGroup? bin)
+    private List<(PwGroup Group, PwEntry Entry)> LiveHolders(string uuidHex)
+    {
+        List<(PwGroup Group, PwEntry Entry)> holders = [];
+        CollectLiveHolders(_database.RootGroup, string.Empty, uuidHex, Bin(), holders);
+        return holders;
+    }
+
+    private static void CollectLiveHolders(PwGroup group, string groupPath, string uuidHex, PwGroup? bin, List<(PwGroup Group, PwEntry Entry)> holders)
     {
         foreach (PwEntry entry in group.Entries)
         {
             if (string.Equals(entry.Uuid.ToHexString(), uuidHex, StringComparison.Ordinal))
             {
-                return new EntryName(groupPath, ReadField(entry, PwDefs.TitleField));
+                holders.Add((group, entry));
             }
         }
 
@@ -2814,15 +2822,11 @@ internal sealed class KeePassInterop : IDisposable
         {
             var childPath = ChildPath(groupPath, child.Name);
 
-            if (!ReferenceEquals(child, bin)
-                && !ReservedGroups.IsReserved(childPath)
-                && FindLive(child, childPath, uuidHex, bin) is { } found)
+            if (!ReferenceEquals(child, bin) && !ReservedGroups.IsReserved(childPath))
             {
-                return found;
+                CollectLiveHolders(child, childPath, uuidHex, bin, holders);
             }
         }
-
-        return null;
     }
 
     /// <summary>How many deleted-object tombstones the vault carries. A test seam.</summary>
@@ -3488,7 +3492,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             if (ReadField(entry, PwDefs.NotesField) is { Length: > 0 } notes)
             {
-                found.Add(new EntryNotes(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), entry.Uuid.ToHexString(), notes));
+                found.Add(new EntryNotes(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() }, entry.Uuid.ToHexString(), notes));
             }
         }
 
@@ -3508,7 +3512,7 @@ internal sealed class KeePassInterop : IDisposable
             var (bits, digest) = Rate(entry.Strings.GetSafe(PwDefs.PasswordField), key);
 
             found.Add(new EntryPasswordHealth(
-                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)),
+                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() },
                 entry.Uuid.ToHexString(),
                 bits,
                 digest,
@@ -3567,7 +3571,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             if (entry.History.UCount > 0)
             {
-                LostProjectTags(entry, new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), lost);
+                LostProjectTags(entry, new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() }, lost);
             }
         }
 
@@ -3735,7 +3739,7 @@ internal sealed class KeePassInterop : IDisposable
 
             if (query.Length == 0 || fields != MatchedFields.None)
             {
-                matches.Add(new EntryMatch(new EntryName(groupPath, title), fields) { Tags = tags });
+                matches.Add(new EntryMatch(new EntryName(groupPath, title), fields) { Uuid = entry.Uuid.ToHexString(), Tags = tags });
             }
         }
 
@@ -3820,6 +3824,7 @@ internal sealed class KeePassInterop : IDisposable
             Expires = entry.Expires
                 ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true))
                 : null,
+            Uuid = entry.Uuid.ToHexString(),
         };
     }
 
@@ -3865,7 +3870,8 @@ internal sealed class KeePassInterop : IDisposable
     /// <see cref="Collect"/>, so a deleted entry cannot be found, read or removed by name.
     /// </para>
     /// <para>
-    /// Two entries answering to one name are refused rather than resolved to whichever came first,
+    /// A name carrying a UUID finds the item holding it alone, for a screen showing it. Otherwise,
+    /// two entries answering to one name are refused rather than resolved to whichever came first,
     /// because there is no answer that is not a guess (docs/PRODUCT.md law 3.7). KDBX permits that
     /// within one group and KeePassXC will make it; <see cref="EntryHandle"/> is what keeps each of
     /// them individually addressable.
@@ -3873,7 +3879,14 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     private (PwGroup Group, PwEntry Entry)? Locate(EntryName name)
     {
-        List<(PwGroup Group, PwEntry Entry)> matches = Matches(name);
+        List<(PwGroup Group, PwEntry Entry)> matches = name.Uuid is { } uuid ? LiveHolders(uuid) : Matches(name);
+
+        // A file can hold one UUID twice, which the format forbids and opening does not refuse, and then the name has to agree too.
+        if (name.Uuid is not null && matches.Count > 1)
+        {
+            matches = [.. matches.Where(found => string.Equals(PathOf(found.Group), name.GroupPath, StringComparison.Ordinal)
+                && string.Equals(ReadField(found.Entry, PwDefs.TitleField), name.Title, StringComparison.Ordinal))];
+        }
 
         if (matches.Count > 1)
         {
@@ -3885,6 +3898,14 @@ internal sealed class KeePassInterop : IDisposable
 
         return matches.Count == 0 ? null : matches[0];
     }
+
+    internal bool NameIsShared(EntryName name) => Matches(name).Count > 1;
+
+    /// <summary>Whether the item a name reaches is still called that, which a UUID alone would not notice.</summary>
+    internal bool IsStillCalled(EntryName name) =>
+        Locate(name) is { } found
+        && string.Equals(PathOf(found.Group), name.GroupPath, StringComparison.Ordinal)
+        && string.Equals(ReadField(found.Entry, PwDefs.TitleField), name.Title, StringComparison.Ordinal);
 
     /// <summary>Every live entry answering to this name, in traversal order.</summary>
     /// <remarks>

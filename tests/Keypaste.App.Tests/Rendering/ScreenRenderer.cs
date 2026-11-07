@@ -26,6 +26,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
@@ -212,6 +213,7 @@ public sealed class ScreenRenderer
         DrawLockAndImport(demo, output);
         DrawPrompts(output);
         DrawGroupNoTrashCannotDelete(output);
+        DrawSameNameItems(output);
         DrawTrashWithRows(demo, output);
         DrawHardwareKey(output);
         DrawSmallScreens(demo, output);
@@ -1395,6 +1397,107 @@ public sealed class ScreenRenderer
         Save(noTrash.Window, output, "12-items-group-not-empty-no-trash");
     }
 
+    private static void DrawSameNameItems(string output)
+    {
+        using var shell = new RenderedShell(seed: vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "Mail", Username = "alice@example.test", Password = "alice-password", Url = "https://mail.example.test", GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Mail", Username = "bob@example.test", Password = "bob-password", Url = "https://mail.example.test", GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Forum", Username = "carol@example.test", Password = "carol-password", Url = "https://forum.example.test", GroupPath = "services" });
+            vault.SetRecyclesDeletedEntries(false);
+        });
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+
+        items.Selected = items.Rows.Single(row => row.Username.StartsWith("alice", StringComparison.Ordinal));
+        Save(shell.Window, output, "12a-items-same-name");
+
+        var (width, height) = (shell.Window.Width, shell.Window.Height);
+        shell.Window.Width = 720 * InterfaceZoom.Factor;
+        Save(shell.Window, output, "12b-items-same-name-720");
+        shell.Window.Width = width;
+        shell.Window.Height = height;
+
+        items.DeleteCommand.Press();
+        Save(shell.Window, output, "12c-items-same-name-delete");
+        items.CancelDeleteCommand.Press();
+
+        // The access card, with a release recorded under the name both items have.
+        var released = EntryActivity.Build(
+            [],
+            string.Empty,
+            ApproverActivity.None,
+            [new ReleaseSeen("services/Mail", "claude-code", "allowance", AppClock.Start.AddMinutes(-4))],
+            AppClock.Start,
+            [new AgentReach("claude-code", (_, _) => ExposureReach.Entry)]);
+        items.Detail!.Apply(released);
+
+        foreach (var row in items.Rows)
+        {
+            row.Apply(released, AppClock.Start);
+        }
+
+        shell.Window.Height = 1400;
+        Save(shell.Window, output, "12d-items-same-name-agent-access");
+        shell.Window.Height = height;
+
+        DrawSameNameNothingTells(output);
+        DrawSameNameElsewhere(output);
+    }
+
+    private static void DrawSameNameNothingTells(string output)
+    {
+        using var shell = new RenderedShell(seed: vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "Mail", Password = "first-password", GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Mail", Password = "second-password", GroupPath = "services" });
+            vault.SetRecyclesDeletedEntries(false);
+        });
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+
+        items.Selected = items.Rows.First(row => row.Title == "Mail");
+        Save(shell.Window, output, "12e-items-same-name-nothing-tells");
+
+        var (width, height) = (shell.Window.Width, shell.Window.Height);
+        shell.Window.Width = 720 * InterfaceZoom.Factor;
+        Save(shell.Window, output, "12f-items-same-name-nothing-tells-720");
+        shell.Window.Width = width;
+        shell.Window.Height = height;
+
+        items.DeleteCommand.Press();
+        Save(shell.Window, output, "12g-items-same-name-nothing-tells-delete");
+        items.CancelDeleteCommand.Press();
+    }
+
+    private static void DrawSameNameElsewhere(string output)
+    {
+        using var shell = new RenderedShell(seed: vault =>
+        {
+            const string Notes = "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz0123456789";
+            vault.AddEntry(new VaultEntry { Title = "Mail", Username = "alice@example.test", Password = "alice-password", Notes = Notes, GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Mail", Username = "bob@example.test", Password = "bob-password", Notes = Notes, GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Forum", Username = "carol@example.test", Password = "carol-correct-horse-battery-staple", GroupPath = "services" });
+            vault.AddEntry(new VaultEntry { Title = "Forum", Username = "dan@example.test", Password = "dan-correct-horse-battery-staple", GroupPath = "services" });
+        });
+
+        Wait(shell.Shell.Recommendations.Checking);
+        shell.Show<RecommendationsViewModel>(DestinationKind.Recommendations);
+        var settingsWidth = shell.Window.Width;
+        shell.Window.Height = 1400;
+        Save(shell.Window, output, "12h-recommendations-same-name");
+
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        foreach (var row in items.Rows.Where(row => row.Title == "Forum").ToList())
+        {
+            items.Selected = row;
+            items.DeleteCommand.Press();
+        }
+
+        var trash = shell.Show<TrashViewModel>(DestinationKind.Trash);
+        Assert.Equal(2, trash.Rows.Count(row => row.Title == "Forum"));
+        shell.Window.Width = settingsWidth;
+        Save(shell.Window, output, "12i-trash-same-name");
+    }
+
     private static void DrawTerms(string output)
     {
         var terms = new TermsWindow { DataContext = Terms.TermsOfUse.Carried };
@@ -1994,7 +2097,7 @@ public sealed class ScreenRenderer
         sharing.CancelRevokeCommand.Press();
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
-        shell.ShareCommand.Press("Work/aws-console");
+        shell.ShareCommand.Press(new EntryName("Work", "aws-console"));
         var dialog = shell.Share!;
         dialog.Recipient = "sam@acme.dev";
         dialog.RequirePassphrase = true;
