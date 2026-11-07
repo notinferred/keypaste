@@ -48,6 +48,9 @@ public sealed class ApprovalPromptTests
     /// <c>AlwaysFor</c> is the project environment the approver reads from the entry's own tag for a
     /// named agent, never from the request's text: it adds one choice that still asks for its own
     /// confirmation, and leaves the default a denial and the deadline where it was.
+    /// <c>Candidates</c> are the items the approver read from the vault for the name the request resolved to, each with its
+    /// own names and its own offer, never the request's text: a list in the vault's order with none picked, so it adds no
+    /// default, no duration and no position a reason could choose. <c>Item</c> is the one item's UUID, read from the vault.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -60,10 +63,12 @@ public sealed class ApprovalPromptTests
         Assert.Equal(
             [
                 "Always",
+                "Candidates",
                 "Client",
                 "Entry",
                 "EntryWasAltered",
                 "Field",
+                "Item",
                 "Label",
                 "OnceOnly",
                 "Reason",
