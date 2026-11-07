@@ -148,7 +148,7 @@ public sealed partial class PlainWordsTests
 
         foreach (var settings in model.Rows.Select(row => row.Settings).OfType<AgentSettingsViewModel>())
         {
-            settings.ToggleAdvancedCommand.Press();
+            settings.IsMoreOpen = true;
         }
 
         agents.Settle();
@@ -401,7 +401,8 @@ public sealed partial class PlainWordsTests
             AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
             AccessOrigin.Prompt,
             string.Empty,
-            TimeZoneInfo.Utc);
+            TimeZoneInfo.Utc,
+            ApprovalLimits.DefaultMaximumTtlSeconds);
 
         yield return ("the access-change confirmation", new AccessChangeWindow(new AccessChangeViewModel(change)));
         yield return ("a terminal's edit", new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
@@ -486,11 +487,10 @@ public sealed partial class PlainWordsTests
         }
     }
 
-    /// <summary>A plan is the commands a tool runs, an install link encodes them, and history's rows keep the words the log records, so only its column heads are prose.</summary>
+    /// <summary>A plan is the commands a tool runs and an install link encodes them, so neither is prose.</summary>
     private static string Prose(TextBlock block) => block.Name switch
     {
         "ConnectPlan" or "InstallLink" => string.Empty,
-        "SessionHistory" => (block.Text ?? string.Empty).Split(Environment.NewLine)[0],
         _ => block.Text ?? string.Empty,
     };
 

@@ -45,7 +45,7 @@ public sealed class AgentClientsTests
         Assert.Equal(("*", "Agents without settings of their own"), (model.Rows[^1].Initials, model.Rows[^1].Status));
         Assert.All(model.Rows, row => Assert.True(row.HasSettings));
         Assert.Equal(
-            ["Ask, allow for a while · sees all projects", "Ask, allow for a while · sees all projects", "Ask, allow for a while · sees every item · may run commands", "Ask, allow for a while · sees all projects"],
+            ["Ask, allow for 1 hour · sees all projects", "Ask, allow for 1 hour · sees all projects", "Ask, allow for 1 hour · sees every item · may run commands", "Ask, allow for 1 hour · sees all projects"],
             model.Rows.Select(row => row.Summary));
         Assert.All(model.Rows, row => Assert.False(row.OffersConnect));
         Assert.All(model.Rows, row => Assert.Null(row.Settings));
@@ -130,7 +130,8 @@ public sealed class AgentClientsTests
 
         Assert.False(row.HasSettings);
         Assert.Equal("?", row.Initials);
-        Assert.Contains("Every other agent's settings apply", row.Status, StringComparison.Ordinal);
+        Assert.DoesNotContain("Every other agent", row.Status, StringComparison.Ordinal);
+        Assert.StartsWith("An agent here with no Settings follows Every other agent's", model.UnnamedAgentsNote, StringComparison.Ordinal);
 
         row.IsOpen = true;
 

@@ -442,7 +442,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         await EndCheckAsync(answer.Outcome switch
         {
             McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and {Shown(entry.Field)} was released to the check, which discarded it unread. "
-                + "Its record is under Since you unlocked, below.",
+                + "Its record is in this screen's History.",
             McpCheckOutcome.Denied => $"Connected: the request for {entry.Name} reached you and was refused. {answer.Said}",
             _ => $"The check failed: {answer.Said?.TrimEnd('.')}. Connect the tool again, then check.",
         }).ConfigureAwait(true);

@@ -17,19 +17,13 @@
       </Grid.ColumnDefinitions>
       <StackPanel Spacing="28">
 
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
           <StackPanel Spacing="6">
             <TextBlock Classes="h1" Text="{x:Static res:Strings.Agents}" />
             <TextBlock Classes="subtitle" TextWrapping="Wrap"
                        Text="{x:Static res:Strings.ConnectYourAIToolsAndChooseWhatXe237ce}" />
           </StackPanel>
-          <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,8,0,0"
-                IsVisible="{Binding IsServing}">
-            <Border Classes="dot ok" VerticalAlignment="Center" />
-            <!-- Runs on one line: whitespace between them would be drawn as a space. -->
-            <TextBlock Grid.Column="1" Classes="caption" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"><Run Text="{x:Static res:Strings.AnsweringAgentsFromThisApp}" /><Run Text="{Binding Serving}" FontFamily="{DynamicResource KpMono}" /></TextBlock>
-          </Grid>
-          <!-- Agents › History: what agents and tokens asked for. -->
+          <!-- Agents › History, the one place on this screen for the log: what agents and tokens asked for. -->
           <Button Grid.Column="1" Name="AgentHistory"
                   Classes="ghost"
                   Padding="12,0"
@@ -137,6 +131,9 @@
           </StackPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="{x:Static res:Strings.FoundOnThisComputerAndAnyAgentX88444b}" />
+          <TextBlock Name="ConnectAdvice" Classes="caption" TextWrapping="Wrap"
+                     IsVisible="{Binding HasUnnamedAgentsNote}"
+                     Text="{Binding UnnamedAgentsNote}" />
           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}">
             <ctl:KpIcon Icon="refresh-cw" Size="13" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
             <TextBlock Classes="caption" Text="{x:Static res:Strings.LookingForAIToolsOnThisComputer}" />
@@ -167,8 +164,7 @@
                           <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="size-12" TextWrapping="Wrap"
                                      Classes.ok="{Binding IsLive}" Classes.muted="{Binding !IsLive}" />
                         </Grid>
-                        <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" TextWrapping="Wrap" />
-                        <TextBlock Classes="caption" IsVisible="{Binding !HasSettings}" TextWrapping="Wrap" Text="{x:Static res:Strings.ConnectItFromThisListToGiveX2bd860}" />
+                        <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding ShowsSummary}" TextWrapping="Wrap" />
                       </StackPanel>
                       <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top" MaxWidth="220"
                               IsVisible="{Binding OffersConnect}"
@@ -288,28 +284,6 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </Border>
-        </StackPanel>
-
-        <!-- The records since this unlock as `keypaste log` renders them; the activity log in
-             Settings › Advanced has the whole file. -->
-        <StackPanel Spacing="10">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="history" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Classes="section" Text="{x:Static res:Strings.SinceYouUnlocked}" />
-          </StackPanel>
-          <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" TextWrapping="Wrap" />
-          <TextBlock Classes="caption" Text="{Binding HistoryHeading}" IsVisible="{Binding HasHistory}" TextWrapping="Wrap" />
-          <Border Classes="terminal" IsVisible="{Binding HasHistory}">
-            <!-- The inset is the text's margin: a ScrollViewer's own Padding is left out of its measured height. -->
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360">
-              <SelectableTextBlock Name="SessionHistory"
-                                   Text="{Binding History}"
-                                   Margin="14,12"
-                                   FontFamily="{DynamicResource KpMono}"
-                                   Classes="size-12"
-                                   Foreground="{DynamicResource KpGrey3}" />
-            </ScrollViewer>
           </Border>
         </StackPanel>
 

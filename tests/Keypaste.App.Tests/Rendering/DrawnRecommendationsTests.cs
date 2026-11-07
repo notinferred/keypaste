@@ -9,8 +9,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// V-C.2 and V.9 on screen: Settings draws each key left in notes and each weak or reused password by
-/// item, and no frame or automation name carries a value (D-0303, D-0232).
+/// V-C.2 and V.9 on screen: Settings › Recommendations draws each key left in notes and each weak or reused
+/// password by item, and no frame or automation name carries a value (D-0303, D-0232).
 /// </summary>
 public sealed class DrawnRecommendationsTests
 {
@@ -26,9 +26,9 @@ public sealed class DrawnRecommendationsTests
             seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = _stripeLogin, Notes = $"STRIPE_SECRET_KEY={_keyValue}\n{_token}" }));
         await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
 
-        shell.Show<SettingsViewModel>(DestinationKind.Settings);
+        shell.Show<RecommendationsViewModel>(DestinationKind.Recommendations);
         var key = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.Name == "RecommendationKey" && block.Text == "STRIPE_SECRET_KEY");
-        var where = shell.Named<Border>("RecommendationsCard").GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "in the notes of services/Stripe");
+        var where = shell.Named<Border>("NoteKeysCard").GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "in the notes of services/Stripe");
         var frame = shell.Frame();
         var mono = TextStyle.Of(key);
         var sans = TextStyle.Of(where);
@@ -57,15 +57,15 @@ public sealed class DrawnRecommendationsTests
             });
         await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
 
-        shell.Show<SettingsViewModel>(DestinationKind.Settings);
-        var card = shell.Named<Border>("RecommendationsCard");
-        var problem = card.GetVisualDescendants().OfType<TextBlock>().First(block => block.Name == "PasswordProblem" && block.Text == "Weak password");
-        var where = card.GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "on services/Shop, also on github");
+        shell.Show<RecommendationsViewModel>(DestinationKind.Recommendations);
+        var card = shell.Named<ItemsControl>("PasswordGroups");
+        var problem = card.GetVisualDescendants().OfType<TextBlock>().First(block => block.Name == "PasswordProblem" && block.Text == "Weak passwords");
+        var where = card.GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "services/Shop, also on github");
         var frame = shell.Frame();
         var label = TextStyle.Of(problem);
         var caption = TextStyle.Of(where);
 
-        Assert.True(frame.Shows("Weak password", label, frame.Of(problem, shell.Window)), "the problem is not drawn");
+        Assert.True(frame.Shows("Weak passwords", label, frame.Of(problem, shell.Window)), "the problem is not drawn");
         Assert.True(frame.Shows("services/Shop", caption, frame.Of(where, shell.Window)), "the item is not drawn");
 
         foreach (var value in new[] { _weak, RenderedShell.Current })
@@ -94,7 +94,7 @@ public sealed class DrawnRecommendationsTests
 
             Assert.DoesNotContain(
                 shell.Window.GetVisualDescendants().OfType<TextBlock>(),
-                block => block.IsEffectivelyVisible && block.Text is "Needs review" or "STRIPE_SECRET_KEY" or "Weak password");
+                block => block.IsEffectivelyVisible && block.Text is "STRIPE_SECRET_KEY" or "Weak passwords");
             Assert.Null(shell.Shell.Notice);
         }
     });

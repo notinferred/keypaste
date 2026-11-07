@@ -6,6 +6,12 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
+/// <summary>The password findings of one problem, which their heading explains once.</summary>
+/// <param name="Heading">The problem.</param>
+/// <param name="Reason">Why it is one.</param>
+/// <param name="Rows">Each item with it.</param>
+internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyList<PasswordRow> Rows);
+
 /// <summary>Settings › Recommendations: keys left in notes (C.2, D-0372), project tags another app dropped (V.11) and weak, reused or expired passwords (V.9), for review.</summary>
 /// <remarks>
 /// <para>
@@ -63,18 +69,40 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     /// <summary>Every finding: those needing review first, then those dismissed.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys))]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys), nameof(Line))]
     internal partial IReadOnlyList<RecommendationRow> Rows { get; private set; } = [];
 
     /// <summary>Every project tag an entry lost in another app: those needing review first, then those dismissed.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasLostTags))]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasLostTags), nameof(Line))]
     internal partial IReadOnlyList<LostTagRow> LostTags { get; private set; } = [];
 
     /// <summary>Every weak, reused or expired password: those needing review first, then those dismissed.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasPasswords))]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasPasswords), nameof(Line), nameof(PasswordGroups))]
     internal partial IReadOnlyList<PasswordRow> Passwords { get; private set; } = [];
+
+    /// <summary>The passwords by problem, in the order the problems are declared.</summary>
+    internal IReadOnlyList<PasswordGroup> PasswordGroups =>
+    [
+        .. Passwords
+            .GroupBy(row => row.Finding.Problem)
+            .OrderBy(group => group.Key)
+            .Select(group => new PasswordGroup(PasswordRow.Heading(group.Key), PasswordRow.Reason(group.Key), [.. group])),
+    ];
+
+    /// <summary>The one line Settings shows; whatever was dismissed stays reachable from it.</summary>
+    internal string Line
+    {
+        get
+        {
+            var dismissed = Rows.Count + LostTags.Count + Passwords.Count - NeedsReview;
+
+            return NeedsReview > 0
+                ? string.Create(CultureInfo.InvariantCulture, $"Recommendations: {NeedsReview} to review")
+                : string.Create(CultureInfo.InvariantCulture, $"Recommendations: nothing to review, {dismissed} dismissed");
+        }
+    }
 
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>

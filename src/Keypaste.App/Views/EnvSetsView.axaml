@@ -402,13 +402,13 @@
                                   <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:EnvProfileCell">
                                       <!-- Every column draws a cell alike: the mask or "missing", then a note on a value
-                                           that differs, and under it the entry the value lives on. In the selected
-                                           environment the value lies over the mask. -->
+                                           that differs, and under it the entry the value lives on where that is not its
+                                           column's usual item. In the selected environment the value lies over the mask. -->
                                       <StackPanel Margin="12,0,0,0" VerticalAlignment="Center" Spacing="2">
                                       <Panel ToolTip.Tip="{Binding Tip}">
                                         <Button Classes="flat cell" Command="{Binding Act}"
                                                 IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}"
-                                                AutomationProperties.Name="{Binding Label}">
+                                                AutomationProperties.Name="{Binding Spoken}">
                                           <!-- A narrow cell drops the note below the mask rather than cutting it to a stub. -->
                                           <WrapPanel Orientation="Horizontal">
                                             <TextBlock Classes="mono cell-mask" Margin="0,0,8,0" VerticalAlignment="Center"
@@ -444,7 +444,7 @@
                                         </ContentControl>
                                       </Panel>
                                       <TextBlock Classes="mono sm muted" Text="{Binding SourceNote}" IsVisible="{Binding HasSourceNote}"
-                                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SourceNote}" />
+                                                 TextWrapping="Wrap" ToolTip.Tip="{Binding FullSourceNote}" />
                                       </StackPanel>
                                     </DataTemplate>
                                   </ItemsControl.ItemTemplate>
@@ -650,7 +650,7 @@
                                   <Border Classes="table-row matrix-row">
                                     <Grid ColumnDefinitions="1.6*,3*,120">
                                       <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Classes="mono primary" Text="{Binding Display}" TextTrimming="CharacterEllipsis"
+                                        <TextBlock Classes="mono primary" Text="{Binding Display}" TextWrapping="Wrap"
                                                    ToolTip.Tip="{Binding Display}" />
                                         <TextBlock Classes="mono sm muted" Text="{Binding AlsoText}" IsVisible="{Binding HasAlso}"
                                                    TextWrapping="Wrap" />

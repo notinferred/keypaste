@@ -663,7 +663,7 @@ public sealed class ApproverHandler
             return Changed(AuditDecision.Denied, AuditMethod.Failed, refusal);
         }
 
-        var prompt = AccessChangePrompt.For(agent, change, origin, reason, _clock.LocalTimeZone) with { StaysBeneathDefaults = !written.Understood };
+        var prompt = AccessChangePrompt.For(agent, change, origin, reason, _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds) with { StaysBeneathDefaults = !written.Understood };
 
         // Every request for more over the pipe shares one cooldown, whatever it asks for and whichever
         // agent it names, since both the name and the origin are the requester's own claim: no program
@@ -771,7 +771,7 @@ public sealed class ApproverHandler
                     $"keypaste could not read this computer's limits, so it left the file as it is: {problem}; fix what keeps it from being read, or move it away yourself");
         }
 
-        var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone);
+        var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds);
         var answer = await _gate.AskAsync([], prompt, coolUnanswered: false, cancellationToken).ConfigureAwait(false);
 
         if (!answer.Releases())

@@ -147,6 +147,7 @@ internal sealed class CrashReporting : IDisposable
         DestinationKind.Log => "activity-log",
         DestinationKind.Settings => "settings",
         DestinationKind.Advanced => "advanced",
+        DestinationKind.Recommendations => "recommendations",
         DestinationKind.Trash => "trash",
         DestinationKind.Sharing => "share-links",
         DestinationKind.Tokens => "scoped-tokens",

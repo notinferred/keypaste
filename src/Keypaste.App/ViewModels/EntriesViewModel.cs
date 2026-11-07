@@ -162,7 +162,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>What matches the search and the selected group, in the table's order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(Selected), nameof(DeletePrompt), nameof(OrganizePrompt))]
+    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(Selected), nameof(DeletePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
     internal partial IReadOnlyList<EntryRow> Rows { get; private set; } = [];
 
@@ -373,7 +373,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         !SearchHasFocus && !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
 
     /// <summary>Whether the pane says the item's group: only while the list and its Group column are away, and the header does not already name it.</summary>
-    internal bool PaneNamesGroup => !ShowsList && _detail is { GroupPath.Length: > 0 } detail && detail.GroupPath != SelectedGroup?.Path;
+    internal bool PaneNamesGroup => _detail is { GroupPath.Length: > 0 } detail && (ShowsList ? SelectedGroup is { IsEverything: false } && detail.GroupPath != SelectedGroup.Path : detail.GroupPath != SelectedGroup?.Path);
 
     /// <summary>Whether the search in the list header holds the keyboard.</summary>
     [ObservableProperty]
@@ -478,7 +478,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
-                OnPropertyChanged(nameof(OrganizePrompt));
                 BeginAddCommand.NotifyCanExecuteChanged();
                 CancelAddCommand.NotifyCanExecuteChanged();
                 ConfirmAddCommand.NotifyCanExecuteChanged();
@@ -631,10 +630,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The group the entry would move into.</summary>
     [ObservableProperty]
     internal partial GroupNode? MoveTarget { get; set; }
-
-    /// <summary>What the organize form is looking at.</summary>
-    internal string OrganizePrompt =>
-        Selected is { } row ? EntryNameSanitizer.SanitizePath(row.Path).Text : string.Empty;
 
     /// <summary>Where a new group would go.</summary>
     internal string CreateGroupPrompt =>
@@ -893,7 +888,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker);
+        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard };
     }
 
     /// <summary>Reads the list again and lands on the entry a restore left behind, unless a merge took it to Trash.</summary>
@@ -967,7 +962,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         TableStates.Title => new(row.DisplayTitle),
         TableStates.Username => new(row.DisplayUsername),
         TableStates.Url => new(row.DisplayUrl),
-        TableStates.Kind => new(row.KindLabel),
         TableStates.Group => new(row.GroupPath.Length == 0 ? null : row.Where),
         _ => SortValue.At(row.LastUsedTicks),
     };
@@ -1052,7 +1046,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         OnPropertyChanged(nameof(Selected));
         OnPropertyChanged(nameof(DeletePrompt));
-        OnPropertyChanged(nameof(OrganizePrompt));
         DeleteCommand.NotifyCanExecuteChanged();
         OrganizeCommand.NotifyCanExecuteChanged();
         DuplicateCommand.NotifyCanExecuteChanged();

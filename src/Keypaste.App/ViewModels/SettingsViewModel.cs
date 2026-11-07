@@ -80,6 +80,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         Access = new VaultAccessViewModel(session, home, picker, paste);
         Recommendations = recommendations;
         OpenAdvancedCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Advanced), () => open is not null);
+        OpenRecommendationsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Recommendations), () => open is not null);
         LinkCliCommand = new AsyncRelayCommand(LinkCliAsync, () => OffersCliLink && !IsCliLinking);
         BeginReplaceCliCommand = new RelayCommand(
             () => IsConfirmingCliReplace = true,
@@ -92,6 +93,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
     internal RelayCommand OpenAdvancedCommand { get; }
+
+    internal RelayCommand OpenRecommendationsCommand { get; }
 
     /// <summary>Recommendations, owned by the shell for the unlock; null where no shell built this screen.</summary>
     internal RecommendationsViewModel? Recommendations { get; }

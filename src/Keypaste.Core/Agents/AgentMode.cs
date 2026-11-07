@@ -6,7 +6,7 @@ public enum AgentMode
     /// <summary>Ask every time: a person answers each request, with Allow once only.</summary>
     Ask = 0,
 
-    /// <summary>Ask, allow for a while: a person answers, and may allow for the timed grant the prompt offers.</summary>
+    /// <summary>The timed mode: a person answers, and may allow for the timed grant the prompt offers.</summary>
     AllowForAWhile = 1,
 
     /// <summary>Automatic: what the agent can see is released without asking and recorded in history. Commands still ask.</summary>

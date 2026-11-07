@@ -673,9 +673,9 @@ internal sealed class Driver(string home)
 
                 foreach (var row in open.Rows)
                 {
-                    foreach (var cell in row.Cells.Where(cell => cell.HasSourceNote))
+                    foreach (var cell in row.Cells.Where(cell => cell.Sources.Count > 0))
                     {
-                        Console.Out.WriteLine($"value {open.DisplayName}/{cell.Profile} {row.DisplayKey}: {cell.SourceNote}");
+                        Console.Out.WriteLine($"value {open.DisplayName}/{cell.Profile} {row.DisplayKey}: {cell.FullSourceNote}");
                     }
                 }
             }
@@ -1495,19 +1495,17 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine($"grant n={row.Number} {Describe(row)}");
         }
 
-        if (model.HasHistoryMessage)
+        // What Agents › History draws, read by that screen's own view model, which shows the whole file.
+        using var history = new LogViewModel(home, agentsOnly: true);
+
+        if (history.HasMessage)
         {
-            Console.Out.WriteLine($"history-message {model.HistoryMessage}");
+            Console.Out.WriteLine($"history-message {history.Message}");
         }
 
-        if (model.HasHistory)
+        foreach (var row in history.Rows)
         {
-            Console.Out.WriteLine($"history-heading {model.HistoryHeading}");
-        }
-
-        foreach (var line in model.History.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
-        {
-            Console.Out.WriteLine($"history {line}");
+            Console.Out.WriteLine($"history {row.RowName}");
         }
 
         Console.Out.WriteLine("activity end");

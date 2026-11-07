@@ -87,7 +87,6 @@ public sealed class AgentSettingsViewModelTests
 
         model.IsMoreOpen = false;
         Assert.True(model.IsMoreOpen);
-        Assert.Equal(what == "a pattern", model.IsAdvancedOpen);
     }
 
     [Fact]
@@ -115,15 +114,12 @@ public sealed class AgentSettingsViewModelTests
         await using var app = await App.StartAsync();
         using var model = app.Settings();
 
-        model.IsAdvancedOpen = true;
-        Assert.True(model.IsMoreOpen);
+        model.IsMoreOpen = true;
         model.SeePattern = "api/**";
 
         model.IsMoreOpen = false;
-        model.IsAdvancedOpen = false;
 
         Assert.True(model.IsMoreOpen);
-        Assert.True(model.IsAdvancedOpen);
     }
 
     /// <summary>The panel opens on Mode, Can see and May run commands, as segmented controls; a change waiting for the person shows what still holds.</summary>
@@ -146,7 +142,7 @@ public sealed class AgentSettingsViewModelTests
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBox>(), box => box.IsEffectivelyVisible);
 
-        Segment(window, "ModeChoices", "Ask, allow for a while", isChecked: true);
+        Segment(window, "ModeChoices", "Ask, allow for 1 hour", isChecked: true);
         var automatic = Segment(window, "ModeChoices", "Automatic", isChecked: false);
         var toggle = ControlAutomationPeer.CreatePeerForElement(automatic).GetProvider<IToggleProvider>();
         Assert.NotNull(toggle);
@@ -156,7 +152,7 @@ public sealed class AgentSettingsViewModelTests
 
         Assert.False(automatic.IsChecked);
         Assert.True(model.IsChanging);
-        Segment(window, "ModeChoices", "Ask, allow for a while", isChecked: true);
+        Segment(window, "ModeChoices", "Ask, allow for 1 hour", isChecked: true);
 
         answer.SetResult(ApprovalAnswer.ApprovedOnce);
         await model.Changing.WaitAsync(_connect, Token);
@@ -171,7 +167,7 @@ public sealed class AgentSettingsViewModelTests
         await using var app = await App.StartAsync();
         using var model = app.Settings();
 
-        Assert.Equal("Ask, allow for a while", Chosen(model.ModeChoices));
+        Assert.Equal("Ask, allow for 1 hour", Chosen(model.ModeChoices));
         Assert.Equal("Yes", Chosen(model.ValueChoices));
         Assert.Equal("Off", Chosen(model.RunChoices));
         Assert.Equal("All projects", Chosen(model.SeeScopes));
@@ -263,7 +259,7 @@ public sealed class AgentSettingsViewModelTests
         await using var app = await App.StartAsync();
         using var model = app.Settings(AgentNames.Any);
 
-        Assert.Equal(["Ask every time", "Ask, allow for a while"], model.ModeChoices.Select(choice => choice.Words));
+        Assert.Equal(["Ask every time", "Ask, allow for 1 hour"], model.ModeChoices.Select(choice => choice.Words));
         Assert.Empty(model.RunChoices);
         Assert.False(model.OffersRun);
         Assert.Contains("only take away", model.Identity, StringComparison.Ordinal);
@@ -334,7 +330,7 @@ public sealed class AgentSettingsViewModelTests
 
         Assert.Empty(app.Person.Changes);
         var row = Assert.Single(model.Rows);
-        Assert.Equal(("billing:dev", "Ask, allow for a while"), (row.Name, Chosen(row.Modes)));
+        Assert.Equal(("billing:dev", "Ask, allow for 1 hour"), (row.Name, Chosen(row.Modes)));
         Assert.DoesNotContain("billing:dev", model.NewRowScopes);
 
         await model.ChooseAsync(Choice(row.Modes, "Automatic"));
@@ -454,8 +450,6 @@ public sealed class AgentSettingsViewModelTests
         Assert.Equal("All projects", Chosen(model.SeeScopes));
         Assert.False(model.IsOnly);
 
-        model.ToggleAdvancedCommand.Press();
-        Assert.True(model.IsAdvancedOpen);
         model.SeePattern = "api/**, tag:env:billing:dev";
         await model.ApplySeeAsync();
 

@@ -44,6 +44,32 @@ internal sealed class PasswordRow
             $"on {Entry}, whose expiry date {(Finding.ExpiredUtc is { } expired ? PersonTime.Moment(expired.ToLocalTime()) : string.Empty)} has passed"),
     };
 
+    /// <summary>What the row says under its group's heading: the item, and what only it has.</summary>
+    internal string Line => Finding.Problem switch
+    {
+        PasswordProblem.Weak => Entry,
+        PasswordProblem.Reused => $"{Entry}, also on {Sharers()}",
+        _ => string.Create(
+            CultureInfo.InvariantCulture,
+            $"{Entry}, {(Finding.ExpiredUtc is { } expired ? PersonTime.Moment(expired.ToLocalTime()) : string.Empty)}"),
+    };
+
+    /// <summary>A group's heading.</summary>
+    internal static string Heading(PasswordProblem problem) => problem switch
+    {
+        PasswordProblem.Weak => "Weak passwords",
+        PasswordProblem.Reused => "Reused passwords",
+        _ => "Expired items",
+    };
+
+    /// <summary>What a group's heading means.</summary>
+    internal static string Reason(PasswordProblem problem) => problem switch
+    {
+        PasswordProblem.Weak => "Short or predictable enough to be guessed.",
+        PasswordProblem.Reused => "The same password is on more than one item.",
+        _ => "Their expiry date has passed.",
+    };
+
     internal bool IsDismissed { get; }
 
     internal bool NeedsReview => !IsDismissed;

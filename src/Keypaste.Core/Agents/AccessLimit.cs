@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Keypaste.Core.Agents;
 
 /// <summary>An optional limit on what Automatic releases: at most so many an hour, and only until a time.</summary>
-/// <remarks>Reaching either asks instead of refusing: the request falls back to Ask, allow for a while.</remarks>
+/// <remarks>Reaching either asks instead of refusing: the request falls back to the timed mode.</remarks>
 public sealed record AccessLimit
 {
     /// <summary>The most releases an hour a limit may allow, which bounds the memory its window costs.</summary>

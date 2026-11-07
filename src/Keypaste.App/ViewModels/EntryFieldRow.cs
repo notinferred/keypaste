@@ -67,12 +67,6 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     /// <inheritdoc/>
     public int MaskedLength => MaskWidth;
 
-    /// <summary>What the rename button is called. Names the field, never the value.</summary>
-    internal string RenameLabel => $"Rename {DisplayName}";
-
-    /// <summary>What the protection button does now.</summary>
-    internal string ProtectionLabel => IsProtected ? $"Stop protecting {DisplayName}" : $"Protect {DisplayName}";
-
     internal AsyncRelayCommand CopyValueCommand { get; }
 
     internal RelayCommand ReplaceCommand { get; }
@@ -86,6 +80,9 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     internal RelayCommand ToggleProtectionCommand { get; }
 
     internal RelayCommand RemoveCommand { get; }
+
+    /// <summary>What the row's menu says for its protection: it names no field, as a menu's words are written once.</summary>
+    internal string ProtectionHeader => IsProtected ? "Stop protecting field" : "Protect field";
 
     /// <inheritdoc/>
     public string? Reveal() => _owner.ReadField(Name);

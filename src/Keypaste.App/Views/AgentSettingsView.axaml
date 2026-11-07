@@ -63,10 +63,7 @@
 
   <StackPanel Spacing="16">
 
-    <StackPanel Spacing="4">
-      <TextBlock Classes="dialog-title" Text="{Binding Agent, StringFormat={x:Static res:Strings.SettingsForValue}}" TextTrimming="CharacterEllipsis" />
-      <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
-    </StackPanel>
+    <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
 
     <TextBlock Name="SettingsProblem" Classes="body danger" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
 
@@ -77,7 +74,7 @@
         <Border Classes="segmented">
           <ItemsControl Name="ModeChoices" ItemsSource="{Binding ModeChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
-        <TextBlock Classes="caption" Text="{x:Static res:Strings.AutomaticReleasesWhatItCanSeeWithoutXd71d13}" TextWrapping="Wrap" />
+        <TextBlock Classes="caption" Text="{Binding ModeNote}" TextWrapping="Wrap" />
         <TextBlock Classes="caption" Text="{Binding ProtectedNote}" TextWrapping="Wrap" />
       </StackPanel>
 
@@ -120,37 +117,35 @@
           <ItemsControl Name="ValueChoices" ItemsSource="{Binding ValueChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
 
-        <Expander Grid.Row="2" Grid.Column="1" Name="PatternsDisclosure" Header="{x:Static res:Strings.AdvancedPatterns}" IsExpanded="{Binding IsAdvancedOpen, Mode=TwoWay}"
-                  AutomationProperties.Name="{x:Static res:Strings.AdvancedPatterns}">
-          <StackPanel Spacing="6">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ctl:FormKeys.Confirm="{Binding ApplySeeCommand}">
-              <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="{x:Static res:Strings.PatternsItCanSee}" />
-              <Button Grid.Column="1" Content="{x:Static res:Strings.LetItSeeThese}" Command="{Binding ApplySeeCommand}" />
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-              <TextBlock Classes="caption" TextWrapping="Wrap"
-                         Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
-              <Button Grid.Column="1" Name="LearnMoreSeeing" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
-                      AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutWhatItCanSee}">
-                <Button.Flyout>
-                  <Flyout Placement="Bottom">
-                    <StackPanel MaxWidth="320" Spacing="10">
-                      <StackPanel Spacing="2">
-                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironmentExample}" />
-                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironment}" />
-                      </StackPanel>
-                      <StackPanel Spacing="2">
-                        <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItemExample}" />
-                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItem}" />
-                      </StackPanel>
-                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingIsCaseSensitiveAndHeldBack}" />
+        <TextBlock Grid.Row="2" Classes="label" Text="{x:Static res:Strings.Patterns}" Margin="0,6,0,0" />
+        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="6">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" ctl:FormKeys.Confirm="{Binding ApplySeeCommand}">
+            <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="{x:Static res:Strings.PatternsItCanSee}" />
+            <Button Grid.Column="1" Content="{x:Static res:Strings.LetItSeeThese}" Command="{Binding ApplySeeCommand}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
+            <Button Grid.Column="1" Name="LearnMoreSeeing" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
+                    AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutWhatItCanSee}">
+              <Button.Flyout>
+                <Flyout Placement="Bottom">
+                  <StackPanel MaxWidth="320" Spacing="10">
+                    <StackPanel Spacing="2">
+                      <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironmentExample}" />
+                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironment}" />
                     </StackPanel>
-                  </Flyout>
-                </Button.Flyout>
-              </Button>
-            </Grid>
-          </StackPanel>
-        </Expander>
+                    <StackPanel Spacing="2">
+                      <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItemExample}" />
+                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItem}" />
+                    </StackPanel>
+                    <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingIsCaseSensitiveAndHeldBack}" />
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+          </Grid>
+        </StackPanel>
 
         <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.ProjectRows}" Margin="0,5,0,0" />
         <StackPanel Grid.Row="3" Grid.Column="1" Spacing="8">

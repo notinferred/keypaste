@@ -675,6 +675,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
         var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
 
+        var usual = profiles.ToDictionary(
+            profile => profile.Name,
+            profile => EnvProfileCell.UsualOf(
+                (Matrix?.Rows ?? [])
+                    .SelectMany(row => row.Cells.Where(cell => string.Equals(cell.Profile, profile.Name, StringComparison.Ordinal)))
+                    .Select(cell => (IReadOnlyList<string>)[.. cell.Sources.Select(ApprovalPrompt.Shown)])),
+            StringComparer.Ordinal);
+
         Rows =
         [
             .. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))])),
@@ -697,6 +705,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             {
                 Sources = [.. (known?.Sources ?? []).Select(ApprovalPrompt.Shown)],
                 Also = known?.Sources is [var only] ? Elsewhere(only, profile) : [],
+                UsualSource = usual.GetValueOrDefault(profile),
             };
         }
     }

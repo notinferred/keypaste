@@ -51,10 +51,13 @@ internal sealed class DiagnosticsViewModel : ObservableObject
     private readonly AppVaultSession _session;
     private readonly string? _home;
     private readonly CrashReporting? _crashes;
+    private readonly AppAuthority? _authority;
 
-    internal DiagnosticsViewModel(AppVaultSession session, string? home, CrashReporting? crashes = null)
+    internal DiagnosticsViewModel(AppVaultSession session, string? home, CrashReporting? crashes = null, AppAuthority? authority = null)
     {
         ArgumentNullException.ThrowIfNull(session);
+
+        _authority = authority;
 
         _session = session;
         _home = home;
@@ -70,6 +73,11 @@ internal sealed class DiagnosticsViewModel : ObservableObject
 
     /// <summary>Whether <c>KEYPASTE_HOME</c> is overriding that.</summary>
     internal string HomeOverride => string.IsNullOrEmpty(_home) ? "not set" : _home;
+
+    /// <summary>Which process and unlock answer agents, for a support request; nothing a person acts on, so Agents leaves it out.</summary>
+    internal string AnsweringAgents => _authority?.Status is AuthorityStatus.Serving serving
+        ? string.Create(CultureInfo.InvariantCulture, $"process {serving.Owner.ProcessId} · unlock {serving.Session}")
+        : "no";
 
     /// <summary>The app's version, for a bug report.</summary>
     internal static string Version =>

@@ -23,6 +23,10 @@ internal sealed partial class ShellView : UserControl
         ["Move group…"] = "MoveGroupTarget",
         ["Delete group"] = "KeepGroup",
         ["Rename or move…"] = "OrganizeTitle",
+        ["Replace value…"] = "ReplacementFieldValue",
+        ["Generate value…"] = "ReplacementFieldValue",
+        ["Rename field…"] = "RenamedFieldName",
+        ["Remove field…"] = "KeepField",
     };
 
     private static void OnToastPointerEntered(object? sender, PointerEventArgs e) => ((sender as Control)?.DataContext as Toast)?.Hold();
@@ -254,6 +258,9 @@ internal sealed partial class ShellView : UserControl
         }
 
         e.Handled = true;
+
+        // A menu lies over the pane, and a value shown beneath it would stay out of the person's reach to hide.
+        RevealedValue.HideShown();
 
         // Choosing a sidebar row can rebuild the sidebar, taking the row's container with it.
         if (TopLevel.GetTopLevel(anchor) is null)

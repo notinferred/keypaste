@@ -312,8 +312,8 @@ public sealed class SortAndSizeTablesTests
         {
             _ = Items(shell);
             var row = shell.Named<ListBox>("Rows").ContainerFromIndex(0)!.GetVisualDescendants().OfType<EntryColumns>().Single();
-            var kind = row.GetVisualDescendants().OfType<TextBlock>().Single(block => Grid.GetColumn(block) == 4);
-            Assert.Equal(InWindow(kind, shell.Window).X, InWindow(LabelOf(Head(shell, TableStates.Kind)), shell.Window).X, 0.01);
+            var group = row.GetVisualDescendants().OfType<TextBlock>().Single(block => Grid.GetColumn(block) == 4);
+            Assert.Equal(InWindow(group, shell.Window).X, InWindow(LabelOf(Head(shell, TableStates.Group)), shell.Window).X, 0.01);
         }
 
         using var log = LogShell("keypaste-table-align-log-");
@@ -427,7 +427,7 @@ public sealed class SortAndSizeTablesTests
         Assert.Equal(edge.X + by, InWindow(grip, shell.Window).X, 1d);
 
         var row = shell.Named<ListBox>("Rows").ContainerFromIndex(0)!.GetVisualDescendants().OfType<EntryColumns>().Single();
-        Assert.Equal(InWindow(Head(shell, TableStates.Group), shell.Window).X, InWindow(row.Children[5], shell.Window).X, 1d);
+        Assert.Equal(InWindow(Head(shell, TableStates.Group), shell.Window).X, InWindow(row.Children[4], shell.Window).X, 1d);
     });
 
     [Theory]

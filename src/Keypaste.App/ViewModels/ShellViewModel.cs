@@ -283,7 +283,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
     internal RelayCommand CancelTouchCommand { get; }
 
-    /// <summary>Recommendations, checked on unlock and after each save, and listed only in Settings.</summary>
+    /// <summary>Recommendations, checked on unlock and after each save, and listed only on their screen under Settings.</summary>
     internal RecommendationsViewModel Recommendations { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
@@ -933,7 +933,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             previous.PropertyChanged -= OnEntriesChanged;
         }
 
-        (Content as IDisposable)?.Dispose();
+        // Recommendations lives as long as the unlock, and is disposed with the shell.
+        if (!ReferenceEquals(Content, Recommendations))
+        {
+            (Content as IDisposable)?.Dispose();
+        }
 
         if (_crashes is not null)
         {
@@ -952,8 +956,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Trash => new TrashViewModel(_session, Tables.Trash),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
-            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes),
+            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes, Authority),
             DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
+            DestinationKind.Recommendations => Recommendations,
             _ => null,
         };
 

@@ -5,6 +5,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 
@@ -30,14 +31,8 @@ namespace Keypaste.App.ViewModels;
 /// or check runs no other Connect, Connect again or Disconnect can start.
 /// </para>
 /// <para>
-/// <b>History is read from the audit file this app records every answered request in</b>, kept to
-/// the records since this unlock and rendered by <see cref="AuditText"/> as the activity log reads
-/// the whole file (D-0331). A log that is missing has no records yet, as the activity log reads it; one
-/// that cannot be read is said to be unavailable, never shown as an unlock in which nothing happened.
-/// </para>
-/// <para>
-/// It re-reads the authority every second so the lifetimes count down, and re-reads the file only
-/// when its length or write time has moved.
+/// It re-reads the authority every second so the lifetimes count down, and re-reads the audit file, which says
+/// when each agent last asked, only when its length or write time has moved. The log itself is Agents › History.
 /// </para>
 /// </remarks>
 internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable, IHoldsDraft
@@ -68,10 +63,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     private readonly ObservableCollection<ActivityRow> _waiting = [];
     private readonly ObservableCollection<ActivityRow> _grants = [];
-    private string _historyHeading = string.Empty;
-    private string _history = string.Empty;
-    private string _historyMessage = string.Empty;
-    private (string? Session, long Length, DateTime Written)? _historyRead;
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
@@ -130,6 +121,14 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     /// <summary>The look in progress or the last one, finished once what it found is posted.</summary>
     internal Task Looking { get; private set; } = Task.CompletedTask;
+
+    /// <summary>Why a listed agent has no Settings, said once for them all, and what would give it some where a Connect is on the list; empty with none listed.</summary>
+    internal string UnnamedAgentsNote => !_rows.Any(row => !row.HasSettings)
+        ? string.Empty
+        : "An agent here with no Settings follows Every other agent's, because its connection gave it no name."
+            + (_rows.Any(row => row.OffersConnect) ? $" {Resources.Strings.ConnectAToolFromThisListToGive}" : string.Empty);
+
+    internal bool HasUnnamedAgentsNote => UnnamedAgentsNote.Length > 0;
 
     /// <summary>Whether the last look found none of the tools keypaste connects.</summary>
     internal bool HasNoTools => _connector is not null && _looked && !IsLooking && _findings.Count == 0;
@@ -191,13 +190,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     [ObservableProperty]
     internal partial string Status { get; private set; } = string.Empty;
 
-    /// <summary>Which process and session answer agents, as the line after "Answering agents from this app" names them, or empty when none does.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsServing))]
-    internal partial string Serving { get; private set; } = string.Empty;
-
-    internal bool IsServing => Serving.Length > 0;
-
     /// <summary>Why waiting requests and allowances cannot be read, or empty when they were.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting), nameof(NoGrants))]
@@ -224,19 +216,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>The audit log history is read from.</summary>
     internal string AuditPath => _auditPath;
 
-    /// <summary>How many of the log's records are since this unlock, as <see cref="AuditText"/> states it.</summary>
-    internal string HistoryHeading => _historyHeading;
-
-    /// <summary>The records since this unlock and their notes, exactly as <see cref="AuditText"/> rendered them.</summary>
-    internal string History => _history;
-
-    internal bool HasHistory => _history.Length > 0;
-
-    /// <summary>What is true of the log as a whole: that it is unavailable, or that its chain is broken.</summary>
-    internal string HistoryMessage => _historyMessage;
-
-    internal bool HasHistoryMessage => _historyMessage.Length > 0;
-
     /// <summary>Ends the allowance a row lists, so the next matching request asks again.</summary>
     internal RelayCommand<ActivityRow> EndCommand { get; }
 
@@ -260,7 +239,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     /// <summary>Reads the authority and the log again.</summary>
     [RelayCommand]
-    internal void Refresh() => Read(forceHistory: true);
+    internal void Refresh() => Read(force: true);
 
     /// <summary>The status as the screen says it, with no agent Automatic.</summary>
     internal static string Describe(AuthorityStatus status) => Describe(status, []);
@@ -313,25 +292,19 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         if (!_disposed)
         {
-            Read(forceHistory: false);
+            Read(force: false);
         }
     }
 
-    private void Read(bool forceHistory)
+    private void Read(bool force)
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
-        Serving = status is AuthorityStatus.Serving answering
-            ? string.Create(CultureInfo.InvariantCulture, $"process {answering.Owner.ProcessId} · unlock {answering.Session}")
-            : string.Empty;
-
-        string? session = null;
         List<ActivityRow> waiting = [];
         List<ActivityRow> grants = [];
 
         if (status is AuthorityStatus.Serving serving)
         {
             var activity = _authority!.Activity;
-            session = serving.Session;
             Unavailable = string.Empty;
             var asked = activity.Waiting.Count;
             var run = asked + activity.WaitingRuns.Count;
@@ -368,8 +341,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(NoGrants));
         EndAllCommand.NotifyCanExecuteChanged();
 
-        ReadHistory(session, forceHistory);
-        var (caps, records) = ReadClients(forceHistory);
+        var (caps, records) = ReadClients(force);
+
+        OnPropertyChanged(nameof(UnnamedAgentsNote));
+        OnPropertyChanged(nameof(HasUnnamedAgentsNote));
 
         // With clients.toml unreadable every agent request is refused, so nobody is answered without asking.
         var said = Describe(status, status is AuthorityStatus.Serving && caps is not null ? AutomaticAgents.Named(records, caps, _clock.GetUtcNow()) : []);
@@ -603,14 +578,14 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         AgentMode.Ask => "Ask every time",
         AgentMode.Automatic => "Automatic",
-        _ => "Ask, allow for a while",
+        _ => AccessChangePrompt.AllowForDefaultWords,
     };
 
     /// <summary>The panel a row's Settings opens, which re-reads the screen after each change.</summary>
     private AgentSettingsViewModel? OpenAgentSettings(string agent) =>
         _authority is null ? null : new AgentSettingsViewModel(_authority, agent, () =>
         {
-            Read(forceHistory: false);
+            Read(force: false);
             Summarize();
         });
 
@@ -754,57 +729,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
     }
 
-    private void ReadHistory(string? session, bool force)
-    {
-        var file = new FileInfo(_auditPath);
-        (string?, long, DateTime) stamp = file.Exists ? (session, file.Length, file.LastWriteTimeUtc) : (session, -1, default);
-
-        if (!force && _historyRead == stamp)
-        {
-            return;
-        }
-
-        _historyRead = stamp;
-
-        if (session is null)
-        {
-            Show([], "History can't be shown, because this app is not answering agents for this vault. Lock and unlock the vault to try again.");
-            return;
-        }
-
-        var history = AuditHistory.Read(
-            _auditPath,
-            entry => string.Equals(entry.Session, session, StringComparison.Ordinal),
-            ["since you unlocked"]);
-
-        // No log yet is the first run before any agent asked, as the activity log reads it too.
-        if (history.Kind == AuditReadKind.Missing || (history.Kind == AuditReadKind.Intact && history.Entries.Count == 0))
-        {
-            Show([], "Nothing has been recorded since you unlocked.");
-            return;
-        }
-
-        Show(history.Lines, history.Kind switch
-        {
-            AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
-            AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
-            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. The activity log in Settings › Advanced says where.",
-            _ => string.Empty,
-        });
-    }
-
-    private void Show(IReadOnlyList<string> lines, string message)
-    {
-        _historyHeading = lines.Count > 0 ? lines[0] : string.Empty;
-        _history = string.Join(Environment.NewLine, lines.Skip(1));
-        _historyMessage = message;
-        OnPropertyChanged(nameof(HistoryHeading));
-        OnPropertyChanged(nameof(History));
-        OnPropertyChanged(nameof(HistoryMessage));
-        OnPropertyChanged(nameof(HasHistory));
-        OnPropertyChanged(nameof(HasHistoryMessage));
-    }
-
     /// <summary>Brings the waiting prompt's window forward with Deny focused and its allows disarmed for a second; only the person's press reaches it, never a message on the pipe (D-0456).</summary>
     [RelayCommand(CanExecute = nameof(HasWaiting))]
     private void ShowPrompt()
@@ -814,7 +738,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             _toast("The prompt window is no longer open.", ToastTone.Information);
         }
 
-        Read(forceHistory: false);
+        Read(force: false);
     }
 
     private void End(ActivityRow? row)
@@ -822,7 +746,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         if (row?.Id is { } id)
         {
             var ended = _authority?.Revoke(id) == true;
-            Read(forceHistory: false);
+            Read(force: false);
 
             if (ended)
             {
@@ -835,7 +759,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         IsConfirmingEndAll = false;
         _authority?.RevokeAll();
-        Read(forceHistory: false);
+        Read(force: false);
         _toast("Ended every allowance.", ToastTone.Success);
     }
 

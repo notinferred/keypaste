@@ -53,8 +53,6 @@ public sealed class AgentActivityViewModelTests
         Assert.True(model.HasWaiting);
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
-        var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
-        Assert.Equal($"process {serving.Owner.ProcessId} · unlock {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 
@@ -183,73 +181,6 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task History_is_the_audit_records_naming_this_session()
-    {
-        await using var app = await App.StartAsync();
-        app.Audit("env/other/FROM_BEFORE", "an-earlier-session");
-        app.Audit("example", app.Session);
-
-        using var model = app.Model();
-
-        Assert.False(model.HasHistoryMessage);
-        Assert.Equal($"1 record of 2 in {AuditHistory.ShortPath(model.AuditPath)}, since you unlocked", model.HistoryHeading);
-        Assert.DoesNotContain(app.Session, model.HistoryHeading + model.History, StringComparison.Ordinal);
-        Assert.Contains("example", model.History, StringComparison.Ordinal);
-        Assert.DoesNotContain("FROM_BEFORE", model.History, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task A_record_written_while_the_screen_is_open_appears_at_the_next_tick()
-    {
-        await using var app = await App.StartAsync();
-        app.Audit("example", app.Session);
-
-        using var model = app.Model();
-        app.Audit("example", app.Session);
-
-        app.Clock.Advance(TimeSpan.FromSeconds(1));
-
-        Assert.Contains("2 records of 2", model.HistoryHeading, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task A_session_with_no_records_says_so_instead_of_an_empty_table()
-    {
-        await using var app = await App.StartAsync();
-        app.Audit("env/other/FROM_BEFORE", "an-earlier-session");
-
-        using var model = app.Model();
-
-        Assert.False(model.HasHistory);
-        Assert.Equal("Nothing has been recorded since you unlocked.", model.HistoryMessage);
-        Assert.Empty(model.HistoryHeading);
-    }
-
-    [Fact]
-    public async Task A_missing_log_reads_as_a_session_with_no_records_yet()
-    {
-        await using var app = await App.StartAsync();
-
-        using var model = app.Model();
-
-        Assert.False(model.HasHistory);
-        Assert.Equal("Nothing has been recorded since you unlocked.", model.HistoryMessage);
-        Assert.DoesNotContain(model.AuditPath, model.HistoryMessage, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task An_unreadable_log_is_unavailable()
-    {
-        await using var app = await App.StartAsync();
-        Directory.CreateDirectory(KeypasteHome.AuditPath(app.Fixture.Home));
-
-        using var model = app.Model();
-
-        Assert.False(model.HasHistory);
-        Assert.StartsWith("History unavailable: the audit log couldn't be read", model.HistoryMessage, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task A_lock_empties_both_lists_because_the_authority_holds_nothing()
     {
         await using var app = await App.StartAsync();
@@ -267,7 +198,6 @@ public sealed class AgentActivityViewModelTests
         Assert.Empty(model.Waiting);
         Assert.True(model.IsUnavailable);
         Assert.False(model.NoGrants);
-        Assert.Equal("History can't be shown, because this app is not answering agents for this vault. Lock and unlock the vault to try again.", model.HistoryMessage);
     }
 
     [Fact]
@@ -585,7 +515,7 @@ public sealed class AgentActivityViewModelTests
         string.Join(
             '\n',
             [
-                model.Status, model.Unavailable, model.History, model.HistoryMessage,
+                model.Status, model.Unavailable,
                 .. model.Waiting.Concat(model.Grants).Select(row => $"{row.Who} {row.What} {row.Left}"),
             ]);
 

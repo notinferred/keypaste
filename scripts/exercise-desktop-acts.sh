@@ -1099,6 +1099,7 @@ act_field() {
 
 act_notes_flag() {
   attempt settings shortcut 4 || return 1
+  attempt recommendations drive invoke 'Open recommendations' || return 1
   attempt flagged drive find-prefix "$NOTE_KEY " || return 1
   saved moved_ms move drive invoke "Move $NOTE_KEY to a field" || return 1
   fact field_sha256 "$(field_hash "$ENTRY_NOTES" "$NOTE_KEY")"
@@ -1123,7 +1124,10 @@ act_project_run() {
 act_edit_rerun() {
   attempt items shortcut 1 || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
-  attempt replace drive invoke "Replace $FIELD" || return 1
+  # The row's menu is a popup of its own, outside the window the driver searches, and takes the keyboard as it opens.
+  attempt field-menu drive invoke "More actions for $FIELD" || return 1
+  attempt replace-item drive key Down || return 1
+  attempt replace drive key Return || return 1
   attempt value-focus drive focus id:ReplacementFieldValue || return 1
   attempt value drive type "$VALUE2" || return 1
   saved replaced_ms confirm drive invoke Replace || return 1

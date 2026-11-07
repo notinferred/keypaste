@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
@@ -780,7 +781,8 @@ public sealed class ScreenRenderer
 
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
         var window = new MainWindow { Width = _width, Height = _height };
-        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        var commands = new AppCommands(new AppCommandHost { Session = authority.Session, Shell = () => shell, Unlock = () => null });
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell, Commands = commands };
         window.Show();
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
@@ -793,6 +795,13 @@ public sealed class ScreenRenderer
         entries.SelectedGroup = entries.Groups.First(group => group.Path == "env/acme-api");
         entries.Selected = entries.Rows.First(row => row.Name == _apiHome);
         Save(window, output, "11-secrets-home-entry");
+        var fieldMenu = window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "FieldMenu" && button.IsEffectivelyVisible);
+        fieldMenu.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Save(window, output, "11a-secrets-field-menu");
+        var opened = (MenuFlyout)FlyoutBase.GetAttachedFlyout(fieldMenu)!;
+        Save(TopLevel.GetTopLevel(opened.Items.OfType<MenuItem>().First())!, output, "11a-secrets-field-menu-popup");
+        opened.Hide();
+        WindowInput.Drain();
 
         WindowInput.Drain();
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = true;
@@ -1233,7 +1242,8 @@ public sealed class ScreenRenderer
             AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
             AccessOrigin.Prompt,
             string.Empty,
-            TimeZoneInfo.Utc);
+            TimeZoneInfo.Utc,
+            ApprovalLimits.DefaultMaximumTtlSeconds);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
@@ -1305,7 +1315,10 @@ public sealed class ScreenRenderer
         var settingsWidth = window.Width;
         window.Width = 720;
         Save(window, output, "95a-settings-720");
+        shell.Current = Destinations.Of(DestinationKind.Recommendations);
+        Save(window, output, "96a-recommendations-720");
         window.Width = settingsWidth;
+        Save(window, output, "96-recommendations");
         window.Height = _height;
 
         shell.Current = Destinations.Of(DestinationKind.Diagnostics);
@@ -1663,7 +1676,6 @@ public sealed class ScreenRenderer
         Save(window, output, "27-agents-settings-closed");
         model.IsMoreOpen = true;
         Save(window, output, "27-agents-settings-more");
-        model.IsAdvancedOpen = true;
         WindowInput.Drain();
         var learnMore = settings.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreSeeing");
         learnMore.BringIntoView();
@@ -1671,7 +1683,6 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
         Save(window, output, "27-agents-settings-learn-more");
         learnMore.Flyout.Hide();
-        model.IsAdvancedOpen = false;
         await model.ChooseAsync(model.SeeScopes.Single(choice => choice.Words == "Only these"));
         Save(window, output, "27-agents-settings-only-these");
         window.Width = 720;

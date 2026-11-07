@@ -56,6 +56,10 @@
       <views:AdvancedView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:RecommendationsViewModel">
+      <views:RecommendationsView />
+    </DataTemplate>
+
   </UserControl.DataTemplates>
 
   <UserControl.Styles>

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Agents shows what the app's session holds and what was answered since the unlock (4.3b, V-4.3b, N.3),
+# Agents shows what the app's session holds, and its History what agents asked for (4.3b, V-4.3b, N.3),
 # across real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver holding the vault
 # as launch composes the app, with its prompt window drawn on a headless display and clicked. The driver's
-# `activity` prints what the screen's own view model reads from the authority and the audit file, and its
+# `activity` prints what the screens' own view models read from the authority and the audit file, and its
 # `revoke` and `show-prompt` press the screen's buttons.
 #
 # A real keypaste mcp request waiting at the unlocked app is listed. Show the prompt, pressed once the prompt
@@ -13,7 +13,7 @@
 # show what the vault gives the agent; a narrowing chosen there applies at once, to the vault and
 # clients.toml, and a widening opens the app's confirmation window, changes nothing when refused, and once
 # allowed makes the next request Automatic. Each change is one keypaste app line labelled with the agent.
-# A missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
+# History reads a missing audit log as nothing asked yet, and says when one could not be read.
 #
 # NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if Show the prompt leaves the
 # prompt armed or focus off Deny, if an ended allowance still
@@ -163,8 +163,8 @@ FIRST="$(session_of)"
 activity
 omits '^unavailable ' "the authority as unreadable while it serves"
 omits '^(waiting|grant) ' "a request or grant before any agent asked"
-shows '^history-message Nothing has been recorded since you unlocked\.' "a missing log as a session with no records yet"
-omits '^history-message History unavailable' "a missing log as unavailable"
+shows '^history-message Nothing has asked' "a missing log as nothing asked yet"
+omits '^history ' "a record while the log is missing"
 
 # ------------------------------------------ the waiting request, then its grant and its audit record
 start_bridge first
@@ -192,8 +192,7 @@ last_audit --arg s "$FIRST" '.decision == "granted" and .method == "prompt" and 
 activity
 omits '^waiting ' "a request after it was answered"
 shows "$LISTED" "the grant Approve gave"
-shows "^history-heading 1 record of [0-9]+ in .*, since you unlocked$" "history kept to this session"
-shows "^history .*DEPLOY_KEY.*granted.*prompt" "the prompted grant from the audit file"
+shows "^history .*DEPLOY_KEY.*Approved" "the prompted grant from the audit file"
 
 ask 4
 reply 4
@@ -225,8 +224,7 @@ echo deny >&7
 reply 6
 refused 6
 activity
-shows "^history .*DEPLOY_KEY.*denied.*prompt" "the refusal from the audit file"
-shows "^history-heading 4 records of [0-9]+ in .*, since you unlocked$" "every record of this session"
+shows "^history .*DEPLOY_KEY.*Denied" "the refusal from the audit file"
 
 # ------------------------------------------------ a lock empties both lists; the next session has none
 # Another field, because the refusal above cools the password down for every bridge (D-0425).
@@ -252,8 +250,7 @@ SECOND="$(session_of)"
 activity
 omits '^unavailable ' "the new session as unreadable"
 omits '^(waiting|grant) ' "a request or grant from before the lock"
-shows '^history-message Nothing has been recorded since you unlocked\.' "the new session's history"
-omits '^history(-heading)? ' "a record from before the lock in the new session's history"
+shows "^history .*DEPLOY_KEY.*Approved" "the file's records after a lock, which History reads whole"
 
 # ---------------------------- a row's settings: a narrowing applies at once, a widening only once confirmed
 start_bridge third
@@ -278,7 +275,7 @@ released 7
 change mode allow-for-a-while
 wait_for '^access-prompt agent=' "$HOLD_OUT" 1
 grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Ask, allow for a while" \
+  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Ask, allow for 1 hour" \
   || die "the confirmation does not say who gains what, or where it was asked from"
 echo deny >&7
 changed
@@ -311,7 +308,7 @@ mkdir "$AUDIT"
 echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 3
 activity
-shows "^history-message History unavailable: the audit log couldn't be read" "an unreadable log as unavailable"
+shows "^history-message That log couldn't be read" "an unreadable log said plainly"
 omits '^history ' "history from a log that could not be read"
 
 grep -q "$SECRET" "$HOLD_OUT" && die "a credential reached the app's output"

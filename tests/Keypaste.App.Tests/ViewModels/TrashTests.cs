@@ -87,7 +87,7 @@ public sealed class TrashTests : IDisposable
         Assert.True(context.Trash.IsEmpty);
         Assert.Empty(context.Trash.Rows);
         Assert.Equal(TrashViewModel.RecycledNote, context.Trash.Note);
-        Assert.Contains("format 4.1", context.Trash.ReaderFloor, StringComparison.Ordinal);
+        Assert.Contains("format 4.1", context.Trash.Note, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -256,7 +256,7 @@ public sealed class TrashTests : IDisposable
 
         trash.Selected = Assert.Single(trash.Rows);
 
-        Assert.Contains(nameof(TrashViewModel.AwaitsSelection), raised);
+        Assert.Contains(nameof(TrashViewModel.HasSelection), raised);
         Assert.Contains(nameof(TrashViewModel.PurgePrompt), raised);
         Assert.Equal(["purge", "restore"], asked.Order(StringComparer.Ordinal));
         Assert.True(trash.RestoreCommand.CanExecute(null));

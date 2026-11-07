@@ -34,7 +34,7 @@ public sealed record ProjectAccess
 /// <para>
 /// <see cref="Defaults"/> is what keypaste did before these settings existed, and what an agent with
 /// no settings gets: every project's variables, values when a person allows them, no commands, and
-/// Ask, allow for a while.
+/// the timed mode.
 /// </para>
 /// <para>
 /// A row beats the default for the items it covers, and an environment's row beats its project's.
@@ -51,7 +51,7 @@ public sealed record AgentAccess
     private readonly AccessLimit _limit = AccessLimit.None;
     private readonly IReadOnlyList<ProjectAccess> _projects = [];
 
-    /// <summary>Today's behaviour: every project's variables, values when allowed, no commands, Ask, allow for a while.</summary>
+    /// <summary>Today's behaviour: every project's variables, values when allowed, no commands, the timed mode.</summary>
     public static AgentAccess Defaults { get; } = new();
 
     /// <summary>What it can see, in <c>--expose</c>'s selectors.</summary>

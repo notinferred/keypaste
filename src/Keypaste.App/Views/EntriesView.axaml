@@ -13,8 +13,6 @@
     <views:DepthToIndent x:Key="Indent" />
     <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="13" /></DataTemplate>
     <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="13" /></DataTemplate>
-    <DataTemplate x:Key="FieldRenameGlyph"><ctl:KpIcon Icon="pencil" Size="13" /></DataTemplate>
-    <DataTemplate x:Key="FieldProtectGlyph"><ctl:KpIcon Icon="shield" Size="13" /></DataTemplate>
     <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="13" /></DataTemplate>
     <DataTemplate x:Key="AttachmentSaveGlyph"><ctl:KpIcon Icon="download" Size="13" /></DataTemplate>
   </UserControl.Resources>
@@ -380,8 +378,8 @@
       </Grid.RowDefinitions>
 
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
-        <!-- The columns, as KeePassXC's entry table draws them: what an item is, its username and web
-             address, and where it lives, never a password or a custom field's value (EntryRow). -->
+        <!-- The columns: an item's title, its username and web address, and where it lives, never a password
+             or a custom field's value (EntryRow). Its icon alone says what kind it is. -->
         <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,6,16,0">
           <views:ColumnHead Grid.Column="1" x:Name="TitleHead" Column="title" />
           <views:ColumnGrip Grid.Column="1" Column="title" />
@@ -389,11 +387,9 @@
           <views:ColumnGrip Grid.Column="2" Column="username" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
           <views:ColumnHead Grid.Column="3" x:Name="UrlHead" Column="url" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
           <views:ColumnGrip Grid.Column="3" Column="url" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
-          <views:ColumnHead Grid.Column="4" x:Name="KindHead" Column="kind" />
-          <views:ColumnGrip Grid.Column="4" Column="kind" />
-          <views:ColumnHead Grid.Column="5" x:Name="GroupHead" Column="group" />
-          <views:ColumnGrip Grid.Column="5" Column="group" />
-          <views:ColumnHead Grid.Column="6" x:Name="LastUsedHead" Column="last-used" HorizontalContentAlignment="Right" />
+          <views:ColumnHead Grid.Column="4" x:Name="GroupHead" Column="group" IsVisible="{Binding $self.(views:EntryColumns.ShowsGroup)}" />
+          <views:ColumnGrip Grid.Column="4" Column="group" IsVisible="{Binding $self.(views:EntryColumns.ShowsGroup)}" />
+          <views:ColumnHead Grid.Column="5" x:Name="LastUsedHead" Column="last-used" HorizontalContentAlignment="Right" />
         </views:EntryColumns>
         <Panel>
           <!-- An empty list says why, so a filter with no match does not read as a failed load. -->
@@ -451,7 +447,10 @@
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EntryRow">
                 <views:EntryColumns>
-                  <ctl:KpIcon Grid.Column="0" Classes="kind" Icon="{Binding Icon}" Size="15" />
+                  <!-- The icon alone answers the pointer only on its strokes, so a background carries its tip. -->
+                  <Panel Grid.Column="0" Name="KindMark" Background="Transparent" ToolTip.Tip="{Binding KindLabel}" AutomationProperties.Name="{Binding KindLabel}">
+                    <ctl:KpIcon Classes="kind" Icon="{Binding Icon}" Size="15" />
+                  </Panel>
                   <DockPanel Grid.Column="1" Margin="0,0,8,0">
                     <!-- Why it is in a result: a field name from a fixed vocabulary, or the tag it was in,
                          never the value that matched. -->
@@ -474,18 +473,18 @@
                   <TextBlock Grid.Column="3" Classes="mono muted size-12" Text="{Binding DisplayUrl}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="muted size-12-5" Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="5" Classes="mono muted size-12" Text="{Binding Where}"
+                  <TextBlock Grid.Column="4" Classes="mono muted size-12" Text="{Binding Where}"
+                             IsVisible="{Binding $self.(views:EntryColumns.ShowsGroup)}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <!-- When an agent last received it: blue in use, green recent, grey idle. A time, never a value. Not amber:
+                  <!-- When an agent last received it, with a dot only while it is in use. A time, never a value. Not amber:
                        several rows can be in use at once, and a view has one amber element. -->
-                  <StackPanel Grid.Column="6"
+                  <StackPanel Grid.Column="5"
                               Orientation="Horizontal"
                               HorizontalAlignment="Right"
                               Spacing="6"
                               IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Classes="mono sm muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
-                    <Border Classes="dot" Classes.info="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}" />
+                    <Border Classes="dot info" IsVisible="{Binding IsInUse}" />
                   </StackPanel>
                 </views:EntryColumns>
               </DataTemplate>
@@ -749,13 +748,13 @@
                                    IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                        <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
+                        <Button x:Name="CopyPassword" Classes="action" IsVisible="{Binding HasPassword}" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="copy" Size="13" />
-                            <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static res:Strings.CopyPassword}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
-                        <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
+                        <Button x:Name="RotateFromPane" Classes="action" IsVisible="{Binding HasPassword}" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="refresh-cw" Size="13" />
                             <TextBlock Text="{x:Static res:Strings.RotateLabel}" VerticalAlignment="Center" />
@@ -906,9 +905,6 @@
                           IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
                     <StackPanel Spacing="10">
                       <TextBlock Classes="section" Text="{x:Static res:Strings.RenameOrMove}" />
-                      <TextBlock Text="{Binding OrganizePrompt}"
-                                 Classes="mono sm muted"
-                                 TextTrimming="CharacterEllipsis" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
                         <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Classes="mono" Text="{Binding DraftTitle}" />
@@ -974,6 +970,7 @@
                               <TextBlock Grid.Column="0" Classes="mono size-12" Text="{Binding When}" />
                               <TextBlock Grid.Column="1"
                                          Text="{Binding DisplayTitle}"
+                                         IsVisible="{Binding TitleDiffers}"
                                          Margin="12,0,0,0"
                                          Classes="muted size-12"
                                          TextTrimming="CharacterEllipsis" />
@@ -982,103 +979,110 @@
                         </ListBox.ItemTemplate>
                       </ListBox>
 
-                      <!-- The chosen revision above the entry as it is now, field by field. Its password
-                           can be read only while Reveal shows it, and copied as the current one is. -->
-                      <Grid IsVisible="{Binding History.HasSelection}"
-                            ColumnDefinitions="Auto,12,*"
-                            RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-
-                        <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
-                                   Classes="caption"
-                                   Text="{Binding History.Selected.When, StringFormat={x:Static res:Strings.ThenIsTheRevisionSavedValueNowXc49899}}"
-                                   TextWrapping="Wrap" />
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Password}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" VerticalAlignment="Center" />
-                        <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto,Auto">
-                          <ctl:RevealedValue Grid.Column="0"
-                                             x:Name="RevisionPassword"
-                                             Source="{Binding History.Selected}"
-                                             MaskedLength="{Binding History.Selected.MaskedLength}"
-                                             AutomationProperties.Name="{Binding History.Selected.Subject}"
-                                             FontFamily="{DynamicResource KpMono}"
-                                             HorizontalAlignment="Left"
-                                             VerticalAlignment="Center"
-                                             Foreground="{DynamicResource KpTextSecondary}" />
-                          <ctl:RevealButton Grid.Column="1"
-                                            x:Name="RevealRevisionPassword"
-                                            Classes="ghost in-field"
-                                            Margin="0,0,6,0"
-                                            Target="{Binding #RevisionPassword}"
-                                            ShowsWord="True"
-                                            Subject="{Binding History.Selected.Subject}" />
-                          <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="{x:Static res:Strings.Copy}"
-                                  Command="{Binding History.Selected.CopyPasswordCommand}" />
+                      <!-- What the chosen revision held against the entry as it is now, only where they differ. Its password
+                           can be read only while Reveal shows it, and copied as the current one is. Custom fields by
+                           name and protection, and the tags: never a field's value. -->
+                      <StackPanel Spacing="12" IsVisible="{Binding History.HasSelection}">
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.PasswordDiffers}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.Password}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" VerticalAlignment="Center" />
+                          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding !History.Selected.HasPassword}" />
+                            <ctl:RevealedValue Grid.Column="0"
+                                               x:Name="RevisionPassword"
+                                               Source="{Binding History.Selected}"
+                                               MaskedLength="{Binding History.Selected.MaskedLength}"
+                                               AutomationProperties.Name="{Binding History.Selected.Subject}"
+                                               FontFamily="{DynamicResource KpMono}"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource KpTextSecondary}" />
+                            <ctl:RevealButton Grid.Column="1"
+                                              x:Name="RevealRevisionPassword"
+                                              Classes="ghost in-field"
+                                              Margin="0,0,6,0"
+                                              IsVisible="{Binding History.Selected.HasPassword}"
+                                              Target="{Binding #RevisionPassword}"
+                                              ShowsWord="True"
+                                              Subject="{Binding History.Selected.Subject}" />
+                            <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="{x:Static res:Strings.Copy}"
+                                    IsVisible="{Binding History.Selected.HasPassword}"
+                                    AutomationProperties.Name="{x:Static res:Strings.CopyThisRevisionsPassword}"
+                                    Command="{Binding History.Selected.CopyPasswordCommand}" />
+                          </Grid>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="mono secondary" Text="{Binding PasswordMask}" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding !HasPassword}" />
+                          </Panel>
                         </Grid>
-                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <TextBlock Grid.Row="3" Grid.Column="2" Classes="mono secondary" Text="{Binding PasswordMask}" Margin="0,4,0,0" />
-
-                        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Username}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
-                        <Panel Grid.Row="5" Grid.Column="2">
-                          <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <Panel Grid.Row="6" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-
-                        <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.URL}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="8" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
-                        <Panel Grid.Row="8" Grid.Column="2">
-                          <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                        <TextBlock Grid.Row="9" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <Panel Grid.Row="9" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-
-                        <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Notes}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
-                        <Panel Grid.Row="11" Grid.Column="2">
-                          <TextBlock Classes="size-13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                        <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <Panel Grid.Row="12" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="size-13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-
-                        <!-- Custom fields by name and protection, and the tags: never a field's value. -->
-                        <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.CustomFields}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
-                        <Panel Grid.Row="14" Grid.Column="2">
-                          <TextBlock x:Name="RevisionFields" Classes="mono size-12" Text="{Binding History.Selected.FieldsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                        <TextBlock Grid.Row="15" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <Panel Grid.Row="15" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono size-12" Text="{Binding FieldsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-
-                        <TextBlock Grid.Row="16" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="{x:Static res:Strings.Tags}" Margin="0,12,0,6" />
-                        <TextBlock Grid.Row="17" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Then}" />
-                        <Panel Grid.Row="17" Grid.Column="2">
-                          <TextBlock x:Name="RevisionTags" Classes="mono size-12" Text="{Binding History.Selected.TagsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                        <TextBlock Grid.Row="18" Grid.Column="0" Classes="caption" Text="{x:Static res:Strings.Now}" Margin="0,4,0,0" />
-                        <Panel Grid.Row="18" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono size-12" Text="{Binding TagsSummary}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                        </Panel>
-                      </Grid>
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.UsernameDiffers}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.Username}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" />
+                          <Panel Grid.Row="1" Grid.Column="1">
+                            <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="mono" Text="{Binding DisplayUsername}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                        </Grid>
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.UrlDiffers}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.URL}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" />
+                          <Panel Grid.Row="1" Grid.Column="1">
+                            <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                        </Grid>
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.NotesDiffer}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.Notes}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" />
+                          <Panel Grid.Row="1" Grid.Column="1">
+                            <TextBlock Classes="size-13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="size-13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                        </Grid>
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.FieldNamesDiffer}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.CustomFields}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" />
+                          <Panel Grid.Row="1" Grid.Column="1">
+                            <TextBlock x:Name="RevisionFields" Classes="mono size-12" Text="{Binding History.Selected.FieldsSummary}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="mono size-12" Text="{Binding FieldsSummary}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                        </Grid>
+                        <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" IsVisible="{Binding History.Selected.TagsDiffer}">
+                          <TextBlock Grid.ColumnSpan="2" Classes="label" Text="{x:Static res:Strings.Tags}" Margin="0,0,0,2" />
+                          <TextBlock Grid.Row="1" Classes="caption" Text="{x:Static res:Strings.Then}" />
+                          <Panel Grid.Row="1" Grid.Column="1">
+                            <TextBlock x:Name="RevisionTags" Classes="mono size-12" Text="{Binding History.Selected.TagsSummary}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding History.Selected.TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                          <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
+                          <Panel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Classes="mono size-12" Text="{Binding TagsSummary}" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" Text="{x:Static res:Strings.None}" IsVisible="{Binding TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                          </Panel>
+                        </Grid>
+                        <TextBlock x:Name="RevisionUnchanged" Classes="caption" TextWrapping="Wrap" Text="{Binding History.Selected.Unchanged}" IsVisible="{Binding History.Selected.HasUnchanged}" />
+                      </StackPanel>
 
                       <StackPanel Spacing="6" IsVisible="{Binding History.HasSelection}">
                         <Button x:Name="RestoreRevision"
@@ -1112,9 +1116,15 @@
                     </StackPanel>
                   </Border>
 
-                  <!-- The fields. A login leads with its username. -->
-                  <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
+                  <!-- The fields, each only once it holds something: Edit fields… adds one. A login leads with its username. -->
+                  <StackPanel Spacing="8" IsVisible="{Binding HasStandardRows}">
+                    <Grid ColumnDefinitions="96,*">
+                      <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                          <Binding Path="!IsEditing" />
+                          <Binding Path="HasUsername" />
+                        </MultiBinding>
+                      </Grid.IsVisible>
                       <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Username}" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto">
@@ -1136,7 +1146,13 @@
                       </Border>
                     </Grid>
 
-                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
+                    <Grid ColumnDefinitions="96,*">
+                      <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                          <Binding Path="!IsEditing" />
+                          <Binding Path="HasPassword" />
+                        </MultiBinding>
+                      </Grid.IsVisible>
                       <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Password}" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto,Auto">
@@ -1225,7 +1241,13 @@
                                  ctl:Announcer.Says="{Binding TotpProblem}" Text="{Binding TotpProblem}" />
                     </Grid>
 
-                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
+                    <Grid ColumnDefinitions="96,*">
+                      <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                          <Binding Path="!IsEditing" />
+                          <Binding Path="HasUrl" />
+                        </MultiBinding>
+                      </Grid.IsVisible>
                       <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.URL}" VerticalAlignment="Top" Margin="0,11,0,0" />
                       <!-- A web address opens in the browser; anything else is text and says why (N.5). -->
                       <StackPanel Grid.Column="1" Spacing="6">
@@ -1340,33 +1362,13 @@
                                     AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.CopyValue}}"
                                         ToolTip.Tip="{x:Static res:Strings.CopyTheValueTheClipboardClearsItself}"
                                         Command="{Binding CopyValueCommand}" />
-                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource FieldReplaceGlyph}"
-                                    AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.ReplaceValue}}"
-                                        ToolTip.Tip="{x:Static res:Strings.ReplaceTheValue}"
+                                <!-- Opens the row's own context menu, whose commands the Item menu holds too. It names the field, never a value. -->
+                                <Button x:Name="FieldMenu" Classes="ghost row-action"
                                         IsVisible="{Binding IsWritable}"
-                                        Command="{Binding ReplaceCommand}" />
-                                <Button Classes="ghost row-action"
-                                        ToolTip.Tip="{x:Static res:Strings.GenerateANewValue}"
-                                        AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.GenerateANewValueForValue}}"
-                                        IsVisible="{Binding CanGenerate}"
-                                        Command="{Binding GenerateCommand}">
-                                  <ctl:KpIcon Icon="wand-2" Size="13" />
+                                        ToolTip.Tip="{x:Static res:Strings.MoreActions}"
+                                        AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.MoreActionsForValue}}">
+                                  <ctl:KpIcon Icon="ellipsis" Size="14" />
                                 </Button>
-                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Rename}" ContentTemplate="{StaticResource FieldRenameGlyph}"
-                                        ToolTip.Tip="{Binding RenameLabel}"
-                                        AutomationProperties.Name="{Binding RenameLabel}"
-                                        IsVisible="{Binding IsWritable}"
-                                        Command="{Binding RenameCommand}" />
-                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Protection}" ContentTemplate="{StaticResource FieldProtectGlyph}"
-                                        ToolTip.Tip="{Binding ProtectionLabel}"
-                                        AutomationProperties.Name="{Binding ProtectionLabel}"
-                                        IsVisible="{Binding IsWritable}"
-                                        Command="{Binding ToggleProtectionCommand}" />
-                                <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
-                                        AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.RemoveValue}}"
-                                        ToolTip.Tip="{x:Static res:Strings.RemoveThisField}"
-                                        IsVisible="{Binding IsWritable}"
-                                        Command="{Binding RemoveCommand}" />
                               </StackPanel>
                             </Grid>
                           </Border>
@@ -1477,7 +1479,7 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveFieldCommand}" />
+                          <Button x:Name="KeepField" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveFieldCommand}" />
                           <Button Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveFieldCommand}" />
                         </StackPanel>
                       </StackPanel>

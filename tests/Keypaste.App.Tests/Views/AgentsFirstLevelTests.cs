@@ -39,7 +39,7 @@ public sealed class AgentsFirstLevelTests
     private static readonly string[] _kinds =
     [
         "Button/AgentHistory", "Button/ShowPrompt", "Button/EndAllowance", "Button/EndAllAllowances", "Button/ConnectTool",
-        "Expander/AgentSettings", "Button/ResetClients", "SelectableTextBlock/SessionHistory",
+        "Expander/AgentSettings", "Button/ResetClients",
     ];
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -158,7 +158,7 @@ public sealed class AgentsFirstLevelTests
         Disclosure(agents.Window, claude).IsExpanded = true;
         agents.Settle();
         var settings = Assert.IsType<AgentSettingsViewModel>(claude.Settings);
-        settings.ToggleAdvancedCommand.Press();
+        settings.IsMoreOpen = true;
         agents.Settle();
 
         Assert.True(settings.OffersLimits, "no limits to show");
@@ -189,7 +189,7 @@ public sealed class AgentsFirstLevelTests
 
         await agents.RequestAsync("password");
         agents.Settle();
-        Assert.True(agents.Model.HasGrants && agents.Model.HasHistory, "no allowance or history to show");
+        Assert.True(agents.Model.HasGrants, "no allowance to show");
         look(agents.Window);
 
         agents.Person.Hold = true;

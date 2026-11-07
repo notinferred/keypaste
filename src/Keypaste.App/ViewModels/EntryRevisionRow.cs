@@ -33,8 +33,13 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     private readonly string _username;
     private readonly string _url;
     private readonly string _notes;
+    private readonly IReadOnlyList<(string Name, bool IsProtected)> _fields;
+    private readonly IReadOnlyList<string> _tags;
 
-    internal EntryRevisionRow(EntryHistoryViewModel owner, EntryRevision revision)
+    /// <param name="owner">The history it is listed in.</param>
+    /// <param name="revision">What it held.</param>
+    /// <param name="passwordDiffers">Whether its password is not the item's now; a bool, so the row holds neither.</param>
+    internal EntryRevisionRow(EntryHistoryViewModel owner, EntryRevision revision, bool passwordDiffers)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(revision);
@@ -44,11 +49,14 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
         ModifiedUtc = revision.ModifiedUtc;
         Title = revision.Fields.Title;
         MaskedLength = revision.Fields.Password.Length;
+        PasswordDiffers = passwordDiffers;
         _username = revision.Fields.Username;
         _url = revision.Fields.Url;
         _notes = revision.Fields.Notes;
-        FieldsSummary = Describe(revision.CustomFields.Select(field => (field.Name, field.IsProtected)));
-        TagsSummary = Describe(revision.Tags);
+        _fields = [.. revision.CustomFields.Select(field => (field.Name, field.IsProtected))];
+        _tags = [.. revision.Tags];
+        FieldsSummary = Describe(_fields);
+        TagsSummary = Describe(_tags);
 
         CopyPasswordCommand = new AsyncRelayCommand(() => _owner.Copy(this), () => MaskedLength > 0);
     }
@@ -90,6 +98,53 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// <summary>The notes this revision held, as the pane draws it.</summary>
     internal string DisplayNotes =>
         DisplayTextSanitizer.Sanitize(_notes, DisplayTextSanitizer.MaximumNotesLength).Text;
+
+    /// <summary>Whether its title is not the item's now; the list names it only then.</summary>
+    internal bool TitleDiffers => !string.Equals(DisplayTitle, _owner.Current.DisplayTitle, StringComparison.Ordinal);
+
+    internal bool PasswordDiffers { get; }
+
+    internal bool HasPassword => MaskedLength > 0;
+
+    // What is stored decides, not what is drawn: drawing cuts long text and takes out invisible characters.
+    internal bool UsernameDiffers => !string.Equals(_username, _owner.Current.Username, StringComparison.Ordinal);
+
+    internal bool UrlDiffers => !string.Equals(_url, _owner.Current.Url, StringComparison.Ordinal);
+
+    internal bool NotesDiffer => !string.Equals(_notes, _owner.Current.Notes, StringComparison.Ordinal);
+
+    internal bool FieldNamesDiffer => !_fields.SequenceEqual(_owner.Current.Fields.Select(row => (row.Name, row.IsProtected)));
+
+    internal bool TagsDiffer => !_tags.SequenceEqual(_owner.Current.Tags.Select(chip => chip.Tag), StringComparer.Ordinal);
+
+    /// <summary>What did not change, in one line, saying that custom field values are not compared, since one is not read to compare it.</summary>
+    internal string Unchanged
+    {
+        get
+        {
+            List<string> same =
+            [
+                .. new (bool Differs, string Name)[]
+                {
+                    (PasswordDiffers, "password"), (UsernameDiffers, "username"), (UrlDiffers, "URL"), (NotesDiffer, "notes"),
+                    (FieldNamesDiffer, "custom field names"), (TagsDiffer, "tags"),
+                }.Where(part => !part.Differs).Select(part => part.Name),
+            ];
+
+            var unchanged = same.Count switch
+            {
+                0 => string.Empty,
+                1 => $"Unchanged: {same[0]}.",
+                _ => $"Unchanged: {string.Join(", ", same.SkipLast(1))} and {same[^1]}.",
+            };
+
+            return _fields.Count > 0 || _owner.Current.Fields.Count > 0
+                ? $"{unchanged} Custom field values aren't compared here.".TrimStart()
+                : unchanged;
+        }
+    }
+
+    internal bool HasUnchanged => Unchanged.Length > 0;
 
     /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-0487).</summary>
     internal string FieldsSummary { get; }

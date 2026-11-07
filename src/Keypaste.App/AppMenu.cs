@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Keypaste.App.Controls;
 
 namespace Keypaste.App;
 
@@ -24,6 +25,7 @@ internal static class AppMenu
         }
 
         menu.NeedsUpdate += (_, _) => Refresh(menu);
+        menu.Opening += (_, _) => RevealedValue.HideShown();
     }
 
     /// <summary>A menu of <paramref name="entries"/>, as the Dock's.</summary>
@@ -55,7 +57,7 @@ internal static class AppMenu
     {
         ArgumentNullException.ThrowIfNull(commands);
 
-        var made = new List<RelayCommand>();
+        var made = new List<Action>();
         var flyout = new MenuFlyout();
         flyout.Items.Add(Group("keypaste", commands.AppMenu, made));
 
@@ -64,7 +66,11 @@ internal static class AppMenu
             flyout.Items.Add(Group(group.Header, group.Entries, made));
         }
 
-        flyout.Opening += (_, _) => made.ForEach(command => command.NotifyCanExecuteChanged());
+        flyout.Opening += (_, _) =>
+        {
+            RevealedValue.HideShown();
+            made.ForEach(refresh => refresh());
+        };
         return flyout;
     }
 
@@ -73,7 +79,7 @@ internal static class AppMenu
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var made = new List<RelayCommand>();
+        var made = new List<Action>();
         var flyout = new MenuFlyout();
 
         foreach (var entry in entries)
@@ -81,7 +87,7 @@ internal static class AppMenu
             flyout.Items.Add(entry is AppCommand command ? Item(command, made) : new Separator());
         }
 
-        flyout.Opening += (_, _) => made.ForEach(command => command.NotifyCanExecuteChanged());
+        flyout.Opening += (_, _) => made.ForEach(refresh => refresh());
         return flyout;
     }
 
@@ -98,6 +104,7 @@ internal static class AppMenu
         var item = new NativeMenuItem(command.HeaderNow)
         {
             Command = new RelayCommand(command.Run, command.CanRun),
+            CommandParameter = command,
             Gesture = command.Shown,
         };
         command.Reworded += () => item.Header = command.HeaderNow;
@@ -140,17 +147,18 @@ internal static class AppMenu
         foreach (var item in menu.Items.OfType<NativeMenuItem>())
         {
             (item.Command as RelayCommand)?.NotifyCanExecuteChanged();
+            (item.CommandParameter as AppCommand)?.Reword();
         }
     }
 
-    private static MenuItem Group(string header, IReadOnlyList<AppMenuEntry> entries, List<RelayCommand> made)
+    private static MenuItem Group(string header, IReadOnlyList<AppMenuEntry> entries, List<Action> made)
     {
         var group = new MenuItem { Header = header };
         AddItems(group, entries, made);
         return group;
     }
 
-    private static void AddItems(MenuItem parent, IReadOnlyList<AppMenuEntry> entries, List<RelayCommand> made)
+    private static void AddItems(MenuItem parent, IReadOnlyList<AppMenuEntry> entries, List<Action> made)
     {
         foreach (var entry in entries)
         {
@@ -163,16 +171,20 @@ internal static class AppMenu
         }
     }
 
-    private static MenuItem Item(AppCommand command, List<RelayCommand> made)
+    private static MenuItem Item(AppCommand command, List<Action> made)
     {
         var relay = new RelayCommand(command.Run, command.CanRun);
-        made.Add(relay);
         var item = new MenuItem { Header = command.HeaderNow, Command = relay, InputGesture = command.Shown };
         command.Reworded += () => item.Header = command.HeaderNow;
+        made.Add(() =>
+        {
+            relay.NotifyCanExecuteChanged();
+            item.Header = command.HeaderNow;
+        });
         return item;
     }
 
-    private static MenuItem Submenu(AppSubmenu submenu, List<RelayCommand> made)
+    private static MenuItem Submenu(AppSubmenu submenu, List<Action> made)
     {
         var item = new MenuItem { Header = submenu.Header };
         AddItems(item, submenu.Entries(), made);

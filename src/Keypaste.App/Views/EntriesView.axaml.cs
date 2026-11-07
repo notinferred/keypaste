@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
@@ -38,6 +39,7 @@ internal sealed partial class EntriesView : UserControl
     private readonly ListBox _rows;
     private GridLength _listHeight;
     private EntriesViewModel? _entries;
+    private EntryDetailViewModel? _detail;
     private ShellViewModel? _shell;
     private (EntryRow Row, PointerPressedEventArgs Press, Point At)? _dragFrom;
 
@@ -142,6 +144,14 @@ internal sealed partial class EntriesView : UserControl
         }
     }
 
+    // The list's header names a chosen group, so its column would only repeat it.
+    private void ShowGroupColumn()
+    {
+        var shows = _entries?.SelectedGroup is null or { IsEverything: true };
+        EntryColumns.SetShowsGroup(this, shows);
+        _entries?.Table.Show(TableStates.Group, shows);
+    }
+
     private void ShowContactColumns(bool shows)
     {
         EntryColumns.SetShowsContact(this, shows);
@@ -175,8 +185,10 @@ internal sealed partial class EntriesView : UserControl
             _entries.PropertyChanged += OnEntriesChanged;
         }
 
+        WatchDetail();
         TellEntriesAboutSearchFocus();
         PlaceList();
+        ShowGroupColumn();
 
         if (_shell is not null)
         {
@@ -184,8 +196,41 @@ internal sealed partial class EntriesView : UserControl
         }
     }
 
+    private void WatchDetail()
+    {
+        if (_detail is not null)
+        {
+            _detail.FieldRebuilt -= FocusFieldMenu;
+        }
+
+        _detail = _entries?.Detail;
+
+        if (_detail is not null)
+        {
+            _detail.FieldRebuilt += FocusFieldMenu;
+        }
+    }
+
+    /// <summary>A rebuilt row took the keyboard's place with it, so its new ⋯ takes it, keeping the Item menu's field commands on.</summary>
+    private void FocusFieldMenu(string field) =>
+        Dispatcher.UIThread.Post(
+            () => this.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(button => button.Name == "FieldMenu" && button.DataContext is EntryFieldRow row && row.Name == field)
+                ?.Focus(NavigationMethod.Tab),
+            DispatcherPriority.Loaded);
+
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
+        {
+            ShowGroupColumn();
+        }
+
+        if (e.PropertyName == nameof(EntriesViewModel.Detail))
+        {
+            WatchDetail();
+        }
+
         if (e.PropertyName == nameof(EntriesViewModel.ShowsList))
         {
             PlaceList();
@@ -217,9 +262,15 @@ internal sealed partial class EntriesView : UserControl
         _listRow.Height = new GridLength(0);
     }
 
-    /// <summary>A choice in a menu closes it.</summary>
+    /// <summary>A choice in a menu closes it, and a field's ⋯ asks for that row's menu as the menu key does.</summary>
     private void OnClick(object? sender, RoutedEventArgs e)
     {
+        if (e.Source is Button { Name: "FieldMenu" } fieldMenu)
+        {
+            fieldMenu.RaiseEvent(new ContextRequestedEventArgs());
+            return;
+        }
+
         if (e.Source is Button { Classes: var classes } && classes.Contains("menu-item"))
         {
             foreach (var (toggle, _) in OpenMenus())
@@ -270,6 +321,8 @@ internal sealed partial class EntriesView : UserControl
         {
             return;
         }
+
+        RevealedValue.HideShown();
 
         var method = toggle.Classes.Contains(":focus-visible") ? NavigationMethod.Tab : NavigationMethod.Pointer;
 

@@ -27,17 +27,12 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 {
     internal const string RecycledNote =
-        "Deleting an item in keypaste moves it here, to the vault's own Trash. KeePassXC "
-        + "opens the same file and shows it as its Recycle Bin.";
+        "Deleted items wait here until you delete them for good, and KeePassXC shows them as its Recycle Bin. A vault that "
+        + "has put anything here is saved in the KeePass database format 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.";
 
     internal const string NoBinNote =
         "This vault's Trash is switched off in KeePassXC, so deleting removes an item and "
         + "its history for good. Nothing can arrive here until that setting is turned back on.";
-
-    /// <summary>What recycling anything costs the file's other readers.</summary>
-    internal const string ReaderFloorNote =
-        "A vault that has put anything in the Trash is saved in the KeePass database format 4.1, which KeePassXC 2.7 and "
-        + "KeePass 2.48 and later read. Older readers do not.";
 
     private readonly AppVaultSession _session;
 
@@ -75,7 +70,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>What is in the bin, most recently deleted first until another order is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(AwaitsSelection), nameof(EmptyPrompt))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(EmptyPrompt))]
     [NotifyCanExecuteChangedFor(nameof(EmptyCommand))]
     internal partial IReadOnlyList<TrashRow> Rows { get; private set; } = [];
 
@@ -94,7 +89,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
             // selection while either is showing would leave its button pointing at another entry.
             if (SetProperty(ref _selected, value))
             {
-                OnPropertyChanged(nameof(AwaitsSelection));
+                OnPropertyChanged(nameof(HasSelection));
                 OnPropertyChanged(nameof(PurgePrompt));
                 RestoreCommand.NotifyCanExecuteChanged();
                 RestoreAsCommand.NotifyCanExecuteChanged();
@@ -115,7 +110,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     internal bool IsEmpty => Rows.Count == 0;
 
     /// <summary>Whether the bin holds entries but none is picked, so Restore and Delete wait on one.</summary>
-    internal bool AwaitsSelection => Rows.Count > 0 && _selected is null;
+    internal bool HasSelection => _selected is not null;
 
     /// <summary>Whether this vault recycles a deleted entry at all.</summary>
     internal bool RecyclesDeletedEntries => _session.Unlocked?.RecyclesDeletedEntries == true;
@@ -127,15 +122,6 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     internal string EmptyNote => RecyclesDeletedEntries
         ? "Nothing has been deleted from this vault, or what was has already been erased."
         : "Nothing can be recovered from this vault.";
-
-    /// <summary>The reader floor recycling costs the file.</summary>
-    /// <remarks>
-    /// An instance property over the constant, because a binding needs one — the same reason
-    /// <see cref="ShellViewModel.Destinations_"/> gives.
-    /// </remarks>
-#pragma warning disable CA1822
-    internal string ReaderFloor => ReaderFloorNote;
-#pragma warning restore CA1822
 
     /// <summary>Whether the permanent deletion is waiting to be confirmed.</summary>
     /// <remarks>

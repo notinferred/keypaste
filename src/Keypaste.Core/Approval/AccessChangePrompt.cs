@@ -82,12 +82,13 @@ public sealed record AccessChangePrompt
     /// <summary>The prompt for resetting this computer's ceilings, which keypaste cannot read.</summary>
     /// <param name="records">Every record the vault holds, as <see cref="IAgentSettings.List"/> reads them.</param>
     /// <param name="zone">This computer's time zone, which an end to Automatic is shown in.</param>
+    /// <param name="timedSeconds">The timed grant this approver's prompts offer, which the timed mode is named by.</param>
     /// <returns>A prompt naming, for each agent, what the vault's settings give it beyond what an agent with no settings of its own gets.</returns>
     /// <remarks>
     /// What the file held back cannot be read, so the gains are against the defaults rather than against what
     /// applied; a record that applies only beneath the defaults gives nothing beyond them.
     /// </remarks>
-    public static AccessChangePrompt ForReset(AgentRecordList records, TimeZoneInfo zone)
+    public static AccessChangePrompt ForReset(AgentRecordList records, TimeZoneInfo zone, int timedSeconds)
     {
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(zone);
@@ -108,7 +109,7 @@ public sealed record AccessChangePrompt
                 }
 
                 gains.AddRange(agent
-                    .SelectMany(record => AccessChange.Classify(unset, record.Record.Access).Gains.Select(gain => Words(gain, record.Record.Access, zone)))
+                    .SelectMany(record => AccessChange.Classify(unset, record.Record.Access).Gains.Select(gain => Words(gain, record.Record.Access, zone, timedSeconds)))
                     .Distinct(StringComparer.Ordinal)
                     .Select(words => $"{shown}: {words}"));
             }
@@ -141,8 +142,9 @@ public sealed record AccessChangePrompt
     /// <param name="origin">Where the request says it came from.</param>
     /// <param name="reason">The requester's own reason, verbatim, or empty.</param>
     /// <param name="zone">This computer's time zone, which an end to Automatic is shown in.</param>
+    /// <param name="timedSeconds">The timed grant this approver's prompts offer, which the timed mode is named by.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
-    public static AccessChangePrompt For(string agent, AccessChange change, AccessOrigin origin, string reason, TimeZoneInfo zone)
+    public static AccessChangePrompt For(string agent, AccessChange change, AccessOrigin origin, string reason, TimeZoneInfo zone, int timedSeconds)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(change);
@@ -157,7 +159,7 @@ public sealed record AccessChangePrompt
         return new AccessChangePrompt
         {
             Agent = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text,
-            Gains = [.. change.Gains.Select(gain => Words(gain, change.Proposed, zone))],
+            Gains = [.. change.Gains.Select(gain => Words(gain, change.Proposed, zone, timedSeconds))],
             Origin = origin,
             Reason = shownReason.Text,
             ReasonWasTruncated = reason.Length > ApprovalPrompt.MaximumReasonLength,
@@ -165,14 +167,18 @@ public sealed record AccessChangePrompt
         };
     }
 
+    /// <summary>The timed mode as the app reads it, whose prompts always offer the default grant.</summary>
+    public static string AllowForDefaultWords { get; } = Words(AgentMode.AllowForAWhile, ApprovalLimits.DefaultMaximumTtlSeconds);
+
     /// <summary>A mode as a person reads it.</summary>
     /// <param name="mode">The mode.</param>
+    /// <param name="timedSeconds">The timed grant a value's prompt offers at this approver.</param>
     /// <returns>Its words.</returns>
-    public static string Words(AgentMode mode) => mode switch
+    public static string Words(AgentMode mode, int timedSeconds) => mode switch
     {
         AgentMode.Ask => "Ask every time",
         AgentMode.Automatic => "Automatic: released without asking, recorded in history",
-        _ => "Ask, allow for a while",
+        _ => $"Ask, allow for {ApprovalLimits.Describe(timedSeconds)}",
     };
 
     /// <summary>A limit on Automatic as a person reads it, its end on this computer's clock.</summary>
@@ -203,8 +209,9 @@ public sealed record AccessChangePrompt
     /// <param name="gain">The gain.</param>
     /// <param name="proposed">The settings the change would leave the agent with.</param>
     /// <param name="zone">This computer's time zone.</param>
+    /// <param name="timedSeconds">The timed grant a value's prompt offers at this approver.</param>
     /// <returns>Its words, naming its project or environment, and the limit Automatic would have.</returns>
-    public static string Words(AccessGain gain, AgentAccess proposed, TimeZoneInfo zone)
+    public static string Words(AccessGain gain, AgentAccess proposed, TimeZoneInfo zone, int timedSeconds)
     {
         ArgumentNullException.ThrowIfNull(gain);
         ArgumentNullException.ThrowIfNull(proposed);
@@ -220,7 +227,7 @@ public sealed record AccessChangePrompt
             AccessDimension.Run => "may run commands, each still asked about",
             AccessDimension.Mode when decided.Mode == AgentMode.Automatic && !decided.Limit.IsNone =>
                 $"{where}: {Automatic(decided.Limit, zone)}: released without asking, recorded in history",
-            AccessDimension.Mode => $"{where}: {Words(decided.Mode)}",
+            AccessDimension.Mode => $"{where}: {Words(decided.Mode, timedSeconds)}",
             _ => $"{where}: {Automatic(decided.Limit, zone)}",
         };
     }

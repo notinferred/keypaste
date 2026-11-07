@@ -71,11 +71,15 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
             if (SetProperty(ref _summary, value ?? string.Empty))
             {
                 OnPropertyChanged(nameof(HasSummary));
+                OnPropertyChanged(nameof(ShowsSummary));
             }
         }
     }
 
     internal bool HasSummary => _summary.Length > 0;
+
+    /// <summary>Whether its summary shows: not while its settings' own controls say the same, open below it.</summary>
+    internal bool ShowsSummary => HasSummary && !_isOpen;
 
     /// <summary>The catalogue's tool this row is, or null for an agent of no tool.</summary>
     internal McpClient? Tool => _card.Tool;
@@ -103,7 +107,14 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
         get => _isOpen;
         set
         {
-            if (!HasSettings || !SetProperty(ref _isOpen, value) || !value || _settings is not null || Label is null)
+            if (!HasSettings || !SetProperty(ref _isOpen, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(ShowsSummary));
+
+            if (!value || _settings is not null || Label is null)
             {
                 return;
             }
@@ -178,11 +189,6 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
         else if (card.Presence is null)
         {
             yield return "hasn't asked in the last 30 days";
-        }
-
-        if (!HasSettings)
-        {
-            yield return "has no name, so Every other agent's settings apply";
         }
     }
 

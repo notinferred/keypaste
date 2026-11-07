@@ -68,7 +68,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         nameof(Identity), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
         nameof(IsOnly), nameof(AlsoSees), nameof(HasAlsoSees), nameof(SeePattern), nameof(Rows), nameof(HasRows), nameof(NewRowScopes), nameof(NewRowScope),
         nameof(LimitTargets), nameof(OffersLimits), nameof(LimitTarget), nameof(LimitNow), nameof(HeldBack), nameof(IsHeldBack),
-        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen), nameof(IsAdvancedOpen),
+        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen),
     ];
 
     private static readonly string[] _timesOfDay = [@"h\:mm", @"hh\:mm", @"h\:mm\:ss", @"hh\:mm\:ss"];
@@ -76,7 +76,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private static readonly (AgentMode Mode, string Words)[] _modes =
     [
         (AgentMode.Ask, "Ask every time"),
-        (AgentMode.AllowForAWhile, "Ask, allow for a while"),
+        (AgentMode.AllowForAWhile, AccessChangePrompt.AllowForDefaultWords),
         (AgentMode.Automatic, "Automatic"),
     ];
 
@@ -105,7 +105,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private DateTime? _shownUntilDate;
     private string _shownUntilTime = string.Empty;
     private bool _moreAskedOpen;
-    private bool _advancedAskedOpen;
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, which reads and changes their settings.</param>
@@ -129,7 +128,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         RemoveRowCommand = new RelayCommand<SettingRow>(row => Start(() => RemoveRowAsync(row!)), row => CanChange && row is not null);
         ApplyLimitCommand = new RelayCommand(() => Start(ApplyLimitAsync), () => CanChange && _limitTarget is not null);
         UseVaultCommand = new RelayCommand(() => Start(UseVaultAsync), () => CanChange && IsHeldBack);
-        ToggleAdvancedCommand = new RelayCommand(() => IsAdvancedOpen = !IsAdvancedOpen);
 
         Read();
     }
@@ -145,6 +143,10 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         ? "Every agent without settings of its own gets these, beneath the defaults. They only take away, so there is no Automatic and no commands here."
         : $"These follow the name {Shown}, which this agent's connection was given, not the name the agent calls itself. Any program started with that name gets them."
             + (_state is { HasRecord: false } ? " It has no settings of its own yet, so it gets the defaults." : string.Empty);
+
+    /// <summary>What the modes do, with how long each kind of timed grant lasts.</summary>
+    internal string ModeNote { get; } =
+        $"Automatic releases what it can see without asking, and records each release in history. A timed allow on a whole run of a project, or on a command, lasts {ApprovalLimits.Describe(EnvGrantCache.CeilingSeconds)}.";
 
     /// <summary>That protected environments are always asked, whatever the settings say.</summary>
     internal string ProtectedNote { get; } =
@@ -200,19 +202,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         {
             _moreAskedOpen = value || SeeTyped || LimitTyped;
             OnPropertyChanged();
-        }
-    }
-
-    /// <summary>Whether the pattern field is shown: while it holds a pattern, and otherwise as the person left it.</summary>
-    internal bool IsAdvancedOpen
-    {
-        get => _advancedAskedOpen || Patterns().Any();
-        set
-        {
-            _advancedAskedOpen = value || SeeTyped;
-            _moreAskedOpen |= _advancedAskedOpen;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsMoreOpen));
         }
     }
 
@@ -334,8 +323,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     /// <summary>Lifts this computer's ceilings back to what the vault gives, once the person confirms it.</summary>
     internal RelayCommand UseVaultCommand { get; }
-
-    internal RelayCommand ToggleAdvancedCommand { get; }
 
     private string Shown => EntryNameSanitizer.Sanitize(Agent, ApprovalPrompt.MaximumClientLength).Text;
 
@@ -496,7 +483,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         }
 
         HeldBack = _state is { HeldBack.Count: > 0 } held
-            ? $"This computer holds {Shown} back from what the vault gives it: {string.Join("; ", held.HeldBack.Select(gain => AccessChangePrompt.Words(gain, held.Vault, Zone)))}."
+            ? $"This computer holds {Shown} back from what the vault gives it: {string.Join("; ", held.HeldBack.Select(gain => AccessChangePrompt.Words(gain, held.Vault, Zone, ApprovalLimits.DefaultMaximumTtlSeconds)))}."
             : string.Empty;
         Beneath = _state is { BeneathDefaults: true }
             ? "The vault holds a change not saved yet, another program changed its file, or keypaste does not wholly understand these settings, so for now they apply only beneath the defaults."
@@ -504,7 +491,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
         // Open because something was set, it stays open when that is removed, rather than closing under the person's hand.
         _moreAskedOpen |= IsMoreHeldOpen;
-        _advancedAskedOpen |= Patterns().Any();
 
         foreach (var name in _read)
         {

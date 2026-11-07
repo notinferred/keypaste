@@ -58,11 +58,9 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
             : path;
     }
 
-    /// <summary>Reads the log at <paramref name="path"/>, keeping the records <paramref name="keep"/> accepts.</summary>
+    /// <summary>Reads the log at <paramref name="path"/>.</summary>
     /// <param name="path">The log.</param>
-    /// <param name="keep">Which records the table holds, or null for all of them.</param>
-    /// <param name="filters">The filter in words, which the heading states with its counts (D-0032).</param>
-    internal static AuditHistory Read(string path, Func<AuditEntry, bool>? keep = null, IReadOnlyList<string>? filters = null)
+    internal static AuditHistory Read(string path)
     {
         if (!Path.Exists(path))
         {
@@ -82,21 +80,20 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
             return new AuditHistory(AuditReadKind.Unchecked, [], [], report.Error);
         }
 
-        var kept = keep is null ? entries : entries.Where(keep).ToList();
         var unverified = report.Unverified;
 
         IReadOnlyList<string> lines =
         [
-            AuditText.Heading(ShortPath(path), kept.Count, entries.Count, filters ?? []),
-            .. AuditText.Table(kept, unverified),
-            .. AuditText.Notes(kept, unreadable, unverified),
+            AuditText.Heading(ShortPath(path), entries.Count, entries.Count, []),
+            .. AuditText.Table(entries, unverified),
+            .. AuditText.Notes(entries, unreadable, unverified),
         ];
 
         var kind = report.Verdict == AuditChainVerdict.Broken ? AuditReadKind.Broken : AuditReadKind.Intact;
 
         return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty)
         {
-            Entries = kept,
+            Entries = entries,
             Total = entries.Count,
             Unreadable = unreadable,
             Unverified = unverified,

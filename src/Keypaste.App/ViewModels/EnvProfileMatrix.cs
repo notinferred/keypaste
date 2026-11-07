@@ -59,10 +59,21 @@ internal sealed record EnvProfileCell(
     /// <summary>The other environments the one source entry serves, which a change to its value reaches too.</summary>
     internal IReadOnlyList<string> Also { get; init; } = [];
 
-    /// <summary>Where the value lives, drawn under it: its entry, and the other environments that entry serves.</summary>
-    internal string SourceNote => Sources.Count == 0
+    /// <summary>The item holding most of this column's keys, which the cells of that item leave unsaid.</summary>
+    internal string? UsualSource { get; init; }
+
+    /// <summary>Where the value lives: its entry, and the other environments that entry serves.</summary>
+    internal string FullSourceNote => Sources.Count == 0
         ? string.Empty
         : string.Join(", ", Sources) + (Also.Count > 0 ? " · also " + string.Join(", ", Also) : string.Empty);
+
+    /// <summary>What is drawn under the value: where it lives, unless that is its column's usual item, whose other environments still show since a change reaches them.</summary>
+    internal string SourceNote => Sources is [var only] && string.Equals(only, UsualSource, StringComparison.Ordinal)
+        ? Also.Count > 0 ? "item also in " + string.Join(", ", Also) : string.Empty
+        : FullSourceNote;
+
+    /// <summary>What a screen reader hears for the cell: the mask or "missing", and the item always.</summary>
+    internal string Spoken => Sources.Count > 0 ? $"{Label}, from {string.Join(", ", Sources)}" : Label;
 
     internal bool HasSourceNote => SourceNote.Length > 0;
 
@@ -88,6 +99,16 @@ internal sealed record EnvProfileCell(
 
     internal bool HasNote => Note.Length > 0;
 
+    /// <summary>The usual item of a column whose cells name these items: most cells first, then the first path in ordinal order, so a tie is settled the same way every time. A cell two items hold counts for neither, and an item in one cell only is usual for nothing.</summary>
+    internal static string? UsualOf(IEnumerable<IReadOnlyList<string>> sources) =>
+        sources
+            .Where(held => held.Count == 1)
+            .GroupBy(held => held[0], StringComparer.Ordinal)
+            .Where(item => item.Count() >= 2)
+            .OrderByDescending(item => item.Count())
+            .ThenBy(item => item.Key, StringComparer.Ordinal)
+            .FirstOrDefault()?.Key;
+
     /// <summary>The first thing wrong with an unusable value, short enough for a cell; the tip has the rest.</summary>
     private string ShortProblem
     {
@@ -110,7 +131,7 @@ internal sealed record EnvProfileCell(
     internal string? Tip => State switch
     {
         EnvCellState.Missing => $"Not set in {Profile}. Click to add it.",
-        EnvCellState.Unusable => DisplayTextSanitizer.Sanitize($"keypaste run refuses this value: {Problem}").Text,
+        EnvCellState.Unusable => DisplayTextSanitizer.Sanitize($"keypaste run refuses this value: {Problem}.{From}").Text,
         _ when SameValueAs.Count > 0 => $"The {Profile} value is the same as in {string.Join(" and ", SameValueAs)}.{From}",
         _ => Sources.Count > 0 ? From.TrimStart() : null,
     };

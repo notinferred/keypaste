@@ -61,6 +61,9 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         CancelRestoreCommand = new RelayCommand(() => Asking = null, () => Asking is not null);
     }
 
+    /// <summary>The item as it is now, which each revision is compared with.</summary>
+    internal EntryDetailViewModel Current => _owner;
+
     /// <summary>Whether the history section is showing.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ToggleLabel), nameof(ShowsEmptyNote))]
@@ -182,7 +185,8 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         _countAtRead = revisions.Count;
         _read = true;
         Selected = null;
-        Rows = [.. revisions.Select(revision => new EntryRevisionRow(this, revision))];
+        var password = _session.Unlocked?.Find(_owner.Name)?.Password;
+        Rows = [.. revisions.Select(revision => new EntryRevisionRow(this, revision, !string.Equals(revision.Fields.Password, password, StringComparison.Ordinal)))];
     }
 
     /// <summary>Hands a row its password, and takes it away from whichever row had it.</summary>

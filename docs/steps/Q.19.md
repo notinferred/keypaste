@@ -60,3 +60,57 @@ On the branch, at that commit, all green: ci 42296184294's fast tier; ci 4229983
 ### Limits and follow-ups
 
 `scripts/verify-crash-report.sh`, the exercises and the AppDriver walk the new screen. `exercise-desktop-upgrade.sh`'s real upgrade ran only as its selftest. No person has used the screen, and the terms window's modal behaviour on real desktops stays unobserved. The route stays off until H-0028, so nothing has been sent to keypaste.com. Agreement by continuing needs the lawyer's EU check under H-0027. Whether a program under AGPL-3.0 may stand a terms screen before its first use, as `§10` forbids further restrictions, went to BACKLOG for the same review. The exercises set `KEYPASTE_CRASH_URL=none`, so a run they kill reaches nothing now that Continue turns reports on.
+
+## Stage 2: each fact once, and the main job gets the room
+
+Implemented only, in RELEASE's terms. Answers the founder's "too much to look at"; his decisions of 2026-11-06 settled the choices marked below.
+
+### Findings closed
+
+| ID | Checked against source | What changed |
+|---|---|---|
+| A01 | Confirmed | Settings says "Recommendations: 11 to review" in one line with Open, gone when nothing was found, and "nothing to review, 3 dismissed" while only dismissed rows remain, since Review again must stay reachable. Their screen sits under Settings with a Back, keeps Move, Open item and Dismiss, says each problem's reason once as its group's heading and labels only a dismissed row. The sidebar's count is unchanged. |
+| A02, A37 | Confirmed | A writable custom field keeps Reveal and Copy; replace, generate, rename, protection and remove are its ⋯, which opens the row's context menu, also from a right-click, the menu key or Shift+F10, and each is in the Item menu, acting on the row holding the keyboard. A field KeePassXC owns has no ⋯. |
+| A03 | Confirmed | A cell names its item only where it differs from its column's usual item: the one holding most of the column's single-item cells and at least two, a tie going to the first path in ordinal order. A column with no such item names each cell's. The full path is always on the tooltip and accessible name, and a drawn path wraps rather than trims. The other environments that item serves stay visible as "item also in …", since a change reaches them. |
+| A04 | Confirmed | The Group column is not drawn while a group is chosen. A sort by it gives way as a dropped column's does, and the pane names a row's subgroup, since a group lists its subgroups' items. |
+| A13 | Confirmed | A row's summary hides while its settings are open, the subtitle keeps its first clause, and Mode's help no longer repeats that commands ask. |
+| A14, A28 | Confirmed | One line under AI tools says why a listed agent has no Settings, shown only with such a row, and the Connect advice joins it only when a Connect is listed. No row repeats it. |
+| A15, A25 | Confirmed | Since you unlocked is gone. Agents' History, in its header, is the one place for the log, which already draws its table with PersonTime; Connect's check points there. |
+| A16 | Confirmed | The status line is gone; the error card covers the failing state. |
+| A17 | Confirmed | The pane's button says Copy password, hidden with Rotate… on an item with none, since neither applies. Rotate… and the row's Generate… otherwise stay, as the founder decided only the label. |
+| A18 | Confirmed | Username, Password and URL rows are not drawn when empty, with no gap left, so Reveal is not offered on an empty password. Edit fields… adds one. A revision with no password offers no Reveal or Copy either. |
+| A19 | Confirmed | The icon says the kind and the Kind column is gone: it costs 28 pixels against 88, and reads faster in a list, and it now carries the kind as its tooltip and accessible name. Sorting by kind goes with the column; a kept sort or kept widths for the old columns give way to the table's own. The dot stays only for "in use", beside the time it repeated. |
+| A21 | Confirmed | Mode and each row say "Ask, allow for 1 hour", read from `ApprovalLimits.DefaultMaximumTtlSeconds`, and AccessChangePrompt uses the same words, copy only. Mode's help says a timed allow on a whole run of a project, or on a command, lasts 15 minutes, read from `EnvGrantCache.CeilingSeconds`, since those prompts offer that; a project variable asked for alone gets the hour. The confirmation's words follow the approver's `--max-ttl`, the app's being the default. The stored mode `allow-for-a-while` is unchanged. |
+| A26 | Part | Process and unlock moved to Settings › Advanced › Diagnostics, as Answering agents. The rest of the finding, 'hash-chained', 'Injected', 'Bundled' and 'the bridge', is words for a later stage and stays in BACKLOG. |
+| A46 | Confirmed | Then and Now show only what differs, comparing stored text rather than what drawing cleans and cuts, the rest in one line, "Unchanged: username, URL, notes, custom field names and tags. Custom field values aren't compared here." Comparing them would need Core to read each revision's values, which stays the founder's choice. A revision row shows its title only where it differs, and the sentence restating the time is gone. The password is compared when history is read, leaving a bool on the row. |
+| A48 | Confirmed | One sentence pair under the heading holds what the footnote and the hint said; Restore and Delete for good appear with a selection on the title's row, so the note and table stay still. |
+| A49 | Confirmed | Patterns sit directly in More, and the inner "Settings for" heading is gone. |
+| A52 | Confirmed | The form no longer restates the path. |
+
+A review's repairs on the branch: a row's menu, its Generate, and Add field ask before discarding what another field form holds, and choosing protection hands the keyboard to the rebuilt row's ⋯. A revision with an empty password says "(empty)" in Then and Now. The kind's tooltip sits on a mark the pointer can hit, not the icon's strokes. `verify-agent-activity.sh` checks what `LogViewModel(agentsOnly: true)` draws, and `AuditHistory.Read` lost the filter only the old table used.
+
+### Secret paths
+
+Opening a row's menu, the pane's ⋯, the menu button's flyout or, on macOS, a menu bar menu hides a shown value, recorded under T-25. A row's ⋯ and its menu name the field at most, never a value, and the masked and revealed rules hold.
+
+### Before and after, by frame
+
+| Frame | Before | After |
+|---|---|---|
+| Items, open item | Seven icons per field, two Copies and a detached third, Kind and Group columns | Three per field, Copy password, no Kind, Group only with no group chosen |
+| Items, open `.env` item | Three blank rows above the fields, Group repeating the header | Fields straight under the title, Title and Last used taking the room |
+| Settings | Security starts below the fold on a 10-item vault | One line, then Security at once |
+| Recommendations | Inside Settings, "Needs review" and the reason on every row | Its own screen, each reason once |
+| Env | A path under all 18 filled cells | Two, the ones that differ; rows are shorter |
+| Agents, settings open | Process line, summary above its controls, a third disclosure, a raw log | None of them |
+| Trash | Paragraph, footnote, hint and two disabled buttons | One paragraph and Empty Trash until a row is chosen |
+
+### Evidence
+
+The review's repairs at `691bf6e6`, all green: ci 42326142913 (fast tier), dev 42326836531 (desktop, Linux), dev 42326825273 (desktop gates, Linux). Before them, at `ba876e6f` on `q19-2-each-fact-once`, all green: ci 42317232101 (fast tier); dev 42317760186 (desktop, Linux, 2365 and 39 tests, none failed in app 42319660431's matching Linux job); dev 42318778468 (desktop gates, Linux, its `verify-agent-activity.sh` reading the log through `AuditHistory` now the screen does not); ci 42319648697; app 42319660431. dev 42323539068 installed that app run's packages on all three runners and every act passed, edit-rerun opening the row's menu and choosing Replace value… by Down and Return; by its own terms it is not evidence. Local, on macOS: `tests/Keypaste.App.Tests`, 2389 passed, 10 skipped, with `AccessChangeTests` and `ClientsVerbTests`, and the acts' selftest, 62 cases.
+
+`desktop tests (macos-15)` in app 42319660431 attempt 1 reached its 24-minute limit: `LockedNoticeTests.A_vault_chosen_while_the_app_stays_locked_is_listened_for_in_place_of_the_one_before` failed after 11 s with "the app never listened for that vault", and the test host printed nothing more until it was cancelled. `gh run rerun --failed` passed it in 10 m 27 s. This stage changes nothing that test reaches; its mechanism is not diagnosed.
+
+### Limits and follow-ups
+
+The row's menu takes the keyboard in the app, and the acts press Down and Return after opening it, because their drivers search only the main window; no person has used it. The macOS menu bar's hide uses `NativeMenu.Opening`, which no headless test can raise. A chosen group hides Group even where it lists subgroups' items, as the founder decided, and only the selected row's pane names the subgroup.

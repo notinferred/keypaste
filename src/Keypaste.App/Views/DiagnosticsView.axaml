@@ -27,7 +27,7 @@
       </StackPanel>
 
       <Border Classes="card filled" Padding="20,16">
-        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.Vault}" />
           <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value" Text="{Binding VaultPath}" />
           <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.KeypasteHome}" />
@@ -36,6 +36,8 @@
           <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value" Text="{Binding HomeOverride}" />
           <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.Version}" />
           <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value" Text="{Binding Version}" />
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="fact" TextWrapping="Wrap" Text="{x:Static res:Strings.AnsweringAgents}" />
+          <SelectableTextBlock Name="AnsweringAgents" Grid.Row="4" Grid.Column="1" Classes="fact-value" Text="{Binding AnsweringAgents}" />
         </Grid>
       </Border>
 

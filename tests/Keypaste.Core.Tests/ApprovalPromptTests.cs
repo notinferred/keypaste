@@ -233,8 +233,8 @@ public sealed class ApprovalPromptTests
     {
         var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Run = true });
 
-        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc);
-        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc);
+        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
+        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
 
         Assert.Equal((string.Empty, false, false), (none.Reason, none.ReasonWasAltered, none.ReasonWasTruncated));
         Assert.True(scrubbed.ReasonWasAltered);
@@ -253,7 +253,7 @@ public sealed class ApprovalPromptTests
         Assert.True(EntryExposure.TryCreate(["tag:env:billing", hidden, "\u202Eprod/**"], out var see, out var error), error);
         var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { See = see });
 
-        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc).Gains);
+        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds).Gains);
 
         Assert.Equal($"sees tag:env:billing, x{string.Concat(Enumerable.Repeat("\\u2028", 20))}**, \\u202Eprod/**", gain);
         Assert.DoesNotContain('\u2028', gain);

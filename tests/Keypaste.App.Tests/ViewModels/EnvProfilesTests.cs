@@ -428,8 +428,20 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal("env/acme-api/.env.prod", Assert.Single(project.Environments[2].Members).Display);
 
         var cells = project.Rows.Single(row => row.Key == "STRIPE_KEY").Cells;
+        Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.FullSourceNote));
         Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.SourceNote));
-        Assert.Equal("env/acme-api/.env", project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[0].SourceNote);
+
+        // Three items, one cell each: nothing is usual in that column, so each cell names its own.
+        var named = project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[0];
+        Assert.Equal("env/acme-api/.env", named.SourceNote);
+        Assert.Equal("env/acme-api/.env", named.FullSourceNote);
+        Assert.Equal("••••••, from env/acme-api/.env", named.Spoken);
+        Assert.Contains("env/acme-api/.env", named.Tip, StringComparison.Ordinal);
+
+        // Two keys on one item: it is that column's usual one, and only the tooltip and accessible name still say it.
+        var usual = project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[2];
+        Assert.Empty(usual.SourceNote);
+        Assert.Contains("env/acme-api/.env.prod", usual.Spoken, StringComparison.Ordinal);
 
         project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal(

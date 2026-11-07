@@ -120,6 +120,7 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _groupMenu;
     private readonly IReadOnlyList<AppMenuEntry> _projectMenu;
     private readonly IReadOnlyList<AppMenuEntry> _agentMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _fieldMenu;
 
     // The row a context menu was opened on, for the rows that cannot be chosen without opening them.
     private object? _context;
@@ -246,6 +247,11 @@ internal sealed class AppCommands
         var renameGroup = Routed("Rename group…", Items, items => items.BeginRenameGroupCommand);
         var moveGroup = Routed("Move group…", Items, items => items.BeginMoveGroupCommand);
         var deleteGroup = Routed("Delete group", Items, items => items.BeginDeleteGroupCommand);
+        var replaceField = Routed("Replace value…", Field, field => field.ReplaceCommand);
+        var generateField = Routed("Generate value…", Field, field => field.GenerateCommand);
+        var renameField = Routed("Rename field…", Field, field => field.RenameCommand);
+        var protectField = Routed("Protect field", Field, field => field.ToggleProtectionCommand) with { Says = () => Field()?.ProtectionHeader ?? "Protect field" };
+        var removeField = Routed("Remove field…", Field, field => field.RemoveCommand);
         var openProject = new AppCommand(
             "Open project",
             [],
@@ -264,12 +270,14 @@ internal sealed class AppCommands
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
         _projectMenu = [openProject];
         _agentMenu = [agentSettings, _line, disconnect];
+        _fieldMenu = [replaceField, generateField, renameField, protectField, _line, removeField];
 
         // Edit has Delete, and File has New group, so the item menu leaves them out.
         var item = new AppMenuGroup("Item",
         [
             copyUsername, copyPassword, openUrl, _line,
             editFields, organize, duplicate, share, _line,
+            replaceField, generateField, renameField, protectField, removeField, _line,
             copyRevision, restoreRevision, _line,
             restore, purge, _line,
             renameGroup, moveGroup, deleteGroup, _line,
@@ -458,11 +466,11 @@ internal sealed class AppCommands
     }
 
     /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
-    internal static bool HasContextMenu(object? row) => row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow;
+    internal static bool HasContextMenu(object? row) => row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow;
 
     /// <summary>
     /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
-    /// are chosen, while a project and an agent, which choosing would open or cannot be chosen, are its commands' target
+    /// are chosen, while a project, an agent and a custom field, which choosing would open or cannot be chosen, are its commands' target
     /// while they run. Null for a row with no menu.
     /// </summary>
     internal IReadOnlyList<AppMenuEntry>? ContextMenu(object row)
@@ -490,6 +498,8 @@ internal sealed class AppCommands
                 return Bound(_projectMenu, row);
             case AgentRow when Agents() is not null:
                 return Bound(_agentMenu, row);
+            case EntryFieldRow when Items() is not null:
+                return Bound(_fieldMenu, row);
             default:
                 return null;
         }
@@ -498,7 +508,12 @@ internal sealed class AppCommands
     private List<AppMenuEntry> Bound(IReadOnlyList<AppMenuEntry> entries, object row) =>
     [
         .. entries.Select(entry => entry is AppCommand command
-            ? command with { CanRun = () => On(row, command.CanRun), Run = () => On(row, () => { command.Run(); return true; }) }
+            ? command with
+            {
+                CanRun = () => On(row, command.CanRun),
+                Run = () => On(row, () => { command.Run(); return true; }),
+                Says = command.Says is { } says ? () => On(row, says) : null,
+            }
             : entry),
     ];
 
@@ -523,6 +538,8 @@ internal sealed class AppCommands
         _context as T ?? (Focus() as Visual)?.GetSelfAndVisualAncestors().OfType<StyledElement>().Select(element => element.DataContext).OfType<T>().FirstOrDefault();
 
     private AgentActivityViewModel? Agents() => Unmodal()?.Content as AgentActivityViewModel;
+
+    private EntryFieldRow? Field() => Items() is not null ? Target<EntryFieldRow>() : null;
 
     private static AppCommand Routed<T>(string header, Func<T?> target, Func<T, ICommand> command, Func<T, object?>? parameter = null)
         where T : class =>

@@ -81,10 +81,10 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
-        RotateCommand = new RelayCommand(() => IsConfirmingRotate = true, () => !IsConfirmingRotate && !IsEditing);
+        RotateCommand = new RelayCommand(() => IsConfirmingRotate = true, () => HasPassword && !IsConfirmingRotate && !IsEditing);
         ConfirmRotateCommand = new RelayCommand(ConfirmRotate, () => IsConfirmingRotate);
         CancelRotateCommand = new RelayCommand(() => IsConfirmingRotate = false, () => IsConfirmingRotate);
-        BeginAddFieldCommand = new RelayCommand(BeginAddField, () => !IsAddingField);
+        BeginAddFieldCommand = new RelayCommand(() => LeavingFieldForm(BeginAddField), () => !IsAddingField);
         ConfirmAddFieldCommand = new RelayCommand(ConfirmAddField, () => IsAddingField && DraftFieldName.Trim().Length > 0);
         CancelAddFieldCommand = new RelayCommand(CancelAddField, () => IsAddingField);
         ConfirmReplaceFieldCommand = new RelayCommand(ConfirmReplaceField, () => ReplacingField is not null);
@@ -156,6 +156,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             if (SetProperty(ref _totp, value))
             {
                 OnPropertyChanged(nameof(ShowsTotp));
+                OnPropertyChanged(nameof(HasStandardRows));
                 previous?.Dispose();
             }
         }
@@ -165,7 +166,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTotpProblem))]
+    [NotifyPropertyChangedFor(nameof(ShowsTotpProblem), nameof(HasStandardRows))]
     internal partial string? TotpProblem { get; private set; }
 
     internal bool ShowsTotpProblem => !IsEditing && TotpProblem is not null;
@@ -493,11 +494,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     }
 
     /// <summary>Generate, on a protected field: its replace form with a generated value, which Save writes and history keeps the old one of.</summary>
-    internal void GenerateField(EntryFieldRow row)
-    {
-        BeginReplaceField(row);
-        GenerateInto(ReplacementFieldValue);
-    }
+    internal void GenerateField(EntryFieldRow row) =>
+        LeavingFieldForm(() =>
+        {
+            OpenReplaceField(row);
+            GenerateInto(ReplacementFieldValue);
+        });
 
     private void GeneratePassword()
     {
@@ -526,6 +528,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Opens the form that writes a new value over one field's.</summary>
     internal void BeginReplaceField(EntryFieldRow row)
     {
+        if (ReplacingField != row)
+        {
+            LeavingFieldForm(() => OpenReplaceField(row));
+        }
+    }
+
+    private void OpenReplaceField(EntryFieldRow row)
+    {
         IsAddingField = false;
         RemovingField = null;
         RenamingField = null;
@@ -534,28 +544,61 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     }
 
     /// <summary>Asks whether to remove one field.</summary>
-    internal void BeginRemoveField(EntryFieldRow row)
-    {
-        IsAddingField = false;
-        ReplacingField = null;
-        RenamingField = null;
-        RemovingField = row;
-        Report(null);
-    }
+    internal void BeginRemoveField(EntryFieldRow row) =>
+        LeavingFieldForm(() =>
+        {
+            IsAddingField = false;
+            ReplacingField = null;
+            RenamingField = null;
+            RemovingField = row;
+            Report(null);
+        });
 
     /// <summary>Opens the form that gives one field another name.</summary>
     internal void BeginRenameField(EntryFieldRow row)
     {
-        IsAddingField = false;
-        ReplacingField = null;
-        RemovingField = null;
-        RenamingField = row;
-        Report(null);
+        if (RenamingField == row)
+        {
+            return;
+        }
+
+        LeavingFieldForm(() =>
+        {
+            IsAddingField = false;
+            ReplacingField = null;
+            RemovingField = null;
+            RenamingField = row;
+            Report(null);
+        });
     }
 
-    /// <summary>Protects a plain field or stops protecting a protected one, keeping its value.</summary>
-    internal void ToggleProtection(EntryFieldRow row) =>
-        Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, Value: null, Protect: !row.IsProtected)]), null);
+    /// <summary>Opens another of the pane's field forms, first asking when the one open holds what was typed.</summary>
+    private void LeavingFieldForm(Action open)
+    {
+        if ((AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft()) is { } draft && AskDiscard is { } ask)
+        {
+            ask(draft, open, null);
+        }
+        else
+        {
+            open();
+        }
+    }
+
+    /// <summary>Protects a plain field or stops protecting a protected one, keeping its value; the rows are rebuilt, so the view hands the keyboard to its new row.</summary>
+    internal void ToggleProtection(EntryFieldRow row)
+    {
+        if (Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, Value: null, Protect: !row.IsProtected)]), null))
+        {
+            FieldRebuilt?.Invoke(row.Name);
+        }
+    }
+
+    /// <summary>Raised with a field's name when its row was replaced under the keyboard.</summary>
+    internal event Action<string>? FieldRebuilt;
+
+    /// <summary>How leaving a form holding what was typed is asked about, or null to leave without asking.</summary>
+    internal Action<string, Action, Action?>? AskDiscard { get; init; }
 
     /// <summary>Removes one of the entry's tags, first asking about a project tag.</summary>
     internal void RemoveTag(EntryTagChip chip)
@@ -771,17 +814,17 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         DisplayTextSanitizer.Sanitize(Notes, DisplayTextSanitizer.MaximumNotesLength).Text;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DisplayUsername))]
+    [NotifyPropertyChangedFor(nameof(DisplayUsername), nameof(HasUsername), nameof(HasStandardRows))]
     [NotifyCanExecuteChangedFor(nameof(CopyUsernameCommand))]
     internal partial string Username { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl))]
+    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl), nameof(HasUrl), nameof(HasStandardRows))]
     [NotifyCanExecuteChangedFor(nameof(CopyUrlCommand), nameof(OpenUrlCommand))]
     internal partial string Url { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsNotes), nameof(DisplayNotes))]
+    [NotifyPropertyChangedFor(nameof(ShowsNotes), nameof(DisplayNotes), nameof(HasStandardRows))]
     internal partial string Notes { get; private set; }
 
     /// <summary>
@@ -793,9 +836,18 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// it is visible to anyone who can already see that an entry exists.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(MaskedLength), nameof(PasswordMask))]
-    [NotifyCanExecuteChangedFor(nameof(CopyPasswordCommand))]
+    [NotifyPropertyChangedFor(nameof(MaskedLength), nameof(PasswordMask), nameof(HasPassword), nameof(HasStandardRows))]
+    [NotifyCanExecuteChangedFor(nameof(CopyPasswordCommand), nameof(RotateCommand))]
     internal partial int PasswordLength { get; private set; }
+
+    internal bool HasUsername => Username.Length > 0;
+
+    internal bool HasUrl => Url.Length > 0;
+
+    internal bool HasPassword => PasswordLength > 0;
+
+    /// <summary>Whether the pane draws any of the rows every item may have, so an item with none leaves no gap for them.</summary>
+    internal bool HasStandardRows => HasUsername || HasPassword || HasUrl || ShowsNotes || _totp is not null || TotpProblem is not null;
 
     /// <summary>The dots the detail pane shows where the password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(PasswordLength, 24));

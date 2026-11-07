@@ -764,7 +764,7 @@ public sealed class TerminalApprovalChannelTests
         Assert.DoesNotContain("UTC", shown, StringComparison.Ordinal);
 
         static AccessChangePrompt Changing(AgentAccess proposed) =>
-            AccessChangePrompt.For("claude-code", AccessChange.Classify(EffectiveAccess.Defaults, proposed), AccessOrigin.Terminal, string.Empty, TestZones.PlusTwo);
+            AccessChangePrompt.For("claude-code", AccessChange.Classify(EffectiveAccess.Defaults, proposed), AccessOrigin.Terminal, string.Empty, TestZones.PlusTwo, ApprovalLimits.DefaultMaximumTtlSeconds);
 
         static ProjectScope Scope(string name) =>
             ProjectScope.TryParseName(name, out var scope, out var error) ? scope : throw new InvalidOperationException(error);
