@@ -213,7 +213,7 @@ public sealed class AgentSettingsViewModelTests
         app.Person.Change = ApprovalAnswer.Denied;
         using var model = app.Settings();
 
-        await model.ChooseAsync(Choice(model.RunChoices, "On, asked about unless always allowed"));
+        await model.ChooseAsync(Choice(model.RunChoices, "On, each command still asked about"));
 
         var asked = Assert.Single(app.Person.Changes);
         Assert.Equal(("ci-probe", AccessOrigin.Settings), (asked.Agent, asked.Origin));
@@ -226,7 +226,7 @@ public sealed class AgentSettingsViewModelTests
         Assert.Equal(("denied", "prompt"), (app.LastLine().Decision, app.LastLine().Method));
 
         // Refusing their own change holds nothing back: trying it again asks again.
-        await model.ChooseAsync(Choice(model.RunChoices, "On, asked about unless always allowed"));
+        await model.ChooseAsync(Choice(model.RunChoices, "On, each command still asked about"));
 
         Assert.Equal(2, app.Person.Changes.Count);
         Assert.Equal(("denied", "prompt"), (app.LastLine().Decision, app.LastLine().Method));

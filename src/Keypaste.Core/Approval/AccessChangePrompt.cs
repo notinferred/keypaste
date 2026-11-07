@@ -49,9 +49,8 @@ public sealed record AccessChangePrompt
         "clears every limit this computer kept on agents, and keeps the file keypaste cannot read beside it as clients.toml"
         + AccessCaps.KeptSuffix + ", or the next free name, so no copy kept before is replaced";
 
-    /// <summary>What a person must know before a command is answered without asking (T-35), said wherever that is confirmed.</summary>
-    public const string CommandCautionText =
-        "The command's files can change: keypaste approves this command line, not what it does. Its arguments are kept in the vault as written.";
+    /// <summary>What a person must know before the agent's commands start without asking (T-35), said wherever that is confirmed.</summary>
+    public string CommandCaution => $"{Agent} can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.";
 
     /// <summary>The agent's name, sanitized.</summary>
     public required string Agent { get; init; }
@@ -71,7 +70,7 @@ public sealed record AccessChangePrompt
     /// <summary>Whether the reason had anything scrubbed out of it.</summary>
     public required bool ReasonWasAltered { get; init; }
 
-    /// <summary>Whether it would answer a command without asking, so <see cref="CommandCautionText"/> is said.</summary>
+    /// <summary>Whether it would start the agent's commands without asking, so <see cref="CommandCaution"/> is said.</summary>
     public bool AnswersCommand { get; init; }
 
     /// <summary>The <c>keypaste clients</c> arguments that take back what Always allow would add, after the agent's name; null for any other change.</summary>
@@ -174,15 +173,22 @@ public sealed record AccessChangePrompt
             Reason = shownReason.Text,
             ReasonWasTruncated = reason.Length > ApprovalPrompt.MaximumReasonLength,
             ReasonWasAltered = shownReason.WasAltered,
-            AnswersCommand = change.Gains.Any(gain => gain.Dimension == AccessDimension.AlwaysCommand),
+            AnswersCommand = change.Gains.Any(gain => RunsUnasked(gain, change.Proposed)),
             Undo = origin == AccessOrigin.Prompt ? change.Gains.Select(UndoOf).FirstOrDefault(undo => undo is not null) : null,
         };
     }
 
+    /// <summary>Whether a gain starts commands without asking: Automatic with commands where the agent may run them.</summary>
+    private static bool RunsUnasked(AccessGain gain, AgentAccess proposed) => proposed.Run && gain.Dimension switch
+    {
+        AccessDimension.Mode => proposed.Decide(gain.Scope?.Project, gain.Scope?.Environment).Mode == AgentMode.AutomaticCommands,
+        AccessDimension.Run => proposed.Mode == AgentMode.AutomaticCommands || proposed.Projects.Any(row => row.Mode == AgentMode.AutomaticCommands),
+        _ => false,
+    };
+
     private static string? UndoOf(AccessGain gain) => gain switch
     {
         { Dimension: AccessDimension.AlwaysItem, AlwaysItem: { } item } => $"--forget {AlwaysAllowed.ItemId(item)}",
-        { Dimension: AccessDimension.AlwaysCommand, AlwaysCommand: { } command } => $"--forget {command.Id}",
         { Scope: { } scope } => $"--project {DisplayTextSanitizer.Escaped(scope.Name)} --reset",
         _ => null,
     };
@@ -190,9 +196,12 @@ public sealed record AccessChangePrompt
     /// <summary>A mode as a person reads it.</summary>
     /// <param name="mode">The mode.</param>
     /// <returns>Its words.</returns>
-    public static string Words(AgentMode mode) => mode == AgentMode.Automatic
-        ? "Automatic: released without asking, recorded in history"
-        : "Ask every time";
+    public static string Words(AgentMode mode) => mode switch
+    {
+        AgentMode.Automatic => "Automatic: released without asking, recorded in history",
+        AgentMode.AutomaticCommands => "Automatic with commands: released and commands run without asking, recorded in history",
+        _ => "Ask every time",
+    };
 
     /// <summary>A limit on Automatic as a person reads it, its end on this computer's clock.</summary>
     /// <param name="limit">The limit.</param>
@@ -237,44 +246,17 @@ public sealed record AccessChangePrompt
         {
             AccessDimension.See => $"sees {string.Join(", ", proposed.See.Globs.Select(DisplayTextSanitizer.Escaped))}",
             AccessDimension.Values => "is given values, not only into commands it runs",
-            AccessDimension.Run when proposed.Always.Commands.Count > 0 => "may run commands: each still asked about, except the ones you always allowed",
+            AccessDimension.Run when RunsUnasked(gain, proposed) => "may run commands, started without asking where its mode is Automatic with commands",
             AccessDimension.Run => "may run commands, each still asked about",
             AccessDimension.AlwaysItem => $"gets {itemShown?.Invoke(gain.AlwaysItem!) ?? "an item"} without asking, every field it can see, until you remove it",
-            AccessDimension.AlwaysCommand => CommandWords(gain.AlwaysCommand!, itemShown),
             AccessDimension.Mode when decided.Mode == AgentMode.Automatic && !decided.Limit.IsNone =>
                 $"{where}: {Automatic(decided.Limit, zone)}: released without asking, recorded in history",
+            AccessDimension.Mode when decided.Mode == AgentMode.AutomaticCommands && !decided.Limit.IsNone =>
+                $"{where}: {Automatic(decided.Limit, zone)} with commands: released and commands run without asking, recorded in history",
             AccessDimension.Mode => $"{where}: {Words(decided.Mode)}",
             _ => $"{where}: {Automatic(decided.Limit, zone)}",
         };
     }
-
-    /// <summary>A command's line as a person reads it, with anything that could hide or reorder text shown as an escape.</summary>
-    /// <param name="command">The command.</param>
-    /// <returns>Its line.</returns>
-    public static string CommandLine(AlwaysCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        return DisplayTextSanitizer.Escaped(EnvReleasePrompt.CommandLine(command.Command));
-    }
-
-    /// <summary>A command's variables with where each comes from, as a person reads them.</summary>
-    /// <param name="command">The command.</param>
-    /// <param name="itemShown">An item's name as a person reads it, by its UUID as hex; null names it by the UUID.</param>
-    /// <param name="separator">What goes between two variables.</param>
-    /// <returns>Such as <c>TOKEN from api/GitHub · password</c>.</returns>
-    public static string Variables(AlwaysCommand command, Func<string, string>? itemShown = null, string separator = ", ")
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        return string.Join(separator, command.Variables.Select(variable =>
-            $"{DisplayTextSanitizer.Escaped(variable.Name)} from {itemShown?.Invoke(variable.Item) ?? $"item {DisplayTextSanitizer.Escaped(variable.Item)}"} · {DisplayTextSanitizer.Escaped(variable.Field)}"));
-    }
-
-    /// <summary>What Always allow on a command gives, naming all of what makes it that command.</summary>
-    private static string CommandWords(AlwaysCommand command, Func<string, string>? itemShown) =>
-        $"runs {CommandLine(command)} ({DisplayTextSanitizer.Escaped(command.Program)}) in {DisplayTextSanitizer.Escaped(command.Directory)}, "
-        + $"with {Variables(command, itemShown)}, without asking, until you remove it";
 
     /// <summary>Automatic with its limit, such as <c>Automatic until 2026-12-31 23:59 +02:00, at most 20 an hour</c>.</summary>
     private static string Automatic(AccessLimit limit, TimeZoneInfo zone) => limit switch

@@ -65,7 +65,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     /// <summary>Everything <see cref="Read"/> sets.</summary>
     private static readonly string[] _read =
     [
-        nameof(Identity), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
+        nameof(Identity), nameof(ModeRunNote), nameof(HasModeRunNote), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
         nameof(IsOnly), nameof(AlsoSees), nameof(HasAlsoSees), nameof(SeePattern), nameof(Rows), nameof(HasRows), nameof(NewRowScopes), nameof(NewRowScope),
         nameof(LimitTargets), nameof(OffersLimits), nameof(LimitTarget), nameof(LimitNow), nameof(HeldBack), nameof(IsHeldBack),
         nameof(AlwaysRows), nameof(HasAlwaysRows), nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen),
@@ -77,6 +77,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     [
         (AgentMode.Ask, "Ask every time"),
         (AgentMode.Automatic, "Automatic"),
+        (AgentMode.AutomaticCommands, "Automatic with commands"),
     ];
 
     private readonly AppAuthority _authority;
@@ -145,7 +146,14 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     /// <summary>What the modes do.</summary>
     internal string ModeNote { get; } =
-        "Automatic releases what it can see without asking, and records each release in history. A command is never answered by a mode: it still asks unless you chose Always allow on exactly that command.";
+        "Automatic releases what it can see without asking, and records each release in history; each command still asks. Automatic with commands also runs its commands without asking, and keypaste approves nothing about what they do.";
+
+    /// <summary>That Automatic with commands runs nothing while the agent may not run commands; or empty.</summary>
+    internal string ModeRunNote => _state?.Vault is { Mode: AgentMode.AutomaticCommands, Run: false }
+        ? "May run commands is off, so it runs nothing until you turn that on."
+        : string.Empty;
+
+    internal bool HasModeRunNote => ModeRunNote.Length > 0;
 
     /// <summary>That protected environments are always asked, whatever the settings say.</summary>
     internal string ProtectedNote { get; } =
@@ -441,7 +449,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         List<SettingChoice> run =
         [
             new(_run, "off", "Off", !vault.Run),
-            new(_run, "on", "On, asked about unless always allowed", vault.Run),
+            new(_run, "on", vault.Mode == AgentMode.AutomaticCommands ? "On, run without asking" : "On, each command still asked about", vault.Run),
         ];
         _runChoices = IsEveryOther ? [] : run;
         var scopes = projects.SelectMany(project => project.Environments.Prepend(project.Whole)).ToList();
@@ -462,7 +470,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             .. vault.Projects.Select(row => new SettingRow(
                 row.Scope,
                 ModesFor(row.Mode, row.Scope),
-                row.Mode == AgentMode.Automatic ? AccessChangePrompt.Words(row.Limit, Zone) : string.Empty)),
+                row.Mode >= AgentMode.Automatic ? AccessChangePrompt.Words(row.Limit, Zone) : string.Empty)),
         ];
         _newRowScopes =
         [
@@ -472,8 +480,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         ];
         NewRowScope = Kept(NewRowScope, _newRowScopes);
 
-        List<string> targets = vault.Mode == AgentMode.Automatic ? [_byDefault] : [];
-        targets.AddRange(vault.Projects.Where(row => row.Mode == AgentMode.Automatic).Select(row => row.Scope.Name));
+        List<string> targets = vault.Mode >= AgentMode.Automatic ? [_byDefault] : [];
+        targets.AddRange(vault.Projects.Where(row => row.Mode >= AgentMode.Automatic).Select(row => row.Scope.Name));
         _limitTargets = targets;
         _limitTarget = Kept(_limitTarget, _limitTargets);
         if (!limitTyped)
@@ -589,7 +597,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         get
         {
             var access = _state?.Vault ?? AgentAccess.Defaults;
-            var runs = access.Run;
 
             return
             [
@@ -600,22 +607,11 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
                     return new AlwaysRow(
                         shown,
                         isProtected ? "Item · protected now, so it is still asked about every time" : "Item · every field it can see",
-                        string.Empty,
                         new AlwaysRemoval(() => RemoveAlwaysAsync(AlwaysAllowed.ItemId(item)), this));
                 }),
-                .. access.Always.Commands.Select(command => new AlwaysRow(
-                    AccessChangePrompt.CommandLine(command),
-                    runs ? "Command" : "Command · May run commands is off, so this does nothing now",
-                    string.Join(
-                        Environment.NewLine,
-                        DisplayTextSanitizer.Escaped(command.Program),
-                        $"in {DisplayTextSanitizer.Escaped(command.Directory)}",
-                        AccessChangePrompt.Variables(command, item => _authority.AlwaysItem(item).Shown, Environment.NewLine)),
-                    new AlwaysRemoval(() => RemoveAlwaysAsync(command.Id), this))),
-                .. access.Projects.Where(row => row.Mode == AgentMode.Automatic).Select(row => new AlwaysRow(
+                .. access.Projects.Where(row => row.Mode >= AgentMode.Automatic).Select(row => new AlwaysRow(
                     DisplayTextSanitizer.Escaped(row.Scope.Name),
                     AutomaticRowDetail(row),
-                    string.Empty,
                     new AlwaysRemoval(() => RemoveAutomaticRowAsync(row.Scope), this))),
             ];
         }
@@ -627,7 +623,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         get
         {
             var access = _state?.Vault ?? AgentAccess.Defaults;
-            return !access.Always.IsEmpty || access.Projects.Any(row => row.Mode == AgentMode.Automatic);
+            return !access.Always.IsEmpty || access.Projects.Any(row => row.Mode >= AgentMode.Automatic);
         }
     }
 
@@ -650,10 +646,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         }
 
         var access = _state?.Vault ?? AgentAccess.Defaults;
-        var command = access.Always.Commands.FirstOrDefault(held => string.Equals(held.Id, id, StringComparison.Ordinal));
         var item = access.Always.Items.FirstOrDefault(held => string.Equals(AlwaysAllowed.ItemId(held), id, StringComparison.Ordinal));
-        var shown = command is not null ? AccessChangePrompt.CommandLine(command) : item is not null ? _authority.AlwaysItem(item).Shown : id;
-        var after = command is not null || (access.Mode != AgentMode.Automatic && access.Projects.All(row => row.Mode != AgentMode.Automatic))
+        var shown = item is not null ? _authority.AlwaysItem(item).Shown : id;
+        var after = access.Mode < AgentMode.Automatic && access.Projects.All(row => row.Mode < AgentMode.Automatic)
             ? "The next request for it asks you."
             : "The next request for it follows this agent's Automatic settings.";
 
@@ -787,7 +782,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private List<SettingChoice> ModesFor(AgentMode held, ProjectScope? project) =>
     [
         .. _modes
-            .Where(mode => !(IsEveryOther && mode.Mode == AgentMode.Automatic))
+            .Where(mode => !(IsEveryOther && mode.Mode >= AgentMode.Automatic))
+            .Where(mode => mode.Mode != AgentMode.AutomaticCommands || project is null || held == AgentMode.AutomaticCommands)
             .Select(mode => new SettingChoice(_mode, AgentModes.Name(mode.Mode), mode.Words, mode.Mode == held, project)),
     ];
 

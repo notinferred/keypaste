@@ -114,7 +114,7 @@ public sealed class AccessCapsChangeTests
 
         var lifted = caps.Lifted(_agent, AccessChange.Classify(current, AgentAccess.Defaults));
 
-        Assert.Equal(AgentMode.Automatic, Own(lifted).Mode);
+        Assert.Equal(AgentMode.AutomaticCommands, Own(lifted).Mode);
         Assert.True(EffectiveAccess.Create(_agent, AgentRecords.None, lifted).Values);
     }
 
@@ -150,7 +150,7 @@ public sealed class AccessCapsChangeTests
         var lowered = AccessCaps.Empty.Narrowed(_agent, current, change);
 
         var row = Own(lowered, Scope("billing:dev"));
-        Assert.Equal((AgentMode.Automatic, new AccessLimit { Until = _end }), (row.Mode, row.Limit));
+        Assert.Equal((AgentMode.AutomaticCommands, new AccessLimit { Until = _end }), (row.Mode, row.Limit));
         var held = EffectiveAccess.Create(_agent, AgentAccessBuilders.Own(record), lowered);
         Assert.Equal(AgentMode.Automatic, held.Item(["env:billing"], _end.AddMinutes(-1)).Mode);
         Assert.Equal(AgentMode.Ask, held.Item(["env:billing"], _end).Mode);
@@ -171,7 +171,7 @@ public sealed class AccessCapsChangeTests
 
         Assert.True(caps.TryLower(_agent, Edit(project: "billing", perHour: "3"), out var lowered));
 
-        Assert.Equal((AgentMode.Automatic, new AccessLimit { PerHour = 3 }), (Own(lowered, Scope("billing")).Mode, Own(lowered, Scope("billing")).Limit));
+        Assert.Equal((AgentMode.AutomaticCommands, new AccessLimit { PerHour = 3 }), (Own(lowered, Scope("billing")).Mode, Own(lowered, Scope("billing")).Limit));
         Assert.Equal(new AccessLimit { PerHour = 3 }, Own(lowered, Scope("billing:staging")).Limit);
 
         Assert.True(lowered.TryLower(_agent, Edit(until: UntilTime.Recorded(_end)), out var ended));

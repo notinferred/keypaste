@@ -359,20 +359,6 @@ public sealed class TerminalApprovalChannelTests
     }
 
     [Fact]
-    public async Task ARunsAlways_SaysTheFilesCanChange()
-    {
-        var rig = Build("a");
-        var command = new AlwaysCommand("/usr/bin/npm", ["npm", "run", "migrate"], "/work/api", []);
-        var offered = RunPromptFor() with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), "npm run migrate") };
-
-        Assert.Equal(ApprovalAnswer.Always, await rig.Channel.AskAsync(offered, Token));
-        var said = rig.Stderr.ToString();
-        Assert.Contains("The command's files can change", said, StringComparison.Ordinal);
-        Assert.Contains("not what it does.", said, StringComparison.Ordinal);
-        Assert.All(said.Split('\n'), line => Assert.True(line.Length <= 80 || !line.Contains("files can change", StringComparison.Ordinal), line));
-    }
-
-    [Fact]
     public async Task AnEnvRun_OffersOnceOnly()
     {
         var rig = Build("o");

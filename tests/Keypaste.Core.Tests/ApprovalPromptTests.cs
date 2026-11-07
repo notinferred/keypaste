@@ -241,4 +241,19 @@ public sealed class ApprovalPromptTests
         Assert.DoesNotContain('\u2028', gain);
         Assert.DoesNotContain('\u202E', gain);
     }
+
+    /// <summary>Choosing Automatic with commands, or letting such an agent run commands, says it runs them unasked and that nothing approves what they do; with Run off it says nothing of commands.</summary>
+    [Fact]
+    public void AutomaticWithCommands_IsConfirmedSayingItsCommandsRunUnasked()
+    {
+        var both = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true });
+        var runOff = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands });
+
+        var asked = AccessChangePrompt.For("claude-code", both, AccessOrigin.Agent, "to run the tests", TimeZoneInfo.Utc);
+
+        Assert.True(asked.AnswersCommand);
+        Assert.Equal("claude-code can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", asked.CommandCaution);
+        Assert.Contains(asked.Gains, gain => gain.Contains("Automatic with commands", StringComparison.Ordinal));
+        Assert.False(AccessChangePrompt.For("claude-code", runOff, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc).AnswersCommand);
+    }
 }

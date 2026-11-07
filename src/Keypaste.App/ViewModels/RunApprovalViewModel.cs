@@ -14,8 +14,7 @@ internal sealed record RunVariableRow(string Name, string Source, string Tag);
 /// </summary>
 /// <remarks>
 /// The command and directory are shown whole: the request was refused before anybody was asked if
-/// either held anything a prompt would have to scrub (D-0358). Always allow covers exactly this command
-/// for this agent, and allows this once before asking the person to confirm that.
+/// either held anything a prompt would have to scrub (D-0358). A run is allowed once, never always.
 /// </remarks>
 internal sealed class RunApprovalViewModel : PromptViewModel
 {
@@ -43,28 +42,13 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
-        OffersAlways = prompt.Always is not null;
-        AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.Always), () => IsArmed && OffersAlways && !IsAnswered);
         OnceOnlyText = prompt.OnceOnly switch
         {
-            OnceOnly.None or OnceOnly.Unnamed => string.Empty,
-            _ => "This environment is protected: it is asked about every time.",
-        };
-        AlwaysCaption = prompt switch
-        {
-            { Always: not null } => "Always allow covers exactly this command for this agent. It allows this once, then asks you to confirm.",
-            { OnceOnly: OnceOnly.Unnamed } => ApprovalPrompt.UnnamedText,
+            OnceOnly.ProtectedProfile => "This environment is protected: it is asked about every time.",
+            OnceOnly.LimitReached => "This agent's limit was reached, so this run is asked about.",
             _ => string.Empty,
         };
     }
-
-    /// <summary>Allows this run once, then asks the person to confirm the command's Always allow row.</summary>
-    internal RelayCommand AlwaysAllowCommand { get; }
-
-    protected override void OnAllowsChanged() => AlwaysAllowCommand.NotifyCanExecuteChanged();
-
-    /// <summary>Whether the prompt offers Always allow.</summary>
-    internal bool OffersAlways { get; }
 
     /// <summary>What keypaste does with the values, and what it cannot stop.</summary>
     internal string Explainer { get; } =
@@ -108,9 +92,6 @@ internal sealed class RunApprovalViewModel : PromptViewModel
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
 
-    /// <summary>Why no Always allow is offered, or empty.</summary>
+    /// <summary>Why this run is asked about although its mode could start it unasked, or why it always is; otherwise empty.</summary>
     internal string OnceOnlyText { get; }
-
-    /// <summary>What Always allow covers and does, or empty.</summary>
-    internal string AlwaysCaption { get; }
 }

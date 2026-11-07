@@ -8,6 +8,9 @@ public enum AgentMode
 
     /// <summary>Automatic: what the agent can see is released without asking and recorded in history. It never answers a command.</summary>
     Automatic = 1,
+
+    /// <summary>Automatic with commands: as Automatic, and the agent's commands start without asking too, when it may run them. keypaste approves nothing about what they do (T-35).</summary>
+    AutomaticCommands = 2,
 }
 
 /// <summary>The words an ACAF record, <c>clients.toml</c> and the CLI use for a mode.</summary>
@@ -15,12 +18,13 @@ public static class AgentModes
 {
     /// <summary>A mode's word.</summary>
     /// <param name="mode">The mode.</param>
-    /// <returns><c>ask</c> or <c>automatic</c>.</returns>
+    /// <returns><c>ask</c>, <c>automatic</c> or <c>automatic-commands</c>.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is not a mode.</exception>
     public static string Name(AgentMode mode) => mode switch
     {
         AgentMode.Ask => "ask",
         AgentMode.Automatic => "automatic",
+        AgentMode.AutomaticCommands => "automatic-commands",
         _ => throw new ArgumentOutOfRangeException(nameof(mode)),
     };
 
@@ -36,6 +40,7 @@ public static class AgentModes
         {
             "ask" => (true, AgentMode.Ask),
             "automatic" => (true, AgentMode.Automatic),
+            "automatic-commands" => (true, AgentMode.AutomaticCommands),
             _ => (false, AgentMode.Ask),
         };
 
@@ -55,6 +60,9 @@ public static class AgentModes
 
     /// <summary>The word of the timed mode earlier versions wrote: read, and never written.</summary>
     internal const string RetiredWord = "allow-for-a-while";
+
+    /// <summary>The mode that gives the most, which every other mode is beneath.</summary>
+    internal const AgentMode Most = AgentMode.AutomaticCommands;
 
     /// <summary>The mode that gives less.</summary>
     internal static AgentMode Least(AgentMode first, AgentMode second) => first < second ? first : second;

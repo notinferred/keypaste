@@ -585,12 +585,6 @@ public sealed record RunRequest
 /// <param name="Reason">keypaste's own words.</param>
 public sealed record RunReply(EnvResolved Set, AuditMethod Method, string Reason)
 {
-    /// <summary>What the person chose Always allow on for this run, which the owner then asks them to confirm; never on the wire.</summary>
-    internal AlwaysOffer? Always { get; init; }
-
-    /// <summary>The gate's slot, kept with <see cref="Always"/> for that confirmation, which the owner then gives back; never on the wire.</summary>
-    internal KeptSlot? Kept { get; init; }
-
     /// <summary>Each entry released or asked about, as <see cref="ApprovalPrompt.Shown"/> writes it.</summary>
     public IReadOnlyList<string> Entries { get; init; } = [];
 

@@ -154,7 +154,7 @@ public sealed class AccessCaps
     [
         "keypaste: this computer's limits on each agent, by the --client-label its bridge was started with.",
         "Nothing here gives more than the vault's settings. \"*\" is every agent without rows of its own.",
-        "mode: ask or automatic. values = \"no\": values reach only commands it runs.",
+        "mode: ask, automatic or automatic-commands. values = \"no\": values reach only commands it runs.",
         "run = \"off\": no commands. see: [selectors] as --expose takes them.",
         "per_hour = <n> and until = \"<time in UTC>\": Automatic at most n an hour, and only until then, where the row's mode applies.",
         "A row with project = \"<project>\" or \"<project>:<environment>\" holds only mode, per_hour and until.",
@@ -283,9 +283,9 @@ public sealed class AccessCaps
             var held = new AccessCeiling(own);
             var (_, limit) = held.LimitFor(project, environment);
 
-            if (next.Mode == AgentMode.Automatic
+            if (next.Mode >= AgentMode.Automatic
                 && !next.Limit.IsNone
-                && held.ModeFor(project, environment) == AgentMode.Automatic
+                && held.ModeFor(project, environment) >= AgentMode.Automatic
                 && !Bounds([.. current.Terms.Select(term => term.Decide(project, environment).Limit), limit], next.Limit))
             {
                 SetLimit(own, label, scope, Tighter(limit, next.Limit));
@@ -383,8 +383,8 @@ public sealed class AccessCaps
             return false;
         }
 
-        if (edit.Mode is { } mode
-            && (mode == AgentMode.Automatic || mode > ceiling.ModeFor(edit.Project?.Project, edit.Project?.Environment)))
+        // Only Ask is surely no wider than what the vault, which this cannot read, gives now.
+        if (edit.Mode is > AgentMode.Ask)
         {
             return false;
         }
@@ -1003,7 +1003,7 @@ public sealed class AccessCaps
             && !string.Equals(label, AgentNames.Any, StringComparison.Ordinal)
             && Rows.Any(row => string.Equals(row.Label, AgentNames.Any, StringComparison.Ordinal)))
         {
-            kept.Add(new CapsRow { Label = label, Mode = AgentMode.Automatic });
+            kept.Add(new CapsRow { Label = label, Mode = AgentModes.Most });
         }
 
         foreach (var row in kept)
@@ -1164,9 +1164,9 @@ public sealed class AccessCeiling
     /// <summary>The most a mode may give for a project's environment: its row's, else its project's row's, else the agent's row's.</summary>
     /// <param name="project">The project, or null for an item in no project.</param>
     /// <param name="environment">The environment, or null for one no row names.</param>
-    /// <returns>The ceiling; <see cref="AgentMode.Automatic"/> when no row sets one.</returns>
+    /// <returns>The ceiling; <see cref="AgentModes.Most"/> when no row sets one.</returns>
     internal AgentMode ModeFor(string? project, string? environment) =>
-        Deciding(project, environment)?.Mode ?? _agent?.Mode ?? AgentMode.Automatic;
+        Deciding(project, environment)?.Mode ?? _agent?.Mode ?? AgentModes.Most;
 
     /// <summary>The limit on Automatic for a project's environment, from the row its mode comes from.</summary>
     /// <param name="project">The project, or null for an item in no project.</param>

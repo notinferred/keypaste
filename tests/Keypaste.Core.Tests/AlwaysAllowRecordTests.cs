@@ -9,16 +9,10 @@ public sealed class AlwaysAllowRecordTests
     private const string _item = "0123456789abcdef0123456789abcdef";
     private const string _other = "fedcba9876543210fedcba9876543210";
 
-    private static readonly AlwaysCommand _command = new(
-        "/usr/bin/npm",
-        ["npm", "run", "migrate"],
-        "/work/billing",
-        [new AlwaysVariable("STRIPE_KEY", _item, "password"), new AlwaysVariable("DATABASE_URL", _other, "DATABASE_URL")]);
-
     [Fact]
     public void Rows_round_trip_and_the_record_stays_wholly_understood()
     {
-        var access = AgentAccess.Defaults with { Always = new AlwaysAllowed { Items = [_item], Commands = [_command] } };
+        var access = AgentAccess.Defaults with { Always = new AlwaysAllowed { Items = [_item, _other] } };
 
         var read = AcafRecord.Read(AcafRecord.Write(access));
 
@@ -53,7 +47,7 @@ public sealed class AlwaysAllowRecordTests
     {
         Assert.False(AgentModes.TryParse("allow-for-a-while", out _));
         Assert.False(AccessEdit.TryCreate(null, "allow-for-a-while", null, null, null, null, null, false, out _, out var error));
-        Assert.Equal("a mode is ask or automatic", error);
+        Assert.Equal("a mode is ask, automatic or automatic-commands", error);
     }
 
     [Theory]
@@ -90,17 +84,16 @@ public sealed class AlwaysAllowRecordTests
         const string stored = """{"acaf":1,"see":["tag:env:*"],"values":true,"run":true,"mode":"ask","later":1}""";
 
         Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(AccessEdit.AlwaysItem(_item), [stored], out var one));
-        Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(AccessEdit.AlwaysCommand(_command), [one], out var two));
+        Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(AccessEdit.AlwaysItem(_other), [one], out var two));
         Assert.Contains("\"later\":1", two, StringComparison.Ordinal);
 
         var read = AcafRecord.Read(two).Said;
-        Assert.Equal([_item], read.Always.Items);
-        Assert.Equal([_command], read.Always.Commands);
+        Assert.Equal([_item, _other], read.Always.Items);
 
         Assert.True(AccessEdit.TryForget(AlwaysAllowed.ItemId(_item), out var forgetItem, out _));
-        Assert.True(AccessEdit.TryForget(_command.Id, out var forgetCommand, out _));
+        Assert.True(AccessEdit.TryForget(AlwaysAllowed.ItemId(_other), out var forgetOther, out _));
         Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(forgetItem, [two], out var three));
-        Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(forgetCommand, [three], out var four));
+        Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(forgetOther, [three], out var four));
         Assert.DoesNotContain("always", four, StringComparison.Ordinal);
     }
 
@@ -113,34 +106,6 @@ public sealed class AlwaysAllowRecordTests
         Assert.Equal(AgentAccessWrite.Written, AcafRecord.WriteChange(reset, [AcafRecord.Write(access)], out var written));
 
         Assert.True(AcafRecord.Read(written).Access.Always.IsEmpty);
-    }
-
-    [Theory]
-    [InlineData("/usr/bin/npm2", "npm run migrate", "/work/billing", "STRIPE_KEY")]
-    [InlineData("/usr/bin/npm", "npm run migrate --force", "/work/billing", "STRIPE_KEY")]
-    [InlineData("/usr/bin/npm", "npm migrate run", "/work/billing", "STRIPE_KEY")]
-    [InlineData("/usr/bin/npm", "npm run migrate", "/work/other", "STRIPE_KEY")]
-    [InlineData("/usr/bin/npm", "npm run migrate", "/work/billing", "OTHER_KEY")]
-    public void Anything_different_is_another_command(string program, string line, string directory, string name)
-    {
-        var variables = new[] { new AlwaysVariable(name, _item, "password"), new AlwaysVariable("DATABASE_URL", _other, "DATABASE_URL") };
-
-        Assert.NotEqual(_command, new AlwaysCommand(program, line.Split(' '), directory, variables));
-    }
-
-    [Fact]
-    public void A_variable_from_another_item_or_field_is_another_command_and_their_order_is_not()
-    {
-        var same = new AlwaysCommand(_command.Program, _command.Command, _command.Directory, [.. _command.Variables.Reverse()]);
-        var otherItem = new AlwaysCommand(_command.Program, _command.Command, _command.Directory, [new AlwaysVariable("STRIPE_KEY", _other, "password"), new AlwaysVariable("DATABASE_URL", _other, "DATABASE_URL")]);
-        var otherField = new AlwaysCommand(_command.Program, _command.Command, _command.Directory, [new AlwaysVariable("STRIPE_KEY", _item, "username"), new AlwaysVariable("DATABASE_URL", _other, "DATABASE_URL")]);
-        var fewer = new AlwaysCommand(_command.Program, _command.Command, _command.Directory, [new AlwaysVariable("STRIPE_KEY", _item, "password")]);
-
-        Assert.Equal(_command, same);
-        Assert.Equal(_command.Id, same.Id);
-        Assert.NotEqual(_command, otherItem);
-        Assert.NotEqual(_command, otherField);
-        Assert.NotEqual(_command, fewer);
     }
 
     [Fact]
@@ -169,5 +134,32 @@ public sealed class AlwaysAllowRecordTests
         Assert.False(EffectiveAccess.Create("claude-code", new AgentRecords(SavedRead.Current, [holds, lacks], []), AccessCaps.Empty).AlwaysAllows(_item));
         Assert.False(EffectiveAccess.Create("claude-code", new AgentRecords(SavedRead.ChangedOnDisk, [holds], []), AccessCaps.Empty).AlwaysAllows(_item));
         Assert.False(EffectiveAccess.Create(null, new AgentRecords(SavedRead.Current, [], [holds]), AccessCaps.Empty).AlwaysAllows(_item));
+    }
+
+    [Fact]
+    public void Automatic_with_commands_round_trips_and_an_unknown_mode_word_reads_as_ask()
+    {
+        var read = AcafRecord.Read("""{"acaf":1,"mode":"automatic-commands"}""");
+
+        Assert.True(read.Understood);
+        Assert.Equal(AgentMode.AutomaticCommands, read.Access.Mode);
+        Assert.Contains("\"mode\":\"automatic-commands\"", AcafRecord.Write(read.Access), StringComparison.Ordinal);
+
+        var unknown = AcafRecord.Read("""{"acaf":1,"mode":"automatic-everything","run":true}""");
+
+        Assert.False(unknown.Understood);
+        Assert.Equal(AgentMode.Ask, unknown.Access.Mode);
+    }
+
+    [Fact]
+    public void The_least_of_two_records_is_the_stricter_mode()
+    {
+        var commands = AcafRecord.Read("""{"acaf":1,"run":true,"mode":"automatic-commands"}""");
+        var automatic = AcafRecord.Read("""{"acaf":1,"run":true,"mode":"automatic"}""");
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.Equal(AgentMode.AutomaticCommands, EffectiveAccess.Create("claude-code", new AgentRecords(SavedRead.Current, [commands], []), AccessCaps.Empty).Item([], now).Mode);
+        Assert.Equal(AgentMode.Automatic, EffectiveAccess.Create("claude-code", new AgentRecords(SavedRead.Current, [commands, automatic], []), AccessCaps.Empty).Item([], now).Mode);
+        Assert.Equal(AgentMode.Ask, EffectiveAccess.Create("claude-code", new AgentRecords(SavedRead.Current, [commands], []), AccessCaps.Empty).Item(["env:billing:prod"], now).Mode);
     }
 }

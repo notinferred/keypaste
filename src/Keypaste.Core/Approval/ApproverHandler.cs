@@ -105,6 +105,28 @@ public sealed class ApproverHandler
     /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule.</remarks>
     public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
 
+    /// <summary>Whether an agent's run starts without asking under Automatic with commands, spending its hourly limits if it does.</summary>
+    /// <param name="access">What applies to the agent.</param>
+    /// <param name="entries">Each item the run's set comes from, none of them protected.</param>
+    /// <param name="limitReached">Whether it asks because a limit, its end or its hourly count, was reached.</param>
+    /// <returns>Whether it starts unasked.</returns>
+    internal bool TryRunUnasked(EffectiveAccess access, IReadOnlyList<EntryName> entries, out bool limitReached)
+    {
+        var now = _clock.GetUtcNow();
+        List<ItemAccess> items = entries.Count == 0
+            ? [access.Item([], now)]
+            : [.. entries.Select(entry => access.Item(_source.Tags(entry), now))];
+
+        if (access.TryAutomaticRun(items, _hourly))
+        {
+            limitReached = false;
+            return true;
+        }
+
+        limitReached = access.Run && items.All(item => item.LimitReached || item.Mode == AgentMode.AutomaticCommands) && items.Any(item => item.LimitReached || item.Mode == AgentMode.AutomaticCommands);
+        return false;
+    }
+
     /// <summary>An entry's UUID as hex, for the release paths beside this one to name it by in an Always allow row.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>The UUID, or null when it cannot be read.</returns>
@@ -276,14 +298,16 @@ public sealed class ApproverHandler
                 display,
                 cooldownKey,
                 access.Label!,
-                AuditMethod.Automatic,
-                shown => $"released without asking: {shown}'s mode for this item is Automatic",
-                "Automatic",
+                item.Mode == AgentMode.AutomaticCommands ? AuditMethod.AutomaticCommands : AuditMethod.Automatic,
+                item.Mode == AgentMode.AutomaticCommands
+                    ? shown => $"released without asking: {shown}'s mode for this item is Automatic with commands"
+                    : shown => $"released without asking: {shown}'s mode for this item is Automatic",
+                item.Mode == AgentMode.AutomaticCommands ? "Automatic with commands" : "Automatic",
                 cancellationToken);
         }
 
         // Where it is Automatic and still reached here, its hourly limit is spent; no row bypasses that.
-        var limitReached = item.LimitReached || item.Mode == AgentMode.Automatic;
+        var limitReached = item.LimitReached || item.Mode >= AgentMode.Automatic;
         var itemId = _source.ItemId(name);
 
         if (!isProtected && !limitReached && itemId is not null && access.AlwaysAllows(itemId))
@@ -726,8 +750,7 @@ public sealed class ApproverHandler
 
         var why = !TryAccess(agent, out var after, out var problem) ? Unusable(problem)
             : (edit.Project is { } scope && after.IsAutomaticIn(scope, _clock.GetUtcNow()))
-                || (edit.AddsItem is { } item && after.AlwaysAllows(item))
-                || (edit.AddsCommand is { } command && after.AlwaysAllows(command)) ? null
+                || (edit.AddsItem is { } item && after.AlwaysAllows(item)) ? null
             : written.Understood ? "keypaste still asks before releasing it there"
             : AccessChangePrompt.BeneathDefaultsText;
 

@@ -55,7 +55,7 @@ public sealed class ClientsVerbTests : IDisposable
     public void TheRetiredModeWord_IsRefusedAsANewSetting()
     {
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--mode", "allow-for-a-while"));
-        Assert.Contains("a mode is ask or automatic", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("a mode is ask, automatic or automatic-commands", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -93,6 +93,7 @@ public sealed class ClientsVerbTests : IDisposable
     /// <summary>With nothing holding the vault, anything that could give more, or remove what only the vault holds, is refused, saying how to start an owner.</summary>
     [Theory]
     [InlineData("--mode", "automatic")]
+    [InlineData("--mode", "automatic-commands")]
     [InlineData("--values", "yes")]
     [InlineData("--run", "on")]
     [InlineData("--per-hour", "none")]

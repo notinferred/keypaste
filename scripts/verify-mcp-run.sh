@@ -9,7 +9,8 @@
 # keep its commands off, if `--run on` applies without the person, if the approved run does not return
 # the command's exit code, if either stream is anything but the value's marker, if the sentinel
 # appears anywhere in the transcript or the audit log, if the same run on the same connection is asked
-# about again instead of started by its row, if the text {S:DEPLOY_KEY} filled into DATABASE_URL
+# about while the agent is Automatic with commands, if that mode applies without the person or its
+# confirmation does not say the agent's commands then run unasked, if the text {S:DEPLOY_KEY} filled into DATABASE_URL
 # comes back as anything but DATABASE_URL's marker when the command prints it alone, if a denied run
 # starts anything, or if the audit lines do not name the entry, the session and the vault.
 # These checks must never be skipped or soft-passed.
@@ -68,10 +69,10 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci 'DATABASE_URL=pre-{S:DEPLOY_KEY}-pos
   || die "could not store the value holding {S:DEPLOY_KEY}"
 
 # ------------------------------------------------------------------------------- start the owner
-# The master password, then one answer per prompt: y to turning ci-probe's commands on, a for the first
-# run, y to its confirmation, o for the third and d for the fourth. The second is started by the row the
-# a wrote, so nothing reads an answer for it.
-printf '%s\ny\na\ny\no\nd\n' "$MASTER" \
+# The master password, then one answer per prompt: y to turning ci-probe's commands on, o for the first
+# run, y to making it Automatic with commands, o for the third and d for the fourth. The second is
+# started by that mode, and setting it back to Ask gives less, so nothing reads an answer for either.
+printf '%s\ny\no\ny\no\nd\n' "$MASTER" \
   | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -139,8 +140,12 @@ grep -q 'a change would give an agent more' "$AGENT_ERR" || die "turning command
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   call 2 "$PRINTS"
   wait_for_reply 2 || true
+  "$CLI" clients ci-probe --mode automatic-commands --vault "$VAULT" --approver "$PIPE" 2>>"$ERR" \
+    || die "making ci-probe Automatic with commands, confirmed in the agent's terminal, was not applied"
   call 3 "$PRINTS"
   wait_for_reply 3 || true
+  "$CLI" clients ci-probe --mode ask --vault "$VAULT" --approver "$PIPE" 2>>"$ERR" \
+    || die "setting ci-probe back to Ask every time was not applied"
   call 4 "$SPLICED" '["DATABASE_URL"]'
   wait_for_reply 4 || true
   call 5 "$DENIED"
@@ -159,9 +164,9 @@ jq -se 'any(.[]; .id == 2 and .result.isError == false
   and .result.structuredContent.stderr == "[keypaste:DEPLOY_KEY]")' <"$OUT" >/dev/null \
   || die "the approved run did not come back as exit 3 with both streams scrubbed"
 
-# 2. The same run is started by the Always allow row the person confirmed, unasked.
+# 2. The same run is started unasked by the mode the person confirmed.
 jq -se 'any(.[]; .id == 3 and .result.isError == false and .result.structuredContent.exit_code == 3)' <"$OUT" >/dev/null \
-  || die "the same run was not started by its row"
+  || die "the same run was not started by Automatic with commands"
 
 # 3. The text {S:DEPLOY_KEY} filled into DATABASE_URL, printed alone, comes back as DATABASE_URL's marker.
 jq -se 'any(.[]; .id == 4 and .result.isError == false
@@ -182,24 +187,26 @@ grep -q "$CORE" "$AUDIT" && die "the audit log carries the injected value"
 
 # 6. One line per run, naming the entry, how it was decided, the session and the vault, and one for each change.
 jq -e -s --arg s "$SESSION" '
-  length == 7
+  length == 8
   and .[0].tool == "run" and .[0].decision == "denied" and .[0].method == "run-off"
   and .[1].tool == "access_change" and .[1].decision == "granted" and .[1].client.label == "ci-probe"
-  and .[2].tool == "access_change" and .[2].decision == "granted"
-  and (.[3:] | all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16)))
+  and .[3].tool == "access_change" and .[3].decision == "granted"
+  and .[5].tool == "access_change" and .[5].decision == "granted"
+  and ([.[2], .[4], .[6], .[7]] | all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16)))
   and .[0].session == $s
-  and .[3].decision == "granted" and .[3].method == "prompt"
-  and .[3].entries == ["env/ci/.env"] and (.[3].command | startswith("sh -c"))
-  and .[4].decision == "granted" and .[4].method == "always-allowed" and .[4].entries == ["env/ci/.env"]
-  and .[5].decision == "granted" and .[5].method == "prompt" and .[5].entries == ["env/ci/.env"]
-  and .[6].decision == "denied" and .[6].method == "prompt"' <"$AUDIT" >/dev/null \
-  || die "the audit lines do not show a run refused while off, the change, a run allowed once, its confirmed row, a row-started run, a run allowed once and a denial in session $SESSION"
+  and .[2].decision == "granted" and .[2].method == "prompt"
+  and .[2].entries == ["env/ci/.env"] and (.[2].command | startswith("sh -c"))
+  and .[4].decision == "granted" and .[4].method == "automatic-commands" and .[4].entries == ["env/ci/.env"]
+  and .[6].decision == "granted" and .[6].method == "prompt" and .[6].entries == ["env/ci/.env"]
+  and .[7].decision == "denied" and .[7].method == "prompt"' <"$AUDIT" >/dev/null \
+  || die "the audit lines do not show a run refused while off, the change, a run allowed once, the mode, a run it started, the mode set back, a run allowed once and a denial in session $SESSION"
 
-# 7. The person was shown the exact command and the claim, and the owner narrated the row's use.
+# 7. The person was shown the exact command and the claim, was told what the mode lets the agent do, and the owner narrated its use.
 grep -q 'tool         keypaste.run' "$AGENT_ERR" || die "the run dialog was not shown"
 grep -q 'ci run probe' "$AGENT_ERR" || die "the agent's stated reason was not shown to the person"
-grep -q 'without asking (Always allow)' "$AGENT_ERR" || die "the run its row started was not narrated"
+grep -q 'can now run commands with the values it can see' "$AGENT_ERR" || die "the mode's confirmation did not say its commands run unasked"
+grep -q 'without asking (Automatic with commands)' "$AGENT_ERR" || die "the run the mode started was not narrated"
 
 echo "ok: a person approved a run and denied another across two real processes; the value reached the"
-echo "    command and never the result, the transcript or the log, the row started the same run once more,"
+echo "    command and never the result, the transcript or the log, Automatic with commands started the same run once more,"
 echo "    and the text a placeholder filled into another value came back as that value's marker"

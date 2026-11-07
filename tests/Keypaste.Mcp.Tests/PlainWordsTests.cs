@@ -69,7 +69,7 @@ public sealed partial class PlainWordsTests
         said.Add(("ReleasedByAlways", ToolText.ReleasedByAlways("password")));
         said.Add(("ReleasedAutomatically", ToolText.ReleasedAutomatically("password")));
         said.Add(("Ran from a person", ToolText.Ran(["DEPLOY_KEY"], AuditMethod.Prompt, 0, 120, 1)));
-        said.Add(("Ran under Always allow", ToolText.Ran(["DEPLOY_KEY"], AuditMethod.AlwaysAllowed, null, 120, 0)));
+        said.Add(("Ran under Automatic with commands", ToolText.Ran(["DEPLOY_KEY"], AuditMethod.AutomaticCommands, null, 120, 0)));
         said.Add(("RunNotStarted", ToolText.RunNotStarted("/usr/bin/npm", "no such file")));
         said.Add(("Invalid", ToolText.Invalid("reason", "must not be empty")));
 

@@ -226,7 +226,7 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
 
         return access.Values
             && (reach == ExposureReach.Entry || (reach == ExposureReach.ProjectFields && hasVariables))
-            && access.Item(carried, now).Mode == AgentMode.Automatic;
+            && access.Item(carried, now).Mode >= AgentMode.Automatic;
     }
 
     /// <summary>The environment the tags name, as <c>project/environment</c>; null for a malformed tag.</summary>

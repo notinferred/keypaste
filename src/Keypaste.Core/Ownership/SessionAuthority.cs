@@ -918,15 +918,16 @@ public sealed class SessionAuthority : IApproverHandler
     /// The order is the security property. Admitted, then the request's rules, then the exposure and
     /// the agent's settings, a run refused unresolved when they do not let it run commands, then
     /// resolved under the admitted lifetime; the person is asked about the names the set holds once
-    /// what the agent can see, the name rule and the audit line's room are checked, unless the person chose
-    /// Always allow on exactly this command, and a refusal is not cooling. The set is read again
+    /// what the agent can see, the name rule and the audit line's room are checked, unless every item in
+    /// the set is Automatic with commands for the agent, none protected, its limits unspent and a refusal
+    /// not cooling. The set is read again
     /// after the answer, so an edit saved meanwhile is what leaves. A release whose names are not the
     /// ones the request named, or that one frame cannot carry, is refused before it is recorded.
     /// </para>
     /// <para>
     /// A missing project, a missing profile, an unusable set and one outside the exposure all come back
     /// as <see cref="AuditMethod.OutOfScope"/>, so a run cannot map the vault (THREATS.md T-4); the
-    /// reason, which only the audit line keeps, says which. No mode releases a run: Automatic asks.
+    /// reason, which only the audit line keeps, says which. Only Automatic with commands starts a run unasked: Automatic asks.
     /// </para>
     /// </remarks>
     public async ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
@@ -964,9 +965,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var client = ConnectedClient.Named(request.ClientLabel, request.ClientName);
-        var waiting = admitted.Waiting;
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.AddOwner(waiting);
 
         var decided = await Decided(
             token => DecideRunAsync(request, asked, connectionId, admitted, token),
@@ -975,33 +973,6 @@ public sealed class SessionAuthority : IApproverHandler
             CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
-        AlwaysNotice? unmade = null;
-
-        // As a credential's: before the commit, in the slot the prompt kept, whatever became of the run.
-        using (decided.Kept)
-        {
-            if (decided is { Always: { } offer, Set.Outcome: EnvOutcome.Resolved } && request.ClientLabel is { } agent)
-            {
-                unmade = await AlwaysAsync(
-                    AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
-                    agent,
-                    offer,
-                    decided.Kept,
-                    admitted,
-                    request.Session,
-                    request.Vault,
-                    waiting,
-                    withdrawn.Token).ConfigureAwait(false);
-            }
-        }
-
-        // The set was read before this question: a lock or a reload while the person answered it refuses the run.
-        if (decided is { Always: not null, Set.Outcome: EnvOutcome.Resolved } && !admitted.TryCommitAfter(waiting))
-        {
-            var (method, reason) = WithdrawnBy(admitted, "this was released");
-            decided = RunRefused(request, OutcomeOf(method), method, reason, decided.Entries);
-        }
-
         var delivered = Deliverable(asked, decided with { Session = request.Session });
         var answered = Answer(delivered);
 
@@ -1009,17 +980,12 @@ public sealed class SessionAuthority : IApproverHandler
         {
             Record(admitted, answered.Entries, client, "run");
 
-            // Every run is narrated with its command, one under Always allow too: the row approved a
-            // command line, not what the files it runs do (T-35).
+            // Every run is narrated with its command, one its mode started too: the mode approved
+            // nothing about what the files it runs do (T-35).
             var command = EnvReleasePrompt.CommandLine(request.Command);
-            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.AlwaysAllowed
-                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` without asking (Always allow)"
+            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.AutomaticCommands
+                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` without asking (Automatic with commands)"
                 : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` once");
-
-            if (unmade is not null)
-            {
-                _inner.Tell(unmade);
-            }
         }
         else if (delivered.Set.Outcome == EnvOutcome.Resolved)
         {
@@ -1086,11 +1052,8 @@ public sealed class SessionAuthority : IApproverHandler
             document = new EnvReferenceDocument(lines, []);
         }
 
-        var command = EnvReleasePrompt.CommandLine(request.Command);
         var answer = ApprovalAnswer.NoChannel;
         var method = AuditMethod.Prompt;
-        AlwaysOffer? chosen = null;
-        KeptSlot? kept = null;
         IReadOnlyList<string> shown = [];
         string? refused = null;
         var refusedMethod = AuditMethod.InvalidRequest;
@@ -1125,7 +1088,6 @@ public sealed class SessionAuthority : IApproverHandler
             }
 
             var isProtected = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name));
-            var identity = isProtected ? null : Identity(request, entries, preview.Keys);
 
             // A denial cools down every run of this connection and each field it asked for, whichever
             // connection asks next and whether a run or a credential request reaches it: another argument,
@@ -1136,40 +1098,30 @@ public sealed class SessionAuthority : IApproverHandler
                 .. entries.Select(entry => ApprovalGate.FieldKey(EntryHandle.For(entry.Name), entry.Field)).Distinct(StringComparer.Ordinal),
             ];
 
-            // Exact and failing closed: anything but this program, these arguments, this directory and
-            // these names from these items' fields asks. A refusal still cooling outranks the row.
-            if (identity is not null && access.AlwaysAllows(identity) && !cooldownKeys.Any(environments.Gate.IsInCooldown))
+            // A protected item in the set asks in every mode, and a refusal still cooling outranks the mode.
+            var limitReached = false;
+
+            if (!isProtected
+                && !cooldownKeys.Any(environments.Gate.IsInCooldown)
+                && _inner.TryRunUnasked(access, [.. entries.Select(entry => entry.Name)], out limitReached))
             {
-                method = AuditMethod.AlwaysAllowed;
+                method = AuditMethod.AutomaticCommands;
                 return true;
             }
 
-            var offer = identity is not null && access.Label is not null
-                ? new AlwaysOffer(AccessEdit.AlwaysCommand(identity), command)
-                : null;
             var prompt = RunPrompt.For(
                 request,
                 preview.Project,
                 preview.Profile,
                 [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))],
-                isProtected ? OnceOnly.ProtectedProfile : offer is null ? OnceOnly.Unnamed : OnceOnly.None) with
-            {
-                Always = offer,
-            };
+                isProtected ? OnceOnly.ProtectedProfile : limitReached ? OnceOnly.LimitReached : OnceOnly.None);
 
-            (answer, kept) = await environments.Gate.AskKeepingAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
+            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();
 
             method = AuditMethod.Prompt;
-
-            if (answer == ApprovalAnswer.Always && offer is not null)
-            {
-                chosen = offer;
-                answer = ApprovalAnswer.ApprovedOnce;
-            }
-
             return answer.Releases();
         }
 
@@ -1178,40 +1130,19 @@ public sealed class SessionAuthority : IApproverHandler
             environments.VaultFor,
             environments.Clock);
 
-        EnvResolved resolved;
-
-        try
-        {
-            resolved = document is null
-                ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
-                : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
-        }
-        catch
-        {
-            kept?.Dispose();
-            throw;
-        }
+        var resolved = document is null
+            ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
+            : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
 
         if (resolved.Outcome == EnvOutcome.Resolved)
         {
-            var reply = new RunReply(resolved, method, method == AuditMethod.AlwaysAllowed
-                ? "started without asking: a person always allowed exactly this command for this agent"
+            return new RunReply(resolved, method, method == AuditMethod.AutomaticCommands
+                ? "started without asking: this agent's mode is Automatic with commands"
                 : "a person approved this one run")
             {
                 Entries = shown,
-                Always = chosen,
-                Kept = chosen is null ? null : kept,
             };
-
-            if (chosen is null)
-            {
-                kept?.Dispose();
-            }
-
-            return reply;
         }
-
-        kept?.Dispose();
 
         if (refused is not null)
         {
@@ -1423,25 +1354,6 @@ public sealed class SessionAuthority : IApproverHandler
         return (int)buffer.Length;
     }
 
-    /// <summary>A command's identity for Always allow, or null when any of its items cannot be named by UUID, so no row covers it.</summary>
-    private AlwaysCommand? Identity(RunRequest request, IReadOnlyList<(EntryName Name, string Field)> entries, IReadOnlyList<string> keys)
-    {
-        List<AlwaysVariable> variables = [];
-
-        foreach (var (entry, key) in entries.Zip(keys))
-        {
-            if (_inner.ItemId(entry.Name) is not { } item)
-            {
-                return null;
-            }
-
-            variables.Add(new AlwaysVariable(key, item, entry.Field));
-        }
-
-        return RunProgram.FinalTarget(request.Program) is { } program
-            ? new AlwaysCommand(program, request.Command, request.Directory, variables)
-            : null;
-    }
 
     private void Record(SessionLifetime lifetime, IEnumerable<string> entries, string client, string how)
     {

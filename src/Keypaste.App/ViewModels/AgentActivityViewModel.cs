@@ -545,7 +545,12 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         : state.HeldBack.Count > 0 ? "less on this computer"
         : null;
 
-    private static string Words(AgentMode mode) => mode == AgentMode.Automatic ? "Automatic" : "Ask every time";
+    private static string Words(AgentMode mode) => mode switch
+    {
+        AgentMode.Automatic => "Automatic",
+        AgentMode.AutomaticCommands => "Automatic with commands",
+        _ => "Ask every time",
+    };
 
     /// <summary>The panel a row's Settings opens, which re-reads the screen after each change.</summary>
     private AgentSettingsViewModel? OpenAgentSettings(string agent) =>

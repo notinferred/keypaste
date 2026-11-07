@@ -45,7 +45,7 @@ flowchart TD
   ask -->|allow| released
 ```
 
-Automatic is a setting you confirm for one agent, for a project or environment it can see; Always allow, which you confirm too, covers one item or one exact command. Production environments are always asked, and so is any command you did not choose Always allow on. Every error on this path refuses. If the audit record cannot be written, the value is not released.
+Automatic is a setting you confirm for one agent, for a project or environment it can see; Always allow, which you confirm too, covers one item. A command is asked about each time unless you set the agent to Automatic with commands, which runs its commands without asking and approves nothing about what they do. Production environments are always asked. Every error on this path refuses. If the audit record cannot be written, the value is not released.
 
 ## What locking does
 

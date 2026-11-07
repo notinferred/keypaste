@@ -308,14 +308,14 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time, the default, asks you each time, and Always allow on a prompt releases it once and, once you confirm, keeps answering that item or that exact command without asking until you remove it in Agents; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Protected environments are always asked, and so is any command you did not choose Always allow on. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
+In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time, the default, asks you each time, and Always allow on a prompt releases it once and, once you confirm, keeps answering that item without asking until you remove it in Agents; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. A command is asked about each time, with Allow once only, unless you set the agent to Automatic with commands, which also runs its commands without asking. Protected environments are always asked. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
 
 ```sh
 keypaste clients
 keypaste clients claude-code --project billing:dev --mode automatic --per-hour 20
 ```
 
-The app's Agents screen sets the same things, and its prompt's Always allow button keeps answering that item or command, or makes an item's one environment Automatic, after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1.2](https://keypaste.com/acaf/v1.2/), a published format other KeePass apps can read.
+The app's Agents screen sets the same things, and its prompt's Always allow button keeps answering that item, or makes an item's one environment Automatic, after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1.2](https://keypaste.com/acaf/v1.2/), a published format other KeePass apps can read.
 
 ### Seeing what happened
 

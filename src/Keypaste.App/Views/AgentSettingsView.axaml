@@ -74,6 +74,7 @@
           <ItemsControl Name="ModeChoices" ItemsSource="{Binding ModeChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
         <TextBlock Classes="caption" Text="{Binding ModeNote}" TextWrapping="Wrap" />
+        <TextBlock Name="ModeRunNote" Classes="caption" Text="{Binding ModeRunNote}" TextWrapping="Wrap" IsVisible="{Binding HasModeRunNote}" />
         <TextBlock Classes="caption" Text="{Binding ProtectedNote}" TextWrapping="Wrap" />
       </StackPanel>
 
@@ -114,8 +115,6 @@
               <StackPanel Spacing="2" VerticalAlignment="Center">
                 <TextBlock Classes="mono size-12" Text="{Binding What}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding What}" />
                 <TextBlock Classes="caption" Text="{Binding Detail}" TextWrapping="Wrap" />
-                <TextBlock Classes="mono size-12" Text="{Binding Identity}" TextWrapping="Wrap" IsVisible="{Binding HasIdentity}"
-                           Foreground="{DynamicResource KpTextSecondary}" />
               </StackPanel>
               <Button Grid.Column="1" Name="RemoveAlways" Classes="sm size-12" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Center"
                       Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />

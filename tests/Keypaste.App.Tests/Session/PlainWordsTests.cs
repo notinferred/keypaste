@@ -385,7 +385,6 @@ public sealed partial class PlainWordsTests
             Variables = [new("STRIPE_KEY", "env/billing/.env", "STRIPE_KEY")],
         };
 
-        yield return ("the run prompt, with Always allow", new RunApprovalWindow(new RunApprovalViewModel(run with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(new AlwaysCommand("/usr/local/bin/npm", ["npm", "test"], "/home/maya/billing", [])), "npm test") })));
         yield return ("the run prompt, once only", new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.ProtectedProfile })));
 
         var timed = ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env"), "STRIPE_KEY", "Run the tests against the dev account.", "work laptop");

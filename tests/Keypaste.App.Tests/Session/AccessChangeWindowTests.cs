@@ -75,7 +75,7 @@ public sealed class AccessChangeWindowTests
             var asking = screen.Ask(Prompt(AccessOrigin.Prompt, string.Empty) with { AnswersCommand = true });
             var window = await screen.ShownAsync();
 
-            Assert.Contains(AccessChangePrompt.CommandCautionText, Text(window, "ExplainerText"), StringComparison.Ordinal);
+            Assert.Contains("can now run commands with the values it can see, without asking", Text(window, "ExplainerText"), StringComparison.Ordinal);
             Assert.Contains("on Agents", Text(window, "ExplainerText"), StringComparison.Ordinal);
 
             Click(window, "Deny");

@@ -186,7 +186,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(started, cancellationToken, request.Always);
+        return AnswerAsync(started, cancellationToken);
     }
 
     /// <summary>The vault <c>keypaste clients</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
@@ -489,7 +489,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         if (request.AnswersCommand)
         {
-            lines.AddRange(Wrapped(AccessChangePrompt.CommandCautionText, "           "));
+            lines.AddRange(Wrapped(request.CommandCaution, "           "));
         }
 
         if (request.Undo is { } undo)
@@ -615,17 +615,12 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         lines.Add("  the values and reveal them, so approve only a command you would run yourself.");
         lines.Add(string.Empty);
 
-        if (request.Always is null && request.OnceOnly == OnceOnly.None)
+        if (request.OnceOnly is OnceOnly.ProtectedProfile or OnceOnly.LimitReached)
         {
-            return string.Join(Environment.NewLine, lines);
+            lines.Add(request.OnceOnly == OnceOnly.LimitReached
+                ? "  this agent's limit was reached, so this run is asked about."
+                : "  this environment is protected: it is asked about every time.");
         }
-
-        lines.Add(request.Always is not null
-            ? string.Join(Environment.NewLine, Wrapped(
-                $"[a] allows this once, then asks you to let {request.Label ?? request.Client} run exactly this command here without asking. "
-                    + "The command's files can change: keypaste approves the command line, not what it does.",
-                "  "))
-            : OnceOnlyLine(request.OnceOnly).Replace("this item is in a protected environment", "this environment is protected", StringComparison.Ordinal));
 
         return string.Join(Environment.NewLine, lines);
     }

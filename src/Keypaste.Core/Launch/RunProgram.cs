@@ -84,53 +84,6 @@ public static class RunProgram
         return true;
     }
 
-    /// <summary>The file a program's path finally names, for what a person's Always allow on it is bound to.</summary>
-    /// <param name="program">The program's absolute path, as <see cref="TryResolve"/> found it.</param>
-    /// <returns>The path with no link left in it; the same path where nothing is there; null where it cannot be followed, which binds to nothing.</returns>
-    /// <remarks>
-    /// What starts stays <paramref name="program"/>, since a program can read the name it was started by.
-    /// So a link pointed elsewhere, a package upgrade's included, is another command, and asks. Swapping a
-    /// component after this was read is not prevented.
-    /// </remarks>
-    public static string? FinalTarget(string program)
-    {
-        ArgumentNullException.ThrowIfNull(program);
-
-        try
-        {
-            var linksLeft = _maximumLinks;
-            var current = Path.GetFullPath(program);
-
-            while (Path.GetDirectoryName(current) is { } parent && Directory.Exists(parent))
-            {
-                if (Resolve(parent, ref linksLeft) is not { } real)
-                {
-                    return null;
-                }
-
-                current = Path.Combine(real, Path.GetFileName(current));
-
-                if (new FileInfo(current).LinkTarget is not { } target)
-                {
-                    return current;
-                }
-
-                if (linksLeft-- == 0)
-                {
-                    return null;
-                }
-
-                current = Path.GetFullPath(target, real);
-            }
-
-            return current;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
-        {
-            return null;
-        }
-    }
-
     /// <summary>Resolves every link in an existing directory's path to its final target.</summary>
     /// <param name="directory">An absolute path <see cref="Approval.RunRequestRules"/> accepted.</param>
     /// <param name="resolved">The directory with no link left in its path, when it exists.</param>

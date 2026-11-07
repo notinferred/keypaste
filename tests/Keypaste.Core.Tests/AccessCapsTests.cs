@@ -102,7 +102,7 @@ public sealed class AccessCapsTests : IDisposable
         foreach (var label in new string?[] { "cursor", null, string.Empty, AgentNames.Any, "a/b" })
         {
             Assert.False(caps.For(label).Values);
-            Assert.Equal(AgentMode.Automatic, caps.For(label).ModeFor(null, null));
+            Assert.Equal(AgentMode.AutomaticCommands, caps.For(label).ModeFor(null, null));
         }
     }
 
@@ -119,7 +119,7 @@ public sealed class AccessCapsTests : IDisposable
         Assert.Equal(AgentMode.Ask, ceiling.ModeFor("billing", null));
         Assert.Equal(AgentMode.Ask, ceiling.ModeFor("other", "dev"));
         Assert.Equal(AgentMode.Ask, ceiling.ModeFor(null, null));
-        Assert.Equal(AgentMode.Automatic, AccessCeiling.None.ModeFor("billing", "dev"));
+        Assert.Equal(AgentMode.AutomaticCommands, AccessCeiling.None.ModeFor("billing", "dev"));
     }
 
     [Fact]

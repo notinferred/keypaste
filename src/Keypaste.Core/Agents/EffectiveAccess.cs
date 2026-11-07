@@ -153,11 +153,11 @@ public sealed class EffectiveAccess
     /// <returns>Whether the mode there is Automatic, which a protected environment never is.</returns>
     internal bool IsAutomaticIn(ProjectScope? scope, DateTimeOffset now) =>
         !(scope?.Environment is { } environment && EnvProfileNames.IsProtected(environment))
-        && Decide([(scope?.Project, scope?.Environment)], now).Mode == AgentMode.Automatic;
+        && Decide([(scope?.Project, scope?.Environment)], now).Mode >= AgentMode.Automatic;
 
     private ItemAccess Decide(IReadOnlyList<(string? Project, string? Environment)> classes, DateTimeOffset now)
     {
-        var mode = AgentMode.Automatic;
+        var mode = AgentModes.Most;
         List<(string Row, AccessLimit Limit)> deciding = [];
 
         foreach (var (project, environment) in classes)
@@ -177,7 +177,7 @@ public sealed class EffectiveAccess
             }
         }
 
-        if (mode != AgentMode.Automatic)
+        if (mode < AgentMode.Automatic)
         {
             return new ItemAccess(mode, []);
         }
@@ -188,7 +188,7 @@ public sealed class EffectiveAccess
         }
 
         return new ItemAccess(
-            AgentMode.Automatic,
+            mode,
             [.. deciding
                 .Where(row => row.Limit.PerHour is not null)
                 .GroupBy(row => row.Row, StringComparer.Ordinal)
@@ -207,7 +207,22 @@ public sealed class EffectiveAccess
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(limits);
 
-        return item.Mode == AgentMode.Automatic && Label is not null && limits.TryUse(Label, item.Limits);
+        return item.Mode >= AgentMode.Automatic && Label is not null && limits.TryUse(Label, item.Limits);
+    }
+
+    /// <summary>Whether a run starts without asking, spending one release of each of its items' hourly limits if it does.</summary>
+    /// <param name="items">What applies to each item of the run's set, from <see cref="Item"/>.</param>
+    /// <param name="limits">The owner's hourly limits.</param>
+    /// <returns>Whether the agent may run commands and every item is Automatic with commands with every hourly limit unspent.</returns>
+    public bool TryAutomaticRun(IReadOnlyList<ItemAccess> items, HourlyLimit limits)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(limits);
+
+        return Run
+            && Label is not null
+            && items.All(item => item.Mode == AgentMode.AutomaticCommands)
+            && limits.TryUse(Label, [.. items.SelectMany(item => item.Limits)]);
     }
 
     /// <summary>Whether the person chose Always allow on an item for this agent.</summary>
@@ -220,13 +235,4 @@ public sealed class EffectiveAccess
         return Label is not null && Terms.All(term => term.Always.Items.Contains(item, StringComparer.Ordinal));
     }
 
-    /// <summary>Whether the person chose Always allow on exactly this command for this agent.</summary>
-    /// <param name="command">The command's identity.</param>
-    /// <returns>Whether a named agent's every term holds it.</returns>
-    public bool AlwaysAllows(AlwaysCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        return Label is not null && Terms.All(term => term.Always.Commands.Contains(command));
-    }
 }

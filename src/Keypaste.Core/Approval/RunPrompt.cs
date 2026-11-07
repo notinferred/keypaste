@@ -65,18 +65,15 @@ public sealed record RunPrompt
     /// <summary>The variables, in the order the command receives them.</summary>
     public required IReadOnlyList<RunPromptVariable> Variables { get; init; }
 
-    /// <summary>Why no Always allow is offered, when none is.</summary>
+    /// <summary>Why it is asked about: a protected environment, or a limit Automatic with commands reached; otherwise none.</summary>
     public OnceOnly OnceOnly { get; init; }
-
-    /// <summary>What Always allow would ask the person to confirm, or null when it is not offered.</summary>
-    public AlwaysOffer? Always { get; init; }
 
     /// <summary>Builds the prompt for a request <see cref="RunRequestRules"/> accepted.</summary>
     /// <param name="request">The request.</param>
     /// <param name="project">The project, or the mixed name for references.</param>
     /// <param name="profile">The profile, or the mixed name.</param>
     /// <param name="variables">The variables and where each comes from.</param>
-    /// <param name="onceOnly">Why no Always allow is offered.</param>
+    /// <param name="onceOnly">Why it is asked about, when that is worth saying.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
     public static RunPrompt For(
         RunRequest request,

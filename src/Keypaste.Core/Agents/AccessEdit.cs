@@ -69,14 +69,12 @@ public sealed record AccessEdit
     /// <summary>The item Always allow in a prompt adds a row for, by its UUID as hex, or null.</summary>
     public string? AddsItem { get; private init; }
 
-    /// <summary>The command Always allow in a prompt adds a row for, or null.</summary>
-    public AlwaysCommand? AddsCommand { get; private init; }
 
     /// <summary>The short name of the Always allow row this removes, or null.</summary>
     public string? Forgets { get; private init; }
 
     /// <summary>Whether it changes the Always allow rows and nothing else.</summary>
-    internal bool ChangesAlways => AddsItem is not null || AddsCommand is not null || Forgets is not null;
+    internal bool ChangesAlways => AddsItem is not null || Forgets is not null;
 
     /// <summary>The change Always allow in an item's prompt asks for: that item released to this agent without asking from now on.</summary>
     /// <param name="item">The item's UUID as hex.</param>
@@ -88,15 +86,6 @@ public sealed record AccessEdit
         return new AccessEdit { AddsItem = item };
     }
 
-    /// <summary>The change Always allow in a run's prompt asks for: exactly that command started without asking from now on.</summary>
-    /// <param name="command">The command's identity.</param>
-    /// <returns>The change. No CLI word or agent request makes it: only the person's answer in a prompt.</returns>
-    public static AccessEdit AlwaysCommand(AlwaysCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        return new AccessEdit { AddsCommand = command };
-    }
 
     /// <summary>The change that removes one Always allow row, which gives the agent nothing more.</summary>
     /// <param name="id">The row's short name.</param>
@@ -164,7 +153,7 @@ public sealed record AccessEdit
         {
             if (!AgentModes.TryParse(mode, out var known))
             {
-                error = "a mode is ask or automatic";
+                error = "a mode is ask, automatic or automatic-commands";
                 return false;
             }
 
@@ -241,7 +230,6 @@ public sealed record AccessEdit
             AccessDimension.Run => Run == true,
             AccessDimension.See => See is not null,
             AccessDimension.AlwaysItem => string.Equals(gain.AlwaysItem, AddsItem, StringComparison.Ordinal),
-            AccessDimension.AlwaysCommand => gain.AlwaysCommand == AddsCommand,
             _ => (Reset || Mode is not null || PerHour is not null || NoPerHour || Until is not null || NoUntil) && Holds(Project, gain.Scope),
         };
 
@@ -270,10 +258,6 @@ public sealed record AccessEdit
                 always = always with { Items = [.. always.Items, item] };
             }
 
-            if (AddsCommand is { } command && !always.Commands.Contains(command))
-            {
-                always = always with { Commands = [.. always.Commands, command] };
-            }
 
             return access with { Always = Forgets is { } id ? always.Without(id) : always };
         }
@@ -318,10 +302,6 @@ public sealed record AccessEdit
             return $"always allow item {item}";
         }
 
-        if (AddsCommand is { } command)
-        {
-            return $"always allow command {command.Id}";
-        }
 
         if (Forgets is { } id)
         {

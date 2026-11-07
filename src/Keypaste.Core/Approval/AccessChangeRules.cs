@@ -13,7 +13,7 @@ namespace Keypaste.Core.Approval;
 public static class AccessChangeRules
 {
     /// <summary>The rule for <c>mode</c>.</summary>
-    public const string ModeRule = "must be ask or automatic";
+    public const string ModeRule = "must be ask, automatic or automatic-commands";
 
     /// <summary>The rule for <c>forget</c>, which the tool never sends: only its person removes what they always allowed.</summary>
     public const string ForgetRule = "is not one an agent may give: only its person changes what is always allowed";

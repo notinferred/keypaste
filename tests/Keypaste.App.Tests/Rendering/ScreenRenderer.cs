@@ -820,17 +820,6 @@ public sealed class ScreenRenderer
         var alwaysItem = authority.Session.Unlocked!.EntryUuid(_apiHome)!;
         var alwaysStore = new Core.Agents.AgentAccessStore(authority.Session.Unlocked!);
         alwaysStore.Write("claude-code", AccessEdit.AlwaysItem(alwaysItem));
-        alwaysStore.Write("claude-code", AccessEdit.AlwaysCommand(new Core.Agents.AlwaysCommand(
-            "/usr/local/bin/npm",
-            ["npm", "run", "migrate"],
-            "/home/maya/acme/api",
-            [new Core.Agents.AlwaysVariable("DATABASE_URL", alwaysItem, "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", alwaysItem, "STRIPE_SECRET_KEY")])));
-        var longMigration = new Core.Agents.AlwaysCommand(
-            "/usr/local/lib/node_modules/npm/bin/npm-cli.js",
-            ["npm", "run", "migrate", "--", "--schema", "billing", "--target", "2026-11-07T12-00-00-add-invoice-reconciliation-tables", "--lock-timeout", "120", "--statement-timeout", "600", "--dry-run=false"],
-            "/home/maya/acme/api/services/billing/migrations",
-            [new Core.Agents.AlwaysVariable("DATABASE_URL", alwaysItem, "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", alwaysItem, "STRIPE_SECRET_KEY")]);
-        alwaysStore.Write("claude-code", AccessEdit.AlwaysCommand(longMigration));
         Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var alwaysProject, out var alwaysError), alwaysError);
         alwaysStore.Write("claude-code", AccessEdit.Automatic(alwaysProject));
         authority.Session.Unlocked!.Save();
@@ -846,8 +835,28 @@ public sealed class ScreenRenderer
         window.Width = _width;
         var alwaysSettings = window.GetVisualDescendants().OfType<AgentSettingsView>().First(view => view.IsEffectivelyVisible);
         var alwaysModel = Assert.IsType<AgentSettingsViewModel>(alwaysSettings.DataContext);
-        await alwaysModel.RemoveAlwaysAsync(longMigration.Id);
+        await alwaysModel.RemoveAlwaysAsync(Core.Agents.AlwaysAllowed.ItemId(alwaysItem));
         Save(window, output, "27c-agents-always-removed");
+
+        Assert.True(AccessEdit.TryCreate(null, "automatic-commands", null, null, "off", null, null, false, out var commandsMode, out var commandsError), commandsError);
+        alwaysStore.Write("claude-code", commandsMode);
+        authority.Session.Unlocked!.Save();
+        claudeRow.IsOpen = false;
+        agents.Refresh();
+        claudeRow.IsOpen = true;
+        agents.Refresh();
+        Save(window, output, "27d-agents-automatic-commands-run-off");
+        window.Width = 720;
+        Save(window, output, "27d-agents-automatic-commands-run-off-narrow");
+        window.Width = _width;
+        Assert.True(AccessEdit.TryCreate(null, null, null, null, "on", null, null, false, out var runOn, out var runError), runError);
+        alwaysStore.Write("claude-code", runOn);
+        authority.Session.Unlocked!.Save();
+        claudeRow.IsOpen = false;
+        agents.Refresh();
+        claudeRow.IsOpen = true;
+        agents.Refresh();
+        Save(window, output, "27e-agents-automatic-commands");
         window.Height = tall;
         await DrawMore(window, output);
         window.Width = 960;
@@ -1558,37 +1567,28 @@ public sealed class ScreenRenderer
             Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
         };
         DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91c-run-once-only");
-        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { Label = null, OnceOnly = OnceOnly.Unnamed })), output, "91c2-run-unnamed");
-        var longCommand = new Core.Agents.AlwaysCommand(
-            run.Program,
-            ["npm", "run", "migrate", "--", "--schema", "billing", "--target", "2026-11-07T12-00-00-add-invoice-reconciliation-tables", "--lock-timeout", "120", "--statement-timeout", "600", "--dry-run=false"],
-            directory,
-            [new Core.Agents.AlwaysVariable("DATABASE_URL", new string('a', 32), "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", new string('a', 32), "STRIPE_SECRET_KEY"), new Core.Agents.AlwaysVariable("STRIPE_RESTRICTED_KEY", new string('a', 32), "STRIPE_RESTRICTED_KEY")]);
-        var command = new Core.Agents.AlwaysCommand(run.Program, ["npm", "run", "migrate"], directory, [new Core.Agents.AlwaysVariable("DATABASE_URL", new string('a', 32), "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", new string('a', 32), "STRIPE_SECRET_KEY")]);
-        DrawWindow(
-            new RunApprovalWindow(new RunApprovalViewModel(run with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), run.Command) })),
-            output,
-            "91c-run-approval");
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.LimitReached })), output, "91c2-run-limit-reached");
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
         DrawWindow(
             new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
                 "work laptop",
-                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = [command] } }),
-                AccessOrigin.Prompt,
+                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Mode = AgentMode.AutomaticCommands, Run = true }),
+                AccessOrigin.Settings,
                 string.Empty,
-                TimeZoneInfo.Utc,
-                _ => "env/acme-api/.env"))),
+                TimeZoneInfo.Utc))),
             output,
-            "91f3-access-change-command");
+            "91f3-access-change-automatic-commands");
         DrawWindow(
             new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
                 "work laptop",
-                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = [longCommand] } }),
-                AccessOrigin.Prompt,
-                string.Empty,
-                TimeZoneInfo.Utc,
-                _ => "env/acme-api/.env"))),
+                AccessChange.Classify(
+                    EffectiveAccess.Create("work laptop", new AgentRecords(SavedRead.Current, [new AcafRead(AgentAccess.Defaults with { Run = true }, Understood: true, Rewritable: true)], []), AccessCaps.Empty),
+                    AgentAccess.Defaults with { Run = true, Mode = AgentMode.AutomaticCommands, Limit = new AccessLimit { PerHour = 20 } }),
+                AccessOrigin.Agent,
+                "Run the test suite after each change without stopping to ask.",
+                TimeZoneInfo.Utc))),
             output,
-            "91f5-access-change-long-command");
+            "91f5-access-change-automatic-commands-agent");
         DrawWindow(
             new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
                 "work laptop",

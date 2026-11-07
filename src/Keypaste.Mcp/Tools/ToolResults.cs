@@ -78,7 +78,7 @@ internal static class ToolResults
                 // claim keypaste asks to be trusted on.
                 Text = (method switch
                 {
-                    AuditMethod.Automatic => ToolText.ReleasedAutomatically(field),
+                    AuditMethod.Automatic or AuditMethod.AutomaticCommands => ToolText.ReleasedAutomatically(field),
                     AuditMethod.AlwaysAllowed => ToolText.ReleasedByAlways(field),
                     _ => ToolText.ReleasedOnce(field),
                 }) + (codeSeconds > 0 ? ToolText.CodeLasts(codeSeconds) : string.Empty) + value,

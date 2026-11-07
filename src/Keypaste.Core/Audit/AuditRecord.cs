@@ -145,6 +145,10 @@ public enum AuditMethod
 
     /// <summary>The person removed a browser's pairing, which released nothing and took its access away (D-0633).</summary>
     Removed = 31,
+
+    /// <summary>Released, or a command started, without asking because the agent's mode is Automatic with commands, a setting the person confirmed.</summary>
+    /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/>; keypaste approved nothing about what the command does (T-35).</remarks>
+    AutomaticCommands = 32,
 }
 
 /// <summary>Who asked.</summary>

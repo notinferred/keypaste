@@ -268,8 +268,8 @@ internal static class ToolText
             : string.Create(CultureInfo.InvariantCulture, $"exit code: none; timed out after {timeoutSeconds} s and was stopped");
 
         return string.Join('\n',
-            method == AuditMethod.AlwaysAllowed
-                ? $"keypaste: RAN without asking. A person always allowed exactly this command with {string.Join(", ", names)} in its environment."
+            method == AuditMethod.AutomaticCommands
+                ? $"keypaste: RAN without asking. This agent's mode, Automatic with commands, started this command with {string.Join(", ", names)} in its environment."
                 : $"keypaste: RAN. A person approved running this command with {string.Join(", ", names)} in its environment once.",
             exit,
             string.Create(

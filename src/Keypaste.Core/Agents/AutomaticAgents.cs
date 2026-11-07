@@ -51,12 +51,12 @@ public static class AutomaticAgents
     /// <summary>Where a record says Automatic: its default, then each of its rows.</summary>
     private static IEnumerable<ProjectScope?> Places(AgentAccess access)
     {
-        if (access.Mode == AgentMode.Automatic)
+        if (access.Mode >= AgentMode.Automatic)
         {
             yield return null;
         }
 
-        foreach (var row in access.Projects.Where(project => project.Mode == AgentMode.Automatic))
+        foreach (var row in access.Projects.Where(project => project.Mode >= AgentMode.Automatic))
         {
             yield return row.Scope;
         }
@@ -74,7 +74,7 @@ public static class AutomaticAgents
             .. records
                 .Where(record => AgentNames.IsNamed(record.Name) && record.Record.Understood && !record.Record.Access.Always.IsEmpty)
                 .DistinctBy(record => record.Name, StringComparer.Ordinal)
-                .Select(record => string.Create(CultureInfo.InvariantCulture, $"{record.Name} ({record.Record.Access.Always.Items.Count + record.Record.Access.Always.Commands.Count})")),
+                .Select(record => string.Create(CultureInfo.InvariantCulture, $"{record.Name} ({record.Record.Access.Always.Items.Count})")),
         ];
     }
 }

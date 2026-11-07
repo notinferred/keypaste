@@ -32,7 +32,7 @@ internal static class ClientsCommand
 
     private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent whose settings to change; \"*\" is every other agent");
     private static readonly Option<string> _project = Syntax.Value("--project", "project[:environment]", "the project row to change");
-    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|automatic", "how it is asked");
+    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|automatic|automatic-commands", "how it is asked");
     private static readonly Option<string[]> _see = Syntax.Values("--see", "selector", "what it can see, as often as you like");
     private static readonly Option<string> _values = Syntax.Value("--values", "yes|no", "whether it may read values");
     private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may run commands");
@@ -40,7 +40,7 @@ internal static class ClientsCommand
     private static readonly Option<string> _until = Syntax.Value(
         "--until", "date|time|none", "when Automatic ends: a date at its close, a time on this computer's clock unless it ends in Z or an offset");
     private static readonly Option<bool> _reset = Syntax.Flag("--reset", "go back to the defaults");
-    private static readonly Option<string> _forget = Syntax.Value("--forget", "id", "remove one always-allowed item or command, by the id this verb lists");
+    private static readonly Option<string> _forget = Syntax.Value("--forget", "id", "remove one always-allowed item, by the id this verb lists");
 
     internal static CliVerb Command { get; } = new(
         "clients",
@@ -388,14 +388,7 @@ internal static class ClientsCommand
                 var said = AcafRecord.Read(agent.Record).Access.Always;
                 var name = EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text;
 
-                return said.Items
-                    .Select(item => new[] { name, AlwaysAllowed.ItemId(item), $"item {item}" })
-                    .Concat(said.Commands.Select(command => new[]
-                    {
-                        name,
-                        command.Id,
-                        $"{AccessChangePrompt.CommandLine(command)} ({DisplayTextSanitizer.Escaped(command.Program)}) in {DisplayTextSanitizer.Escaped(command.Directory)}, with {AccessChangePrompt.Variables(command)}",
-                    }));
+                return said.Items.Select(item => new[] { name, AlwaysAllowed.ItemId(item), $"item {item}" });
             }),
         ];
 
@@ -439,7 +432,7 @@ internal static class ClientsCommand
     };
 
     private static string Mode(AgentMode mode, AccessLimit limit, TimeZoneInfo zone) =>
-        mode == AgentMode.Automatic && !limit.IsNone
+        mode >= AgentMode.Automatic && !limit.IsNone
             ? $"{AgentModes.Name(mode)}, {AccessChangePrompt.Words(limit, zone)}"
             : AgentModes.Name(mode);
 

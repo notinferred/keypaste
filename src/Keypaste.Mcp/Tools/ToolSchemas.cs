@@ -139,8 +139,8 @@ internal static class ToolSchemas
           "properties": {
             "mode": {
               "type": "string",
-              "enum": ["ask", "automatic"],
-              "description": "ask: the person is asked every time. automatic: released without asking, within until and per_hour. With project, for that project or environment only."
+              "enum": ["ask", "automatic", "automatic-commands"],
+              "description": "ask: the person is asked every time. automatic: released without asking, within until and per_hour. automatic-commands: as automatic, and commands this agent runs start without asking too. With project, for that project or environment only."
             },
             "project": {
               "type": "string",

@@ -233,30 +233,6 @@ public sealed class ApprovalGate : IDisposable
         return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
-    /// <summary>Asks a human about an agent's run, as the other overload does, and keeps the one slot when they answer Always allow on a prompt that offered it.</summary>
-    /// <param name="cooldownKeys">Each identity under which a refusal holds the next run back.</param>
-    /// <param name="prompt">What the human is shown.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, and for Always allow the slot, which the caller asks the confirmation that follows in and then disposes.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
-    public async ValueTask<(ApprovalAnswer Answer, KeptSlot? Kept)> AskKeepingAsync(
-        IReadOnlyList<string> cooldownKeys,
-        RunPrompt prompt,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(cooldownKeys);
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        KeptSlot? kept = null;
-        var answer = await AskThroughAsync(
-            cooldownKeys,
-            new Asked(null, prompt, null, null, null),
-            token => _channel.AskAsync(prompt, token),
-            cancellationToken,
-            keep: answered => prompt.Always is not null && answered == ApprovalAnswer.Always ? kept = new KeptSlot(this) : null).ConfigureAwait(false);
-
-        return (answer, kept);
-    }
 
     /// <summary>Asks a human to confirm a change that gives an agent more, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKeys">Each identity under which a refusal holds the next change back: one cooling under any of them is refused unasked, and a refusal cools all of them.</param>

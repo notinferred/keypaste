@@ -90,40 +90,17 @@ public sealed class AgentSettingsViewTests
     {
         using var panel = new SettingsPanel();
         var item = panel.Vault.EntryUuid(new EntryName("env/billing", ".env"))!;
-        var command = new AlwaysCommand("/usr/bin/npm", ["npm", "test"], "/work", [new AlwaysVariable("STRIPE_KEY", item, "STRIPE_KEY")]);
-        var store = new AgentAccessStore(panel.Vault);
-        store.Write("ci-probe", AccessEdit.AlwaysItem(item));
-        store.Write("ci-probe", AccessEdit.AlwaysCommand(command));
+        new AgentAccessStore(panel.Vault).Write("ci-probe", AccessEdit.AlwaysItem(item));
         panel.Vault.Save();
 
         using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
-
-        Assert.Equal(["env/billing/.env", "npm test"], model.AlwaysRows.Select(row => row.What));
-        Assert.Contains("/usr/bin/npm", model.AlwaysRows[1].Identity, StringComparison.Ordinal);
-        Assert.Contains("STRIPE_KEY from env/billing/.env · STRIPE_KEY", model.AlwaysRows[1].Identity, StringComparison.Ordinal);
-        Assert.Contains("May run commands is off", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
-
-        await model.RemoveAlwaysAsync(command.Id);
 
         Assert.Equal(["env/billing/.env"], model.AlwaysRows.Select(row => row.What));
-        Assert.Equal("Removed npm test. The next request for it asks you.", model.AlwaysMessage);
-    });
 
-    /// <summary>Text from a merged record draws as escapes, so nothing in a row can hide or reorder what the person checks.</summary>
-    [Fact]
-    public Task A_stored_command_draws_with_its_hidden_characters_as_escapes() => HeadlessSession.On(() =>
-    {
-        using var panel = new SettingsPanel();
-        var command = new AlwaysCommand("/usr/bin/\u202enpm", ["npm", "te\u202est"], "/wo\u202erk", [new AlwaysVariable("KE\u202eY", new string('0', 32), "fie\u202eld")]);
-        new AgentAccessStore(panel.Vault).Write("ci-probe", AccessEdit.AlwaysCommand(command));
-        panel.Vault.Save();
+        await model.RemoveAlwaysAsync(AlwaysAllowed.ItemId(item));
 
-        using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
-        var row = Assert.Single(model.AlwaysRows);
-
-        Assert.DoesNotContain('\u202e', row.What);
-        Assert.DoesNotContain('\u202e', row.Identity);
-        return Task.CompletedTask;
+        Assert.Empty(model.AlwaysRows);
+        Assert.Equal("Removed env/billing/.env. The next request for it asks you.", model.AlwaysMessage);
     });
 
     /// <summary>Always allow on an item in one project environment makes that row Automatic, so the list names it and takes it back, and never says nothing is always allowed.</summary>

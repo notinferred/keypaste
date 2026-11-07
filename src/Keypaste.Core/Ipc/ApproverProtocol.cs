@@ -88,6 +88,7 @@ public static partial class ApproverProtocol
         AuditMethod.Prompt => "a person approved this release and it was too large to send in one reply",
         AuditMethod.AlwaysAllowed => "a person had always allowed this release and it was too large to send in one reply",
         AuditMethod.Automatic => "the agent's Automatic mode authorized this release and it was too large to send in one reply",
+        AuditMethod.AutomaticCommands => "the agent's Automatic with commands mode authorized this release and it was too large to send in one reply",
         _ => "this release was authorized and it was too large to send in one reply",
     };
 
@@ -1005,7 +1006,7 @@ public static partial class ApproverProtocol
         {
             Record = AcafRecord.Write(access with { Projects = [], Always = dropAlways ? AlwaysAllowed.None : access.Always }),
             ProjectsNotShown = access.Projects.Count,
-            AlwaysNotShown = dropAlways ? access.Always.Items.Count + access.Always.Commands.Count : 0,
+            AlwaysNotShown = dropAlways ? access.Always.Items.Count : 0,
         };
     }
 
@@ -1109,7 +1110,7 @@ public static partial class ApproverProtocol
                 var alwaysNotShown = 0;
 
                 if (row.TryGetProperty("always_not_shown", out _)
-                    && (!TryInteger(row, "always_not_shown", out alwaysNotShown) || alwaysNotShown is < 1 or > AlwaysAllowed.MaximumItems + AlwaysAllowed.MaximumCommands))
+                    && (!TryInteger(row, "always_not_shown", out alwaysNotShown) || alwaysNotShown is < 1 or > AlwaysAllowed.MaximumItems))
                 {
                     return false;
                 }

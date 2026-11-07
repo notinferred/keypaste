@@ -57,14 +57,6 @@ public static class AcafRecord
     private const string _projectKey = "project";
     private const string _alwaysKey = "always";
     private const string _itemsKey = "items";
-    private const string _commandsKey = "commands";
-    private const string _programKey = "program";
-    private const string _commandKey = "command";
-    private const string _directoryKey = "directory";
-    private const string _variablesKey = "variables";
-    private const string _nameKey = "name";
-    private const string _itemKey = "item";
-    private const string _fieldKey = "field";
     private const string _timestampFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
     // A member named twice would leave the reader to pick one, and the writer may have meant the other (D-0325).
@@ -425,8 +417,7 @@ public static class AcafRecord
             }
         }
 
-        if ((edit.AddsItem is { } item && !said.Items.Contains(item, StringComparer.Ordinal) && said.Items.Count >= AlwaysAllowed.MaximumItems)
-            || (edit.AddsCommand is { } command && !said.Commands.Contains(command) && said.Commands.Count >= AlwaysAllowed.MaximumCommands))
+        if (edit.AddsItem is { } item && !said.Items.Contains(item, StringComparer.Ordinal) && said.Items.Count >= AlwaysAllowed.MaximumItems)
         {
             return AgentAccessWrite.TooManyAlways;
         }
@@ -455,22 +446,6 @@ public static class AcafRecord
             json[_itemsKey] = new JsonArray([.. always.Items.Select(item => (JsonNode?)JsonValue.Create(item))]);
         }
 
-        if (always.Commands.Count > 0)
-        {
-            json[_commandsKey] = new JsonArray([.. always.Commands.Select(command => (JsonNode?)new JsonObject
-            {
-                [_programKey] = command.Program,
-                [_commandKey] = new JsonArray([.. command.Command.Select(argument => (JsonNode?)JsonValue.Create(argument))]),
-                [_directoryKey] = command.Directory,
-                [_variablesKey] = new JsonArray([.. command.Variables.Select(variable => (JsonNode?)new JsonObject
-                {
-                    [_nameKey] = variable.Name,
-                    [_itemKey] = variable.Item,
-                    [_fieldKey] = variable.Field,
-                })]),
-            })]);
-        }
-
         return json;
     }
 
@@ -488,14 +463,12 @@ public static class AcafRecord
         }
 
         List<string> items = [];
-        List<AlwaysCommand> commands = [];
 
         foreach (var member in element.EnumerateObject())
         {
             var read = member.Name switch
             {
                 _itemsKey => TryReadItems(member.Value, items),
-                _commandsKey => TryReadCommands(member.Value, commands),
                 _ => false,
             };
 
@@ -506,7 +479,7 @@ public static class AcafRecord
         }
 
         understood = true;
-        return new AlwaysAllowed { Items = items, Commands = commands };
+        return new AlwaysAllowed { Items = items };
     }
 
     private static bool TryReadItems(JsonElement element, List<string> items)
@@ -526,72 +499,6 @@ public static class AcafRecord
             items.Add(item.GetString()!);
         }
 
-        return true;
-    }
-
-    private static bool TryReadCommands(JsonElement element, List<AlwaysCommand> commands)
-    {
-        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > AlwaysAllowed.MaximumCommands)
-        {
-            return false;
-        }
-
-        foreach (var row in element.EnumerateArray())
-        {
-            if (row.ValueKind != JsonValueKind.Object
-                || row.EnumerateObject().Any(member => member.Name is not (_programKey or _commandKey or _directoryKey or _variablesKey))
-                || !TryText(row, _programKey, out var program)
-                || !TryText(row, _directoryKey, out var directory)
-                || !row.TryGetProperty(_commandKey, out var command)
-                || command.ValueKind != JsonValueKind.Array
-                || command.GetArrayLength() == 0
-                || command.EnumerateArray().Any(argument => argument.ValueKind != JsonValueKind.String)
-                || !row.TryGetProperty(_variablesKey, out var variables)
-                || variables.ValueKind != JsonValueKind.Array)
-            {
-                return false;
-            }
-
-            List<AlwaysVariable> read = [];
-
-            foreach (var variable in variables.EnumerateArray())
-            {
-                if (variable.ValueKind != JsonValueKind.Object
-                    || variable.EnumerateObject().Any(member => member.Name is not (_nameKey or _itemKey or _fieldKey))
-                    || !TryText(variable, _nameKey, out var name)
-                    || !TryText(variable, _itemKey, out var item)
-                    || !TryText(variable, _fieldKey, out var field)
-                    || !IsItemId(item))
-                {
-                    return false;
-                }
-
-                read.Add(new AlwaysVariable(name, item, field));
-            }
-
-            var parsed = new AlwaysCommand(program, [.. command.EnumerateArray().Select(argument => argument.GetString()!)], directory, read);
-
-            if (commands.Contains(parsed))
-            {
-                return false;
-            }
-
-            commands.Add(parsed);
-        }
-
-        return true;
-    }
-
-    private static bool TryText(JsonElement holder, string name, out string text)
-    {
-        text = string.Empty;
-
-        if (!holder.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String || value.GetString() is not { Length: > 0 } read)
-        {
-            return false;
-        }
-
-        text = read;
         return true;
     }
 

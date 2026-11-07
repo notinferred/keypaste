@@ -246,6 +246,7 @@ internal sealed record LogRow
                 var seconds => $"Approved {Span(seconds.Value)}",
             }, LogTone.Ok),
             "automatic" => ("Automatic", LogTone.Ok),
+            "automatic-commands" => ("Automatic with commands", LogTone.Ok),
             "always-allowed" => ("Always", LogTone.Ok),
             // Released by a policy.toml rule, in a line written before agents had modes.
             "policy" => ("By rule", LogTone.Ok),
