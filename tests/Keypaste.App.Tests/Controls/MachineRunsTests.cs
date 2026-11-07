@@ -8,6 +8,25 @@ namespace Keypaste.App.Tests.Controls;
 /// <summary>What a machine reads, set inside a sentence, is drawn in Fragment Mono and the rest stays the sentence's own face (DESIGN Rule 5).</summary>
 public sealed class MachineRunsTests
 {
+    [Fact]
+    public Task A_flag_is_not_split_at_its_hyphens_when_the_line_wraps() => HeadlessSession.On(() =>
+    {
+        foreach (var width in Enumerable.Range(14, 40).Select(step => step * 10d))
+        {
+            var block = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+            MachineRuns.SetInText(block, true);
+            block.Text = "If you kept a hash, run it with --client-label and --expect on the command line.";
+            block.Measure(new Avalonia.Size(width, double.PositiveInfinity));
+            var drawn = string.Concat(block.Inlines!.OfType<Run>().Select(run => run.Text));
+
+            foreach (var line in block.TextLayout.TextLines)
+            {
+                var text = drawn.Substring(line.FirstTextSourceIndex, Math.Min(line.Length, drawn.Length - line.FirstTextSourceIndex));
+                Assert.False(text.TrimEnd().TrimEnd('\u2060').EndsWith('-'), $"a flag split at {width}: {text}");
+            }
+        }
+    });
+
     [Theory]
     [InlineData("Connect changes only /Users/maya/.cursor/mcp.json, and keeps it.", "/Users/maya/.cursor/mcp.json")]
     [InlineData("Keeps it as ~/.cursor/mcp.json.", "~/.cursor/mcp.json")]
@@ -30,8 +49,8 @@ public sealed class MachineRunsTests
         block.Text = sentence;
 
         Assert.Equal(sentence, block.Text);
-        Assert.Equal(sentence, string.Concat(block.Inlines!.OfType<Run>().Select(run => run.Text)));
-        Assert.Equal(word, Assert.Single(block.Inlines!.OfType<Run>(), run => Equals(run.FontFamily, Avalonia.Application.Current!.FindResource("KpMono"))).Text);
+        Assert.Equal(sentence, string.Concat(block.Inlines!.OfType<Run>().Select(run => run.Text)).Replace("\u2060", string.Empty, StringComparison.Ordinal));
+        Assert.Equal(word, Assert.Single(block.Inlines!.OfType<Run>(), run => Equals(run.FontFamily, Avalonia.Application.Current!.FindResource("KpMono"))).Text!.Replace("\u2060", string.Empty, StringComparison.Ordinal));
     });
 
     [Theory]

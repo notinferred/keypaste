@@ -72,6 +72,21 @@ public sealed class LogViewModelTests : IDisposable
         Assert.False(model.VerifyCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void An_empty_log_offers_Agents_where_something_can_take_it_there()
+    {
+        var opened = false;
+        using var model = new LogViewModel(_home.Home, openAgents: () => opened = true);
+        using var alone = new LogViewModel(_home.Home);
+
+        Assert.True(model.OffersAgents);
+        Assert.False(alone.OffersAgents);
+
+        model.OpenAgentsCommand.Press();
+
+        Assert.True(opened);
+    }
+
     /// <summary>A log with records produces the table, and says nothing alarming about an intact one.</summary>
     [Fact]
     public void A_log_with_records_produces_rows()

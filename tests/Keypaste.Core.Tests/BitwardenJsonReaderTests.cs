@@ -177,7 +177,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
                 new ExportLoss(-1, string.Empty, "folder Empty", "it holds no item"),
                 new ExportLoss(-1, string.Empty, _noAttachments.Part, _noAttachments.Reason),
                 new ExportLoss(0, "Work/Projects/GitHub", "passkey 2", "KeePassXC keeps one passkey per item, so only the item's first lands"),
-                new ExportLoss(0, "Work/Projects/GitHub", "match detection of web address 2", "keypaste keeps no match rule for a web address"),
+                new ExportLoss(0, "Work/Projects/GitHub", "match detection of URL 2", "keypaste keeps no match rule for a URL"),
                 new ExportLoss(0, "Work/Projects/GitHub", "passkey's counter, site name, display name, discoverable flag and creation date", "KeePassXC has no field for them"),
                 new ExportLoss(0, "Work/Projects/GitHub", "field Login name", "it is a link to another of the item's own fields, which lands in its own right"),
                 new ExportLoss(0, "Work/Projects/GitHub", "master password re-prompt", "keypaste asks for no password to show one item"),

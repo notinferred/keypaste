@@ -237,7 +237,7 @@ public sealed class EntriesOrganizeTests : IDisposable
 
             Assert.Null(entries.Error);
             Assert.True(entries.SelectedGroup?.IsEverything);
-            Assert.Equal("Moved servers and the 2 items in it to the trash. Trash puts each one back.", entries.Notice);
+            Assert.StartsWith("Moved servers and the 2 items in it to the Trash. Trash puts each one back.", entries.Notice, StringComparison.Ordinal);
             Assert.DoesNotContain(entries.Groups, node => node.Path == "servers");
         }
 

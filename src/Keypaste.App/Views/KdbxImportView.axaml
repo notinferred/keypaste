@@ -146,7 +146,7 @@
     <DockPanel>
 
       <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16">
-        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="20" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
+        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="16" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
         <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ImportAKeePassDatabase}" VerticalAlignment="Center" />
         <Button Grid.Column="2"
                 Classes="icon ghost sm"
@@ -214,7 +214,7 @@
                    StrokeThickness="1"
                    StrokeDashArray="4,3" />
         <Grid ColumnDefinitions="Auto,*,Auto" Margin="16">
-          <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="20" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
+          <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="16" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
             <TextBlock Classes="mono size-13" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
             <TextBlock

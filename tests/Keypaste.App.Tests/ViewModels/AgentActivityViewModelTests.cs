@@ -418,6 +418,7 @@ public sealed class AgentActivityViewModelTests
 
         Assert.True(model.HasNoTools);
         Assert.StartsWith("None of the AI tools keypaste connects was found on this computer: Claude Code, Codex, ", model.NoTools, StringComparison.Ordinal);
+        Assert.EndsWith("Install one, then open Agents again.", model.NoTools, StringComparison.Ordinal);
     }
 
     /// <summary>

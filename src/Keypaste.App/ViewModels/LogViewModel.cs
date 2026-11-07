@@ -73,8 +73,10 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     /// log, with its filters, is Settings › Advanced's Activity log.
     /// </param>
     /// <param name="table">How the table is sorted and sized, or null for its own way.</param>
-    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false, TableState? table = null)
+    /// <param name="openAgents">Goes to Agents, the next step from an empty log.</param>
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false, TableState? table = null, Action? openAgents = null)
     {
+        OpenAgentsCommand = new RelayCommand(() => openAgents?.Invoke(), () => openAgents is not null);
         Table = table ?? TableStates.NewLog();
         Table.OrderChanged += Apply;
         _path = KeypasteHome.AuditPath(home);
@@ -117,8 +119,8 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     internal string Title => IsAgentHistory ? "History" : "Activity log";
 
     internal string Subtitle => IsAgentHistory
-        ? "What agents and tokens asked for, and what came of it. Kept on this machine, hash-chained, append-only."
-        : "Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only.";
+        ? "What agents and tokens asked for, and what came of it. Kept on this machine, each line tied to the one before it, so an edit shows."
+        : "Every agent request, allowance, token run and share. Kept on this machine, each line tied to the one before it, so an edit shows.";
 
     internal IReadOnlyList<LogFilterOption> Filters { get; } =
     [
@@ -232,6 +234,10 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     /// <summary>Whether no log has been written yet, which the screen draws as its empty state rather than a notice.</summary>
     internal bool IsEmpty => _history.Kind == AuditReadKind.Missing;
 
+    internal RelayCommand OpenAgentsCommand { get; }
+
+    internal bool OffersAgents => IsEmpty && OpenAgentsCommand.CanExecute(null);
+
     /// <summary>Whether the message is drawn as a notice above the table.</summary>
     internal bool HasNotice => HasMessage && !IsEmpty;
 
@@ -266,6 +272,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(VerdictShown));
         OnPropertyChanged(nameof(Message));
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(OffersAgents));
         OnPropertyChanged(nameof(IsBroken));
         OnPropertyChanged(nameof(UnreadableNote));
         OnPropertyChanged(nameof(OffersVerify));

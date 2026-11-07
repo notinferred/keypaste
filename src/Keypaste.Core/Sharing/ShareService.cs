@@ -215,10 +215,11 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused($"the record of share {info.Id} is incomplete, so it cannot be revoked from here");
         }
 
-        var failure = await _client.WithEndpoint(endpoint).RevokeAsync(info.Id, token, ct).ConfigureAwait(false);
+        var recorded = _client.WithEndpoint(endpoint);
+        var failure = await recorded.RevokeAsync(info.Id, token, ct).ConfigureAwait(false);
         if (failure != ShareFailure.None)
         {
-            return new ShareOutcome(false, null, info, failure, ShareClient.Describe(failure));
+            return new ShareOutcome(false, null, info, failure, recorded.Describe(failure));
         }
 
         if (!TryWrite(vault, () => store.Remove(info.Id), out var unsaved))

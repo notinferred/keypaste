@@ -162,7 +162,7 @@ internal sealed record LogRow
         return entry.Tool switch
         {
             "list_entry_names" => "Listed names",
-            "run" => entry.Granted ? "Injected" : "Requested",
+            "run" => entry.Granted ? "Ran with" : "Requested",
             "access_change" => entry.Granted ? "Changed settings" : "Asked to change settings",
             "terminal_edit" => entry.Granted ? "Changed from a terminal" : "Asked to change from a terminal",
             "browser" => entry.Field switch
@@ -172,7 +172,7 @@ internal sealed record LogRow
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
             },
             "vault_merge" => "Merged another program's save",
-            "token bundle" => "Bundled",
+            "token bundle" => "Made a bundle",
             "" => _none,
             var tool when tool.EndsWith("_credential", StringComparison.Ordinal) => "Requested",
             var tool => tool,

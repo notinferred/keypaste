@@ -136,7 +136,7 @@ public sealed class SecretsScreenTests : IDisposable
 
         Assert.True(context.Entries.ShowsListEmpty);
         Assert.Equal("No items match “nothing-is-called-this”.", context.Entries.ListEmptyNote);
-        Assert.False(context.Entries.ListEmptyOffersNew);
+        Assert.False(context.Entries.ShowsPlaceholder);
     }
 
     [Fact]

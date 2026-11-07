@@ -112,6 +112,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
+    /// <summary>Whether Move selected has anything to move.</summary>
+    internal bool HasSelectedKeys => Rows.Any(row => row.IsSelected && !row.IsDismissed);
+
     internal bool HasLostTags => LostTags.Count > 0;
 
     internal bool HasPasswords => Passwords.Count > 0;

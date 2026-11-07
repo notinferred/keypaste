@@ -173,7 +173,7 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
-                  <TextBlock Text="{Binding}"
+                  <TextBlock ctl:MachineRuns.InText="True" Text="{Binding}"
                              TextWrapping="Wrap"
                              Classes="size-13"
                              LineHeight="19"
@@ -212,16 +212,21 @@
           </Border>
           <TextBlock Text="{x:Static res:Strings.NoActivityYet}"
                      Margin="0,4,0,0"
-                     Classes="size-15"
-                     FontWeight="SemiBold"
-                     HorizontalAlignment="Center"
-                     Foreground="{DynamicResource KpTextPrimary}" />
+                     Classes="dialog-title"
+                     HorizontalAlignment="Center" />
           <TextBlock ctl:MachineRuns.InText="True" Text="{Binding Message}"
                      MaxWidth="380"
                      TextWrapping="Wrap"
                      TextAlignment="Center"
                      Classes="size-13"
                      Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Name="OpenAgentsFromLog"
+                  Classes="sm"
+                  HorizontalAlignment="Center"
+                  Margin="0,4,0,0"
+                  Content="{x:Static res:Strings.OpenAgents}"
+                  IsVisible="{Binding OffersAgents}"
+                  Command="{Binding OpenAgentsCommand}" />
         </StackPanel>
 
         <StackPanel Spacing="12">
@@ -230,7 +235,7 @@
             <!-- As wide as the table when it fits, so its star columns trim; at most 680 narrower, where it scrolls. -->
             <StackPanel Name="LogTable" Width="{Binding #TableScroll.Viewport.Width}">
 
-              <Border Classes="table-head" Padding="16,6">
+              <Border Classes="table-head top" Padding="16,6">
                 <views:LogColumns>
                   <views:ColumnHead Grid.Column="0" Column="time" />
                   <views:ColumnGrip Grid.Column="0" Column="time" />

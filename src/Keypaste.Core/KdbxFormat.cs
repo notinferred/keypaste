@@ -95,6 +95,28 @@ public readonly record struct KdbxHeader
             }
             : null;
 
+    /// <summary>Whether the file at <paramref name="path"/> is a KDBX file saved in a format older than 4.1.</summary>
+    /// <param name="path">Path of the file to inspect.</param>
+    /// <returns><see langword="false"/> for a file at 4.1 or later, or one whose first twelve bytes cannot be read as a header.</returns>
+    public static bool IsOlderThan41(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        Span<byte> start = stackalloc byte[12];
+
+        try
+        {
+            using var file = File.OpenRead(path);
+            file.ReadAtLeast(start, start.Length, throwOnEndOfStream: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return Of(start) is { } header && (header.FormatMajorVersion < 4 || (header.FormatMajorVersion == 4 && header.FormatMinorVersion == 0));
+    }
+
     /// <summary>Whether the file at <paramref name="path"/> carries the KDBX signature.</summary>
     /// <param name="path">Path of the file to inspect.</param>
     /// <returns><see langword="true"/> when the first twelve bytes are a KDBX header.</returns>

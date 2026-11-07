@@ -5,7 +5,7 @@ using Keypaste.Core.Recommendations;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One weak, reused or expired password, as Settings › Recommendations lists it: the item and the problem, never the value (V.9).</summary>
-internal sealed class PasswordRow
+internal sealed class PasswordRow : IRecommendationRow
 {
     private const int _namedSharers = 3;
 
@@ -70,9 +70,9 @@ internal sealed class PasswordRow
         _ => "Their expiry date has passed.",
     };
 
-    internal bool IsDismissed { get; }
+    public bool IsDismissed { get; }
 
-    internal bool NeedsReview => !IsDismissed;
+    public bool NeedsReview => !IsDismissed;
 
     internal string StateLabel => IsDismissed ? "Dismissed" : "Needs review";
 
@@ -85,9 +85,9 @@ internal sealed class PasswordRow
     /// <summary>Shows the item in Items, selected, where its password is replaced.</summary>
     internal RelayCommand OpenCommand { get; }
 
-    internal RelayCommand DismissCommand { get; }
+    public RelayCommand DismissCommand { get; }
 
-    internal RelayCommand ReviewAgainCommand { get; }
+    public RelayCommand ReviewAgainCommand { get; }
 
     /// <summary>The other items holding the password: every one up to three, or two and how many more.</summary>
     private string Sharers()

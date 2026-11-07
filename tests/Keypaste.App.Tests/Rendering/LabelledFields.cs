@@ -34,7 +34,7 @@ internal static class LabelledFields
 
     // The search field names itself by its icon and its one word and a title's picker is its heading, as DESIGN says; a mapping row's field takes its column's head; the box inside an AutoCompleteBox is that box's own.
     private static bool AsksForAValue(Control control) =>
-        control is TextBox or MaskedInput or AutoCompleteBox or ComboBox
+        control is TextBox or MaskedInput or AutoCompleteBox or ComboBox or NumericUpDown or CalendarDatePicker
         && !control.Classes.Contains("search")
         && !control.Classes.Contains("title")
         && control.TemplatedParent is not (AutoCompleteBox or NumericUpDown or CalendarDatePicker or ComboBox)

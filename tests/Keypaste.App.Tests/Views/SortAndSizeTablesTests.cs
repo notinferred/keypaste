@@ -73,6 +73,18 @@ public sealed class SortAndSizeTablesTests
 
     private static TextBlock LabelOf(ColumnHead head) => head.GetVisualDescendants().OfType<TextBlock>().Single();
 
+    private static void DeleteOne(RenderedShell shell)
+    {
+        var entries = Items(shell);
+        entries.Selected = entries.Rows[0];
+        entries.DeleteCommand.Press();
+
+        if (entries.IsConfirmingDelete)
+        {
+            entries.ConfirmDeleteCommand.Press();
+        }
+    }
+
     private static EntriesViewModel Items(RenderedShell shell)
     {
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -344,6 +356,7 @@ public sealed class SortAndSizeTablesTests
 
         if (name == "trash")
         {
+            DeleteOne(shell);
             shell.Show<TrashViewModel>(DestinationKind.Trash);
             shell.Frame();
         }
@@ -437,6 +450,7 @@ public sealed class SortAndSizeTablesTests
     {
         InterfaceZoom.Set(percent);
         using var shell = ShellWith("keypaste-table-gaps-", 1920, 1200);
+        DeleteOne(shell);
         _ = shell.Show<TrashViewModel>(DestinationKind.Trash);
         shell.Frame();
         var head = Head(shell, TableStates.Title);

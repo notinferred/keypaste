@@ -92,7 +92,7 @@ public sealed class McpConnectionCheckTests
         var answer = await check.RequestAsync(Listed(await check.ListAsync(Token))[0], Token);
 
         Assert.Equal(McpCheckOutcome.Failed, answer.Outcome);
-        Assert.Equal("the bridge exited without answering", answer.Said);
+        Assert.Equal("keypaste mcp exited without answering", answer.Said);
     }
 
     [Fact]
@@ -107,11 +107,11 @@ public sealed class McpConnectionCheckTests
         Assert.Equal("initialize", bridge.Method);
         Assert.True(bridge.PendingAtTheLastSecond);
         Assert.Empty(listing.Entries);
-        Assert.Equal("the bridge did not answer within 10 seconds", listing.Problem);
+        Assert.Equal("keypaste mcp did not answer within 10 seconds", listing.Problem);
 
         bridge.Exit();
 
-        Assert.Equal("the bridge exited without answering", (await check.ListAsync(Token)).Problem);
+        Assert.Equal("keypaste mcp exited without answering", (await check.ListAsync(Token)).Problem);
     }
 
     [Fact]

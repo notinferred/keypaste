@@ -134,7 +134,7 @@ public sealed class SessionEditor
                 ApprovalAnswer.Denied => "a person refused this change",
                 ApprovalAnswer.Cooldown => _gate.CoolingDown("make the change where the vault is unlocked"),
                 ApprovalAnswer.TimedOut => "nobody answered inside the window",
-                ApprovalAnswer.Busy => "another request is in front of the person; try again once it is answered",
+                ApprovalAnswer.Busy => "another prompt is waiting for an answer; try again once it is answered",
                 ApprovalAnswer.Cancelled => "the request was withdrawn before anybody answered",
                 _ => "the prompt could not be shown, so nobody was asked",
             };

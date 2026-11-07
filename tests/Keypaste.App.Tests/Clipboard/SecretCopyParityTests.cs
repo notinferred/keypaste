@@ -181,7 +181,7 @@ public sealed class SecretCopyParityTests
 
         Assert.Empty(screen.Launcher.Opened);
         Assert.Equal(
-            "The web address holds the KeePass placeholder {TOTP}, which keypaste does not fill in, so it was not opened. Edit the item so keypaste can fill it in.",
+            "The URL holds the KeePass placeholder {TOTP}, which keypaste does not fill in, so it was not opened. Edit the item so keypaste can fill it in.",
             entries.Error);
     });
 
@@ -334,7 +334,7 @@ public sealed class SecretCopyParityTests
             {
                 "current" => ("The password", Named(OpenEntry("legacy"), "CopyPassword")),
                 "username" => ("The username", Bound(OpenEntry("legacy").Detail!.CopyUsernameCommand)),
-                "url" => ("The web address", Named(OpenEntry("legacy"), "CopyUrl")),
+                "url" => ("The URL", Named(OpenEntry("legacy"), "CopyUrl")),
                 "field" => ("TOKEN", FieldCopy("legacy", "TOKEN")),
                 "revision" => RevisionCopy("legacy"),
                 "env" => ("API_KEY", EnvCopy("relay", "API_KEY")),

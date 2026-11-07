@@ -93,6 +93,12 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
     /// <summary>A found tool without keypaste, or one whose configuration keypaste cannot read, has Connect on its row.</summary>
     internal bool OffersConnect => Tool is not null && Presence?.State is McpToolState.NotConnected or McpToolState.CannotTell;
 
+    /// <summary>What Connect says, on its button and in the menus.</summary>
+    internal string ConnectLabel => $"Connect {Title}…";
+
+    /// <summary>What Connect again says, on its button and in the menus.</summary>
+    internal string ConnectAgainLabel => $"Connect {Title} again…";
+
     /// <summary>A connected tool can be connected again under Settings, for a moved vault or app.</summary>
     internal bool OffersConnectAgain => Tool is not null && Presence?.State is McpToolState.Connected;
 

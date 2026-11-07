@@ -1,6 +1,6 @@
 # Q.19 — Fix every confirmed finding of the whole-app design audit
 
-The founder directed this work on 2026-11-06: fix every confirmed finding of the whole-app design audit, going with what the audit recommends, with the code changing to match DESIGN's numbers. There is no STEPS row. It runs in five stages, and each adds its section here.
+The founder directed this work on 2026-11-06: fix every confirmed finding of the whole-app design audit, going with what the audit recommends, with the code changing to match DESIGN's numbers. There is no STEPS row. It ran in five stages, each with its section here, and the last section's table says where each of A01 to A67 stands. Implemented only, in RELEASE's terms: no person has used these screens, and no package has been published. Stage 5's last fast tier is ci 42372147044 at `cbff0e46`, with its full run at `a262eef2`; stages 1 to 4 name theirs in their sections.
 
 ## Stage 1: the one terms screen, and behaviour and truth findings
 
@@ -205,3 +205,124 @@ The review's repairs at `9f189044`, which differs from this commit only in this 
 
 `MachineRuns` finds paths by their shape, so a path holding a space is mono only up to the space and a relative path such as `Work/linear` inside a sentence stays sans; the sentences come from core and the system, so nothing marks them. A flag can break after its hyphens at 720 (`95a-settings-720`). KeePass import's scroll bar crosses the card's edge when it shows on a small window. No person has seen these sizes on a real screen; the frames are headless.
 
+## Stage 5: quieter numbers, states and words, and every finding closed
+
+The founder amended DESIGN on 2026-11-07, in its Brand status line, because stage 4's numbers made screens louder, against "too much to look at". Compared side by side with stage 4's frames, Settings, Agents, Recommendations and a form read quieter (`04-settings`, `21-agents-full`, `96-recommendations`, `13-secrets-new`, dark).
+
+### What the numbers now mean
+
+| Text | Size | Class |
+|---|---|---|
+| A screen's title, an open item's title | 24/600, −0.03em | `h1`, `title` |
+| What a list shows, All items or a group, and New item's title | 20/600, −0.01em | `list-title` |
+| A dialog's, a card's, a list's or an inline form's heading | 16/600, −0.01em | `dialog-title`; `section` is gone |
+| A label, and the helper line with it | 12/500 and 12/400, line height 1.5 | `label`, `caption` |
+
+20 no longer means "section": it is the list header alone. An icon is 20 only on the rail, in a tile and as an empty state's mark, Trash's and the log's, as DESIGN § Icons now says; the two import dialogs' headings and file icons moved to 16, as Share's. `DesignScaleTests` holds each title's size, the helper against its label, that every view's 20 icon is one of those, and that a sidebar row's is 16. DESIGN's Type table also names a row's title and a button, which it had left out.
+
+### Findings closed
+
+| ID | Checked against the tree | What changed |
+|---|---|---|
+| A26 | Confirmed, remainder | The log's subtitle says "each line tied to the one before it, so an edit shows"; 'Injected' is "Ran with", 'Bundled' "Made a bundle"; Connect's check and its Core messages say `keypaste mcp`. |
+| A29 | Confirmed, and each state now drawn | `60-empty-*` (items, projects, agents, history, settings, 720), `61-title-merging`, `61-title-updated`, `61-title-file-unreadable`, `61-title-changed-on-disk` and at 720, `61-reload-banner-merge-refused`, `61-merge-notice`, `61-title-idle-countdown` and at 720, `61-clipboard-countdown`, `20a-agents-looking`, `20b-agents-clients-unreadable`, `82b-lock-creating`, `12-items-share-creating`, `04-settings-share-links-checking`, `04-settings-browser-fill-armed`, scrolled to its card with the earlier toasts closed, and `-remove`, `49-env-terminal-unavailable`, now scrolled to its message, `91f2-access-change-reset`, `60-empty-group` and `60-first-delete-format`. `60-empty-agents` is the real state, a vault with no AI tool found, and `60-agents-unavailable` the card. Looking at them found: a merging or unsaved dot was a second amber beside New, so it is the idle grey with its word; an unreadable `clients.toml` was a whole red paragraph on a plain card, now a problem note; an empty vault offered New twice, under column heads for nothing and above a line dividing nothing, so its list says one next step and neither is drawn; Trash drew heads over nothing too; an empty group and Agents with no tool found said no next step, and now do. |
+| A44 | Confirmed by crop | A table's top head takes the card's curve, so its fill no longer runs through the card's line at the corners, on Env, Trash, the log and tokens. |
+| A50 | Confirmed | No pane text under an empty list, nor the line dividing them. |
+| A51 | Confirmed | The tray sentence shows only on Linux and the ⌘H sentence only on macOS. |
+| A54 | Confirmed | "under a reason you never saw", in the CLI's and the guides' words too, and "another prompt was already waiting for an answer", which names nobody, since the same sentence is both the Always for notice and an audit line. An audit line's other reasons still say "a person", since it is a record someone else may read: a person's own History can read "a person refused this request". |
+| A57 | Confirmed, and wider | keypaste.com for "the share server" on every screen and in Core's and the CLI's refusals to it, a chosen `--endpoint`'s own host otherwise; "the Trash" throughout. "empty your system's trash" names the operating system's. |
+| A58 | Confirmed | The whole activity log, when empty, opens Agents; History has its Back to Agents already. The restore line hides with no copies. |
+| A67 | Confirmed | (a) and (b) are written into DESIGN: a prompt's muted dot, and Vault access's radio rings. (c) closed at stage 3. (d) "The Q tasks brought the existing screens into line" became "A new screen starts from these rules". |
+| A30 | Confirmed, remainder | In the menus now: a recommendation row's Move to a field, Restore tag, Open item, Dismiss and Review again, each also on the row's own menu; Move selected and Select all; removing a tag, on its chip's menu too; Clear search and Search all items in Edit; Back in View; Reload, Create a vault… and Restore a backup… in File; Forget recent vaults, Replace the other keypaste and Remove pairing in File › This computer, the last on its row's menu too; Refresh, Copy latest hash and Show all in Agents; Generate a new password… on the Item menu and an item's own. DESIGN Interaction 1 names what stays out: Reveal, a sort, a notice's Dismiss and a sidebar row's chevron. Create a vault… is off once a form is open, Select all without note keys and Move selected without a selection. |
+| A64 | Confirmed, remainder | URL in every sentence keypaste shows, written into DESIGN's word list, while code comments and past CHANGELOG entries keep what they said; Restore this revision on the button; Connect Cursor…, Connect Cursor again… and Disconnect… in the menus as on the row. |
+| Labels | Rechecked | Every ComboBox already had a label above it but the project title's, which DESIGN names; `LabelledFields` now also holds `NumericUpDown` and `CalendarDatePicker`. |
+
+### Settled choices
+
+A title bar's unsaved or merging dot is idle, not amber, written into DESIGN's status line: the word says it and New keeps the one amber. `section` is deleted rather than kept beside an identical `dialog-title`. A helper line is 12/400 rather than raising the label to 13, since that is the quieter pair, and a prompt's captions follow, shortening its fixed layout. A sidebar row's fold is a named exception rather than a menu item, because it arranges the view as a sort does and a menu word would have to name whichever row holds the keyboard. A share refusal names the host asked, so `--endpoint` never blames keypaste.com. A list header tracks −0.01em, not −0.03em, since the tighter tracking closed the gap in "All items". A flag's hyphens carry a word joiner in its drawn run, so it wraps whole, and `TextBlock.Text` keeps the plain sentence. A row whose settings match Every other agent's says only "Less on this computer" where that applies, and nothing otherwise. "keypaste mcp setup" is the step when no Connect is listed, since `--client-label` is not one a person should need to type. Trash's format sentence moved to the delete's own notice, read from the file's header before that delete. "Forget them all" stays only as the confirmation's action; the button and its menu say Forget recent vaults, which reads alone. Bare "Refresh" and "Show all" in the Agents menu follow their buttons' words. Recommendation and pairing rows take a transparent ground, or a right-click between their words reached the card and opened nothing. A row's `IRecommendationRow` members are `public`, as an internal interface's implementation must be.
+
+### Sentences changed in DESIGN
+
+The Brand status line; Type's table; Icons; Colour's status paragraph; Shape and motion's waiting dot; Voice's word list; Interaction's introduction, 1 and 10; by this task's direction.
+
+### Evidence
+
+The review's repairs ran green at `cbff0e46` on `q19-5-finish`, which differs from this commit only in this record: fast tier ci 42372147044; desktop on Linux dev 42372774879, 2471 and 39 with none failed and 41 skipped; desktop gates on Linux dev 42373516606. Locally on macOS at that commit: the renderer's walk, 34 tests, after the last view change; `tests/Keypaste.Core.Tests`, 4497 before one share test was added; `tests/Keypaste.Cli.Tests`, 983; `tests/Keypaste.App.Tests`, 2463 before the repairs to its five failures, then those classes. Windows, macOS, `compat` and the app's packages have not run on those repairs, and `main`'s push runs them.
+
+Before those repairs, all green at `a262eef2`: ci 42365591096 on every runner, `test` at 5776 and 4497 on Linux and 4499 on Windows with none failed, and every `compat`; app 42365597757, with desktop tests at 2466 and 39 on all three runners and none failed (skipped 41 on Linux, 38 on macOS, 53 on Windows), desktop gates on all three, and KeePassXC's first run and workflows; dev 42366812373, that app run's packages installed and its acts done on all three, which by its own terms is not evidence. `tools` was not run, since nothing here reaches an AI tool. Locally, on macOS: `tests/Keypaste.App.Tests`, 2458 with two failing on the URL's words before their tests moved; the renderer's walk at every zoom and pseudo-locale, 34 tests, after the last view change; `tests/Keypaste.Cli.Tests`, 983. `keepassxc first run (macos-15)` passed this time. The runs at `2e8fc9ec` were cancelled by an amend that closed an empty Settings' gap and added `60-empty-log`.
+
+### Limits and follow-ups
+
+Title bar and banner frames draw the state the view reads, set by reflection, not a real save by another program; `ShellStatusTests` and the merge tests cover the transitions. No person has seen the menus' new entries, and macOS's native menu is drawn only by the headless tests. BACKLOG keeps what MachineRuns leaves in sans, a prompt's path among them, and the Agents status row, neither of which this batch settles.
+
+## Where each finding stands
+
+| ID | Closed where, or why not |
+|---|---|
+| A01 | Closed, stage 2; `04-settings`, `96-recommendations` seen. |
+| A02 | Closed, stage 2; `01-items` seen, three per field. |
+| A03 | Closed, stage 2; `40-env-staging` seen, two paths. |
+| A04 | Closed, stage 2; `11-secrets-home-entry` seen, no Group column. |
+| A05 | Closed, stage 1; `CancelRevokeCommand` and `AskDelete` in source. |
+| A06 | Closed, stage 3; `Border.note` on ink in source. |
+| A07 | Closed, stage 3; `13-secrets-new` seen. |
+| A08 | Closed, stage 4; `01-items`, `40-env-staging` seen. |
+| A09 | Closed, stage 4; the log verdict's command, Vault access's backup path and a flag's line break here (`73-yubikey-settings`, `04-settings-activity-log-broken-verify` seen). A prompt's path and a relative path stay in BACKLOG with their reason. |
+| A10 | Closed, stage 4, and its numbers replaced here by the founder's amendment. |
+| A11 | Closed, stage 4; `DesignScaleTests`. Helper line changed here. |
+| A12 | Closed, stage 4, and sidebar rows and import's icons moved to 16 here (`94-import-mapped` seen). |
+| A13 | Closed: stage 2 hid the summary on an open row, and the collapsed row's differs-only part came here; `21-agents-full` seen. |
+| A14 | Closed: stage 2 and the wording here; `02-agents` seen. |
+| A15 | Closed, stage 2; no "Since you unlocked" in source. |
+| A16 | Closed, stage 2; `21-agents-full` seen. The `Status` text with the process number survives only where BACKLOG's Agents row says. |
+| A17 | Closed, stage 2; `01-items` seen. |
+| A18 | Closed, stage 2; `11-secrets-home-entry` seen. |
+| A19 | Closed, stage 2; `01-items` seen. |
+| A20 | Closed, stage 1; CHANGELOG read. |
+| A21 | Closed, stage 2; no "for a while" in the app's strings. |
+| A22 | Closed, stage 1; source read. |
+| A23 | Closed, stage 3; `82-lock-create` seen. |
+| A24 | Closed, stage 1; none of the cited words remain in `docs/desktop.md`. |
+| A25 | Closed, stage 2, as A15. |
+| A26 | Closed: stage 2 and here. |
+| A27 | Closed, stage 1; the command's line break here, `04-settings-activity-log-broken-verify` seen. |
+| A28 | Closed: stage 2, and "connected without a label of its own" with a next step whether or not a Connect is listed, here; `02-agents` seen. |
+| A29 | Closed here; each frame named above seen, Reset's on a built prompt rather than through a real unreadable file. |
+| A30 | Closed, stage 3 and here. |
+| A31 | Closed, stage 1; `FormKeys.Cancel` on both Trash forms. |
+| A32 | Closed, stage 3; `82-lock-create` seen. |
+| A33 | Closed, as A07. |
+| A34 | Closed, stage 3; source read. |
+| A35 | Closed, stage 3; `spinning` on each cited view. |
+| A36 | Closed, stage 1; "Allow until you change it" in `AccessChangeWindow`. |
+| A37 | Closed, as A02. |
+| A38 | Closed, stage 3; no "Run it". |
+| A39 | Closed, stage 1; `Launch.UnsavedDraft` in `UnsavedDraft`. |
+| A40 | Closed, stage 4; `DesignScaleTests`. |
+| A41 | Closed, stage 3; DESIGN's Colour read. |
+| A42 | Closed, stage 3; the caret's brush is `KpAccentText` in source. |
+| A43 | Closed, stage 4; `DesignScaleTests`. |
+| A44 | Closed here. |
+| A45 | Closed, stage 4; `MaskedInput`'s theme read. |
+| A46 | Closed, stage 2; `14-secrets-history` seen. |
+| A47 | Replaced, stage 1; the card is gone. |
+| A48 | Closed: stage 2 hid the buttons; one sentence under the heading and the format said at the delete here; `03-trash`, `93a-trash-no-selection`, `60-first-delete-format` seen. |
+| A49 | Closed, stage 2; no inner Advanced in source. |
+| A50 | Closed here. |
+| A51 | Closed here. |
+| A52 | Closed, stage 2; `19-secrets-organize` seen. |
+| A53 | Closed, stage 1; CHANGELOG read. |
+| A54 | Closed here. |
+| A55 | Closed, stage 4; `01-items` seen. |
+| A56 | Closed, stage 3; no "Run it". |
+| A57 | Closed here. |
+| A58 | Closed here. |
+| A59 | Closed, stage 3; `21-agents-full` seen for Gemini CLI's line. |
+| A60 | Closed, stage 1; `DeleteForGood` on both forms. |
+| A61 | Closed, stage 3; as A59. |
+| A62 | Closed, stage 3; every remaining placeholder in the views is an example. |
+| A63 | Closed, stage 3; DESIGN Interaction 1 read. |
+| A64 | Closed, stage 4 and here. |
+| A65 | Closed, stage 3; source read. |
+| A66 | Closed, stage 3; `AppCommands` read. |
+| A67 | Closed here. |

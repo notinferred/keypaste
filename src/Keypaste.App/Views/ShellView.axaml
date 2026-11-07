@@ -154,7 +154,7 @@
               <Border Classes="dot"
                       Margin="0,0,6,0"
                       Classes.ok="{Binding VaultStatusOk}"
-                      Classes.warn="{Binding VaultStatusAccent}"
+                      Classes.idle="{Binding VaultStatusPending}"
                       Classes.danger="{Binding VaultStatusDanger}" />
               <!-- A long file name gives way in its middle, so the save state at the end always shows. -->
               <TextBlock Grid.Column="1"
@@ -273,7 +273,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:NavItem">
                   <Grid ColumnDefinitions="Auto,*,Auto" AutomationProperties.Name="{Binding Title}">
-                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="20" Margin="0,0,8,0" />
+                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,8,0" />
                     <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2"
                                Classes="label muted"
@@ -299,7 +299,7 @@
                         AutomationProperties.Name="{Binding Title}"
                         AutomationProperties.HelpText="{Binding Detail}"
                         ToolTip.Tip="{Binding Detail}">
-                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="20" Margin="0,0,8,0" />
+                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,8,0" />
                     <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2"
                                Classes="label muted"
@@ -344,7 +344,7 @@
                             AutomationProperties.Name="{Binding FoldLabel}">
                       <ctl:KpIcon Icon="{Binding Chevron}" Size="14" />
                     </Button>
-                    <ctl:KpIcon Grid.Column="1" Icon="folder" Size="20" Margin="4,0,8,0" />
+                    <ctl:KpIcon Grid.Column="1" Icon="folder" Size="16" Margin="4,0,8,0" />
                     <TextBlock Grid.Column="2"
                                Text="{Binding Title}"
                                TextTrimming="CharacterEllipsis"
@@ -359,7 +359,7 @@
                         Margin="16,0,0,0"
                         AutomationProperties.Name="{Binding Title}"
                         ToolTip.Tip="{Binding Name}">
-                    <ctl:KpIcon Grid.Column="0" Icon="folder-git-2" Size="20" Margin="0,0,8,0" />
+                    <ctl:KpIcon Grid.Column="0" Icon="folder-git-2" Size="16" Margin="0,0,8,0" />
                     <TextBlock Grid.Column="1"
                                Classes="mono size-12"
                                FontWeight="Normal"

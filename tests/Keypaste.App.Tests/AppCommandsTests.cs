@@ -67,6 +67,39 @@ public sealed class AppCommandsTests : IDisposable
     }
 
     [Fact]
+    public void The_commands_that_were_only_on_buttons_are_in_the_menus()
+    {
+        var commands = Commands(shell: null, mac: false);
+
+        foreach (var (menu, header) in new[]
+        {
+            ("File", "Create a vault…"),
+            ("File", "Restore a backup…"),
+            ("File", "Reload"),
+            ("Edit", "Clear search"),
+            ("Edit", "Search all items"),
+            ("View", "Back"),
+            ("Agents", "Copy latest hash"),
+            ("Agents", "Refresh"),
+            ("Agents", "Show all"),
+        })
+        {
+            var entry = commands.Menus.Single(group => group.Header == menu).Entries.OfType<AppCommand>().Single(command => command.Header == header);
+            Assert.False(entry.CanRun(), $"{header} is on with nothing for it to act on");
+        }
+
+        var file = commands.Menus.Single(group => group.Header == "File").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "This computer").Entries();
+        Assert.Contains("Forget recent vaults", file.OfType<AppCommand>().Select(command => command.Header));
+        Assert.Contains("Replace the other keypaste", file.OfType<AppCommand>().Select(command => command.Header));
+        Assert.Contains("Remove pairing", file.OfType<AppCommand>().Select(command => command.Header));
+
+        var item = commands.Menus.Single(group => group.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Recommendations").Entries();
+        Assert.Equal(
+            ["Move to a field", "Restore tag", "Open item", "Dismiss", "Review again", "Select all", "Move selected"],
+            item.OfType<AppCommand>().Select(command => command.Header));
+    }
+
+    [Fact]
     public void Each_platforms_window_and_view_menus_hold_what_that_platform_has()
     {
         var mac = Commands(shell: null, mac: true);
@@ -285,6 +318,34 @@ public sealed class AppCommandsTests : IDisposable
         Assert.True(Find(commands, "Select all").CanRun());
         window.Close();
     });
+
+    [Fact]
+    public void Select_all_and_Move_selected_are_off_with_no_key_left_in_notes()
+    {
+        using var shell = new ShellViewModel(_session, _vault.Home, null, clipboard: _clipboard, clock: new ManualClock(AppClock.Start));
+        shell.Current = Destinations.Of(DestinationKind.Recommendations);
+        var findings = Commands(shell).Menus.Single(group => group.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Recommendations").Entries().OfType<AppCommand>();
+
+        Assert.False(findings.Single(command => command.Header == "Select all").CanRun());
+        Assert.False(findings.Single(command => command.Header == "Move selected").CanRun());
+    }
+
+    [Fact]
+    public async Task Create_a_vault_is_off_once_a_form_is_open()
+    {
+        using var locked = new AppVaultSession(new ManualClock(AppClock.Start));
+        var picker = new FakeVaultFilePicker { NewPath = Path.Combine(_vault.Home, "new.kdbx") };
+        using var unlock = new UnlockViewModel(locked, _vault.Home, picker, () => { });
+        var commands = new AppCommands(new AppCommandHost { Session = locked, Shell = () => null, Unlock = () => unlock, Home = _vault.Home });
+        var create = Find(commands, "Create a vault…");
+
+        Assert.True(create.CanRun());
+
+        await unlock.StartCreateAsync();
+
+        Assert.True(unlock.IsCreating);
+        Assert.False(create.CanRun());
+    }
 
     [Fact]
     public Task Paste_into_a_masked_field_pastes_once_and_exposes_nothing() => HeadlessSession.On(async () =>

@@ -27,8 +27,7 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 {
     internal const string RecycledNote =
-        "Deleted items wait here until you delete them for good, and KeePassXC shows them as its Recycle Bin. A vault that "
-        + "has put anything here is saved in the KeePass database format 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.";
+        "Deleted items wait here until you delete them for good, and KeePassXC shows them as its Recycle Bin.";
 
     internal const string NoBinNote =
         "This vault's Trash is switched off in KeePassXC, so deleting removes an item and "
@@ -149,8 +148,8 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     internal string EmptyPrompt => Rows.Count switch
     {
         0 => string.Empty,
-        1 => "Delete the one item in the trash and its history for good? This cannot be undone.",
-        var count => Invariant($"Delete all {count} items in the trash and their history for good? This cannot be undone."),
+        1 => "Delete the one item in the Trash and its history for good? This cannot be undone.",
+        var count => Invariant($"Delete all {count} items in the Trash and their history for good? This cannot be undone."),
     };
 
     /// <summary>The title a restore refused for a taken name can put the selected entry back under, or null.</summary>
@@ -199,7 +198,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         Report(
             back == 0 ? null : back == 1 ? "1 item is back." : Invariant($"{back} items are back."),
-            left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Something else has the name, or it left the trash. Restore each one alone to see why.");
+            left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Something else has the name, or it left the Trash. Restore each one alone to see why.");
         SelectedRows.Clear();
         Load();
     }
@@ -338,7 +337,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             default:
-                Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
+                Report(null, $"{row.DisplayTitle} is not in the Trash any more. Check the list.");
                 break;
         }
 
@@ -386,7 +385,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             default:
-                Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
+                Report(null, $"{row.DisplayTitle} is not in the Trash any more. Check the list.");
                 break;
         }
 
@@ -414,7 +413,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         }
         else
         {
-            Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
+            Report(null, $"{row.DisplayTitle} is not in the Trash any more. Check the list.");
         }
 
         IsConfirmingPurge = false;
@@ -433,7 +432,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
             vault => shown.SetEquals(vault.ReadRecycled().Select(recycled => recycled.Id)) ? vault.EmptyRecycleBin() : (int?)null,
             removed => removed > 0);
 
-        if (write.Problem("empty the trash again") is { } problem)
+        if (write.Problem("empty the Trash again") is { } problem)
         {
             Report(null, problem);
             return;
@@ -442,15 +441,15 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         switch (write.Value)
         {
             case null:
-                Report(null, "The trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.");
+                Report(null, "The Trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.");
                 break;
 
             case 1:
-                Report("The trash is empty. The item in it and its history are gone.", null);
+                Report("The Trash is empty. The item in it and its history are gone.", null);
                 break;
 
             case var removed:
-                Report(Invariant($"The trash is empty. {removed} items and their history are gone."), null);
+                Report(Invariant($"The Trash is empty. {removed} items and their history are gone."), null);
                 break;
         }
 

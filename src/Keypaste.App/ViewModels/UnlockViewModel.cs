@@ -100,7 +100,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         ResumeCommand = new AsyncRelayCommand(ResumeAsync, () => !Busy && OffersQuickUnlock);
         BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !Busy && IsOpening);
-        StartCreateCommand = new AsyncRelayCommand(StartCreateAsync, () => !Busy);
+        StartCreateCommand = new AsyncRelayCommand(StartCreateAsync, () => !Busy && IsOpening);
         CancelCreateCommand = new AsyncRelayCommand(CancelCreateAsync, () => !Busy);
         StartRestoreCommand = new RelayCommand(StartRestore, () => !Busy && HasBackups && IsOpening);
         CloseRestoreCommand = new RelayCommand(CloseRestore, () => Restore is { Busy: false });
@@ -240,7 +240,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRestoring), nameof(IsOpening), nameof(OffersQuickUnlock), nameof(OffersRestore), nameof(HasLooseError))]
     [NotifyPropertyChangedFor(nameof(Subtitle), nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(CloseRestoreCommand), nameof(BrowseCommand), nameof(StartRestoreCommand), nameof(ResumeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CloseRestoreCommand), nameof(BrowseCommand), nameof(StartCreateCommand), nameof(StartRestoreCommand), nameof(ResumeCommand))]
     internal partial RestoreBackupViewModel? Restore { get; private set; }
 
     internal bool IsRestoring => Restore is not null;
@@ -375,7 +375,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyfileNote), nameof(IsOpening), nameof(HasKeyfileNote), nameof(OffersQuickUnlock), nameof(OffersRestore))]
     [NotifyPropertyChangedFor(nameof(HasLooseError), nameof(Subtitle), nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(CreateKeyfileCommand), nameof(BrowseCommand), nameof(StartRestoreCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(CreateKeyfileCommand), nameof(BrowseCommand), nameof(StartCreateCommand), nameof(StartRestoreCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResumeCommand))]
     internal partial bool IsCreating { get; private set; }
 

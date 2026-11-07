@@ -26,15 +26,16 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <!-- A section heading inside a screen: "Allowances", "AI tools". -->
-  <Style Selector=":is(TextBlock).section">
-    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
+  <!-- What a list shows, "All items" or a group, and New item's title: under an item's title at 24, which outranks it. -->
+  <Style Selector=":is(TextBlock).list-title">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
     <Setter Property="FontSize" Value="20" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.6" />
+    <Setter Property="LetterSpacing" Value="-0.2" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
+  <!-- A dialog's, a card's or an inline form's heading: "Allowances", "Rename or move". -->
   <Style Selector=":is(TextBlock).dialog-title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="16" />
@@ -80,10 +81,10 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
-  <!-- A helper line under a field. -->
+  <!-- A helper line under a field: its label's size at a lighter weight, so it never reads above its label. -->
   <Style Selector=":is(TextBlock).caption">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>

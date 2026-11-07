@@ -19,7 +19,7 @@ public sealed partial class DesignScaleTests
     private static readonly HashSet<double> _radii = [0, 4, 6, 7, 10, 14];
     private static readonly HashSet<double> _icons = [14, 16, 20];
 
-    // Display, heading, section, dialog title, body and mono, label and table header. The half sizes are inside DESIGN's ranges.
+    // Display, heading, list header, dialog title, body and mono, label and helper line, and table header. The half sizes are inside DESIGN's ranges.
     private static readonly HashSet<double> _typeSizes = [54, 24, 20, 16, 15, 14, 13.5, 13, 12.5, 12, 11];
 
     private static readonly HashSet<string> _spacingProperties = ["Margin", "Padding", "Spacing", "RowSpacing", "ColumnSpacing", "ItemSpacing", "LineSpacing"];
@@ -129,6 +129,40 @@ public sealed partial class DesignScaleTests
             select $"{Path.GetFileName(file)}: {element.Attribute("Classes")} {element.Attribute("Text")}");
 
     [Fact]
+    public void Each_title_ranks_where_DESIGN_puts_it()
+    {
+        Assert.Equal(24, ClassSize("h1"));
+        Assert.Equal(24, ClassSize("title"));
+        Assert.Equal(20, ClassSize("list-title"));
+        Assert.Equal(16, ClassSize("dialog-title"));
+    }
+
+    [Fact]
+    public void A_helper_line_is_not_larger_than_its_label() =>
+        Assert.True(ClassSize("caption") <= ClassSize("label"));
+
+    [Fact]
+    public void An_icon_is_20_only_on_the_rail_in_a_tile_or_as_an_empty_marks()
+    {
+        Assert.Empty(
+            from file in Directory.EnumerateFiles(Path.Combine(App(), "Views"), "*.axaml")
+            from icon in XDocument.Load(file).Descendants().Where(element => element.Name.LocalName == "KpIcon" && (string?)element.Attribute("Size") == "20")
+            where !icon.Ancestors().Any(ancestor => (string?)ancestor.Attribute("Name") == "Rail" || ((string?)ancestor.Attribute("Classes"))?.Contains("tile", StringComparison.Ordinal) == true)
+                && !(Path.GetFileName(file) is "TrashView.axaml" or "LogView.axaml")
+            select $"{Path.GetFileName(file)}: {icon}");
+    }
+
+    [Fact]
+    public void A_sidebar_row_icon_is_16()
+    {
+        var shell = XDocument.Load(Path.Combine(App(), "Views", "ShellView.axaml"));
+
+        Assert.All(
+            shell.Descendants().Where(element => element.Name.LocalName == "KpIcon" && ((string?)element.Attribute("Icon"))?.Contains("{Binding Icon}", StringComparison.Ordinal) == true && !element.Ancestors().Any(ancestor => (string?)ancestor.Attribute("Name") == "Rail")),
+            icon => Assert.Equal("16", (string?)icon.Attribute("Size")));
+    }
+
+    [Fact]
     public void A_literal_in_csharp_is_on_its_list()
     {
         Assert.Contains(DepthToIndent.Step, _spacing);
@@ -162,6 +196,13 @@ public sealed partial class DesignScaleTests
     private static partial Regex LiteralIcon();
 
     private static bool IsLiteral(string part) => part.Length > 0 && char.IsAsciiDigit(part[0]) && part.TrimEnd('d').All(character => char.IsAsciiDigit(character) || character == '.');
+
+    private static double ClassSize(string name) =>
+        (from style in XDocument.Load(Path.Combine(App(), "Theme", "Typography.axaml")).Descendants().Where(element => element.Name.LocalName == "Style")
+         where (string?)style.Attribute("Selector") == $":is(TextBlock).{name}"
+         from setter in style.Elements()
+         where (string?)setter.Attribute("Property") == "FontSize"
+         select double.Parse((string)setter.Attribute("Value")!, CultureInfo.InvariantCulture)).Single();
 
     private static IEnumerable<string> Offenders(HashSet<string> properties, HashSet<double> allowed, Func<XElement, bool> isResource) =>
         from file in Files()

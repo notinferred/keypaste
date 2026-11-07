@@ -80,7 +80,9 @@ public sealed class RecommendationsTests : IDisposable
         await shell.Recommendations.Checking;
         var list = shell.Recommendations;
 
+        Assert.False(list.HasSelectedKeys);
         list.SelectAllCommand.Press();
+        Assert.True(list.HasSelectedKeys);
         list.MoveSelectedCommand.Press();
         await list.Checking;
 

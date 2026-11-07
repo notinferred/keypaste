@@ -108,12 +108,17 @@ public static class Strings
     public static string ConfirmNewMasterPassword => Manager.GetString("ConfirmNewMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string ConfirmRemovingThePairingValue => Manager.GetString("ConfirmRemovingThePairingValue", CultureInfo.CurrentUICulture)!;
     public static string ConnectAToolFromThisListToGive => Manager.GetString("ConnectAToolFromThisListToGive", CultureInfo.CurrentUICulture)!;
-    public static string ConnectAgentAgainLabel => Manager.GetString("ConnectAgentAgainLabel", CultureInfo.CurrentUICulture)!;
-    public static string ConnectAgentLabel => Manager.GetString("ConnectAgentLabel", CultureInfo.CurrentUICulture)!;
+    public static string AgentsWithoutALabel => Manager.GetString("AgentsWithoutALabel", CultureInfo.CurrentUICulture)!;
+    public static string SetupGivesEachToolALabel => Manager.GetString("SetupGivesEachToolALabel", CultureInfo.CurrentUICulture)!;
+    public static string NoAIToolsFound => Manager.GetString("NoAIToolsFound", CultureInfo.CurrentUICulture)!;
+    public static string InstallOneThenOpenAgentsAgain => Manager.GetString("InstallOneThenOpenAgentsAgain", CultureInfo.CurrentUICulture)!;
+    public static string GenerateANewPasswordLabel => Manager.GetString("GenerateANewPasswordLabel", CultureInfo.CurrentUICulture)!;
+    public static string ThisVaultIsNowSavedInFormat41 => Manager.GetString("ThisVaultIsNowSavedInFormat41", CultureInfo.CurrentUICulture)!;
+    public static string NewItemAddsOneHere => Manager.GetString("NewItemAddsOneHere", CultureInfo.CurrentUICulture)!;
+    public static string ConnectAgainLabel => Manager.GetString("ConnectAgainLabel", CultureInfo.CurrentUICulture)!;
+    public static string ConnectLabel => Manager.GetString("ConnectLabel", CultureInfo.CurrentUICulture)!;
     public static string ConnectValue => Manager.GetString("ConnectValue", CultureInfo.CurrentUICulture)!;
     public static string ConnectValueAgain => Manager.GetString("ConnectValueAgain", CultureInfo.CurrentUICulture)!;
-    public static string ConnectValueAgainLabel => Manager.GetString("ConnectValueAgainLabel", CultureInfo.CurrentUICulture)!;
-    public static string ConnectValueLabel => Manager.GetString("ConnectValueLabel", CultureInfo.CurrentUICulture)!;
     public static string ConnectYourAIToolsAndChooseWhatXe237ce => Manager.GetString("ConnectYourAIToolsAndChooseWhatXe237ce", CultureInfo.CurrentUICulture)!;
     public static string Continue => Manager.GetString("Continue", CultureInfo.CurrentUICulture)!;
     public static string ContinuingAgreesToTheTermsOfUse => Manager.GetString("ContinuingAgreesToTheTermsOfUse", CultureInfo.CurrentUICulture)!;
@@ -129,7 +134,6 @@ public static class Strings
     public static string CopyTheReference => Manager.GetString("CopyTheReference", CultureInfo.CurrentUICulture)!;
     public static string CopyTheTOTPCode => Manager.GetString("CopyTheTOTPCode", CultureInfo.CurrentUICulture)!;
     public static string CopyTheValueTheClipboardClearsItself => Manager.GetString("CopyTheValueTheClipboardClearsItself", CultureInfo.CurrentUICulture)!;
-    public static string CopyTheWebAddress => Manager.GetString("CopyTheWebAddress", CultureInfo.CurrentUICulture)!;
     public static string CopyThisGroup => Manager.GetString("CopyThisGroup", CultureInfo.CurrentUICulture)!;
     public static string CopyThisRevisionsPassword => Manager.GetString("CopyThisRevisionsPassword", CultureInfo.CurrentUICulture)!;
     public static string CopyThisTokenNowItWillNotX0f6e03 => Manager.GetString("CopyThisTokenNowItWillNotX0f6e03", CultureInfo.CurrentUICulture)!;
@@ -175,7 +179,6 @@ public static class Strings
     public static string Diagnostics => Manager.GetString("Diagnostics", CultureInfo.CurrentUICulture)!;
     public static string Discard => Manager.GetString("Discard", CultureInfo.CurrentUICulture)!;
     public static string Disconnect => Manager.GetString("Disconnect", CultureInfo.CurrentUICulture)!;
-    public static string DisconnectAgentLabel => Manager.GetString("DisconnectAgentLabel", CultureInfo.CurrentUICulture)!;
     public static string DisconnectLabel => Manager.GetString("DisconnectLabel", CultureInfo.CurrentUICulture)!;
     public static string DisconnectValue => Manager.GetString("DisconnectValue", CultureInfo.CurrentUICulture)!;
     public static string Dismiss => Manager.GetString("Dismiss", CultureInfo.CurrentUICulture)!;
@@ -224,6 +227,7 @@ public static class Strings
     public static string FindMenu => Manager.GetString("FindMenu", CultureInfo.CurrentUICulture)!;
     public static string ForYourListOnlyNeverSent => Manager.GetString("ForYourListOnlyNeverSent", CultureInfo.CurrentUICulture)!;
     public static string ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb => Manager.GetString("ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb", CultureInfo.CurrentUICulture)!;
+    public static string ForgetRecentVaults => Manager.GetString("ForgetRecentVaults", CultureInfo.CurrentUICulture)!;
     public static string ForgetThemAll => Manager.GetString("ForgetThemAll", CultureInfo.CurrentUICulture)!;
     public static string FoundOnThisComputerAndAnyAgentX88444b => Manager.GetString("FoundOnThisComputerAndAnyAgentX88444b", CultureInfo.CurrentUICulture)!;
     public static string FreeSoftwareUnderTheGNUAfferoGeneralXba93e5 => Manager.GetString("FreeSoftwareUnderTheGNUAfferoGeneralXba93e5", CultureInfo.CurrentUICulture)!;
@@ -247,6 +251,7 @@ public static class Strings
     public static string HideKeypaste => Manager.GetString("HideKeypaste", CultureInfo.CurrentUICulture)!;
     public static string HideOthers => Manager.GetString("HideOthers", CultureInfo.CurrentUICulture)!;
     public static string HideSidebar => Manager.GetString("HideSidebar", CultureInfo.CurrentUICulture)!;
+    public static string HidingTheAppIsNotMinimizing => Manager.GetString("HidingTheAppIsNotMinimizing", CultureInfo.CurrentUICulture)!;
     public static string History => Manager.GetString("History", CultureInfo.CurrentUICulture)!;
     public static string Host => Manager.GetString("Host", CultureInfo.CurrentUICulture)!;
     public static string Import => Manager.GetString("Import", CultureInfo.CurrentUICulture)!;
@@ -391,6 +396,7 @@ public static class Strings
     public static string OpenAKeypasteVault => Manager.GetString("OpenAKeypasteVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAVault => Manager.GetString("OpenAVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAdvanced => Manager.GetString("OpenAdvanced", CultureInfo.CurrentUICulture)!;
+    public static string OpenAgents => Manager.GetString("OpenAgents", CultureInfo.CurrentUICulture)!;
     public static string OpenAnotherFile => Manager.GetString("OpenAnotherFile", CultureInfo.CurrentUICulture)!;
     public static string OpenAnotherVault => Manager.GetString("OpenAnotherVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAnotherVaultLabel => Manager.GetString("OpenAnotherVaultLabel", CultureInfo.CurrentUICulture)!;
@@ -405,7 +411,6 @@ public static class Strings
     public static string OpenTheActivityLog => Manager.GetString("OpenTheActivityLog", CultureInfo.CurrentUICulture)!;
     public static string OpenTheScopedTokens => Manager.GetString("OpenTheScopedTokens", CultureInfo.CurrentUICulture)!;
     public static string OpenTheShareLinks => Manager.GetString("OpenTheShareLinks", CultureInfo.CurrentUICulture)!;
-    public static string OpenTheWebAddress => Manager.GetString("OpenTheWebAddress", CultureInfo.CurrentUICulture)!;
     public static string OpenUrl => Manager.GetString("OpenUrl", CultureInfo.CurrentUICulture)!;
     public static string OpenVault => Manager.GetString("OpenVault", CultureInfo.CurrentUICulture)!;
     public static string OpeningThisScreenAsksTheShareServerXdb6227 => Manager.GetString("OpeningThisScreenAsksTheShareServerXdb6227", CultureInfo.CurrentUICulture)!;
@@ -446,6 +451,8 @@ public static class Strings
     public static string RemoveAttachment => Manager.GetString("RemoveAttachment", CultureInfo.CurrentUICulture)!;
     public static string RemoveField => Manager.GetString("RemoveField", CultureInfo.CurrentUICulture)!;
     public static string RemoveKey => Manager.GetString("RemoveKey", CultureInfo.CurrentUICulture)!;
+    public static string RemovePairing => Manager.GetString("RemovePairing", CultureInfo.CurrentUICulture)!;
+    public static string RemoveTag => Manager.GetString("RemoveTag", CultureInfo.CurrentUICulture)!;
     public static string RemoveThePairingValue => Manager.GetString("RemoveThePairingValue", CultureInfo.CurrentUICulture)!;
     public static string RemoveTheRowForValue => Manager.GetString("RemoveTheRowForValue", CultureInfo.CurrentUICulture)!;
     public static string RemoveThisAttachment => Manager.GetString("RemoveThisAttachment", CultureInfo.CurrentUICulture)!;
@@ -476,7 +483,6 @@ public static class Strings
     public static string RestoreABackupLabel => Manager.GetString("RestoreABackupLabel", CultureInfo.CurrentUICulture)!;
     public static string RestoreAsAnotherName => Manager.GetString("RestoreAsAnotherName", CultureInfo.CurrentUICulture)!;
     public static string RestoreTag => Manager.GetString("RestoreTag", CultureInfo.CurrentUICulture)!;
-    public static string RestoreThis => Manager.GetString("RestoreThis", CultureInfo.CurrentUICulture)!;
     public static string RestoreThisBackup => Manager.GetString("RestoreThisBackup", CultureInfo.CurrentUICulture)!;
     public static string RestoreThisRevision => Manager.GetString("RestoreThisRevision", CultureInfo.CurrentUICulture)!;
     public static string RestoreValue => Manager.GetString("RestoreValue", CultureInfo.CurrentUICulture)!;
@@ -546,6 +552,7 @@ public static class Strings
     public static string SkipThem => Manager.GetString("SkipThem", CultureInfo.CurrentUICulture)!;
     public static string Slot1 => Manager.GetString("Slot1", CultureInfo.CurrentUICulture)!;
     public static string Slot2 => Manager.GetString("Slot2", CultureInfo.CurrentUICulture)!;
+    public static string SomeLinuxDesktopsShowNoTrayIcon => Manager.GetString("SomeLinuxDesktopsShowNoTrayIcon", CultureInfo.CurrentUICulture)!;
     public static string SomeTagsPutTheirItemInNoXd8ea51 => Manager.GetString("SomeTagsPutTheirItemInNoXd8ea51", CultureInfo.CurrentUICulture)!;
     public static string Start => Manager.GetString("Start", CultureInfo.CurrentUICulture)!;
     public static string Startup => Manager.GetString("Startup", CultureInfo.CurrentUICulture)!;
@@ -624,7 +631,6 @@ public static class Strings
     public static string ViewMenu => Manager.GetString("ViewMenu", CultureInfo.CurrentUICulture)!;
     public static string Views => Manager.GetString("Views", CultureInfo.CurrentUICulture)!;
     public static string WaitingForYou => Manager.GetString("WaitingForYou", CultureInfo.CurrentUICulture)!;
-    public static string WebAddress => Manager.GetString("WebAddress", CultureInfo.CurrentUICulture)!;
     public static string What => Manager.GetString("What", CultureInfo.CurrentUICulture)!;
     public static string WhatFailedAndWhereInKeypastesCodeX12c043 => Manager.GetString("WhatFailedAndWhereInKeypastesCodeX12c043", CultureInfo.CurrentUICulture)!;
     public static string WhatItCanSeeSeparatedByCommasXd38ad7 => Manager.GetString("WhatItCanSeeSeparatedByCommasXd38ad7", CultureInfo.CurrentUICulture)!;

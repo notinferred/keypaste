@@ -133,7 +133,7 @@
 
         <Border Classes="table">
           <StackPanel>
-            <Border Classes="table-head">
+            <Border Classes="table-head top">
               <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="1.1*" />

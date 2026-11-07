@@ -45,7 +45,7 @@
   <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="AppliesTo" xml:space="preserve"><value>Applies to</value></data>
   <data name="AskForIt" xml:space="preserve"><value>Ask for it</value></data>
-  <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask the share server how many views each link has left</value></data>
+  <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask keypaste.com how many views each link has left</value></data>
   <data name="AtLeast20CharactersSuchAsSixGeneratedWords" xml:space="preserve"><value>At least 20 characters, such as six generated words</value></data>
   <data name="AtMostThisManyAnHour" xml:space="preserve"><value>At most this many an hour</value></data>
   <data name="Attachments" xml:space="preserve"><value>Attachments</value></data>
@@ -83,13 +83,20 @@
   <data name="Close" xml:space="preserve"><value>Close</value></data>
   <data name="CloseThisMessage" xml:space="preserve"><value>Close this message</value></data>
   <data name="CloseWindow" xml:space="preserve"><value>Close window</value></data>
-  <data name="ClosingTheWindowStillLocksTheVaultX283e06" xml:space="preserve"><value>Closing the window still locks the vault. Open, Lock and Quit are on the icon's menu. Some Linux desktops show no tray icon.</value></data>
+  <data name="ClosingTheWindowStillLocksTheVaultX283e06" xml:space="preserve"><value>Closing the window still locks the vault. Open, Lock and Quit are on the icon&apos;s menu.</value></data>
   <data name="ComesBackAtTheTopLevel" xml:space="preserve"><value>comes back at the top level</value></data>
   <data name="Command" xml:space="preserve"><value>Command</value></data>
   <data name="ConfirmMasterPassword" xml:space="preserve"><value>Confirm master password</value></data>
   <data name="ConfirmNewMasterPassword" xml:space="preserve"><value>Confirm new master password</value></data>
   <data name="ConfirmRemovingThePairingValue" xml:space="preserve"><value>Confirm removing the pairing {0}</value></data>
   <data name="ConnectAToolFromThisListToGive" xml:space="preserve"><value>Connect a tool from this list to give it settings of its own.</value></data>
+  <data name="AgentsWithoutALabel" xml:space="preserve"><value>An agent here with no Settings connected without a label of its own, so Every other agent's settings apply.</value></data>
+  <data name="SetupGivesEachToolALabel" xml:space="preserve"><value>keypaste mcp setup connects each AI tool it finds with a label, which gives it settings of its own.</value></data>
+  <data name="NoAIToolsFound" xml:space="preserve"><value>None of the AI tools keypaste connects was found on this computer:</value></data>
+  <data name="InstallOneThenOpenAgentsAgain" xml:space="preserve"><value>Install one, then open Agents again.</value></data>
+  <data name="GenerateANewPasswordLabel" xml:space="preserve"><value>Generate a new password…</value></data>
+  <data name="ThisVaultIsNowSavedInFormat41" xml:space="preserve"><value>This vault is now saved in the KeePass database format 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.</value></data>
+  <data name="NewItemAddsOneHere" xml:space="preserve"><value>New item adds one here.</value></data>
   <data name="ConnectValue" xml:space="preserve"><value>Connect {0}</value></data>
   <data name="ConnectValueAgain" xml:space="preserve"><value>Connect {0} again</value></data>
   <data name="ConnectYourAIToolsAndChooseWhatXe237ce" xml:space="preserve"><value>Connect your AI tools and choose what each may see.</value></data>
@@ -106,7 +113,6 @@
   <data name="CopyTheReference" xml:space="preserve"><value>Copy the reference</value></data>
   <data name="CopyTheTOTPCode" xml:space="preserve"><value>Copy the TOTP code</value></data>
   <data name="CopyTheValueTheClipboardClearsItself" xml:space="preserve"><value>Copy the value; the clipboard clears itself</value></data>
-  <data name="CopyTheWebAddress" xml:space="preserve"><value>Copy the web address</value></data>
   <data name="CopyThisGroup" xml:space="preserve"><value>Copy this group</value></data>
   <data name="CopyThisTokenNowItWillNotX0f6e03" xml:space="preserve"><value>Copy this token now. It will not be shown again.</value></data>
   <data name="CopyToken" xml:space="preserve"><value>Copy token</value></data>
@@ -185,7 +191,7 @@
   <data name="ForYourListOnlyNeverSent" xml:space="preserve"><value>For your list only; never sent</value></data>
   <data name="ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb" xml:space="preserve"><value>Forget every recent vault? The vaults themselves are not touched.</value></data>
   <data name="ForgetThemAll" xml:space="preserve"><value>Forget them all</value></data>
-  <data name="FoundOnThisComputerAndAnyAgentX88444b" xml:space="preserve"><value>Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's name.</value></data>
+  <data name="FoundOnThisComputerAndAnyAgentX88444b" xml:space="preserve"><value>Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's label.</value></data>
   <data name="FreeSoftwareUnderTheGNUAfferoGeneralXba93e5" xml:space="preserve"><value>Free software under the GNU Affero General Public License, version 3.</value></data>
   <data name="Generate" xml:space="preserve"><value>Generate…</value></data>
   <data name="GenerateANewPassword" xml:space="preserve"><value>Generate a new password</value></data>
@@ -218,7 +224,7 @@
   <data name="ImportValue" xml:space="preserve"><value>Import {0}?</value></data>
   <data name="Imported" xml:space="preserve"><value>Imported</value></data>
   <data name="InValue" xml:space="preserve"><value>in {0}</value></data>
-  <data name="ItHoldsYourPasswordsUnencryptedAndKeypasteXdcf75b" xml:space="preserve"><value>It holds your passwords unencrypted, and keypaste does not delete it for you. Delete it, then empty the trash. Deleting does not overwrite the disk blocks it used: on an SSD, a copy-on-write file system or a volume with snapshots or backups, its contents can outlive it, as can a copy a sync service or backup made.</value></data>
+  <data name="ItHoldsYourPasswordsUnencryptedAndKeypasteXdcf75b" xml:space="preserve"><value>It holds your passwords unencrypted, and keypaste does not delete it for you. Delete it, then empty your system's trash. Deleting does not overwrite the disk blocks it used: on an SSD, a copy-on-write file system or a volume with snapshots or backups, its contents can outlive it, as can a copy a sync service or backup made.</value></data>
   <data name="ItStartsLockedAndWithNoWindowX07ac3e" xml:space="preserve"><value>It starts locked, and with no window when it stays in the tray. Only your own login is changed.</value></data>
   <data name="ItemForTheNewKey" xml:space="preserve"><value>Item for the new key</value></data>
   <data name="ItemToAskFor" xml:space="preserve"><value>Item to ask for</value></data>
@@ -243,7 +249,7 @@
   <data name="KeypasteHelp" xml:space="preserve"><value>keypaste help</value></data>
   <data name="KeypasteHome" xml:space="preserve"><value>keypaste home</value></data>
   <data name="KeypasteInATerminal" xml:space="preserve"><value>keypaste in a terminal</value></data>
-  <data name="KeypasteOpensOnlyWebAddressesStartingHttpX58cb44" xml:space="preserve"><value>keypaste opens only web addresses starting http or https, so this one is text. Copy it to use it.</value></data>
+  <data name="KeypasteOpensOnlyWebAddressesStartingHttpX58cb44" xml:space="preserve"><value>keypaste opens only URLs starting http or https, so this one is text. Copy it to use it.</value></data>
   <data name="KeypasteRemembersThePathsOfVaultsYouXb13291" xml:space="preserve"><value>keypaste remembers the paths of vaults you have opened on this machine, where the key file each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material.</value></data>
   <data name="KeypasteWasAskedToOpenThisFileX50ed11" xml:space="preserve"><value>keypaste was asked to open this file. Nothing changes unless you say so.</value></data>
   <data name="KeysLeftInNotes" xml:space="preserve"><value>Keys left in notes</value></data>
@@ -346,9 +352,8 @@
   <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>
   <data name="OpenTheScopedTokens" xml:space="preserve"><value>Open the scoped tokens</value></data>
   <data name="OpenTheShareLinks" xml:space="preserve"><value>Open the share links</value></data>
-  <data name="OpenTheWebAddress" xml:space="preserve"><value>Open the web address</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
-  <data name="OpeningThisScreenAsksTheShareServerXdb6227" xml:space="preserve"><value>Opening this screen asks the share server nothing. Check status asks how many views each link has left.</value></data>
+  <data name="OpeningThisScreenAsksTheShareServerXdb6227" xml:space="preserve"><value>Opening this screen asks keypaste.com nothing. Check status asks how many views each link has left.</value></data>
   <data name="OptionalOneYouHaveOrANewX7bc1a7" xml:space="preserve"><value>Optional: one you have, or a new one keypaste makes where you choose. Losing it locks the vault.</value></data>
   <data name="PairABrowser" xml:space="preserve"><value>Pair a browser</value></data>
   <data name="PairedBrowsers" xml:space="preserve"><value>Paired browsers</value></data>
@@ -402,7 +407,6 @@
   <data name="Restore" xml:space="preserve"><value>Restore</value></data>
   <data name="RestoreABackup" xml:space="preserve"><value>Restore a backup</value></data>
   <data name="RestoreTag" xml:space="preserve"><value>Restore tag</value></data>
-  <data name="RestoreThis" xml:space="preserve"><value>Restore this</value></data>
   <data name="RestoreThisBackup" xml:space="preserve"><value>Restore this backup</value></data>
   <data name="RestoreValue" xml:space="preserve"><value>Restore {0}</value></data>
   <data name="RestoringMakesTheseTheItemsValuesAndX0e783d" xml:space="preserve"><value>Restoring makes these the item's values and drops any attachments, custom fields and custom data added since. The ones it replaces are kept here.</value></data>
@@ -436,7 +440,7 @@
   <data name="SelectValue" xml:space="preserve"><value>Select {0}</value></data>
   <data name="SendCrashReports" xml:space="preserve"><value>Send crash reports</value></data>
   <data name="Separator" xml:space="preserve"><value>Separator</value></data>
-  <data name="ServedFromAnEarlierApprovalUnderAXde6ddd" xml:space="preserve"><value>Served from an earlier approval, under a reason that person never saw.</value></data>
+  <data name="ServedFromAnEarlierApprovalUnderAXde6ddd" xml:space="preserve"><value>Served from an earlier approval, under a reason you never saw.</value></data>
   <data name="Servers" xml:space="preserve"><value>servers</value></data>
   <data name="SetANewMasterPassword" xml:space="preserve"><value>Set a new master password</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
@@ -465,7 +469,7 @@
   <data name="TagAnItemFromYourVaultIntoX85a64e" xml:space="preserve"><value>Tag an item from your vault into this environment</value></data>
   <data name="Tags" xml:space="preserve"><value>Tags</value></data>
   <data name="TakeThisItemOutOfTheEnvironmentX38da29" xml:space="preserve"><value>Take this item out of the environment; the item and its fields stay</value></data>
-  <data name="TakesEffectAtOnceAndAtEveryX7e38a2" xml:space="preserve"><value>Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with ⌘H is not minimizing either.</value></data>
+  <data name="TakesEffectAtOnceAndAtEveryX7e38a2" xml:space="preserve"><value>Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock.</value></data>
   <data name="TermsOfUse" xml:space="preserve"><value>Terms of use</value></data>
   <data name="ThatBackupsKeyFile" xml:space="preserve"><value>That backup's key file</value></data>
   <data name="ThatBackupsMasterPassword" xml:space="preserve"><value>That backup's master password</value></data>
@@ -512,7 +516,7 @@
   <data name="Until" xml:space="preserve"><value>Until</value></data>
   <data name="UseAYubiKey" xml:space="preserve"><value>Use a YubiKey</value></data>
   <data name="UseTheVaultsSettings" xml:space="preserve"><value>Use the vault's settings</value></data>
-  <data name="UseThisInEnvKeypasteWithKeypasteX22e6e9" xml:space="preserve"><value>Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file.</value></data>
+  <data name="UseThisInEnvKeypasteWithKeypasteX22e6e9" xml:space="preserve"><value>Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when keypaste mcp allows it. keypaste puts the value into the command&apos;s environment, not into the file.</value></data>
   <data name="UseThisVault" xml:space="preserve"><value>Use this vault</value></data>
   <data name="UseThisVaultForAgentsAndTheXb47c9a" xml:space="preserve"><value>Use this vault for agents and the CLI</value></data>
   <data name="Username" xml:space="preserve"><value>Username</value></data>
@@ -524,7 +528,6 @@
   <data name="Version" xml:space="preserve"><value>Version</value></data>
   <data name="Views" xml:space="preserve"><value>Views</value></data>
   <data name="WaitingForYou" xml:space="preserve"><value>Waiting for you</value></data>
-  <data name="WebAddress" xml:space="preserve"><value>Web address</value></data>
   <data name="What" xml:space="preserve"><value>What</value></data>
   <data name="WhatFailedAndWhereInKeypastesCodeX12c043" xml:space="preserve"><value>What failed and where in keypaste's code. Never anything from your vault, a path or who you are. Turning it off deletes the reports waiting to be sent, which Diagnostics lists.</value></data>
   <data name="WhatItCanSeeSeparatedByCommasXd38ad7" xml:space="preserve"><value>What it can see, separated by commas: tag:env:billing is every environment of billing; a place pattern such as api/** reaches whole items.</value></data>
@@ -582,8 +585,6 @@
   <data name="Passphrase" xml:space="preserve"><value>Passphrase</value></data>
   <data name="ProtectThisField" xml:space="preserve"><value>Protect this field</value></data>
   <data name="CopyGroupValue" xml:space="preserve"><value>Copy {0}</value></data>
-  <data name="ConnectValueLabel" xml:space="preserve"><value>Connect {0}…</value></data>
-  <data name="ConnectValueAgainLabel" xml:space="preserve"><value>Connect {0} again…</value></data>
   <data name="DisconnectLabel" xml:space="preserve"><value>Disconnect…</value></data>
   <data name="ThisComputer" xml:space="preserve"><value>This computer</value></data>
   <data name="ClearTheClipboardNow" xml:space="preserve"><value>Clear the clipboard now</value></data>
@@ -596,12 +597,9 @@
   <data name="AddAKeyLabel" xml:space="preserve"><value>Add a key…</value></data>
   <data name="AgentSettingsLabel" xml:space="preserve"><value>Agent settings…</value></data>
   <data name="Attachment" xml:space="preserve"><value>Attachment</value></data>
-  <data name="ConnectAgentAgainLabel" xml:space="preserve"><value>Connect agent again…</value></data>
-  <data name="ConnectAgentLabel" xml:space="preserve"><value>Connect agent…</value></data>
   <data name="CopyUrl" xml:space="preserve"><value>Copy URL</value></data>
   <data name="CopyValueMenu" xml:space="preserve"><value>Copy value</value></data>
   <data name="DeleteGroup" xml:space="preserve"><value>Delete group</value></data>
-  <data name="DisconnectAgentLabel" xml:space="preserve"><value>Disconnect agent…</value></data>
   <data name="EditMenu" xml:space="preserve"><value>Edit</value></data>
   <data name="FileMenu" xml:space="preserve"><value>File</value></data>
   <data name="FindMenu" xml:space="preserve"><value>Find</value></data>
@@ -636,4 +634,12 @@
   <data name="ExampleItemPath" xml:space="preserve"><value>Work/github</value></data>
   <data name="ExampleProjectDirectory" xml:space="preserve"><value>~/code/acme-api</value></data>
   <data name="ExampleWebAddress" xml:space="preserve"><value>https://example.com</value></data>
+  <data name="ForgetRecentVaults" xml:space="preserve"><value>Forget recent vaults</value></data>
+  <data name="RemovePairing" xml:space="preserve"><value>Remove pairing</value></data>
+  <data name="RemoveTag" xml:space="preserve"><value>Remove tag</value></data>
+  <data name="ConnectLabel" xml:space="preserve"><value>Connect…</value></data>
+  <data name="ConnectAgainLabel" xml:space="preserve"><value>Connect again…</value></data>
+  <data name="SomeLinuxDesktopsShowNoTrayIcon" xml:space="preserve"><value>Some Linux desktops show no tray icon.</value></data>
+  <data name="HidingTheAppIsNotMinimizing" xml:space="preserve"><value>Hiding the app with ⌘H is not minimizing either.</value></data>
+  <data name="OpenAgents" xml:space="preserve"><value>Open Agents</value></data>
 </root>

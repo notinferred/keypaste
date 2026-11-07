@@ -359,8 +359,8 @@ internal sealed class BitwardenJsonReader : IExportReader
                 if (Number(uris[index], "match", uriWhere) is not null)
                 {
                     omitted.Add(new ExportOmission(
-                        string.Create(CultureInfo.InvariantCulture, $"match detection of web address {urls.Count}"),
-                        "keypaste keeps no match rule for a web address"));
+                        string.Create(CultureInfo.InvariantCulture, $"match detection of URL {urls.Count}"),
+                        "keypaste keeps no match rule for a URL"));
                 }
             }
         }

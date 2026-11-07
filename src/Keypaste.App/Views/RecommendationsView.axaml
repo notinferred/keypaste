@@ -44,7 +44,7 @@
           <Border Classes="settings-head">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Spacing="4">
-                <TextBlock Classes="section" Text="{x:Static res:Strings.KeysLeftInNotes}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.KeysLeftInNotes}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
@@ -56,7 +56,7 @@
           <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RecommendationRow">
-                <Border Classes="settings-row">
+                <Border Classes="settings-row" Background="Transparent">
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12"
                         AutomationProperties.Name="{Binding Description}">
                     <CheckBox Grid.Column="0"
@@ -101,12 +101,12 @@
       <Border Name="LostTagsCard" Classes="card filled settings" IsVisible="{Binding HasLostTags}">
         <StackPanel>
           <Border Classes="settings-head">
-            <TextBlock Classes="section" Text="{x:Static res:Strings.ProjectTagsDropped}" />
+            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.ProjectTagsDropped}" />
           </Border>
           <ItemsControl Name="LostTagRows" ItemsSource="{Binding LostTags}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LostTagRow">
-                <Border Classes="settings-row">
+                <Border Classes="settings-row" Background="Transparent">
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
                           AutomationProperties.Name="{Binding Description}">
@@ -165,14 +165,14 @@
               <StackPanel>
                 <Border Classes="settings-head">
                   <StackPanel Spacing="4">
-                    <TextBlock Name="PasswordProblem" Classes="section" Text="{Binding Heading}" />
+                    <TextBlock Name="PasswordProblem" Classes="dialog-title" Text="{Binding Heading}" />
                     <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Reason}" />
                   </StackPanel>
                 </Border>
                 <ItemsControl ItemsSource="{Binding Rows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PasswordRow">
-                      <Border Classes="settings-row">
+                      <Border Classes="settings-row" Background="Transparent">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
                               AutomationProperties.Name="{Binding Description}">
                           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

@@ -163,7 +163,7 @@
           </Grid.ColumnDefinitions>
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <TextBlock x:Name="ListTitle"
-                       Classes="h1"
+                       Classes="list-title"
                        MaxWidth="200"
                        Text="{Binding ListTitle}"
                        ToolTip.Tip="{Binding ListTitle}"
@@ -408,7 +408,7 @@
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
         <!-- The columns: an item's title, its username and web address, and where it lives, never a password
              or a custom field's value (EntryRow). Its icon alone says what kind it is. -->
-        <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,6,16,0">
+        <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,6,16,0" IsVisible="{Binding !ShowsListEmpty}">
           <views:ColumnHead Grid.Column="1" x:Name="TitleHead" Column="title" />
           <views:ColumnGrip Grid.Column="1" Column="title" />
           <views:ColumnHead Grid.Column="2" x:Name="UsernameHead" Column="username" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
@@ -443,15 +443,6 @@
                       IsVisible="{Binding ListEmptyOffersClearSearch}"
                       Command="{Binding ClearSearchCommand}"
                       AutomationProperties.Name="{x:Static res:Strings.ClearSearch}" />
-              <Button Classes="sm"
-                      IsVisible="{Binding ListEmptyOffersNew}"
-                      Command="{Binding BeginAddCommand}"
-                      AutomationProperties.Name="{x:Static res:Strings.NewItem}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <ctl:KpIcon Icon="plus" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
               <!-- The first run: a new vault is empty, and a person's first act may be to bring their items in from another app. -->
               <Button x:Name="ImportFromEmpty"
                       Classes="sm"
@@ -529,8 +520,14 @@
                     Background="Transparent"
                     BorderBrush="{DynamicResource KpBorderSubtle}"
                     BorderThickness="0,0,0,1"
-                    IsVisible="{Binding ShowsList}"
-                    AutomationProperties.Name="{x:Static res:Strings.ResizeTheListAndThePreview}" />
+                    AutomationProperties.Name="{x:Static res:Strings.ResizeTheListAndThePreview}">
+        <GridSplitter.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="ShowsList" />
+            <Binding Path="!ShowsListEmpty" />
+          </MultiBinding>
+        </GridSplitter.IsVisible>
+      </GridSplitter>
 
       <Panel Grid.Row="2">
 
@@ -550,7 +547,7 @@
           </Grid.ColumnDefinitions>
           <StackPanel Spacing="24">
 
-            <TextBlock Classes="h1" Text="{x:Static res:Strings.NewItem}" />
+            <TextBlock Classes="list-title" Text="{x:Static res:Strings.NewItem}" />
 
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
@@ -672,8 +669,8 @@
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUrl}">
-                <TextBlock Classes="label" Text="{x:Static res:Strings.WebAddress}" />
-                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.WebAddress}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="{x:Static res:Strings.ExampleWebAddress}" />
+                <TextBlock Classes="label" Text="{x:Static res:Strings.URL}" />
+                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.URL}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="{x:Static res:Strings.ExampleWebAddress}" />
               </StackPanel>
 
               <StackPanel Spacing="8">
@@ -932,7 +929,7 @@
                           DataContext="{Binding $parent[views:EntriesView].DataContext}"
                           IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
                     <StackPanel Spacing="8">
-                      <TextBlock Classes="section" Text="{x:Static res:Strings.RenameOrMove}" />
+                      <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RenameOrMove}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
                         <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Text="{Binding DraftTitle}" />
@@ -976,7 +973,7 @@
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="history" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Classes="section" Text="{x:Static res:Strings.History}" VerticalAlignment="Center" />
+                          <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.History}" VerticalAlignment="Center" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="link" Content="{Binding History.ToggleLabel}" Command="{Binding History.ToggleCommand}" />
                       </Grid>
@@ -1114,7 +1111,7 @@
                       <StackPanel Spacing="6" IsVisible="{Binding History.HasSelection}">
                         <Button x:Name="RestoreRevision"
                                 Classes="sm"
-                                Content="{x:Static res:Strings.RestoreThis}"
+                                Content="{x:Static res:Strings.RestoreThisRevision}"
                                 Command="{Binding History.RestoreCommand}"
                                 HorizontalAlignment="Left" />
                         <TextBlock Classes="caption"
@@ -1287,7 +1284,7 @@
                                     IsVisible="{Binding OpensUrl}"
                                     Command="{Binding OpenUrlCommand}"
                                     ToolTip.Tip="{x:Static res:Strings.OpenInYourBrowser}"
-                                    AutomationProperties.Name="{x:Static res:Strings.OpenTheWebAddress}">
+                                    AutomationProperties.Name="{x:Static res:Strings.OpenUrl}">
                               <DockPanel>
                                 <ctl:KpIcon DockPanel.Dock="Right" Icon="external-link" Size="14" Margin="6,0,0,0" />
                                 <TextBlock Classes="mono size-13"
@@ -1307,7 +1304,7 @@
                                     Grid.Column="1"
                                     Classes="ghost in-field size-12"
                                     Command="{Binding CopyUrlCommand}"
-                                    AutomationProperties.Name="{x:Static res:Strings.CopyTheWebAddress}">
+                                    AutomationProperties.Name="{x:Static res:Strings.CopyUrl}">
                               <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ctl:KpIcon Icon="copy" Size="14" />
                                 <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
@@ -1405,7 +1402,7 @@
 
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="8">
-                        <TextBlock Classes="section" Text="{x:Static res:Strings.AddAField}" />
+                        <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AddAField}" />
                         <StackPanel Spacing="6">
                           <TextBlock Classes="label" Text="{x:Static res:Strings.FieldName}" />
                           <TextBox x:Name="NewFieldName" AutomationProperties.Name="{x:Static res:Strings.FieldName}"
@@ -1746,7 +1743,7 @@
 
                   <Border Classes="form" IsVisible="{Binding IsEditing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding SaveCommand}" ctl:FormKeys.Cancel="{Binding CancelCommand}" ctl:FormKeys.Draft="{Binding EditDraft}">
                     <StackPanel Spacing="8">
-                      <TextBlock Classes="section" Text="{x:Static res:Strings.EditFields}" />
+                      <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.EditFields}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Username}" />
                         <TextBox Classes="mono" Text="{Binding DraftUsername}" AutomationProperties.Name="{x:Static res:Strings.Username}" />

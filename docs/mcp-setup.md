@@ -262,7 +262,7 @@ keypaste log --client claude-code --since 2h
   2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
   2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
 
-(!) served from an earlier approval, under a reason that person never saw.
+(!) served from an earlier approval, under a reason you never saw.
 ```
 
 `--since` accepts a span (`30m`, `2h`, `7d`) or timestamp (`2026-07-20` or a full timestamp). `--client` matches part of a label or name. Filtered views show both the selected and total record counts.

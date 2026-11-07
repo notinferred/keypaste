@@ -21,6 +21,13 @@ public sealed class ShareClientTests : IDisposable
         ReadOnlySpan<char>.Empty).Envelope;
 
     [Fact]
+    public void Describe_NamesTheHostAsked()
+    {
+        Assert.Equal("keypaste.com could not be reached", Client.WithEndpoint(ShareEndpoint.Default).Describe(ShareFailure.Network));
+        Assert.Equal("share.example.org could not be reached", Client.WithEndpoint(new Uri("https://share.example.org")).Describe(ShareFailure.Network));
+    }
+
+    [Fact]
     public async Task Create_PostsTheEnvelopeAndLimits_AsJson()
     {
         var envelope = Envelope();

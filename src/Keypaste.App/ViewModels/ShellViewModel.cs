@@ -32,8 +32,8 @@ internal enum StatusTone
     /// <summary>All is as it should be.</summary>
     Ok = 0,
 
-    /// <summary>Needs attention soon.</summary>
-    Accent = 1,
+    /// <summary>Saving or merging is still to come: drawn idle, since the view's one amber is its primary action.</summary>
+    Pending = 1,
 
     /// <summary>Something is wrong.</summary>
     Danger = 2,
@@ -629,12 +629,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The colour of the titlebar's dot.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(VaultStatusOk), nameof(VaultStatusAccent), nameof(VaultStatusDanger))]
+    [NotifyPropertyChangedFor(nameof(VaultStatusOk), nameof(VaultStatusPending), nameof(VaultStatusDanger))]
     internal partial StatusTone VaultStatusTone { get; private set; }
 
     internal bool VaultStatusOk => VaultStatusTone == StatusTone.Ok;
 
-    internal bool VaultStatusAccent => VaultStatusTone == StatusTone.Accent;
+    internal bool VaultStatusPending => VaultStatusTone == StatusTone.Pending;
 
     internal bool VaultStatusDanger => VaultStatusTone == StatusTone.Danger;
 
@@ -947,7 +947,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log, openAgents: OpenAgents),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
@@ -1511,7 +1511,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             VaultSaveStatus.Saved when _updatedAt is { } updated =>
                 ($"updated {PersonTime.Clock(updated.ToLocalTime())}", StatusTone.Ok),
             VaultSaveStatus.Saved => ("saved", StatusTone.Ok),
-            VaultSaveStatus.Unsaved => ("unsaved changes", StatusTone.Accent),
+            VaultSaveStatus.Unsaved => ("unsaved changes", StatusTone.Pending),
             VaultSaveStatus.ChangedOnDisk => ("changed on disk", StatusTone.Danger),
             _ => ("file unreadable", StatusTone.Danger),
         };
@@ -1574,10 +1574,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         });
     }
 
+    private void OpenAgents() => Current = Destinations.Of(DestinationKind.AgentActivity);
+
     private void ShowMerging()
     {
         VaultSaveWords = "merging";
-        VaultStatusTone = StatusTone.Accent;
+        VaultStatusTone = StatusTone.Pending;
         VaultStatusDetail = $"Merging another program's save · {VaultPath}";
         VaultChanged = null;
     }

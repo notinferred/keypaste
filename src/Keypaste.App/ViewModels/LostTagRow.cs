@@ -6,7 +6,7 @@ using Keypaste.Core.Recommendations;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One project tag an entry lost in another app, as Settings › Recommendations lists it (V.11).</summary>
-internal sealed partial class LostTagRow : ObservableObject
+internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
 {
     internal LostTagRow(RecommendationsViewModel owner, LostProjectTag finding, bool isDismissed)
     {
@@ -37,9 +37,9 @@ internal sealed partial class LostTagRow : ObservableObject
         CultureInfo.InvariantCulture,
         $"dropped from {Entry} in a change saved {PersonTime.Moment(Finding.LostUtc.ToLocalTime())}{(Finding.Protects ? ", so agents are no longer asked live for it" : string.Empty)}");
 
-    internal bool IsDismissed { get; }
+    public bool IsDismissed { get; }
 
-    internal bool NeedsReview => !IsDismissed && !IsConfirming;
+    public bool NeedsReview => !IsDismissed && !IsConfirming;
 
     internal string StateLabel => IsDismissed ? "Dismissed" : "Needs review";
 
@@ -59,7 +59,7 @@ internal sealed partial class LostTagRow : ObservableObject
 
     internal RelayCommand CancelRestoreCommand { get; }
 
-    internal RelayCommand DismissCommand { get; }
+    public RelayCommand DismissCommand { get; }
 
-    internal RelayCommand ReviewAgainCommand { get; }
+    public RelayCommand ReviewAgainCommand { get; }
 }

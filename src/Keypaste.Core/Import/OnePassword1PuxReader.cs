@@ -659,13 +659,13 @@ internal sealed class OnePassword1PuxReader : IExportReader
                 if (Text(url, "label", urlWhere) is { Length: > 0 } label && !string.Equals(label, "website", StringComparison.OrdinalIgnoreCase))
                 {
                     landing.Omitted.Add(new ExportOmission(
-                        string.Create(CultureInfo.InvariantCulture, $"label of web address {number}"), "keypaste keeps no label for a web address"));
+                        string.Create(CultureInfo.InvariantCulture, $"label of URL {number}"), "keypaste keeps no label for a URL"));
                 }
 
                 if (Text(url, "mode", urlWhere) is { Length: > 0 } mode && mode != "default")
                 {
                     landing.Omitted.Add(new ExportOmission(
-                        string.Create(CultureInfo.InvariantCulture, $"autofill setting of web address {number}"), "keypaste keeps no autofill setting for a web address"));
+                        string.Create(CultureInfo.InvariantCulture, $"autofill setting of URL {number}"), "keypaste keeps no autofill setting for a URL"));
                 }
             }
 

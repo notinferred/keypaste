@@ -305,7 +305,7 @@ public sealed class SessionBrowsers : IBrowserRequests
             {
                 ApprovalAnswer.Denied => "a person refused to pair this browser",
                 ApprovalAnswer.TimedOut => "nobody answered inside the window",
-                ApprovalAnswer.Busy => "another request is in front of the person; connect again once it is answered",
+                ApprovalAnswer.Busy => "another prompt is waiting for an answer; connect again once it is answered",
                 ApprovalAnswer.Cancelled => "the request was withdrawn before anybody answered",
                 _ => "the confirmation could not be shown, so nobody was asked",
             };

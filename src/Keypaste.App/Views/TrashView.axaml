@@ -146,7 +146,7 @@
          none, and this list is held for as long as the screen is open. -->
     <Border Grid.Row="4" Classes="table" VerticalAlignment="Top">
       <Grid RowDefinitions="Auto,*">
-        <Border Grid.Row="0" Classes="table-head" Padding="16,6">
+        <Border Grid.Row="0" Classes="table-head top" Padding="16,6" IsVisible="{Binding !IsEmpty}">
           <views:TrashColumns>
             <views:ColumnHead Grid.Column="0" Column="title" />
             <views:ColumnGrip Grid.Column="0" Column="title" />

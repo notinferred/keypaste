@@ -37,7 +37,7 @@
                  Text="{Binding Separator}" />
       </StackPanel>
     </StackPanel>
-    <TextBlock Classes="muted size-13" Text="{Binding Strength}" />
+    <TextBlock Classes="caption" Text="{Binding Strength}" />
     <TextBlock Classes="caption" IsVisible="{Binding UseWords}" Text="{Binding Provenance}" />
     <TextBlock Classes="caption secondary"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"

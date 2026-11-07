@@ -203,7 +203,7 @@ public sealed class AutoTypePlan : IDisposable
         "Title" => "its title holds",
         "UserName" => "its username holds",
         "Password" => "its password holds",
-        "URL" => "its web address holds",
+        "URL" => "its URL holds",
         "Notes" => "its notes hold",
         _ => $"its field {EntryNameSanitizer.Sanitize(field).Text} holds",
     };

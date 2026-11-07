@@ -134,7 +134,7 @@ public sealed class AssistiveTechnologyTests
         shell.Show<SettingsViewModel>(DestinationKind.Settings);
 
         var heading = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("h1") && text.Text == "Settings");
-        var section = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("section") && text.IsEffectivelyVisible);
+        var section = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("dialog-title") && text.IsEffectivelyVisible);
 
         Assert.Equal(1, ControlAutomationPeer.CreatePeerForElement(heading).GetHeadingLevel());
         Assert.Equal(2, ControlAutomationPeer.CreatePeerForElement(section).GetHeadingLevel());

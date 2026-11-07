@@ -45,7 +45,7 @@ public sealed class ShellStatusTests
 
         session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "NEW", Password = "x" });
         Assert.Equal("unsaved changes", shell.VaultSaveWords);
-        Assert.Equal(StatusTone.Accent, shell.VaultStatusTone);
+        Assert.Equal(StatusTone.Pending, shell.VaultStatusTone);
 
         session.Unlocked.Save();
         Assert.Equal("saved", shell.VaultSaveWords);

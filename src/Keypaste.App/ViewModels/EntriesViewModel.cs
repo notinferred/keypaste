@@ -1,4 +1,5 @@
 using Keypaste.App.Clipboard;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 
@@ -163,7 +164,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>What matches the search and the selected group, in the table's order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(Selected), nameof(DeletePrompt))]
+    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
     internal partial IReadOnlyList<EntryRow> Rows { get; private set; } = [];
 
@@ -175,7 +176,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Search.Trim() is { Length: > 0 } query
             ? $"No items match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
             : SelectedGroup is { IsEverything: false }
-                ? $"No items in {ListTitle}."
+                ? $"No items in {ListTitle}. {Strings.NewItemAddsOneHere}"
                 : "No items in this vault yet.";
 
     /// <summary>Whether a search found nothing, so clearing it is the next step.</summary>
@@ -196,14 +197,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     [RelayCommand]
     private void SearchAllItems() => WidenSearch?.Invoke();
 
-    /// <summary>Whether the empty list offers New, which it does when a filter is not the reason.</summary>
-    internal bool ListEmptyOffersNew => Search.Trim().Length == 0;
-
     /// <summary>
     /// Whether the empty list also offers Import .kdbx: the vault holds no item at all, as a new one
     /// does, so the first thing a KeePass user may want is to bring their database in.
     /// </summary>
-    internal bool ListEmptyOffersImport => TotalCount == 0 && ListEmptyOffersNew && SelectedGroup is null or { IsEverything: true };
+    internal bool ListEmptyOffersImport => TotalCount == 0 && !ListEmptyOffersClearSearch && SelectedGroup is null or { IsEverything: true };
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -226,7 +224,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             if (SetProperty(ref _search, value))
             {
                 OnPropertyChanged(nameof(ListEmptyNote));
-                OnPropertyChanged(nameof(ListEmptyOffersNew));
                 OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
                 OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
@@ -419,7 +416,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     }
 
     /// <summary>Whether the pane's place says to choose an entry: nothing is open and nothing is being made.</summary>
-    internal bool ShowsPlaceholder => _detail is null && !IsAdding;
+    internal bool ShowsPlaceholder => _detail is null && !IsAdding && Rows.Count > 0;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
     [ObservableProperty]
@@ -859,7 +856,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         OnPropertyChanged(nameof(Search));
         OnPropertyChanged(nameof(ListEmptyNote));
-        OnPropertyChanged(nameof(ListEmptyOffersNew));
         OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
         OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
@@ -1129,6 +1125,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         // The row is addressed by its name rather than its path: two entries can share a path.
+        var firstDeleteNote = FirstDeleteNote();
         var write = _session.Write(
             vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
             removal => removal.Outcome != DeletionOutcome.NothingMatched);
@@ -1163,9 +1160,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                     Restores: true)
                 : null,
             outcome == DeletionOutcome.Recycled
-                ? $"Moved {name} to the trash."
+                ? $"Moved {name} to the Trash.{firstDeleteNote}"
                 : $"Deleted {name}. This vault has no Trash, so nothing can put it back.");
     }
+
+    /// <summary>The format's one mention, for a first delete, which saves the file as KDBX 4.1 (D-0247); empty for a file there already.</summary>
+    private string FirstDeleteNote() =>
+        _session.Unlocked?.RecyclesDeletedEntries == true && KdbxHeader.IsOlderThan41(_session.Unlocked.Path)
+            ? $" {Strings.ThisVaultIsNowSavedInFormat41}"
+            : string.Empty;
 
     /// <summary>Reverses the last delete, rename, move, duplicate or group change through its inverse write.</summary>
     [RelayCommand(CanExecute = nameof(CanUndo))]
@@ -1508,6 +1511,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         var path = selected.Path;
         var count = _all.Count(row => selected.Contains(row.GroupPath));
+        var firstDeleteNote = FirstDeleteNote();
         var write = _session.Write(
             vault => vault.DeleteGroup(path),
             outcome => outcome is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently);
@@ -1539,8 +1543,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             write.Value == GroupOutcome.DeletedPermanently
                 ? $"Deleted {name}. This vault has no Trash, so nothing can put it back."
                 : count == 0
-                    ? $"Moved {name} to the trash."
-                    : $"Moved {name} and the {(count == 1 ? "1 item" : Invariant($"{count} items"))} in it to the trash. Trash puts each one back.");
+                    ? $"Moved {name} to the Trash.{firstDeleteNote}"
+                    : $"Moved {name} and the {(count == 1 ? "1 item" : Invariant($"{count} items"))} in it to the Trash. Trash puts each one back.{firstDeleteNote}");
     }
 
     /// <summary>

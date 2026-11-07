@@ -37,7 +37,7 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Show history", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Show history", "-", "Delete"],
             Headers(menu));
         Assert.All(menu.Items.OfType<MenuItem>().Where(item => item.Header as string != "Copy the TOTP code"), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
         menu.Hide();
@@ -141,6 +141,53 @@ public sealed class ContextMenuTests
     });
 
     [Fact]
+    public Task A_recommendations_rows_menu_dismisses_it_and_reviews_it_again() => HeadlessSession.On(async () =>
+    {
+        using var shell = new RenderedShell(
+            "keypaste-context-finding-",
+            seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "p", Notes = "STRIPE_SECRET_KEY=sk_live_SENTINEL4f6a" }));
+        await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
+        var recommendations = shell.Show<RecommendationsViewModel>(DestinationKind.Recommendations);
+        var row = recommendations.Rows.Single();
+        var drawn = shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, row));
+
+        var menu = RightClick(shell.Window, drawn);
+        Assert.Equal(["Move to a field", "-", "Dismiss", "Review again"], Headers(menu));
+        Assert.False(Item(menu, "Review again").IsEffectivelyEnabled);
+        Choose(menu, "Dismiss");
+        RenderedShell.Drain();
+
+        var dismissed = recommendations.Rows.Single();
+        Assert.True(dismissed.IsDismissed);
+
+        var again = RightClick(shell.Window, shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, dismissed)));
+        Assert.False(Item(again, "Move to a field").IsEffectivelyEnabled);
+        Choose(again, "Review again");
+        Assert.False(recommendations.Rows.Single().IsDismissed);
+    });
+
+    [Fact]
+    public Task A_tags_menu_removes_it() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(
+            "keypaste-context-tag-",
+            seed: vault =>
+            {
+                vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Tagged", Password = "p" });
+                vault.AddTag(new EntryName("services", "Tagged"), "blue");
+            });
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows.Single(row => row.Title == "Tagged");
+        RenderedShell.Drain();
+        var chip = entries.Detail!.Tags.Single();
+        var drawn = shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, chip) && control.IsEffectivelyVisible);
+
+        Choose(RightClick(shell.Window, drawn), chip.RemoveLabel);
+
+        Assert.Empty(entries.Detail!.Tags);
+    });
+
+    [Fact]
     public Task A_Trash_rows_menu_restores_it() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-context-trash-");
@@ -226,7 +273,7 @@ public sealed class ContextMenuTests
         var card = agents.Card(claude);
 
         var menu = RightClick(agents.Window, card);
-        Assert.Equal(["Agent settings…", "Connect agent…", "Connect agent again…", "-", "Disconnect agent…"], Headers(menu));
+        Assert.Equal(["Agent settings…", "Connect Claude Code…", "Connect Claude Code again…", "-", "Disconnect…"], Headers(menu));
         Choose(menu, "Agent settings…");
         Assert.True(claude.IsOpen);
 
@@ -237,7 +284,7 @@ public sealed class ContextMenuTests
         Assert.False(Item(open, "Agent settings…").IsEffectivelyEnabled);
         open.Hide();
 
-        var disconnect = agents.Commands.Menus.Single(group => group.Header == "Agents").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect agent…");
+        var disconnect = agents.Commands.Menus.Single(group => group.Header == "Agents").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect…");
         Assert.True(disconnect.CanRun());
         agents.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav").ContainerFromIndex(0)!.Focus();
         Assert.False(disconnect.CanRun());
@@ -246,7 +293,7 @@ public sealed class ContextMenuTests
         await agents.Model.Opening;
         WindowInput.Drain();
         var whilePaneIsOpen = RightClick(agents.Window, card);
-        Assert.False(Item(whilePaneIsOpen, "Disconnect agent…").IsEffectivelyEnabled);
+        Assert.False(Item(whilePaneIsOpen, "Disconnect…").IsEffectivelyEnabled);
         whilePaneIsOpen.Hide();
     });
 

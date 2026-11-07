@@ -49,6 +49,10 @@ internal sealed partial class MachineRuns : AvaloniaObject
     [GeneratedRegex(@"(?<![\w/.~:\\-])(?:(?:~?/|[A-Za-z]:\\)(?:[^\s,;]|(?<![.:)]) (?=[^\s,;]*[/\\]|[^\s,;/\\]+\.[A-Za-z0-9]{1,8}\b))*[^\s,;.:)]|(?:read:|env:|tag:|--[a-z])[^\s,;]*[^\s,;.:)]|keypaste (?:mcp|run|log verify)\b)")]
     private static partial Regex Machine();
 
+    /// <summary>A flag, which a word joiner after each hyphen keeps on one line; a line may otherwise end at <c>--</c>.</summary>
+    [GeneratedRegex(@"(?<!\S)--\S+", RegexOptions.CultureInvariant)]
+    private static partial Regex Flag();
+
     private static void Split(TextBlock block)
     {
         var words = GetWords(block);
@@ -87,7 +91,7 @@ internal sealed partial class MachineRuns : AvaloniaObject
                 runs.Add(new Run(text[at..index]));
             }
 
-            runs.Add(new Run(text.Substring(index, length)) { FontFamily = mono ?? FontFamily.Default });
+            runs.Add(new Run(Flag().Replace(text.Substring(index, length), flag => flag.Value.Replace("-", "-\u2060", StringComparison.Ordinal))) { FontFamily = mono ?? FontFamily.Default });
             at = index + length;
         }
 

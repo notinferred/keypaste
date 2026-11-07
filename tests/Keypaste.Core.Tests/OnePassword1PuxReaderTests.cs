@@ -284,8 +284,8 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
             [
                 .. source.Unread.Select(omission => new ExportLoss(-1, string.Empty, omission.Part, omission.Reason)),
                 new ExportLoss(0, "Personal/GitHub", "futureThing", unread),
-                new ExportLoss(0, "Personal/GitHub", "label of web address 2", "keypaste keeps no label for a web address"),
-                new ExportLoss(0, "Personal/GitHub", "autofill setting of web address 2", "keypaste keeps no autofill setting for a web address"),
+                new ExportLoss(0, "Personal/GitHub", "label of URL 2", "keypaste keeps no label for a URL"),
+                new ExportLoss(0, "Personal/GitHub", "autofill setting of URL 2", "keypaste keeps no autofill setting for a URL"),
                 new ExportLoss(0, "Personal/GitHub", "Watchtower exclusions", "keypaste keeps the recommendations you dismiss on each computer"),
                 new ExportLoss(0, "Personal/GitHub", "TOTP 2", "keypaste and KeePassXC compute one TOTP per item, so only the item's first lands"),
                 new ExportLoss(0, "Personal/GitHub", "an earlier password", "the export gives it no time"),

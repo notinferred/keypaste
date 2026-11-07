@@ -3,7 +3,7 @@ using Keypaste.Core.Recommendations;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One key left in notes, as Settings › Recommendations lists it: entry and key, never the value.</summary>
-internal sealed class RecommendationRow : ObservableObject
+internal sealed class RecommendationRow : ObservableObject, IRecommendationRow
 {
     private bool _isSelected;
 
@@ -36,9 +36,9 @@ internal sealed class RecommendationRow : ObservableObject
 
     internal string Where => $"in the notes of {Entry}";
 
-    internal bool IsDismissed { get; }
+    public bool IsDismissed { get; }
 
-    internal bool NeedsReview => !IsDismissed;
+    public bool NeedsReview => !IsDismissed;
 
     internal string StateLabel => IsDismissed ? "Dismissed" : "Needs review";
 
@@ -55,7 +55,7 @@ internal sealed class RecommendationRow : ObservableObject
 
     internal RelayCommand MoveCommand { get; }
 
-    internal RelayCommand DismissCommand { get; }
+    public RelayCommand DismissCommand { get; }
 
-    internal RelayCommand ReviewAgainCommand { get; }
+    public RelayCommand ReviewAgainCommand { get; }
 }

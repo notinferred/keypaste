@@ -112,7 +112,7 @@ public sealed class LogRowTests
         });
 
         Assert.Equal("ci-github-actions", row.Actor);
-        Assert.Equal("Injected", row.Action);
+        Assert.Equal("Ran with", row.Action);
         Assert.Equal("4 secrets", row.Secrets);
         Assert.Equal("acme-api · staging", row.Where);
         Assert.Equal("Token", row.Result);

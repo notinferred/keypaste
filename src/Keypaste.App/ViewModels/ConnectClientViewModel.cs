@@ -395,14 +395,14 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
         if (listing.Problem is { } problem)
         {
-            await EndCheckAsync($"The bridge started but did not list: {problem.TrimEnd('.')}. Connect the tool again, then check.").ConfigureAwait(true);
+            await EndCheckAsync($"keypaste mcp started but did not list: {problem.TrimEnd('.')}. Connect the tool again, then check.").ConfigureAwait(true);
             return;
         }
 
         switch (listing.Entries.Count)
         {
             case 0:
-                await EndCheckAsync($"The bridge reached this vault and lists nothing {Client.DisplayName} may see, so there is nothing to ask for.")
+                await EndCheckAsync($"keypaste mcp reached this vault and lists nothing {Client.DisplayName} may see, so there is nothing to ask for.")
                     .ConfigureAwait(true);
                 return;
             case 1:
@@ -415,7 +415,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
                 OnPropertyChanged(nameof(IsCheckWorking));
                 AskCommand.NotifyCanExecuteChanged();
                 SelectedCheckEntry = listing.Entries[0];
-                CheckMessage = $"The bridge lists {listing.Entries.Count} items. Pick the one to ask for.";
+                CheckMessage = $"keypaste mcp lists {listing.Entries.Count} items. Pick the one to ask for.";
                 return;
         }
     }

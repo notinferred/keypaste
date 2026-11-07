@@ -217,6 +217,149 @@ public sealed class ScreenRenderer
         DrawSmallScreens(demo, output);
         DrawDrops(demo, output);
         DrawPolish(demo, output);
+        DrawEmptyVault(demo, output);
+    }
+
+    /// <summary>A vault with nothing in it, as a new person's first look at each place finds it.</summary>
+    private static void DrawEmptyVault(DemoVault demo, string output)
+    {
+        var path = Path.Combine(demo.Home, "first.kdbx");
+        File.Delete(path);
+
+        using (var made = Vault.Create(path, _master))
+        {
+            made.Save();
+        }
+
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(path, master.Value));
+        }
+
+        var emptyHome = Directory.CreateTempSubdirectory("keypaste-empty-home-").FullName;
+        using var shell = new ShellViewModel(session, emptyHome, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker());
+        var window = new MainWindow { Width = _width, Height = _height };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        Save(window, output, "60-empty-items");
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        Save(window, output, "60-empty-projects");
+        shell.Current = Destinations.Of(DestinationKind.AgentActivity);
+        Save(window, output, "60-agents-unavailable");
+        shell.Current = Destinations.Of(DestinationKind.AgentHistory);
+        Save(window, output, "60-empty-agent-history");
+        shell.Current = Destinations.Of(DestinationKind.Log);
+        Save(window, output, "60-empty-log");
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        Save(window, output, "60-empty-settings");
+
+        using var authority = new AppAuthority(session, null, () => new Allowing());
+        var noTools = new FakeTools(Path.Combine(emptyHome, "computer"));
+        using (var connected = new ShellViewModel(authority.Session, emptyHome, authority, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker())
+        {
+            Tools = () => noTools.Connector(),
+        })
+        {
+            window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = connected };
+            connected.Current = Destinations.Of(DestinationKind.AgentActivity);
+            Wait(Assert.IsType<AgentActivityViewModel>(connected.Content).Looking);
+            WindowInput.Drain();
+            Save(window, output, "60-empty-agents");
+        }
+
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+
+        window.Width = 720;
+        window.Height = 520;
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        Save(window, output, "60-empty-items-720");
+
+        window.Width = _width;
+        window.Height = _height;
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.BeginCreateGroupCommand.Press();
+        entries.DraftGroupName = "Work";
+        entries.ConfirmCreateGroupCommand.Press();
+        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
+        Save(window, output, "60-empty-group");
+
+        session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { Title = "github", Password = "demo-gh-7Hq2x", GroupPath = "Work" });
+                return true;
+            },
+            _ => true);
+        entries.Reload();
+        entries.Selected = entries.Rows[0];
+        entries.DeleteCommand.Press();
+
+        if (entries.IsConfirmingDelete)
+        {
+            entries.ConfirmDeleteCommand.Press();
+        }
+
+        Save(window, output, "60-first-delete-format");
+
+        window.Close();
+        Directory.Delete(emptyHome, recursive: true);
+    }
+
+    /// <summary>What the title bar says of the vault, the banners under it and the two countdowns.</summary>
+    private static void DrawVaultStates(Window window, ShellViewModel shell, string output)
+    {
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        var entries = (EntriesViewModel)shell.Content!;
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+
+        void Words(string words, StatusTone tone)
+        {
+            SetDrawnState(shell, nameof(shell.VaultSaveWords), words);
+            SetDrawnState(shell, nameof(shell.VaultStatusTone), tone);
+        }
+
+        Words("merging", StatusTone.Pending);
+        Save(window, output, "61-title-merging");
+
+        Words("updated 14:02", StatusTone.Ok);
+        Save(window, output, "61-title-updated");
+
+        Words("file unreadable", StatusTone.Danger);
+        Save(window, output, "61-title-file-unreadable");
+
+        Words("changed on disk", StatusTone.Danger);
+        SetDrawnState(shell, nameof(shell.VaultChanged), "Another program saved acme.kdbx. Agents are refused until you reload it.");
+        Save(window, output, "61-title-changed-on-disk");
+
+        var width = window.Width;
+        window.Width = 720;
+        Save(window, output, "61-title-changed-on-disk-720");
+        window.Width = width;
+
+        SetDrawnState(shell, nameof(shell.VaultChanged), "Another program saved acme.kdbx, and keypaste could not merge it: the file uses an older KeePass format, which keypaste does not merge; choose the newer format in KeePassXC's database settings. Agents are refused until you reload it.");
+        Save(window, output, "61-reload-banner-merge-refused");
+        SetDrawnState(shell, nameof(shell.VaultChanged), null);
+
+        Words("saved", StatusTone.Ok);
+        SetDrawnState(shell, nameof(shell.Notice), "Another program saved acme.kdbx, and keypaste merged it with your changes and saved. github changed in both, and the newer one is kept; the other is in its history.");
+        Save(window, output, "61-merge-notice");
+        SetDrawnState(shell, nameof(shell.Notice), null);
+
+        SetDrawnState(shell, nameof(shell.Countdown), "Locking in 28 seconds.");
+        Save(window, output, "61-title-idle-countdown");
+        window.Width = 720;
+        Save(window, output, "61-title-idle-countdown-720");
+        window.Width = width;
+        SetDrawnState(shell, nameof(shell.Countdown), string.Empty);
+
+        Wait(entries.Detail!.CopyPasswordCommand.PressAsync());
+        Save(window, output, "61-clipboard-countdown");
+        shell.Clipboard.ClearNowCommand.Press();
+        WindowInput.Drain();
     }
 
     /// <summary>What Q.17 drew: Settings' theme where it is offered, Learn more, toasts under the titlebar, the tight widths, the Items icon and the prompt without focus.</summary>
@@ -647,6 +790,14 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
         Save(window, output, "20-agents");
 
+        SetDrawnState(agents, nameof(agents.IsLooking), true);
+        Save(window, output, "20a-agents-looking");
+        SetDrawnState(agents, nameof(agents.IsLooking), false);
+
+        SetDrawnState(agents, nameof(agents.ClientsProblem), $"{Core.Audit.KeypasteHome.ClientsPath(demo.Home)}: line 3 is not one this version reads. Every agent request is refused until it is fixed or reset; Reset shows what each agent then gets before anything changes.");
+        Save(window, output, "20b-agents-clients-unreadable");
+        SetDrawnState(agents, nameof(agents.ClientsProblem), string.Empty);
+
         window.Height = 1500;
         Save(window, output, "21-agents-full");
 
@@ -710,6 +861,26 @@ public sealed class ScreenRenderer
         tokens.DoneMintedCommand.Press();
         tokens.AskRevokeCommand.Press(tokens.Rows[0]);
         Save(window, output, "26-settings-tokens-revoke");
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        var browserFill = Assert.IsType<SettingsViewModel>(shell.Content).BrowserFill!;
+        browserFill.PairCommand.Press();
+        var pairing = new PairingItem("work laptop", "chrome-extension://oboonakemofpalcgghocfoadofidjkkk", "Last used 2 days ago");
+        SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
+        WindowInput.Drain();
+        foreach (var toast in shell.Toasts.Shown.ToList())
+        {
+            toast.CloseCommand.Press();
+        }
+
+        var stopPairing = window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "StopPairing");
+        var scroller = stopPairing.GetVisualAncestors().OfType<ScrollViewer>().First();
+        scroller.Offset = new Vector(0, scroller.Offset.Y + stopPairing.TranslatePoint(default, scroller)!.Value.Y - 160);
+        WindowInput.Drain();
+        Save(window, output, "04-settings-browser-fill-armed");
+        pairing.IsConfirmingRemove = true;
+        Save(window, output, "04-settings-browser-fill-remove");
+        browserFill.StopCommand.Press();
 
         window.Close();
     }
@@ -980,6 +1151,9 @@ public sealed class ScreenRenderer
             Assert.True(unlock.StartCreateCommand.CanExecute(null));
             Wait(unlock.StartCreateAsync());
             Save(window, output, "82-lock-create");
+            SetDrawnState(unlock, nameof(unlock.Busy), true);
+            Save(window, output, "82b-lock-creating");
+            SetDrawnState(unlock, nameof(unlock.Busy), false);
 
             foreach (var c in "one")
             {
@@ -1285,6 +1459,12 @@ public sealed class ScreenRenderer
             TimeZoneInfo.Utc,
             ApprovalLimits.DefaultMaximumTtlSeconds);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
+        var named = AgentAccess.Defaults with { Mode = AgentMode.Automatic };
+        var reset = AccessChangePrompt.ForReset(
+            new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named, Understood: true, Rewritable: true))]),
+            TimeZoneInfo.Utc,
+            ApprovalLimits.DefaultMaximumTtlSeconds);
+        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(reset)), output, "91f2-access-change-reset");
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
             {
@@ -1295,7 +1475,7 @@ public sealed class ScreenRenderer
             output,
             "91h-terminal-edit");
 
-        var notice = new NoticeWindow(new AlwaysForNotice("work laptop", "acme-api:dev", "another request was already in front of a person"), _ => { });
+        var notice = new NoticeWindow(new AlwaysForNotice("work laptop", "acme-api:dev", "another prompt was already waiting for an answer"), _ => { });
         notice.Show();
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
@@ -1541,6 +1721,7 @@ public sealed class ScreenRenderer
         window.Width = _width;
         window.Height = _height;
 
+        DrawVaultStates(window, shell, output);
         DrawActivityStates(shell, window, demo.Home, output);
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
@@ -1691,6 +1872,9 @@ public sealed class ScreenRenderer
         {
             window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = copyOnly };
             copyOnly.Current = Destinations.Of(DestinationKind.EnvSets);
+            ((EnvSetsViewModel)copyOnly.Content!).OpenCommand.Press("acme-api");
+            WindowInput.Drain();
+            window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("caption") && text.IsEffectivelyVisible && text.Text?.Contains("Terminal", StringComparison.OrdinalIgnoreCase) == true).BringIntoView();
             Save(window, output, "49-env-terminal-unavailable");
         }
 
@@ -1792,7 +1976,13 @@ public sealed class ScreenRenderer
 
         Save(window, output, name + "-unchecked");
 
-        Wait(sharing.RefreshCommand.PressAsync());
+        var checking = new TaskCompletionSource();
+        shares.Held = checking.Task;
+        var refreshed = sharing.RefreshCommand.PressAsync();
+        Save(window, output, name + "-checking");
+        checking.SetResult();
+        Wait(refreshed);
+        shares.Held = null;
         Save(window, output, name);
 
         sharing.RevokeRowCommand.Press(sharing.Rows.First(row => row.Opens));
@@ -1812,7 +2002,13 @@ public sealed class ScreenRenderer
 
         shares.Answer = _ => FakeShareServer.Json(System.Net.HttpStatusCode.NotFound, "{\"error\":\"not found\"}");
         dialog.RequirePassphrase = false;
-        Wait(dialog.CreateCommand.PressAsync());
+        var creating = new TaskCompletionSource();
+        shares.Held = creating.Task;
+        var created = dialog.CreateCommand.PressAsync();
+        Save(window, output, "12-items-share-creating");
+        creating.SetResult();
+        Wait(created);
+        shares.Held = null;
         Save(window, output, "12-items-share-unavailable");
         shares.Answer = null;
         dialog.CancelCommand.Press();
@@ -1927,7 +2123,7 @@ public sealed class ScreenRenderer
         page.Children.AddRange(
         [
             Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
-            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("Allowances", "section")),
+            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("All items", "list-title"), Text("Allowances", "dialog-title")),
             Row(Text("AI tools and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
             Row(Button("Connect", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
@@ -1961,6 +2157,12 @@ public sealed class ScreenRenderer
         }
 
         var heads = window.GetVisualDescendants().OfType<ColumnHead>().Where(head => head.IsEffectivelyVisible).ToList();
+
+        if (heads.Count == 0)
+        {
+            return;
+        }
+
         var grip = window.GetVisualDescendants().OfType<ColumnGrip>().First(candidate => candidate.IsEffectivelyVisible);
         var widths = grip.FindAncestorOfType<TableColumns>()!.DrawnWidths;
 
@@ -2041,7 +2243,7 @@ public sealed class ScreenRenderer
         // Not a bridge that could run: the view reads only that a check is held, and it is let go below without being disposed.
         typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, new McpListedEntry[] { new("1", "env/ci/DEPLOY_KEY", "value"), new("2", "env/ci/OTHER", "value") });
         setCheck.Invoke(pane, [RuntimeHelpers.GetUninitializedObject(typeof(McpConnectionCheck))]);
-        SetDrawnState(pane, nameof(pane.CheckMessage), "The bridge lists 2 items. Pick the one to ask for.");
+        SetDrawnState(pane, nameof(pane.CheckMessage), "keypaste mcp lists 2 items. Pick the one to ask for.");
         Save(window, output, "24c-agents-connect-picking");
         typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, Array.Empty<McpListedEntry>());
         setCheck.Invoke(pane, [null]);

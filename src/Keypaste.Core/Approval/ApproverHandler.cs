@@ -1080,7 +1080,7 @@ public sealed class ApproverHandler
         ApprovalAnswer.Denied => "a person refused this request",
         ApprovalAnswer.TimedOut => "nobody answered inside the window",
         ApprovalAnswer.Cancelled => "the agent gave up before anybody answered",
-        ApprovalAnswer.Busy => "another request was already in front of a person",
+        ApprovalAnswer.Busy => "another prompt was already waiting for an answer",
         ApprovalAnswer.Cooldown => "the same request was refused a moment ago",
         ApprovalAnswer.NoChannel => "there was nowhere to ask a person",
         _ => "asking a person went wrong",

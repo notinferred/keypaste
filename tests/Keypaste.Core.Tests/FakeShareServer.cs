@@ -30,6 +30,9 @@ internal sealed class FakeShareServer : HttpMessageHandler
     /// <summary>Answers instead of the store when it returns a response.</summary>
     internal Func<HttpRequestMessage, HttpResponseMessage?>? Answer { get; set; }
 
+    /// <summary>What a request waits on before it is answered, to hold a wait on the screen.</summary>
+    internal Task? Held { get; set; }
+
     /// <summary>Runs as each request arrives, before it is answered.</summary>
     internal Action<Seen>? OnRequest { get; set; }
 
@@ -43,6 +46,11 @@ internal sealed class FakeShareServer : HttpMessageHandler
         var seen = new Seen(request.Method, request.RequestUri!, headers, body);
         Requests.Add(seen);
         OnRequest?.Invoke(seen);
+
+        if (Held is { } held)
+        {
+            await held.ConfigureAwait(false);
+        }
 
         if (Unreachable)
         {

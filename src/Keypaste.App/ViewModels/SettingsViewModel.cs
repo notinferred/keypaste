@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Globalization;
 using Keypaste.App.Navigation;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
 using Keypaste.Core;
@@ -98,8 +99,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Recommendations, owned by the shell for the unlock; null where no shell built this screen.</summary>
     internal RecommendationsViewModel? Recommendations { get; }
-
-    internal bool HasRecommendations => Recommendations is not null;
 
     /// <summary>Changing the vault's master password and keyfile.</summary>
     internal VaultAccessViewModel Access { get; }
@@ -439,7 +438,18 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         }
         : string.Empty;
 
+    /// <summary>Whether a copy is there to put back, for the line that says how.</summary>
+    internal bool HasBackupCopies => _session.VaultPath is { } path && VaultBackups.List(path).Count > 0;
+
 #pragma warning disable CA1822
+    internal string CloseHelp => OperatingSystem.IsLinux()
+        ? $"{Strings.ClosingTheWindowStillLocksTheVaultX283e06} {Strings.SomeLinuxDesktopsShowNoTrayIcon}"
+        : Strings.ClosingTheWindowStillLocksTheVaultX283e06;
+
+    internal string MinimizeHelp => OperatingSystem.IsMacOS()
+        ? $"{Strings.TakesEffectAtOnceAndAtEveryX7e38a2} {Strings.HidingTheAppIsNotMinimizing}"
+        : Strings.TakesEffectAtOnceAndAtEveryX7e38a2;
+
     internal string BackupsRule =>
         $"A save keeps the file it replaces: the first save after each unlock, no more often than every " +
         $"fifteen minutes, keeping the last {VaultBackups.Retained}. Each copy opens with the master " +

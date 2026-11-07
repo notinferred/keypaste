@@ -272,7 +272,7 @@
 
         <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewProjectDraft}">
           <StackPanel Spacing="8">
-            <TextBlock Classes="section" Text="{x:Static res:Strings.NewProject}" />
+            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.NewProject}" />
             <TextBlock Classes="caption" ctl:MachineRuns.InText="True"
                        Text="{x:Static res:Strings.AProjectIsTheItemsInYourX9f49b8}" />
             <TextBlock Classes="label" Text="{x:Static res:Strings.ProjectName}" />
@@ -291,7 +291,7 @@
 
         <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="20">
           <StackPanel Spacing="12">
-            <TextBlock Classes="section" Text="{x:Static res:Strings.NoProjectsYet}" />
+            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.NoProjectsYet}" />
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="keypaste env set billing-api STRIPE_KEY"
                        Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
             <Button Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
@@ -307,7 +307,7 @@
                 <!-- The .env import: read and checked whole, previewed by name, written only on Import. -->
                 <Border Classes="card filled" IsVisible="{Binding Import.IsPreviewing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Import.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Import.CancelCommand}">
                   <StackPanel Spacing="8">
-                    <TextBlock Classes="section" Text="{Binding Import.Source, StringFormat={x:Static res:Strings.ImportValue}}" TextWrapping="Wrap" />
+                    <TextBlock Classes="dialog-title" Text="{Binding Import.Source, StringFormat={x:Static res:Strings.ImportValue}}" TextWrapping="Wrap" />
                     <ItemsControl ItemsSource="{Binding Import.Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="x:String">
@@ -342,7 +342,7 @@
                 <StackPanel Spacing="8">
                   <Border Classes="table">
                     <StackPanel>
-                      <Border Classes="table-head">
+                      <Border Classes="table-head top">
                         <Grid ColumnDefinitions="1.6*,3*,120">
                           <TextBlock Grid.Column="0" Classes="th" Text="{x:Static res:Strings.KEY}" VerticalAlignment="Center" />
                           <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}">
@@ -508,7 +508,7 @@
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->
                 <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddProfileCommand}" ctl:FormKeys.Cancel="{Binding CancelAddProfileCommand}" ctl:FormKeys.Draft="{Binding ProfileDraft}">
                   <StackPanel Spacing="8">
-                    <TextBlock Classes="section" Text="{x:Static res:Strings.NewEnvironment}" />
+                    <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.NewEnvironment}" />
                     <TextBlock Classes="caption"
                                Text="{x:Static res:Strings.LowercaseLettersDigitsAndDashesSuchAsX8d843c}" />
                     <TextBlock Classes="label" Text="{x:Static res:Strings.EnvironmentName}" />
@@ -527,7 +527,7 @@
 
                 <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding KeyDraft}">
                   <StackPanel Spacing="8">
-                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
+                    <TextBlock Classes="dialog-title" Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
                     <StackPanel Spacing="6">
                       <TextBlock Classes="label" Text="{x:Static res:Strings.KeyName}" />
                       <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
@@ -638,7 +638,7 @@
                      entry puts its variables in. Add entry tags one and Remove takes the tag off, each after
                      saying what it reaches (D-0415); neither deletes an entry or a field. -->
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="section" Text="{x:Static res:Strings.Items}" />
+                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Items}" />
                   <Border Classes="table">
                     <ItemsControl ItemsSource="{Binding Environments}">
                       <ItemsControl.ItemTemplate>
@@ -698,7 +698,7 @@
                 </StackPanel>
                 <Border Classes="card filled" IsVisible="{Binding IsAddingEntry}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelAddEntryCommand}">
                   <StackPanel Spacing="8">
-                    <TextBlock Classes="section" Text="{Binding AddEntryTitle}" />
+                    <TextBlock Classes="dialog-title" Text="{Binding AddEntryTitle}" />
                     <StackPanel Spacing="6">
                       <TextBlock Classes="label" Text="{x:Static res:Strings.FindAnItem}" />
                       <TextBox Classes="mono" Text="{Binding EntryFilter}" PlaceholderText="{x:Static res:Strings.ExampleItemPath}" Width="420"
@@ -786,7 +786,7 @@
                     <StackPanel Spacing="12">
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <ctl:KpIcon Icon="terminal" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                        <TextBlock Classes="section" Text="{x:Static res:Strings.RunWithThisEnvironment}" VerticalAlignment="Center" />
+                        <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RunWithThisEnvironment}" VerticalAlignment="Center" />
                       </StackPanel>
 
                       <Border Classes="terminal" CornerRadius="6" Padding="12,4,4,4" IsVisible="{Binding HasRunCommand}">
@@ -805,9 +805,9 @@
                       </Border>
                       <TextBlock Classes="caption" Text="{Binding RunCommandNote}" IsVisible="{Binding !HasRunCommand}" />
 
-                      <TextBlock Classes="body muted size-13" LineHeight="18.75"
+                      <TextBlock Classes="caption"
                                  Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
-                      <TextBlock Classes="body muted size-13" LineHeight="18.75"
+                      <TextBlock Classes="caption"
                                  Text="{x:Static res:Strings.ThroughAnAgentOrATokenAXbc5a7a}" />
 
                       <Border Classes="divider" Margin="0,2" />

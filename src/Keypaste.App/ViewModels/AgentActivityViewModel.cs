@@ -122,11 +122,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>The look in progress or the last one, finished once what it found is posted.</summary>
     internal Task Looking { get; private set; } = Task.CompletedTask;
 
-    /// <summary>Why a listed agent has no Settings, said once for them all, and what would give it some where a Connect is on the list; empty with none listed.</summary>
+    /// <summary>Why a listed agent has no Settings, said once for them all, and what would give it some; empty with none listed.</summary>
     internal string UnnamedAgentsNote => !_rows.Any(row => !row.HasSettings)
         ? string.Empty
-        : "An agent here with no Settings follows Every other agent's, because its connection gave it no name."
-            + (_rows.Any(row => row.OffersConnect) ? $" {Resources.Strings.ConnectAToolFromThisListToGive}" : string.Empty);
+        : $"{Resources.Strings.AgentsWithoutALabel} {(_rows.Any(row => row.OffersConnect) ? Resources.Strings.ConnectAToolFromThisListToGive : Resources.Strings.SetupGivesEachToolALabel)}";
 
     internal bool HasUnnamedAgentsNote => UnnamedAgentsNote.Length > 0;
 
@@ -136,7 +135,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>The tools keypaste looks for on this computer, named when none was found.</summary>
     internal string NoTools => _connector is null
         ? string.Empty
-        : $"None of the AI tools keypaste connects was found on this computer: {string.Join(", ", McpClientCatalog.For(_connector.Machine.Platform).Select(tool => tool.DisplayName))}.";
+        : $"{Resources.Strings.NoAIToolsFound} {string.Join(", ", McpClientCatalog.For(_connector.Machine.Platform).Select(tool => tool.DisplayName))}. {Resources.Strings.InstallOneThenOpenAgentsAgain}";
 
     /// <summary>Opens a found tool's Connect pane under its row.</summary>
     internal RelayCommand<AgentRow> ConnectCommand { get; }
@@ -529,19 +528,29 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             ? string.Create(CultureInfo.InvariantCulture, $"{file.Length}@{file.LastWriteTimeUtc.Ticks}")
             : "-";
 
-    /// <summary>Says on each row that has settings what they give it, as its panel reads them.</summary>
+    /// <summary>Says on each row with settings what they give it, as its panel reads them: Every other agent's in full, and another's where they differ or this computer holds it back.</summary>
     private void Summarize()
     {
+        var everyOther = _authority is not null && _authority.TrySettings(AgentNames.Any, out var others, out _) ? Given(others) : null;
+
         foreach (var row in _rows)
         {
             row.Summary = row.Label is { } label && _authority is not null && _authority.TrySettings(label, out var state, out _)
-                ? Summary(state)
+                ? Summary(state, followsEveryOther: !row.IsEveryOther && Given(state) == everyOther)
                 : string.Empty;
         }
     }
 
-    /// <summary>An agent's settings in a line: its mode, each project row, what it sees, values and commands, and what holds them back.</summary>
-    private static string Summary(AgentSettingsState state)
+    private static string Summary(AgentSettingsState state, bool followsEveryOther) => (followsEveryOther, HeldBack(state)) switch
+    {
+        (false, null) => Given(state),
+        (false, var held) => $"{Given(state)} · {held}",
+        (true, null) => string.Empty,
+        (true, var held) => string.Concat(held[..1].ToUpperInvariant(), held[1..]),
+    };
+
+    /// <summary>What an agent's settings give it, in a line: its mode, each project row, what it sees, values and commands.</summary>
+    private static string Given(AgentSettingsState state)
     {
         var access = state.Vault;
         List<string> parts = [Words(access.Mode), .. access.Projects.Select(row => $"{Words(row.Mode)} for {row.Scope.Name}")];
@@ -562,17 +571,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             parts.Add("may run commands");
         }
 
-        if (state.BeneathDefaults)
-        {
-            parts.Add("the defaults apply until its saved settings can be read");
-        }
-        else if (state.HeldBack.Count > 0)
-        {
-            parts.Add("less on this computer");
-        }
-
         return string.Join(" · ", parts);
     }
+
+    private static string? HeldBack(AgentSettingsState state) =>
+        state.BeneathDefaults ? "the defaults apply until its saved settings can be read"
+        : state.HeldBack.Count > 0 ? "less on this computer"
+        : null;
 
     private static string Words(AgentMode mode) => mode switch
     {

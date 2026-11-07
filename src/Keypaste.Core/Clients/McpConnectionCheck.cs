@@ -194,7 +194,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new McpCheckListing([], Invariant($"the bridge did not answer within {StepTimeout.TotalSeconds:0} seconds"));
+            return new McpCheckListing([], Invariant($"keypaste mcp did not answer within {StepTimeout.TotalSeconds:0} seconds"));
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
@@ -404,7 +404,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
             {
                 if (_buffer.Length >= _maximumLine)
                 {
-                    throw new InvalidDataException("the bridge sent a line longer than the check reads");
+                    throw new InvalidDataException("keypaste mcp sent a line longer than the check reads");
                 }
 
                 var larger = ArrayPool<byte>.Shared.Rent(_buffer.Length * 2);
@@ -434,7 +434,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         {
             CryptographicOperations.ZeroMemory(line);
             ArrayPool<byte>.Shared.Return(line);
-            return new Reply(null, null, "the bridge sent something that is not JSON-RPC");
+            return new Reply(null, null, "keypaste mcp sent something that is not JSON-RPC");
         }
     }
 
@@ -450,12 +450,12 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         {
             return error.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String
                 ? FirstLine(message.GetString())
-                : "the bridge answered with an error";
+                : "keypaste mcp answered with an error";
         }
 
         return root.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object
             ? null
-            : "the bridge answered with no result";
+            : "keypaste mcp answered with no result";
     }
 
     private static bool IsError(JsonElement result) =>
@@ -475,7 +475,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
             }
         }
 
-        return "the bridge refused without saying why";
+        return "keypaste mcp refused without saying why";
     }
 
     private static List<McpListedEntry> Entries(JsonElement result)
@@ -530,7 +530,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
     private async Task<string> Exited()
     {
         var said = FirstLine(await _stderr.ConfigureAwait(false));
-        return said.Length > 0 ? $"the bridge exited: {said}" : "the bridge exited without answering";
+        return said.Length > 0 ? $"keypaste mcp exited: {said}" : "keypaste mcp exited without answering";
     }
 
     /// <summary>Keeps the start of what the bridge writes to stderr, and drains the rest.</summary>

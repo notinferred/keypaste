@@ -193,16 +193,18 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     }
 
     /// <summary>The sentence a front end shows for a failure.</summary>
-    public static string Describe(ShareFailure failure) => failure switch
+    public string Describe(ShareFailure failure) => failure switch
     {
         ShareFailure.None => string.Empty,
-        ShareFailure.Unavailable => "keypaste.com is not accepting shares right now",
-        ShareFailure.Refused => "the share server refused the request",
+        ShareFailure.Unavailable => $"{Server} is not accepting shares right now",
+        ShareFailure.Refused => $"{Server} refused the request",
         ShareFailure.TooLarge => "what would be shared is too large",
         ShareFailure.RateLimited => "too many share requests from this address; try again in a minute",
-        ShareFailure.Network => "the share server could not be reached",
-        _ => "the share server answered something keypaste does not understand",
+        ShareFailure.Network => $"{Server} could not be reached",
+        _ => $"{Server} answered something keypaste does not understand",
     };
+
+    private string Server => ShareEndpoint.IsDefault(Endpoint) ? Endpoint.Host : Endpoint.Authority;
 
     private HttpRequestMessage Request(HttpMethod method, string path)
     {
@@ -270,9 +272,9 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         _ => ShareFailure.Protocol,
     };
 
-    private static string Refusal(byte[] body) =>
+    private string Refusal(byte[] body) =>
         TryRead(body, out var root) && TryString(root, "error", out var error)
-            ? "the share server refused the request: " + EntryNameSanitizer.SanitizeProse(error, 200).Text
+            ? $"{Server} refused the request: " + EntryNameSanitizer.SanitizeProse(error, 200).Text
             : Describe(ShareFailure.Refused);
 
     private static bool TryRead(byte[] body, out JsonElement root)

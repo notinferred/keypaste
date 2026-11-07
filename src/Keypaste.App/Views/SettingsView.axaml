@@ -67,12 +67,11 @@
         </StackPanel>
 
         <!-- One line, opening their own screen, so Settings opens on settings; gone when nothing was found. -->
-        <Panel IsVisible="{Binding HasRecommendations}">
+        <Panel IsVisible="{Binding !Recommendations.IsEmpty, FallbackValue=False}">
           <Border Name="RecommendationsCard"
                   Classes="card filled settings"
                   DataContext="{Binding Recommendations}"
-                  x:DataType="vm:RecommendationsViewModel"
-                  IsVisible="{Binding !IsEmpty}">
+                  x:DataType="vm:RecommendationsViewModel">
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                 <ctl:KpIcon Grid.Column="0" Icon="clipboard-check" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
@@ -91,7 +90,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="shield" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.Security}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Security}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -118,7 +117,7 @@
                               Classes="size-13-5"
                               IsChecked="{Binding LockWhenMinimized}" />
                 <TextBlock Classes="caption" Margin="40,0,0,0"
-                           Text="{x:Static res:Strings.TakesEffectAtOnceAndAtEveryX7e38a2}" />
+                           Text="{Binding MinimizeHelp}" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -130,7 +129,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="rotate-cw" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.Startup}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Startup}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -141,7 +140,7 @@
                               Classes="size-13-5"
                               IsChecked="{Binding StayInTray}" />
                 <TextBlock Classes="caption" Margin="40,0,0,0"
-                           Text="{x:Static res:Strings.ClosingTheWindowStillLocksTheVaultX283e06}" />
+                           Text="{Binding CloseHelp}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding OpenAtLoginSupported}">
@@ -164,7 +163,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="sun" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.Appearance}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Appearance}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -190,7 +189,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="key-round" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.VaultAccess}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.VaultAccess}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -290,7 +289,7 @@
                       <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="size-13" FontWeight="Medium"
                                  Foreground="{DynamicResource KpTextPrimary}" />
                     </StackPanel>
-                    <TextBlock Classes="caption" Text="{Binding BackupCost}" Foreground="{DynamicResource KpTextSecondary}" />
+                    <TextBlock Classes="caption" ctl:MachineRuns.InText="True" Text="{Binding BackupCost}" Foreground="{DynamicResource KpTextSecondary}" />
                     <TextBlock Classes="caption" Text="{Binding KeyfileWarning}"
                                IsVisible="{Binding HasKeyfileWarning}"
                                Foreground="{DynamicResource KpTextSecondary}" />
@@ -325,7 +324,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="history" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.Backups}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Backups}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -339,7 +338,7 @@
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextPrimary}"
                            Text="{Binding BackupsSummary}" />
-                <TextBlock Classes="caption" Text="{Binding RestoreHint}" />
+                <TextBlock Classes="caption" Text="{Binding RestoreHint}" IsVisible="{Binding HasBackupCopies}" />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -351,7 +350,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="download" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.Export}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Export}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -374,7 +373,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="terminal" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.AgentsAndTheCLI}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AgentsAndTheCLI}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -425,7 +424,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="globe" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.BrowserFill}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.BrowserFill}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -455,7 +454,7 @@
                 <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PairingItem">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,8">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,8" Background="Transparent">
                         <StackPanel Grid.Column="0" Spacing="2">
                           <TextBlock Classes="size-13-5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
                           <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
@@ -490,7 +489,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="folder-open" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.RecentVaults}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RecentVaults}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -498,7 +497,7 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <TextBlock Grid.Column="0" Classes="caption"
                              Text="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}" />
-                  <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding AskForgetAllCommand}"
+                  <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="{x:Static res:Strings.ForgetRecentVaults}" Command="{Binding AskForgetAllCommand}"
                           IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
                 </Grid>
                 <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
@@ -520,7 +519,7 @@
             <Border Classes="settings-head">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="{x:Static res:Strings.CrashReports}" />
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.CrashReports}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">

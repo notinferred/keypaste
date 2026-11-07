@@ -128,6 +128,11 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _linkMenu;
     private readonly IReadOnlyList<AppMenuEntry> _allowanceMenu;
     private readonly IReadOnlyList<AppMenuEntry> _reportMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _tagMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _noteKeyMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _lostTagMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _weakPasswordMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _pairingMenu;
 
     // The row a context menu was opened on, for the rows that cannot be chosen without opening them.
     private object? _context;
@@ -158,6 +163,7 @@ internal sealed class AppCommands
         _openVault = new AppCommand(Strings.OpenVault, Chord(Key.O), CanOpenVault, () => OpenVault(null));
         var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
         _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
+        var removePairing = Routed(Strings.RemovePairing, () => Settings()?.BrowserFill, browser => browser.AskRemoveCommand, _ => Target<PairingItem>());
         var exportReferences = Routed(Strings.ExportEnvKeypasteLabel, Project, project => project.ExportReferencesCommand);
         var file = new AppMenuGroup(Strings.FileMenu,
         [
@@ -168,6 +174,9 @@ internal sealed class AppCommands
             _line,
             _openVault,
             new AppSubmenu(Strings.OpenRecent, RecentEntries),
+            Routed(Strings.CreateAVault, OpeningScreen, unlock => unlock.StartCreateCommand),
+            Routed(Strings.RestoreABackupLabel, OpeningScreen, unlock => unlock.StartRestoreCommand),
+            Routed(Strings.Reload, () => Unmodal() is { HasVaultChanged: true } shell ? shell : null, shell => shell.ReloadCommand),
             _line,
             new AppCommand(Strings.CloseWindow, Chord(Key.W), () => host.Window() is { IsVisible: true }, () => host.Window()?.Close()),
             lockNow,
@@ -182,7 +191,10 @@ internal sealed class AppCommands
                 Routed(Strings.UseThisVaultForAgentsAndTheXb47c9a, Settings, settings => settings.UseThisVaultCommand),
                 Routed(Strings.LinkTheKeypasteCommand, Settings, settings => settings.LinkCliCommand),
                 Routed(Strings.PairABrowser, () => Settings()?.BrowserFill, browser => browser.PairCommand),
-                Routed(Strings.StopPairing, () => Settings()?.BrowserFill, browser => browser.StopCommand)),
+                Routed(Strings.ReplaceTheOtherKeypaste, () => Settings() is { OffersCliReplace: true } settings ? settings : null, settings => settings.BeginReplaceCliCommand),
+                Routed(Strings.StopPairing, () => Settings()?.BrowserFill, browser => browser.StopCommand),
+                removePairing,
+                Routed(Strings.ForgetRecentVaults, () => Settings() is { IsConfirmingForgetAll: false } settings ? settings : null, settings => settings.AskForgetAllCommand)),
         ]);
 
         _delete = new AppCommand(Strings.Delete, Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete);
@@ -202,6 +214,8 @@ internal sealed class AppCommands
                 Mac ? [new(Key.F, command), new(Key.F, command | KeyModifiers.Alt), new(Key.K, command)] : [new(Key.F, command), new(Key.K, command)],
                 () => Unmodal() is not null,
                 () => Unmodal()?.FocusSearch()),
+            Routed(Strings.ClearSearch, () => Items() is { ListEmptyOffersClearSearch: true } items ? items : null, items => items.ClearSearchCommand),
+            Routed(Strings.SearchAllItems, () => Items() is { ListEmptyOffersSearchAll: true } items ? items : null, items => items.SearchAllItemsCommand),
             _line,
             Routed(Strings.ClearTheClipboardNow, () => Unmodal()?.Clipboard is { IsCounting: true } clipboard ? clipboard : null, clipboard => clipboard.ClearNowCommand),
         ]);
@@ -237,14 +251,16 @@ internal sealed class AppCommands
             Strings.SettingsScreens,
             [.. Destinations.All.Where(screen => screen.Parent is DestinationKind.Settings or DestinationKind.Advanced).Select(screen => new AppCommand(screen.Title, [], () => Unmodal() is not null, () => Go(screen.Kind)))]);
 
+        var back = Routed(Strings.Back, Unmodal, shell => shell.BackCommand);
+
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         AppCommand fullScreen = new(Strings.EnterFullScreen, [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)
         {
             Says = () => host.Window()?.WindowState == WindowState.FullScreen ? Strings.ExitFullScreen : Strings.EnterFullScreen,
         };
         var view = new AppMenuGroup(Strings.ViewMenu, Mac
-            ? [.. places, screens, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
-            : [.. places, screens, _line, _sidebar, groupsAndProjects, fullScreen, resetTable, _line, .. zoom]);
+            ? [.. places, screens, back, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
+            : [.. places, screens, back, _line, _sidebar, groupsAndProjects, fullScreen, resetTable, _line, .. zoom]);
 
         // Zoom, ⌘M and Bring All to Front are macOS's; Windows and Linux maximize a window, and have no chord for minimizing it.
         var window = new AppMenuGroup(Strings.WindowMenu, Mac
@@ -276,6 +292,7 @@ internal sealed class AppCommands
         var copyReference = Routed(Strings.CopyTheReference, Pane, detail => detail.CopyReferenceCommand);
         var openUrl = Routed(Strings.OpenUrl, Pane, detail => detail.OpenUrlCommand);
         var rotate = Routed(Strings.Rotate, Pane, detail => detail.RotateCommand);
+        var generatePassword = Routed(Strings.GenerateANewPasswordLabel, Pane, detail => detail.GeneratePasswordCommand);
         var history = Routed(Strings.ShowHistory, PaneOutOfEdit, detail => detail.History.ToggleCommand) with { Says = () => PaneOutOfEdit()?.History.ToggleLabel ?? Strings.ShowHistory };
         var addField = Routed(Strings.AddFieldLabel, PaneOutOfEdit, detail => detail.BeginAddFieldCommand);
         var addAttachment = Routed(Strings.AddAttachmentLabel, PaneOutOfEdit, detail => detail.Attachments.AddCommand);
@@ -322,9 +339,9 @@ internal sealed class AppCommands
             [],
             () => Agents() is not null && Target<AgentRow>() is { HasSettings: true, IsOpen: false },
             OpenAgentSettings);
-        var connect = Routed(Strings.ConnectAgentLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane());
-        var connectAgain = Routed(Strings.ConnectAgentAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane());
-        var disconnect = Routed(Strings.DisconnectAgentLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
+        var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
+        var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
+        var disconnect = Routed(Strings.DisconnectLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
         var resetClients = Routed(Strings.ResetClientsToml, () => Agents() is { HasClientsProblem: true } agents ? agents : null, agents => agents.ResetClientsCommand);
         var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
         var endAllowance = Routed(Strings.EndAllowance, Agents, agents => agents.EndCommand, _ => Target<ActivityRow>());
@@ -333,11 +350,22 @@ internal sealed class AppCommands
         var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
         var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
         var verifyChain = Routed(Strings.VerifyChain, Log, log => log.VerifyCommand) with { Says = () => Log()?.VerifyLabel ?? Strings.VerifyChain };
+        var refreshLog = Routed(Strings.Refresh, Log, log => log.RefreshCommand);
+        var copyHash = Routed(Strings.CopyLatestHash, Log, log => log.CopyHashCommand);
+        var showWholeLog = Routed(Strings.ShowAll, () => Log() is { OffersShowAll: true } log ? log : null, log => log.ShowWholeLogCommand);
+        var removeTag = Routed(Strings.RemoveTag, () => Items() is not null ? Target<EntryTagChip>() : null, chip => chip.RemoveCommand) with { Says = () => Target<EntryTagChip>()?.RemoveLabel ?? Strings.RemoveTag };
+        var moveNoteKey = Routed(Strings.MoveToAField, () => Recommendations() is not null && Target<RecommendationRow>() is { NeedsReview: true } row ? row : null, row => row.MoveCommand);
+        var restoreLostTag = Routed(Strings.RestoreTag, () => Recommendations() is not null && Target<LostTagRow>() is { NeedsReview: true } row ? row : null, row => row.RestoreCommand);
+        var openWeakPassword = Routed(Strings.OpenItem, () => Recommendations() is not null ? Target<PasswordRow>() : null, row => row.OpenCommand);
+        var dismissFinding = Routed(Strings.Dismiss, () => Finding() is { NeedsReview: true } finding ? finding : null, finding => finding.DismissCommand);
+        var reviewFindingAgain = Routed(Strings.ReviewAgain, () => Finding() is { IsDismissed: true } finding ? finding : null, finding => finding.ReviewAgainCommand);
+        var selectAllFindings = Routed(Strings.SelectAll, () => Recommendations() is { HasNoteKeys: true } recommendations ? recommendations : null, recommendations => recommendations.SelectAllCommand);
+        var moveSelectedFindings = Routed(Strings.MoveSelected, () => Recommendations() is { HasSelectedKeys: true } recommendations ? recommendations : null, recommendations => recommendations.MoveSelectedCommand);
         var checkLinks = Routed(Strings.CheckStatus, Links, links => links.RefreshCommand);
         var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
         var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
-        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, history, _line, _delete];
+        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, generatePassword, history, _line, _delete];
         _trashMenu = [restore, restoreAs, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
@@ -351,13 +379,18 @@ internal sealed class AppCommands
         _linkMenu = [checkLinks, _line, revokeLink];
         _allowanceMenu = [endAllowance, endAll];
         _reportMenu = [deleteReport];
+        _tagMenu = [removeTag];
+        _noteKeyMenu = [moveNoteKey, _line, dismissFinding, reviewFindingAgain];
+        _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
+        _weakPasswordMenu = [openWeakPassword, _line, dismissFinding, reviewFindingAgain];
+        _pairingMenu = [removePairing];
 
         // Edit has Delete, and File has New group, so the item menu leaves them out. What acts on one row sits in its own submenu.
         var item = new AppMenuGroup(Strings.ItemMenu,
         [
             copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line,
-            editFields, organize, duplicate, share, rotate, history, _line,
-            addField, addAttachment,
+            editFields, organize, duplicate, share, rotate, generatePassword, history, _line,
+            addField, addAttachment, removeTag,
             Folder(Strings.Field, copyField, replaceField, generateField, renameField, protectField, _line, removeField),
             Folder(Strings.Attachment, saveAttachment, replaceAttachment, _line, removeAttachment),
             Folder(Strings.Revision, copyRevision, restoreRevision),
@@ -365,6 +398,7 @@ internal sealed class AppCommands
             Folder(Strings.Group, renameGroup, moveGroup, _line, deleteGroup),
             Folder(Strings.Trash, restore, restoreAs, purge, _line, emptyTrash),
             Folder(Strings.ShareLinks, checkLinks, revokeLink),
+            Folder(Strings.Recommendations, moveNoteKey, restoreLostTag, openWeakPassword, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
         ]);
 
         var projects = new AppMenuGroup(Strings.Project,
@@ -380,7 +414,7 @@ internal sealed class AppCommands
         [
             agentSettings, connect, connectAgain, disconnect, resetClients, _line,
             showPrompt, endAllowance, endAll, _line,
-            agentHistory, verifyChain, _line,
+            agentHistory, verifyChain, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,
             deleteReport,
         ]);
@@ -582,7 +616,8 @@ internal sealed class AppCommands
     /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
     internal static bool HasContextMenu(object? row) =>
         row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
-            or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow or ActivityRow { Id: not null };
+            or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow or ActivityRow { Id: not null }
+            or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or PairingItem;
 
     /// <summary>
     /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
@@ -615,6 +650,16 @@ internal sealed class AppCommands
                 return Bound(_agentMenu, row);
             case EntryFieldRow when Items() is not null:
                 return Bound(_fieldMenu, row);
+            case EntryTagChip when Items() is not null:
+                return Bound(_tagMenu, row);
+            case RecommendationRow when Recommendations() is not null:
+                return Bound(_noteKeyMenu, row);
+            case LostTagRow when Recommendations() is not null:
+                return Bound(_lostTagMenu, row);
+            case PasswordRow when Recommendations() is not null:
+                return Bound(_weakPasswordMenu, row);
+            case PairingItem when Settings() is not null:
+                return Bound(_pairingMenu, row);
             case EntryAttachmentRow when Items() is not null:
                 return Bound(_attachmentMenu, row);
             case EnvKeyRow { Variable: not null } when Project() is not null:
@@ -666,6 +711,12 @@ internal sealed class AppCommands
     private T? Target<T>()
         where T : class =>
         _context is not null ? _context as T : (Focus() as Visual)?.GetSelfAndVisualAncestors().OfType<StyledElement>().Select(element => element.DataContext).OfType<T>().FirstOrDefault();
+
+    private RecommendationsViewModel? Recommendations() => Unmodal()?.Content as RecommendationsViewModel;
+
+    private IRecommendationRow? Finding() => Recommendations() is not null ? Target<IRecommendationRow>() : null;
+
+    private UnlockViewModel? OpeningScreen() => _host.Shell() is null && !_host.AsksTerms() ? _host.Unlock() : null;
 
     private AgentActivityViewModel? Agents() => Unmodal()?.Content as AgentActivityViewModel;
 

@@ -87,7 +87,7 @@ public sealed class TrashTests : IDisposable
         Assert.True(context.Trash.IsEmpty);
         Assert.Empty(context.Trash.Rows);
         Assert.Equal(TrashViewModel.RecycledNote, context.Trash.Note);
-        Assert.Contains("format 4.1", context.Trash.Note, StringComparison.Ordinal);
+        Assert.DoesNotContain("format 4.1", context.Trash.Note, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -442,7 +442,7 @@ public sealed class TrashTests : IDisposable
         trash.ConfirmEmptyCommand.Press();
 
         Assert.Equal(
-            "The trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.",
+            "The Trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.",
             trash.Error,
             StringComparer.Ordinal);
         Assert.Null(trash.Notice);
@@ -474,7 +474,7 @@ public sealed class TrashTests : IDisposable
 
             Assert.True(trash.IsConfirmingEmpty);
             Assert.Equal(
-                "Delete all 2 items in the trash and their history for good? This cannot be undone.",
+                "Delete all 2 items in the Trash and their history for good? This cannot be undone.",
                 trash.EmptyPrompt,
                 StringComparer.Ordinal);
             Assert.False(trash.PurgeCommand.CanExecute(null));
@@ -490,7 +490,7 @@ public sealed class TrashTests : IDisposable
             trash.EmptyCommand.Press();
             trash.ConfirmEmptyCommand.Press();
 
-            Assert.Equal("The trash is empty. 2 items and their history are gone.", trash.Notice, StringComparer.Ordinal);
+            Assert.Equal("The Trash is empty. 2 items and their history are gone.", trash.Notice, StringComparer.Ordinal);
             Assert.Null(trash.Error);
             Assert.False(trash.IsConfirmingEmpty);
             Assert.True(trash.IsEmpty);
@@ -518,7 +518,7 @@ public sealed class TrashTests : IDisposable
         var trash = context.NewTrash();
         Assert.True(trash.EmptyCommand.CanExecute(null));
         Assert.Equal(
-            "Delete the one item in the trash and its history for good? This cannot be undone.",
+            "Delete the one item in the Trash and its history for good? This cannot be undone.",
             trash.EmptyPrompt,
             StringComparer.Ordinal);
 
@@ -567,7 +567,7 @@ public sealed class TrashTests : IDisposable
 
         trash.RestoreCommand.Press();
 
-        Assert.Equal("production is not in the trash any more. Check the list.", trash.Error, StringComparer.Ordinal);
+        Assert.Equal("production is not in the Trash any more. Check the list.", trash.Error, StringComparer.Ordinal);
         Assert.True(trash.IsEmpty);
     }
 
@@ -622,13 +622,33 @@ public sealed class TrashTests : IDisposable
     /// is still looking at.
     /// </summary>
     [Fact]
+    public void The_format_is_said_once_with_the_delete_that_raises_it()
+    {
+        using var context = new Context(_vaultPath);
+
+        Assert.True(KdbxHeader.IsOlderThan41(_vaultPath));
+        Delete(context, "servers/production");
+
+        Assert.Equal(
+            "Moved servers/production to the Trash. This vault is now saved in the KeePass database format 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.",
+            context.Entries.Notice,
+            StringComparer.Ordinal);
+        Assert.False(KdbxHeader.IsOlderThan41(_vaultPath));
+
+        var other = context.Entries.Rows[0].Path;
+        Delete(context, other);
+
+        Assert.Equal($"Moved {other} to the Trash.", context.Entries.Notice, StringComparer.Ordinal);
+    }
+
+    [Fact]
     public void The_entry_screen_states_the_outcome_and_can_undo_it()
     {
         using (var context = new Context(_vaultPath))
         {
             Delete(context, "servers/production");
 
-            Assert.Equal("Moved servers/production to the trash.", context.Entries.Notice, StringComparer.Ordinal);
+            Assert.StartsWith("Moved servers/production to the Trash.", context.Entries.Notice, StringComparison.Ordinal);
             Assert.True(context.Entries.CanUndo);
             Assert.DoesNotContain(context.Entries.Rows, row => row.Path == "servers/production");
 

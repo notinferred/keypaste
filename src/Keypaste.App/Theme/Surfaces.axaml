@@ -86,6 +86,10 @@
     <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
     <Setter Property="Padding" Value="16,8" />
   </Style>
+  <!-- A table's top head takes its card's curve, or its fill runs through the card's line at the corners. -->
+  <Style Selector="Border.table-head.top, Border.table ItemsControl > ContentPresenter:nth-child(1) Border.table-head">
+    <Setter Property="CornerRadius" Value="10,10,0,0" />
+  </Style>
   <!-- The edge between two heads is a control, so it draws the control edge and changes as one does. -->
   <Style Selector="Border.column-grip-line">
     <Setter Property="Background" Value="{DynamicResource KpBorderControl}" />

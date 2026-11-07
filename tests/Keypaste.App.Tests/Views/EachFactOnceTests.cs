@@ -482,7 +482,7 @@ public sealed class EachFactOnceTests
         RenderedShell.Drain();
 
         Assert.False(shell.Named<Button>("RestoreButton").IsEffectivelyVisible);
-        Assert.Single(Shown<TextBlock>(shell), block => block.Text?.Contains("format 4.1", StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(Shown<TextBlock>(shell), block => block.Text?.Contains("format 4.1", StringComparison.Ordinal) == true);
 
         trash.Selected = Assert.Single(trash.Rows);
         RenderedShell.Drain();

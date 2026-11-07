@@ -173,7 +173,7 @@ public static class AuditText
         // a mark precisely because nothing else about such a line looks unusual.
         if (entries.Any(e => e.ReasonUnread))
         {
-            lines.Add($"{UnreadMark} served from an earlier approval, under a reason that person never saw.");
+            lines.Add($"{UnreadMark} served from an earlier approval, under a reason you never saw.");
         }
 
         if (unreadable > 0)

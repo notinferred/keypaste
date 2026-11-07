@@ -411,7 +411,7 @@ public sealed partial class PlainWordsTests
             Item = "env/billing/.env",
             Changes = ["Adds STRIPE_KEY to billing/dev on env/billing/.env with the value the terminal sent."],
         })));
-        yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another request was already in front of a person"), _ => { }));
+        yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another prompt was already waiting for an answer"), _ => { }));
         yield return ("the locked notice", new LockedNoticeWindow("billing.kdbx", () => { }, TimeProvider.System));
         yield return ("a browser's pairing", new PairingWindow(new PairingViewModel(new PairingPrompt
         {

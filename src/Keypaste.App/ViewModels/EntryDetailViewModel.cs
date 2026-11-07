@@ -90,7 +90,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ConfirmReplaceFieldCommand = new RelayCommand(ConfirmReplaceField, () => ReplacingField is not null);
         CancelReplaceFieldCommand = new RelayCommand(() => ReplacingField = null, () => ReplacingField is not null);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
-        GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => !IsEditing);
+        GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => HasPassword && !IsEditing);
         Generator.PropertyChanged += (_, _) =>
         {
             if (_generatedInto is { IsGenerated: true } field)
@@ -861,7 +861,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MaskedLength), nameof(PasswordMask), nameof(HasPassword), nameof(HasStandardRows))]
-    [NotifyCanExecuteChangedFor(nameof(CopyPasswordCommand), nameof(RotateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CopyPasswordCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand))]
     internal partial int PasswordLength { get; private set; }
 
     internal bool HasUsername => Username.Length > 0;
@@ -899,7 +899,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
-    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand))]
     internal partial bool IsEditing { get; private set; }
 
     [ObservableProperty]
@@ -1086,14 +1086,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [RelayCommand(CanExecute = nameof(OpensUrl))]
     private async Task OpenUrlAsync()
     {
-        if (Filled(vault => vault.FillPlaceholders(Name, Url), "The web address", "opened") is not { } url)
+        if (Filled(vault => vault.FillPlaceholders(Name, Url), "The URL", "opened") is not { } url)
         {
             return;
         }
 
         if (!WebAddress.TryOpenable(url, out var address))
         {
-            Report("Filled in, the web address is not one keypaste opens, so it was not opened. Copy it to use it.");
+            Report("Filled in, the URL is not one keypaste opens, so it was not opened. Copy it to use it.");
             return;
         }
 
@@ -1106,7 +1106,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     }
 
     private async Task CopyUrlAsync() =>
-        await CopyFilledAsync(Url, "The web address", "Web address").ConfigureAwait(true);
+        await CopyFilledAsync(Url, "The URL", "URL").ConfigureAwait(true);
 
     /// <summary>Copies a field that is not a secret as it leaves keypaste; once it filled in another field it may carry one, so it gets the countdown.</summary>
     private async Task CopyFilledAsync(string stored, string what, string label)

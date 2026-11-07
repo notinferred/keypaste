@@ -200,7 +200,7 @@ public sealed class SharingViewModelTests : IDisposable
 
         await screen.CreateCommand.PressAsync();
 
-        Assert.Equal("The share server could not be reached.", screen.Unavailable);
+        Assert.Equal("keypaste.com could not be reached.", screen.Unavailable);
         Assert.False(screen.CreateCommand.CanExecute(null));
         Assert.Null(_clipboard.Content);
         Assert.Empty(_toasts);
@@ -319,7 +319,7 @@ public sealed class SharingViewModelTests : IDisposable
         screen.Selected = Assert.Single(screen.Rows);
         await screen.RevokeCommand.PressAsync();
 
-        Assert.Equal("The share server could not be reached. The link still opens.", screen.Error);
+        Assert.Equal("keypaste.com could not be reached. The link still opens.", screen.Error);
         Assert.Single(screen.Rows);
         Assert.Single(_server.Shares);
     }

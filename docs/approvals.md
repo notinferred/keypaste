@@ -122,7 +122,7 @@ keypaste: a change would give an agent more.
 When the change `a` asked for does not take effect, for any reason but your `d`, a line after the release says so and why, and gives the command that asks for it again, naming this terminal's vault and pipe when `keypaste clients` would not find them by itself:
 
 ```
-keypaste: allowed once. billing:dev was not made Automatic for claude-code: another request was already in front of a person. To ask for it again: keypaste clients claude-code --project billing:dev --mode automatic
+keypaste: allowed once. billing:dev was not made Automatic for claude-code: another prompt was already waiting for an answer. To ask for it again: keypaste clients claude-code --project billing:dev --mode automatic
 ```
 
 When a name in that command is one a shell would act on, or would read as an option, the line says only that `keypaste clients` can ask for it again.
