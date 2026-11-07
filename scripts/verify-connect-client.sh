@@ -237,7 +237,7 @@ clean_config "$CONFIG"
 say '^prompt client' check
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CLAUDE entry=env/ci/DEPLOY_KEY field=password" \
   || die "the prompt does not show the check, the tool's id and the one item its settings let it see"
-say '^check end' approve
+say '^check end' once
 case "$(last_check)" in
   "Connected: you approved env/ci/DEPLOY_KEY"*) ;;
   *) die "the check did not report the approval: $(last_check)" ;;
@@ -385,7 +385,7 @@ grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an item an agent
 say '^prompt client' pick 2
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CURSOR_ID entry=env/beta/.env field=BETA_KEY" \
   || die "the prompt is not Cursor's registration asking for the picked item's variable"
-say '^check end' approve
+say '^check end' once
 case "$(last_check)" in
   "Connected: you approved env/beta/.env"*) ;;
   *) die "the check through Cursor's registration did not report the approval: $(last_check)" ;;

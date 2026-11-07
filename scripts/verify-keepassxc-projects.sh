@@ -683,7 +683,7 @@ app_run() {
   return 0
 }
 app_run dev 'keys=DATABASE_URL,STRIPE_SECRET_KEY entries=services/Database,services/Stripe' \
-  approve "$dev_set" billing
+  once "$dev_set" billing
 app_run staging 'keys=SHARED_KEY entries=services/Shared' \
   once "$shared_set" billing -p staging
 grep -qF -- '-c1b' "$hold_out" && die "a value reached the app's output"
