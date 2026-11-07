@@ -11,7 +11,7 @@ The founder decided on 2026-11-07, after review:
 - Items keep Always allow, per agent and item, the item's live TOTP codes included, as built: this is the founder's choice. A row has no end time.
 - Commands lose per-command Always allow entirely: a run's prompt, the agent's `run` tool's and `keypaste run --session`'s, offers Deny and Allow once only. The command rows are removed as code: the `commands` member of `always`, the command identity and `RunProgram.FinalTarget`, their rows in Agents, `--forget` for a command, their confirmation and strings.
 - A third agent mode, in the founder's words "an agent can get bypass permissions or auto mode like claude code's options": it releases what the agent can see as Automatic does and also runs its commands without asking. Protected environments are asked every time with Allow once only in every mode, a command's set included; it needs May run commands on, which the pane says rather than hiding the choice; Automatic's end time and hourly limit apply to it and a reached limit asks with Deny and Allow once; choosing it is a widening the access-change confirmation must allow, saying the agent can then run commands with these values without asking and that keypaste approves nothing about what those commands do (T-35); an agent's own `request_access_change` may ask for it; its releases and runs are their own audit kind. It is a scope change to PRODUCT's commands law, in the v1.23 draft.
-- Restoring one of two same-named items from Trash restores it under its own name, and Trash rows of such a pair show their group (F.75's follow-ups).
+- Restoring one of two same-named items from Trash restores it under its own name, and Trash rows of such a pair show their group (F.75's follow-ups). The first is done. The second is not: Trash rows already show their group at every width, and a pair as F.75 defines it shares its group and title, so both rows read the same; telling them apart needs the founder's choice of the item's own username or URL (which `RecycledEntry` does not carry, as it carries no field value), the deletion time to the second, or leaving it.
 - DESIGN-PRINCIPLES' "every grant names its duration" becomes "every allow says how long it lasts".
 - The terminal's list names an item by its UUID, not its name: a vault's item names are not sent over the pipe to `keypaste clients`, which any program of the person's can run.
 
@@ -19,7 +19,9 @@ The founder decided on 2026-11-07, after review:
 
 An item's prompt, in the app and at `keypaste approve`, offers Deny, Allow once and Always allow. Always allow allows the request once and opens the access-change confirmation, answered before the value leaves; only once the person confirms does anything beyond that release hold. For an entry in one project environment it keeps its wider scope, making that row Automatic. For any other it writes a row, by the item's UUID, for that agent. A run's prompt offers Deny and Allow once. Protected items stay asked every time, a tag added after the row included. An agent's settings on Agents list what is always allowed, project rows set to Automatic included, each with a Remove. Each release under a row is logged as `always-allowed`, never `prompt`.
 
-Modes are Ask every time, Automatic, and Automatic with commands, which also starts the agent's runs unasked when every value of the run is its own Automatic release, and is logged as `automatic-commands`.
+Modes are Ask every time, Automatic, and Automatic with commands, which also starts the agent's runs unasked when it may run commands and every item of the run's set is Automatic with commands for it, none protected, no limit reached and no refusal cooling; its releases and runs are logged as `automatic-commands`. The app's mode control, `keypaste clients --mode`, the pipe and `request_access_change` take it, and its confirmation, in the app and at `keypaste approve`, says "<agent> can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do."
+
+A restore from Trash, of one of a same-named pair or onto a name KeePassXC took meanwhile, comes back under its own title beside the other, so Restore as and its `(restored)` titles are gone.
 
 Timed allowing is gone as code: `Approved`, `GrantCache`, `EnvGrantCache`, `GrantId`, `--max-ttl`, `ttl_seconds`, the Allowances list, `[h]`, `keypaste grants` and its pipe messages, and the timed mode. A stored `allow-for-a-while` reads as Ask every time, a change rewrites it to `ask`, and the CLI, the pipe and the tool refuse it as a new setting. The default mode is ask.
 
@@ -29,6 +31,12 @@ Storage is a new optional member, `always`, holding `items`, in the agent's `aca
 
 - **The third mode is named "Automatic with commands"**, beside "Ask every time" and "Automatic", so the difference reads in its name; its word in ACAF, `clients.toml` and the CLI is `automatic-commands`, ordered `ask` < `automatic` < `automatic-commands` for the least-of rule, and its audit method is `automatic-commands` for its releases and its runs alike.
 - **A v1.1 reader meeting `automatic-commands`** reads `mode` as `ask`, or a project row holding it as no rows, as v1.1 says of a mode or row it does not understand, and applies that record beneath the defaults, so the word never gives that reader more. keypaste's own reader fails closed the same way on any mode word it does not have.
+- **A run spends one release of each limit its items fall under**, not one per value, as one release of a set; a run's set with no items takes the agent's own mode.
+- **A project row is offered Automatic with commands only where it already holds it**; the agent's own mode always is. The CLI and the pipe accept it for a row.
+- **With nothing holding the vault, only `--mode ask` applies as a lowering.** Before, the one other mode was the top one; now Automatic can be wider than what the vault gives, which this computer cannot read.
+- **A `clients.toml` ceiling written as `automatic`** now holds that agent beneath Automatic with commands; no ceiling at all is the new top.
+- **The run prompt says why it asks** when Automatic with commands would otherwise have started it: a protected environment, or a reached limit.
+- **Restore as is removed**, since a restore now keeps its title in every case it offered one; `verify-keepassxc-workflows.sh` and `verify-keepassxc-recyclebin.sh` now expect the pair, and neither runs before `main`.
 - **A reached Automatic limit offers Deny and Allow once only**, as the founder's task says, since an Always there would bypass a limit the person set. An existing row does not answer such a request either.
 - **`always` is a member of the record, not a second field of the entry.** A second field would leave a 1.1 reader's reading whole, but needs its own read, write, undo, duplicate handling and saved-state comparison in the store. A member needs none, and a 1.1 reader tolerates it as its text requires: it keeps it and applies that record only beneath the defaults, which takes away and never widens. No published keypaste reads ACAF, so that reader is so far theoretical. The founder may prefer the field.
 - **Keeping `"acaf": 1`.** A value other than `1` makes a 1.1 writer refuse to rewrite the record.
@@ -65,5 +73,8 @@ These await the founder's review:
 Runs: TBD
 
 ## Open
+
+- `ApproverProtocol`'s always-not-shown count can no longer be reached: once project rows are left out, 256 item UUIDs always fit one reply. It stays, untested by a reply that needs it.
+- The bridge's bound on a run stays two windows, which T-10 states; a run no longer has a confirmation after its prompt, so one window would do.
 
 `THREATS.md` names three tests that do not exist, on `main` too: `EnvTagVerbTests.Tag_names_an_agent_set_to_Automatic_there_before_asking`, `RunSessionTests.A_command_the_prompt_cannot_show_whole_is_refused_and_recorded_by_the_owner` and `VerbTests.Get_ClipboardChangedSinceTheCopy_IsLeftAlone`. `DesktopApprovalTests.A_custom_field_is_named_on_the_prompt_and_allowing_it_answers_no_other_field` failed once locally, at the prompt that never came, with its class beside others and passed alone; it asked again before the previous release's reply had come back, so it now waits for that reply.
