@@ -252,17 +252,17 @@ public sealed record AccessChangePrompt
             AccessDimension.Mode when decided.Mode == AgentMode.Automatic && !decided.Limit.IsNone =>
                 $"{where}: {Automatic(decided.Limit, zone)}: released without asking, recorded in history",
             AccessDimension.Mode when decided.Mode == AgentMode.AutomaticCommands && !decided.Limit.IsNone =>
-                $"{where}: {Automatic(decided.Limit, zone)} with commands: released and commands run without asking, recorded in history",
+                $"{where}: {Automatic(decided.Limit, zone, "Automatic with commands")}: released and commands run without asking, recorded in history",
             AccessDimension.Mode => $"{where}: {Words(decided.Mode)}",
-            _ => $"{where}: {Automatic(decided.Limit, zone)}",
+            _ => $"{where}: {Automatic(decided.Limit, zone, decided.Mode == AgentMode.AutomaticCommands ? "Automatic with commands" : "Automatic")}",
         };
     }
 
-    /// <summary>Automatic with its limit, such as <c>Automatic until 2026-12-31 23:59 +02:00, at most 20 an hour</c>.</summary>
-    private static string Automatic(AccessLimit limit, TimeZoneInfo zone) => limit switch
+    /// <summary>An Automatic mode with its limit, such as <c>Automatic until 2026-12-31 23:59 +02:00, at most 20 an hour</c>.</summary>
+    private static string Automatic(AccessLimit limit, TimeZoneInfo zone, string mode = "Automatic") => limit switch
     {
-        { IsNone: true } => "Automatic with no limit",
-        { Until: not null } => $"Automatic {Words(limit, zone)}",
-        _ => $"Automatic, {Words(limit, zone)}",
+        { IsNone: true } => $"{mode} with no limit",
+        { Until: not null } => $"{mode} {Words(limit, zone)}",
+        _ => $"{mode}, {Words(limit, zone)}",
     };
 }

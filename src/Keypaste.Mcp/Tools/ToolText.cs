@@ -84,9 +84,9 @@ internal static class ToolText
         Asks for a change to this agent's own keypaste settings: what it can see (see), whether it is
         handed values (values), whether it may ask to run commands (run), and its mode (mode), for this
         agent as a whole or for one project or environment (project). The modes are ask (the person is
-        asked every time) and automatic (what this agent can see is released without asking, and still
-        recorded). Commands are asked about unless the person chose Always allow on that exact command.
-        Automatic can end at a time (until) and be held to at most so many values an hour (per_hour);
+        asked every time), automatic (what this agent can see is released without asking, and still
+        recorded; each command is still asked about) and automatic-commands (as automatic, and the
+        commands it runs start without asking too). Either Automatic can end at a time (until) and be held to at most so many values an hour (per_hour);
         past either, the person is asked again. When you ask for automatic, ask for the shortest time
         your task needs, and the person sees that limit before confirming.
 

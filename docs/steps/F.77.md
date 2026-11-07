@@ -35,6 +35,8 @@ Storage is a new optional member, `always`, holding `items`, in the agent's `aca
 - **A project row is offered Automatic with commands only where it already holds it**; the agent's own mode always is. The CLI and the pipe accept it for a row.
 - **With nothing holding the vault, only `--mode ask` applies as a lowering.** Before, the one other mode was the top one; now Automatic can be wider than what the vault gives, which this computer cannot read.
 - **A `clients.toml` ceiling written as `automatic`** now holds that agent beneath Automatic with commands; no ceiling at all is the new top.
+- **The mode control wraps** where the pane is too narrow for three segments on one line, as at 150% zoom, rather than cutting "Automatic with commands"; the other segmented controls keep one line.
+- **The confirmation's commands sentence is said wherever the change lets the agent run commands unasked**: setting the mode with May run commands on, or turning May run commands on under the mode. Setting the mode with it off says only what Automatic says, and the pane says it runs nothing until it is on.
 - **The run prompt says why it asks** when Automatic with commands would otherwise have started it: a protected environment, or a reached limit.
 - **Restore as is removed**, since a restore now keeps its title in every case it offered one; `verify-keepassxc-workflows.sh` and `verify-keepassxc-recyclebin.sh` now expect the pair, and neither runs before `main`.
 - **A reached Automatic limit offers Deny and Allow once only**, as the founder's task says, since an Always there would bypass a limit the person set. An existing row does not answer such a request either.

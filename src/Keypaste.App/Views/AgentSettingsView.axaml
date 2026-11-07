@@ -43,6 +43,10 @@
     <ItemsPanelTemplate x:Key="Segments">
       <StackPanel Orientation="Horizontal" />
     </ItemsPanelTemplate>
+    <!-- The mode's three segments wrap where the pane is too narrow for them on one line, as at 150% zoom. -->
+    <ItemsPanelTemplate x:Key="WrappingSegments">
+      <WrapPanel Orientation="Horizontal" />
+    </ItemsPanelTemplate>
   </UserControl.Resources>
 
   <UserControl.DataTemplates>
@@ -71,7 +75,7 @@
       <TextBlock Grid.Row="0" Classes="label" Text="{x:Static res:Strings.Mode}" Margin="0,6,0,0" />
       <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
         <Border Classes="segmented">
-          <ItemsControl Name="ModeChoices" ItemsSource="{Binding ModeChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
+          <ItemsControl Name="ModeChoices" ItemsSource="{Binding ModeChoices}" ItemsPanel="{StaticResource WrappingSegments}" ItemTemplate="{StaticResource Segment}" />
         </Border>
         <TextBlock Classes="caption" Text="{Binding ModeNote}" TextWrapping="Wrap" />
         <TextBlock Name="ModeRunNote" Classes="caption" Text="{Binding ModeRunNote}" TextWrapping="Wrap" IsVisible="{Binding HasModeRunNote}" />

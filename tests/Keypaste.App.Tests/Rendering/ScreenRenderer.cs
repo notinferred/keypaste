@@ -1572,7 +1572,9 @@ public sealed class ScreenRenderer
         DrawWindow(
             new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
                 "work laptop",
-                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Mode = AgentMode.AutomaticCommands, Run = true }),
+                AccessChange.Classify(
+                    EffectiveAccess.Create("work laptop", new AgentRecords(SavedRead.Current, [new AcafRead(AgentAccess.Defaults with { Run = true }, Understood: true, Rewritable: true)], []), AccessCaps.Empty),
+                    AgentAccess.Defaults with { Mode = AgentMode.AutomaticCommands, Run = true }),
                 AccessOrigin.Settings,
                 string.Empty,
                 TimeZoneInfo.Utc))),

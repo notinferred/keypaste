@@ -58,7 +58,7 @@ public sealed class EffectiveAccess
     /// <summary>Whether the agent is given values; when not, values reach only commands it runs.</summary>
     public bool Values { get; }
 
-    /// <summary>Whether the agent's settings let it run commands, each of which still asks unless the person chose Always allow on it.</summary>
+    /// <summary>Whether the agent's settings let it run commands, each of which still asks unless its mode is Automatic with commands.</summary>
     public bool Run { get; }
 
     /// <summary>The settings whose least applies.</summary>

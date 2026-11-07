@@ -65,7 +65,7 @@ public sealed record AgentAccess
     /// <summary>Whether it is given values; when not, values reach only commands it runs.</summary>
     public bool Values { get; init; } = true;
 
-    /// <summary>Whether it may run commands, each of which still asks unless the person chose Always allow on it.</summary>
+    /// <summary>Whether it may run commands, each of which still asks unless its mode is Automatic with commands.</summary>
     public bool Run { get; init; }
 
     /// <summary>Its mode where no row covers an item.</summary>
@@ -105,7 +105,7 @@ public sealed record AgentAccess
         }
     }
 
-    /// <summary>The items and exact commands the person chose Always allow on.</summary>
+    /// <summary>The items the person chose Always allow on.</summary>
     public AlwaysAllowed Always
     {
         get => _always;
