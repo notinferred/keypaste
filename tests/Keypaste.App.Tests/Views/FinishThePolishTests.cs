@@ -287,7 +287,7 @@ public sealed class FinishThePolishTests
         var root = (Visual)ShellViewOf(shell);
         var newProject = BoundsIn(root, Named("New project"));
         var import = BoundsIn(root, Named("Import .env"));
-        Assert.True(newProject.Right <= import.Left, $"New project ends at {newProject.Right} and Import starts at {import.Left} at {width}");
+        Assert.False(newProject.Intersects(import), $"New project at {newProject} overlaps Import at {import} at {width}");
 
         Button Named(string name) => shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);
     });

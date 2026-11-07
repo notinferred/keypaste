@@ -32,6 +32,8 @@ internal sealed record EnvMemberRow(EntryName Entry, string Environment, IReadOn
 {
     internal string Display => ApprovalPrompt.Shown(Entry);
 
+    internal bool HasKeys => Keys.Count > 0;
+
     internal string KeysText => Keys.Count == 0
         ? "No variables"
         : string.Join(", ", Keys.Select(key => EntryNameSanitizer.Sanitize(key).Text));

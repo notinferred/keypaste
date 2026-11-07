@@ -26,13 +26,13 @@
       <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
 
       <StackPanel Spacing="4" HorizontalAlignment="Center">
-        <TextBlock Classes="prompt-title" Text="keypaste" HorizontalAlignment="Center" />
+        <TextBlock Classes="prompt-title size-16" Text="keypaste" HorizontalAlignment="Center" />
         <TextBlock Name="VersionText" Classes="mono" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
 
       <StackPanel Spacing="2" HorizontalAlignment="Center">
-        <TextBlock Name="CopyrightText" Classes="prompt-note" HorizontalAlignment="Center" TextAlignment="Center" />
-        <TextBlock Classes="prompt-note" HorizontalAlignment="Center" TextAlignment="Center"
+        <TextBlock Name="CopyrightText" Classes="prompt-note size-13" HorizontalAlignment="Center" TextAlignment="Center" />
+        <TextBlock Classes="prompt-note size-13" HorizontalAlignment="Center" TextAlignment="Center"
                    Text="{x:Static res:Strings.FreeSoftwareUnderTheGNUAfferoGeneralXba93e5}" />
       </StackPanel>
 

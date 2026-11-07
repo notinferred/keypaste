@@ -31,39 +31,39 @@
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="8">
         <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
           <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
           <Border Grid.Column="0" Classes="prompt-tile">
-            <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+            <ctl:KpIcon Icon="terminal" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
           </Border>
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-            <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
+            <TextBlock Name="TitleText" Classes="prompt-title size-16" Text="{Binding Title}" />
             <DockPanel HorizontalAlignment="Left">
-              <TextBlock DockPanel.Dock="Left" Classes="prompt-sub" Text="project " />
-              <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}" />
+              <TextBlock DockPanel.Dock="Left" Classes="prompt-sub size-13" Text="project " />
+              <TextBlock Name="ProjectText" Classes="prompt-sub size-13" Text="{Binding Project}" />
             </DockPanel>
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <Border Classes="dot waiting" />
-            <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+            <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
           </StackPanel>
         </Grid>
 
         <Grid Classes="prompt-environment" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="prompt-sub" Text="environment" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment" Text="{Binding Profile}" />
+          <TextBlock Grid.Column="0" Classes="prompt-sub size-13" Text="environment" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment size-12-5" Text="{Binding Profile}" />
         </Grid>
       </StackPanel>
 
-      <TextBlock Name="RequesterText" Classes="prompt-sub" TextTrimming="CharacterEllipsis"
+      <TextBlock Name="RequesterText" Classes="prompt-sub size-13" TextTrimming="CharacterEllipsis"
                  Text="{Binding Requester, StringFormat='asked by {0}'}"
                  IsVisible="{Binding Requester, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-      <Border Classes="prompt-call" Height="58">
+      <Border Classes="prompt-call size-12" Height="58">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="12,10" Spacing="2">
-            <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+          <StackPanel Margin="12,8" Spacing="2">
+            <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
                        IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <Grid ColumnDefinitions="36,*" RowDefinitions="Auto,Auto">
               <TextBlock Grid.Row="0" Grid.Column="0" Text="run" />
@@ -77,7 +77,7 @@
 
       <!-- The names, one row each with its tag. A name wraps rather than ending in an ellipsis: two
            long names that share a prefix must still read as two different variables. -->
-      <Border Classes="prompt-list" Height="110">
+      <Border Classes="prompt-list size-12-5" Height="110">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel>
             <ItemsControl Name="KeysList" ItemsSource="{Binding Keys}">
@@ -86,7 +86,7 @@
                   <Border Classes="prompt-row" MinHeight="36" Padding="12,6">
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
                       <TextBlock Classes="key" Text="{Binding Key}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="1" Classes="tag" Text="inject only" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="tag size-13" Text="inject only" VerticalAlignment="Center" />
                       <TextBlock Grid.Row="1" Classes="entry size-12" Text="{Binding Entry}" TextWrapping="Wrap"
                                  IsVisible="{Binding Entry, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>
@@ -95,17 +95,17 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <TextBlock Name="NoKeysText" Text="(none)" Margin="12,8" IsVisible="{Binding HasNoKeys}" />
-            <TextBlock Name="FileLinesText" Classes="tag size-12" Text="{Binding FileLines}" TextWrapping="Wrap"
+            <TextBlock Name="FileLinesText" Classes="tag size-13" Text="{Binding FileLines}" TextWrapping="Wrap"
                        Margin="12,8"
                        IsVisible="{Binding FileLines, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
         </ScrollViewer>
       </Border>
 
-      <TextBlock Classes="prompt-note"
+      <TextBlock Classes="prompt-note size-13"
                  Text="The command is what the run says it will start. Allow only a run you started: every value goes into its environment." />
 
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="8">
         <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
           <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                   IsCancel="True" Command="{Binding DenyCommand}" />

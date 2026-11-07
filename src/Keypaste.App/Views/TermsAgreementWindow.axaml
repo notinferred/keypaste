@@ -31,7 +31,7 @@
                    TextWrapping="Wrap"
                    LineHeight="21"
                    Text="{x:Static res:Strings.ContinuingAgreesToTheTermsOfUse}" />
-        <TextBlock Classes="prompt-note" Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
+        <TextBlock Classes="prompt-note size-13" Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
       </StackPanel>
 
       <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Left" />

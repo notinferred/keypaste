@@ -8,7 +8,6 @@
 
   <UserControl.Styles>
     <Style Selector="TextBlock.status">
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
@@ -25,7 +24,6 @@
       <Setter Property="Height" Value="24" />
       <Setter Property="Padding" Value="8,0" />
       <Setter Property="Margin" Value="0,-4" />
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
     <Style Selector="Button.row-action.quiet /template/ ContentPresenter#PART_ContentPresenter">
@@ -40,7 +38,7 @@
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <!-- The design's max-width 1080, left-aligned: the star column fills up to it. -->
-    <Grid Margin="32,12,32,28">
+    <Grid Margin="32,12,32,24">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
         <ColumnDefinition Width="Auto" />
@@ -65,14 +63,14 @@
                     Command="{Binding RefreshCommand}"
                     AutomationProperties.Name="{x:Static res:Strings.CheckStatus}">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="refresh-cw" Size="13" Classes.spinning="{Binding RefreshCommand.IsRunning}" />
+                <ctl:KpIcon Icon="refresh-cw" Size="14" Classes.spinning="{Binding RefreshCommand.IsRunning}" />
                 <TextBlock Text="{x:Static res:Strings.CheckStatus}" IsVisible="{Binding !RefreshCommand.IsRunning}" />
                 <TextBlock Text="{x:Static res:Strings.CheckingStatus}" IsVisible="{Binding RefreshCommand.IsRunning}" />
               </StackPanel>
             </Button>
           </Grid>
 
-          <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,14">
+          <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,12">
             <TextBlock Classes="caption"
                        Text="{x:Static res:Strings.NoLinksYetChooseShareInAnX8aa94b}" />
           </Border>
@@ -86,12 +84,12 @@
             <ItemsControl ItemsSource="{Binding Rows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:SharingRow">
-                  <Border Padding="16,14"
+                  <Border Padding="16,12"
                           BorderBrush="{DynamicResource KpBorderSubtle}"
                           BorderThickness="0,0,0,1">
                     <Panel>
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}">
-                      <TextBlock Name="RevokeQuestion" Text="{Binding ConfirmText}" Classes="size-12-5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Name="RevokeQuestion" Text="{Binding ConfirmText}" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" />
                       <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}" />
                       <Button Grid.Column="2" Name="ConfirmRevoke" Classes="danger sm size-12" Content="{x:Static res:Strings.RevokeLink}" AutomationProperties.Name="{Binding What, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
@@ -100,23 +98,23 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4" IsVisible="{Binding !IsConfirming}">
                       <TextBlock Grid.Row="0" Grid.Column="0"
-                                 Classes="mono lg"
+                                 Classes="mono size-13"
                                  Text="{Binding What}"
                                  TextTrimming="CharacterEllipsis"
                                  ToolTip.Tip="{Binding What}" />
                       <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6"
                                   HorizontalAlignment="Right">
                         <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}" />
-                        <TextBlock Classes="status" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}"
+                        <TextBlock Classes="status size-12" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}"
                                    Text="{Binding Status}" />
                       </StackPanel>
                       <TextBlock Grid.Row="1" Grid.Column="0"
-                                 Classes="size-12"
+                                 Classes="size-13"
                                  Foreground="{DynamicResource KpTextMuted}"
                                  Text="{Binding Detail}"
                                  TextTrimming="CharacterEllipsis" />
                       <Button Grid.Row="1" Grid.Column="1"
-                              Classes="row-action"
+                              Classes="row-action size-12"
                               Classes.danger="{Binding Opens}"
                               Classes.quiet="{Binding !Opens}"
                               Content="{Binding RevokeLabel}"

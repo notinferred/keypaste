@@ -8,19 +8,17 @@
 
   <UserControl.Styles>
     <Style Selector="TextBlock.fact">
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
     <Style Selector="SelectableTextBlock.fact-value">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,28" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+    <StackPanel Margin="32,12,32,24" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
       <StackPanel Spacing="6">
         <TextBlock Classes="h1" Text="{x:Static res:Strings.Diagnostics}" />
         <TextBlock Classes="subtitle" Text="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXa37320}" />
@@ -28,16 +26,16 @@
 
       <Border Classes="card filled" Padding="20,16">
         <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
-          <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.Vault}" />
-          <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value" Text="{Binding VaultPath}" />
-          <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.KeypasteHome}" />
-          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="fact-value" Text="{Binding HomePath}" />
-          <TextBlock Grid.Row="2" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.KEYPASTEHOMECapitals}" FontFamily="{DynamicResource KpMono}" />
-          <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value" Text="{Binding HomeOverride}" />
-          <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact" Text="{x:Static res:Strings.Version}" />
-          <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value" Text="{Binding Version}" />
-          <TextBlock Grid.Row="4" Grid.Column="0" Classes="fact" TextWrapping="Wrap" Text="{x:Static res:Strings.AnsweringAgents}" />
-          <SelectableTextBlock Name="AnsweringAgents" Grid.Row="4" Grid.Column="1" Classes="fact-value" Text="{Binding AnsweringAgents}" />
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.Vault}" />
+          <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value size-12" Text="{Binding VaultPath}" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.KeypasteHome}" />
+          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="fact-value size-12" Text="{Binding HomePath}" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Classes="mono muted size-12" Text="{x:Static res:Strings.KEYPASTEHOMECapitals}" />
+          <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value size-12" Text="{Binding HomeOverride}" />
+          <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.Version}" />
+          <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value size-12" Text="{Binding Version}" />
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="fact size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.AnsweringAgents}" />
+          <SelectableTextBlock Name="AnsweringAgents" Grid.Row="4" Grid.Column="1" Classes="fact-value size-12" Text="{Binding AnsweringAgents}" />
         </Grid>
       </Border>
 
@@ -55,13 +53,13 @@
                 <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,12">
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                      <SelectableTextBlock Grid.Column="0" Classes="fact-value" Text="{Binding Json}" />
+                      <SelectableTextBlock Grid.Column="0" Classes="fact-value size-12" Text="{Binding Json}" />
                       <Button Grid.Column="1" Classes="sm ghost" Content="{x:Static res:Strings.Delete}" VerticalAlignment="Top"
                               IsVisible="{Binding !IsConfirming}"
                               Command="{Binding AskDeleteCommand}" />
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelDeleteCommand}">
-                      <TextBlock Text="{x:Static res:Strings.DeleteThisReportItWontBeSent}" Classes="size-12-5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Text="{x:Static res:Strings.DeleteThisReportItWontBeSent}" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" />
                       <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
                       <Button Grid.Column="2" Name="ConfirmDeleteReport" Classes="danger sm size-12" Content="{x:Static res:Strings.DeleteReport}" Command="{Binding DeleteCommand}" />
                     </Grid>

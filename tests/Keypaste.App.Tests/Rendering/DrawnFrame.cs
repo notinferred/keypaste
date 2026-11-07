@@ -20,7 +20,7 @@ internal readonly record struct TextStyle(Typeface Typeface, double Size, double
     internal static TextStyle Of(RevealedValue cell) => new(new Typeface(cell.FontFamily), cell.FontSize);
 
     internal static TextStyle Of(TextBlock block) =>
-        new(new Typeface(block.FontFamily, block.FontStyle, block.FontWeight, block.FontStretch), block.FontSize);
+        new(new Typeface(block.FontFamily, block.FontStyle, block.FontWeight, block.FontStretch), block.FontSize, block.LetterSpacing);
 }
 
 /// <summary>

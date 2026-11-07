@@ -15,7 +15,7 @@ namespace Keypaste.App.Views;
 internal sealed class DepthToIndent : IValueConverter
 {
     /// <summary>How far one level of nesting moves a row.</summary>
-    internal const double Step = 14d;
+    internal const double Step = 16d;
 
     /// <summary>The only one there needs to be.</summary>
     internal static DepthToIndent Instance { get; } = new();

@@ -258,7 +258,6 @@
   <data name="Link" xml:space="preserve"><value>Link</value></data>
   <data name="LinkTheKeypasteCommand" xml:space="preserve"><value>Link the keypaste command</value></data>
   <data name="LinksYouMadeFromAnItemsMenuXfaa446" xml:space="preserve"><value>Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it.</value></data>
-  <data name="Lock" xml:space="preserve"><value>lock</value></data>
   <data name="LockAndOpen" xml:space="preserve"><value>Lock and open</value></data>
   <data name="LockLabel" xml:space="preserve"><value>Lock</value></data>
   <data name="LockNow" xml:space="preserve"><value>Lock now</value></data>

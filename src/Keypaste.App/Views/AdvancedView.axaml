@@ -11,25 +11,20 @@
       <Setter Property="Padding" Value="0" />
     </Style>
     <Style Selector="Border.settings-row">
-      <Setter Property="Padding" Value="20,14" />
+      <Setter Property="Padding" Value="20,12" />
     </Style>
     <Style Selector="Border.settings-row:nth-child(n+2)">
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
     </Style>
     <Style Selector="TextBlock.row-label">
-      <Setter Property="FontSize" Value="13.5" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
-    <Style Selector="TextBlock.caption">
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="LineHeight" Value="18.75" />
     </Style>
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,28" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+    <StackPanel Margin="32,12,32,24" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
       <StackPanel Spacing="6">
         <TextBlock Classes="h1" Text="{x:Static res:Strings.Advanced}" />
         <TextBlock Classes="subtitle" Text="{x:Static res:Strings.WhatTheEverydayScreensLeaveOutEachX739fe5}" />
@@ -40,7 +35,7 @@
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ActivityLog}" />
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ActivityLog}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="{x:Static res:Strings.EveryAgentRequestAllowanceTokenRunAndX73000f}" />
               </StackPanel>
@@ -52,7 +47,7 @@
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ShareLinks}" />
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ShareLinks}" />
                 <TextBlock Name="ShareLinksNote" Classes="caption" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
               </StackPanel>
               <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
@@ -63,7 +58,7 @@
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.ScopedTokens}" />
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ScopedTokens}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="{x:Static res:Strings.LetAScriptOrCIJobRunX39c663}" />
               </StackPanel>
@@ -75,7 +70,7 @@
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
               <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.Diagnostics}" />
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Diagnostics}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXee7732}" />
               </StackPanel>

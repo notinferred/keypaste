@@ -14,8 +14,7 @@
     <Style Selector="Button.choice">
       <Setter Property="Height" Value="28" />
       <Setter Property="MinHeight" Value="28" />
-      <Setter Property="Padding" Value="10,0" />
-      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Padding" Value="12,0" />
     </Style>
     <Style Selector="Button.choice.chosen /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
@@ -23,7 +22,7 @@
     </Style>
     <!-- Tighter than the log's filter, so three modes stay on one line beside the sidebar in the narrowest column the panel gets. -->
     <Style Selector="ToggleButton.segment">
-      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Padding" Value="6,2" />
     </Style>
   </UserControl.Styles>
 
@@ -36,7 +35,7 @@
                          CommandParameter="{Binding}"
                          AutomationProperties.Name="{Binding Words}">
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <ctl:KpIcon Icon="check" Size="13" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
+          <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
           <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
         </StackPanel>
       </ctl:ChoiceSegment>
@@ -54,7 +53,7 @@
               CommandParameter="{Binding}"
               AutomationProperties.Name="{Binding Words}">
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <ctl:KpIcon Icon="check" Size="13" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
+          <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
           <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
@@ -67,7 +66,7 @@
 
     <TextBlock Name="SettingsProblem" Classes="body danger" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
 
-    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="14">
+    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="12">
 
       <TextBlock Grid.Row="0" Classes="label" Text="{x:Static res:Strings.Mode}" Margin="0,6,0,0" />
       <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
@@ -107,7 +106,7 @@
     <!-- An Expander, so a screen reader hears it open or closed. It will not close while anything inside is set: a setting never looks unset. -->
     <Expander Name="MoreSettings" Header="{x:Static res:Strings.More}" IsExpanded="{Binding IsMoreOpen, Mode=TwoWay}"
               AutomationProperties.Name="{x:Static res:Strings.MoreSettingsGivingValuesPatternsProjectRowsX451a25}">
-      <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="14">
+      <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="12">
 
         <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Name="MoreHeldOpen" Classes="caption" TextWrapping="Wrap"
                    IsVisible="{Binding IsMoreHeldOpen}" Text="{x:Static res:Strings.ThisStaysOpenWhileAnythingHereIsX9a6bbb}" />
@@ -124,22 +123,22 @@
             <Button Grid.Column="1" Content="{x:Static res:Strings.LetItSeeThese}" Command="{Binding ApplySeeCommand}" />
           </Grid>
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-            <TextBlock Classes="caption" TextWrapping="Wrap"
+            <TextBlock Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="api/**"
                        Text="{x:Static res:Strings.WhatItCanSeeSeparatedByCommasXd38ad7}" />
             <Button Grid.Column="1" Name="LearnMoreSeeing" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
                     AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutWhatItCanSee}">
               <Button.Flyout>
                 <Flyout Placement="Bottom">
-                  <StackPanel MaxWidth="320" Spacing="10">
+                  <StackPanel MaxWidth="320" Spacing="8">
                     <StackPanel Spacing="2">
                       <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironmentExample}" />
-                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironment}" />
+                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneEnvironment}" />
                     </StackPanel>
                     <StackPanel Spacing="2">
                       <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItemExample}" />
-                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItem}" />
+                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingOneItem}" />
                     </StackPanel>
-                    <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingIsCaseSensitiveAndHeldBack}" />
+                    <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.SeeingIsCaseSensitiveAndHeldBack}" />
                   </StackPanel>
                 </Flyout>
               </Button.Flyout>
@@ -147,13 +146,13 @@
           </Grid>
         </StackPanel>
 
-        <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.ProjectRows}" Margin="0,5,0,0" />
+        <TextBlock Grid.Row="3" Classes="label" Text="{x:Static res:Strings.ProjectRows}" Margin="0,6,0,0" />
         <StackPanel Grid.Row="3" Grid.Column="1" Spacing="8">
           <TextBlock Classes="caption" Text="{x:Static res:Strings.ARowBeatsTheModeAboveForXdf0cc4}" TextWrapping="Wrap" />
           <ItemsControl Name="SettingRows" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SettingRow">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4" Margin="0,0,0,8">
                   <TextBlock Classes="mono" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                   <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Top"
                           Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).RemoveRowCommand}"
@@ -176,7 +175,7 @@
           </WrapPanel>
         </StackPanel>
 
-        <TextBlock Grid.Row="4" Classes="label" Text="{x:Static res:Strings.Limits}" Margin="0,5,0,0" IsVisible="{Binding OffersLimits}" />
+        <TextBlock Grid.Row="4" Classes="label" Text="{x:Static res:Strings.Limits}" Margin="0,6,0,0" IsVisible="{Binding OffersLimits}" />
         <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6" IsVisible="{Binding OffersLimits}">
           <!-- Wraps, so the panel's narrowest column, inside a row of a table that clips, still shows Apply. -->
           <WrapPanel ItemSpacing="8" LineSpacing="8" ctl:FormKeys.Confirm="{Binding ApplyLimitCommand}">

@@ -9,7 +9,7 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <!-- A capped star column keeps the page at the left gutter; a MaxWidth on a stretched panel centres it. -->
-    <Grid Margin="32,12,32,28">
+    <Grid Margin="32,12,32,24">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1016" />
       </Grid.ColumnDefinitions>
@@ -19,19 +19,19 @@
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
           <StackPanel Spacing="6">
             <TextBlock Classes="h1" Text="{x:Static res:Strings.ScopedTokens}" />
-            <TextBlock Classes="subtitle" Text="{x:Static res:Strings.ATokenLetsAScriptOrCIX41bca7}" />
+            <TextBlock Classes="subtitle" ctl:MachineRuns.InText="True" Text="{x:Static res:Strings.ATokenLetsAScriptOrCIX41bca7}" />
           </StackPanel>
           <Button Grid.Column="1" Name="NewToken" Classes="primary" Padding="12,0" Height="30" VerticalAlignment="Bottom"
                   IsVisible="{Binding CanOpenForm}" Command="{Binding OpenFormCommand}" AutomationProperties.Name="{x:Static res:Strings.NewToken}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Icon="plus" Size="13" />
+              <ctl:KpIcon Icon="plus" Size="14" />
               <TextBlock Text="{x:Static res:Strings.NewTokenLabel}" />
             </StackPanel>
           </Button>
         </Grid>
 
         <Border Classes="card filled" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding CreateCommand}" ctl:FormKeys.Cancel="{Binding CancelFormCommand}" ctl:FormKeys.Draft="{Binding FormDraft}">
-          <StackPanel Spacing="14">
+          <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
               <TextBlock Classes="label" Text="{x:Static res:Strings.Name}" />
               <TextBlock Grid.Column="1" Classes="label" Text="{x:Static res:Strings.Scope}" />
@@ -59,22 +59,22 @@
                          IsVisible="{Binding HasScopeProblem}" ctl:Announcer.Says="{Binding ScopeProblem}" Text="{Binding ScopeProblem}" />
             </Grid>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-              <TextBlock Classes="caption" TextWrapping="Wrap"
+              <TextBlock Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.InText="True"
                          Text="{x:Static res:Strings.ReadProjectEnvironmentKEYOrForTheX9b0d4d}" />
               <Button Grid.Column="1" Name="LearnMoreScopes" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
                       AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutTokenScopes}">
                 <Button.Flyout>
                   <Flyout Placement="Bottom">
-                    <StackPanel MaxWidth="320" Spacing="10">
+                    <StackPanel MaxWidth="320" Spacing="8">
                       <StackPanel Spacing="2">
                         <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfAWholeSetExample}" />
-                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfAWholeSet}" />
+                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfAWholeSet}" />
                       </StackPanel>
                       <StackPanel Spacing="2">
                         <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKeyExample}" />
-                        <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKey}" />
+                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKey}" />
                       </StackPanel>
-                      <TextBlock Classes="size-12-5" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeNamesNoProtectedEnvironmentHere}" />
+                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeNamesNoProtectedEnvironmentHere}" />
                     </StackPanel>
                   </Flyout>
                 </Button.Flyout>
@@ -91,8 +91,8 @@
         <Border Classes="card" BorderBrush="{DynamicResource KpBorderStrong}" Background="{DynamicResource KpBgCard}"
                 IsVisible="{Binding HasMinted}">
           <StackPanel Spacing="12">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-              <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpTextSecondary}" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+              <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpTextSecondary}" VerticalAlignment="Top" Margin="0,2,0,0" />
               <StackPanel Grid.Column="1" Spacing="4">
                 <TextBlock Classes="body strong" Text="{x:Static res:Strings.CopyThisTokenNowItWillNotX0f6e03}" />
                 <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
@@ -120,7 +120,7 @@
               </Border>
               <Button Grid.Column="1" Name="CopyToken" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="{x:Static res:Strings.CopyToken}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <ctl:KpIcon Icon="copy" Size="13" />
+                  <ctl:KpIcon Icon="copy" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.Copy}" />
                 </StackPanel>
               </Button>
@@ -167,7 +167,7 @@
                   <Border Classes="table-row" Padding="16,12">
                     <Panel>
                       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}">
-                        <TextBlock Text="{Binding ConfirmText}" Classes="size-12-5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ConfirmText}" Classes="size-13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
                         <Button Grid.Column="2" Classes="danger sm size-12" Content="{x:Static res:Strings.Revoke}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
@@ -183,14 +183,14 @@
                           <ColumnDefinition Width="0.6*" MinWidth="64" />
                           <ColumnDefinition Width="72" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding Name}" Classes="size-12-5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" Classes="size-13" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Classes="mono secondary size-12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="2" Classes="mono secondary size-12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                    ToolTip.Tip="{Binding Scope}" />
                         <Border Grid.Column="3" Classes="chip outline">
                           <TextBlock Text="{Binding Mode}" />
                         </Border>
-                        <TextBlock Grid.Column="4" Classes="size-12-5" Text="{Binding Expires}" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="4" Classes="size-13" Text="{Binding Expires}" VerticalAlignment="Center"
                                    Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
                         <Button Grid.Column="5" Classes="danger sm size-12" Content="{x:Static res:Strings.Revoke}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RevokeValue}}" HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"

@@ -244,6 +244,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             {
                 OnPropertyChanged(nameof(IsReplacingField));
                 OnPropertyChanged(nameof(ReplaceFieldPrompt));
+                OnPropertyChanged(nameof(ReplacingFieldName));
                 OnPropertyChanged(nameof(HasOwnPrimary));
                 ConfirmReplaceFieldCommand.NotifyCanExecuteChanged();
                 CancelReplaceFieldCommand.NotifyCanExecuteChanged();
@@ -261,6 +262,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal bool TakesWholeView => IsEditing || History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
+
+    internal string? ReplacingFieldName => _replacingField?.DisplayName;
 
     /// <summary>The field the remove confirmation is for, or null.</summary>
     [ObservableProperty]
@@ -282,6 +285,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             {
                 OnPropertyChanged(nameof(IsRenamingField));
                 OnPropertyChanged(nameof(RenameFieldPrompt));
+                OnPropertyChanged(nameof(RenamingFieldName));
                 OnPropertyChanged(nameof(HasOwnPrimary));
                 ConfirmRenameFieldCommand.NotifyCanExecuteChanged();
                 CancelRenameFieldCommand.NotifyCanExecuteChanged();
@@ -294,6 +298,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal bool IsRenamingField => _renamingField is not null;
 
     internal string RenameFieldPrompt => $"New name for {_renamingField?.DisplayName}";
+
+    internal string? RenamingFieldName => _renamingField?.DisplayName;
 
     /// <summary>The name being typed for the field; a change of it asks again about what the rename breaks.</summary>
     internal string DraftFieldRename

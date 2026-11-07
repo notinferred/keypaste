@@ -11,10 +11,10 @@
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
-    <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="13" /></DataTemplate>
-    <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="13" /></DataTemplate>
-    <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="13" /></DataTemplate>
-    <DataTemplate x:Key="AttachmentSaveGlyph"><ctl:KpIcon Icon="download" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="14" /></DataTemplate>
+    <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="14" /></DataTemplate>
+    <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="14" /></DataTemplate>
+    <DataTemplate x:Key="AttachmentSaveGlyph"><ctl:KpIcon Icon="download" Size="14" /></DataTemplate>
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -33,7 +33,6 @@
       <Setter Property="Height" Value="30" />
       <Setter Property="Padding" Value="8,0" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="FontSize" Value="13" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
     <Style Selector="ListBox.groups > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
@@ -80,9 +79,8 @@
     <Style Selector="Button.in-field">
       <Setter Property="Height" Value="30" />
       <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="10,0" />
-      <Setter Property="CornerRadius" Value="5" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="CornerRadius" Value="6" />
     </Style>
 
     <!-- A value in a field-shaped box: the design's Value field, 40px on the app ink. -->
@@ -96,7 +94,7 @@
     </Style>
 
     <Style Selector="Border.meta">
-      <Setter Property="Padding" Value="0,10" />
+      <Setter Property="Padding" Value="0,8" />
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
@@ -106,7 +104,7 @@
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
-      <Setter Property="Padding" Value="14" />
+      <Setter Property="Padding" Value="16" />
     </Style>
 
     <!-- The destructive confirmation, the one place KpDanger appears on this screen. -->
@@ -165,7 +163,7 @@
           </Grid.ColumnDefinitions>
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <TextBlock x:Name="ListTitle"
-                       Classes="dialog-title"
+                       Classes="h1"
                        MaxWidth="200"
                        Text="{Binding ListTitle}"
                        ToolTip.Tip="{Binding ListTitle}"
@@ -191,25 +189,27 @@
                    PlaceholderText="{x:Static res:Strings.Search}"
                    AutomationProperties.Name="{x:Static res:Strings.Search}">
             <TextBox.InnerLeftContent>
-              <ctl:KpIcon Icon="search" Size="13" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
+              <ctl:KpIcon Icon="search" Size="14" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
             </TextBox.InnerLeftContent>
             <TextBox.InnerRightContent>
-              <Border Classes="keycap" Margin="0,0,5,0">
+              <Border Classes="keycap" Margin="0,0,4,0">
                 <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
               </Border>
             </TextBox.InnerRightContent>
           </TextBox>
+          <!-- One weight whether or not it holds the view's amber, so the search beside it stays still as the amber leaves. -->
           <ToggleButton Grid.Column="3"
                         x:Name="AddEntry"
                         Classes="sm"
                         Classes.primary="{Binding AddIsPrimary}"
-                        Width="68"
+                        MinWidth="68"
                         Height="28"
-                        Padding="10,0"
+                        Padding="12,0"
+                        FontWeight="SemiBold"
                         ToolTip.Tip="{x:Static res:Strings.NewItemProjectOrImport}"
                         AutomationProperties.Name="{x:Static res:Strings.New}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Icon="plus" Size="13" />
+              <ctl:KpIcon Icon="plus" Size="14" />
               <TextBlock Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
             </StackPanel>
           </ToggleButton>
@@ -225,7 +225,7 @@
                   IsVisible="{Binding #AddEntry.IsChecked}">
             <StackPanel Spacing="2">
               <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="{x:Static res:Strings.NewItem}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="key-round" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -234,7 +234,7 @@
                       Classes="ghost menu-item"
                       Command="{Binding BeginCreateGroupCommand}"
                       AutomationProperties.Name="{x:Static res:Strings.NewGroup}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="folder-plus" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.NewGroupLabel}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -243,7 +243,7 @@
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"
                       AutomationProperties.Name="{x:Static res:Strings.GeneratePassword}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="wand-2" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.GeneratePasswordXf22f07}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -252,7 +252,7 @@
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}"
                       AutomationProperties.Name="{x:Static res:Strings.NewProject}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="folder-git-2" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.NewProjectLabel}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -261,7 +261,7 @@
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}"
                       AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-code" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.ImportEnvLabel}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -270,7 +270,7 @@
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
                       AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-input" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.ImportFromAnotherAppLabel}" VerticalAlignment="Center" />
                 </StackPanel>
@@ -287,15 +287,15 @@
            recovery is on Trash, which is where this one goes once the screen moves on. -->
       <Border Classes="note" IsVisible="{Binding HasNotice}">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Grid.Column="0"
+          <TextBlock ctl:MachineRuns.InText="True" Grid.Column="0"
                      ctl:Announcer.Says="{Binding Notice}" Text="{Binding Notice}"
                      TextWrapping="Wrap"
                      VerticalAlignment="Center"
-                     Classes="secondary size-12" />
+                     Classes="secondary size-13" />
           <Button Grid.Column="1"
                   Classes="link"
                   Content="{x:Static res:Strings.Restore}"
-                  Margin="10,0,0,0"
+                  Margin="12,0,0,0"
                   IsVisible="{Binding OffersRestore}"
                   Command="{Binding UndoCommand}" />
         </Grid>
@@ -304,13 +304,13 @@
       <!-- Calm, not a dialog; drawn as Env's banner draws a problem. -->
       <Border Classes="note problem" IsVisible="{Binding HasError}">
         <Grid ColumnDefinitions="Auto,*">
-          <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
-          <TextBlock Grid.Column="1" ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="secondary size-12" />
+          <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,2,8,0" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
+          <TextBlock ctl:MachineRuns.InText="True" Grid.Column="1" ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="secondary size-13" />
         </Grid>
       </Border>
 
       <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="8">
           <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
           <StackPanel Spacing="6">
             <TextBlock Classes="label" Text="{x:Static res:Strings.GroupName}" />
@@ -329,7 +329,7 @@
       </Border>
 
       <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="8">
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
           <StackPanel Spacing="6">
             <TextBlock Classes="label" Text="{x:Static res:Strings.TheGroupsNewName}" />
@@ -355,7 +355,7 @@
 
       <!-- A group moves with everything in it, to the places an item can move to. -->
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="8">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
           <StackPanel Spacing="6">
             <TextBlock Classes="label" Text="{x:Static res:Strings.MoveTo}" />
@@ -387,8 +387,8 @@
 
       <!-- Only where the vault has no recycle bin: a recycled group goes at once, and Undo brings it back. -->
       <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
-        <StackPanel Spacing="10">
-          <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
+        <StackPanel Spacing="8">
+          <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="KeepGroup" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
             <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="{x:Static res:Strings.DeleteForGood}" IsVisible="{Binding GroupCanBeDeleted}" Command="{Binding ConfirmDeleteGroupCommand}" />
@@ -448,7 +448,7 @@
                       Command="{Binding BeginAddCommand}"
                       AutomationProperties.Name="{x:Static res:Strings.NewItem}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <ctl:KpIcon Icon="plus" Size="13" />
+                  <ctl:KpIcon Icon="plus" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
@@ -459,7 +459,7 @@
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
                       AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <ctl:KpIcon Icon="file-input" Size="13" />
+                  <ctl:KpIcon Icon="file-input" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.ImportFromAnotherAppLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
@@ -469,7 +469,7 @@
           <ListBox Name="Rows"
                    AutomationProperties.Name="{x:Static res:Strings.Items}"
                    Classes="rows table"
-                   Padding="6,4"
+                   Padding="4,4"
                    ItemsSource="{Binding Rows}"
                    SelectedItem="{Binding Selected}">
             <ListBox.ItemTemplate>
@@ -477,14 +477,14 @@
                 <views:EntryColumns>
                   <!-- The icon alone answers the pointer only on its strokes, so a background carries its tip. -->
                   <Panel Grid.Column="0" Name="KindMark" Background="Transparent" ToolTip.Tip="{Binding KindLabel}" AutomationProperties.Name="{Binding KindLabel}">
-                    <ctl:KpIcon Classes="kind" Icon="{Binding Icon}" Size="15" />
+                    <ctl:KpIcon Classes="kind" Icon="{Binding Icon}" Size="16" />
                   </Panel>
                   <DockPanel Grid.Column="1" Margin="0,0,8,0">
                     <!-- Why it is in a result: a field name from a fixed vocabulary, or the tag it was in,
                          never the value that matched. -->
                     <TextBlock DockPanel.Dock="Right"
                                Text="{Binding Why}"
-                               Classes="secondary size-12"
+                               Classes="secondary size-13"
                                Margin="8,0,0,0"
                                MaxWidth="180"
                                TextTrimming="CharacterEllipsis"
@@ -511,7 +511,7 @@
                               HorizontalAlignment="Right"
                               Spacing="6"
                               IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Classes="mono sm muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
+                    <TextBlock Classes="size-13 muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
                     <Border Classes="dot info" IsVisible="{Binding IsInUse}" />
                   </StackPanel>
                 </views:EntryColumns>
@@ -543,7 +543,7 @@
       <!-- A new item is made from a template in the pane's place, where there is room for its generator (N.4). -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                     IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewItemDraft}">
-        <Grid Margin="32,28">
+        <Grid Margin="32,24">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="756" />
             <ColumnDefinition Width="Auto" />
@@ -638,7 +638,7 @@
                 <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="{x:Static res:Strings.Username}" Classes="mono" MinHeight="40" Text="{Binding Username}" />
               </StackPanel>
 
-              <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsPassword}">
                 <TextBlock Classes="label" Text="{x:Static res:Strings.Password}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <ctl:MaskedInput x:Name="NewEntryPassword"
@@ -697,14 +697,14 @@
                     <DataTemplate x:DataType="vm:EntryTagChip">
                       <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Spoken}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                          <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
-                          <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
+                          <ctl:KpIcon Icon="shield-check" Size="14" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
+                          <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
                           <TextBlock Text="{Binding Display}" />
                           <Button Classes="chip-remove"
                                   AutomationProperties.Name="{Binding RemoveLabel}"
                                   ToolTip.Tip="{Binding RemoveLabel}"
                                   Command="{Binding RemoveCommand}">
-                            <ctl:KpIcon Icon="x" Size="10" />
+                            <ctl:KpIcon Icon="x" Size="14" />
                           </Button>
                         </StackPanel>
                       </Border>
@@ -730,7 +730,7 @@
                            ctl:Announcer.Says="{Binding TagProblem}" Text="{Binding TagProblem}" />
               </StackPanel>
 
-              <TextBlock x:Name="NewItemError"
+              <TextBlock ctl:MachineRuns.InText="True" x:Name="NewItemError"
                          Classes="caption danger"
                          TextWrapping="Wrap"
                          IsVisible="{Binding HasError}"
@@ -754,7 +754,7 @@
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:EntryDetailViewModel">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-              <Grid Margin="32,28">
+              <Grid Margin="32,24">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" MaxWidth="756" />
                   <ColumnDefinition Width="Auto" />
@@ -778,13 +778,13 @@
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
                         <Button x:Name="CopyPassword" Classes="action" IsVisible="{Binding HasPassword}" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:KpIcon Icon="copy" Size="13" />
+                            <ctl:KpIcon Icon="copy" Size="14" />
                             <TextBlock Text="{x:Static res:Strings.CopyPassword}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
                         <Button x:Name="RotateFromPane" Classes="action" IsVisible="{Binding HasPassword}" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:KpIcon Icon="refresh-cw" Size="13" />
+                            <ctl:KpIcon Icon="refresh-cw" Size="14" />
                             <TextBlock Text="{x:Static res:Strings.Rotate}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
@@ -808,7 +808,7 @@
                               IsVisible="{Binding #EntryMenu.IsChecked}">
                         <StackPanel Spacing="2">
                           <Button Classes="ghost menu-item" Command="{Binding EditCommand}" AutomationProperties.Name="{x:Static res:Strings.EditFields}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="pencil" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.EditFieldsLabel}" VerticalAlignment="Center" />
                             </StackPanel>
@@ -817,7 +817,7 @@
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
                                   AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="folder-input" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.RenameOrMoveLabel}" VerticalAlignment="Center" />
                             </StackPanel>
@@ -826,7 +826,7 @@
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DuplicateCommand}"
                                   AutomationProperties.Name="{x:Static res:Strings.Duplicate}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="copy" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.Duplicate}" VerticalAlignment="Center" />
                             </StackPanel>
@@ -838,20 +838,20 @@
                                   Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
                                   CommandParameter="{Binding Path}"
                                   AutomationProperties.Name="{x:Static res:Strings.Share}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="share-2" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.Share}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}" AutomationProperties.Name="{Binding History.ToggleLabel}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="history" Size="14" />
                               <TextBlock Text="{Binding History.ToggleLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <!-- What names the entry rather than what it holds, kept here out of the preview (N.5). -->
                           <Border Classes="divider" Margin="6,2" />
-                          <StackPanel x:Name="EntryIdentity" Margin="10,4" Spacing="3">
+                          <StackPanel x:Name="EntryIdentity" Margin="8,4" Spacing="2">
                             <TextBlock Classes="caption" Text="{x:Static res:Strings.Reference}" IsVisible="{Binding HasReference}" />
                             <TextBlock x:Name="ReferenceText"
                                        Classes="mono secondary size-12"
@@ -874,7 +874,7 @@
                                   IsVisible="{Binding HasReference}"
                                   Command="{Binding CopyReferenceCommand}"
                                   AutomationProperties.Name="{x:Static res:Strings.CopyTheReference}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="copy" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.CopyTheReference}" VerticalAlignment="Center" />
                             </StackPanel>
@@ -885,7 +885,7 @@
                                   Foreground="{DynamicResource KpDanger}"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DeleteCommand}"
                                   AutomationProperties.Name="{x:Static res:Strings.Delete}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="trash-2" Size="14" Foreground="{DynamicResource KpDanger}" />
                               <TextBlock Text="{x:Static res:Strings.Delete}" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
                             </StackPanel>
@@ -897,8 +897,8 @@
 
                   <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
                   <Border Classes="note" IsVisible="{Binding IsConfirmingRotate}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRotateCommand}" ctl:FormKeys.Cancel="{Binding CancelRotateCommand}">
-                    <StackPanel Spacing="10">
-                      <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRotateCommand}" />
                         <Button x:Name="ConfirmRotate" Classes="primary sm" Content="{x:Static res:Strings.Rotate}" Command="{Binding ConfirmRotateCommand}" />
@@ -914,8 +914,8 @@
                     <!-- What the deletion costs depends on the vault: DeletePrompt reads its recycle-bin
                          setting and says which case this is. -->
                     <Border Classes="form danger">
-                      <StackPanel Spacing="10">
-                        <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
                           <Button Classes="danger sm" Content="{x:Static res:Strings.DeleteForGood}" Command="{Binding ConfirmDeleteCommand}" />
@@ -931,11 +931,11 @@
                           x:DataType="vm:EntriesViewModel"
                           DataContext="{Binding $parent[views:EntriesView].DataContext}"
                           IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="8">
                       <TextBlock Classes="section" Text="{x:Static res:Strings.RenameOrMove}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
-                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Classes="mono" Text="{Binding DraftTitle}" />
+                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Text="{Binding DraftTitle}" />
                         <TextBlock x:Name="OrganizeTitleProblem"
                                    Classes="caption danger"
                                    TextWrapping="Wrap"
@@ -999,7 +999,7 @@
                                          Text="{Binding DisplayTitle}"
                                          IsVisible="{Binding TitleDiffers}"
                                          Margin="12,0,0,0"
-                                         Classes="muted size-12"
+                                         Classes="muted size-13"
                                          TextTrimming="CharacterEllipsis" />
                             </Grid>
                           </DataTemplate>
@@ -1026,7 +1026,7 @@
                                                Foreground="{DynamicResource KpTextSecondary}" />
                             <ctl:RevealButton Grid.Column="1"
                                               x:Name="RevealRevisionPassword"
-                                              Classes="ghost in-field"
+                                              Classes="ghost in-field size-12"
                                               Margin="0,0,6,0"
                                               IsVisible="{Binding History.Selected.HasPassword}"
                                               Target="{Binding #RevisionPassword}"
@@ -1039,7 +1039,7 @@
                           </Grid>
                           <TextBlock Grid.Row="2" Classes="caption" Text="{x:Static res:Strings.Now}" />
                           <Panel Grid.Row="2" Grid.Column="1">
-                            <TextBlock Classes="mono secondary" Text="{Binding PasswordMask}" />
+                            <TextBlock Classes="mono secondary size-14" Text="{Binding PasswordMask}" />
                             <TextBlock Classes="caption" Text="{x:Static res:Strings.Empty}" IsVisible="{Binding !HasPassword}" />
                           </Panel>
                         </Grid>
@@ -1124,7 +1124,7 @@
                         <!-- A restore that puts back other project tags is written only after the person has seen what
                              it does to the item's projects, as every tag change is. -->
                         <Border Classes="form" IsVisible="{Binding History.IsConfirmingRestore}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding History.ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding History.CancelRestoreCommand}">
-                          <StackPanel Spacing="10">
+                          <StackPanel Spacing="8">
                             <ItemsControl ItemsSource="{Binding History.RestoreLines}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="x:String">
@@ -1156,16 +1156,16 @@
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock Grid.Column="0"
-                                     Classes="mono lg"
+                                     Classes="mono size-13"
                                      Text="{Binding DisplayUsername}"
                                      TextTrimming="CharacterEllipsis"
                                      VerticalAlignment="Center" />
                           <Button Grid.Column="1"
-                                  Classes="ghost in-field"
+                                  Classes="ghost in-field size-12"
                                   Command="{Binding CopyUsernameCommand}"
                                   AutomationProperties.Name="{x:Static res:Strings.CopyUsername}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                              <ctl:KpIcon Icon="copy" Size="13" />
+                              <ctl:KpIcon Icon="copy" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
@@ -1196,14 +1196,14 @@
                                              ClipToBounds="True"
                                              Foreground="{DynamicResource KpTextPrimary}" />
                           <ctl:RevealButton Grid.Column="1"
-                                            Classes="ghost in-field"
+                                            Classes="ghost in-field size-12"
                                             Target="{Binding #CurrentPassword}"
                                             ShowsWord="True"
                                             Subject="{x:Static res:Strings.ThePasswordAsAnObject}" />
                           <!-- Generate opens Edit fields with a generated password; Save writes it and history keeps the old one (V.12). -->
                           <Button Grid.Column="2"
                                   x:Name="GeneratePassword"
-                                  Classes="ghost in-field"
+                                  Classes="ghost in-field size-12"
                                   Command="{Binding GeneratePasswordCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.GenerateANewPassword}"
                                   AutomationProperties.Name="{x:Static res:Strings.GenerateANewPassword}">
@@ -1240,18 +1240,18 @@
                                      VerticalAlignment="Center"
                                      Margin="0,0,8,0" />
                           <ctl:RevealButton Grid.Column="2"
-                                            Classes="ghost in-field"
+                                            Classes="ghost in-field size-12"
                                             Target="{Binding #CurrentTotp}"
                                             ShowsWord="True"
                                             Subject="{x:Static res:Strings.TheTotpCodeAsAnObject}" />
                           <Button Grid.Column="3"
                                   x:Name="CopyTotp"
-                                  Classes="ghost in-field"
+                                  Classes="ghost in-field size-12"
                                   Command="{Binding Totp.CopyCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.CopyTheCodeTheClipboardClearsItself}"
                                   AutomationProperties.Name="{x:Static res:Strings.CopyTheTOTPCode}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                              <ctl:KpIcon Icon="copy" Size="13" />
+                              <ctl:KpIcon Icon="copy" Size="14" />
                               <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
@@ -1275,7 +1275,7 @@
                           <Binding Path="HasUrl" />
                         </MultiBinding>
                       </Grid.IsVisible>
-                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.URL}" VerticalAlignment="Top" Margin="0,11,0,0" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.URL}" VerticalAlignment="Top" Margin="0,12,0,0" />
                       <!-- A web address opens in the browser; anything else is text and says why (N.5). -->
                       <StackPanel Grid.Column="1" Spacing="6">
                         <Border Classes="value">
@@ -1289,8 +1289,8 @@
                                     ToolTip.Tip="{x:Static res:Strings.OpenInYourBrowser}"
                                     AutomationProperties.Name="{x:Static res:Strings.OpenTheWebAddress}">
                               <DockPanel>
-                                <ctl:KpIcon DockPanel.Dock="Right" Icon="external-link" Size="13" Margin="6,0,0,0" />
-                                <TextBlock Classes="mono lg"
+                                <ctl:KpIcon DockPanel.Dock="Right" Icon="external-link" Size="14" Margin="6,0,0,0" />
+                                <TextBlock Classes="mono size-13"
                                            Text="{Binding DisplayUrl}"
                                            TextDecorations="Underline"
                                            TextTrimming="CharacterEllipsis"
@@ -1298,18 +1298,18 @@
                               </DockPanel>
                             </Button>
                             <TextBlock Grid.Column="0"
-                                       Classes="mono lg"
+                                       Classes="mono size-13"
                                        IsVisible="{Binding !OpensUrl}"
                                        Text="{Binding DisplayUrl}"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />
                             <Button x:Name="CopyUrl"
                                     Grid.Column="1"
-                                    Classes="ghost in-field"
+                                    Classes="ghost in-field size-12"
                                     Command="{Binding CopyUrlCommand}"
                                     AutomationProperties.Name="{x:Static res:Strings.CopyTheWebAddress}">
                               <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ctl:KpIcon Icon="copy" Size="13" />
+                                <ctl:KpIcon Icon="copy" Size="14" />
                                 <TextBlock Text="{x:Static res:Strings.Copy}" VerticalAlignment="Center" />
                               </StackPanel>
                             </Button>
@@ -1330,8 +1330,8 @@
                           <Binding Path="ShowsNotes" />
                         </MultiBinding>
                       </Grid.IsVisible>
-                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Notes}" VerticalAlignment="Top" Margin="0,11,0,0" />
-                      <Border Grid.Column="1" Classes="value" Padding="12,10">
+                      <TextBlock Grid.Column="0" Classes="label" Text="{x:Static res:Strings.Notes}" VerticalAlignment="Top" Margin="0,12,0,0" />
+                      <Border Grid.Column="1" Classes="value" Padding="12,8">
                         <TextBlock Text="{Binding DisplayNotes}"
                                    TextWrapping="Wrap"
                                    LineHeight="19.5"
@@ -1351,7 +1351,7 @@
                               Command="{Binding BeginAddFieldCommand}"
                               AutomationProperties.Name="{x:Static res:Strings.AddField}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="plus" Size="13" />
+                          <ctl:KpIcon Icon="plus" Size="14" />
                           <TextBlock Text="{x:Static res:Strings.AddFieldLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
@@ -1404,7 +1404,7 @@
                     </ItemsControl>
 
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <TextBlock Classes="section" Text="{x:Static res:Strings.AddAField}" />
                         <StackPanel Spacing="6">
                           <TextBlock Classes="label" Text="{x:Static res:Strings.FieldName}" />
@@ -1456,8 +1456,8 @@
                     </Border>
 
                     <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmReplaceFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelReplaceFieldCommand}" ctl:FormKeys.Draft="{Binding ReplaceFieldDraft}">
-                      <StackPanel Spacing="10">
-                        <TextBlock Classes="section" Text="{Binding ReplaceFieldPrompt}" TextWrapping="Wrap" />
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="body primary" AutomationProperties.HeadingLevel="2" Text="{Binding ReplaceFieldPrompt}" ctl:MachineRuns.Words="{Binding ReplacingFieldName}" />
                         <TextBlock Classes="label" Text="{x:Static res:Strings.NewFieldValue}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:MaskedInput x:Name="ReplacementFieldValue"
@@ -1491,8 +1491,8 @@
                     <!-- A field named as a project variable, or one the item's own {S:…} names, is renamed only after
                          the person has seen what the rename breaks, as a project tag change is. -->
                     <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
-                      <StackPanel Spacing="10">
-                        <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="body primary" AutomationProperties.HeadingLevel="2" Text="{Binding RenameFieldPrompt}" ctl:MachineRuns.Words="{Binding RenamingFieldName}" />
                         <StackPanel Spacing="6">
                           <TextBlock Classes="label" Text="{x:Static res:Strings.NewFieldName}" />
                           <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="{x:Static res:Strings.NewFieldName}"
@@ -1522,7 +1522,7 @@
                     </Border>
 
                     <Border Classes="form danger" IsVisible="{Binding IsRemovingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveFieldCommand}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button x:Name="KeepField" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveFieldCommand}" />
@@ -1543,7 +1543,7 @@
                               Command="{Binding Attachments.AddCommand}"
                               AutomationProperties.Name="{x:Static res:Strings.AddAttachment}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="plus" Size="13" />
+                          <ctl:KpIcon Icon="plus" Size="14" />
                           <TextBlock Text="{x:Static res:Strings.AddAttachmentLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
@@ -1576,13 +1576,13 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBlock x:Name="AttachmentNote"
-                               Classes="secondary size-12-5"
+                               Classes="secondary size-13"
                                TextWrapping="Wrap"
                                IsVisible="{Binding Attachments.HasNote}"
                                Text="{Binding Attachments.Note}" />
 
                     <Border Classes="form danger" IsVisible="{Binding Attachments.IsRemoving}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding Attachments.CancelRemoveCommand}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <TextBlock Text="{Binding Attachments.RemovePrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Attachments.CancelRemoveCommand}" />
@@ -1606,14 +1606,14 @@
                         <DataTemplate x:DataType="vm:EntryTagChip">
                           <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Spoken}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                              <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
-                              <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
+                              <ctl:KpIcon Icon="shield-check" Size="14" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
+                              <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
                               <TextBlock Text="{Binding Display}" />
                               <Button Classes="chip-remove"
                                       AutomationProperties.Name="{Binding RemoveLabel}"
                                       ToolTip.Tip="{Binding RemoveLabel}"
                                       Command="{Binding RemoveCommand}">
-                                <ctl:KpIcon Icon="x" Size="10" />
+                                <ctl:KpIcon Icon="x" Size="14" />
                               </Button>
                             </StackPanel>
                           </Border>
@@ -1637,7 +1637,7 @@
                     <!-- A project tag is written only after the person has seen the environment and the fields it
                          reaches. -->
                     <Border Classes="form" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmTagChangeCommand}" ctl:FormKeys.Cancel="{Binding CancelTagChangeCommand}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <ItemsControl ItemsSource="{Binding TagChangeLines}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
@@ -1657,13 +1657,13 @@
                        only when agents can see the entry (N.5). -->
                   <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
                     <Border x:Name="AgentAccessCard" Classes="card" IsVisible="{Binding ShowsAgentAccess}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="bot" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                           <TextBlock Classes="label" Text="{x:Static res:Strings.AgentAccess}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock x:Name="AgentAccessSummary"
-                                   Classes="mono size-12-5"
+                                   Classes="size-13"
                                    IsVisible="{Binding ShowsAgentAccessSummary}"
                                    Text="{Binding AgentAccessSummary}"
                                    TextWrapping="Wrap" />
@@ -1671,7 +1671,7 @@
                                       IsVisible="{Binding AgentLines.Count}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
-                              <TextBlock Classes="mono size-12-5" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
+                              <TextBlock Classes="size-13" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -1684,7 +1684,7 @@
                     <!-- Each project environment the item's own tags put it in, and where an agent gets it only once
                          a person answers; shown only for an item in a project. Names, never a value. -->
                     <Border x:Name="EnvironmentsCard" Classes="card" IsVisible="{Binding ShowsEnvironments}">
-                      <StackPanel Spacing="10">
+                      <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="layers" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                           <TextBlock Classes="label" Text="{x:Static res:Strings.Environments}" VerticalAlignment="Center" />
@@ -1694,12 +1694,12 @@
                             <DataTemplate x:DataType="vm:EnvironmentRow">
                               <Grid ColumnDefinitions="*,Auto" Margin="0,2">
                                 <TextBlock Grid.Column="0"
-                                           Classes="mono size-12-5"
+                                           Classes="mono"
                                            Text="{Binding Label}"
                                            TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
-                                           Classes="size-12-5"
+                                           Classes="size-13"
                                            Margin="12,0,0,0"
                                            Classes.muted="{Binding !RequiresApproval}"
                                            Classes.secondary="{Binding RequiresApproval}"
@@ -1719,17 +1719,17 @@
                     <StackPanel>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{x:Static res:Strings.Created}" />
-                          <TextBlock Grid.Column="1" x:Name="CreatedText" Classes="primary size-12-5" Text="{Binding Created}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-13" Text="{x:Static res:Strings.Created}" />
+                          <TextBlock Grid.Column="1" x:Name="CreatedText" Classes="primary size-13" Text="{Binding Created}" />
                         </Grid>
                       </Border>
                       <!-- An expiry KeePassXC set, shown as Expired in danger text once the session's clock passes it. -->
                       <Border Classes="meta" IsVisible="{Binding HasExpiry}">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{Binding ExpiryLabel}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-13" Text="{Binding ExpiryLabel}" />
                           <TextBlock Grid.Column="1"
                                      x:Name="ExpiryText"
-                                     Classes="size-12-5"
+                                     Classes="size-13"
                                      Classes.primary="{Binding !IsExpired}"
                                      Classes.danger="{Binding IsExpired}"
                                      Text="{Binding Expiry}" />
@@ -1737,15 +1737,15 @@
                       </Border>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{x:Static res:Strings.Rotated}" />
-                          <TextBlock Grid.Column="1" x:Name="RotatedText" Classes="primary size-12-5" Text="{Binding Rotated}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-13" Text="{x:Static res:Strings.Rotated}" />
+                          <TextBlock Grid.Column="1" x:Name="RotatedText" Classes="primary size-13" Text="{Binding Rotated}" />
                         </Grid>
                       </Border>
                     </StackPanel>
                   </Border>
 
                   <Border Classes="form" IsVisible="{Binding IsEditing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding SaveCommand}" ctl:FormKeys.Cancel="{Binding CancelCommand}" ctl:FormKeys.Draft="{Binding EditDraft}">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="8">
                       <TextBlock Classes="section" Text="{x:Static res:Strings.EditFields}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Username}" />

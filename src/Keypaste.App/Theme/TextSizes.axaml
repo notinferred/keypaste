@@ -4,9 +4,6 @@
   <!-- A size for text whose other properties stay its own: the sizes of Typography's classes, without their weights and
        colours. Included after the control styles so that a size named on an element holds over a control's own. -->
 
-  <Style Selector=":is(Control).size-11">
-    <Setter Property="TextElement.FontSize" Value="11" />
-  </Style>
   <Style Selector=":is(Control).size-12">
     <Setter Property="TextElement.FontSize" Value="12" />
   </Style>
@@ -24,6 +21,12 @@
   </Style>
   <Style Selector=":is(Control).size-15">
     <Setter Property="TextElement.FontSize" Value="15" />
+  </Style>
+  <Style Selector=":is(Control).size-16">
+    <Setter Property="TextElement.FontSize" Value="16" />
+  </Style>
+  <Style Selector=":is(Control).size-24">
+    <Setter Property="TextElement.FontSize" Value="24" />
   </Style>
 
 </Styles>

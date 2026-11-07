@@ -38,18 +38,17 @@ public sealed class ShellStatusTests
         }
 
         using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
-        var name = Path.GetFileName(fixture.Path_);
 
-        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.Equal("saved", shell.VaultSaveWords);
         Assert.True(shell.VaultStatusOk);
         Assert.StartsWith("Saved ", shell.VaultStatusDetail, StringComparison.Ordinal);
 
         session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "NEW", Password = "x" });
-        Assert.Equal($"{name} · unsaved changes", shell.VaultStatus);
+        Assert.Equal("unsaved changes", shell.VaultSaveWords);
         Assert.Equal(StatusTone.Accent, shell.VaultStatusTone);
 
         session.Unlocked.Save();
-        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.Equal("saved", shell.VaultSaveWords);
 
         using (var other = Vault.Open(fixture.Path_, TempVault.Password))
         {
@@ -62,7 +61,7 @@ public sealed class ShellStatusTests
             clock.Advance(TimeSpan.FromSeconds(1));
         }
 
-        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.Equal("changed on disk", shell.VaultSaveWords);
         Assert.True(shell.VaultStatusDanger);
     }
 
@@ -89,14 +88,14 @@ public sealed class ShellStatusTests
         session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "z" });
         Assert.Throws<VaultChangedOnDiskException>(session.Unlocked.Save);
 
-        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.Equal("changed on disk", shell.VaultSaveWords);
         Assert.EndsWith(" Your change to env/app/MINE was not saved, and reloading discards it.", shell.VaultChanged, StringComparison.Ordinal);
 
         var before = shell.Content;
         shell.ReloadCommand.Press();
 
         Assert.False(shell.HasVaultChanged);
-        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.Equal("saved", shell.VaultSaveWords);
         Assert.NotSame(before, shell.Content);
         var titles = session.Unlocked!.ReadEntries().Select(entry => entry.Title).ToList();
         Assert.Contains("ELSEWHERE", titles);
@@ -142,7 +141,6 @@ public sealed class ShellStatusTests
         using var session = new AppVaultSession(clock, home: fixture.Home);
         Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
-        var name = Path.GetFileName(fixture.Path_);
         Assert.False(shell.HasVaultChanged);
 
         SaveElsewhere(fixture, "ELSEWHERE");
@@ -159,7 +157,7 @@ public sealed class ShellStatusTests
         }
 
         Assert.True(shell.HasVaultChanged, "the save was noticed only by the poll, or not at all");
-        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.Equal("changed on disk", shell.VaultSaveWords);
     }
 
     [Fact]
@@ -496,7 +494,7 @@ public sealed class ShellStatusTests
         Assert.Equal(WriteOutcome.Saved, write.Outcome);
         Assert.False(write.Unwritten);
         Assert.False(shell.HasVaultChanged);
-        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.Equal("saved", shell.VaultSaveWords);
         Assert.Equal(
             $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to env/app/MINE is saved.",
             shell.Notice);
@@ -588,7 +586,7 @@ public sealed class ShellStatusTests
         SaveElsewhere(fixture, "LATER");
         await MergedByThePoll(shell, clock);
 
-        Assert.StartsWith($"{name} · updated ", shell.VaultStatus, StringComparison.Ordinal);
+        Assert.StartsWith("updated ", shell.VaultSaveWords, StringComparison.Ordinal);
         Assert.Equal(conflict, shell.Notice);
 
         SaveElsewhere(fixture, "LATEST");
@@ -636,7 +634,7 @@ public sealed class ShellStatusTests
         Assert.Equal(
             $"Another program saved {name}, and keypaste could not merge it: the file now holds another vault. Agents are refused until you reload it.",
             shell.VaultChanged);
-        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.Equal("changed on disk", shell.VaultSaveWords);
         Assert.Equal(1, merges);
 
         for (var tick = 0; tick < 5; tick++)
@@ -665,7 +663,6 @@ public sealed class ShellStatusTests
         var session = authority.Session;
         Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
-        var name = Path.GetFileName(fixture.Path_);
 
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
@@ -676,7 +673,7 @@ public sealed class ShellStatusTests
         SaveElsewhere(fixture, "ELSEWHERE");
         await MergedByThePoll(shell, clock);
 
-        Assert.StartsWith($"{name} · updated ", shell.VaultStatus, StringComparison.Ordinal);
+        Assert.StartsWith("updated ", shell.VaultSaveWords, StringComparison.Ordinal);
         Assert.Same(entries, shell.Content);
         Assert.Same(detail, entries.Detail);
         Assert.True(detail.IsEditing);

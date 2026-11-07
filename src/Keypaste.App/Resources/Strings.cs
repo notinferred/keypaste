@@ -307,7 +307,6 @@ public static class Strings
     public static string Link => Manager.GetString("Link", CultureInfo.CurrentUICulture)!;
     public static string LinkTheKeypasteCommand => Manager.GetString("LinkTheKeypasteCommand", CultureInfo.CurrentUICulture)!;
     public static string LinksYouMadeFromAnItemsMenuXfaa446 => Manager.GetString("LinksYouMadeFromAnItemsMenuXfaa446", CultureInfo.CurrentUICulture)!;
-    public static string Lock => Manager.GetString("Lock", CultureInfo.CurrentUICulture)!;
     public static string LockAndOpen => Manager.GetString("LockAndOpen", CultureInfo.CurrentUICulture)!;
     public static string LockLabel => Manager.GetString("LockLabel", CultureInfo.CurrentUICulture)!;
     public static string LockNow => Manager.GetString("LockNow", CultureInfo.CurrentUICulture)!;

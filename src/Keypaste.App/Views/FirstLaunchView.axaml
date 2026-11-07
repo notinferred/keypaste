@@ -23,7 +23,7 @@
   <Border Background="{StaticResource FirstLaunchGrid}">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Width="360"
-                  Margin="24,48,24,32"
+                  Margin="24,40,24,32"
                   HorizontalAlignment="Center"
                   VerticalAlignment="Center"
                   Spacing="16">

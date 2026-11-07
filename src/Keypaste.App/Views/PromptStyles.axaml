@@ -50,7 +50,6 @@
   </Style>
   <Style Selector="TextBlock.prompt-environment">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="TextTrimming" Value="None" />
     <Setter Property="VerticalAlignment" Value="Center" />
@@ -60,21 +59,19 @@
   <Style Selector="Border.prompt-tile">
     <Setter Property="Width" Value="36" />
     <Setter Property="Height" Value="36" />
-    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
   <Style Selector="TextBlock.prompt-title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
-    <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.16" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
   <Style Selector="TextBlock.prompt-sub">
-    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
@@ -85,7 +82,6 @@
   </Style>
   <Style Selector="TextBlock.prompt-countdown">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -97,7 +93,6 @@
   </Style>
   <Style Selector="Border.prompt-call TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="11.5" />
     <Setter Property="LineHeight" Value="18.4" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
@@ -114,10 +109,15 @@
   </Style>
   <Style Selector="Border.prompt-list TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
+  <!-- What a row's value does or where it comes from is words. -->
   <Style Selector="Border.prompt-list TextBlock.tag">
+    <Setter Property="FontFamily" Value="{DynamicResource KpSans}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <!-- The item a run's variable comes from is a path, quieter than the name above it. -->
+  <Style Selector="Border.prompt-list TextBlock.source">
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
   <Style Selector="Border.prompt-row">
@@ -138,14 +138,12 @@
   </Style>
 
   <Style Selector="TextBlock.prompt-note">
-    <Setter Property="FontSize" Value="12.5" />
-    <Setter Property="LineHeight" Value="18.75" />
+    <Setter Property="LineHeight" Value="19.5" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
   <Style Selector="TextBlock.prompt-scrubbed">
-    <Setter Property="FontSize" Value="12" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
@@ -154,10 +152,9 @@
     <Setter Property="Height" Value="34" />
     <Setter Property="MinHeight" Value="34" />
     <Setter Property="Padding" Value="12,0" />
-    <Setter Property="FontSize" Value="13" />
   </Style>
   <Style Selector="Button.prompt.primary, Button.prompt.danger">
-    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Padding" Value="16,0" />
   </Style>
   <!-- While arming, Allow once keeps its fill and shape; only its label fades, and stays readable because a person is reading the prompt by then. -->
   <Style Selector="Button.prompt:not(.primary):not(.danger):not(.ghost):disabled /template/ ContentPresenter#PART_ContentPresenter">

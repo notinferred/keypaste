@@ -625,7 +625,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The titlebar's status line: whether the file holds what is open.</summary>
     [ObservableProperty]
-    internal partial string VaultStatus { get; private set; } = string.Empty;
+    internal partial string VaultSaveWords { get; private set; } = string.Empty;
 
     /// <summary>The colour of the titlebar's dot.</summary>
     [ObservableProperty]
@@ -1482,7 +1482,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         if (_session.Unlocked is not { } vault || VaultName.Length == 0)
         {
-            VaultStatus = string.Empty;
+            VaultSaveWords = string.Empty;
             VaultStatusDetail = string.Empty;
             VaultStatusTone = StatusTone.Ok;
             VaultChanged = null;
@@ -1506,14 +1506,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        (VaultStatus, VaultStatusTone) = state.Status switch
+        (VaultSaveWords, VaultStatusTone) = state.Status switch
         {
             VaultSaveStatus.Saved when _updatedAt is { } updated =>
-                ($"{VaultName} · updated {PersonTime.Clock(updated.ToLocalTime())}", StatusTone.Ok),
-            VaultSaveStatus.Saved => ($"{VaultName} · saved", StatusTone.Ok),
-            VaultSaveStatus.Unsaved => ($"{VaultName} · unsaved changes", StatusTone.Accent),
-            VaultSaveStatus.ChangedOnDisk => ($"{VaultName} · changed on disk", StatusTone.Danger),
-            _ => ($"{VaultName} · file unreadable", StatusTone.Danger),
+                ($"updated {PersonTime.Clock(updated.ToLocalTime())}", StatusTone.Ok),
+            VaultSaveStatus.Saved => ("saved", StatusTone.Ok),
+            VaultSaveStatus.Unsaved => ("unsaved changes", StatusTone.Accent),
+            VaultSaveStatus.ChangedOnDisk => ("changed on disk", StatusTone.Danger),
+            _ => ("file unreadable", StatusTone.Danger),
         };
 
         VaultStatusDetail = (state.Status, _updatedAt, state.SavedAt) switch
@@ -1576,7 +1576,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private void ShowMerging()
     {
-        VaultStatus = $"{VaultName} · merging";
+        VaultSaveWords = "merging";
         VaultStatusTone = StatusTone.Accent;
         VaultStatusDetail = $"Merging another program's save · {VaultPath}";
         VaultChanged = null;

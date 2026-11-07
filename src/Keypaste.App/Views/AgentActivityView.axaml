@@ -11,11 +11,11 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <!-- A capped star column keeps the page at the left gutter; a MaxWidth on a stretched panel centres it. -->
-    <Grid Margin="32,28">
+    <Grid Margin="32,24">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1016" />
       </Grid.ColumnDefinitions>
-      <StackPanel Spacing="28">
+      <StackPanel Spacing="24">
 
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
           <StackPanel Spacing="6">
@@ -33,24 +33,24 @@
                   Command="{Binding OpenHistoryCommand}"
                   AutomationProperties.Name="{x:Static res:Strings.History}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Icon="history" Size="13" />
+              <ctl:KpIcon Icon="history" Size="14" />
               <TextBlock Text="{x:Static res:Strings.History}" />
             </StackPanel>
           </Button>
         </Grid>
 
         <Border Classes="card" IsVisible="{Binding IsUnavailable}">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
             <TextBlock Grid.Column="1" Classes="body secondary" Text="{Binding Status}" TextWrapping="Wrap" />
           </Grid>
         </Border>
 
         <!-- Only the prompt window answers (T-2): a row names what was asked, never the agent's reason, and
              Show the prompt brings that window forward with Deny focused and its allows disarmed. -->
-        <StackPanel Spacing="10" IsVisible="{Binding HasWaiting}">
+        <StackPanel Spacing="8" IsVisible="{Binding HasWaiting}">
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="clock" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+            <ctl:KpIcon Icon="clock" Size="16" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="{x:Static res:Strings.WaitingForYou}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Classes="caption" Text="{x:Static res:Strings.AnswerInThePromptWindow}" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
@@ -58,13 +58,13 @@
             <ItemsControl ItemsSource="{Binding Waiting}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ActivityRow">
-                  <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                  <Border Padding="16,12" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
                       <StackPanel Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="mono secondary size-12" Text="{Binding Asked}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Classes="mono amber size-11" Text="{Binding LeftText}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="label amber" Text="{Binding LeftText}" VerticalAlignment="Center" />
                       <Button Grid.Column="2" Name="ShowPrompt" Classes="sm" Content="{x:Static res:Strings.ShowThePrompt}" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).ShowPromptCommand}"
                               AutomationProperties.Name="{Binding Client, StringFormat={x:Static res:Strings.ShowThePromptFromValue}}" />
@@ -76,17 +76,17 @@
           </Border>
         </StackPanel>
 
-        <StackPanel Spacing="10" IsVisible="{Binding IsAvailable}">
+        <StackPanel Spacing="8" IsVisible="{Binding IsAvailable}">
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+            <ctl:KpIcon Icon="hourglass" Size="16" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="{x:Static res:Strings.Allowances}" VerticalAlignment="Center" />
             <Button Grid.Column="2" Name="EndAllAllowances" Classes="sm size-12" Content="{x:Static res:Strings.EndAll}" HorizontalAlignment="Right" VerticalAlignment="Center"
                     IsVisible="{Binding OffersEndAll}" Command="{Binding AskEndAllCommand}"
                     AutomationProperties.Name="{x:Static res:Strings.EndAllAllowances}" />
           </Grid>
           <Border Name="EndAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingEndAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelEndAllCommand}">
-            <StackPanel Spacing="10">
-              <TextBlock Text="{x:Static res:Strings.EndEveryAllowanceTheNextRequestAsksAgain}" TextWrapping="Wrap" Classes="primary size-12-5" />
+            <StackPanel Spacing="8">
+              <TextBlock Text="{x:Static res:Strings.EndEveryAllowanceTheNextRequestAsksAgain}" TextWrapping="Wrap" Classes="primary size-13" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Name="CancelEndAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelEndAllCommand}" />
                 <Button Name="ConfirmEndAll" Classes="danger sm" Content="{x:Static res:Strings.EndAllAllowances}" Command="{Binding EndAllCommand}" />
@@ -99,14 +99,14 @@
             <ItemsControl ItemsSource="{Binding Grants}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ActivityRow">
-                  <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                  <Border Padding="16,12" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,150,Auto" ColumnSpacing="16">
                       <StackPanel Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="mono secondary size-12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Classes="mono sm secondary" Text="{Binding LeftText}" />
+                        <TextBlock Classes="label secondary" Text="{Binding LeftText}" />
                         <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
                       </StackPanel>
                       <Button Grid.Column="2" Name="EndAllowance" Classes="sm size-12" Content="{x:Static res:Strings.End}" VerticalAlignment="Center"
@@ -124,9 +124,9 @@
         <!-- The AI tools found on this computer and the agents of this vault, each with its settings.
              Names are what agents say about themselves and the names their connections were given: display
              only (T-3, T-36). -->
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="8">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="plug" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+            <ctl:KpIcon Icon="plug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Classes="section" Text="{x:Static res:Strings.AITools}" />
           </StackPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"
@@ -135,13 +135,13 @@
                      IsVisible="{Binding HasUnnamedAgentsNote}"
                      Text="{Binding UnnamedAgentsNote}" />
           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}">
-            <ctl:KpIcon Icon="refresh-cw" Size="13" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
+            <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
             <TextBlock Classes="caption" Text="{x:Static res:Strings.LookingForAIToolsOnThisComputer}" />
           </StackPanel>
           <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
           <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-              <TextBlock Name="ClientsProblemText" Classes="body danger" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <TextBlock Name="ClientsProblemText" Classes="body danger" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
               <Button Grid.Column="1" Name="ResetClients" Content="{x:Static res:Strings.ResetClientsToml}" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
             </Grid>
           </Border>
@@ -150,18 +150,18 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AgentRow">
                   <!-- Transparent, so a right-click anywhere on the row opens its menu. -->
-                  <Border Padding="16,14" Background="Transparent" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                  <Border Padding="16,12" Background="Transparent" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
                       <Border Classes="tile" VerticalAlignment="Top">
                         <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextPrimary}" />
+                                   Classes="label" Foreground="{DynamicResource KpTextPrimary}" />
                       </Border>
-                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                      <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Classes="size-14" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                           <!-- Top, so a status that wraps keeps its dot on the first line. -->
-                          <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Top" Margin="0,5,0,0" />
-                          <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="size-12" TextWrapping="Wrap"
+                          <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="size-13" TextWrapping="Wrap" ctl:MachineRuns.InText="True"
                                      Classes.ok="{Binding IsLive}" Classes.muted="{Binding !IsLive}" />
                         </Grid>
                         <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding ShowsSummary}" TextWrapping="Wrap" />
@@ -185,18 +185,18 @@
                               <ctl:KpIcon Icon="x" Size="14" />
                             </Button>
                           </Grid>
-                          <StackPanel Spacing="10" IsVisible="{Binding HasPreview}">
+                          <StackPanel Spacing="8" IsVisible="{Binding HasPreview}">
                             <Border Classes="terminal">
                               <ScrollViewer HorizontalScrollBarVisibility="Auto">
                                 <SelectableTextBlock Name="ConnectPlan"
                                                      Text="{Binding Preview}"
-                                                     Margin="14,12"
+                                                     Margin="16,12"
                                                      FontFamily="{DynamicResource KpMono}"
                                                      Classes="size-12"
                                                      Foreground="{DynamicResource KpGrey3}" />
                               </ScrollViewer>
                             </Border>
-                            <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                            <TextBlock Classes="caption" ctl:MachineRuns.InText="True" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Button Name="CancelConnection" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
                               <Button Name="RunConnection"
@@ -204,22 +204,22 @@
                                       AutomationProperties.Name="{Binding Title}"
                                       Command="{Binding ConfirmCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                  <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
+                                  <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
                                   <TextBlock Text="{Binding Title}" IsVisible="{Binding !IsRunning}" />
                                   <TextBlock Text="{x:Static res:Strings.Running}" IsVisible="{Binding IsRunning}" />
                                 </StackPanel>
                               </Button>
                             </StackPanel>
                           </StackPanel>
-                          <TextBlock Classes="body" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                          <TextBlock Classes="body" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                           <!-- Cursor and VS Code add keypaste themselves from a link holding the same entry (G.6e). -->
-                          <StackPanel Spacing="10" IsVisible="{Binding OffersInstallLink}">
+                          <StackPanel Spacing="8" IsVisible="{Binding OffersInstallLink}">
                             <TextBlock Classes="caption" Text="{Binding InstallLinkNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                             <Border Classes="terminal">
                               <ScrollViewer HorizontalScrollBarVisibility="Auto">
                                 <SelectableTextBlock Name="InstallLink"
                                                      Text="{Binding InstallLink}"
-                                                     Margin="14,12"
+                                                     Margin="16,12"
                                                      FontFamily="{DynamicResource KpMono}"
                                                      Classes="size-12"
                                                      Foreground="{DynamicResource KpGrey3}" />
@@ -230,11 +230,11 @@
                               <Button Name="CopyInstallLink" Classes="ghost" Content="{x:Static res:Strings.CopyLink}" Command="{Binding CopyInstallLinkCommand}" />
                             </StackPanel>
                           </StackPanel>
-                          <StackPanel Spacing="10" IsVisible="{Binding OffersCheck}">
+                          <StackPanel Spacing="8" IsVisible="{Binding OffersCheck}">
                             <WrapPanel ItemSpacing="8" LineSpacing="8">
                               <Button Name="CheckConnection" VerticalAlignment="Bottom" Command="{Binding CheckCommand}" AutomationProperties.Name="{x:Static res:Strings.CheckTheConnection}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                  <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding IsCheckWorking}" Classes.spinning="{Binding IsCheckWorking}" />
+                                  <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsCheckWorking}" Classes.spinning="{Binding IsCheckWorking}" />
                                   <TextBlock Text="{x:Static res:Strings.CheckTheConnection}" />
                                 </StackPanel>
                               </Button>
@@ -267,7 +267,7 @@
                                 IsVisible="{Binding HasSettings}"
                                 IsExpanded="{Binding IsOpen, Mode=TwoWay}"
                                 AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.SettingsForValue}}">
-                        <StackPanel Spacing="14">
+                        <StackPanel Spacing="12">
                           <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsToolActions}">
                             <Button Name="ConnectToolAgain" MaxWidth="260"
                                     IsVisible="{Binding OffersConnectAgain}"

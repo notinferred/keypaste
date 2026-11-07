@@ -35,8 +35,8 @@
   <Border Classes="prompt">
     <StackPanel Spacing="12">
       <StackPanel Spacing="2">
-        <TextBlock Classes="prompt-title" Text="{Binding Title}" />
-        <TextBlock Classes="prompt-sub" Text="{Binding Status}" />
+        <TextBlock Classes="prompt-title size-16" Text="{Binding Title}" />
+        <TextBlock Classes="prompt-sub size-13" Text="{Binding Status}" />
       </StackPanel>
 
       <!-- The keyboard reaches the whole text here: Tab stops once, and Page Up and Page Down scroll it. -->
@@ -49,7 +49,7 @@
                       Focusable="True"
                       AutomationProperties.Name="Terms of use"
                       HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl Margin="14,6,14,8" ItemsSource="{Binding Sections}">
+          <ItemsControl Margin="16,6,16,8" ItemsSource="{Binding Sections}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="terms:TermsSection">
                 <StackPanel Spacing="6" Margin="0,0,0,4">
@@ -57,7 +57,7 @@
                   <ItemsControl ItemsSource="{Binding Paragraphs}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="x:String">
-                        <SelectableTextBlock Classes="terms-text size-12-5" Text="{Binding}" Margin="0,0,0,6" />
+                        <SelectableTextBlock Classes="terms-text size-13" Text="{Binding}" Margin="0,0,0,6" />
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>

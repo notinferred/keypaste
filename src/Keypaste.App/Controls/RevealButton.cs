@@ -35,7 +35,7 @@ internal sealed class RevealButton : Button
     internal static readonly StyledProperty<bool> ShowsWordProperty =
         AvaloniaProperty.Register<RevealButton, bool>(nameof(ShowsWord));
 
-    private readonly KpIcon _icon = new() { Size = 13 };
+    private readonly KpIcon _icon = new() { Size = 14 };
 
     // As wide as "Reveal", so its neighbours stay where they are when it says "Hide".
     private readonly TextBlock _word = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 38 };

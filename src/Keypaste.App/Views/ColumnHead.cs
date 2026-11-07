@@ -13,7 +13,7 @@ internal sealed class ColumnHead : Button
 {
     public static readonly StyledProperty<string> ColumnProperty = AvaloniaProperty.Register<ColumnHead, string>(nameof(Column), string.Empty);
 
-    private const double _arrowSize = 12;
+    private const double _arrowSize = 14;
     private const double _ringOutset = 4;
 
     private readonly TextBlock _label = new() { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };

@@ -26,19 +26,12 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <Style Selector=":is(TextBlock).h2">
+  <!-- A section heading inside a screen: "Allowances", "AI tools". -->
+  <Style Selector=":is(TextBlock).section">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="20" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.6" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-  </Style>
-
-  <!-- A section heading inside a screen: "Allowances", "AI tools". -->
-  <Style Selector=":is(TextBlock).section">
-    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
@@ -70,8 +63,14 @@
   <!-- The line under a screen's h1. -->
   <Style Selector=":is(TextBlock).subtitle">
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19.5" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Body text's line height wherever a sentence wraps at the size alone. -->
+  <Style Selector=":is(TextBlock).size-13[TextWrapping=Wrap]">
+    <Setter Property="LineHeight" Value="19.5" />
   </Style>
 
   <!-- A field's label. -->
@@ -83,7 +82,8 @@
 
   <!-- A helper line under a field. -->
   <Style Selector=":is(TextBlock).caption">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19.5" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
@@ -102,24 +102,14 @@
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="12.5" />
   </Style>
-  <Style Selector=":is(TextBlock).mono.sm">
-    <Setter Property="FontSize" Value="11" />
-  </Style>
-  <Style Selector=":is(TextBlock).mono.lg">
-    <Setter Property="FontSize" Value="13" />
-  </Style>
-  <Style Selector=":is(TextBlock).mono.xl">
-    <Setter Property="FontSize" Value="22" />
-    <Setter Property="LetterSpacing" Value="-0.22" />
-  </Style>
 
   <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (DESIGN).
-       A variable's key is machine text and stays mono.lg / mono.xl. -->
+       A variable's key is machine text and stays mono. -->
   <Style Selector=":is(TextBlock).title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="24" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.66" />
+    <Setter Property="LetterSpacing" Value="-0.72" />
   </Style>
   <Style Selector=":is(TextBlock).row-title">
     <Setter Property="FontSize" Value="13.5" />

@@ -306,7 +306,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// thirty buffers in order to use one of them.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ReplacePrompt), nameof(IsReplacing))]
+    [NotifyPropertyChangedFor(nameof(ReplacePrompt), nameof(ReplaceWords), nameof(IsReplacing))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmReplaceCommand), nameof(CancelReplaceCommand))]
     internal partial EnvVariableRow? Replacing { get; private set; }
 
@@ -317,6 +317,9 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     internal string ReplacePrompt => Replacing is { } row
         ? $"New value for {row.DisplayKey} on {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}. The old one stays in the item's history."
         : string.Empty;
+
+    /// <summary>The key and the item in <see cref="ReplacePrompt"/>, for its mono runs.</summary>
+    internal string? ReplaceWords => Replacing is { } row ? $"{row.DisplayKey}|{ApprovalPrompt.Shown(row.Source.Entry)}" : null;
 
     /// <summary>The value being entered for a new variable, when it is not being generated.</summary>
     internal SecretField NewValue { get; }

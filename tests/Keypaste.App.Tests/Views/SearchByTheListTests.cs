@@ -72,7 +72,8 @@ public sealed class SearchByTheListTests
         RenderedShell.Drain();
 
         Assert.Equal("All items", title.Text);
-        Assert.Equal("vault.kdbx · saved", shell.Named<TextBlock>("VaultStatusLine").Text);
+        Assert.Equal("vault.kdbx", shell.Named<TextBlock>("VaultFileName").Text);
+        Assert.Equal("saved", shell.Named<TextBlock>("VaultSaveState").Text);
         Assert.Contains(shell.Session.VaultPath!, shell.Shell.VaultStatusDetail, StringComparison.Ordinal);
         Assert.Single(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text?.Contains("vault.kdbx", StringComparison.Ordinal) == true);
 
@@ -380,11 +381,11 @@ public sealed class SearchByTheListTests
         shell.Shell.ToggleSidebar();
         shell.Frame();
 
-        var line = shell.Named<TextBlock>("VaultStatusLine");
+        var line = shell.Named<TextBlock>("VaultFileName");
         var titleBar = shell.Named<Border>("TitleBar");
         var lockNow = titleBar.GetVisualDescendants().OfType<Button>().Single(button => AutomationProperties.GetName(button) == "Lock now");
 
-        Assert.EndsWith(" · saved", line.Text, StringComparison.Ordinal);
+        Assert.Equal("saved", shell.Named<TextBlock>("VaultSaveState").Text);
         Assert.True(line.TextLayout.TextLines[0].HasCollapsed);
         Assert.True(Bounds(shell, lockNow).Right <= 720);
         Assert.True(Bounds(shell, line).X >= Bounds(shell, shell.Named<Button>("ShowSidebar")).Right);

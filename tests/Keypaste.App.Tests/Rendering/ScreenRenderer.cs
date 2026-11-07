@@ -924,6 +924,14 @@ public sealed class ScreenRenderer
         Save(window, output, "20-secrets-edit");
         entries.Detail.CancelCommand.Press();
 
+        entries.Detail.Fields.Single(field => field.Name == "GITHUB_TOKEN").ReplaceCommand.Press();
+        Save(window, output, "20c-secrets-replace-field");
+        entries.Detail.CancelReplaceFieldCommand.Press();
+
+        entries.Detail.Fields.Single(field => field.Name == "Region").RenameCommand.Press();
+        Save(window, output, "20d-secrets-rename-field");
+        entries.Detail.CancelRenameFieldCommand.Press();
+
         // V.12: Generate on the saved password opens Edit fields with one, and Generate password… stands on its own.
         entries.Detail.GeneratePasswordCommand.Press();
         Save(window, output, "20b-secrets-edit-generated");
@@ -1341,7 +1349,7 @@ public sealed class ScreenRenderer
             Thread.Sleep(1);
         }
 
-        window.Height = 1700;
+        window.Height = 2200;
         shell.Current = Destinations.Of(DestinationKind.Settings);
         Save(window, output, "95-settings-whole");
         var settingsWidth = window.Width;
@@ -1661,6 +1669,10 @@ public sealed class ScreenRenderer
         Save(window, output, "46-env-add-entry");
         project.CancelAddEntryCommand.Press();
 
+        project.BeginReplace(project.Variables.First(row => row.Key == "DATABASE_URL"));
+        Save(window, output, "46b-env-replace");
+        project.CancelReplaceCommand.Press();
+
         project.Environments.Single(environment => environment.Name == "staging").Members[^1].Remove.Press();
         Save(window, output, "47-env-remove-entry");
         project.CancelTagChangeCommand.Press();
@@ -1921,7 +1933,7 @@ public sealed class ScreenRenderer
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
             Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
             Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
-            Row(Box("dot ok"), Text("Allowed", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono sm amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
+            Row(Box("dot ok"), Text("Allowed", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono size-12 amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
             Row(
                 new Border { Classes = { "card" }, Width = 260, Child = Text("card: hairline, no fill", "") },
                 new Border { Classes = { "card", "filled" }, Width = 260, Child = Text("card filled", "") },

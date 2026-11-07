@@ -224,8 +224,8 @@
   <CornerRadius x:Key="KpRadiusMd">10</CornerRadius>
 
   <Thickness x:Key="KpCardPadding">20</Thickness>
-  <Thickness x:Key="KpFieldPadding">12,9</Thickness>
-  <Thickness x:Key="KpScreenPadding">32,28</Thickness>
+  <Thickness x:Key="KpFieldPadding">12,8</Thickness>
+  <Thickness x:Key="KpScreenPadding">32,24</Thickness>
 
   <BoxShadows x:Key="KpShadowDialog">0 24 64 0 #8C000000</BoxShadows>
   <BoxShadows x:Key="KpShadowPopover">0 8 24 0 #59000000</BoxShadows>

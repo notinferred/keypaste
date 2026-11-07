@@ -13,7 +13,7 @@
       terminal          a command or file preview; stays dark in the light theme
       table             a bordered, clipped table; rows inside use table-head / table-row
       chip              4px badge on #24262A; chip.outline for a bordered one; put a
-                        TextBlock inside, which is drawn mono 11
+                        TextBlock inside, which is drawn as a label; chip.tag holds a tag, in mono
       keycap            a keyboard shortcut hint
       dot               6px status dot: add ok, warn, danger, info or idle; waiting adds the halo
       tile              the 32px initials / icon square
@@ -44,7 +44,7 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
-    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="Padding" Value="16,8" />
   </Style>
 
   <Style Selector="Border.backdrop">
@@ -84,7 +84,7 @@
   </Style>
   <Style Selector="Border.table-head">
     <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
-    <Setter Property="Padding" Value="16,9" />
+    <Setter Property="Padding" Value="16,8" />
   </Style>
   <!-- The edge between two heads is a control, so it draws the control edge and changes as one does. -->
   <Style Selector="Border.column-grip-line">
@@ -94,7 +94,7 @@
     <Setter Property="Background" Value="{DynamicResource TextControlBorderBrushPointerOver}" />
   </Style>
   <Style Selector="Border.table-row">
-    <Setter Property="Padding" Value="16,11" />
+    <Setter Property="Padding" Value="16,12" />
     <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
     <Setter Property="BorderThickness" Value="0,1,0,0" />
     <Setter Property="Background" Value="Transparent" />
@@ -106,7 +106,7 @@
   <Style Selector="Border.chip">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
-    <Setter Property="Padding" Value="7,0" />
+    <Setter Property="Padding" Value="8,0" />
     <Setter Property="MinHeight" Value="20" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Left" />
@@ -124,7 +124,7 @@
   <!-- A tag: the chip's text sits beside its icons and its remove button. -->
   <Style Selector="Border.chip.tag TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -135,7 +135,7 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="Margin" Value="0,-2,-6,-2" />
-    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="CornerRadius" Value="4" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -147,8 +147,8 @@
   </Style>
 
   <Style Selector="Border.chip > TextBlock">
-    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -162,19 +162,19 @@
   <Style Selector="Border.keycap">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
-    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="Padding" Value="6,2" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.keycap > TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="10.5" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
   <Style Selector="Border.dot">
     <Setter Property="Width" Value="6" />
     <Setter Property="Height" Value="6" />
-    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="CornerRadius" Value="4" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Background" Value="{DynamicResource KpTextMuted}" />
   </Style>
@@ -201,7 +201,7 @@
   <Style Selector="Border.tile">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
 

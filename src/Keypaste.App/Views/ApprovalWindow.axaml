@@ -30,27 +30,27 @@
       <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
         <Border Grid.Column="0" Classes="prompt-tile">
-          <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+          <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
           <Grid ColumnDefinitions="Auto,Auto">
-            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title" Text="{Binding Client}"
+            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title size-16" Text="{Binding Client}"
                        MaxWidth="220" TextTrimming="CharacterEllipsis" />
-            <TextBlock Grid.Column="1" Classes="prompt-title" Text=" wants 1 secret" />
+            <TextBlock Grid.Column="1" Classes="prompt-title size-16" Text=" wants 1 secret" />
           </Grid>
           <StackPanel Orientation="Horizontal">
-            <TextBlock Classes="prompt-sub" Text="via MCP · label " />
-            <TextBlock Name="LabelText" Classes="prompt-sub" Text="{Binding Label}"
+            <TextBlock Classes="prompt-sub size-13" Text="via MCP · label " />
+            <TextBlock Name="LabelText" Classes="prompt-sub size-13" Text="{Binding Label}"
                        MaxWidth="200" TextTrimming="CharacterEllipsis" />
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Border Classes="dot waiting" />
-          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
         </StackPanel>
       </Grid>
 
-      <Border Classes="prompt-call" Padding="12,10">
+      <Border Classes="prompt-call size-12" Padding="12,8">
         <StackPanel>
           <TextBlock Text="tool: keypaste.request_credential" />
           <TextBlock Name="EntryText" Classes="value" Text="{Binding Entry}" TextTrimming="CharacterEllipsis" />
@@ -58,15 +58,15 @@
       </Border>
 
       <StackPanel Spacing="8">
-        <Border Classes="prompt-list">
+        <Border Classes="prompt-list size-12-5">
           <Grid ColumnDefinitions="*,Auto" Height="36" Margin="12,0">
             <TextBlock Grid.Column="0" Name="FieldText" Text="{Binding Field}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="tag" Text="value goes to the agent" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="tag size-13" Text="value goes to the agent" VerticalAlignment="Center" />
           </Grid>
         </Border>
         <StackPanel Orientation="Horizontal">
-          <TextBlock Classes="prompt-note" TextWrapping="NoWrap" Text="You can allow it " />
-          <TextBlock Name="LifetimeText" Classes="prompt-note" TextWrapping="NoWrap" Text="{Binding Lifetime}"
+          <TextBlock Classes="prompt-note size-13" TextWrapping="NoWrap" Text="You can allow it " />
+          <TextBlock Name="LifetimeText" Classes="prompt-note size-13" TextWrapping="NoWrap" Text="{Binding Lifetime}"
                      Foreground="{DynamicResource KpTextSecondary}" />
         </StackPanel>
       </StackPanel>
@@ -75,10 +75,10 @@
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
         <Border Classes="prompt-reason" Height="77">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12,9" Spacing="6">
-              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+            <StackPanel Margin="12,8" Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
                          IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
+              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
                          IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
                          Foreground="{DynamicResource KpTextSecondary}" />
@@ -88,19 +88,19 @@
         <TextBlock Classes="caption" Text="{Binding Attribution}" />
       </StackPanel>
 
-      <TextBlock Classes="prompt-note"
+      <TextBlock Classes="prompt-note size-13"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
       <!-- Always for has a place of its own, kept whether the prompt offers it or not, so Deny and the
            allows never move (D-0326, T-2). It is armed with them. Its caption wraps to two lines at
            most inside the same height. -->
-      <Grid Name="AlwaysSlot" Height="34" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+      <Grid Name="AlwaysSlot" Height="34" ColumnDefinitions="Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="AlwaysFor" Classes="prompt" MaxWidth="220"
                 IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysForCommand}"
                 AutomationProperties.Name="{Binding AlwaysLabel}">
           <TextBlock Name="AlwaysText" Text="{Binding AlwaysLabel}" TextTrimming="CharacterEllipsis" />
         </Button>
-        <TextBlock Grid.Column="1" Name="AlwaysCaptionText" Classes="prompt-note" Text="{Binding AlwaysCaption}"
+        <TextBlock Grid.Column="1" Name="AlwaysCaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
                    TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                    IsVisible="{Binding OffersAlways}" />
       </Grid>

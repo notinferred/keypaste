@@ -21,9 +21,9 @@
           <Grid ColumnDefinitions="Auto,*" Background="Transparent">
             <Border Name="Track"
                     Width="32" Height="18"
-                    CornerRadius="9"
+                    CornerRadius="10"
                     VerticalAlignment="Top"
-                    Margin="0,1,10,0"
+                    Margin="0,2,8,0"
                     Background="{DynamicResource KpBgActive}"
                     BorderBrush="{DynamicResource KpBorderControl}"
                     BorderThickness="1">
@@ -31,7 +31,7 @@
                       Width="14" Height="14"
                       CornerRadius="7"
                       HorizontalAlignment="Left"
-                      Margin="1,0,0,0"
+                      Margin="2,0,0,0"
                       Background="{DynamicResource KpTextMuted}" />
             </Border>
             <ContentPresenter Grid.Column="1"
@@ -46,7 +46,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource KpTextPrimary}" />
       </Style>
       <Style Selector="^:checked /template/ Border#Knob">
-        <Setter Property="Margin" Value="15,0,0,0" />
+        <Setter Property="Margin" Value="16,0,0,0" />
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#Track">
@@ -59,7 +59,7 @@
 
     <!-- A 16px include box: hairline when off, a quiet filled box with a check when on. -->
     <ControlTheme x:Key="IncludeBox" TargetType="CheckBox">
-      <Setter Property="Margin" Value="0,0,10,0" />
+      <Setter Property="Margin" Value="0,0,8,0" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Template">
         <ControlTemplate>
@@ -69,7 +69,7 @@
                   BorderThickness="1"
                   BorderBrush="{DynamicResource KpBorderControl}"
                   Background="Transparent">
-            <ctl:KpIcon Name="Check" Icon="check" Size="12" IsVisible="False"
+            <ctl:KpIcon Name="Check" Icon="check" Size="14" IsVisible="False"
                         HorizontalAlignment="Center"
                         Foreground="{DynamicResource KpTextPrimary}" />
           </Border>
@@ -93,11 +93,10 @@
          field while it blocks the import, so the fix is visible where the problem is. -->
     <ControlTheme x:Key="DestinationField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="MinHeight" Value="22" />
       <Setter Property="Height" Value="22" />
       <Setter Property="Padding" Value="6,0" />
-      <Setter Property="Margin" Value="-7,0,0,0" />
+      <Setter Property="Margin" Value="-8,0,0,0" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -122,14 +121,13 @@
       <Setter Property="Height" Value="34" />
       <Setter Property="MinHeight" Value="34" />
       <Setter Property="Padding" Value="12,0" />
-      <Setter Property="FontSize" Value="13" />
     </Style>
     <Style Selector="Button.dialog-action.primary">
-      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Padding" Value="16,0" />
     </Style>
 
     <Style Selector="Border.map-row">
-      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="Padding" Value="12,8" />
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
@@ -145,19 +143,69 @@
           MaxWidth="520"
           HorizontalAlignment="Center"
           VerticalAlignment="Center">
-    <StackPanel Spacing="16">
+    <DockPanel>
 
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16">
+        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="20" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
         <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ImportAKeePassDatabase}" VerticalAlignment="Center" />
         <Button Grid.Column="2"
                 Classes="icon ghost sm"
                 ToolTip.Tip="{x:Static res:Strings.Cancel}"
                 Command="{Binding CancelCommand}"
                 AutomationProperties.Name="{x:Static res:Strings.Cancel}">
-          <ctl:KpIcon Icon="x" Size="15" />
+          <ctl:KpIcon Icon="x" Size="16" />
         </Button>
       </Grid>
+
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <Button Classes="ghost dialog-action" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+        <Button x:Name="ChooseAnother"
+                Classes="dialog-action"
+                IsVisible="{Binding CanChooseAnother}"
+                Content="{x:Static res:Strings.ChooseAnotherFile}"
+                Command="{Binding ChooseAnotherCommand}" />
+        <Button Classes="dialog-action"
+                Classes.primary="{Binding UnlockIsPrimary}"
+                IsVisible="{Binding NeedsUnlock}"
+                Command="{Binding UnlockCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.Unlock}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+            <TextBlock Text="{Binding UnlockText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="ImportConfirm"
+                Classes="primary dialog-action"
+                IsVisible="{Binding ShowsConfirm}"
+                Content="{Binding ConfirmText}"
+                Command="{Binding ConfirmCommand}" />
+      </StackPanel>
+
+      <!-- A choice with no sign of itself on a small screen would pass unseen, so it stays with the answers. -->
+      <StackPanel DockPanel.Dock="Bottom" Spacing="16" Margin="0,16,0,0">
+      <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
+        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}">
+          <TextBlock Classes="size-13"
+                     FontWeight="Normal"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextPrimary}"
+                     Text="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}" />
+        </ToggleButton>
+        <TextBlock Classes="caption"
+                   Margin="40,0,0,0"
+                   Text="{Binding InPlaceNote}"
+                   IsVisible="{Binding KeepEditingInPlace}" />
+      </StackPanel>
+
+      <TextBlock ctl:MachineRuns.InText="True" Classes="danger size-13"
+                 TextWrapping="Wrap"
+                 ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
+                 IsVisible="{Binding HasTrailingMessage}" />
+      </StackPanel>
+
+      <!-- A small screen scrolls what lies between the head and the answers, so Cancel and Import stay in view. The margins give the scroll bar the card's edge. -->
+      <ScrollViewer Margin="-4,-4,-12,-4" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="4,4,12,4" Spacing="16">
 
       <!-- The file card, on a dashed hairline. -->
       <Panel>
@@ -165,47 +213,47 @@
                    Stroke="{DynamicResource KpBorderStrong}"
                    StrokeThickness="1"
                    StrokeDashArray="4,3" />
-        <Grid ColumnDefinitions="Auto,*,Auto" Margin="14">
-          <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="16">
+          <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="20" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-            <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Classes="mono size-13" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
             <TextBlock
-                       Classes="muted size-12"
+                       Classes="muted size-13"
                        Text="{Binding CardDetail}"
                        TextTrimming="CharacterEllipsis"
                        IsVisible="{Binding IsReadable}" />
-            <TextBlock
-                       Classes="danger size-12"
+            <TextBlock ctl:MachineRuns.InText="True"
+                       Classes="danger size-13"
                        ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding IsUnreadable}" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
-                      Spacing="5"
+                      Spacing="4"
                       Margin="12,0,0,0"
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsDecrypted}">
-            <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpOk}" />
-            <TextBlock Classes="ok size-12" Text="{x:Static res:Strings.Decrypted}" VerticalAlignment="Center" />
+            <ctl:KpIcon Icon="lock-open" Size="14" Foreground="{DynamicResource KpOk}" />
+            <TextBlock Classes="ok size-13" Text="{x:Static res:Strings.Decrypted}" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
-                      Spacing="5"
+                      Spacing="4"
                       Margin="12,0,0,0"
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsLocked}">
-            <ctl:KpIcon Icon="lock" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Classes="muted size-12" Text="{x:Static res:Strings.Locked}" VerticalAlignment="Center" />
+            <ctl:KpIcon Icon="lock" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.Locked}" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
-                      Spacing="5"
+                      Spacing="4"
                       Margin="12,0,0,0"
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsUnreadable}">
-            <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
-            <TextBlock Classes="danger size-12" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
+            <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpDanger}" />
+            <TextBlock Classes="danger size-13" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
           </StackPanel>
         </Grid>
       </Panel>
@@ -220,8 +268,8 @@
                          FontFamily="{DynamicResource KpMono}"
                          Classes="size-14"
                          AutomationProperties.Name="{x:Static res:Strings.PasswordForThisFile}" />
-        <TextBlock
-                   Classes="danger size-12-5"
+        <TextBlock ctl:MachineRuns.InText="True"
+                   Classes="danger size-13"
                    TextWrapping="Wrap"
                    ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                    IsVisible="{Binding HasMessage}" />
@@ -236,7 +284,7 @@
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center" />
           <TextBlock Grid.Column="1"
-                     Classes="muted size-12"
+                     Classes="muted size-13"
                      Text="{x:Static res:Strings.NoKeyFile}"
                      IsVisible="{Binding !HasKeyfile}"
                      VerticalAlignment="Center" />
@@ -250,12 +298,12 @@
           <ctl:KpIcon Grid.Column="0" Icon="usb" Size="14" Margin="0,0,8,0"
                       Foreground="{DynamicResource KpTextMuted}" />
           <TextBlock Grid.Column="1"
-                     Classes="mono secondary size-12"
+                     Classes="secondary size-13"
                      Text="{Binding HardwareKeyLabel}"
                      IsVisible="{Binding UsesHardwareKey}"
                      VerticalAlignment="Center" />
           <TextBlock Grid.Column="1"
-                     Classes="muted size-12"
+                     Classes="muted size-13"
                      Text="{x:Static res:Strings.NoYubiKey}"
                      IsVisible="{Binding !UsesHardwareKey}"
                      VerticalAlignment="Center" />
@@ -267,7 +315,7 @@
           </StackPanel>
         </Grid>
         <!-- Waiting is an amber dot with its halo, the dialog's one amber element while it shows (DESIGN). -->
-        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsWaitingForTouch}">
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsWaitingForTouch}">
           <Border Classes="dot waiting" VerticalAlignment="Center" />
           <TextBlock Text="{x:Static res:Strings.TouchYourYubiKey}" Classes="size-13" VerticalAlignment="Center"
                      Foreground="{DynamicResource KpTextPrimary}" />
@@ -298,30 +346,30 @@
                         <TextBlock Classes="mono secondary size-12"
                                    Text="{Binding SourceGroup}"
                                    TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono muted size-11"
+                        <TextBlock Classes="label muted"
                                    Text="{Binding CountText}"
                                    VerticalAlignment="Center" />
                       </StackPanel>
                       <ctl:KpIcon Grid.Column="2"
                                   Icon="arrow-right"
-                                  Size="12"
+                                  Size="14"
                                   Margin="0,0,8,0"
                                   HorizontalAlignment="Center"
                                   Foreground="{DynamicResource KpTextMuted}" />
                       <TextBox Grid.Column="3"
                                Theme="{StaticResource DestinationField}"
                                Classes.blocked="{Binding Blocks}"
-                               Classes="size-12"
+                               Classes="size-13"
                                FontWeight="Normal"
                                Text="{Binding Destination}"
                                AutomationProperties.Name="{Binding SourceGroup, StringFormat={x:Static res:Strings.WhereValueGoes}}"
                                IsEnabled="{Binding Include}" />
-                      <TextBlock Grid.Row="1"
+                      <TextBlock ctl:MachineRuns.InText="True" Grid.Row="1"
                                  Grid.Column="1"
                                  Grid.ColumnSpan="3"
                                  Margin="0,4,0,0"
                                  TextWrapping="Wrap"
-                                 Classes="muted size-12"
+                                 Classes="muted size-13"
                                  Classes.danger="{Binding Blocks}"
                                  Text="{Binding Problem}"
                                  IsVisible="{Binding HasProblem}" />
@@ -335,50 +383,10 @@
         <TextBlock Classes="caption" Text="{Binding SkippedText}" IsVisible="{Binding HasSkipped}" />
       </StackPanel>
 
-      <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
-        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}">
-          <TextBlock Classes="size-13"
-                     FontWeight="Normal"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextPrimary}"
-                     Text="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}" />
-        </ToggleButton>
-        <TextBlock Classes="caption"
-                   Margin="42,0,0,0"
-                   Text="{Binding InPlaceNote}"
-                   IsVisible="{Binding KeepEditingInPlace}" />
       </StackPanel>
+      </ScrollViewer>
 
-      <TextBlock Classes="danger size-12-5"
-                 TextWrapping="Wrap"
-                 ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
-                 IsVisible="{Binding HasTrailingMessage}" />
-
-      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <Button Classes="ghost dialog-action" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
-        <Button x:Name="ChooseAnother"
-                Classes="dialog-action"
-                IsVisible="{Binding CanChooseAnother}"
-                Content="{x:Static res:Strings.ChooseAnotherFile}"
-                Command="{Binding ChooseAnotherCommand}" />
-        <Button Classes="dialog-action"
-                Classes.primary="{Binding UnlockIsPrimary}"
-                IsVisible="{Binding NeedsUnlock}"
-                Command="{Binding UnlockCommand}"
-                AutomationProperties.Name="{x:Static res:Strings.Unlock}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
-            <TextBlock Text="{Binding UnlockText}" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
-        <Button x:Name="ImportConfirm"
-                Classes="primary dialog-action"
-                IsVisible="{Binding ShowsConfirm}"
-                Content="{Binding ConfirmText}"
-                Command="{Binding ConfirmCommand}" />
-      </StackPanel>
-
-    </StackPanel>
+    </DockPanel>
   </Border>
 
 </UserControl>

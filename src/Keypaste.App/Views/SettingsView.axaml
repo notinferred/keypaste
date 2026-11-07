@@ -17,24 +17,18 @@
       <Setter Property="Padding" Value="20,16,20,4" />
     </Style>
     <Style Selector="Border.settings-row">
-      <Setter Property="Padding" Value="20,14" />
+      <Setter Property="Padding" Value="20,12" />
     </Style>
     <Style Selector="Border.settings-row:nth-child(n+3)">
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
     </Style>
     <Style Selector="TextBlock.row-label">
-      <Setter Property="FontSize" Value="13.5" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
-    <Style Selector="TextBlock.caption">
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="LineHeight" Value="18.75" />
-    </Style>
     <Style Selector="SelectableTextBlock.fact-value">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-      <Setter Property="FontSize" Value="12" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
@@ -44,11 +38,7 @@
       <Setter Property="BorderBrush" Value="{DynamicResource KpDanger}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
-      <Setter Property="Padding" Value="14" />
-    </Style>
-    <!-- Choices read at the size of the row labels they sit under. -->
-    <Style Selector="RadioButton, CheckBox">
-      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="Padding" Value="16" />
     </Style>
   </UserControl.Styles>
 
@@ -61,9 +51,9 @@
             BorderThickness="0,1,0,0"
             Background="{DynamicResource KpBgPanel}"
             Padding="32,12">
-      <StackPanel Orientation="Horizontal" Spacing="10">
+      <StackPanel Orientation="Horizontal" Spacing="8">
         <ctl:KpIcon Icon="info" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" Classes="size-12-5" VerticalAlignment="Center"
+        <TextBlock ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" Classes="size-13" VerticalAlignment="Center"
                    Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
     </Border>
@@ -86,7 +76,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                 <ctl:KpIcon Grid.Column="0" Icon="clipboard-check" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Name="RecommendationsLine" Classes="row-label" Text="{Binding Line}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Name="RecommendationsLine" Classes="row-label size-13-5" Text="{Binding Line}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 <Button Grid.Column="2" Name="OpenRecommendations" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
                         AutomationProperties.Name="{x:Static res:Strings.OpenRecommendations}"
                         Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).OpenRecommendationsCommand}" />
@@ -127,7 +117,7 @@
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding LockWhenMinimized}" />
-                <TextBlock Classes="caption" Margin="42,0,0,0"
+                <TextBlock Classes="caption" Margin="40,0,0,0"
                            Text="{x:Static res:Strings.TakesEffectAtOnceAndAtEveryX7e38a2}" />
               </StackPanel>
             </Border>
@@ -150,7 +140,7 @@
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding StayInTray}" />
-                <TextBlock Classes="caption" Margin="42,0,0,0"
+                <TextBlock Classes="caption" Margin="40,0,0,0"
                            Text="{x:Static res:Strings.ClosingTheWindowStillLocksTheVaultX283e06}" />
               </StackPanel>
             </Border>
@@ -161,7 +151,7 @@
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding OpenAtLogin}" />
-                <TextBlock Classes="caption" Margin="42,0,0,0"
+                <TextBlock Classes="caption" Margin="40,0,0,0"
                            Text="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}" />
               </StackPanel>
             </Border>
@@ -180,7 +170,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="{x:Static res:Strings.Theme}" />
+                  <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Theme}" />
                   <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ThisDesktopReportsNoLightOrDark}" />
                 </StackPanel>
                 <ListBox Grid.Column="1"
@@ -206,7 +196,7 @@
             <Border Classes="settings-row">
               <StackPanel Spacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="row-label" Text="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}" />
+                  <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}" />
                   <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
                              Foreground="{DynamicResource KpTextSecondary}" />
                 </StackPanel>
@@ -221,7 +211,7 @@
                                      IsEnabled="{Binding IsEditing}" />
                   </StackPanel>
 
-                  <CheckBox Content="{x:Static res:Strings.SetANewMasterPassword}"
+                  <CheckBox Classes="size-13-5" Content="{x:Static res:Strings.SetANewMasterPassword}"
                             IsChecked="{Binding SetPassword}"
                             IsEnabled="{Binding IsEditing}" />
                   <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
@@ -246,9 +236,9 @@
 
                 <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}">
                   <TextBlock Classes="label" Text="{x:Static res:Strings.KeyFile}" Margin="0,0,0,4" />
-                  <RadioButton GroupName="Keyfile" Content="{x:Static res:Strings.KeepTheKeyFileAsItIs}" IsChecked="{Binding KeepKeyfile}" />
-                  <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
-                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="28,4,0,4" IsVisible="{Binding AttachKeyfile}">
+                  <RadioButton Classes="size-13-5" GroupName="Keyfile" Content="{x:Static res:Strings.KeepTheKeyFileAsItIs}" IsChecked="{Binding KeepKeyfile}" />
+                  <RadioButton Classes="size-13-5" GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="24,4,0,4" IsVisible="{Binding AttachKeyfile}">
                     <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="{x:Static res:Strings.ChooseKeyFile}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="file-key" Size="14" />
@@ -264,25 +254,25 @@
                     <TextBlock Classes="mono secondary" Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
                                ToolTip.Tip="{Binding NewKeyfilePath}" />
                   </StackPanel>
-                  <RadioButton GroupName="Keyfile" Content="{x:Static res:Strings.StopUsingAKeyFile}"
+                  <RadioButton Classes="size-13-5" GroupName="Keyfile" Content="{x:Static res:Strings.StopUsingAKeyFile}"
                                IsVisible="{Binding HasKeyfile}"
                                IsChecked="{Binding RemoveKeyfile}" />
                 </StackPanel>
 
                 <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}" IsVisible="{Binding OffersHardwareKey}">
                   <TextBlock Classes="label" Text="{x:Static res:Strings.YubiKey}" Margin="0,0,0,4" />
-                  <RadioButton GroupName="HardwareKey" Content="{x:Static res:Strings.KeepTheYubiKeyAsItIs}" IsChecked="{Binding KeepHardwareKey}" />
-                  <RadioButton x:Name="AttachHardwareKey"
+                  <RadioButton Classes="size-13-5" GroupName="HardwareKey" Content="{x:Static res:Strings.KeepTheYubiKeyAsItIs}" IsChecked="{Binding KeepHardwareKey}" />
+                  <RadioButton Classes="size-13-5" x:Name="AttachHardwareKey"
                                GroupName="HardwareKey"
                                Content="{Binding AttachHardwareKeyLabel}"
                                IsChecked="{Binding AttachHardwareKey}" />
-                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="28,4,0,4" IsVisible="{Binding AttachHardwareKey}">
-                    <RadioButton GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot1}" IsChecked="{Binding NewSlotOne}" />
-                    <RadioButton GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot2}" IsChecked="{Binding NewSlotTwo}" />
+                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="24,4,0,4" IsVisible="{Binding AttachHardwareKey}">
+                    <RadioButton Classes="size-13-5" GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot1}" IsChecked="{Binding NewSlotOne}" />
+                    <RadioButton Classes="size-13-5" GroupName="HardwareKeySlot" Content="{x:Static res:Strings.Slot2}" IsChecked="{Binding NewSlotTwo}" />
                   </StackPanel>
-                  <TextBlock Classes="caption" Margin="28,0,0,4" IsVisible="{Binding AttachHardwareKey}"
+                  <TextBlock Classes="caption" Margin="24,0,0,4" IsVisible="{Binding AttachHardwareKey}"
                              Text="{x:Static res:Strings.PlugInAYubiKeyWhoseSlotIsX754e43}" />
-                  <RadioButton GroupName="HardwareKey" Content="{x:Static res:Strings.StopUsingTheYubiKey}"
+                  <RadioButton Classes="size-13-5" GroupName="HardwareKey" Content="{x:Static res:Strings.StopUsingTheYubiKey}"
                                IsVisible="{Binding HasHardwareKey}"
                                IsChecked="{Binding RemoveHardwareKey}" />
                 </StackPanel>
@@ -316,10 +306,10 @@
                 </Border>
 
                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
-                  <ctl:KpIcon Icon="refresh-cw" Size="13" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding Busy}" />
+                  <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding Busy}" />
                   <TextBlock Classes="caption" Text="{x:Static res:Strings.Changing}" VerticalAlignment="Center" />
                 </StackPanel>
-                <TextBlock Name="AccessMessage"
+                <TextBlock ctl:MachineRuns.InText="True" Name="AccessMessage"
                            Classes="caption"
                            ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                            IsVisible="{Binding HasMessage}"
@@ -339,12 +329,12 @@
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
-              <StackPanel Spacing="10">
+              <StackPanel Spacing="8">
                 <TextBlock Classes="caption" Text="{Binding BackupsRule}" />
-                <Border Classes="field" Padding="12,9">
-                  <SelectableTextBlock Classes="fact-value" Text="{Binding BackupsPath}" VerticalAlignment="Center" />
+                <Border Classes="field" Padding="12,8">
+                  <SelectableTextBlock Classes="fact-value size-12" Text="{Binding BackupsPath}" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Name="BackupsSummary"
+                <TextBlock ctl:MachineRuns.InText="True" Name="BackupsSummary"
                            Classes="size-13"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextPrimary}"
@@ -390,8 +380,8 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="6">
-                  <TextBlock Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
-                  <TextBlock Classes="caption" Text="{Binding ChosenVaultRule}" />
+                  <TextBlock ctl:MachineRuns.InText="True" Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
+                  <TextBlock ctl:MachineRuns.InText="True" Classes="caption" Text="{Binding ChosenVaultRule}" />
                 </StackPanel>
                 <Button Grid.Column="1" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.UseThisVaultForAgentsAndTheXb47c9a}">
                   <TextBlock Text="{x:Static res:Strings.UseThisVault}" />
@@ -402,9 +392,9 @@
               <StackPanel Spacing="12">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label" Text="{x:Static res:Strings.KeypasteInATerminal}" />
-                    <TextBlock Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
-                    <TextBlock Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
+                    <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.KeypasteInATerminal}" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
                   </StackPanel>
                   <Panel Grid.Column="1" VerticalAlignment="Top">
                     <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
@@ -416,8 +406,8 @@
                   </Panel>
                 </Grid>
                 <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
+                  <StackPanel Spacing="8">
+                    <TextBlock ctl:MachineRuns.InText="True" Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="KeepCli" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCliCommand}" />
                       <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCliCommand}" />
@@ -439,10 +429,10 @@
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
-              <StackPanel Spacing="10">
+              <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label" Text="{x:Static res:Strings.PairABrowser}" />
+                    <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.PairABrowser}" />
                     <TextBlock Classes="caption" TextWrapping="Wrap"
                                Text="{x:Static res:Strings.KeePassXCBrowserPairsWithKeypasteAsItX779e5d}" />
                   </StackPanel>
@@ -455,17 +445,17 @@
                 </Grid>
                 <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
                            Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
-                <TextBlock Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+                <TextBlock ctl:MachineRuns.InText="True" Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
-              <StackPanel Spacing="10">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.PairedBrowsers}" />
+              <StackPanel Spacing="8">
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.PairedBrowsers}" />
                 <TextBlock Classes="caption" Text="{x:Static res:Strings.NoBrowserIsPairedWithThisVault}" IsVisible="{Binding HasNoRows}" />
                 <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PairingItem">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,10">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,8">
                         <StackPanel Grid.Column="0" Spacing="2">
                           <TextBlock Classes="size-13-5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
                           <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
@@ -504,7 +494,7 @@
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
-              <StackPanel Spacing="10">
+              <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <TextBlock Grid.Column="0" Classes="caption"
                              Text="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}" />
@@ -512,8 +502,8 @@
                           IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
                 </Grid>
                 <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Text="{x:Static res:Strings.ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb}" TextWrapping="Wrap" Classes="primary size-12-5" />
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{x:Static res:Strings.ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb}" TextWrapping="Wrap" Classes="primary size-13" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="CancelForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelForgetAllCommand}" />
                       <Button Name="ConfirmForgetAll" Classes="danger sm" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding ForgetAllCommand}" />
@@ -540,7 +530,7 @@
                               FontWeight="Medium"
                               Classes="size-13-5"
                               IsChecked="{Binding SendCrashReports}" />
-                <TextBlock Classes="caption" Margin="42,0,0,0" TextWrapping="Wrap"
+                <TextBlock Classes="caption" Margin="40,0,0,0" TextWrapping="Wrap"
                            Text="{x:Static res:Strings.WhatFailedAndWhereInKeypastesCodeX12c043}" />
               </StackPanel>
             </Border>
@@ -553,7 +543,7 @@
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
               <ctl:KpIcon Grid.Column="0" Icon="layers" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
               <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Classes="row-label" Text="{x:Static res:Strings.Advanced}" />
+                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Advanced}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="{x:Static res:Strings.TheActivityLogShareLinksScopedTokensX927922}" />
               </StackPanel>

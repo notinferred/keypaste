@@ -157,3 +157,51 @@ dev 42335749470 (desktop, Linux) failed at `d1aa8507` on `The_gui_refuses_every_
 ### Limits and follow-ups
 
 No person has used the menus, and macOS's native submenus and the Windows and Linux flyout's are drawn only by the headless tests. Commands that stay button-only are in BACKLOG's row. `OneHomeJourneyTests.Every_advanced_feature_is_reached_from_its_one_home` failed once locally at "the settings did not open" during a whole-project run and passed when run with fewer classes; its mechanism is not diagnosed.
+
+## Stage 4: the code matches DESIGN's numbers
+
+The founder decided that the code changes to DESIGN's numbers and DESIGN's numbers do not change; DESIGN is untouched. Implemented only, in RELEASE's terms. Recounted on main at `7f918324` before the change: 278 off-scale numbers in the AXAML's spacing, 10 off-list radii, 109 `mono sm` and 51 `size-12-5` uses, and 31 `section` uses at 13.
+
+### Findings closed
+
+| ID | What changed |
+|---|---|
+| A08 | Plain words left mono: the save state, 'live', sidebar counts, 'missing', 'expired', 'same as staging', 'value goes to the agent', the generator's strength, agent initials, a chip's words, Agents' time left, the idle-lock sentence, 'also …', a cell's 'item also in …' with its paths staying mono, 'No variables', Items' last used ('never', '7m ago'), an item's agent lines and a YubiKey's label. The Rename form's title is sans, as New item's is. |
+| A09 | `MachineRuns`, an attached property, sets machine text in a sentence as mono runs, keeping the whole sentence in `Text`. `InText` finds what has a machine's shape: paths from the root, the home or a drive, spaces included where the path goes on after them (`Application Support/Claude/...`, `C:\Users\Maya Ochoa\...`), flags, `read:`, `env:` and `tag:` words, and `keypaste mcp`, `run` and `log verify`. `Words` names what has no shape: a key, an item's path, a command with arguments. It is on Connect's explanation, a tool's status, the token scope line, the static sentences that name a tag or a command, the replace and rename forms and the notices and errors that can name a path. Recommendations' item paths are mono. |
+| A10 | `.section` is 20/600 at −0.03em, and the unused `.h2` is gone. `.title`, the lock screen's title and the open project's title are 24/600 at −0.03em, and Items' list header is `.h1`. The unused `mono.xl` is gone. A project page's 'Items' is a `.section`, the rank of its sibling 'Run with this environment'. The replace and rename forms' heads are sentences holding a key or a path, so they are Body with mono runs, not `.section`. |
+| A11 | Mono is 12, 12.5 or 13: `mono.sm`, `mono.lg`, `size-11` and `size-12-5` are gone, keycaps, chips and the prompt's call and countdown rise to 12. Sans is 13 or 13.5 for body, with buttons, fields and captions at 13, and 12 only at weight 500. Helper text and wrapped text at 13 take Body's line height of 1.5. A view sets a size only through a class: all 41 local size setters are gone, by deleting those that changed nothing and naming `size-*` on the element for the rest. |
+| A12 | Every icon is 14, 16 or 20: 10 to 13 became 14, 15 became 16, 18 and above became 20, and every sidebar row's icon is 20, its fold chevron staying a 14 glyph in a 20 target. A column head's arrow and the reveal button's icon are 14. The stroke was already 1.5 at every size. |
+| A40 | Every Margin, Padding, Spacing and thickness resource is on the scale, by one table of old to new, with the head-to-row, toggle-to-text and 20-target offsets moved together. A tree's indent is 16 a level, so deeper levels are multiples of the 16 grid, 48 at the third. `DesignScaleTests` fails a value off the scale, a radius off the list, a type size off the table or an icon off the three, in the AXAML, its `x:Double` resources and C#'s literals; mono over 13 outside a mask; sans at 12 that is not a label; a size set in a view; and a negative margin its named list of 14 does not give a reason for. `ScrollBarSize`, Fluent's, is the one size exempt. |
+| A43 | Radii are 4, 6, 7, 10 and 14. Tiles take 10, segments and in-field buttons 6, Lock and menu items 7, chip removes 4. A dot, a switch's track and the thin progress bar are round at 4, 10 and 4, since a radius over half the side draws the same. |
+| A45 | `MaskedInput` draws mono 14 by its theme, and the history's Now mask and a project cell's mask are 14 and mono. |
+| A55, A64 | The title bar says 'Lock' in sans, from the menu's label, and the lowercase string is gone. `VaultStatus` became `VaultSaveWords`, and the file name draws in mono beside it in sans, the name still giving way in its middle. A64's other word pairs are in BACKLOG, for stage 5's words. |
+
+### Settled choices
+
+The mapping, where a number had two neighbours: gaps and stacks go down (10 to 8, 14 to 12, 18 to 16, 28 to 24), a button's sides go up (10 to 12), and a card's padding goes up (14 to 16). A list row's `0,1` margin became `0,0,0,2`, which keeps the 2px gap between rows. Sans at 12/400 became 13/400 rather than 12/500, since a heavier helper line is louder. A half size inside DESIGN's range stays: mono 12.5, row titles and sidebar places at 13.5. Time left stays out of mono because it holds a word; a prompt's `0:28` and a time or date stay mono.
+
+### Repairs the frames and the walk asked for
+
+The numbers moved things out of place. KeePass import's Cancel and Import fell off the card at 200% on a small window, so the card scrolls between its head and its answers, its bar in the card's padding, and the keep-in-place choice and any message stay in view with the answers. The project title's picker was cut in the long pseudo-locale at 840, so the title has its own line and the header's actions drop under the subtitle where they do not fit, through `HeaderRow`, at their usual padding. Items' head sat 2 off its rows when row padding became 12, so the list's padding became 4. New outgrew its fixed 68 and cut its label in the long pseudo-locale, so it is a least width at one weight, SemiBold, which keeps the search beside it still as the amber leaves. The title bar's dot sat against 'saved', because Instrument Sans's middle dot advances 1.3 and inks past that; it is drawn.
+
+### For the founder to weigh
+
+DESIGN's numbers are followed as decided, and these are louder or flatter than before. Before frames are `q19-4-base`, rendered at main's `7f918324`, and after frames `q19-4r`, under the session's scratchpad, named in the batch's report.
+
+- Settings and Agents: each card's or list's heading at 20 competes with its contents, where 13 read as a label, and a page of them is a page of headlines (`04-settings`, `95-settings-whole`, `21-agents-full`, `96-recommendations`).
+- A form's title inside a pane at 20 sits right under the item's title at 24, two near-equal headings (`19-secrets-organize`, `20-secrets-edit`, `14-secrets-history`, `41-env-add`, `46-env-add-entry`).
+- Items: 'All items' and the item's title are both 24, so the list header and the pane no longer rank, and New item's 'New item' stacks under 'All items' at the same size (`01-items`, `13-secrets-new`).
+- The sidebar's group and project rows at 20 draw larger than their 13 labels and take a little of a project's name (`01-items`).
+- A project page's 'Items' at 20 now ranks with 'Run with this environment' and any open form, adding one more headline to the page (`40-env-staging`).
+- Prompts grew. The 13 size and Body's line height take the approval prompt from 574 to 601 tall and the run prompt from 750 to 807, order, Deny and the reason unchanged. A prompt is scaled to fit its screen, so on a 1366 by 768 screen at 200% the run prompt draws at 90% of its design size, where it was 97% (`91-approval`, `91c-run-approval`, `s-run-approval-on-1366x768`).
+
+### Evidence
+
+All green at `cb798d8d` on `q19-4-design-numbers`, before the review's repairs: ci 42347753914 (fast tier); ci 42349447939 on every runner, `test` at 5776 on Linux and macOS and 5778 on Windows, with none failed, and every `compat`; app 42349456134, with desktop tests at 2442 and 39 on all three runners and none failed, desktop gates on all three, and KeePassXC's first run and workflows; dev 42350538138, this app run's packages installed and its acts done on all three; dev 42348145356 (desktop, Linux, 2442 and 39); dev 42348848746 (desktop gates, Linux). `tools` was not run, since nothing here reaches an AI tool. Locally, the renderer's walk at every zoom and pseudo-locale, 70 tests with the classes it touches, and 699 across the views and rendering classes before their last two repairs.
+
+The review's repairs at `9f189044`, which differs from this commit only in this record: ci 42354418065 (fast tier); dev 42354929889 (desktop, Linux, 2459 and 39, none failed, 41 skipped as before); dev 42355658273 (desktop gates, Linux). Windows, macOS and compatibility have not run on the repairs; `main`'s push runs them. Locally, the renderer's walk at every zoom and pseudo-locale, 813 tests across the views, controls, rendering and session classes the repairs touch, and a mutation of each value the check now covers failing it.
+
+### Limits and follow-ups
+
+`MachineRuns` finds paths by their shape, so a path holding a space is mono only up to the space and a relative path such as `Work/linear` inside a sentence stays sans; the sentences come from core and the system, so nothing marks them. A flag can break after its hyphens at 720 (`95a-settings-720`). KeePass import's scroll bar crosses the card's edge when it shows on a small window. No person has seen these sizes on a real screen; the frames are headless.
+

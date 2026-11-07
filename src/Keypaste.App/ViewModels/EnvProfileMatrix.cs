@@ -72,6 +72,9 @@ internal sealed record EnvProfileCell(
         ? Also.Count > 0 ? "item also in " + string.Join(", ", Also) : string.Empty
         : FullSourceNote;
 
+    /// <summary>The item paths in <see cref="SourceNote"/>, for its mono runs.</summary>
+    internal string SourceWords => string.Join('|', Sources);
+
     /// <summary>What a screen reader hears for the cell: the mask or "missing", and the item always.</summary>
     internal string Spoken => Sources.Count > 0 ? $"{Label}, from {string.Join(", ", Sources)}" : Label;
 

@@ -15,14 +15,13 @@
       <Setter Property="Height" Value="34" />
       <Setter Property="MinHeight" Value="34" />
       <Setter Property="Padding" Value="12,0" />
-      <Setter Property="FontSize" Value="13" />
     </Style>
     <Style Selector="Button.dialog-action.primary">
-      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Padding" Value="16,0" />
     </Style>
 
     <Style Selector="Border.map-row">
-      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="Padding" Value="12,8" />
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
@@ -42,14 +41,14 @@
       <StackPanel Spacing="16">
 
         <Grid ColumnDefinitions="Auto,*,Auto">
-          <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
+          <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="20" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
           <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ImportAnotherAppsExport}" VerticalAlignment="Center" />
           <Button Grid.Column="2"
                   Classes="icon ghost sm"
                   ToolTip.Tip="{x:Static res:Strings.Close}"
                   Command="{Binding CancelCommand}"
                   AutomationProperties.Name="{x:Static res:Strings.Close}">
-            <ctl:KpIcon Icon="x" Size="15" />
+            <ctl:KpIcon Icon="x" Size="16" />
           </Button>
         </Grid>
 
@@ -59,35 +58,35 @@
                      Stroke="{DynamicResource KpBorderStrong}"
                      StrokeThickness="1"
                      StrokeDashArray="4,3" />
-          <Grid ColumnDefinitions="Auto,*,Auto" Margin="14">
-            <ctl:KpIcon Grid.Column="0" Icon="file-code" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
+          <Grid ColumnDefinitions="Auto,*,Auto" Margin="16">
+            <ctl:KpIcon Grid.Column="0" Icon="file-code" Size="20" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-              <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FilePath}" />
+              <TextBlock Classes="mono size-13" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FilePath}" />
               <TextBlock
-                         Classes="muted size-12"
+                         Classes="muted size-13"
                          Text="{Binding CardDetail}"
                          TextTrimming="CharacterEllipsis"
                          IsVisible="{Binding !IsUnreadable}" />
-              <TextBlock
-                         Classes="danger size-12"
+              <TextBlock ctl:MachineRuns.InText="True"
+                         Classes="danger size-13"
                          ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                          TextWrapping="Wrap"
                          IsVisible="{Binding IsUnreadable}" />
             </StackPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsPreviewing}">
-              <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock Classes="muted size-12" Text="{x:Static res:Strings.NotEncrypted}" VerticalAlignment="Center" />
+              <ctl:KpIcon Icon="lock-open" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.NotEncrypted}" VerticalAlignment="Center" />
             </StackPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsImported}">
-              <ctl:KpIcon Icon="circle-check" Size="13" Foreground="{DynamicResource KpOk}" />
-              <TextBlock Classes="ok size-12" Text="{x:Static res:Strings.Imported}" VerticalAlignment="Center" />
+              <ctl:KpIcon Icon="circle-check" Size="14" Foreground="{DynamicResource KpOk}" />
+              <TextBlock Classes="ok size-13" Text="{x:Static res:Strings.Imported}" VerticalAlignment="Center" />
             </StackPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding IsUnreadable}">
-              <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
-              <TextBlock Classes="danger size-12" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
+              <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpDanger}" />
+              <TextBlock Classes="danger size-13" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>
         </Panel>
@@ -140,7 +139,7 @@
                                      VerticalAlignment="Center" />
                           <ctl:KpIcon Grid.Column="1"
                                       Icon="arrow-right"
-                                      Size="12"
+                                      Size="14"
                                       HorizontalAlignment="Center"
                                       Foreground="{DynamicResource KpTextMuted}" />
                           <TextBlock Grid.Column="2"
@@ -155,7 +154,7 @@
                                      Grid.ColumnSpan="3"
                                      Margin="0,4,0,0"
                                      TextWrapping="Wrap"
-                                     Classes="muted size-12"
+                                     Classes="muted size-13"
                                      Text="{Binding Note}"
                                      IsVisible="{Binding HasNote}" />
                         </Grid>
@@ -170,7 +169,7 @@
 
         <!-- After the import: what it did. -->
         <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsImported}">
-          <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
+          <ctl:KpIcon Icon="circle-check" Size="16" Foreground="{DynamicResource KpOk}" />
           <TextBlock Classes="size-13-5"
                      FontWeight="Medium"
                      TextWrapping="Wrap"
@@ -201,7 +200,7 @@
                                    Text="{Binding Item}"
                                    TextTrimming="CharacterEllipsis"
                                    IsVisible="{Binding HasItem}" />
-                        <TextBlock Classes="muted size-12" TextWrapping="Wrap" Text="{Binding What}" />
+                        <TextBlock Classes="muted size-13" TextWrapping="Wrap" Text="{Binding What}" />
                       </StackPanel>
                     </Border>
                   </DataTemplate>
@@ -212,9 +211,9 @@
         </StackPanel>
 
         <!-- The export is plaintext on disk, and keypaste leaves it there (D-0592). -->
-        <Border Classes="card" Padding="14" IsVisible="{Binding IsImported}">
+        <Border Classes="card" Padding="16" IsVisible="{Binding IsImported}">
           <Grid ColumnDefinitions="Auto,*">
-            <ctl:KpIcon Grid.Column="0" Icon="trash-2" Size="15" Margin="0,1,10,0" VerticalAlignment="Top"
+            <ctl:KpIcon Grid.Column="0" Icon="trash-2" Size="16" Margin="0,2,8,0" VerticalAlignment="Top"
                         Foreground="{DynamicResource KpTextMuted}" />
             <StackPanel Grid.Column="1" Spacing="6">
               <TextBlock Classes="size-13"
@@ -223,7 +222,7 @@
                          Foreground="{DynamicResource KpTextPrimary}"
                          Text="{Binding FileName, StringFormat={x:Static res:Strings.DeleteValueNow}}" />
               <TextBlock
-                         Classes="secondary size-12-5"
+                         Classes="secondary size-13"
                          TextWrapping="Wrap"
                          Text="{x:Static res:Strings.ItHoldsYourPasswordsUnencryptedAndKeypasteXdcf75b}" />
               <TextBlock Classes="mono muted size-12" TextWrapping="Wrap" Text="{Binding FilePath}" />
@@ -231,7 +230,7 @@
           </Grid>
         </Border>
 
-        <TextBlock Classes="danger size-12-5"
+        <TextBlock ctl:MachineRuns.InText="True" Classes="danger size-13"
                    TextWrapping="Wrap"
                    ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                    IsVisible="{Binding HasTrailingMessage}" />

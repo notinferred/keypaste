@@ -8,6 +8,8 @@
   <ControlTheme x:Key="{x:Type ctl:MaskedInput}" TargetType="ctl:MaskedInput">
     <Setter Property="Focusable" Value="True" />
     <Setter Property="MinHeight" Value="40" />
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="14" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Name="Frame"
@@ -67,7 +69,7 @@
                         IsChecked="{TemplateBinding IsExpanded, Mode=TwoWay}"
                         AutomationProperties.Name="{Binding $parent[Expander].(AutomationProperties.Name)}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Name="Chevron" Icon="chevron-right" Size="13" />
+              <ctl:KpIcon Name="Chevron" Icon="chevron-right" Size="14" />
               <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" VerticalAlignment="Center" />
             </StackPanel>
           </ToggleButton>

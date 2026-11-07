@@ -10,7 +10,7 @@
        separator, and what that is worth. One markup for every form and the Generate password dialog. It holds no
        secret; the value goes straight into the field it was generated for. -->
 
-  <StackPanel Spacing="10">
+  <StackPanel Spacing="8">
     <Border Classes="segmented inset" HorizontalAlignment="Left">
       <StackPanel Orientation="Horizontal">
         <RadioButton Classes="segment" Content="{x:Static res:Strings.Characters}" IsChecked="{Binding UseCharacters}" />
@@ -37,7 +37,7 @@
                  Text="{Binding Separator}" />
       </StackPanel>
     </StackPanel>
-    <TextBlock Classes="mono muted size-12" Text="{Binding Strength}" />
+    <TextBlock Classes="muted size-13" Text="{Binding Strength}" />
     <TextBlock Classes="caption" IsVisible="{Binding UseWords}" Text="{Binding Provenance}" />
     <TextBlock Classes="caption secondary"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"

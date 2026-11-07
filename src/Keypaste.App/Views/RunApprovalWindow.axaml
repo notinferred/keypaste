@@ -30,32 +30,32 @@
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="8">
         <Grid Classes="prompt-head" Height="57" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
           <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
           <Border Grid.Column="0" Classes="prompt-tile">
-            <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+            <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
           </Border>
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-            <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
-            <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" />
-            <TextBlock Name="ClientText" Classes="prompt-sub size-12" Text="{Binding Client}" />
+            <TextBlock Name="TitleText" Classes="prompt-title size-16" Text="{Binding Title}" />
+            <TextBlock Name="SubtitleText" Classes="prompt-sub size-13" Text="{Binding Subtitle}" />
+            <TextBlock Name="ClientText" Classes="prompt-sub size-13" Text="{Binding Client}" />
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <Border Classes="dot waiting" />
-            <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+            <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
           </StackPanel>
         </Grid>
 
         <Grid Classes="prompt-environment" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="prompt-sub" Text="environment" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment" Text="{Binding Profile}" />
+          <TextBlock Grid.Column="0" Classes="prompt-sub size-13" Text="environment" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment size-12-5" Text="{Binding Profile}" />
         </Grid>
       </StackPanel>
 
-      <Border Classes="prompt-call" Height="94">
+      <Border Classes="prompt-call size-12" Height="94">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="12,10">
+          <StackPanel Margin="12,8">
             <TextBlock Name="ToolText" Text="{Binding Tool}" />
             <TextBlock Name="CommandText" Classes="value" Text="{Binding Command}" TextWrapping="Wrap" />
             <TextBlock Name="ProgramText" Text="{Binding Program}" TextWrapping="Wrap" />
@@ -67,18 +67,18 @@
         </ScrollViewer>
       </Border>
 
-      <Border Classes="prompt-list" Height="131">
+      <Border Classes="prompt-list size-12-5" Height="131">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RunVariableRow">
                 <Border Classes="prompt-row" Padding="12,6">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="1">
+                    <StackPanel Grid.Column="0" Spacing="2">
                       <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                      <TextBlock Classes="tag size-11" Text="{Binding Source}" TextWrapping="Wrap" />
+                      <TextBlock Classes="source size-12" Text="{Binding Source}" TextWrapping="Wrap" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" Classes="tag" Text="{Binding Tag}" TextWrapping="Wrap" MaxWidth="170"
+                    <TextBlock Grid.Column="1" Classes="tag size-13" Text="{Binding Tag}" TextWrapping="Wrap" MaxWidth="170"
                                TextAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
@@ -92,10 +92,10 @@
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
         <Border Classes="prompt-reason" Height="77">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12,9" Spacing="6">
-              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+            <StackPanel Margin="12,8" Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
                          IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
+              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
                          IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
                          Foreground="{DynamicResource KpTextSecondary}" />
@@ -106,13 +106,13 @@
       </StackPanel>
 
       <StackPanel Spacing="4">
-        <TextBlock Name="ExplainerText" Classes="prompt-note" Text="{Binding Explainer}" />
-        <TextBlock Name="OnceOnlyText" Classes="prompt-note" Text="{Binding OnceOnlyText}"
+        <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
+        <TextBlock Name="OnceOnlyText" Classes="prompt-note size-13" Text="{Binding OnceOnlyText}"
                    Foreground="{DynamicResource KpTextSecondary}"
                    IsVisible="{Binding OnceOnlyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
 
-      <StackPanel Spacing="10">
+      <StackPanel Spacing="8">
         <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
           <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                   IsCancel="True" Command="{Binding DenyCommand}" />
