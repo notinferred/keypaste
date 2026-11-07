@@ -37,6 +37,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     private readonly ClipboardCountdown? _clipboard;
     private readonly Action<string> _toast;
     private bool _isFormOpen;
+    private bool _pressedCreate;
     private string _name = string.Empty;
     private string _scope = string.Empty;
     private string _expiry = ExpiryOptions[1];
@@ -79,6 +80,9 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
                 OnPropertyChanged(nameof(CanOpenForm));
                 OpenFormCommand.NotifyCanExecuteChanged();
                 FormError = string.Empty;
+                _pressedCreate = false;
+                OnPropertyChanged(nameof(NameProblem));
+                OnPropertyChanged(nameof(ScopeProblem));
             }
         }
     }
@@ -93,15 +97,48 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     internal string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _name, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(NameProblem));
+                OnPropertyChanged(nameof(HasNameProblem));
+            }
+        }
     }
+
+    /// <summary>Why the name typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
+    internal string? NameProblem =>
+        _name.Trim().Length == 0
+            ? (_pressedCreate ? "A token needs a name. Type one, such as ci-staging." : null)
+            : !TokenStore.IsValidName(_name.Trim(), out var error) ? Sentence(error) : null;
+
+    internal bool HasNameProblem => NameProblem is not null;
 
     /// <summary>The new token's scopes, comma-separated, as <c>--scope</c> takes them.</summary>
     internal string Scope
     {
         get => _scope;
-        set => SetProperty(ref _scope, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _scope, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(ScopeProblem));
+                OnPropertyChanged(nameof(HasScopeProblem));
+            }
+        }
     }
+
+    /// <summary>Why the scope typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
+    internal string? ScopeProblem =>
+        _scope.Trim().Length == 0
+            ? (_pressedCreate ? "A token needs a scope. Type one, such as read:acme-api/staging/*." : null)
+            : !TokenScope.TryParseList(_scope, out _, out var error) ? Sentence(error) : null;
+
+    internal bool HasScopeProblem => ScopeProblem is not null;
+
+    private static string Sentence(string message) =>
+        message.Length == 0 ? "No token was made." : char.ToUpperInvariant(message[0]) + message[1..].TrimEnd('.') + ".";
 
     /// <summary>One of <see cref="ExpiryOptions"/>.</summary>
     internal string Expiry
@@ -264,13 +301,25 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
 
     private void CreateFromForm()
     {
+        _pressedCreate = true;
+        OnPropertyChanged(nameof(NameProblem));
+        OnPropertyChanged(nameof(HasNameProblem));
+        OnPropertyChanged(nameof(ScopeProblem));
+        OnPropertyChanged(nameof(HasScopeProblem));
+
+        if (HasNameProblem || HasScopeProblem)
+        {
+            FormError = string.Empty;
+            return;
+        }
+
         var name = _name.Trim();
         var days = int.Parse(_expiry[..^1], CultureInfo.InvariantCulture);
         var (ok, token, message) = Create(name, _scope, TimeSpan.FromDays(days), allowProd: false);
 
         if (!ok || token is null)
         {
-            FormError = message.Length == 0 ? "No token was made." : char.ToUpperInvariant(message[0]) + message[1..].TrimEnd('.') + ".";
+            FormError = Sentence(message);
             return;
         }
 

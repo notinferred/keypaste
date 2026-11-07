@@ -24,6 +24,7 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private readonly AppVaultSession _session;
+    private string? _newProjectRefusal;
     private readonly ClipboardCountdown _clipboard;
     private readonly IVaultFilePicker? _picker;
     private readonly ProjectLaunching _launching;
@@ -167,7 +168,23 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
     /// <summary>The name of the project being created.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewProjectProblem), nameof(HasNewProjectProblem))]
     internal partial string NewProject { get; set; } = string.Empty;
+
+    /// <summary>Why the project name typed cannot be used, or null: what Create refused it for, then core's rule, an empty name only once Create is pressed on it.</summary>
+    internal string? NewProjectProblem =>
+        _newProjectRefusal ?? (NewProject.Trim() is { Length: > 0 } project && !EnvConvention.IsValidProject(project, out var invalid) ? invalid : null);
+
+    internal bool HasNewProjectProblem => NewProjectProblem is not null;
+
+    partial void OnNewProjectChanged(string value) => _newProjectRefusal = null;
+
+    private void RefuseNewProject(string? refusal)
+    {
+        _newProjectRefusal = refusal;
+        OnPropertyChanged(nameof(NewProjectProblem));
+        OnPropertyChanged(nameof(HasNewProjectProblem));
+    }
 
     /// <summary>Copies a card's run command, plainly and with no countdown.</summary>
     internal RelayCommand<string> CopyRunCommandCommand { get; }
@@ -308,6 +325,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     private void BeginAdd()
     {
         NewProject = string.Empty;
+        RefuseNewProject(null);
         IsAdding = true;
         Error = null;
     }
@@ -316,6 +334,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     {
         IsAdding = false;
         NewProject = string.Empty;
+        RefuseNewProject(null);
         Error = null;
     }
 
@@ -332,13 +351,13 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         // Core's rule again, for the same reason: `keypaste env set` refuses the same names.
         if (!EnvConvention.IsValidProject(project, out var invalid))
         {
-            Error = invalid;
+            RefuseNewProject(invalid);
             return;
         }
 
         if (ProjectCatalog.Read(vault).Projects.Any(listing => string.Equals(listing.Name, project, StringComparison.Ordinal)))
         {
-            Error = $"'{project}' already exists.";
+            RefuseNewProject($"'{project}' already exists. Choose another name, or open it from the sidebar.");
             return;
         }
 

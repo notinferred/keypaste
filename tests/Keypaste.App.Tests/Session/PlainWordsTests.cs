@@ -127,7 +127,7 @@ public sealed partial class PlainWordsTests
         Assert.Empty(Offending(said));
     });
 
-    /// <summary>Agents in every state it can be in, then with every Settings open and each kind of Connect pane, before and after Run it.</summary>
+    /// <summary>Agents in every state it can be in, then with every Settings open and each kind of Connect pane, before and after its action.</summary>
     [Fact]
     public Task Agents_HoldsNoneOfTheRetiredWords() => HeadlessSession.On(async () =>
     {
@@ -167,7 +167,7 @@ public sealed partial class PlainWordsTests
         await model.Connection!.ConfirmCommand.PressAsync();
         await model.Looking.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         agents.Settle();
-        said.AddRange(Shown(agents.Window, "Agents, after Run it"));
+        said.AddRange(Shown(agents.Window, "Agents, after Connect"));
 
         Assert.Empty(Offending(said));
     });

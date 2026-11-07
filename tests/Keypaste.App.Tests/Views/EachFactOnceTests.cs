@@ -69,13 +69,13 @@ public sealed class EachFactOnceTests
             row.GetVisualChildren().OfType<Control>().Where(control => control.IsVisible).Select(AutomationProperties.GetName));
 
         var menu = PressMenu(FieldMenu(shell, "API_TOKEN"));
-        Assert.Equal(["Replace value…", "Generate value…", "Rename field…", "Stop protecting field", "-", "Remove field…"], Headers(menu));
+        Assert.Equal(["Copy value", "Replace value…", "Generate value…", "Rename field…", "Stop protecting field", "-", "Remove field"], Headers(menu));
         Assert.All(menu.Items.OfType<MenuItem>(), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
         menu.Hide();
         RenderedShell.Drain();
 
         menu = PressMenu(FieldMenu(shell, "Region"));
-        Assert.Equal(["Replace value…", "Generate value…", "Rename field…", "Protect field", "-", "Remove field…"], Headers(menu));
+        Assert.Equal(["Copy value", "Replace value…", "Generate value…", "Rename field…", "Protect field", "-", "Remove field"], Headers(menu));
         Assert.False(menu.Items.OfType<MenuItem>().Single(item => item.Header as string == "Generate value…").IsEffectivelyEnabled, "a plain field offers Generate");
         menu.Hide();
     });
@@ -96,7 +96,7 @@ public sealed class EachFactOnceTests
         Choose(PressMenu(FieldMenu(shell, "Region")), "Protect field");
         Assert.True(entries.Detail!.Fields.Single(field => field.Name == "Region").IsProtected);
 
-        Choose(PressMenu(FieldMenu(shell, "API_TOKEN")), "Remove field…");
+        Choose(PressMenu(FieldMenu(shell, "API_TOKEN")), "Remove field");
         Assert.True(entries.Detail!.IsRemovingField);
         Assert.True(shell.Named<Button>("KeepField").IsFocused, "Cancel does not hold the keyboard over a removal");
     });
@@ -107,8 +107,8 @@ public sealed class EachFactOnceTests
     {
         using var shell = new RenderedShell("keypaste-field-bar-");
         var entries = OpenGithub(shell);
-        var item = shell.Commands.Menus.Single(menu => menu.Header == "Item");
-        AppCommand Command(string header) => item.Entries.OfType<AppCommand>().Single(command => command.Header == header);
+        var field = shell.Commands.Menus.Single(menu => menu.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Field");
+        AppCommand Command(string header) => field.Entries().OfType<AppCommand>().Single(command => command.Header == header);
 
         Assert.False(Command("Replace value…").CanRun(), "Replace is on with no field in hand");
 
@@ -425,13 +425,13 @@ public sealed class EachFactOnceTests
     {
         using var shell = new RenderedShell("keypaste-field-protect-focus-");
         var entries = OpenGithub(shell);
-        var item = shell.Commands.Menus.Single(menu => menu.Header == "Item");
+        var field = shell.Commands.Menus.Single(menu => menu.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Field");
 
         Choose(PressMenu(FieldMenu(shell, "Region")), "Protect field");
         RenderedShell.Drain();
 
         Assert.True(FieldMenu(shell, "Region").IsFocused, "the keyboard went nowhere");
-        Assert.True(item.Entries.OfType<AppCommand>().Single(command => command.Header == "Replace value…").CanRun());
+        Assert.True(field.Entries().OfType<AppCommand>().Single(command => command.Header == "Replace value…").CanRun());
         Assert.True(entries.Detail!.Fields.Single(field => field.Name == "Region").IsProtected);
     });
 

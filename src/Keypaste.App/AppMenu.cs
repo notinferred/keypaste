@@ -36,7 +36,7 @@ internal static class AppMenu
         return menu;
     }
 
-    /// <summary>The main window's menus on macOS: File, Edit, Item, View, Window and Help, after the app menu.</summary>
+    /// <summary>The main window's menus on macOS: File, Edit, Item, Project, Agents, View, Window and Help, after the app menu.</summary>
     internal static NativeMenu Bar(AppCommands commands)
     {
         ArgumentNullException.ThrowIfNull(commands);
@@ -51,7 +51,7 @@ internal static class AppMenu
         return bar;
     }
 
-    /// <summary>The menu button's flyout on Windows and Linux: keypaste, then File, Edit, Item, View, Window and Help.</summary>
+    /// <summary>The menu button's flyout on Windows and Linux: keypaste, then File, Edit, Item, Project, Agents, View, Window and Help.</summary>
     /// <remarks>A chord is shown, never bound: the window's chords already run it.</remarks>
     internal static MenuFlyout Flyout(AppCommands commands)
     {
@@ -71,6 +71,7 @@ internal static class AppMenu
             RevealedValue.HideShown();
             made.ForEach(refresh => refresh());
         };
+        GiveTheKeyboardToWhatItOpens(flyout);
         return flyout;
     }
 
@@ -88,7 +89,30 @@ internal static class AppMenu
         }
 
         flyout.Opening += (_, _) => made.ForEach(refresh => refresh());
+        GiveTheKeyboardToWhatItOpens(flyout);
         return flyout;
+    }
+
+    // Closing hands the keyboard back to where it was, so a form a choice opened takes it only after that.
+    private static void GiveTheKeyboardToWhatItOpens(MenuFlyout flyout)
+    {
+        Control? opened = null;
+        void Heard(Control form) => opened = form;
+
+        flyout.Opening += (_, _) =>
+        {
+            opened = null;
+            ShowInView.Shown += Heard;
+        };
+        flyout.Closed += (_, _) =>
+        {
+            ShowInView.Shown -= Heard;
+
+            if (opened is { } form)
+            {
+                ShowInView.TakeTheKeyboard(form);
+            }
+        };
     }
 
     private static IEnumerable<NativeMenuItemBase> NativeItems(IReadOnlyList<AppMenuEntry> entries) =>
@@ -187,11 +211,24 @@ internal static class AppMenu
     private static MenuItem Submenu(AppSubmenu submenu, List<Action> made)
     {
         var item = new MenuItem { Header = submenu.Header };
-        AddItems(item, submenu.Entries(), made);
+        var own = new List<Action>();
+        var shown = submenu.Entries();
+        AddItems(item, shown, own);
+        made.Add(() => own.ForEach(refresh => refresh()));
         item.SubmenuOpened += (_, _) =>
         {
-            item.Items.Clear();
-            AddItems(item, submenu.Entries(), made);
+            // A folder's entries are the same objects each time, whose handlers would pile up on them if drawn again; Open recent's are new each read.
+            var entries = submenu.Entries();
+
+            if (!ReferenceEquals(entries, shown))
+            {
+                shown = entries;
+                own.Clear();
+                item.Items.Clear();
+                AddItems(item, entries, own);
+            }
+
+            own.ForEach(refresh => refresh());
         };
 
         return item;

@@ -5,7 +5,7 @@
                     xmlns:ctl="using:Keypaste.App.Controls"
                     x:Class="Keypaste.App.Views.AboutWindow"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
-                    Title="{x:Static res:Strings.AboutKeypaste}"
+                    Title="{x:Static res:Strings.AboutWindowTitle}"
                     Width="360"
                     SizeToContent="Height"
                     CanResize="False"

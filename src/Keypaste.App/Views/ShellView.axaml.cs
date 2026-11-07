@@ -15,20 +15,6 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class ShellView : UserControl
 {
-    /// <summary>What takes the keyboard after a context menu's choice that opens a form: the form's first field.</summary>
-    private static readonly Dictionary<string, string> _formFocus = new(StringComparer.Ordinal)
-    {
-        ["New group"] = "NewGroupName",
-        ["Rename group…"] = "RenameGroupName",
-        ["Move group…"] = "MoveGroupTarget",
-        ["Delete group"] = "KeepGroup",
-        ["Rename or move…"] = "OrganizeTitle",
-        ["Replace value…"] = "ReplacementFieldValue",
-        ["Generate value…"] = "ReplacementFieldValue",
-        ["Rename field…"] = "RenamedFieldName",
-        ["Remove field…"] = "KeepField",
-    };
-
     private static void OnToastPointerEntered(object? sender, PointerEventArgs e) => ((sender as Control)?.DataContext as Toast)?.Hold();
 
     private static void OnToastPointerExited(object? sender, PointerEventArgs e) => ((sender as Control)?.DataContext as Toast)?.Release();
@@ -269,25 +255,6 @@ internal sealed partial class ShellView : UserControl
         }
 
         var menu = AppMenu.Context(entries);
-        string? chosenForm = null;
-
-        foreach (var item in menu.Items.OfType<MenuItem>())
-        {
-            if (item.Header is string header && _formFocus.TryGetValue(header, out var form))
-            {
-                // The item marks its click handled once it has run the command.
-                item.AddHandler(MenuItem.ClickEvent, (_, _) => chosenForm = form, handledEventsToo: true);
-            }
-        }
-
-        // Closing hands the keyboard back to where it was, so the form takes it only once the menu has closed.
-        menu.Closed += (_, _) =>
-        {
-            if (chosenForm is { } form)
-            {
-                FocusForm(form);
-            }
-        };
 
         // Attached, not set as the row's ContextFlyout, which would open itself at the next request.
         FlyoutBase.SetAttachedFlyout(anchor, menu);
@@ -321,17 +288,6 @@ internal sealed partial class ShellView : UserControl
 
         e.Handled = true;
     }
-
-    private void FocusForm(string name) =>
-        Dispatcher.UIThread.Post(
-            () =>
-            {
-                if (this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == name && control.IsEffectivelyVisible) is { } form)
-                {
-                    form.Focus(NavigationMethod.Tab);
-                }
-            },
-            DispatcherPriority.Loaded);
 
     /// <summary>Gives the keyboard to the sidebar's chosen row, which is in the footer's list on Trash and Settings.</summary>
     private void FocusChosenRow()

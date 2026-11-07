@@ -85,142 +85,154 @@
           MaxWidth="440"
           HorizontalAlignment="Center"
           VerticalAlignment="Center">
-    <StackPanel Spacing="14">
-
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <ctl:KpIcon Grid.Column="0" Icon="link" Size="16" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ShareALink}" VerticalAlignment="Center" />
-        <Button Grid.Column="2"
-                Name="CloseShare"
-                Classes="icon ghost sm"
-                ToolTip.Tip="{x:Static res:Strings.Cancel}"
-                AutomationProperties.Name="{x:Static res:Strings.Cancel}"
-                Command="{Binding CancelCommand}">
-          <ctl:KpIcon Icon="x" Size="15" />
-        </Button>
-      </Grid>
-
-      <TextBlock Classes="caption"
-                 TextWrapping="Wrap"
-                 Text="{x:Static res:Strings.EndToEndEncryptedTheKeyLivesX3e20ff}" />
-
-      <Grid ColumnDefinitions="*,10,112" RowDefinitions="Auto,6,Auto">
-        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="{x:Static res:Strings.What}" />
-        <Border Grid.Row="2" Grid.Column="0"
-                Height="34"
-                Padding="10,0"
-                CornerRadius="{DynamicResource KpRadiusField}"
-                Background="{DynamicResource KpBgApp}"
-                BorderBrush="{DynamicResource KpBorderDefault}"
-                BorderThickness="1">
-          <TextBlock Name="ShareWhat"
-                     Classes="mono size-12-5"
-                     VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis"
-                     Text="{Binding SelectedWhat}"
-                     ToolTip.Tip="{Binding SelectedWhat}" />
-        </Border>
-        <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.Field}" />
-        <ComboBox Grid.Row="2" Grid.Column="2"
-                  x:Name="ShareField" AutomationProperties.Name="{x:Static res:Strings.Field}"
-                  Classes="form"
+    <!-- The form scrolls under zoom; its actions and what they report stay in reach. -->
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Bottom" Spacing="14" Margin="0,14,0,0">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <Button x:Name="CancelShare"
+                  Classes="ghost lg"
+                  Content="{x:Static res:Strings.Cancel}"
+                  Command="{Binding CancelCommand}" />
+          <Button x:Name="CreateLink"
+                  Grid.Column="1"
+                  Classes="primary lg"
                   HorizontalAlignment="Stretch"
-                  ItemsSource="{Binding FieldOptions}"
-                  SelectedItem="{Binding Field}" />
-      </Grid>
+                  HorizontalContentAlignment="Center"
+                  Command="{Binding CreateCommand}"
+                  AutomationProperties.Name="{x:Static res:Strings.CreateAndCopyLink}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ctl:KpIcon Icon="link" Size="14" IsVisible="{Binding !CreateCommand.IsRunning}" />
+              <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding CreateCommand.IsRunning}" Classes.spinning="{Binding CreateCommand.IsRunning}" />
+              <TextBlock Text="{x:Static res:Strings.CreateAndCopyLink}" IsVisible="{Binding !CreateCommand.IsRunning}" />
+              <TextBlock Text="{x:Static res:Strings.CreatingLink}" IsVisible="{Binding CreateCommand.IsRunning}" />
+            </StackPanel>
+          </Button>
+        </Grid>
 
-      <StackPanel Spacing="6">
-        <TextBlock Classes="label" Text="{x:Static res:Strings.Recipient}" />
-        <TextBox x:Name="Recipient" AutomationProperties.Name="{x:Static res:Strings.Recipient}"
-                 Classes="form"
-                 Text="{Binding Recipient}"
-                 MaxLength="128"
-                 PlaceholderText="{x:Static res:Strings.ForYourListOnlyNeverSent}" />
-      </StackPanel>
+        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsUnavailable}">
+          <Border Grid.Column="0" Classes="dot" Margin="0,0,8,0" />
+          <TextBlock Grid.Column="1"
+                     x:Name="Unavailable"
+                     Classes="caption"
+                     TextWrapping="Wrap"
+                     Text="{Binding Unavailable}" />
+          <Button Grid.Column="2"
+                  Classes="link"
+                  Margin="12,0,0,0"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding CanRetry}"
+                  Content="{x:Static res:Strings.TryAgain}"
+                  Command="{Binding RetryCommand}" />
+        </Grid>
 
-      <Grid ColumnDefinitions="*,10,*">
-        <StackPanel Grid.Column="0" Spacing="6">
-          <TextBlock Classes="label" Text="{x:Static res:Strings.Expires}" />
-          <ListBox x:Name="Expires" AutomationProperties.Name="{x:Static res:Strings.Expires}"
-                   Classes="segmented choice"
-                   ItemsSource="{Binding TtlChoices}"
-                   SelectedItem="{Binding Ttl}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="x:String">
-                <TextBlock Text="{Binding Converter={x:Static vm:SharingViewModel.TtlInWords}}" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-        </StackPanel>
-        <StackPanel Grid.Column="2" Spacing="6">
-          <TextBlock Classes="label" Text="{x:Static res:Strings.Views}" />
-          <ListBox x:Name="Views" AutomationProperties.Name="{x:Static res:Strings.Views}"
-                   Classes="segmented choice"
-                   ItemsSource="{Binding ViewChoices}"
-                   SelectedItem="{Binding Views}" />
-        </StackPanel>
-      </Grid>
-
-      <CheckBox x:Name="RequirePassphrase"
-                Classes="passphrase"
-                IsChecked="{Binding RequirePassphrase}"
-                Content="{x:Static res:Strings.RequireAPassphraseSentSeparately}" />
-
-      <StackPanel Spacing="6" IsVisible="{Binding RequirePassphrase}">
-        <ctl:MaskedInput x:Name="SharePassphrase"
-                         MinHeight="34"
-                         Height="34"
-                         Classes="size-14"
-                         AllowsPaste="True"
-                         Sink="{Binding Passphrase}"
-                         MaskedLength="{Binding Passphrase.MaskedLength}"
-                         Placeholder="{x:Static res:Strings.AtLeast20CharactersSuchAsSixGeneratedWords}" />
-        <TextBlock Classes="caption"
-                   Text="{x:Static res:Strings.NotStoredSendItAnotherWayThanXdd068f}" />
-      </StackPanel>
-
-      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-        <Button x:Name="CancelShare"
-                Classes="ghost lg"
-                Content="{x:Static res:Strings.Cancel}"
-                Command="{Binding CancelCommand}" />
-        <Button x:Name="CreateLink"
-                Grid.Column="1"
-                Classes="primary lg"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center"
-                Command="{Binding CreateCommand}"
-                AutomationProperties.Name="{x:Static res:Strings.CreateAndCopyLink}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="link" Size="14" IsVisible="{Binding !CreateCommand.IsRunning}" />
-            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding CreateCommand.IsRunning}" Classes.spinning="{Binding CreateCommand.IsRunning}" />
-            <TextBlock Text="{x:Static res:Strings.CreateAndCopyLink}" IsVisible="{Binding !CreateCommand.IsRunning}" />
-            <TextBlock Text="{x:Static res:Strings.CreatingLink}" IsVisible="{Binding CreateCommand.IsRunning}" />
-          </StackPanel>
-        </Button>
-      </Grid>
-
-      <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsUnavailable}">
-        <Border Grid.Column="0" Classes="dot" Margin="0,0,8,0" />
-        <TextBlock Grid.Column="1"
-                   x:Name="Unavailable"
-                   Classes="caption"
+        <TextBlock x:Name="ShareError"
+                   Classes="caption danger"
                    TextWrapping="Wrap"
-                   Text="{Binding Unavailable}" />
-        <Button Grid.Column="2"
-                Classes="link"
-                Margin="12,0,0,0"
-                VerticalAlignment="Center"
-                IsVisible="{Binding CanRetry}"
-                Content="{x:Static res:Strings.TryAgain}"
-                Command="{Binding RetryCommand}" />
-      </Grid>
+                   IsVisible="{Binding HasError}"
+                   ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
 
-      <TextBlock x:Name="ShareError"
-                 Classes="caption danger"
-                 TextWrapping="Wrap"
-                 IsVisible="{Binding HasError}"
-                 ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
-    </StackPanel>
+      </StackPanel>
+      <!-- The margins leave a focused field its glow and the scroll bar the dialog's edge. -->
+      <ScrollViewer Margin="-4,-4,-14,-4" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="4,4,14,4" Spacing="14">
+
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <ctl:KpIcon Grid.Column="0" Icon="link" Size="16" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.ShareALink}" VerticalAlignment="Center" />
+            <Button Grid.Column="2"
+                    Name="CloseShare"
+                    Classes="icon ghost sm"
+                    ToolTip.Tip="{x:Static res:Strings.Cancel}"
+                    AutomationProperties.Name="{x:Static res:Strings.Cancel}"
+                    Command="{Binding CancelCommand}">
+              <ctl:KpIcon Icon="x" Size="15" />
+            </Button>
+          </Grid>
+
+          <TextBlock Classes="caption"
+                     TextWrapping="Wrap"
+                     Text="{x:Static res:Strings.EndToEndEncryptedTheKeyLivesX3e20ff}" />
+
+          <Grid ColumnDefinitions="*,10,112" RowDefinitions="Auto,6,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="{x:Static res:Strings.What}" />
+            <Border Grid.Row="2" Grid.Column="0"
+                    Height="34"
+                    Padding="10,0"
+                    CornerRadius="{DynamicResource KpRadiusField}"
+                    Background="{DynamicResource KpBgApp}"
+                    BorderBrush="{DynamicResource KpBorderDefault}"
+                    BorderThickness="1">
+              <TextBlock Name="ShareWhat"
+                         Classes="mono size-12-5"
+                         VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding SelectedWhat}"
+                         ToolTip.Tip="{Binding SelectedWhat}" />
+            </Border>
+            <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="{x:Static res:Strings.Field}" />
+            <ComboBox Grid.Row="2" Grid.Column="2"
+                      x:Name="ShareField" AutomationProperties.Name="{x:Static res:Strings.Field}"
+                      Classes="form"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding FieldOptions}"
+                      SelectedItem="{Binding Field}" />
+          </Grid>
+
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.Recipient}" />
+            <TextBox x:Name="Recipient" AutomationProperties.Name="{x:Static res:Strings.Recipient}"
+                     Classes="form"
+                     Text="{Binding Recipient}"
+                     MaxLength="128" />
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.ForYourListOnlyNeverSent}" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="*,10,*">
+            <StackPanel Grid.Column="0" Spacing="6">
+              <TextBlock Classes="label" Text="{x:Static res:Strings.Expires}" />
+              <ListBox x:Name="Expires" AutomationProperties.Name="{x:Static res:Strings.Expires}"
+                       Classes="segmented choice"
+                       ItemsSource="{Binding TtlChoices}"
+                       SelectedItem="{Binding Ttl}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding Converter={x:Static vm:SharingViewModel.TtlInWords}}" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="6">
+              <TextBlock Classes="label" Text="{x:Static res:Strings.Views}" />
+              <ListBox x:Name="Views" AutomationProperties.Name="{x:Static res:Strings.Views}"
+                       Classes="segmented choice"
+                       ItemsSource="{Binding ViewChoices}"
+                       SelectedItem="{Binding Views}" />
+            </StackPanel>
+          </Grid>
+
+          <CheckBox x:Name="RequirePassphrase"
+                    Classes="passphrase"
+                    IsChecked="{Binding RequirePassphrase}"
+                    Content="{x:Static res:Strings.RequireAPassphraseSentSeparately}" />
+
+          <StackPanel Spacing="6" IsVisible="{Binding RequirePassphrase}">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.Passphrase}" />
+            <ctl:MaskedInput x:Name="SharePassphrase"
+                             MinHeight="34"
+                             Height="34"
+                             Classes="size-14"
+                             AllowsPaste="True"
+                             Sink="{Binding Passphrase}"
+                             MaskedLength="{Binding Passphrase.MaskedLength}"
+                             AutomationProperties.Name="{x:Static res:Strings.Passphrase}" />
+            <TextBlock Classes="caption"
+                       Text="{x:Static res:Strings.AtLeast20CharactersSuchAsSixGeneratedWords}" />
+            <TextBlock Classes="caption"
+                       Text="{x:Static res:Strings.NotStoredSendItAnotherWayThanXdd068f}" />
+          </StackPanel>
+
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
   </Border>
 </UserControl>

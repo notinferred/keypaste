@@ -80,7 +80,7 @@ public sealed class EntryFieldsTests : IDisposable
 
         Add(detail, name, _secret, protect: true);
 
-        Assert.NotNull(context.Entries.Error);
+        Assert.NotNull(detail.NewFieldNameProblem ?? context.Entries.Error);
         Assert.True(detail.IsAddingField);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
     }
@@ -212,7 +212,7 @@ public sealed class EntryFieldsTests : IDisposable
         detail.ConfirmRenameFieldCommand.Press();
         detail.ConfirmRenameFieldCommand.Press();
 
-        Assert.NotNull(context.Entries.Error);
+        Assert.NotNull(detail.RenamedFieldProblem);
         Assert.True(detail.IsRenamingField);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
     }

@@ -35,6 +35,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
     private EntryName? _pinned;
+    private string? _groupRefusal;
     private EntryDetailViewModel? _detail;
     private string _search = string.Empty;
     private string? _matchedQuery;
@@ -614,7 +615,26 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>The name being typed for a group.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GroupProblem), nameof(HasGroupProblem))]
     internal partial string DraftGroupName { get; set; } = string.Empty;
+
+    /// <summary>Why the group form's last press changed nothing, or why the name typed cannot be used, or null.</summary>
+    internal string? GroupProblem =>
+        _groupRefusal
+        ?? (DraftGroupName.Trim() is { Length: > 0 } name && EntryNameSanitizer.Sanitize(name) is { WasAltered: true } sanitized
+            ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
+            : null);
+
+    internal bool HasGroupProblem => GroupProblem is not null;
+
+    partial void OnDraftGroupNameChanged(string value) => _groupRefusal = null;
+
+    private void RefuseGroup(string? refusal)
+    {
+        _groupRefusal = refusal;
+        OnPropertyChanged(nameof(GroupProblem));
+        OnPropertyChanged(nameof(HasGroupProblem));
+    }
 
     /// <summary>The groups an entry can be moved into.</summary>
     /// <remarks>
@@ -1123,7 +1143,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            Error = "That item is not in this vault any more.";
+            Error = "That item is not in this vault any more. Choose another.";
             Reload();
             return;
         }
@@ -1378,6 +1398,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         IsConfirmingGroupDelete = false;
         DraftGroupName = string.Empty;
         GroupMoveTarget = null;
+        RefuseGroup(null);
     }
 
     /// <summary>Closes whatever else is open, so one form is on screen at a time.</summary>
@@ -1448,13 +1469,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (write.Problem("make your change again") is { } problem)
         {
-            Error = problem;
+            RefuseGroup(problem);
             return;
         }
 
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            Error = Refusal(write.Value.Outcome);
+            RefuseGroup(Refusal(write.Value.Outcome));
             return;
         }
 
@@ -1554,7 +1575,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         {
             Error = write.Value.Outcome == OrganizeOutcome.NameRefused
                 ? "keypaste could not give a copy of this item a title it accepts. Rename the item, then duplicate it."
-                : "That item is not in this vault any more.";
+                : "That item is not in this vault any more. Choose another.";
             return;
         }
 
@@ -1594,14 +1615,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (name.Length == 0)
         {
-            Error = "A group needs a name.";
+            RefuseGroup("A group needs a name. Type one.");
             return;
         }
 
         var sanitized = EntryNameSanitizer.Sanitize(name);
         if (sanitized.WasAltered)
         {
-            Error = $"That is not a name keypaste will create. Try '{sanitized.Text}'.";
             return;
         }
 
@@ -1609,13 +1629,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (write.Problem("make your change again") is { } problem)
         {
-            Error = problem;
+            RefuseGroup(problem);
             return;
         }
 
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            Error = Refusal(write.Value.Outcome);
+            RefuseGroup(Refusal(write.Value.Outcome));
             return;
         }
 
@@ -1666,23 +1686,23 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         switch (outcome)
         {
             case OrganizeOutcome.NothingMatched:
-                return "That item is not in this vault any more.";
+                return "That item is not in this vault any more. Choose another.";
 
             case OrganizeOutcome.DestinationMissing:
-                return "That group is not in this vault any more.";
+                return "That group is not in this vault any more. Choose another.";
 
             case OrganizeOutcome.DestinationUnchanged:
-                return "That is already its name and its group.";
+                return "That is already its name and its group. Change one, or cancel.";
 
             case OrganizeOutcome.DestinationOccupied:
-                return "That group already has an item with this name.";
+                return "That group already has an item with this name. Choose another name or group.";
 
             case OrganizeOutcome.DestinationAmbiguous:
                 return "That would leave two items answering to one path, and keypaste could not tell them apart afterwards. Choose another name.";
 
             case OrganizeOutcome.NameRefused:
                 VaultNameRules.IsValidTitle(target.Title, out var why);
-                return $"keypaste will not use that title: {why}.";
+                return $"keypaste will not use that title: {why}. Choose another.";
 
             default:
                 return "That change could not be made. Check the name and the group, then try again.";
@@ -1696,10 +1716,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         {
             case GroupOutcome.NothingMatched:
             case GroupOutcome.ParentMissing:
-                return "That group is not in this vault any more.";
+                return "That group is not in this vault any more. Choose another.";
 
             case GroupOutcome.DestinationUnchanged:
-                return IsMovingGroup ? "The group is already there." : "That is already its name.";
+                return IsMovingGroup ? "The group is already there. Choose another place, or cancel." : "That is already its name. Type another, or cancel.";
 
             case GroupOutcome.DestinationOccupied:
                 return "Something in there already answers to that name. Nothing was changed. Choose another name.";
@@ -1715,7 +1735,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
             case GroupOutcome.NameRefused:
                 VaultNameRules.IsValidGroupName(DraftGroupName.Trim(), out var why);
-                return $"keypaste will not use that group name: {why}.";
+                return $"keypaste will not use that group name: {why}. Choose another.";
 
             case GroupOutcome.NameReserved:
                 return "env at the top level and the Trash are names keypaste assigns. A group cannot be created as one, renamed to one "

@@ -567,7 +567,7 @@ public sealed class TrashTests : IDisposable
 
         trash.RestoreCommand.Press();
 
-        Assert.Equal("production is not in the trash any more.", trash.Error, StringComparer.Ordinal);
+        Assert.Equal("production is not in the trash any more. Check the list.", trash.Error, StringComparer.Ordinal);
         Assert.True(trash.IsEmpty);
     }
 

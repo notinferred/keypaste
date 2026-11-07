@@ -206,7 +206,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         await import.UnlockAsync();
 
-        Assert.Equal("That password and key file do not open foreign.kdbx.", import.Message);
+        Assert.Equal("That password and key file do not open foreign.kdbx. Type it again, or choose another key file.", import.Message);
         Assert.True(import.NeedsUnlock);
         Assert.False(import.HasTrailingMessage);
     }

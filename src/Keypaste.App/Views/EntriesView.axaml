@@ -131,10 +131,14 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
 
+    <!-- A note is one ink step up; amber stays for the action inside it. -->
     <Style Selector="Border.note">
-      <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
       <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
       <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="Border.note.problem">
+      <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
     </Style>
 
   </UserControl.Styles>
@@ -297,9 +301,12 @@
         </Grid>
       </Border>
 
-      <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
-      <Border Classes="note" IsVisible="{Binding HasError}">
-        <TextBlock ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="secondary size-12" />
+      <!-- Calm, not a dialog; drawn as Env's banner draws a problem. -->
+      <Border Classes="note problem" IsVisible="{Binding HasError}">
+        <Grid ColumnDefinitions="Auto,*">
+          <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
+          <TextBlock Grid.Column="1" ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="secondary size-12" />
+        </Grid>
       </Border>
 
       <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
@@ -308,6 +315,11 @@
           <StackPanel Spacing="6">
             <TextBlock Classes="label" Text="{x:Static res:Strings.GroupName}" />
             <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="{x:Static res:Strings.Servers}" AutomationProperties.Name="{x:Static res:Strings.GroupName}" />
+            <TextBlock x:Name="NewGroupProblem" ctl:ShowInView.Scrolls="True"
+                       Classes="caption danger"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding HasGroupProblem}"
+                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
@@ -319,7 +331,15 @@
       <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
-          <TextBox x:Name="RenameGroupName" AutomationProperties.Name="{x:Static res:Strings.TheGroupsNewName}" Text="{Binding DraftGroupName}" />
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.TheGroupsNewName}" />
+            <TextBox x:Name="RenameGroupName" AutomationProperties.Name="{x:Static res:Strings.TheGroupsNewName}" Text="{Binding DraftGroupName}" />
+            <TextBlock x:Name="RenameGroupProblem" ctl:ShowInView.Scrolls="True"
+                       Classes="caption danger"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding HasGroupProblem}"
+                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
+          </StackPanel>
           <TextBlock Classes="caption" Text="{Binding AccessNote}" />
           <!-- A group under env is where keypaste puts a project's new keys. -->
           <TextBlock x:Name="ProjectRenameNote"
@@ -337,18 +357,26 @@
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
-          <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="{x:Static res:Strings.MoveTo}"
-                    HorizontalAlignment="Stretch"
-                    ItemsSource="{Binding MoveTargets}"
-                    SelectedItem="{Binding GroupMoveTarget}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:GroupNode">
-                <TextBlock Text="{Binding Label}"
-                           Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                           TextTrimming="CharacterEllipsis" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.MoveTo}" />
+            <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="{x:Static res:Strings.MoveTo}"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding MoveTargets}"
+                      SelectedItem="{Binding GroupMoveTarget}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:GroupNode">
+                  <TextBlock Text="{Binding Label}"
+                             Margin="{Binding Depth, Converter={StaticResource Indent}}"
+                             TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock x:Name="MoveGroupProblem" ctl:ShowInView.Scrolls="True"
+                       Classes="caption danger"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding HasGroupProblem}"
+                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
+          </StackPanel>
           <TextBlock Classes="caption" Text="{Binding AccessNote}" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
@@ -526,33 +554,30 @@
 
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
-              <ListBox x:Name="NewItemTemplate"
-                       AutomationProperties.Name="{x:Static res:Strings.KindOfItem}"
-                       Classes="templates"
-                       ItemsSource="{Binding Templates}"
-                       SelectedItem="{Binding SelectedTemplate}">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" />
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:TemplateChoice">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
-                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
+              <StackPanel Spacing="8">
+                <TextBlock Classes="label" Text="{x:Static res:Strings.KindOfItem}" />
+                <ListBox x:Name="NewItemTemplate"
+                         AutomationProperties.Name="{x:Static res:Strings.KindOfItem}"
+                         Classes="segmented"
+                         ItemsSource="{Binding Templates}"
+                         SelectedItem="{Binding SelectedTemplate}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TemplateChoice">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
 
               <Grid ColumnDefinitions="*,16,*">
                 <StackPanel Grid.Column="0" Spacing="8">
                   <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
                   <TextBox x:Name="NewItemTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" MinHeight="40" Text="{Binding Title}" PlaceholderText="{x:Static res:Strings.Github}" />
-                  <TextBlock x:Name="NewItemTitleProblem"
-                             Classes="caption"
-                             Foreground="{DynamicResource KpDanger}"
+                  <TextBlock x:Name="NewItemTitleProblem" ctl:ShowInView.Scrolls="True"
+                             Classes="caption danger"
                              TextWrapping="Wrap"
                              IsVisible="{Binding HasTitleProblem}"
                              ctl:Announcer.Says="{Binding TitleProblem}" Text="{Binding TitleProblem}" />
@@ -578,9 +603,8 @@
               <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
                 <TextBlock Classes="label" Text="{x:Static res:Strings.KeyName}" />
                 <TextBox x:Name="NewItemKeyName" AutomationProperties.Name="{x:Static res:Strings.KeyName}" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
-                <TextBlock x:Name="NewItemKeyNameProblem"
-                           Classes="caption"
-                           Foreground="{DynamicResource KpDanger}"
+                <TextBlock x:Name="NewItemKeyNameProblem" ctl:ShowInView.Scrolls="True"
+                           Classes="caption danger"
                            TextWrapping="Wrap"
                            IsVisible="{Binding HasKeyNameProblem}"
                            ctl:Announcer.Says="{Binding KeyNameProblem}" Text="{Binding KeyNameProblem}" />
@@ -593,7 +617,12 @@
                                  AllowsPaste="True"
                                  Sink="{Binding KeyValue}"
                                  MaskedLength="{Binding KeyValue.MaskedLength}"
-                                 Placeholder="{x:Static res:Strings.KeyValue}" />
+                                 AutomationProperties.Name="{x:Static res:Strings.KeyValue}" />
+                <TextBlock x:Name="NewItemKeyValueProblem" ctl:ShowInView.Scrolls="True"
+                           Classes="caption danger"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasKeyValueProblem}"
+                           ctl:Announcer.Says="{Binding KeyValueProblem}" Text="{Binding KeyValueProblem}" />
                 <TextBlock Classes="caption"
                            IsVisible="{Binding KeyValue.Note.Length}"
                            Text="{Binding KeyValue.Note}" />
@@ -606,7 +635,7 @@
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUsername}">
                 <TextBlock Classes="label" Text="{x:Static res:Strings.Username}" />
-                <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="{x:Static res:Strings.Username}" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="{x:Static res:Strings.Optional}" />
+                <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="{x:Static res:Strings.Username}" Classes="mono" MinHeight="40" Text="{Binding Username}" />
               </StackPanel>
 
               <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
@@ -617,7 +646,7 @@
                                    AllowsPaste="True"
                                    Sink="{Binding Password}"
                                    MaskedLength="{Binding Password.MaskedLength}"
-                                   Placeholder="{x:Static res:Strings.Password}" />
+                                   AutomationProperties.Name="{x:Static res:Strings.Password}" />
                   <Button x:Name="NewEntryGenerate"
                           Grid.Column="1"
                           Classes="icon ghost"
@@ -644,7 +673,7 @@
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUrl}">
                 <TextBlock Classes="label" Text="{x:Static res:Strings.WebAddress}" />
-                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.WebAddress}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
+                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.WebAddress}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="{x:Static res:Strings.ExampleWebAddress}" />
               </StackPanel>
 
               <StackPanel Spacing="8">
@@ -685,6 +714,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" ctl:FormKeys.Confirm="{Binding AddTagCommand}">
                   <!-- Suggests the vault's project tags as one is typed; choosing one fills the box for Add tag. -->
                   <AutoCompleteBox x:Name="NewItemTag"
+                                   AutomationProperties.Name="{x:Static res:Strings.Tags}"
                                    Classes="mono"
                                    Text="{Binding DraftTag, Mode=TwoWay}"
                                    ItemsSource="{Binding TagSuggestions}"
@@ -694,16 +724,14 @@
                   <Button Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
                 </StackPanel>
                 <TextBlock x:Name="NewItemTagProblem"
-                           Classes="caption"
-                           Foreground="{DynamicResource KpDanger}"
+                           Classes="caption danger"
                            TextWrapping="Wrap"
                            IsVisible="{Binding HasTagProblem}"
                            ctl:Announcer.Says="{Binding TagProblem}" Text="{Binding TagProblem}" />
               </StackPanel>
 
               <TextBlock x:Name="NewItemError"
-                         Classes="caption"
-                         Foreground="{DynamicResource KpDanger}"
+                         Classes="caption danger"
                          TextWrapping="Wrap"
                          IsVisible="{Binding HasError}"
                          ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
@@ -757,7 +785,7 @@
                         <Button x:Name="RotateFromPane" Classes="action" IsVisible="{Binding HasPassword}" Command="{Binding RotateCommand}" AutomationProperties.Name="{x:Static res:Strings.Rotate}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="refresh-cw" Size="13" />
-                            <TextBlock Text="{x:Static res:Strings.RotateLabel}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static res:Strings.Rotate}" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
                         <ToggleButton x:Name="EntryMenu"
@@ -909,8 +937,7 @@
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
                         <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Classes="mono" Text="{Binding DraftTitle}" />
                         <TextBlock x:Name="OrganizeTitleProblem"
-                                   Classes="caption"
-                                   Foreground="{DynamicResource KpDanger}"
+                                   Classes="caption danger"
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding HasOrganizeTitleProblem}"
                                    ctl:Announcer.Says="{Binding OrganizeTitleProblem}" Text="{Binding OrganizeTitleProblem}" />
@@ -1379,19 +1406,28 @@
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{x:Static res:Strings.AddAField}" />
-                        <TextBox x:Name="NewFieldName" AutomationProperties.Name="{x:Static res:Strings.FieldName}"
-                                 Classes="mono"
-                                 Text="{Binding DraftFieldName}"
-                                 PlaceholderText="STRIPE_SECRET_KEY"
-                                 Width="320"
-                                 HorizontalAlignment="Left" />
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="label" Text="{x:Static res:Strings.FieldName}" />
+                          <TextBox x:Name="NewFieldName" AutomationProperties.Name="{x:Static res:Strings.FieldName}"
+                                   Classes="mono"
+                                   Text="{Binding DraftFieldName}"
+                                   PlaceholderText="STRIPE_SECRET_KEY"
+                                   Width="320"
+                                   HorizontalAlignment="Left" />
+                          <TextBlock x:Name="NewFieldNameProblem"
+                                     Classes="caption danger"
+                                     TextWrapping="Wrap"
+                                     IsVisible="{Binding HasNewFieldNameProblem}"
+                                     ctl:Announcer.Says="{Binding NewFieldNameProblem}" Text="{Binding NewFieldNameProblem}" />
+                        </StackPanel>
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.FieldValue}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:MaskedInput x:Name="NewFieldValue"
                                            AllowsPaste="True"
                                            Width="420"
                                            Sink="{Binding NewFieldValue}"
                                            MaskedLength="{Binding NewFieldValue.MaskedLength}"
-                                           Placeholder="{x:Static res:Strings.FieldValue}" />
+                                           AutomationProperties.Name="{x:Static res:Strings.FieldValue}" />
                           <Button x:Name="NewFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
@@ -1407,6 +1443,7 @@
                         </Panel>
                         <TextBlock Classes="caption" IsVisible="{Binding NewFieldValue.Note.Length}" Text="{Binding NewFieldValue.Note}" />
                         <ToggleSwitch x:Name="NewFieldProtected"
+                                      AutomationProperties.Name="{x:Static res:Strings.ProtectThisField}"
                                       IsChecked="{Binding NewFieldProtected}"
                                       OnContent="Protected"
                                       OffContent="Plain" />
@@ -1421,13 +1458,14 @@
                     <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmReplaceFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelReplaceFieldCommand}" ctl:FormKeys.Draft="{Binding ReplaceFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding ReplaceFieldPrompt}" TextWrapping="Wrap" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.NewFieldValue}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:MaskedInput x:Name="ReplacementFieldValue"
                                            AllowsPaste="True"
                                            Width="420"
                                            Sink="{Binding ReplacementFieldValue}"
                                            MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
-                                           Placeholder="{x:Static res:Strings.NewFieldValue}" />
+                                           AutomationProperties.Name="{x:Static res:Strings.NewFieldValue}" />
                           <Button x:Name="ReplacementFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
@@ -1455,11 +1493,19 @@
                     <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
-                        <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="{x:Static res:Strings.NewFieldName}"
-                                 Classes="mono"
-                                 Text="{Binding DraftFieldRename}"
-                                 Width="320"
-                                 HorizontalAlignment="Left" />
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="label" Text="{x:Static res:Strings.NewFieldName}" />
+                          <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="{x:Static res:Strings.NewFieldName}"
+                                   Classes="mono"
+                                   Text="{Binding DraftFieldRename}"
+                                   Width="320"
+                                   HorizontalAlignment="Left" />
+                          <TextBlock x:Name="RenamedFieldProblem"
+                                     Classes="caption danger"
+                                     TextWrapping="Wrap"
+                                     IsVisible="{Binding HasRenamedFieldProblem}"
+                                     ctl:Announcer.Says="{Binding RenamedFieldProblem}" Text="{Binding RenamedFieldProblem}" />
+                        </StackPanel>
                         <TextBlock Classes="caption" Text="{x:Static res:Strings.TheValueAndItsProtectionGoWithX9050e5}" TextWrapping="Wrap" />
                         <ItemsControl x:Name="FieldRenameLines" ItemsSource="{Binding FieldRenameLines}" IsVisible="{Binding IsConfirmingFieldRename}">
                           <ItemsControl.ItemTemplate>
@@ -1578,6 +1624,7 @@
                       <!-- Suggests the vault's project tags the item lacks as one is typed; choosing one fills the box,
                            and Add tag still asks first for a project tag. -->
                       <AutoCompleteBox x:Name="NewTag"
+                                       AutomationProperties.Name="{x:Static res:Strings.Tags}"
                                        Classes="mono"
                                        Text="{Binding DraftTag, Mode=TwoWay}"
                                        ItemsSource="{Binding TagSuggestions}"
@@ -1713,14 +1760,14 @@
                         <TextBox Text="{Binding DraftNotes}" AutomationProperties.Name="{x:Static res:Strings.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="{x:Static res:Strings.Password}" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.NewPassword}" />
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                           <ctl:MaskedInput x:Name="ReplacementPassword"
                                            Grid.Column="0"
                                            AllowsPaste="True"
                                            Sink="{Binding NewPassword}"
                                            MaskedLength="{Binding NewPassword.MaskedLength}"
-                                           Placeholder="{x:Static res:Strings.NewPassword}" />
+                                           AutomationProperties.Name="{x:Static res:Strings.NewPassword}" />
                           <Button x:Name="ReplacementPasswordGenerate"
                                   Grid.Column="1"
                                   Classes="icon ghost"

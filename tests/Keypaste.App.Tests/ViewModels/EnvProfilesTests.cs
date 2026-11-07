@@ -157,7 +157,7 @@ public sealed class EnvProfilesTests : IDisposable
         project.BeginAddCommand.Press();
         project.NewKey = "lower_case";
         project.ConfirmAddCommand.Press();
-        Assert.Contains("'lower_case' cannot be a project's variable", screen.Error, StringComparison.Ordinal);
+        Assert.Contains("'lower_case' cannot be a project's variable", project.NewKeyProblem, StringComparison.Ordinal);
         Assert.True(project.IsAdding);
         Assert.Single(_session.Unlocked.Fields(home)!);
     }

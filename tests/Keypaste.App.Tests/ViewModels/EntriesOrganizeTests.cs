@@ -211,7 +211,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.GroupMoveTarget = Group(entries, target);
         entries.ConfirmMoveGroupCommand.Press();
 
-        Assert.Contains(said, entries.Error, StringComparison.Ordinal);
+        Assert.Contains(said, entries.GroupProblem, StringComparison.Ordinal);
         Assert.True(entries.IsMovingGroup);
         Assert.Equal(before, Digest(_vaultPath));
     }
@@ -453,14 +453,14 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.DraftGroupName = "servers";
         entries.ConfirmCreateGroupCommand.Press();
 
-        Assert.NotNull(entries.Error);
+        Assert.NotNull(entries.GroupProblem);
         Assert.Equal(before, Digest(_vaultPath));
 
         // The name keypaste assigns meaning to is refused too, and says which.
         entries.DraftGroupName = "env";
         entries.ConfirmCreateGroupCommand.Press();
 
-        Assert.Contains("keypaste assigns", entries.Error!, StringComparison.Ordinal);
+        Assert.Contains("keypaste assigns", entries.GroupProblem, StringComparison.Ordinal);
         Assert.Equal(before, Digest(_vaultPath));
     }
 

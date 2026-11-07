@@ -182,7 +182,7 @@ public sealed class ProjectsJourneyTests
                 Fill(main, "New key", "api_key");
                 AssertOneRevealed(main, ByCommand(main, project.ConfirmAddCommand), "adding a key");
                 Unchanged(vault, () => Press(main, ByCommand(main, project.ConfirmAddCommand)));
-                Assert.NotNull(screen.Error);
+                Assert.NotNull(project.NewKeyProblem);
                 Press(main, ByCommand(main, project.CancelAddCommand));
                 Press(main, ByName<Button>(main, "Add a key to dev"));
                 Fill(main, "New key", "NEW_KEY");

@@ -31,13 +31,6 @@
                   Padding="12,0"
                   ClipToBounds="True">
             <Panel VerticalAlignment="Center">
-              <TextBlock Text="{TemplateBinding Placeholder}"
-                         IsVisible="{TemplateBinding IsEmpty}"
-                         FontFamily="{DynamicResource KpSans}"
-                         Classes="size-13"
-                         Margin="6,0,0,0"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextMuted}" />
               <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="{TemplateBinding Display}"
                            VerticalAlignment="Center"
@@ -47,7 +40,7 @@
                         Height="18"
                         Margin="2,0,0,0"
                         IsVisible="False"
-                        Background="{DynamicResource KpAccent}" />
+                        Background="{DynamicResource KpAccentText}" />
               </StackPanel>
             </Panel>
           </Border>
@@ -217,12 +210,13 @@
               </StackPanel>
             </Button>
 
-            <StackPanel Spacing="8">
+            <StackPanel Spacing="6">
+              <TextBlock x:Name="PasswordLabel" Classes="label" Text="{x:Static res:Strings.MasterPassword}" />
               <ctl:MaskedInput x:Name="Password"
                                Theme="{StaticResource LockField}"
                                AllowsPaste="True"
                                MaskedLength="{Binding MaskedLength}"
-                               Placeholder="{x:Static res:Strings.MasterPassword}"
+                               AutomationProperties.Name="{x:Static res:Strings.MasterPassword}"
                                IsEnabled="{Binding CanTypePassword}" />
               <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
             </StackPanel>
@@ -371,18 +365,24 @@
             <TextBlock Classes="lock-subtitle" Text="{x:Static res:Strings.ChooseAMasterPasswordThereIsNoX354515}" />
           </StackPanel>
 
-          <StackPanel Spacing="10">
-            <ctl:MaskedInput x:Name="NewPassword"
-                             Theme="{StaticResource LockField}"
-                             AllowsPaste="True"
-                             MaskedLength="{Binding NewMaskedLength}"
-                             Placeholder="{x:Static res:Strings.NewMasterPassword}" />
-            <ctl:MaskedInput x:Name="ConfirmPassword"
-                             Theme="{StaticResource LockField}"
-                             AllowsPaste="True"
-                             MaskedLength="{Binding ConfirmMaskedLength}"
-                             Placeholder="{x:Static res:Strings.ConfirmMasterPassword}" />
-            <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+          <StackPanel Spacing="12">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="label" Text="{x:Static res:Strings.NewMasterPassword}" />
+              <ctl:MaskedInput x:Name="NewPassword"
+                               Theme="{StaticResource LockField}"
+                               AllowsPaste="True"
+                               MaskedLength="{Binding NewMaskedLength}"
+                               AutomationProperties.Name="{x:Static res:Strings.NewMasterPassword}" />
+            </StackPanel>
+            <StackPanel Spacing="6">
+              <TextBlock Classes="label" Text="{x:Static res:Strings.ConfirmMasterPassword}" />
+              <ctl:MaskedInput x:Name="ConfirmPassword"
+                               Theme="{StaticResource LockField}"
+                               AllowsPaste="True"
+                               MaskedLength="{Binding ConfirmMaskedLength}"
+                               AutomationProperties.Name="{x:Static res:Strings.ConfirmMasterPassword}" />
+              <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+            </StackPanel>
           </StackPanel>
 
           <Button Classes="primary wide"
@@ -518,12 +518,13 @@
               </ListBox>
             </Border>
 
-            <StackPanel Spacing="8">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="label" Text="{x:Static res:Strings.ThatBackupsMasterPassword}" />
               <ctl:MaskedInput x:Name="BackupPassword"
                                Theme="{StaticResource LockField}"
                                AllowsPaste="True"
                                MaskedLength="{Binding MaskedLength}"
-                               Placeholder="{x:Static res:Strings.ThatBackupsMasterPassword}"
+                               AutomationProperties.Name="{x:Static res:Strings.ThatBackupsMasterPassword}"
                                IsEnabled="{Binding IsChoosing}" />
               <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
             </StackPanel>
@@ -562,9 +563,15 @@
             </StackPanel>
 
             <Button Classes="primary wide"
-                    Content="{x:Static res:Strings.CheckThisBackup}"
                     IsVisible="{Binding IsChoosing}"
-                    Command="{Binding CheckCommand}" />
+                    Command="{Binding CheckCommand}"
+                    AutomationProperties.Name="{x:Static res:Strings.CheckThisBackup}">
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+                <TextBlock Text="{x:Static res:Strings.CheckThisBackup}" IsVisible="{Binding !Busy}" />
+                <TextBlock Text="{x:Static res:Strings.CheckingThisBackup}" IsVisible="{Binding Busy}" />
+              </StackPanel>
+            </Button>
 
             <!-- Replacing a vault is the one act on this screen that is not ordinary. -->
             <Border IsVisible="{Binding IsConfirming}"

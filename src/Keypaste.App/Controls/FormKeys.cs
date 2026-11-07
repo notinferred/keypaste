@@ -2,6 +2,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -47,6 +48,20 @@ internal sealed class FormKeys : AvaloniaObject
         // Removed first because Confirm and Cancel each arrive here, and one form answers a key once.
         form.RemoveHandler(InputElement.KeyDownEvent, OnKeyDown);
         form.AddHandler(InputElement.KeyDownEvent, OnKeyDown);
+        form.RemoveHandler(InputElement.KeyDownEvent, OnReturnInDropdown);
+        form.AddHandler(InputElement.KeyDownEvent, OnReturnInDropdown, RoutingStrategies.Tunnel);
+    }
+
+    // A closed dropdown would take Return to open itself, so it opens only while the form cannot yet be confirmed.
+    private static void OnReturnInDropdown(object? sender, KeyEventArgs e)
+    {
+        if (sender is Control form && e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None
+            && e.Source is ComboBox { IsDropDownOpen: false }
+            && GetConfirm(form) is { } confirm && confirm.CanExecute(null))
+        {
+            confirm.Execute(null);
+            e.Handled = true;
+        }
     }
 
     private static void OnKeyDown(object? sender, KeyEventArgs e)

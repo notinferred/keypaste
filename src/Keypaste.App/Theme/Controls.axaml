@@ -17,11 +17,6 @@
                 CornerRadius="{DynamicResource KpRadiusField}"
                 Padding="{DynamicResource KpFieldPadding}">
           <Panel>
-            <TextBlock Text="{TemplateBinding Placeholder}"
-                       IsVisible="{TemplateBinding IsEmpty}"
-                       TextTrimming="CharacterEllipsis"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Text="{TemplateBinding Display}"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextPrimary}" />

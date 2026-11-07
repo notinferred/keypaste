@@ -261,7 +261,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
         project.NewKey = key;
         project.ConfirmAddCommand.Execute(null);
 
-        var guiRefused = screen.Model.Error is not null;
+        var guiRefused = project.HasNewKeyProblem;
 
         var cliExit = fixture.RunAnswering(["value-for-" + key], "env", "set", "billing", key);
 

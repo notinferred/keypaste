@@ -29,7 +29,11 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     private const int _shownCandidates = 50;
 
     private readonly AppVaultSession _session;
+    private const string _keyNeedsAName = "The key needs a name. Type one, such as STRIPE_KEY.";
+
     private readonly Action<string?> _report;
+    private string? _newKeyRefusal;
+    private bool _emptyProfileRefused;
     private readonly Action<string?, ToastTone> _announce;
     private readonly IVaultFilePicker? _picker;
     private readonly Action _projectsChanged;
@@ -176,6 +180,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The name of the profile being started.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewProfileProblem), nameof(HasNewProfileProblem))]
     internal partial string NewProfile { get; set; } = string.Empty;
 
     internal RelayCommand BeginAddProfileCommand { get; }
@@ -357,12 +362,13 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (Generator.Recipe is { } recipe)
         {
+            ReplaceProblem = null;
             field.Generate(recipe);
         }
         else
         {
             field.Clear();
-            _report(Generator.Error);
+            ReplaceProblem = ReferenceEquals(field, ReplacementValue) ? Generator.Error : null;
         }
     }
 
@@ -373,6 +379,13 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     internal RelayCommand ConfirmReplaceCommand { get; }
 
     internal RelayCommand CancelReplaceCommand { get; }
+
+    /// <summary>Why the replace form's value did not go in, shown under it; the form stays open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReplaceProblem))]
+    internal partial string? ReplaceProblem { get; private set; }
+
+    internal bool HasReplaceProblem => ReplaceProblem is not null;
 
     /// <summary>Opens the replace form for one row.</summary>
     /// <param name="row">The variable whose value is being replaced.</param>
@@ -421,13 +434,31 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     [NotifyPropertyChangedFor(nameof(NewKeyProblem), nameof(HasNewKeyProblem))]
     internal partial string NewKey { get; set; } = string.Empty;
 
-    /// <summary>Why the name typed cannot be added, or null: core's rule for a new key, which an existing key of this environment already passed.</summary>
+    /// <summary>Why the name typed cannot be added, or null: what Add refused it for, or an emptied name, then core's rule for a new key, which an existing key of this environment already passed.</summary>
     internal string? NewKeyProblem =>
-        NewKey.Trim() is { Length: > 0 } key
-        && !Variables.Any(variable => string.Equals(variable.Key, key, StringComparison.Ordinal))
-        && !EnvStore.IsNewFieldName(key, out var error)
-            ? EntryNameSanitizer.SanitizeProse(error, 1024).Text
-            : null;
+        _newKeyRefusal
+        ?? (NewKey.Trim() is { Length: > 0 } key
+            && !Variables.Any(variable => string.Equals(variable.Key, key, StringComparison.Ordinal))
+            && !EnvStore.IsNewFieldName(key, out var error)
+                ? EntryNameSanitizer.SanitizeProse(error, 1024).Text
+                : null);
+
+    partial void OnNewKeyChanged(string value) => _newKeyRefusal = null;
+
+    private void RefuseNewKey(string? refusal)
+    {
+        _newKeyRefusal = refusal;
+        OnPropertyChanged(nameof(NewKeyProblem));
+        OnPropertyChanged(nameof(HasNewKeyProblem));
+    }
+
+    /// <summary>Why the environment name typed cannot be used, or null; an empty name only once Add is pressed on it.</summary>
+    internal string? NewProfileProblem =>
+        (NewProfile.Trim().Length > 0 || _emptyProfileRefused) && !EnvProfileNames.IsValid(NewProfile.Trim(), out var invalid) ? invalid : null;
+
+    internal bool HasNewProfileProblem => NewProfileProblem is not null;
+
+    partial void OnNewProfileChanged(string value) => _emptyProfileRefused = false;
 
     internal bool HasNewKeyProblem => NewKeyProblem is not null;
 
@@ -725,6 +756,9 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         CloseEntryForms();
         NewProfile = string.Empty;
+        _emptyProfileRefused = false;
+        OnPropertyChanged(nameof(NewProfileProblem));
+        OnPropertyChanged(nameof(HasNewProfileProblem));
         IsAddingProfile = true;
         _report(null);
     }
@@ -733,9 +767,11 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         var profile = NewProfile.Trim();
 
-        if (!EnvProfileNames.IsValid(profile, out var invalid))
+        if (!EnvProfileNames.IsValid(profile, out _))
         {
-            _report(invalid);
+            _emptyProfileRefused = true;
+            OnPropertyChanged(nameof(NewProfileProblem));
+            OnPropertyChanged(nameof(HasNewProfileProblem));
             return;
         }
 
@@ -887,6 +923,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         CloseEntryForms();
         NewKey = string.Empty;
+        RefuseNewKey(null);
         NewEntry = EntryChoices.Count > 0 ? EntryChoices[0] : null;
         NewValue.Clear();
         IsAdding = true;
@@ -902,6 +939,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         IsAdding = false;
         NewKey = string.Empty;
+        RefuseNewKey(null);
         NewValue.Clear();
         _report(null);
     }
@@ -914,6 +952,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private void CancelReplaceQuietly()
     {
+        ReplaceProblem = null;
         Replacing = null;
         ReplacementValue.Clear();
     }
@@ -930,13 +969,13 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (key.Length == 0)
         {
-            _report("The key needs a name.");
+            RefuseNewKey(_keyNeedsAName);
             return;
         }
 
+        // The generator's options, open under the field, already say why.
         if (GenerateValue && Generator.Recipe is null)
         {
-            _report(Generator.Error ?? string.Empty);
             return;
         }
 
@@ -950,7 +989,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (write.Value?.Refusal is { } refusal)
         {
-            _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
+            RefuseNewKey(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
             return;
         }
 
@@ -962,6 +1001,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         IsAdding = false;
         NewKey = string.Empty;
+        RefuseNewKey(null);
         NewValue.Clear();
         _report(null);
         Reload();
@@ -1000,15 +1040,17 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (write.Value?.Refusal is { } refusal)
         {
-            _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
+            ReplaceProblem = EntryNameSanitizer.SanitizeProse(refusal, 1024).Text;
             return;
         }
 
         if (write.Problem("replace this again") is { } problem)
         {
-            _report(problem);
+            ReplaceProblem = problem;
             return;
         }
+
+        ReplaceProblem = null;
 
         // The one length that changed, rather than Reload, which reads every value in the project
         // back out of the vault to recompute lengths it already knows.

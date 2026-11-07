@@ -400,7 +400,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
         if (!TryUntil(out var until, out var error))
         {
-            Message = $"Not changed: {error}.";
+            Message = $"Not changed: {error}. Correct that, then set it again.";
             return Task.CompletedTask;
         }
 
@@ -535,7 +535,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
         if (!AccessEdit.TryCreate(project, mode, see, values, run, perHour, until, reset, out var edit, out var error))
         {
-            Message = $"Not changed: {error}.";
+            Message = $"Not changed: {error}. Correct that, then set it again.";
             return Task.CompletedTask;
         }
 

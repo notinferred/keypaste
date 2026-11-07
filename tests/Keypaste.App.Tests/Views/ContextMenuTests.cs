@@ -6,12 +6,14 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -35,15 +37,107 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Show history", "-", "Delete"],
             Headers(menu));
-        Assert.All(menu.Items.OfType<MenuItem>(), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
+        Assert.All(menu.Items.OfType<MenuItem>().Where(item => item.Header as string != "Copy the TOTP code"), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
         menu.Hide();
 
         menu = FromTheKeyboard(shell.Window, row, PhysicalKey.F10, RawInputModifiers.Shift);
         Choose(menu, "Duplicate");
 
         Assert.Equal(2, entries.Rows.Count(entry => entry.Title.StartsWith("github", StringComparison.Ordinal)));
+    });
+
+    [Fact]
+    public Task A_variables_menu_copies_through_the_clipboards_countdown_and_names_no_value() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-variable-");
+        var project = shell.OpenProject();
+        var row = shell.Window.GetVisualDescendants().OfType<Border>().First(border => border.DataContext is EnvKeyRow && border.Classes.Contains("matrix-row"));
+
+        var menu = RightClick(shell.Window, row);
+        Assert.Equal(["Copy value", "Replace value…", "-", "Remove key"], Headers(menu));
+        Choose(menu, "Copy value");
+        WindowInput.Drain();
+        Assert.True(shell.Clipboard.ContentWasSetAsASecret);
+
+        Choose(RightClick(shell.Window, row), "Replace value…");
+        Assert.True(project.IsReplacing);
+    });
+
+    [Fact]
+    public Task A_key_rows_menu_acts_on_the_row_it_opened_on_and_not_the_one_holding_the_keyboard() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-key-rows-", vault => ProjectVariables.Set(vault, "billing", "OTHER_KEY", "other"));
+        var project = shell.OpenProject();
+        var rows = shell.Window.GetVisualDescendants().OfType<Border>().Where(border => border.DataContext is EnvKeyRow && border.Classes.Contains("matrix-row")).ToList();
+        Assert.True(rows.Count >= 2, "the project needs two keys");
+
+        rows[0].GetVisualDescendants().OfType<Button>().First(button => button.DataContext is EnvVariableRow && button.IsEffectivelyVisible).Focus();
+        RenderedShell.Drain();
+
+        Choose(RightClick(shell.Window, rows[1]), "Replace value…");
+
+        Assert.Equal(((EnvKeyRow)rows[1].DataContext!).Variable, project.Replacing);
+        Assert.True(shell.Named<MaskedInput>("ReplacementEnvValue").IsFocused, "the form did not take the keyboard");
+        project.CancelReplaceCommand.Press();
+    });
+
+    [Fact]
+    public Task A_rows_menu_does_not_open_over_the_question_about_a_draft_and_the_menus_go_off_behind_it() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-discard-", vault => vault.AddEntry(new VaultEntry { Title = "second", Username = "me", Password = "pw" }));
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows.Single(entry => entry.Title == "github");
+        RenderedShell.Drain();
+        entries.Detail!.EditCommand.Press();
+        entries.Detail.DraftUsername = "someone-else";
+        RenderedShell.Drain();
+
+        var other = entries.Rows.Single(entry => entry.Title == "second");
+        Assert.Null(shell.Commands.ContextMenu(other));
+
+        Assert.True(shell.Shell.HasDiscardPrompt);
+        Assert.Equal("github", entries.Selected?.Title);
+        Assert.Null(shell.Commands.ForChord(shell.Commands.Mac ? Avalonia.Input.Key.Back : Avalonia.Input.Key.Delete, shell.Commands.Mac ? Avalonia.Input.KeyModifiers.Meta : Avalonia.Input.KeyModifiers.None));
+        Assert.Null(shell.Commands.ContextMenu(entries.Rows.Single(entry => entry.Title == "github")));
+
+        shell.Shell.KeepDraftCommand.Press();
+        RenderedShell.Drain();
+        entries.Detail.CancelCommand.Press();
+    });
+
+    [Fact]
+    public Task Forms_opened_from_a_rows_menu_take_the_keyboard() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-forms-");
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        var row = Container(shell.Named<ListBox>("Rows"), entries.Rows.Single(entry => entry.Title == "github"));
+        row.Focus();
+        RenderedShell.Drain();
+
+        Choose(RightClick(shell.Window, row), "Rotate");
+
+        Assert.True(entries.Detail!.IsConfirmingRotate);
+        Assert.IsType<Button>(shell.Window.FocusManager!.GetFocusedElement());
+        Assert.NotSame(row, shell.Window.FocusManager!.GetFocusedElement());
+        entries.Detail.CancelRotateCommand.Press();
+    });
+
+    [Fact]
+    public Task A_tokens_menu_asks_before_it_revokes() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-token-");
+        var tokens = shell.Show<ScopedTokensViewModel>(DestinationKind.Tokens);
+        Assert.True(tokens.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(7), allowProd: false).Ok);
+        WindowInput.Drain();
+        var row = tokens.Rows.Single();
+        var drawn = shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, row));
+
+        Choose(RightClick(shell.Window, drawn), "Revoke token");
+
+        Assert.True(Assert.Single(tokens.Rows).IsConfirming);
+        Assert.Contains("ghost", Assert.IsType<Button>(shell.Window.FocusManager!.GetFocusedElement()).Classes);
     });
 
     [Fact]
@@ -57,7 +151,7 @@ public sealed class ContextMenuTests
         var row = Container(shell.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.ItemsSource == trash.Rows), trash.Rows.Single());
 
         var menu = RightClick(shell.Window, row);
-        Assert.Equal(["Restore", "-", "Delete for good"], Headers(menu));
+        Assert.Equal(["Restore", "Restore as another name", "-", "Delete for good", "Empty Trash"], Headers(menu));
         menu.Hide();
 
         Choose(FromTheKeyboard(shell.Window, row, PhysicalKey.ContextMenu, RawInputModifiers.None), "Restore");
@@ -113,7 +207,7 @@ public sealed class ContextMenuTests
         var billing = shell.Shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "billing");
 
         var menu = RightClick(shell.Window, Container(nav, billing));
-        Assert.Equal(["Open project"], Headers(menu));
+        Assert.Equal(["Open project", "-", "Add a key…", "Add environment…", "Add item…", "-", "Run in a terminal", "Open terminal", "Copy the command", "Export .env.keypaste…"], Headers(menu));
         Choose(menu, "Open project");
 
         Assert.Equal("billing", Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject?.Name);
@@ -132,7 +226,7 @@ public sealed class ContextMenuTests
         var card = agents.Card(claude);
 
         var menu = RightClick(agents.Window, card);
-        Assert.Equal(["Agent settings…", "-", "Disconnect agent"], Headers(menu));
+        Assert.Equal(["Agent settings…", "Connect agent…", "Connect agent again…", "-", "Disconnect agent…"], Headers(menu));
         Choose(menu, "Agent settings…");
         Assert.True(claude.IsOpen);
 
@@ -143,10 +237,17 @@ public sealed class ContextMenuTests
         Assert.False(Item(open, "Agent settings…").IsEffectivelyEnabled);
         open.Hide();
 
-        var disconnect = agents.Commands.Menus.Single(group => group.Header == "Item").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect agent");
+        var disconnect = agents.Commands.Menus.Single(group => group.Header == "Agents").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect agent…");
         Assert.True(disconnect.CanRun());
         agents.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav").ContainerFromIndex(0)!.Focus();
         Assert.False(disconnect.CanRun());
+
+        agents.Model.DisconnectCommand.Press(claude);
+        await agents.Model.Opening;
+        WindowInput.Drain();
+        var whilePaneIsOpen = RightClick(agents.Window, card);
+        Assert.False(Item(whilePaneIsOpen, "Disconnect agent…").IsEffectivelyEnabled);
+        whilePaneIsOpen.Hide();
     });
 
     [Fact]

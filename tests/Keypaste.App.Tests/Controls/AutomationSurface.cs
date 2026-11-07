@@ -40,15 +40,15 @@ internal static class AutomationSurface
     }
 
     /// <summary>
-    /// The field is announced by what it is for: a non-empty name equal to its placeholder, which is
-    /// a literal in every view, so the name cannot move with what is typed (D-0301).
+    /// The field is announced by what it is for: a non-empty name its view sets as a literal, which
+    /// <see cref="Views.InteractionRulesTests"/> holds every view to, so the name cannot move with what is typed.
     /// </summary>
     internal static void AssertNamedByPurpose(MaskedInput field)
     {
         var name = ControlAutomationPeer.CreatePeerForElement(field).GetName();
 
         Assert.False(string.IsNullOrWhiteSpace(name), $"{field.Name} has no accessible name");
-        Assert.Equal(field.Placeholder, name);
+        Assert.Equal(AutomationProperties.GetName(field), name);
     }
 
     /// <summary>

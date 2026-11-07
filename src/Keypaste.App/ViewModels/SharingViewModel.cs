@@ -119,7 +119,8 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
             {
                 Act(row);
             }
-        });
+        },
+        row => row is not null);
         ConfirmRevokeCommand = new RelayCommand<SharingRow>(Act);
         CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));

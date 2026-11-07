@@ -101,6 +101,12 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
 
     internal bool OffersToolActions => OffersConnectAgain || OffersDisconnect;
 
+    /// <summary>Whether the row's Connect shows: its open pane's action takes over from it.</summary>
+    internal bool ShowsConnect => OffersConnect && !HasConnection;
+
+    /// <summary>Whether Connect again and Disconnect show: an open pane's action takes over from them.</summary>
+    internal bool ShowsToolActions => OffersToolActions && !HasConnection;
+
     /// <summary>Whether its Settings disclosure is open; opening it the first time reads its settings.</summary>
     internal bool IsOpen
     {
@@ -129,7 +135,7 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
 
     /// <summary>The Connect or Disconnect pane open under this row, or null.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasConnection))]
+    [NotifyPropertyChangedFor(nameof(HasConnection), nameof(ShowsConnect), nameof(ShowsToolActions))]
     internal partial ConnectClientViewModel? Connection { get; set; }
 
     internal bool HasConnection => Connection is not null;
@@ -149,6 +155,8 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
             OnPropertyChanged(nameof(OffersConnectAgain));
             OnPropertyChanged(nameof(OffersDisconnect));
             OnPropertyChanged(nameof(OffersToolActions));
+            OnPropertyChanged(nameof(ShowsConnect));
+            OnPropertyChanged(nameof(ShowsToolActions));
         }
 
         var inUse = card.Connections > 0;
@@ -173,7 +181,7 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
             {
                 McpToolState.Connected => "Connected",
                 McpToolState.NotConnected => "Not connected",
-                McpToolState.CannotTell => $"keypaste can't tell whether {Title} has it: {presence.Reason}",
+                McpToolState.CannotTell => $"keypaste can't tell whether {Title} has it: {presence.Reason}. Correct that, then open Agents again",
                 _ => presence.Reason ?? $"{Title} can't be connected",
             };
         }

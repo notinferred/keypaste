@@ -191,7 +191,23 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmAddFieldCommand))]
+    [NotifyPropertyChangedFor(nameof(NewFieldNameProblem), nameof(HasNewFieldNameProblem))]
     internal partial string DraftFieldName { get; set; } = string.Empty;
+
+    /// <summary>Why the field name typed cannot be used, or null; none while it is empty, which Add waits on.</summary>
+    internal string? NewFieldNameProblem => FieldNameProblem(DraftFieldName);
+
+    internal bool HasNewFieldNameProblem => NewFieldNameProblem is not null;
+
+    /// <summary>Why the new name typed for a field cannot be used, or null; none while it is empty, which Rename waits on.</summary>
+    internal string? RenamedFieldProblem => FieldNameProblem(DraftFieldRename);
+
+    internal bool HasRenamedFieldProblem => RenamedFieldProblem is not null;
+
+    private static string? FieldNameProblem(string typed) =>
+        typed.Trim() is { Length: > 0 } name && !FieldNameRules.IsWritable(name, out var error)
+            ? string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), ".")
+            : null;
 
     /// <summary>Whether the new field is protected; on unless the person turns it off.</summary>
     [ObservableProperty]
@@ -288,6 +304,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             if (SetProperty(ref _draftFieldRename, value))
             {
                 ConfirmRenameFieldCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(RenamedFieldProblem));
+                OnPropertyChanged(nameof(HasRenamedFieldProblem));
                 FieldRenameLines = [];
             }
         }
@@ -1232,9 +1250,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     {
         var name = DraftFieldName.Trim();
 
-        if (!FieldNameRules.IsWritable(name, out var error))
+        if (HasNewFieldNameProblem)
         {
-            Report(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
             return;
         }
 
@@ -1272,9 +1289,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         var name = DraftFieldRename.Trim();
 
-        if (!FieldNameRules.IsWritable(name, out var error))
+        if (HasRenamedFieldProblem)
         {
-            Report(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
             return;
         }
 

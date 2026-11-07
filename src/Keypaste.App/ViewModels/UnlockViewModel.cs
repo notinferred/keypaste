@@ -1346,8 +1346,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     private static string ExplainCreation(VaultCreationOutcome outcome, int? slot) => outcome switch
     {
         VaultCreationOutcome.PathAlreadyExists => "There's already a file there. Choose a name that isn't taken.",
-        VaultCreationOutcome.EmptyPassword => "A vault needs a master password.",
-        VaultCreationOutcome.PasswordsDoNotMatch => "Those two passwords aren't the same.",
+        VaultCreationOutcome.EmptyPassword => "A vault needs a master password. Type one.",
+        VaultCreationOutcome.PasswordsDoNotMatch => "Those two passwords aren't the same. Type them again.",
         VaultCreationOutcome.KeyfileUnusable => "That key file can't be used. Choose it again, or another.",
         VaultCreationOutcome.KeyfileIsFragile =>
             "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass key file.",

@@ -222,7 +222,7 @@ public sealed class ShellImportTests : IDisposable
         var refused = Assert.IsType<KdbxImportViewModel>(shell.Import);
         Assert.True(refused.IsUnreadable);
         Assert.Equal(
-            "This file is not a KeePass database. Nor is it an export keypaste reads: Bitwarden JSON, 1Password 1PUX, LastPass CSV, 1Password CSV or KeePassXC CSV.",
+            "This file is not a KeePass database. Nor is it an export keypaste reads: Bitwarden JSON, 1Password 1PUX, LastPass CSV, 1Password CSV or KeePassXC CSV. Choose another file.",
             refused.Message);
     }
 

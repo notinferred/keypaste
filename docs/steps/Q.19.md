@@ -114,3 +114,46 @@ The review's repairs at `691bf6e6`, all green: ci 42326142913 (fast tier), dev 4
 ### Limits and follow-ups
 
 The row's menu takes the keyboard in the app, and the acts press Down and Return after opening it, because their drivers search only the main window; no person has used it. The macOS menu bar's hide uses `NativeMenu.Opening`, which no headless test can raise. A chosen group hides Group even where it lists subgroups' items, as the founder decided, and only the selected row's pane names the subgroup.
+
+## Stage 3: menus, labels, errors and amber
+
+Implemented only, in RELEASE's terms. Every ID below was checked against the source after stage 2 moved it.
+
+### Findings closed
+
+| ID | Checked against source | What changed |
+|---|---|---|
+| A06 | Confirmed | `Border.note` sits one ink step up, a problem note on the danger tint with its icon; Env's notice banner takes the same ink. Rotate's question keeps its amber on the button alone. |
+| A07, A33 | Confirmed | New item's kind is `ListBox.segmented` under a label, in ink. The control's name stays `NewItemTemplate`. |
+| A23, A32 | Confirmed | A label above each master password, each value, each form field and each dropdown, on the unlock, create and restore screens too; "On" beside Env's picker became the label "Item for the new key". `LabelledFields` holds every drawn frame to it, dropdowns included; a title's project picker is its heading, and Settings' Lock the vault after moved its label above. |
+| A62 | Confirmed, and wider | `MaskedInput` has no placeholder at all: a secret field's accessible name is a fixed `AutomationProperties.Name`, equal to its label wherever it has one, which a rule test holds. "Optional", "per hour", "until", "end of day" and "Its master password" are gone; "For your list only" and the passphrase's length moved to captions. What remains is an example. |
+| A30 | Confirmed | Rotate, Show history, Copy URL, Copy the reference, Copy the TOTP code, Restore as, Add field…, Add attachment…, New project…, Export .env.keypaste…, Run in a terminal, Open terminal, Copy the command, Empty Trash, New token…, Revoke token, End allowance, End all allowances, Agent history, Verify chain, Check status, Clear the clipboard now, Show the prompt, Connect agent…, the settings screens, and This computer's four are in `AppCommands`. File, Edit, Item, Project, Agents, View, Window, Help, with Field, Attachment, Revision, Group, Trash, Share links and Key as submenus. Attachment, key, environment item, token, share link, allowance and crash report rows have context menus, and a project's holds its commands while it is the one open. Each runs the button's own command, so its disarm, confirmation and clipboard rules are the button's. No chord was added, as none of these has the platform's own. |
+| A34 | Confirmed | Env's key and environment name, a project's name, a group's name and move, a field's name and rename, New item's title, key name and key value, and a token's name and scope each say what is wrong under their field, as typed, and an empty one once its action is pressed. Each scrolls into view as it appears, and Env's page banner does, for what concerns no field, and a problem line brings the field above it along. The Replace form's refusal and its generator's sit under its value. A problem line inside a data template drew muted, because a resource bound there has a template's priority, below a style's; each is now the `danger` class. |
+| A35 | Confirmed | Import's Unlock, Vault access's Changing…, Check this backup and Check the connection spin, the last from its start until it waits on the person to pick an item. |
+| A38, A56 | Confirmed | The pane's action reads its `Title`, Connect Cursor or Disconnect Cursor, and the row's buttons that opened it, now ending in an ellipsis, give way while it is open. |
+| A41 | Confirmed | DESIGN's Colour says what the once counts and what it does not, and `AmberElements`' exclusions say the same. |
+| A42 | Confirmed | The lock field's caret takes `KpAccentText`. |
+| A59, A61 | Confirmed, swept | Added the next step to the cited errors and to those a sweep of the view models found stopping at the fault: a wrong import password, an unreadable tool, mismatched passwords, a refused export, a rename or move, an agent setting and a gone Trash item. |
+| A63 | Confirmed | DESIGN states the exception: a command that only asks to confirm takes no ellipsis. So Rotate, Remove field, Run in a terminal and Change lost theirs; Add item…, Disconnect agent…, About keypaste…, the row's Connect … and Disconnect… gained theirs. |
+| A65 | Confirmed | An import row's box is named Copy and its group, the protection switch Protect this field. |
+| A66 | Confirmed | Windows and Linux have Minimize, with no chord, and Maximize or Restore window size; macOS keeps Zoom, ⌘M and Bring all to front. Enter full screen says Exit while it is. The minimize help writes ⌘H. |
+
+### Settled choices
+
+A form opened from a menu takes the keyboard through `ShowInView` once the menu has closed, which replaced a map of headers to control names; a form holding only a dropdown gives it the keyboard, and Return in a closed dropdown confirms a form that can be confirmed and otherwise opens it. An emptied field does not report itself until its action is pressed, since that would flash at anyone retyping a name. Item commands are off behind New item's form, and those on a section an edit hides are off during an edit. Two new top-level menus rather than a longer Item, since a project's and an agent's commands are not an item's. A row's Reveal stays off the menus, since opening a menu hides a shown value (T-25); no menu answers a prompt, and Show the prompt only brings it forward through its own disarm. Disconnect's action stays primary or plain, not danger, since Connect undoes it. Items' search keeps its icon and one word as its label, written into DESIGN. A row's context menu is flat; only the bar has submenus. The pane's ⋯ stays hand-built, since it also shows the reference and the KeePass ID, and now agrees with the Item menu's words. Share's form scrolls under zoom with its actions pinned, since the new label no longer fits at 200%. Patterns' label sits above its field across both columns of Agents' settings. A wrong password stays reported on pressing, not as typed: comparing buffers on each key would say so at the first character.
+
+### Sentences changed in DESIGN
+
+Colour's accent paragraph, Interaction 1 and Interaction 5, as `git log -p` on DESIGN shows, by this task's direction.
+
+### Evidence
+
+The review's repairs at `eb0e46bc`, all green: ci 42342197966 (fast tier), dev 42342588018 (desktop, Linux), dev 42342611944 (desktop gates, Linux); new frames draw the problem note, each wait's spinner and Connect's item picker, and the 150% walk found the picker's row cut off, which now wraps.
+
+Before them, at `e50fc814` on `q19-3-interaction`, all green: ci 42337271759 (fast tier); ci 42337768643 on every runner, `test` at 5776 on Linux and macOS's 4497 with none failed, every `compat`; app 42337775810, with desktop tests at 2422 and 39 on all three runners and none failed, desktop gates on all three, and KeePassXC's first run and workflows; dev 42337766121 (desktop, Linux). Desktop gates on Linux ran at the commit before it, dev 42335132793, whose only later change is one test's lookup. dev 42339241692 installed that app run's packages on all three runners and the install exercise and acts passed, 58 pass and 3 rehearsal; by its own terms it is not evidence. Local, on macOS: `tests/Keypaste.App.Tests`, 2405 passed, 10 skipped; `tests/Keypaste.Consistency.Tests`, 39; the acts' selftest, 62 cases.
+
+dev 42335749470 (desktop, Linux) failed at `d1aa8507` on `The_gui_refuses_every_variable_name_the_cli_refuses`, which read the page's banner where the form now says it; fixed by that one lookup. `test (windows-2025)` in ci 42337768643 attempt 1 failed `LockedAppEndpointTests.BridgesInQuickSuccession_AreEachHeard`, BACKLOG's known missed knock; `gh run rerun --failed` passed it, and this stage changes nothing that test reaches.
+
+### Limits and follow-ups
+
+No person has used the menus, and macOS's native submenus and the Windows and Linux flyout's are drawn only by the headless tests. Commands that stay button-only are in BACKLOG's row. `OneHomeJourneyTests.Every_advanced_feature_is_reached_from_its_one_home` failed once locally at "the settings did not open" during a whole-project run and passed when run with fewer classes; its mechanism is not diagnosed.

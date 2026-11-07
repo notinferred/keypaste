@@ -91,7 +91,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
         else
         {
             Message = exportFormats is { Count: > 0 }
-                ? $"{WhyUnreadable(path, error)} Nor is it an export keypaste reads: {ExportImportViewModel.Either(exportFormats)}."
+                ? $"{WhyUnreadable(path, error)} Nor is it an export keypaste reads: {ExportImportViewModel.Either(exportFormats)}. Choose another file."
                 : WhyUnreadable(path, error);
         }
 
@@ -447,8 +447,8 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     /// <summary>The refusal of a password, worded for the factors that went with it, since which one was wrong is not knowable (D-0284).</summary>
     private string WrongFactors(bool withKeyfile, bool withHardwareKey) => (withKeyfile, withHardwareKey) switch
     {
-        (false, false) => $"That password does not open {FileName}.",
-        (true, false) => $"That password and key file do not open {FileName}.",
+        (false, false) => $"That password does not open {FileName}. Type it again, or choose a key file if it needs one.",
+        (true, false) => $"That password and key file do not open {FileName}. Type it again, or choose another key file.",
         (false, true) => $"That password and YubiKey do not open {FileName}. If it uses the other slot, switch to it.",
         (true, true) => $"That password, key file and YubiKey do not open {FileName}. If it uses the other slot, switch to it.",
     };

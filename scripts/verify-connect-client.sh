@@ -23,14 +23,14 @@
 # connected and the help as its next step, changing no byte under that home (D-0471). With another vault
 # chosen, Connect again pins this one with --vault and that bridge still reaches the app. Disconnect leaves the
 # tool listing no keypaste and its row offering Connect. For Cursor, which has no settings of its own, the plan
-# is the one edit of keypaste's entry and Cancel writes nothing; Run it changes no byte outside that entry and
+# is the one edit of keypaste's entry and Cancel writes nothing; Connect's action changes no byte outside that entry and
 # keeps the seed as the backup, the check is listed only the projects' tagged items, as the defaults give, and
 # asks for the one picked; Disconnect gives back the seed's bytes, leaves the backup alone, and its row offers
 # Connect again. No configuration ever holds the master password, a keyfile, the session or a credential. Once
 # the app has shut down, doctor notes that nothing holds the vault it held and still exits 0.
 #
 # NEGATIVE CONTROL: this fails if the first unlock chooses nothing, if the CLI without --vault does not reach
-# the app, if a tool is not found or its state is wrong before or after Run it or Disconnect, if a cancelled
+# the app, if a tool is not found or its state is wrong before or after Connect's action or Disconnect, if a cancelled
 # plan writes, if what is registered differs from what was shown, if a registration is not under the tool's id,
 # does not offer run or does not reach every item, if an agent with no settings is listed an untagged item, if
 # the chosen vault is written into the tool or another vault is not, if the check does not reach the app's
@@ -38,7 +38,7 @@
 # non-zero, finds the versions, the vault, the app or Claude Code's registration anything but working or Cursor
 # anything but a note, or changes a byte under the gate's home or a line of the audit file, if keypaste alone on
 # a pseudo-terminal exits non-zero, misses its version, a row or that next step, or changes a byte or a line of
-# the audit file, if Disconnect leaves keypaste listed, if Cursor's plan or Cancel writes its file, if Run it
+# the audit file, if Disconnect leaves keypaste listed, if Cursor's plan or Cancel writes its file, if Connect's action
 # changes a byte outside keypaste's entry or keeps no backup equal to the seed, if Disconnect does not give back
 # the seed's bytes or touches the backup, if a secret reaches a tool's configuration or the driver's output, or
 # if doctor once the app has shut down does not note that nothing holds the vault or exits non-zero. These
@@ -229,7 +229,7 @@ say '^message ' cancel
 say '^preview end' connect "$CLAUDE"
 [ "$(last_preview)" = "$PREVIEW" ] || die "the same tool planned something else"
 say '^message ' confirm
-case "$(last_message)" in Connected.*) ;; *) die "Run it did not connect: $(last_message)" ;; esac
+case "$(last_message)" in Connected.*) ;; *) die "Connect's action did not connect: $(last_message)" ;; esac
 [ "$(registered)" = "${ADD#*keypaste -- }" ] || die "the tool registered [$(registered)], not what the plan showed"
 clean_config "$CONFIG"
 
@@ -245,7 +245,7 @@ esac
 last_audit --arg s "$FIRST" --arg l "$CLAUDE" \
   '.tool == "request_credential" and .decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l and .client.name == "keypaste-check"' \
   || die "the audit file does not hold a prompted grant naming the app's session and the tool's id"
-expect_state "$CLAUDE" connected "after Run it"
+expect_state "$CLAUDE" connected "after Connect's action"
 
 # -------------------- doctor finds everything working while the app holds the vault, and changes nothing
 LOGGED="$(lines_in "$AUDIT")"
@@ -366,15 +366,15 @@ say '^preview end' connect "$CURSOR_ID"
 say '^message ' confirm
 case "$(last_message)" in
   "Connected. Cursor starts keypaste mcp for this vault;"*"Restart Cursor to load it.") ;;
-  *) die "Run it did not connect Cursor: $(last_message)" ;;
+  *) die "Connect's action did not connect Cursor: $(last_message)" ;;
 esac
 [ "$(bytes "$CURSOR.keypaste-backup")" = "$(bytes "$SEED")" ] || die "the backup is not Cursor's file as it was before the first edit"
 without_keypaste "$CURSOR" >"$STRIPPED"
-[ "$(bytes "$STRIPPED")" = "$(bytes "$SEED")" ] || die "Run it changed Cursor's file outside keypaste's entry"
+[ "$(bytes "$STRIPPED")" = "$(bytes "$SEED")" ] || die "Connect's action changed Cursor's file outside keypaste's entry"
 [ "$(grep -v '^ *//' "$CURSOR" | jq -cS '.mcpServers.keypaste')" = "$(printf '%s' "$ENTRY" | jq -cS .)" ] \
   || die "Cursor's file does not hold the entry the plan showed"
 clean_config "$CURSOR"
-expect_state "$CURSOR_ID" connected "after Run it"
+expect_state "$CURSOR_ID" connected "after Connect's action"
 
 # Through a bridge that reaches every item, an agent with no settings is listed the two projects' tagged
 # items, not the untagged ones, and asks for a variable.

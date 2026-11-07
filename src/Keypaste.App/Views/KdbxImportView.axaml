@@ -219,7 +219,7 @@
                          MaskedLength="{Binding PasswordLength}"
                          FontFamily="{DynamicResource KpMono}"
                          Classes="size-14"
-                         Placeholder="{x:Static res:Strings.ItsMasterPassword}" />
+                         AutomationProperties.Name="{x:Static res:Strings.PasswordForThisFile}" />
         <TextBlock
                    Classes="danger size-12-5"
                    TextWrapping="Wrap"
@@ -292,6 +292,7 @@
                       <CheckBox Grid.Column="0"
                                 Theme="{StaticResource IncludeBox}"
                                 IsChecked="{Binding Include}"
+                                AutomationProperties.Name="{Binding SourceGroup, StringFormat={x:Static res:Strings.CopyGroupValue}}"
                                 ToolTip.Tip="{x:Static res:Strings.CopyThisGroup}" />
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Classes="mono secondary size-12"
@@ -363,8 +364,13 @@
         <Button Classes="dialog-action"
                 Classes.primary="{Binding UnlockIsPrimary}"
                 IsVisible="{Binding NeedsUnlock}"
-                Content="{Binding UnlockText}"
-                Command="{Binding UnlockCommand}" />
+                Command="{Binding UnlockCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.Unlock}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+            <TextBlock Text="{Binding UnlockText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Button x:Name="ImportConfirm"
                 Classes="primary dialog-action"
                 IsVisible="{Binding ShowsConfirm}"

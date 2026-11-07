@@ -198,7 +198,7 @@ evidence_connect() {
   registration="$(fact_of "$1" connect registration)"
   vaulted="$(fact_of "$1" connect has_vault)"
   tools="$(fact_of "$1" connect tools)"
-  if [ -z "$registration" ]; then contradict "Run it completed and Claude Code's configuration holds no keypaste"
+  if [ -z "$registration" ]; then contradict "Connect completed and Claude Code's configuration holds no keypaste"
   elif [ "$vaulted" != false ]; then contradict "Claude Code was registered with a vault path: $registration"
   elif [[ " $tools " != *' request_credential '* ]]; then contradict "the registered command answered without request_credential among its tools: ${tools:-none}"
   else pass "Agents' Connect registered '$(fact_of "$1" connect command)' for Claude Code with no vault path, and that command answered as $(fact_of "$1" connect server)"
@@ -1144,7 +1144,7 @@ act_connect() {
   attempt connect drive invoke "Connect $TOOL" || return 1
   # A TextBlock's accessible name is its text, so the plan is found by its automation id.
   attempt plan drive read id:ConnectPlan || return 1
-  attempt run-it drive invoke 'Run it' || return 1
+  attempt run-it drive invoke "Connect $TOOL" || return 1
   attempt registered wait_registration 60 || return 1
   fact registration "$(registration_json)"
   attempt registration read_registration || return 1
@@ -1247,7 +1247,7 @@ act_change_access() {
   attempt new drive type "$NEW_MASTER" || return 1
   attempt confirm-focus drive focus id:AccessConfirmPassword || return 1
   attempt confirm drive type "$NEW_MASTER" || return 1
-  attempt review drive invoke 'Change…' || return 1
+  attempt review drive invoke Change || return 1
   saved changed_ms change drive invoke 'Change access' || return 1
   fact old_password "$(opens_with "$PASSWORD")"
   fact new_password "$(opens_with "$NEW_MASTER")"

@@ -338,7 +338,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             default:
-                Report(null, $"{row.DisplayTitle} is not in the trash any more.");
+                Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
                 break;
         }
 
@@ -386,7 +386,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             default:
-                Report(null, $"{row.DisplayTitle} is not in the trash any more.");
+                Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
                 break;
         }
 
@@ -414,7 +414,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         }
         else
         {
-            Report(null, $"{row.DisplayTitle} is not in the trash any more.");
+            Report(null, $"{row.DisplayTitle} is not in the trash any more. Check the list.");
         }
 
         IsConfirmingPurge = false;

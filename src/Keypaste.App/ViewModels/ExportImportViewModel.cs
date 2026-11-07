@@ -266,7 +266,7 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
 
         if (opened is null)
         {
-            Refuse($"This file is not an export keypaste reads: {Either([.. _readers.Select(reader => reader.Format)])}.");
+            Refuse($"This file is not an export keypaste reads: {Either([.. _readers.Select(reader => reader.Format)])}. Choose another file.");
             return;
         }
 
@@ -326,7 +326,7 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
             NotImported.Add(new ExportLossRow(loss.Index < 0 ? string.Empty : Show(loss.Item), $"{Prose(loss.Part)}: {Prose(loss.Reason)}"));
         }
 
-        Message = plan.Refusal is { } refusal ? $"Nothing can be imported: {Prose(refusal)}." : string.Empty;
+        Message = plan.Refusal is { } refusal ? $"Nothing can be imported: {Prose(refusal)}. Choose another file." : string.Empty;
         Plan = plan;
     }
 

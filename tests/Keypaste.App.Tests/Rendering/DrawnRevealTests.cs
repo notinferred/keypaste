@@ -98,10 +98,9 @@ public sealed class DrawnRevealTests
         Assert.Null(shell.Session.Unlocked);
 
         var locked = shell.Frame();
-        var password = shell.Named<MaskedInput>("Password");
-        var placeholder = DrawnText.Showing(password, password.Placeholder);
+        var label = shell.Named<TextBlock>("PasswordLabel");
         Assert.True(
-            locked.Shows(password.Placeholder, TextStyle.Of(placeholder), locked.Of(placeholder, shell.Window)),
+            locked.Shows(label.Text!, TextStyle.Of(label), locked.Of(label, shell.Window)),
             "the unlock screen is not what the next frame draws");
         AssertNoSecretIn(locked, style);
         AssertNoSecretExposed(shell);

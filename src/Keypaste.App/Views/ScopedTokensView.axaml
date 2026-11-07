@@ -32,7 +32,7 @@
 
         <Border Classes="card filled" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding CreateCommand}" ctl:FormKeys.Cancel="{Binding CancelFormCommand}" ctl:FormKeys.Draft="{Binding FormDraft}">
           <StackPanel Spacing="14">
-            <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+            <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
               <TextBlock Classes="label" Text="{x:Static res:Strings.Name}" />
               <TextBlock Grid.Column="1" Classes="label" Text="{x:Static res:Strings.Scope}" />
               <TextBlock Grid.Column="2" Classes="label" Text="{x:Static res:Strings.Expires}" />
@@ -53,6 +53,10 @@
                                Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
                 </StackPanel>
               </Border>
+              <TextBlock Grid.Row="2" x:Name="TokenNameProblem" ctl:ShowInView.Scrolls="True" Classes="caption danger" TextWrapping="Wrap"
+                         IsVisible="{Binding HasNameProblem}" ctl:Announcer.Says="{Binding NameProblem}" Text="{Binding NameProblem}" />
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TokenScopeProblem" ctl:ShowInView.Scrolls="True" Classes="caption danger" TextWrapping="Wrap"
+                         IsVisible="{Binding HasScopeProblem}" ctl:Announcer.Says="{Binding ScopeProblem}" Text="{Binding ScopeProblem}" />
             </Grid>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
               <TextBlock Classes="caption" TextWrapping="Wrap"

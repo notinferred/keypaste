@@ -215,7 +215,7 @@ public sealed class NewItemTests : IDisposable
         _entries.ConfirmAddCommand.Press();
 
         Assert.True(_entries.IsAdding);
-        Assert.Contains(says, form.Error, StringComparison.Ordinal);
+        Assert.Contains(says, form.Error ?? form.KeyNameProblem, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
     }
 

@@ -27,8 +27,8 @@ namespace Keypaste.App.Tests.Rendering;
 /// are one; and at least eight pixels large, so an anti-aliased fleck is none. Only the topmost surface counts: with a dialog up, what the backdrop dims is not in view.
 /// </para>
 /// <para>
-/// <b>Not counted</b>, because DESIGN gives them amber as identity or state rather than as a signal:
-/// the marks, a selected row's inset bar and the keyboard's focus ring.
+/// <b>Not counted</b>, because DESIGN's Colour section gives them amber as identity or state rather than as a signal:
+/// the marks, a selected row's inset bar, the keyboard's focus ring, a focused field's border and the lock field's caret.
 /// </para>
 /// </remarks>
 internal static class AmberElements

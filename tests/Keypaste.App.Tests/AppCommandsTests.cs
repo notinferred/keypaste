@@ -46,10 +46,10 @@ public sealed class AppCommandsTests : IDisposable
         var mac = Commands(shell: null, mac: true);
         var other = Commands(shell: null, mac: false);
 
-        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], mac.Menus.Select(menu => menu.Header));
-        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], other.Menus.Select(menu => menu.Header));
-        Assert.Equal(["About keypaste", "Settings…", "Hide keypaste", "Hide others", "Show all", "Quit keypaste"], Headers(mac.AppMenu));
-        Assert.Equal(["About keypaste", "Settings…", "Quit keypaste"], Headers(other.AppMenu));
+        Assert.Equal(["File", "Edit", "Item", "Project", "Agents", "View", "Window", "Help"], mac.Menus.Select(menu => menu.Header));
+        Assert.Equal(["File", "Edit", "Item", "Project", "Agents", "View", "Window", "Help"], other.Menus.Select(menu => menu.Header));
+        Assert.Equal(["About keypaste…", "Settings…", "Hide keypaste", "Hide others", "Show all", "Quit keypaste"], Headers(mac.AppMenu));
+        Assert.Equal(["About keypaste…", "Settings…", "Quit keypaste"], Headers(other.AppMenu));
 
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Meta), Find(mac, "Settings…").Shown);
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Control), Find(other, "Settings…").Shown);
@@ -64,6 +64,64 @@ public sealed class AppCommandsTests : IDisposable
         // Windows reports AltGr as Ctrl+Alt, so no chord there holds Alt (Q.1).
         Assert.DoesNotContain(other.All.SelectMany(command => command.Keys), chord => chord.KeyModifiers.HasFlag(KeyModifiers.Alt));
         Assert.Equal(["Lock", "Open vault…"], Headers(mac.Dock));
+    }
+
+    [Fact]
+    public void Each_platforms_window_and_view_menus_hold_what_that_platform_has()
+    {
+        var mac = Commands(shell: null, mac: true);
+        var other = Commands(shell: null, mac: false);
+
+        Assert.Equal(["Minimize", "Zoom", "Bring all to front"], Headers(mac.Menus.Single(menu => menu.Header == "Window").Entries));
+        Assert.Equal(["Minimize", "Maximize"], Headers(other.Menus.Single(menu => menu.Header == "Window").Entries));
+        Assert.Null(Find(other, "Minimize").Shown);
+        Assert.Equal(new KeyGesture(Key.M, KeyModifiers.Meta), Find(mac, "Minimize").Shown);
+    }
+
+    [Fact]
+    public Task Full_screen_and_maximize_say_what_they_would_do() => HeadlessSession.On(() =>
+    {
+        var window = new Window();
+        window.Show();
+        var commands = Commands(shell: null, mac: false, window: window);
+        var fullScreen = Find(commands, "Enter full screen");
+        var maximize = Find(commands, "Maximize");
+
+        Assert.Equal("Enter full screen", fullScreen.HeaderNow);
+        Assert.Equal("Maximize", maximize.HeaderNow);
+
+        window.WindowState = WindowState.FullScreen;
+        Assert.Equal("Exit full screen", fullScreen.HeaderNow);
+
+        window.WindowState = WindowState.Maximized;
+        Assert.Equal("Restore window size", maximize.HeaderNow);
+
+        window.Close();
+    });
+
+    [Fact]
+    public void Every_screens_commands_are_in_the_menus_and_off_with_nothing_to_act_on()
+    {
+        using var shell = NewShell();
+        var commands = Commands(shell);
+
+        foreach (var header in new[]
+        {
+            "Rotate", "Show history", "Copy the reference", "Add field…", "New project…", "Export .env.keypaste…", "Run in a terminal", "Empty Trash",
+            "New token…", "Revoke token", "Revoke link", "End allowance", "Agent history", "Copy the TOTP code", "Restore as another name", "End all allowances", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
+        })
+        {
+            Assert.NotNull(Find(commands, header));
+        }
+
+        foreach (var header in new[] { "Rotate", "Add field…", "Empty Trash", "Revoke token", "Revoke link", "Copy the TOTP code", "Restore as another name", "End all allowances", "Verify chain", "Check status", "Clear the clipboard now", "Run in a terminal" })
+        {
+            Assert.False(Find(commands, header).CanRun(), $"{header} is on with nothing to act on");
+        }
+
+        Assert.DoesNotContain(
+            commands.AppMenu.Concat(commands.Menus.SelectMany(menu => menu.Entries)).SelectMany(Flat),
+            command => command.Header.Contains("Allow", StringComparison.Ordinal) || command.Header.Contains("Deny", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -266,7 +324,7 @@ public sealed class AppCommandsTests : IDisposable
         using var unlock = new UnlockViewModel(locked, _vault.Home, new FakeVaultFilePicker(), () => { });
         unlock.SelectedPath = null;
         var commands = new AppCommands(new AppCommandHost { Session = locked, Shell = () => null, Unlock = () => unlock, Home = _vault.Home });
-        var recent = commands.Menus.Single(menu => menu.Header == "File").Entries.OfType<AppSubmenu>().Single();
+        var recent = commands.Menus.Single(menu => menu.Header == "File").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Open recent");
 
         var vault = recent.Entries().OfType<AppCommand>().First();
         Assert.Equal("test.kdbx", vault.Header);
@@ -327,7 +385,7 @@ public sealed class AppCommandsTests : IDisposable
         using var locked = new AppVaultSession(new ManualClock(AppClock.Start));
         using var unlock = new UnlockViewModel(locked, _vault.Home, new FakeVaultFilePicker(), () => { });
         var commands = new AppCommands(new AppCommandHost { Session = locked, Shell = () => null, Unlock = () => unlock, AsksTerms = () => true, Home = _vault.Home });
-        var recent = commands.Menus.Single(menu => menu.Header == "File").Entries.OfType<AppSubmenu>().Single();
+        var recent = commands.Menus.Single(menu => menu.Header == "File").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Open recent");
         Assert.NotEmpty(unlock.Recent);
 
         Assert.False(recent.Entries().OfType<AppCommand>().First().CanRun());
@@ -376,7 +434,14 @@ public sealed class AppCommandsTests : IDisposable
     }
 
     private static AppCommand Find(AppCommands commands, string header) =>
-        commands.AppMenu.Concat(commands.Menus.SelectMany(menu => menu.Entries)).OfType<AppCommand>().Single(command => command.Header == header);
+        commands.AppMenu.Concat(commands.Menus.SelectMany(menu => menu.Entries)).SelectMany(Flat).First(command => command.Header == header);
+
+    private static IEnumerable<AppCommand> Flat(AppMenuEntry entry) => entry switch
+    {
+        AppCommand command => [command],
+        AppSubmenu { Header: not "Open recent" } submenu => submenu.Entries().SelectMany(Flat),
+        _ => [],
+    };
 
     private static IEnumerable<string> Headers(IEnumerable<AppMenuEntry> entries) =>
         entries.OfType<AppCommand>().Select(command => command.Header);

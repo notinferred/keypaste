@@ -121,6 +121,13 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _projectMenu;
     private readonly IReadOnlyList<AppMenuEntry> _agentMenu;
     private readonly IReadOnlyList<AppMenuEntry> _fieldMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _attachmentMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _variableMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _memberMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _tokenMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _linkMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _allowanceMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _reportMenu;
 
     // The row a context menu was opened on, for the rows that cannot be chosen without opening them.
     private object? _context;
@@ -151,14 +158,16 @@ internal sealed class AppCommands
         _openVault = new AppCommand(Strings.OpenVault, Chord(Key.O), CanOpenVault, () => OpenVault(null));
         var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
         _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
-        var file = new AppMenuGroup("File",
+        var exportReferences = Routed(Strings.ExportEnvKeypasteLabel, Project, project => project.ExportReferencesCommand);
+        var file = new AppMenuGroup(Strings.FileMenu,
         [
             new AppCommand(Strings.NewItemLabel, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
             _newGroup,
+            Routed(Strings.NewProjectLabel, Unmodal, shell => shell.NewProjectCommand),
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,
             _openVault,
-            new AppSubmenu("Open recent", RecentEntries),
+            new AppSubmenu(Strings.OpenRecent, RecentEntries),
             _line,
             new AppCommand(Strings.CloseWindow, Chord(Key.W), () => host.Window() is { IsVisible: true }, () => host.Window()?.Close()),
             lockNow,
@@ -166,10 +175,18 @@ internal sealed class AppCommands
             new AppCommand(ImportHeader, [], CanImport, () => Unmodal()?.ImportCommand.Press()),
             new AppCommand(Strings.ImportEnvLabel, [], () => Unmodal() is not null, () => Unmodal()?.ImportEnvCommand.Press()),
             new AppCommand(Strings.ExportLabel, [], () => Unmodal() is not null, Export),
+            exportReferences,
+            _line,
+            Folder(
+                Strings.ThisComputer,
+                Routed(Strings.UseThisVaultForAgentsAndTheXb47c9a, Settings, settings => settings.UseThisVaultCommand),
+                Routed(Strings.LinkTheKeypasteCommand, Settings, settings => settings.LinkCliCommand),
+                Routed(Strings.PairABrowser, () => Settings()?.BrowserFill, browser => browser.PairCommand),
+                Routed(Strings.StopPairing, () => Settings()?.BrowserFill, browser => browser.StopCommand)),
         ]);
 
         _delete = new AppCommand(Strings.Delete, Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete);
-        var edit = new AppMenuGroup("Edit",
+        var edit = new AppMenuGroup(Strings.EditMenu,
         [
             new AppCommand(Strings.Undo, Chord(Key.Z), () => CanUndo(text: true), Undo) { ChordCanRun = () => CanUndo(text: false) },
             new AppCommand(Strings.Redo, Chord(Key.Z, KeyModifiers.Shift), () => Text() is { CanRedo: true }, () => Text()?.Redo()) { ChordCanRun = static () => false },
@@ -181,10 +198,12 @@ internal sealed class AppCommands
             _delete,
             _line,
             new AppCommand(
-                "Find",
+                Strings.FindMenu,
                 Mac ? [new(Key.F, command), new(Key.F, command | KeyModifiers.Alt), new(Key.K, command)] : [new(Key.F, command), new(Key.K, command)],
                 () => Unmodal() is not null,
                 () => Unmodal()?.FocusSearch()),
+            _line,
+            Routed(Strings.ClearTheClipboardNow, () => Unmodal()?.Clipboard is { IsCounting: true } clipboard ? clipboard : null, clipboard => clipboard.ClearNowCommand),
         ]);
 
         AppMenuEntry[] places =
@@ -214,78 +233,159 @@ internal sealed class AppCommands
             new AppCommand(Strings.ActualSize, [new(Key.D0, command), new(Key.NumPad0, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.ActualSize),
         ];
 
+        var screens = Folder(
+            Strings.SettingsScreens,
+            [.. Destinations.All.Where(screen => screen.Parent is DestinationKind.Settings or DestinationKind.Advanced).Select(screen => new AppCommand(screen.Title, [], () => Unmodal() is not null, () => Go(screen.Kind)))]);
+
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
-        var view = new AppMenuGroup("View", Mac
-            ? [.. places, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
-            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand(Strings.EnterFullScreen, [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), resetTable, _line, .. zoom]);
+        AppCommand fullScreen = new(Strings.EnterFullScreen, [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)
+        {
+            Says = () => host.Window()?.WindowState == WindowState.FullScreen ? Strings.ExitFullScreen : Strings.EnterFullScreen,
+        };
+        var view = new AppMenuGroup(Strings.ViewMenu, Mac
+            ? [.. places, screens, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
+            : [.. places, screens, _line, _sidebar, groupsAndProjects, fullScreen, resetTable, _line, .. zoom]);
 
-        var window = new AppMenuGroup("Window",
-        [
-            new AppCommand(Strings.Minimize, Chord(Key.M), () => host.Window() is { IsVisible: true }, () => SetState(WindowState.Minimized)),
-            new AppCommand(Strings.Zoom, [], () => host.Window() is { IsVisible: true }, Zoom),
-            _line,
-            new AppCommand(Strings.BringAllToFront, [], () => host.OpenWindow is not null, BringAllToFront),
-        ]);
+        // Zoom, ⌘M and Bring All to Front are macOS's; Windows and Linux maximize a window, and have no chord for minimizing it.
+        var window = new AppMenuGroup(Strings.WindowMenu, Mac
+            ?
+            [
+                new AppCommand(Strings.Minimize, Chord(Key.M), () => host.Window() is { IsVisible: true }, () => SetState(WindowState.Minimized)),
+                new AppCommand(Strings.Zoom, [], () => host.Window() is { IsVisible: true }, Zoom),
+                _line,
+                new AppCommand(Strings.BringAllToFront, [], () => host.OpenWindow is not null, BringAllToFront),
+            ]
+            :
+            [
+                new AppCommand(Strings.Minimize, [], () => host.Window() is { IsVisible: true }, () => SetState(WindowState.Minimized)),
+                new AppCommand(Strings.Maximize, [], () => host.Window() is { IsVisible: true }, Zoom)
+                {
+                    Says = () => host.Window()?.WindowState == WindowState.Maximized ? Strings.RestoreWindowSize : Strings.Maximize,
+                },
+            ]);
 
-        var help = new AppMenuGroup("Help",
+        var help = new AppMenuGroup(Strings.HelpMenu,
         [
             new AppCommand(Strings.KeypasteHelp, [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(HelpAddress))),
             new AppCommand(Strings.ReportAProblem, [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(ProblemAddress))),
         ]);
 
-        var copyUsername = Routed("Copy username", () => Items()?.Detail, detail => detail.CopyUsernameCommand);
-        var copyPassword = Routed("Copy password", () => Items()?.Detail, detail => detail.CopyPasswordCommand);
-        var openUrl = Routed("Open URL", () => Items()?.Detail, detail => detail.OpenUrlCommand);
-        var editFields = Routed("Edit fields…", () => Items()?.Detail, detail => detail.EditCommand);
-        var organize = Routed("Rename or move…", Items, items => items.OrganizeCommand);
-        var duplicate = Routed("Duplicate", Items, items => items.DuplicateCommand);
-        var share = Routed("Share…", Unmodal, shell => shell.ShareCommand, shell => (shell.Content as EntriesViewModel)?.Detail?.Path);
-        var restore = Routed("Restore", Trash, trash => trash.RestoreCommand);
-        var purge = Routed("Delete for good", Trash, trash => trash.PurgeCommand);
-        var copyRevision = Routed("Copy this revision's password", () => Items()?.Detail?.History.Selected, revision => revision.CopyPasswordCommand);
-        var restoreRevision = Routed("Restore this revision", () => Items()?.Detail, detail => detail.History.RestoreCommand);
-        var renameGroup = Routed("Rename group…", Items, items => items.BeginRenameGroupCommand);
-        var moveGroup = Routed("Move group…", Items, items => items.BeginMoveGroupCommand);
-        var deleteGroup = Routed("Delete group", Items, items => items.BeginDeleteGroupCommand);
-        var replaceField = Routed("Replace value…", Field, field => field.ReplaceCommand);
-        var generateField = Routed("Generate value…", Field, field => field.GenerateCommand);
-        var renameField = Routed("Rename field…", Field, field => field.RenameCommand);
-        var protectField = Routed("Protect field", Field, field => field.ToggleProtectionCommand) with { Says = () => Field()?.ProtectionHeader ?? "Protect field" };
-        var removeField = Routed("Remove field…", Field, field => field.RemoveCommand);
+        var copyUsername = Routed(Strings.CopyUsername, Pane, detail => detail.CopyUsernameCommand);
+        var copyPassword = Routed(Strings.CopyPassword, Pane, detail => detail.CopyPasswordCommand);
+        var copyUrl = Routed(Strings.CopyUrl, Pane, detail => detail.CopyUrlCommand);
+        var copyReference = Routed(Strings.CopyTheReference, Pane, detail => detail.CopyReferenceCommand);
+        var openUrl = Routed(Strings.OpenUrl, Pane, detail => detail.OpenUrlCommand);
+        var rotate = Routed(Strings.Rotate, Pane, detail => detail.RotateCommand);
+        var history = Routed(Strings.ShowHistory, PaneOutOfEdit, detail => detail.History.ToggleCommand) with { Says = () => PaneOutOfEdit()?.History.ToggleLabel ?? Strings.ShowHistory };
+        var addField = Routed(Strings.AddFieldLabel, PaneOutOfEdit, detail => detail.BeginAddFieldCommand);
+        var addAttachment = Routed(Strings.AddAttachmentLabel, PaneOutOfEdit, detail => detail.Attachments.AddCommand);
+        var editFields = Routed(Strings.EditFieldsLabel, Pane, detail => detail.EditCommand);
+        var organize = Routed(Strings.RenameOrMoveLabel, ItemsInView, items => items.OrganizeCommand);
+        var duplicate = Routed(Strings.Duplicate, ItemsInView, items => items.DuplicateCommand);
+        var share = Routed(Strings.Share, Unmodal, shell => shell.ShareCommand, _ => Pane()?.Path);
+        var restore = Routed(Strings.Restore, Trash, trash => trash.RestoreCommand);
+        var purge = Routed(Strings.DeleteForGood, Trash, trash => trash.PurgeCommand);
+        var copyTotp = Routed(Strings.CopyTheTOTPCode, () => PaneOutOfEdit()?.Totp, totp => totp.CopyCommand);
+        var copyRevision = Routed(Strings.CopyThisRevisionsPassword, () => PaneOutOfEdit()?.History.Selected, revision => revision.CopyPasswordCommand);
+        var restoreRevision = Routed(Strings.RestoreThisRevision, PaneOutOfEdit, detail => detail.History.RestoreCommand);
+        var renameGroup = Routed(Strings.RenameGroupLabel, Items, items => items.BeginRenameGroupCommand);
+        var moveGroup = Routed(Strings.MoveGroupLabel, Items, items => items.BeginMoveGroupCommand);
+        var deleteGroup = Routed(Strings.DeleteGroup, Items, items => items.BeginDeleteGroupCommand);
+        var restoreAs = Routed(Strings.RestoreAsAnotherName, () => Trash() is { OffersRestoreAs: true } trash ? trash : null, trash => trash.RestoreAsCommand) with { Says = () => Trash()?.RestoreAsLabel is { Length: > 0 } label ? label : Strings.RestoreAsAnotherName };
+        var emptyTrash = Routed(Strings.EmptyTrash, Trash, trash => trash.EmptyCommand);
+        var copyField = Routed(Strings.CopyValueMenu, Field, field => field.CopyValueCommand);
+        var replaceField = Routed(Strings.ReplaceValueLabel, Field, field => field.ReplaceCommand);
+        var generateField = Routed(Strings.GenerateValueLabel, Field, field => field.GenerateCommand);
+        var renameField = Routed(Strings.RenameFieldLabel, Field, field => field.RenameCommand);
+        var protectField = Routed(Strings.ProtectField, Field, field => field.ToggleProtectionCommand) with { Says = () => Field()?.ProtectionHeader ?? Strings.ProtectField };
+        var removeField = Routed(Strings.RemoveField, Field, field => field.RemoveCommand);
+        var saveAttachment = Routed(Strings.SaveAttachmentLabel, Attachment, attachment => attachment.SaveCommand);
+        var replaceAttachment = Routed(Strings.ReplaceAttachmentLabel, Attachment, attachment => attachment.ReplaceCommand);
+        var removeAttachment = Routed(Strings.RemoveAttachment, Attachment, attachment => attachment.RemoveCommand);
+        var addKey = Routed(Strings.AddAKeyLabel, Project, project => project.BeginAddCommand);
+        var addEnvironment = Routed(Strings.AddEnvironmentLabel, Project, project => project.BeginAddProfileCommand);
+        var addItem = Routed(Strings.AddItem, EnvironmentInView, environment => environment.AddEntry);
+        var copyRunCommand = Routed(Strings.CopyTheCommand, Project, project => project.CopyRunCommandCommand);
+        var runInTerminal = Routed(Strings.RunInATerminal, Project, project => project.Launch.RunProjectCommand);
+        var openTerminal = Routed(Strings.OpenTerminal, Project, project => project.Launch.OpenTerminalCommand);
+        var copyVariable = Routed(Strings.CopyValueMenu, Variable, variable => variable.CopyValueCommand);
+        var replaceVariable = Routed(Strings.ReplaceValueLabel, Variable, variable => variable.ReplaceCommand);
+        var removeVariable = Routed(Strings.RemoveKey, Variable, variable => variable.RemoveCommand);
+        var removeMember = Routed(Strings.TakeOutOfThisEnvironment, () => Project() is not null ? Target<EnvMemberRow>() : null, member => member.Remove);
         var openProject = new AppCommand(
-            "Open project",
+            Strings.OpenProject,
             [],
             () => Unmodal() is { } shell && Target<ProjectRow>() is { } project && !Equals(shell.SelectedSidebarRow, project),
             OpenProject);
         var agentSettings = new AppCommand(
-            "Agent settings…",
+            Strings.AgentSettingsLabel,
             [],
             () => Agents() is not null && Target<AgentRow>() is { HasSettings: true, IsOpen: false },
             OpenAgentSettings);
-        var disconnect = Routed("Disconnect agent", Agents, agents => agents.DisconnectCommand, _ => Target<AgentRow>());
+        var connect = Routed(Strings.ConnectAgentLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane());
+        var connectAgain = Routed(Strings.ConnectAgentAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane());
+        var disconnect = Routed(Strings.DisconnectAgentLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
+        var resetClients = Routed(Strings.ResetClientsToml, () => Agents() is { HasClientsProblem: true } agents ? agents : null, agents => agents.ResetClientsCommand);
+        var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
+        var endAllowance = Routed(Strings.EndAllowance, Agents, agents => agents.EndCommand, _ => Target<ActivityRow>());
+        var endAll = Routed(Strings.EndAllAllowances, () => Agents() is { OffersEndAll: true } agents ? agents : null, agents => agents.AskEndAllCommand);
+        var agentHistory = Routed(Strings.AgentHistory, Agents, agents => agents.OpenHistoryCommand);
+        var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
+        var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
+        var verifyChain = Routed(Strings.VerifyChain, Log, log => log.VerifyCommand) with { Says = () => Log()?.VerifyLabel ?? Strings.VerifyChain };
+        var checkLinks = Routed(Strings.CheckStatus, Links, links => links.RefreshCommand);
+        var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
+        var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
-        _itemMenu = [copyUsername, copyPassword, openUrl, _line, editFields, organize, duplicate, share, _line, _delete];
-        _trashMenu = [restore, _line, purge];
+        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, history, _line, _delete];
+        _trashMenu = [restore, restoreAs, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
-        _projectMenu = [openProject];
-        _agentMenu = [agentSettings, _line, disconnect];
-        _fieldMenu = [replaceField, generateField, renameField, protectField, _line, removeField];
+        _projectMenu = [openProject, _line, addKey, addEnvironment, addItem, _line, runInTerminal, openTerminal, copyRunCommand, exportReferences];
+        _agentMenu = [agentSettings, connect, connectAgain, _line, disconnect];
+        _fieldMenu = [copyField, replaceField, generateField, renameField, protectField, _line, removeField];
+        _attachmentMenu = [saveAttachment, replaceAttachment, _line, removeAttachment];
+        _variableMenu = [copyVariable, replaceVariable, _line, removeVariable];
+        _memberMenu = [removeMember];
+        _tokenMenu = [newToken, _line, revokeToken];
+        _linkMenu = [checkLinks, _line, revokeLink];
+        _allowanceMenu = [endAllowance, endAll];
+        _reportMenu = [deleteReport];
 
-        // Edit has Delete, and File has New group, so the item menu leaves them out.
-        var item = new AppMenuGroup("Item",
+        // Edit has Delete, and File has New group, so the item menu leaves them out. What acts on one row sits in its own submenu.
+        var item = new AppMenuGroup(Strings.ItemMenu,
         [
-            copyUsername, copyPassword, openUrl, _line,
-            editFields, organize, duplicate, share, _line,
-            replaceField, generateField, renameField, protectField, removeField, _line,
-            copyRevision, restoreRevision, _line,
-            restore, purge, _line,
-            renameGroup, moveGroup, deleteGroup, _line,
-            openProject, _line,
-            agentSettings, disconnect,
+            copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line,
+            editFields, organize, duplicate, share, rotate, history, _line,
+            addField, addAttachment,
+            Folder(Strings.Field, copyField, replaceField, generateField, renameField, protectField, _line, removeField),
+            Folder(Strings.Attachment, saveAttachment, replaceAttachment, _line, removeAttachment),
+            Folder(Strings.Revision, copyRevision, restoreRevision),
+            _line,
+            Folder(Strings.Group, renameGroup, moveGroup, _line, deleteGroup),
+            Folder(Strings.Trash, restore, restoreAs, purge, _line, emptyTrash),
+            Folder(Strings.ShareLinks, checkLinks, revokeLink),
         ]);
 
-        Menus = [file, edit, item, view, window, help];
+        var projects = new AppMenuGroup(Strings.Project,
+        [
+            openProject, _line,
+            addKey, addEnvironment, addItem, _line,
+            runInTerminal, openTerminal, copyRunCommand, _line,
+            Folder(Strings.KeyMenu, copyVariable, replaceVariable, _line, removeVariable),
+            removeMember,
+        ]);
+
+        var agents = new AppMenuGroup(Strings.Agents,
+        [
+            agentSettings, connect, connectAgain, disconnect, resetClients, _line,
+            showPrompt, endAllowance, endAll, _line,
+            agentHistory, verifyChain, _line,
+            newToken, revokeToken, _line,
+            deleteReport,
+        ]);
+
+        Menus = [file, edit, item, projects, agents, view, window, help];
         Dock = [lockNow, new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock)];
     }
 
@@ -298,7 +398,7 @@ internal sealed class AppCommands
     /// <summary>The app's own menu: keypaste's in the macOS menu bar, the first submenu of the menu button elsewhere.</summary>
     internal IReadOnlyList<AppMenuEntry> AppMenu { get; }
 
-    /// <summary>File, Edit, Item, View, Window and Help.</summary>
+    /// <summary>File, Edit, Item, Project, Agents, View, Window and Help.</summary>
     internal IReadOnlyList<AppMenuGroup> Menus { get; }
 
     /// <summary>The macOS Dock icon's menu.</summary>
@@ -322,11 +422,19 @@ internal sealed class AppCommands
 
     private bool InField() => Focus() is TextBox or MaskedInput;
 
-    // The import, share, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
+    // The import, share, discard, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
-        _host.Shell() is { HasImport: false, HasShare: false, HasGeneratorDialog: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
+        _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
 
     private EntriesViewModel? Items() => Unmodal()?.Content as EntriesViewModel;
+
+    // New item's form takes the pane's place, with the row it hides still selected.
+    private EntriesViewModel? ItemsInView() => Items() is { IsAdding: false } items ? items : null;
+
+    private EntryDetailViewModel? Pane() => ItemsInView()?.Detail;
+
+    // Editing an item's fields hides its custom fields, attachments and history.
+    private EntryDetailViewModel? PaneOutOfEdit() => Pane() is { IsEditing: false } detail ? detail : null;
 
     private void Go(DestinationKind kind)
     {
@@ -344,6 +452,12 @@ internal sealed class AppCommands
         {
             act(items);
         }
+    }
+
+    private void NewToken()
+    {
+        Go(DestinationKind.Tokens);
+        Tokens()?.OpenFormCommand.Press();
     }
 
     private void Export()
@@ -429,7 +543,7 @@ internal sealed class AppCommands
     // A TextBox copies its selection even behind a password character unless CanCopy is asked first.
     private bool CanCopy(bool text) =>
         Focus() is TextBox field ? text && field.CanCopy
-        : !InField() && Items()?.Detail is { } detail && detail.CopyPasswordCommand.CanExecute(null);
+        : !InField() && Pane() is { } detail && detail.CopyPasswordCommand.CanExecute(null);
 
     private void Copy()
     {
@@ -439,7 +553,7 @@ internal sealed class AppCommands
         }
         else
         {
-            Items()?.Detail?.CopyPasswordCommand.Press();
+            Pane()?.CopyPasswordCommand.Press();
         }
     }
 
@@ -466,20 +580,21 @@ internal sealed class AppCommands
     }
 
     /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
-    internal static bool HasContextMenu(object? row) => row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow;
+    internal static bool HasContextMenu(object? row) =>
+        row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
+            or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow or ActivityRow { Id: not null };
 
     /// <summary>
     /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
-    /// are chosen, while a project, an agent and a custom field, which choosing would open or cannot be chosen, are its commands' target
+    /// are chosen, while the rest, which choosing would open or cannot be chosen, are its commands' target
     /// while they run. Null for a row with no menu.
     /// </summary>
-    internal IReadOnlyList<AppMenuEntry>? ContextMenu(object row)
-    {
-        if (Unmodal() is not { } shell)
-        {
-            return null;
-        }
+    internal IReadOnlyList<AppMenuEntry>? ContextMenu(object row) =>
+        Unmodal() is { } shell && ChooseRow(shell, row) is { } entries && Unmodal() is not null ? entries : null;
 
+    // Choosing a row with a draft open only asks, and a menu over that question would act on the old row.
+    private IReadOnlyList<AppMenuEntry>? ChooseRow(ShellViewModel shell, object row)
+    {
         switch (row)
         {
             case EntryRow entry when Items() is { } items:
@@ -500,6 +615,21 @@ internal sealed class AppCommands
                 return Bound(_agentMenu, row);
             case EntryFieldRow when Items() is not null:
                 return Bound(_fieldMenu, row);
+            case EntryAttachmentRow when Items() is not null:
+                return Bound(_attachmentMenu, row);
+            case EnvKeyRow { Variable: not null } when Project() is not null:
+            case EnvVariableRow when Project() is not null:
+                return Bound(_variableMenu, row);
+            case EnvMemberRow when Project() is not null:
+                return Bound(_memberMenu, row);
+            case ScopedTokenRow when Tokens() is not null:
+                return Bound(_tokenMenu, row);
+            case SharingRow when Links() is not null:
+                return Bound(_linkMenu, row);
+            case CrashReportRow:
+                return Bound(_reportMenu, row);
+            case ActivityRow when Agents() is not null:
+                return Bound(_allowanceMenu, row);
             default:
                 return null;
         }
@@ -535,11 +665,38 @@ internal sealed class AppCommands
     // A context menu's row, else the row holding the keyboard, as macOS sends a menu's command to the focused view.
     private T? Target<T>()
         where T : class =>
-        _context as T ?? (Focus() as Visual)?.GetSelfAndVisualAncestors().OfType<StyledElement>().Select(element => element.DataContext).OfType<T>().FirstOrDefault();
+        _context is not null ? _context as T : (Focus() as Visual)?.GetSelfAndVisualAncestors().OfType<StyledElement>().Select(element => element.DataContext).OfType<T>().FirstOrDefault();
 
     private AgentActivityViewModel? Agents() => Unmodal()?.Content as AgentActivityViewModel;
 
     private EntryFieldRow? Field() => Items() is not null ? Target<EntryFieldRow>() : null;
+
+    private EntryAttachmentRow? Attachment() => Items() is not null ? Target<EntryAttachmentRow>() : null;
+
+    private AgentRow? AgentWithoutPane() => Target<AgentRow>() is { HasConnection: false } row ? row : null;
+
+    private SettingsViewModel? Settings() => Unmodal()?.Content as SettingsViewModel;
+
+    private ScopedTokensViewModel? Tokens() => Unmodal()?.Content as ScopedTokensViewModel;
+
+    private LogViewModel? Log() => Unmodal()?.Content as LogViewModel;
+
+    private SharingViewModel? Links() => Unmodal()?.Content as SharingViewModel;
+
+    // The project open, unless a context menu opened on a project's row that is not this one.
+    private EnvProjectViewModel? Project() =>
+        (Unmodal()?.Content as EnvSetsViewModel)?.OpenProject is { } open && (_context is not ProjectRow row || string.Equals(row.Name, open.Name, StringComparison.Ordinal))
+            ? open
+            : null;
+
+    private EnvEnvironmentEntries? EnvironmentInView() =>
+        Project() is { } project
+            ? Target<EnvEnvironmentEntries>() ?? project.Environments.FirstOrDefault(environment => string.Equals(environment.Name, project.SelectedProfile, StringComparison.Ordinal))
+            : null;
+
+    private EnvVariableRow? Variable() => Project() is not null ? Target<EnvVariableRow>() ?? Target<EnvKeyRow>()?.Variable : null;
+
+    private static AppSubmenu Folder(string header, params AppMenuEntry[] entries) => new(header, () => entries);
 
     private static AppCommand Routed<T>(string header, Func<T?> target, Func<T, ICommand> command, Func<T, object?>? parameter = null)
         where T : class =>
@@ -573,10 +730,10 @@ internal sealed class AppCommands
         }
     }
 
-    private bool CanDelete() => !InField() && Items() is { } items && items.DeleteCommand.CanExecute(null);
+    private bool CanDelete() => !InField() && ItemsInView() is { } items && items.DeleteCommand.CanExecute(null);
 
     // Asks first only where nothing could put the item back.
-    private void Delete() => Items()?.DeleteCommand.Press();
+    private void Delete() => ItemsInView()?.DeleteCommand.Press();
 
     private void SetState(WindowState state)
     {

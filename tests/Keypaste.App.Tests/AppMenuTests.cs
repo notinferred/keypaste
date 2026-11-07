@@ -1,6 +1,7 @@
 using System.Text;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Internal;
@@ -32,6 +33,24 @@ public sealed class AppMenuTests : IDisposable
     }
 
     [Fact]
+    public Task A_folder_in_the_flyout_is_not_drawn_again_each_time_it_opens_while_open_recent_is() => HeadlessSession.On(() =>
+    {
+        var flyout = AppMenu.Flyout(Commands(null!, mac: false));
+        MenuItem Under(string menu, string header) =>
+            flyout.Items.OfType<MenuItem>().Single(item => item.Header as string == menu).Items.OfType<MenuItem>().Single(item => item.Header as string == header);
+        var field = Under("Item", "Field");
+        var recent = Under("File", "Open recent");
+        var fieldItem = field.Items[0];
+        var recentItem = recent.Items[^1];
+
+        field.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent));
+        recent.RaiseEvent(new RoutedEventArgs(MenuItem.SubmenuOpenedEvent));
+
+        Assert.Same(fieldItem, field.Items[0]);
+        Assert.NotSame(recentItem, recent.Items[^1]);
+    });
+
+    [Fact]
     public Task The_mac_menu_bar_draws_each_menu_and_its_items_run_their_commands() => HeadlessSession.On(() =>
     {
         var foreign = Path.Combine(_vault.Home, "foreign.kdbx");
@@ -41,7 +60,7 @@ public sealed class AppMenuTests : IDisposable
 
         var bar = AppMenu.Bar(commands);
         var menus = bar.Items.OfType<NativeMenuItem>().ToDictionary(item => item.Header!, item => item.Menu!, StringComparer.Ordinal);
-        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], menus.Keys);
+        Assert.Equal(["File", "Edit", "Item", "Project", "Agents", "View", "Window", "Help"], menus.Keys);
 
         var newItem = Item(menus["File"], "New item…");
         Assert.Equal(new KeyGesture(Key.N, KeyModifiers.Meta), newItem.Gesture);
@@ -61,7 +80,7 @@ public sealed class AppMenuTests : IDisposable
         Assert.False(newItem.Command!.CanExecute(null), "New item is on while an import is open");
 
         var app = AppMenu.Native(commands.AppMenu);
-        Assert.Equal(["About keypaste", "Settings…", "Hide keypaste", "Hide others", "Show all", "Quit keypaste"],
+        Assert.Equal(["About keypaste…", "Settings…", "Hide keypaste", "Hide others", "Show all", "Quit keypaste"],
             app.Items.OfType<NativeMenuItem>().Where(item => item is not NativeMenuItemSeparator).Select(item => item.Header));
         Assert.Equal(new KeyGesture(Key.Q, KeyModifiers.Meta), Item(app, "Quit keypaste").Gesture);
     });
@@ -74,7 +93,7 @@ public sealed class AppMenuTests : IDisposable
 
         var flyout = AppMenu.Flyout(commands);
         var groups = flyout.Items.OfType<MenuItem>().ToDictionary(item => (string)item.Header!, StringComparer.Ordinal);
-        Assert.Equal(["keypaste", "File", "Edit", "Item", "View", "Window", "Help"], groups.Keys);
+        Assert.Equal(["keypaste", "File", "Edit", "Item", "Project", "Agents", "View", "Window", "Help"], groups.Keys);
 
         var settings = Child(groups["keypaste"], "Settings…");
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Control), settings.InputGesture);

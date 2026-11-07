@@ -45,6 +45,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private readonly AppVaultSession _session;
     private IReadOnlyList<string> _projectTags;
     private ItemTemplate _template = ItemTemplate.Login;
+    private bool _titleRefused;
+    private bool _keyNameRefused;
     private FolderChoice _folder;
     private bool _generatePassword = true;
 
@@ -109,6 +111,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowsHost));
                 OnPropertyChanged(nameof(ShowsKey));
                 OnPropertyChanged(nameof(ShowsPassword));
+                KeyValueProblem = null;
                 Error = null;
             }
         }
@@ -141,11 +144,15 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(TitleProblem), nameof(HasTitleProblem))]
     internal partial string Title { get; set; } = string.Empty;
 
-    /// <summary>Why the title typed cannot be used, or null; none while it is empty, which Create waits on.</summary>
+    /// <summary>Why the title typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
     internal string? TitleProblem =>
-        HasTitle && EntryNameSanitizer.Sanitize(Title.Trim()) is { WasAltered: true } sanitized
-            ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
-            : null;
+        !HasTitle
+            ? (_titleRefused ? "An item needs a title. Type one." : null)
+            : EntryNameSanitizer.Sanitize(Title.Trim()) is { WasAltered: true } sanitized
+                ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
+                : null;
+
+    partial void OnTitleChanged(string value) => _titleRefused = false;
 
     internal bool HasTitleProblem => TitleProblem is not null;
 
@@ -190,9 +197,11 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(KeyNameProblem), nameof(HasKeyNameProblem))]
     internal partial string KeyName { get; set; } = string.Empty;
 
-    /// <summary>Why the key name typed cannot be used, or null.</summary>
+    /// <summary>Why the key name typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
     internal string? KeyNameProblem =>
-        KeyName.Trim() is { Length: > 0 } key && !EnvConvention.IsEnvNamedField(key) ? _keyNameRule : null;
+        (KeyName.Trim().Length > 0 || _keyNameRefused) && !EnvConvention.IsEnvNamedField(KeyName.Trim()) ? _keyNameRule : null;
+
+    partial void OnKeyNameChanged(string value) => _keyNameRefused = false;
 
     internal bool HasKeyNameProblem => KeyNameProblem is not null;
 
@@ -231,6 +240,13 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     /// <summary>An API key's value.</summary>
     internal SecretField KeyValue { get; }
+
+    /// <summary>Why Create refused the key's value, or null; it names no value.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasKeyValueProblem))]
+    internal partial string? KeyValueProblem { get; private set; }
+
+    internal bool HasKeyValueProblem => KeyValueProblem is not null;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TagSuggestions), nameof(TagProblem), nameof(HasTagProblem))]
@@ -286,7 +302,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         if (title.Length == 0)
         {
-            Error = "An item needs a title.";
+            _titleRefused = true;
+            OnPropertyChanged(nameof(TitleProblem));
+            OnPropertyChanged(nameof(HasTitleProblem));
             return null;
         }
 
@@ -303,7 +321,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
             if (!EnvConvention.IsEnvNamedField(key))
             {
-                Error = _keyNameRule;
+                _keyNameRefused = true;
+                OnPropertyChanged(nameof(KeyNameProblem));
+                OnPropertyChanged(nameof(HasKeyNameProblem));
                 return null;
             }
 
@@ -311,9 +331,11 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
             if (value.Length == 0)
             {
-                Error = "Type or paste the key's value.";
+                KeyValueProblem = "Type or paste the key's value.";
                 return null;
             }
+
+            KeyValueProblem = null;
 
             fields.Add(new FieldWrite(key, value, Protect: true));
         }

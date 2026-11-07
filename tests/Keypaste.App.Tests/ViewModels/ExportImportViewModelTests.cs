@@ -227,7 +227,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         Assert.False(import.ConfirmCommand.CanExecute(null));
 
         import.Into = string.Empty;
-        Assert.Equal("Nothing can be imported: name a group to import into.", import.Message);
+        Assert.Equal("Nothing can be imported: name a group to import into. Choose another file.", import.Message);
         Assert.False(import.CanConfirm);
 
         import.Into = "imported";

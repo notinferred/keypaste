@@ -45,17 +45,9 @@ internal sealed class MaskedInput : TemplatedControl
     internal static readonly StyledProperty<int> MaskedLengthProperty =
         AvaloniaProperty.Register<MaskedInput, int>(nameof(MaskedLength));
 
-    /// <summary>What to show when nothing has been typed.</summary>
-    internal static readonly StyledProperty<string> PlaceholderProperty =
-        AvaloniaProperty.Register<MaskedInput, string>(nameof(Placeholder), string.Empty);
-
     /// <summary>The dots the template draws. Derived; never the password.</summary>
     internal static readonly StyledProperty<string> DisplayProperty =
         AvaloniaProperty.Register<MaskedInput, string>(nameof(Display), string.Empty);
-
-    /// <summary>Whether the placeholder should be visible.</summary>
-    internal static readonly StyledProperty<bool> IsEmptyProperty =
-        AvaloniaProperty.Register<MaskedInput, bool>(nameof(IsEmpty), true);
 
     /// <summary>Where the characters go, when the field is bound to one.</summary>
     /// <remarks>
@@ -96,22 +88,10 @@ internal sealed class MaskedInput : TemplatedControl
         set => SetValue(MaskedLengthProperty, value);
     }
 
-    internal string Placeholder
-    {
-        get => GetValue(PlaceholderProperty);
-        set => SetValue(PlaceholderProperty, value);
-    }
-
     internal string Display
     {
         get => GetValue(DisplayProperty);
         private set => SetValue(DisplayProperty, value);
-    }
-
-    internal bool IsEmpty
-    {
-        get => GetValue(IsEmptyProperty);
-        private set => SetValue(IsEmptyProperty, value);
     }
 
     internal ISecretSink? Sink
@@ -147,7 +127,6 @@ internal sealed class MaskedInput : TemplatedControl
         {
             var length = Math.Max(0, MaskedLength);
             Display = new string('•', length);
-            IsEmpty = length == 0;
         }
     }
 
@@ -243,17 +222,6 @@ internal sealed class MaskedInput : TemplatedControl
     /// no <c>IValueProvider</c>, so there is no accessibility path that returns text — and since
     /// this control never holds the password, there would be nothing to return in any case.
     /// </remarks>
-    protected override AutomationPeer OnCreateAutomationPeer() => new MaskedInputAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer() => new ControlAutomationPeer(this);
 
-    /// <summary>Names the field by what it is for, never by what is in it (D-0301).</summary>
-    /// <remarks>
-    /// The base peer names a control from its attached name, a label or a tooltip, and none of the
-    /// eleven fields sets one, so each was announced with no name at all. The placeholder is a
-    /// literal in every view that uses this control.
-    /// </remarks>
-    private sealed class MaskedInputAutomationPeer(MaskedInput owner) : ControlAutomationPeer(owner)
-    {
-        protected override string? GetNameCore() =>
-            base.GetNameCore() is { Length: > 0 } named ? named : owner.Placeholder;
-    }
 }

@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// The pane under an AI tool's row on Agents: the plan it shows when it opens, what Run it runs, and what the check
+/// The pane under an AI tool's row on Agents: the plan it shows when it opens, what its action runs, and what the check
 /// keeps. Each tool is registered under its own id, offering run and every item.
 /// </summary>
 /// <remarks>
@@ -453,7 +453,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Null(model.InstallLink);
     }
 
-    /// <summary>Inside an AppImage the registration starts a link only Run it makes, so a link opened first would start nothing.</summary>
+    /// <summary>Inside an AppImage the registration starts a link only its action makes, so a link opened first would start nothing.</summary>
     [Fact]
     public async Task Inside_an_appimage_no_link_is_offered_before_run_it_makes_the_one_it_starts()
     {
@@ -622,6 +622,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.CheckCommand.PressAsync();
 
         Assert.True(model.IsPicking);
+        Assert.False(model.IsCheckWorking);
         Assert.Equal(["env/ci/DEPLOY_KEY", "env/ci/OTHER"], model.CheckEntries.Select(entry => entry.Name));
         Assert.Equal("env/ci/DEPLOY_KEY", model.SelectedCheckEntry!.Name);
         Assert.Null(_bridges[0].AskedFor);

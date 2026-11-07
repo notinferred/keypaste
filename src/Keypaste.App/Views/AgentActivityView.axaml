@@ -167,14 +167,14 @@
                         <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding ShowsSummary}" TextWrapping="Wrap" />
                       </StackPanel>
                       <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top" MaxWidth="220"
-                              IsVisible="{Binding OffersConnect}"
+                              IsVisible="{Binding ShowsConnect}"
                               Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectCommand}"
                               CommandParameter="{Binding}"
                               AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}">
-                        <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}" />
+                        <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueLabel}}" />
                       </Button>
 
-                      <!-- The plan core composed, run only on Run it. -->
+                      <!-- The plan core composed, run only by its action, which the row's button gives way to. -->
                       <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
                         <StackPanel Spacing="12" DataContext="{Binding Connection}" x:DataType="vm:ConnectClientViewModel">
                           <Grid ColumnDefinitions="*,Auto">
@@ -201,11 +201,11 @@
                               <Button Name="CancelConnection" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
                               <Button Name="RunConnection"
                                       Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}"
-                                      AutomationProperties.Name="{x:Static res:Strings.RunIt}"
+                                      AutomationProperties.Name="{Binding Title}"
                                       Command="{Binding ConfirmCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                   <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
-                                  <TextBlock Text="{x:Static res:Strings.RunIt}" IsVisible="{Binding !IsRunning}" />
+                                  <TextBlock Text="{Binding Title}" IsVisible="{Binding !IsRunning}" />
                                   <TextBlock Text="{x:Static res:Strings.Running}" IsVisible="{Binding IsRunning}" />
                                 </StackPanel>
                               </Button>
@@ -231,22 +231,30 @@
                             </StackPanel>
                           </StackPanel>
                           <StackPanel Spacing="10" IsVisible="{Binding OffersCheck}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <Button Name="CheckConnection" Content="{x:Static res:Strings.CheckTheConnection}" Command="{Binding CheckCommand}" />
-                              <ComboBox Name="CheckItem"
-                                        ItemsSource="{Binding CheckEntries}"
-                                        SelectedItem="{Binding SelectedCheckEntry}"
-                                        IsVisible="{Binding IsPicking}"
-                                        MinWidth="240"
-                                        AutomationProperties.Name="{x:Static res:Strings.ItemToAskFor}">
-                                <ComboBox.ItemTemplate>
-                                  <DataTemplate x:DataType="clients:McpListedEntry">
-                                    <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
-                                  </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                              </ComboBox>
-                              <Button Name="AskCheckItem" Content="{x:Static res:Strings.AskForIt}" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
-                            </StackPanel>
+                            <WrapPanel ItemSpacing="8" LineSpacing="8">
+                              <Button Name="CheckConnection" VerticalAlignment="Bottom" Command="{Binding CheckCommand}" AutomationProperties.Name="{x:Static res:Strings.CheckTheConnection}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding IsCheckWorking}" Classes.spinning="{Binding IsCheckWorking}" />
+                                  <TextBlock Text="{x:Static res:Strings.CheckTheConnection}" />
+                                </StackPanel>
+                              </Button>
+                              <StackPanel Spacing="6" VerticalAlignment="Bottom">
+                                <TextBlock Classes="label" Text="{x:Static res:Strings.ItemToAskFor}" IsVisible="{Binding IsPicking}" />
+                                <ComboBox Name="CheckItem"
+                                          ItemsSource="{Binding CheckEntries}"
+                                          SelectedItem="{Binding SelectedCheckEntry}"
+                                          IsVisible="{Binding IsPicking}"
+                                          MinWidth="240"
+                                          AutomationProperties.Name="{x:Static res:Strings.ItemToAskFor}">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="clients:McpListedEntry">
+                                      <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
+                                    </DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
+                              <Button Name="AskCheckItem" VerticalAlignment="Bottom" Content="{x:Static res:Strings.AskForIt}" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
+                            </WrapPanel>
                             <TextBlock Classes="body secondary" ctl:Announcer.Says="{Binding CheckMessage}" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
                                        MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                           </StackPanel>
@@ -260,15 +268,15 @@
                                 IsExpanded="{Binding IsOpen, Mode=TwoWay}"
                                 AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.SettingsForValue}}">
                         <StackPanel Spacing="14">
-                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OffersToolActions}">
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsToolActions}">
                             <Button Name="ConnectToolAgain" MaxWidth="260"
                                     IsVisible="{Binding OffersConnectAgain}"
                                     Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectAgainCommand}"
                                     CommandParameter="{Binding}"
                                     AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}">
-                              <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}" />
+                              <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgainLabel}}" />
                             </Button>
-                            <Button Name="DisconnectTool" Classes="danger" Content="{x:Static res:Strings.Disconnect}"
+                            <Button Name="DisconnectTool" Classes="danger" Content="{x:Static res:Strings.DisconnectLabel}"
                                     IsVisible="{Binding OffersDisconnect}"
                                     Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).DisconnectCommand}"
                                     CommandParameter="{Binding}"

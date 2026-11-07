@@ -392,13 +392,13 @@ public sealed class AgentSettingsViewModelTests
         model.UntilTimeText = "6pm";
         await model.ApplyLimitAsync();
 
-        Assert.Equal("Not changed: a time of day is written like 18:00 on this computer's clock, or left empty for the close of the day.", model.Message);
+        Assert.Equal("Not changed: a time of day is written like 18:00 on this computer's clock, or left empty for the close of the day. Correct that, then set it again.", model.Message);
 
         model.UntilDate = new DateTime(2026, 7, 1);
         model.UntilTimeText = string.Empty;
         await model.ApplyLimitAsync();
 
-        Assert.Equal("Not changed: until 2026-07-01 23:59 +02:00 has already passed on this computer's clock.", model.Message);
+        Assert.Equal("Not changed: until 2026-07-01 23:59 +02:00 has already passed on this computer's clock. Correct that, then set it again.", model.Message);
         Assert.Equal(new DateTimeOffset(2026, 12, 31, 16, 0, 0, TimeSpan.Zero), app.Record().Limit.Until);
         Assert.Empty(app.Person.Changes);
     }

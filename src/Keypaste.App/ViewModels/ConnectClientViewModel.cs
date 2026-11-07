@@ -12,7 +12,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>Nothing is written before the person has seen it.</b> The pane composes its plan in core
-/// (<see cref="McpClientSetup"/>) when it opens and shows its display; Run it runs that same plan object, so
+/// (<see cref="McpClientSetup"/>) when it opens and shows its display; Connect runs that same plan object, so
 /// the steps confirmed and the steps run cannot differ. A tool with no command of its own has only
 /// keypaste's entry in its file changed, with the first original kept beside it. Inside an AppImage the
 /// link a tool starts is made or replaced first, as a step of the same plan.
@@ -27,9 +27,9 @@ namespace Keypaste.App.ViewModels;
 /// window and its audit log. The value it is released is discarded unread.
 /// </para>
 /// <para>
-/// <b>Cursor and VS Code can add keypaste themselves.</b> Their install link carries the entry Run it would write
+/// <b>Cursor and VS Code can add keypaste themselves.</b> Their install link carries the entry Connect would write
 /// (<see cref="McpInstallLink"/>), so it is offered beside the plan, and stays offered when keypaste cannot write the
-/// tool's file, until Run it has connected the tool.
+/// tool's file, until Connect has connected the tool.
 /// </para>
 /// </remarks>
 internal sealed partial class ConnectClientViewModel : ObservableObject, IDisposable
@@ -46,6 +46,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     private string _preview = string.Empty;
     private string _previewNote = string.Empty;
     private McpConnectionCheck? _check;
+    private bool _startingCheck;
     private IReadOnlyList<McpListedEntry> _checkEntries = [];
     private bool _disposed;
 
@@ -53,7 +54,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     /// <param name="connector">The machine, the tools' own commands, the bridge and the check.</param>
     /// <param name="client">The tool.</param>
     /// <param name="removes">Whether the pane disconnects the tool rather than connecting it.</param>
-    /// <param name="ran">Called once Run it has run a plan, whatever came of it.</param>
+    /// <param name="ran">Called once Connect has run a plan, whatever came of it.</param>
     /// <param name="cancelled">Called once Cancel has dropped the plan.</param>
     /// <param name="clipboard">Where Copy link puts the tool's install link, or null to offer no copy.</param>
     /// <param name="web">What opens the tool's install link, or null to offer no opening.</param>
@@ -130,7 +131,10 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
     internal bool IsChecking => _check is not null;
 
-    /// <summary>Whether Run it is running the plan.</summary>
+    /// <summary>Whether the check is doing something itself: starting or waiting on the bridge, not on the person picking an item.</summary>
+    internal bool IsCheckWorking => _startingCheck || (IsChecking && !IsPicking);
+
+    /// <summary>Whether Connect is running the plan.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
@@ -158,13 +162,13 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     /// <summary>Asks for the entry picked from the check's listing.</summary>
     internal AsyncRelayCommand AskCommand { get; }
 
-    /// <summary>The link that has the tool add keypaste itself, holding the entry Run it would write; null for a tool that takes none.</summary>
+    /// <summary>The link that has the tool add keypaste itself, holding the entry Connect would write; null for a tool that takes none.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OffersInstallLink))]
     [NotifyCanExecuteChangedFor(nameof(OpenInstallLinkCommand), nameof(CopyInstallLinkCommand))]
     internal partial string? InstallLink { get; private set; }
 
-    /// <summary>Whether the link is offered: until Run it has connected the tool.</summary>
+    /// <summary>Whether the link is offered: until Connect has connected the tool.</summary>
     internal bool OffersInstallLink => InstallLink is not null && Registered is null;
 
     internal string OpenInstallLinkLabel => $"Open in {Client.DisplayName}";
@@ -181,7 +185,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
     private partial McpSetupPlan? Pending { get; set; }
 
-    /// <summary>Composes the plan the pane shows, which Run it runs; nothing is written.</summary>
+    /// <summary>Composes the plan the pane shows, which Connect runs; nothing is written.</summary>
     internal Task PreviewAsync() => Removes ? PreviewRemoveAsync() : PreviewConnectAsync();
 
     private async Task PreviewConnectAsync()
@@ -221,7 +225,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
             return;
         }
 
-        // Inside an AppImage the registration starts a link only Run it makes, so the tool's own link would start nothing.
+        // Inside an AppImage the registration starts a link only Connect makes, so the tool's own link would start nothing.
         if (target.Link is null && McpInstallLink.TryCreate(client, machine.Platform, registration, out var installLink, out _))
         {
             InstallLink = installLink;
@@ -362,7 +366,9 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         }
 
         CheckMessage = $"Starting keypaste mcp as {Client.DisplayName} would…";
+        SetStartingCheck(true);
         var check = await Task.Run(() => _connector.StartCheck(registration)).ConfigureAwait(true);
+        SetStartingCheck(false);
         if (check is null)
         {
             CheckMessage = $"The check could not start {registration.Server.Path}. Connect the tool again, then check.";
@@ -406,6 +412,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
                 _checkEntries = listing.Entries;
                 OnPropertyChanged(nameof(CheckEntries));
                 OnPropertyChanged(nameof(IsPicking));
+                OnPropertyChanged(nameof(IsCheckWorking));
                 AskCommand.NotifyCanExecuteChanged();
                 SelectedCheckEntry = listing.Entries[0];
                 CheckMessage = $"The bridge lists {listing.Entries.Count} items. Pick the one to ask for.";
@@ -425,6 +432,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         _checkEntries = [];
         OnPropertyChanged(nameof(CheckEntries));
         OnPropertyChanged(nameof(IsPicking));
+        OnPropertyChanged(nameof(IsCheckWorking));
         AskCommand.NotifyCanExecuteChanged();
 
         CheckMessage = $"Asking for {Shown(entry.Field)} of {entry.Name}. Answer in the prompt window.";
@@ -450,10 +458,17 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
     private static string Shown(string field) => field == "password" ? "the password" : field;
 
+    private void SetStartingCheck(bool starting)
+    {
+        _startingCheck = starting;
+        OnPropertyChanged(nameof(IsCheckWorking));
+    }
+
     private void SetCheck(McpConnectionCheck? check)
     {
         _check = check;
         OnPropertyChanged(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsCheckWorking));
         OnPropertyChanged(nameof(IsPicking));
         OnPropertyChanged(nameof(OffersCheck));
         OnPropertyChanged(nameof(IsBusy));

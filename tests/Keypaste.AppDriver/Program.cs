@@ -1677,7 +1677,7 @@ internal sealed class Driver(string home)
         internal async Task ConfirmAsync()
         {
             var model = await PaneAsync().ConfigureAwait(true);
-            await PressAsync(model.ConfirmCommand, "Run it").ConfigureAwait(true);
+            await PressAsync(model.ConfirmCommand, model.Title).ConfigureAwait(true);
             Console.Out.WriteLine($"message {model.Message}");
         }
 

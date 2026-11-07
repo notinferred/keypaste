@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -22,6 +24,7 @@ using Keypaste.Core.Activity;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
@@ -298,6 +301,16 @@ public sealed class ScreenRenderer
         tokens.OpenFormCommand.Execute(null);
         WindowInput.Drain();
         Save(window, output, "54-token-form");
+        tokens.CreateCommand.Execute(null);
+        WindowInput.Drain();
+        Save(window, output, "54c-token-form-problems");
+        var tokenFormWidth = window.Width;
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "54d-token-form-720");
+        window.Width = tokenFormWidth;
+        tokens.CancelFormCommand.Execute(null);
+        tokens.OpenFormCommand.Execute(null);
+        WindowInput.Drain();
         window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreScopes").Flyout!.ShowAt(window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreScopes"));
         WindowInput.Drain();
         Save(window, output, "54b-learn-more-scopes");
@@ -561,6 +574,9 @@ public sealed class ScreenRenderer
             var settingsWindow = Show(new SettingsView { DataContext = settings });
             settingsWindow.Height = 1900;
             Save(settingsWindow, output, "73-yubikey-settings");
+            SetDrawnState(settings.Access, nameof(settings.Access.Busy), true);
+            Save(settingsWindow, output, "73b-vault-access-changing");
+            SetDrawnState(settings.Access, nameof(settings.Access.Busy), false);
             settingsWindow.Close();
         }
         finally
@@ -662,8 +678,10 @@ public sealed class ScreenRenderer
         agents.ConnectCommand.Press(agents.Rows.Single(row => row.Key == "cursor"));
         await agents.Opening;
         Save(window, output, "24-agents-connect");
+        var connecting = agents.Connection!;
+        DrawCheckWorking(window, output, connecting);
 
-        // With nothing waiting, the open pane's Run it is the frame's one amber.
+        // With nothing waiting, the open pane's Connect action is the frame's one amber.
         await zed.DisposeAsync();
         await Assert.ThrowsAnyAsync<Exception>(() => waiting);
         // Its grants go with its connection, a moment apart from its waiting request.
@@ -811,6 +829,10 @@ public sealed class ScreenRenderer
         entries.SelectedGroup = entries.Groups[0];
         entries.BeginAddCommand.Press();
         Save(window, output, "13-secrets-new");
+        var newItemWidth = window.Width;
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "13d-secrets-new-720");
+        window.Width = newItemWidth;
         entries.CancelAddCommand.Press();
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
@@ -889,6 +911,10 @@ public sealed class ScreenRenderer
         entries.DeleteCommand.Press();
         Save(window, output, "18-secrets-delete");
         entries.UndoCommand.Press();
+
+        SetDrawnState(entries, nameof(EntriesViewModel.Error), "That item could not be saved. Unlock the vault, then try again.");
+        Save(window, output, "18b-items-problem-note");
+        SetDrawnState(entries, nameof(EntriesViewModel.Error), null);
 
         entries.OrganizeCommand.Press();
         Save(window, output, "19-secrets-organize");
@@ -1023,6 +1049,9 @@ public sealed class ScreenRenderer
             }
 
             Save(window, output, "93-import-locked");
+            SetDrawnState(import, nameof(import.Busy), true);
+            Save(window, output, "93b-import-unlocking");
+            SetDrawnState(import, nameof(import.Busy), false);
 
             Wait(import.UnlockAsync());
             Assert.True(import.HasMessage);
@@ -1121,6 +1150,9 @@ public sealed class ScreenRenderer
             Save(window, output, "84-lock-restore");
 
             var restore = unlock.Restore!;
+            SetDrawnState(restore, nameof(restore.Busy), true);
+            Save(window, output, "84b-lock-restore-checking");
+            SetDrawnState(restore, nameof(restore.Busy), false);
 
             foreach (var c in "wrong")
             {
@@ -1617,6 +1649,11 @@ public sealed class ScreenRenderer
 
         project.BeginAddCommand.Press();
         Save(window, output, "41-env-add");
+        project.ConfirmAddCommand.Press();
+        Save(window, output, "41c-env-key-needs-a-name");
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "41b-env-add-720");
+        window.Width = _width;
         project.CancelAddCommand.Press();
 
         project.Environments[0].AddEntry.Press();
@@ -1970,8 +2007,33 @@ public sealed class ScreenRenderer
         if (!sheet)
         {
             AmberElements.AssertAtMostOne(window, $"{Path.GetFileName(output)}/{name}");
-            _cutOff?.AddRange(ReachableControls.Problems(window).Select(problem => $"{name}: {problem}"));
+            _cutOff?.AddRange(ReachableControls.Problems(window).Concat(LabelledFields.Problems(window)).Select(problem => $"{name}: {problem}"));
         }
+    }
+
+    // A wait or an error a frame cannot hold still by running it: drawn from the state its view reads.
+    private static void SetDrawnState(object model, string property, object? value) =>
+        model.GetType().GetProperty(property, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(model, value);
+
+    private static void DrawCheckWorking(Window window, string output, ConnectClientViewModel pane)
+    {
+        const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+        var starting = typeof(ConnectClientViewModel).GetMethod("SetStartingCheck", Private)!;
+        var setCheck = typeof(ConnectClientViewModel).GetMethod("SetCheck", Private)!;
+
+        SetDrawnState(pane, nameof(pane.CheckMessage), "Starting keypaste mcp as Cursor would…");
+        starting.Invoke(pane, [true]);
+        Save(window, output, "24b-agents-connect-checking");
+        starting.Invoke(pane, [false]);
+
+        // Not a bridge that could run: the view reads only that a check is held, and it is let go below without being disposed.
+        typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, new McpListedEntry[] { new("1", "env/ci/DEPLOY_KEY", "value"), new("2", "env/ci/OTHER", "value") });
+        setCheck.Invoke(pane, [RuntimeHelpers.GetUninitializedObject(typeof(McpConnectionCheck))]);
+        SetDrawnState(pane, nameof(pane.CheckMessage), "The bridge lists 2 items. Pick the one to ask for.");
+        Save(window, output, "24c-agents-connect-picking");
+        typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, Array.Empty<McpListedEntry>());
+        setCheck.Invoke(pane, [null]);
+        SetDrawnState(pane, nameof(pane.CheckMessage), string.Empty);
     }
 
     private static string Slug(string title) => title.ToLowerInvariant().Replace(' ', '-');

@@ -55,7 +55,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
 
         await Unlock(import);
         Assert.False(import.IsDecrypted);
-        Assert.Equal("That password does not open yubikey.kdbx.", import.Message);
+        Assert.Equal("That password does not open yubikey.kdbx. Type it again, or choose a key file if it needs one.", import.Message);
 
         import.UseHardwareKeyCommand.Press();
         Assert.Equal("YubiKey, slot 2", import.HardwareKeyLabel);
