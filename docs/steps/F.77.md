@@ -72,7 +72,7 @@ These await the founder's review:
 
 ## Runs
 
-Runs: TBD
+At `80b25b8f`: ci 42419330456 (fast tier) green; dev desktop 42419346481 and dev desktop-gates 42419346500 green on Linux. Locally: the touched Core, CLI, MCP and App classes, `verify-mcp-run.sh` against the Release CLI, the ScreenRenderer at every theme and zoom, and `verify.sh compile`.
 
 ## Open
 
