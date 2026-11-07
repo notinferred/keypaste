@@ -207,6 +207,8 @@ The review's repairs at `9f189044`, which differs from this commit only in this 
 
 ## Stage 5: quieter numbers, states and words, and every finding closed
 
+On `main` at `16557160`, `desktop tests (macos-15)` failed in app 42374181879's first attempt on `SystemNotificationTests.A_notice_raised_before_the_display_is_up_still_reaches_it_when_pressed`, and `gh run rerun --failed` passed it. Not diagnosed; a first occurrence, so it goes to BACKLOG if it recurs.
+
 The founder amended DESIGN on 2026-11-07, in its Brand status line, because stage 4's numbers made screens louder, against "too much to look at". Compared side by side with stage 4's frames, Settings, Agents, Recommendations and a form read quieter (`04-settings`, `21-agents-full`, `96-recommendations`, `13-secrets-new`, dark).
 
 ### What the numbers now mean
