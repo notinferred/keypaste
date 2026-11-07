@@ -142,7 +142,6 @@ public sealed class ItemPaneJourneyTests
         Entry = "Work/pane-login",
         Field = "password",
         Reason = "check the pane's agent card",
-        TtlSeconds = 60,
         Exposure = ["**"],
         ClientName = "claude-code",
         ClientLabel = "n5",

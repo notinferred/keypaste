@@ -152,8 +152,6 @@ public sealed class OneHomeJourneyTests
                 () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),
                 () => "the settings did not open");
             AmberElements.AssertOne(main, null, "Agents, an agent's settings open");
-            Press(main, Choice(main, "Ask every time"));
-            await Until(() => Ceiling(home) == AgentMode.Ask, () => $"clients.toml holds {Ceiling(home)}");
             AmberElements.AssertOne(main, null, "Agents, the mode changed");
 
             // History shows the records and leaves the check to the activity log.

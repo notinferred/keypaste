@@ -43,7 +43,7 @@ public sealed class DesktopRunApprovalTests
             Assert.Contains("the command itself can read the values", Text(window, "ExplainerText"), StringComparison.Ordinal);
             Assert.Equal(TextWrapping.Wrap, window.FindControl<TextBlock>("CommandText")!.TextWrapping);
             Assert.Equal(TextTrimming.None, window.FindControl<TextBlock>("CommandText")!.TextTrimming);
-            Assert.Equal("Allow for 15 minutes", window.FindControl<Button>("Approve")!.Content);
+            Assert.Equal("Allow once", window.FindControl<Button>("AllowOnce")!.Content);
 
             Click(window, "Deny");
             Assert.Equal(EnvOutcome.Declined, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
@@ -66,32 +66,6 @@ public sealed class DesktopRunApprovalTests
             Assert.Equal(EnvOutcome.Resolved, answered?.Set.Outcome);
             Assert.Equal(Sentinel, Assert.Single(answered!.Set.Variables).Value);
             Assert.Equal(AuditMethod.Prompt, answered.Method);
-            Assert.Empty(app.Authority.Activity.EnvGrants);
-        });
-
-    [Fact]
-    public Task AllowForTheWindow_ServesTheNextSameRun_AndAnEditEndsIt() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskRun();
-            var window = await app.PromptAsync();
-
-            await app.ArmAsync();
-            Click(window, "Approve");
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-            await PromptedApp.WithdrawnAsync(window);
-
-            var again = await app.AskRun().WaitAsync(_wait, Token);
-
-            Assert.Equal(AuditMethod.GrantCache, again?.Method);
-            Assert.Single(app.Windows);
-            Assert.Equal("run", Assert.Single(app.Authority.Grants()).Kind);
-
-            var vault = app.Authority.Session.Unlocked!;
-            Assert.True(vault.SetFields(new EntryName("env/ci", "DEPLOY_KEY"), [new FieldWrite("DEPLOY_KEY", "rotated")]));
-
-            Assert.Empty(app.Authority.Activity.EnvGrants);
         });
 
     [Fact]
@@ -103,7 +77,7 @@ public sealed class DesktopRunApprovalTests
             var window = await app.PromptAsync();
 
             Click(window, "AllowOnce");
-            Click(window, "Approve");
+            Click(window, "AllowOnce");
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
@@ -166,7 +140,6 @@ public sealed class DesktopRunApprovalTests
         Project = "ci",
         Profile = "dev",
         Variables = [new("DEPLOY_KEY", EntryPath, "DEPLOY_KEY")],
-        GrantSeconds = 900,
     };
 
     private static (RunApprovalWindow Window, string Layout) Layout(RunPrompt prompt)
@@ -185,7 +158,7 @@ public sealed class DesktopRunApprovalTests
     }
 
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "Approve")];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "AllowOnce")];
 
     [Fact]
     public Task EnterOnOpen_Denies() =>

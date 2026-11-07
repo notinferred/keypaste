@@ -8,7 +8,11 @@ public sealed record RowLimit(string Row, int PerHour);
 /// <summary>What applies to one item an agent asks for.</summary>
 /// <param name="Mode">How the request is answered, a limit already reached by time applied.</param>
 /// <param name="Limits">The hourly limits an Automatic release spends; empty for any other mode.</param>
-public sealed record ItemAccess(AgentMode Mode, IReadOnlyList<RowLimit> Limits);
+public sealed record ItemAccess(AgentMode Mode, IReadOnlyList<RowLimit> Limits)
+{
+    /// <summary>Whether the mode was Automatic and its end has passed, so the request is asked about, once only.</summary>
+    public bool LimitReached { get; init; }
+}
 
 /// <summary>
 /// What applies to an agent's requests: the least of its records in the vault and this computer's
@@ -29,8 +33,9 @@ public sealed record ItemAccess(AgentMode Mode, IReadOnlyList<RowLimit> Limits);
 /// <see cref="AgentAccess.See"/> and the ceiling's. The mode is, for each of the item's project tags,
 /// its environment's row, else its project's row, else the default, capped, and then the strictest
 /// across its tags; an item in no project takes the default. A protected environment is Ask whatever
-/// any row says (D-0348, D-0371), and an Automatic limit, a record's or this computer's ceiling's, that
-/// has passed its time asks for a while.
+/// any row says, and an Automatic limit, a record's or this computer's ceiling's, that has passed its
+/// time asks, once only. What a person chose Always allow on applies only where every term holds it,
+/// so a record that applies only beneath the defaults, which hold none, gives no such row.
 /// </para>
 /// </remarks>
 public sealed class EffectiveAccess
@@ -53,7 +58,7 @@ public sealed class EffectiveAccess
     /// <summary>Whether the agent is given values; when not, values reach only commands it runs.</summary>
     public bool Values { get; }
 
-    /// <summary>Whether the agent's settings let it run commands, each of which still asks.</summary>
+    /// <summary>Whether the agent's settings let it run commands, each of which still asks unless the person chose Always allow on it.</summary>
     public bool Run { get; }
 
     /// <summary>The settings whose least applies.</summary>
@@ -179,7 +184,7 @@ public sealed class EffectiveAccess
 
         if (deciding.Any(row => row.Limit.Until is { } until && until <= now))
         {
-            return new ItemAccess(AgentMode.AllowForAWhile, []);
+            return new ItemAccess(AgentMode.Ask, []) { LimitReached = true };
         }
 
         return new ItemAccess(
@@ -195,7 +200,7 @@ public sealed class EffectiveAccess
     /// <param name="limits">The owner's hourly limits.</param>
     /// <returns>
     /// Whether it is Automatic with every hourly limit unspent. Otherwise the request is asked about,
-    /// with a timed grant offered where the item's mode is Automatic.
+    /// once only where the item's mode is Automatic, since Always there would bypass the limit.
     /// </returns>
     public bool TryAutomatic(ItemAccess item, HourlyLimit limits)
     {
@@ -203,5 +208,25 @@ public sealed class EffectiveAccess
         ArgumentNullException.ThrowIfNull(limits);
 
         return item.Mode == AgentMode.Automatic && Label is not null && limits.TryUse(Label, item.Limits);
+    }
+
+    /// <summary>Whether the person chose Always allow on an item for this agent.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Whether a named agent's every term holds it.</returns>
+    public bool AlwaysAllows(string item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        return Label is not null && Terms.All(term => term.Always.Items.Contains(item, StringComparer.Ordinal));
+    }
+
+    /// <summary>Whether the person chose Always allow on exactly this command for this agent.</summary>
+    /// <param name="command">The command's identity.</param>
+    /// <returns>Whether a named agent's every term holds it.</returns>
+    public bool AlwaysAllows(AlwaysCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        return Label is not null && Terms.All(term => term.Always.Commands.Contains(command));
     }
 }

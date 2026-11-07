@@ -668,7 +668,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.True(vault.RemoveTags(moved!, ["env:billing"]));
         Assert.True(vault.AddTag(moved!, "env:invoicing"));
-        Assert.Equal(AgentMode.AllowForAWhile, access.Item(vault.Tags(moved!)!, now).Mode);
+        Assert.Equal(AgentMode.Ask, access.Item(vault.Tags(moved!)!, now).Mode);
     }
 
     // ---------------------------------------------------------------- helpers

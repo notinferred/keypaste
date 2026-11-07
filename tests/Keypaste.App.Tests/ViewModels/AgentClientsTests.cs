@@ -45,7 +45,7 @@ public sealed class AgentClientsTests
         Assert.Equal(("*", "Agents without settings of their own"), (model.Rows[^1].Initials, model.Rows[^1].Status));
         Assert.All(model.Rows, row => Assert.True(row.HasSettings));
         Assert.Equal(
-            [string.Empty, string.Empty, "Ask, allow for 1 hour · sees every item · may run commands", "Ask, allow for 1 hour · sees all projects"],
+            [string.Empty, string.Empty, "Ask every time · sees every item · may run commands", "Ask every time · sees all projects"],
             model.Rows.Select(row => row.Summary));
         Assert.All(model.Rows, row => Assert.False(row.OffersConnect));
         Assert.All(model.Rows, row => Assert.Null(row.Settings));
@@ -256,7 +256,7 @@ public sealed class AgentClientsTests
                     {
                         Tool = "request_credential",
                         Client = new AuditClient(label, null, label),
-                        Args = AuditArgs.ForCredentialRequest("example", "password", 60, "deploy"),
+                        Args = AuditArgs.ForCredentialRequest("example", "password", "deploy"),
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.Prompt,
                         Reason = "a person approved this request",

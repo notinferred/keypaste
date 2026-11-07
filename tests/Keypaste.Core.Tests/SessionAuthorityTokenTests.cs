@@ -170,7 +170,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task AProtectedProfileWithoutAllowProd_IsRefusedUnasked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var token = Mint("prod-ci", "read:acme-api/prod/*", allowProd: true);
         var info = Assert.Single(new TokenStore(_vault).List());
         var entry = _vault.Find(new EntryName(ReservedGroups.Tokens, info.Id))!;
@@ -189,7 +189,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task AProtectedProfileWithAllowProd_AsksEveryTime_OnceOnly()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var token = Mint("prod-ci", "read:acme-api/prod/*", allowProd: true);
         var authority = await AttachedAsync();
 
@@ -202,7 +202,6 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         Assert.Equal(2, _fixture.Channel.Asked);
 
         var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
-        Assert.Equal(0, prompt.GrantSeconds);
         Assert.Equal("prod", prompt.Profile);
         Assert.StartsWith("token 'prod-ci' (kpt_", prompt.Requester, StringComparison.Ordinal);
         Assert.DoesNotContain(token[13..], prompt.ToString(), StringComparison.Ordinal);
@@ -216,7 +215,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task ASetHoldingAProdTaggedEntry_IsRefusedWithoutAllowProd_AndAskedOnceOnlyWithIt()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var deploy = new EntryName("services", "Deploy");
         _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deploy", Password = "deploy-login" });
         Assert.True(_vault.SetFields(deploy, [new FieldWrite("DEPLOY_KEY", _deploy)]));
@@ -240,7 +239,6 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         Assert.Equal(["API_KEY", "DATABASE_URL", "DEPLOY_KEY"], asked.Set.Variables.Select(variable => variable.Key));
         Assert.Equal(1, _fixture.Channel.Asked);
         var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
-        Assert.Equal(0, prompt.GrantSeconds);
         Assert.Contains("services/Deploy", prompt.Entries);
 
         var lines = Lines();
@@ -400,7 +398,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     public async Task ASetNamingMoreItemsThanOneLineCanRecord_IsRefusedUnasked_AndRecorded()
     {
         const string Reason = "the run names more items than one audit line can record";
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         // Each item's name takes more bytes in the line than its title has characters.
         var first = Wide((SessionAuthority.MaximumAuditedEntriesBytes / EntryNameSanitizer.MaximumLength) + 1, EntryNameSanitizer.MaximumLength);
@@ -493,7 +491,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task TheTokenAppearsInNoReplyReasonOrToString()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var token = Mint("ci", "read:acme-api/staging/*,read:acme-api/prod/*", allowProd: true);
         var secret = token[13..];
         var authority = await AttachedAsync();

@@ -16,7 +16,7 @@ keypaste protects your secrets at rest in an encrypted KDBX file, and it stands 
 
 - **Programs running as you.** Anything running under your user account can read memory, files and keystrokes. That includes an AI agent with its own shell, which can also reach the agent's own configuration and a running program's environment. THREATS.md lists each case.
 - **Anyone who can open the vault.** Each agent's settings are kept in the vault, so whoever can open it, in KeePassXC for example, can change what an agent gets without keypaste asking.
-- **A value already released.** Whoever received a value keeps it. An allowance's time limit ends its reuse, not the copies.
+- **A value already released.** Whoever received a value keeps it. Removing an always allow stops further releases, not the copies.
 - **The issuing service.** keypaste cannot revoke a credential at the service that issued it.
 - **The log's history.** The audit log shows edits but cannot prevent them, and removing its last lines goes unnoticed unless you keep a copy of its latest hash elsewhere.
 

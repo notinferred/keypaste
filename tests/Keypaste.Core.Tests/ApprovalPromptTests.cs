@@ -14,7 +14,7 @@ namespace Keypaste.Core.Tests;
 public sealed class ApprovalPromptTests
 {
     private static ApprovalPrompt For(string reason = "deploy billing to staging", string? client = "claude-code") =>
-        ApprovalPrompt.For(client, new EntryName("env/dev", "STRIPE_KEY"), "password", reason, 300);
+        ApprovalPrompt.For(client, new EntryName("env/dev", "STRIPE_KEY"), "password", reason);
 
     [Fact]
     public void ItShowsTheFourThingsAHumanNeedsToDecide()
@@ -25,7 +25,6 @@ public sealed class ApprovalPromptTests
         Assert.Equal("env/dev/STRIPE_KEY", prompt.Entry, StringComparer.Ordinal);
         Assert.Equal("password", prompt.Field, StringComparer.Ordinal);
         Assert.Equal("deploy billing to staging", prompt.Reason, StringComparer.Ordinal);
-        Assert.Equal(300, prompt.TtlSeconds);
         Assert.False(prompt.ReasonWasTruncated);
     }
 
@@ -60,7 +59,7 @@ public sealed class ApprovalPromptTests
 
         Assert.Equal(
             [
-                "AlwaysFor",
+                "Always",
                 "Client",
                 "Entry",
                 "EntryWasAltered",
@@ -70,7 +69,6 @@ public sealed class ApprovalPromptTests
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
-                "TtlSeconds",
             ],
             members.Order(StringComparer.Ordinal));
     }
@@ -159,11 +157,11 @@ public sealed class ApprovalPromptTests
     public void TheClientLabel_IsSanitizedAndCapped_AndAbsentWhenNoneWasGiven()
     {
         var label = ApprovalPrompt.For(
-            "claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy", 300, new string('l', 300) + "‮");
+            "claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy", new string('l', 300) + "‮");
 
         Assert.Equal(ApprovalPrompt.MaximumClientLength, label.Label!.Length);
         Assert.Null(For().Label);
-        Assert.Null(ApprovalPrompt.For("c", new EntryName("", "t"), "password", "r", 1, "").Label);
+        Assert.Null(ApprovalPrompt.For("c", new EntryName("", "t"), "password", "r", "").Label);
     }
 
     [Fact]
@@ -186,8 +184,7 @@ public sealed class ApprovalPromptTests
             "claude-code",
             new EntryName("env/dev", "../../prod/ROOT_TOKEN"),
             "password",
-            "routine",
-            300);
+            "routine");
 
         Assert.Equal("env/dev/.. .. prod ROOT_TOKEN", prompt.Entry, StringComparer.Ordinal);
         Assert.StartsWith("env/dev/", prompt.Entry, StringComparison.Ordinal);
@@ -196,24 +193,9 @@ public sealed class ApprovalPromptTests
     [Fact]
     public void AnEntryInTheRootGroup_IsJustItsTitle()
     {
-        var prompt = ApprovalPrompt.For("c", new EntryName("", "LOOSE"), "password", "routine", 60);
+        var prompt = ApprovalPrompt.For("c", new EntryName("", "LOOSE"), "password", "routine");
 
         Assert.Equal("LOOSE", prompt.Entry, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// An Automatic release lasts what the agent asked for, never past the operator's ceiling.
-    /// A person's timed grant is not bounded this way: they chose its length on screen.
-    /// </summary>
-    [Fact]
-    public void AnAutomaticReleaseIsBoundedByTheRequestAndTheCeiling()
-    {
-        var limits = ApprovalLimits.Default with { MaximumTtlSeconds = 300 };
-
-        Assert.Equal(300, limits.EffectiveTtlSeconds(3600));
-        Assert.Equal(60, limits.EffectiveTtlSeconds(60));
-        Assert.Equal(1, limits.EffectiveTtlSeconds(0));
-        Assert.Equal(1, limits.EffectiveTtlSeconds(-99));
     }
 
     [Fact]
@@ -233,8 +215,8 @@ public sealed class ApprovalPromptTests
     {
         var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Run = true });
 
-        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
-        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
+        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc);
+        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc);
 
         Assert.Equal((string.Empty, false, false), (none.Reason, none.ReasonWasAltered, none.ReasonWasTruncated));
         Assert.True(scrubbed.ReasonWasAltered);
@@ -253,7 +235,7 @@ public sealed class ApprovalPromptTests
         Assert.True(EntryExposure.TryCreate(["tag:env:billing", hidden, "\u202Eprod/**"], out var see, out var error), error);
         var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { See = see });
 
-        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds).Gains);
+        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc).Gains);
 
         Assert.Equal($"sees tag:env:billing, x{string.Concat(Enumerable.Repeat("\\u2028", 20))}**, \\u202Eprod/**", gain);
         Assert.DoesNotContain('\u2028', gain);

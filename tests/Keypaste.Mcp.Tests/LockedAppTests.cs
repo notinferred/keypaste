@@ -28,7 +28,6 @@ public sealed class LockedAppTests
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
 
     private static Dictionary<string, object?> Change(string name, string value) =>

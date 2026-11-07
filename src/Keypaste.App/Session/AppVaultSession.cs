@@ -1353,7 +1353,7 @@ internal sealed class AppVaultSession : IDisposable
     /// <para>
     /// For a person told that another program saved the vault (D-0412). The file is opened with the
     /// key this unlock holds, so nothing is asked again except a hardware key's touch. The lifetime
-    /// stays, so connected agents are not cut off, and every grant they hold is withdrawn, as after an
+    /// stays, so connected agents are not cut off, and what they have waiting is withdrawn, as after an
     /// access change (D-0318), with every request still waiting on a person, as a lock withdraws them,
     /// so an agent asks again. A change the open copy holds that no save wrote is discarded; nothing
     /// is merged. The app offers it only once a merge was refused (D-0543).
@@ -1423,7 +1423,7 @@ internal sealed class AppVaultSession : IDisposable
             return new ReloadResult(ReloadOutcome.Locked);
         }
 
-        // Before the swap, so no grant holding a value from the stale copy outlives it, and no prompt a
+        // Before the swap, so no prompt a
         // person answers afterwards releases a value from the copy that replaces it.
         lifetime?.Withdraw();
         Edited?.Invoke(this, VaultEdit.Everything);
@@ -1486,7 +1486,7 @@ internal sealed class AppVaultSession : IDisposable
             }
         }
 
-        // A merge withdraws every grant and prompt before it reads the file, so one asked twice for one save must find nothing to do.
+        // A merge withdraws every prompt before it reads the file, so one asked twice for one save must find nothing to do.
         try
         {
             if (vault.SaveState().Status is not (VaultSaveStatus.ChangedOnDisk or VaultSaveStatus.Unreadable))

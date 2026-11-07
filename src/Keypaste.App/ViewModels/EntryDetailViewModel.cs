@@ -725,7 +725,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         AgentLines = UseText.Lines(access, now);
     }
 
-    /// <summary>The Agent access card's detail: each grant in force, then each client that received this entry.</summary>
+    /// <summary>The Agent access card's detail: each client that received this entry.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsAgentAccessSummary))]
     internal partial IReadOnlyList<string> AgentLines { get; private set; } = [];

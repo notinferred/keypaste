@@ -47,7 +47,7 @@ namespace Keypaste.Cli.Commands;
 /// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
 /// to discover. Ctrl+C, SIGTERM, closing the terminal and <c>keypaste lock</c> end the unlock's
 /// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
-/// take, so a request waiting at the prompt is withdrawn and denied and every grant is zeroed
+/// take, so a request waiting at the prompt is withdrawn and denied
 /// (D-0313).
 /// </para>
 /// </remarks>
@@ -57,9 +57,6 @@ internal static class ApproveCommand
         "--approval-timeout",
         "seconds",
         $"how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, {ApprovalLimits.DefaultWindowSeconds} by default");
-
-    private static readonly Option<string> _maxTtl =
-        Syntax.Value("--max-ttl", "seconds", $"how long an [h] allowance lasts, {ApprovalLimits.DefaultMaximumTtlSeconds} by default");
 
     private static readonly Option<string> _pairBrowser =
         Syntax.Value("--pair-browser", "name", "pair KeePassXC-Browser under this name in the first 2 minutes");
@@ -73,7 +70,7 @@ internal static class ApproveCommand
             + "shows and changes them. your master password is typed here, never in a window an agent caused to appear.",
         Execute)
     {
-        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _maxTtl, _pairBrowser,
+        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _pairBrowser,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -231,8 +228,6 @@ internal static class ApproveCommand
                 Settings = new VaultAgentSettings(Unlocked, Save, caps),
                 Hourly = new HourlyLimit(TimeProvider.System),
                 Audit = () => audit,
-                WatchEdits = edited => vault.Edited += edited,
-                UnwatchEdits = edited => vault.Edited -= edited,
 
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
                 LockNow = () => Stop(lifetime, stop),
@@ -257,17 +252,18 @@ internal static class ApproveCommand
         {
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
-            // grants are zeroed on the way out instead of being abandoned mid-flight.
+            // nothing is abandoned mid-flight.
             var signals = LockOnSignals(lifetime, stop);
 
             try
             {
+                var records = new AgentAccessStore(vault).List();
                 var automatic = AutomaticAgents.Named(
-                    new AgentAccessStore(vault).List(),
+                    records,
                     caps.TryCurrent(out var ceilings, out _) ? ceilings : AccessCaps.Empty,
                     TimeProvider.System.GetUtcNow());
 
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, console);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, AutomaticAgents.AlwaysAllowed(records), console);
 
                 if (pairing is not null)
                 {
@@ -288,7 +284,7 @@ internal static class ApproveCommand
             }
         }
 
-        console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked and every allowance has ended.");
+        console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked.");
         return CliApp.ExitSuccess;
     }
 
@@ -357,6 +353,7 @@ internal static class ApproveCommand
         ApprovalLimits limits,
         string? retiredPolicy,
         IReadOnlyList<string> automatic,
+        IReadOnlyList<string> alwaysAllowed,
         AgentConsole console)
     {
         console.WriteLine($"keypaste: watching {vaultPath}");
@@ -372,14 +369,19 @@ internal static class ApproveCommand
             console.WriteLine($"keypaste: set to Automatic in the vault: {string.Join("; ", automatic)}");
         }
 
+        if (alwaysAllowed.Count > 0)
+        {
+            console.WriteLine($"keypaste: always allowed in the vault: {string.Join("; ", alwaysAllowed)}");
+        }
+
         console.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer, an allowance lasts at most {ApprovalLimits.Describe(limits.MaximumTtlSeconds)}"));
+                $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer."));
 
         console.WriteLine(
-            automatic.Count > 0
-                ? "keypaste: nothing is released without you saying yes, except what an agent above is Automatic for. Press Ctrl+C to stop."
+            automatic.Count > 0 || alwaysAllowed.Count > 0
+                ? "keypaste: nothing is released without you saying yes, except what an agent above is Automatic for or always allowed. Press Ctrl+C to stop."
                 : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
     }
 
@@ -398,25 +400,13 @@ internal static class ApproveCommand
             return false;
         }
 
-        if (!TrySeconds(line.GetValue(_maxTtl), _maxTtl.Name, 1, ToolTtlCeiling, context, out var maxTtl))
-        {
-            return false;
-        }
-
         limits = ApprovalLimits.Default with
         {
             Window = window is null ? ApprovalLimits.Default.Window : TimeSpan.FromSeconds(window.Value),
-            MaximumTtlSeconds = maxTtl ?? ApprovalLimits.Default.MaximumTtlSeconds,
         };
 
         return true;
     }
-
-    /// <summary>
-    /// The ceiling the tool schema advertises. Kept in step by
-    /// <c>ToolSchemasMatchTheCoreTests</c> rather than by hoping.
-    /// </summary>
-    internal const int ToolTtlCeiling = ApprovalLimits.MaximumRequestableTtlSeconds;
 
     private static bool TrySeconds(
         string? raw,

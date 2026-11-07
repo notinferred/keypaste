@@ -38,9 +38,9 @@ flowchart LR
 flowchart TD
   request["A request for one field of one entry"] --> exposed{"Is the entry exposed to this agent?"}
   exposed -->|no| refused["Refused and logged"]
-  exposed -->|yes| allowance{"A live allowance, or Automatic for this agent?"}
-  allowance -->|yes| released["One field released and logged"]
-  allowance -->|no| ask["You are asked"]
+  exposed -->|yes| standing{"Automatic for this agent, or always allowed?"}
+  standing -->|yes| released["One field released and logged"]
+  standing -->|no| ask["You are asked"]
   ask -->|deny, or no answer| refused
   ask -->|allow| released
 ```
@@ -49,7 +49,7 @@ Automatic is a setting you confirm for one agent, for a project or environment i
 
 ## What locking does
 
-Locking the app, idling, sleep and quitting all end the unlocked session. Whatever an agent has waiting is refused and every allowance ends. A value an agent or a program already received stays with it: locking stops future releases, and it cannot revoke a credential at the service that issued it.
+Locking the app, idling, sleep and quitting all end the unlocked session. Whatever an agent has waiting is refused and nothing more is released. A value an agent or a program already received stays with it: locking stops future releases, and it cannot revoke a credential at the service that issued it.
 
 ## Where a secret ends up
 

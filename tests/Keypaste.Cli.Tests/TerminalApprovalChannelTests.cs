@@ -23,8 +23,15 @@ public sealed class TerminalApprovalChannelTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private static ApprovalPrompt Prompt(string reason = "deploy billing to staging", int grantSeconds = 3600) =>
-        ApprovalPrompt.For("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", reason, grantSeconds);
+    private static AlwaysOffer Offer(string scope)
+    {
+        Assert.True(ProjectScope.TryParseName(scope, out var parsed, out var error), error);
+
+        return new AlwaysOffer(AccessEdit.Automatic(parsed), parsed.Name);
+    }
+
+    private static ApprovalPrompt Prompt(string reason = "deploy billing to staging") =>
+        ApprovalPrompt.For("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", reason);
 
     private sealed record Rig(TerminalApprovalChannel Channel, FakeSecretPrompt Prompt, StringWriter Stderr);
 
@@ -40,15 +47,6 @@ public sealed class TerminalApprovalChannelTests
 
     private static TerminalApprovalChannel Channel(FakeSecretPrompt prompt, TextWriter stderr) =>
         new(prompt, new AgentConsole(stderr, interactive: false), _window, TimeProvider.System);
-
-    [Fact]
-    public async Task H_AllowsForTheOfferedTime()
-    {
-        var rig = Build("h");
-
-        Assert.Equal(ApprovalAnswer.Approved, await rig.Channel.AskAsync(Prompt(), Token));
-        Assert.Contains("keypaste: allowed for 1 hour.", rig.Stderr.ToString(), StringComparison.Ordinal);
-    }
 
     [Theory]
     [InlineData("o")]
@@ -94,57 +92,6 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Prompt(), Token));
     }
 
-    [Fact]
-    public async Task H_WhenNoTimedGrantIsOffered_Denies()
-    {
-        var rig = Build("h");
-
-        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Prompt(grantSeconds: 0), Token));
-    }
-
-    [Fact]
-    public async Task TheChoiceLine_NamesTheDuration()
-    {
-        var rig = Build("d");
-
-        await rig.Channel.AskAsync(Prompt(grantSeconds: 300), Token);
-
-        Assert.Equal("[d] deny  [o] once  [h] 5 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
-    }
-
-    /// <summary>The choice line keeps one width as it counts down, which is what lets <see cref="AgentConsole"/> blank it with spaces.</summary>
-    [Fact]
-    public async Task TheChoiceLine_KeepsItsWidth_AtOneDigit()
-    {
-        var prompt = new FakeSecretPrompt();
-        prompt.Enqueue("d");
-        var channel = new TerminalApprovalChannel(
-            prompt, new AgentConsole(new StringWriter(), interactive: false), TimeSpan.FromSeconds(ApprovalLimits.MinimumWindowSeconds), TimeProvider.System);
-
-        await channel.AskAsync(Prompt(), Token);
-
-        Assert.Equal("[d] deny  [o] once  [h] 1 hour   5s › ", Assert.Single(prompt.PromptsSeen));
-    }
-
-    [Theory]
-    [InlineData("h", "<Ok>keypaste: allowed for 1 hour.</>")]
-    [InlineData("o", "<Ok>keypaste: allowed once.</>")]
-    [InlineData("d", "<Danger>keypaste: denied. Nothing was released.</>")]
-    public async Task TheDialog_IsColouredOnlyThroughTheConsoleStyle(string answer, string outcome)
-    {
-        var prompt = new FakeSecretPrompt();
-        prompt.Enqueue(answer);
-        var stderr = new StringWriter();
-        var channel = new TerminalApprovalChannel(
-            prompt, new AgentConsole(stderr, interactive: false, new MarkingStyle(stderr)), _window, TimeProvider.System);
-
-        await channel.AskAsync(Prompt(), Token);
-
-        Assert.Contains($"<Accent>{TerminalApprovalChannel.Rule}</>", stderr.ToString(), StringComparison.Ordinal);
-        Assert.Contains(outcome, stderr.ToString(), StringComparison.Ordinal);
-        Assert.Equal("<Accent>[d] deny  [o] once  </><Ok>[h] 1 hour</>  <Accent>45s ›</> ", Assert.Single(prompt.PromptsSeen));
-    }
-
     /// <summary>Paints by marking each tone, so a test sees what was coloured and how without reading escapes.</summary>
     private sealed class MarkingStyle(TextWriter painted) : Styling.IConsoleStyle
     {
@@ -152,57 +99,6 @@ public sealed class TerminalApprovalChannelTests
 
         public string Paint(TextWriter writer, Styling.Tone tone, string text) =>
             ReferenceEquals(writer, painted) ? $"<{tone}>{text}</>" : text;
-    }
-
-    [Fact]
-    public async Task TheChoiceLine_DropsH_WhenNotOffered()
-    {
-        var rig = Build("d");
-
-        await rig.Channel.AskAsync(Prompt(grantSeconds: 0), Token);
-
-        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
-        Assert.Contains(
-            Environment.NewLine + "  this item is in a protected environment: it is asked about every time." + Environment.NewLine,
-            rig.Stderr.ToString(),
-            StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// The dialog for a bridge started with no label, which names the client alone: the <c>for</c>
-    /// line is gone and nothing else moved.
-    /// </summary>
-    [Fact]
-    public async Task TheDialog_HasNoForLine_AndIsOtherwiseUnchanged()
-    {
-        var rig = Build("d");
-        var prompt = ApprovalPrompt.For(
-            "claude-code", new EntryName("env/demo", "STRIPE_KEY"), "password", "deploy the billing service to staging", 3600);
-
-        await rig.Channel.AskAsync(prompt, Token);
-
-        string[] expected =
-        [
-            string.Empty,
-            TerminalApprovalChannel.Rule,
-            "keypaste: an agent is asking for a credential.",
-            string.Empty,
-            "  agent    claude-code",
-            "  item     env/demo/STRIPE_KEY",
-            "  field    password",
-            string.Empty,
-            "  the agent says it needs this because:",
-            "    deploy the billing service to staging",
-            string.Empty,
-            "  That sentence was written by the agent, not by keypaste. Treat it as a claim.",
-            string.Empty,
-            "keypaste: denied. Nothing was released.",
-            TerminalApprovalChannel.Rule,
-            string.Empty,
-        ];
-
-        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
-        Assert.Equal("[d] deny  [o] once  [h] 1 hour  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
     }
 
     /// <summary>
@@ -214,7 +110,7 @@ public sealed class TerminalApprovalChannelTests
     {
         var rig = Build("d");
         var prompt = ApprovalPrompt.For(
-            "claude-code", new EntryName("env/demo", "STRIPE_KEY"), "password", "deploy the billing service to staging", 3600, "ci-probe");
+            "claude-code", new EntryName("env/demo", "STRIPE_KEY"), "password", "deploy the billing service to staging", "ci-probe");
 
         await rig.Channel.AskAsync(prompt, Token);
 
@@ -242,25 +138,12 @@ public sealed class TerminalApprovalChannelTests
     }
 
     [Fact]
-    public async Task TheChoiceMark_FallsBackOnACodePageWithoutIt()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var prompt = new FakeSecretPrompt();
-        prompt.Enqueue("d");
-        using var stderr = new StreamWriter(new MemoryStream(), Encoding.GetEncoding(437));
-
-        await Channel(prompt, stderr).AskAsync(Prompt(), Token);
-
-        Assert.Equal("[d] deny  [o] once  [h] 1 hour  45s > ", Assert.Single(prompt.PromptsSeen));
-    }
-
-    [Fact]
     public async Task AnEntryNameTheSanitizerChanged_SaysSo()
     {
         var rig = Build("d");
         var spoofed = new EntryName("env/dev", "STRIPE" + ((char)0x202E) + "KEY");
 
-        await rig.Channel.AskAsync(ApprovalPrompt.For("claude-code", spoofed, "password", "deploy", 300), Token);
+        await rig.Channel.AskAsync(ApprovalPrompt.For("claude-code", spoofed, "password", "deploy"), Token);
 
         Assert.Contains("not what the vault holds", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
@@ -356,31 +239,7 @@ public sealed class TerminalApprovalChannelTests
     private static EnvReleasePrompt EnvPrompt(params string[] command) =>
         EnvReleasePrompt.For(new EnvPreview("billing", ["DATABASE_URL", "STRIPE_KEY"]), command, "/home/me/billing") with
         {
-            GrantSeconds = EnvGrantCache.CeilingSeconds,
         };
-
-    [Fact]
-    public async Task ARunsRequest_ShowsTheProjectNamesCommandAndDirectory_AndOnlyAnAllowReleases()
-    {
-        var once = Build("o");
-        var hour = Build("h");
-        var nothing = Build(string.Empty);
-
-        Assert.Equal(ApprovalAnswer.ApprovedOnce, await once.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
-        Assert.Equal(ApprovalAnswer.Approved, await hour.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
-        Assert.Equal(ApprovalAnswer.Denied, await nothing.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
-
-        var shown = once.Stderr.ToString();
-        Assert.Contains("project      billing", shown, StringComparison.Ordinal);
-        Assert.Contains("environment  dev", shown, StringComparison.Ordinal);
-        Assert.Contains("variables    DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
-        Assert.Contains("from         env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
-        Assert.Contains("command      npm run deploy", shown, StringComparison.Ordinal);
-        Assert.Contains("in           /home/me/billing", shown, StringComparison.Ordinal);
-        Assert.DoesNotContain("scrubbed", shown, StringComparison.Ordinal);
-        Assert.DoesNotContain("asked by", shown, StringComparison.Ordinal);
-        Assert.Contains("keypaste: allowed for 15 minutes.", hour.Stderr.ToString(), StringComparison.Ordinal);
-    }
 
     [Fact]
     public async Task TheEnvDialog_NamesTheProfile_AndRequester()
@@ -410,42 +269,14 @@ public sealed class TerminalApprovalChannelTests
     }
 
     [Fact]
-    public async Task TheEnvDialog_SaysWhomTheTimedChoiceCovers()
-    {
-        var rig = Build("d");
-
-        await rig.Channel.AskAsync(EnvPrompt("deploy"), Token);
-
-        Assert.Contains(
-            "  [d] deny: the run gets nothing." + Environment.NewLine
-                + "  [o] once: the run starts this command one time with every value in its environment." + Environment.NewLine
-                + "  [h] 15 minutes: the same, and any program of yours can run exactly this command here again for 15 minutes without asking.",
-            rig.Stderr.ToString(),
-            StringComparison.Ordinal);
-        Assert.Equal("[d] deny  [o] once  [h] 15 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
-    }
-
-    [Fact]
-    public async Task ARequesterPrompt_OffersNoTimedChoice()
+    public async Task AnEnvRun_SaysItIsAskedEveryTime_AndHDenies()
     {
         var rig = Build("h");
 
-        var answer = await rig.Channel.AskAsync(EnvPrompt("deploy") with { Requester = "token ci-deploy" }, Token);
+        var answer = await rig.Channel.AskAsync(EnvPrompt("deploy") with { Profile = "prod" }, Token);
 
         Assert.Equal(ApprovalAnswer.Denied, answer);
-        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
-        Assert.DoesNotContain("[h]", rig.Stderr.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task AProtectedProfilesRun_OffersNoTimedChoice_AndSaysWhy()
-    {
-        var rig = Build("h");
-
-        var answer = await rig.Channel.AskAsync(EnvPrompt("deploy") with { Profile = "prod", GrantSeconds = 0 }, Token);
-
-        Assert.Equal(ApprovalAnswer.Denied, answer);
-        Assert.Contains("this environment is protected: it is asked about every time.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("a run names no agent to keep an always under, so it is asked about every time.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>A line break in a command cannot draw a line of its own under the prompt's.</summary>
@@ -502,27 +333,153 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("--pair-browser <name>", said, StringComparison.Ordinal);
     }
 
-    private static RunPrompt RunPromptFor(int grantSeconds = 900, OnceOnly onceOnly = OnceOnly.None) =>
-        RunPrompt.For(
-            new Keypaste.Core.Ipc.RunRequest
-            {
-                Program = "/usr/bin/npm",
-                Command = ["npm", "run", "migrate"],
-                Directory = "/home/me/acme/api",
-                Project = "acme-api",
-                Reason = "run the pending migration",
-                Exposure = ["env/**"],
-                ClientName = "claude-code",
-                ClientLabel = "claude-code",
-            },
-            "acme-api",
-            "dev",
-            [
-                new RunPromptVariable("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"),
-                new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password"),
-            ],
-            grantSeconds,
-            onceOnly);
+    [Fact]
+    public async Task A_AllowsOnceAndChoosesAlways_WhereItIsOffered_AndTheLineSaysExactlyThreeThings()
+    {
+        var rig = Build("a");
+        var offered = Prompt() with { Label = "claude-code", Always = new AlwaysOffer(AccessEdit.AlwaysItem("0123456789abcdef0123456789abcdef"), "env/dev/STRIPE_KEY") };
+
+        Assert.Equal(ApprovalAnswer.Always, await rig.Channel.AskAsync(offered, Token));
+        Assert.Contains("[d] deny  [o] once  [a] always", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
+        Assert.DoesNotContain("[h]", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+        Assert.Contains("[a] allows this once, then asks you to always allow this item for claude-code", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_Denies_WhereNothingOffersIt_AndH_IsNoAnswerAtAll()
+    {
+        var rig = Build("a");
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Prompt() with { OnceOnly = OnceOnly.ProtectedProfile }, Token));
+        Assert.DoesNotContain("[a]", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
+
+        var hour = Build("h");
+
+        Assert.Equal(ApprovalAnswer.Denied, await hour.Channel.AskAsync(Prompt(), Token));
+    }
+
+    [Fact]
+    public async Task ARunsAlways_SaysTheFilesCanChange()
+    {
+        var rig = Build("a");
+        var command = new AlwaysCommand("/usr/bin/npm", ["npm", "run", "migrate"], "/work/api", []);
+        var offered = RunPromptFor() with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), "npm run migrate") };
+
+        Assert.Equal(ApprovalAnswer.Always, await rig.Channel.AskAsync(offered, Token));
+        Assert.Contains("The command's files can change (scripts, package.json): keypaste approves the command line, not what it does.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnEnvRun_OffersOnceOnly()
+    {
+        var rig = Build("o");
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await rig.Channel.AskAsync(EnvPrompt("deploy"), Token));
+        Assert.DoesNotContain("[a]", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
+        Assert.Contains("[d] deny  [o] once", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>The choice line keeps one width as it counts down, which is what lets <see cref="AgentConsole"/> blank it with spaces.</summary>
+    [Fact]
+    public async Task TheChoiceLine_KeepsItsWidth_AtOneDigit()
+    {
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue("d");
+        var channel = new TerminalApprovalChannel(
+            prompt, new AgentConsole(new StringWriter(), interactive: false), TimeSpan.FromSeconds(ApprovalLimits.MinimumWindowSeconds), TimeProvider.System);
+
+        await channel.AskAsync(Prompt(), Token);
+
+        Assert.Equal("[d] deny  [o] once   5s › ", Assert.Single(prompt.PromptsSeen));
+    }
+
+    [Theory]
+    [InlineData("o", "<Ok>keypaste: allowed once.</>")]
+    [InlineData("d", "<Danger>keypaste: denied. Nothing was released.</>")]
+    public async Task TheDialog_IsColouredOnlyThroughTheConsoleStyle(string answer, string outcome)
+    {
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue(answer);
+        var stderr = new StringWriter();
+        var channel = new TerminalApprovalChannel(
+            prompt, new AgentConsole(stderr, interactive: false, new MarkingStyle(stderr)), _window, TimeProvider.System);
+
+        await channel.AskAsync(Prompt(), Token);
+
+        Assert.Contains($"<Accent>{TerminalApprovalChannel.Rule}</>", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains(outcome, stderr.ToString(), StringComparison.Ordinal);
+        Assert.Equal("<Accent>[d] deny  [o] once  </><Accent>45s ›</> ", Assert.Single(prompt.PromptsSeen));
+    }
+
+    /// <summary>
+    /// The dialog for a bridge started with no label, which names the client alone: the <c>for</c>
+    /// line is gone and nothing else moved.
+    /// </summary>
+    [Fact]
+    public async Task TheDialog_HasNoForLine_AndIsOtherwiseUnchanged()
+    {
+        var rig = Build("d");
+        var prompt = ApprovalPrompt.For(
+            "claude-code", new EntryName("env/demo", "STRIPE_KEY"), "password", "deploy the billing service to staging");
+
+        await rig.Channel.AskAsync(prompt, Token);
+
+        string[] expected =
+        [
+            string.Empty,
+            TerminalApprovalChannel.Rule,
+            "keypaste: an agent is asking for a credential.",
+            string.Empty,
+            "  agent    claude-code",
+            "  item     env/demo/STRIPE_KEY",
+            "  field    password",
+            string.Empty,
+            "  the agent says it needs this because:",
+            "    deploy the billing service to staging",
+            string.Empty,
+            "  That sentence was written by the agent, not by keypaste. Treat it as a claim.",
+            string.Empty,
+            "keypaste: denied. Nothing was released.",
+            TerminalApprovalChannel.Rule,
+            string.Empty,
+        ];
+
+        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
+        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+    }
+
+    [Fact]
+    public async Task TheChoiceMark_FallsBackOnACodePageWithoutIt()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue("d");
+        using var stderr = new StreamWriter(new MemoryStream(), Encoding.GetEncoding(437));
+
+        await Channel(prompt, stderr).AskAsync(Prompt(), Token);
+
+        Assert.Equal("[d] deny  [o] once  45s > ", Assert.Single(prompt.PromptsSeen));
+    }
+
+    [Fact]
+    public async Task ARunsRequest_ShowsTheProjectNamesCommandAndDirectory_AndOnlyAnAllowReleases()
+    {
+        var once = Build("o");
+        var nothing = Build(string.Empty);
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await once.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
+        Assert.Equal(ApprovalAnswer.Denied, await nothing.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
+
+        var shown = once.Stderr.ToString();
+        Assert.Contains("project      billing", shown, StringComparison.Ordinal);
+        Assert.Contains("environment  dev", shown, StringComparison.Ordinal);
+        Assert.Contains("variables    DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("from         env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("command      npm run deploy", shown, StringComparison.Ordinal);
+        Assert.Contains("in           /home/me/billing", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain("scrubbed", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain("asked by", shown, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task TheRunDialog_IsExactlyTheBlock()
@@ -555,38 +512,35 @@ public sealed class TerminalApprovalChannelTests
             "  value's literal and escaped forms removed. The agent sees the names; the command itself can read",
             "  the values and reveal them, so approve only a command you would run yourself.",
             string.Empty,
-            "  [h] lets claude-code run this command line here again for 15 minutes without asking.",
-            "  It can change the files that command runs (scripts, package.json) in that time.",
             "keypaste: denied. Nothing was released.",
             TerminalApprovalChannel.Rule,
             string.Empty,
         ];
 
         Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
-        Assert.Equal("[d] deny  [o] once  [h] 15 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
     }
 
-    [Fact]
-    public async Task TheRunDialog_TimedLineNamesTheClient_AndHAllowsForIt()
-    {
-        var rig = Build("h");
-
-        Assert.Equal(ApprovalAnswer.Approved, await rig.Channel.AskAsync(RunPromptFor(), Token));
-        Assert.Contains("[h] lets claude-code run this command line here again for 15 minutes", rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.Contains("keypaste: allowed for 15 minutes.", rig.Stderr.ToString(), StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(OnceOnly.ProtectedProfile, "  this environment is protected: it is asked about every time.")]
-    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed allowance is offered.")]
-    public async Task ARunPromptOfferingNone_H_Denies_AndSaysWhy(OnceOnly onceOnly, string why)
-    {
-        var rig = Build("h");
-
-        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(RunPromptFor(0, onceOnly), Token));
-        Assert.Contains(why, rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("[h]", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
-    }
+    private static RunPrompt RunPromptFor(OnceOnly onceOnly = OnceOnly.None) =>
+        RunPrompt.For(
+            new Keypaste.Core.Ipc.RunRequest
+            {
+                Program = "/usr/bin/npm",
+                Command = ["npm", "run", "migrate"],
+                Directory = "/home/me/acme/api",
+                Project = "acme-api",
+                Reason = "run the pending migration",
+                Exposure = ["env/**"],
+                ClientName = "claude-code",
+                ClientLabel = "claude-code",
+            },
+            "acme-api",
+            "dev",
+            [
+                new RunPromptVariable("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"),
+                new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password"),
+            ],
+            onceOnly);
 
     [Fact]
     public async Task ALoaderName_IsFlaggedInTheRunDialog()
@@ -601,13 +555,13 @@ public sealed class TerminalApprovalChannelTests
 
     [Theory]
     [InlineData(OnceOnly.ProtectedProfile, "  this item is in a protected environment: it is asked about every time.")]
-    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed allowance is offered.")]
-    [InlineData(OnceOnly.TotpCode, "  a TOTP code changes every period: no timed allowance is offered.")]
+    [InlineData(OnceOnly.LimitReached, "  this agent's Automatic limit was reached: once only, so the limit you set still holds.")]
+    [InlineData(OnceOnly.Unnamed, "  this agent's connection has no name, so keypaste has nowhere to keep an always: once only.")]
     public async Task TheCredentialDialog_SaysWhyItIsOnceOnly(OnceOnly onceOnly, string why)
     {
         var rig = Build("d");
 
-        await rig.Channel.AskAsync(Prompt(grantSeconds: 0) with { OnceOnly = onceOnly }, Token);
+        await rig.Channel.AskAsync(Prompt() with { OnceOnly = onceOnly }, Token);
 
         Assert.Contains(why, rig.Stderr.ToString(), StringComparison.Ordinal);
     }
@@ -615,26 +569,7 @@ public sealed class TerminalApprovalChannelTests
     private static ApprovalPrompt Offering(string scope = "billing:dev")
     {
         Assert.True(ProjectScope.TryParseName(scope, out var parsed, out var error), error);
-        return Prompt() with { Label = "claude-code", AlwaysFor = parsed };
-    }
-
-    /// <summary>Always for is a key of its own after the others, said in full under the dialog's closing line, and chosen only by <c>a</c>.</summary>
-    [Theory]
-    [InlineData("a")]
-    [InlineData("always")]
-    public async Task A_AllowsOnceAndAsksForAlwaysFor_WhenOffered(string answer)
-    {
-        var rig = Build(answer);
-
-        Assert.Equal(ApprovalAnswer.AlwaysForProject, await rig.Channel.AskAsync(Offering(), Token));
-
-        var shown = rig.Stderr.ToString();
-        Assert.Equal("[d] deny  [o] once  [h] 1 hour  [a] always for billing:dev  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
-        Assert.Contains("  [a] allows this once, then asks you to make billing:dev Automatic for claude-code:", shown, StringComparison.Ordinal);
-        Assert.Contains("keypaste: allowed once. Confirm below to make billing:dev Automatic.", shown, StringComparison.Ordinal);
-        Assert.True(
-            shown.IndexOf("That sentence was written by the agent", StringComparison.Ordinal) < shown.IndexOf("[a] allows", StringComparison.Ordinal),
-            "the Always for line moved inside the block the demo pages hold");
+        return Prompt() with { Label = "claude-code", Always = new AlwaysOffer(AccessEdit.Automatic(parsed), parsed.Name) };
     }
 
     /// <summary>
@@ -646,7 +581,7 @@ public sealed class TerminalApprovalChannelTests
     {
         var rig = Build();
 
-        rig.Channel.Tell(new AlwaysForNotice("claude-code", "billing:dev", "nobody answered inside the window"));
+        rig.Channel.Tell(new AlwaysNotice("claude-code", Offer("billing:dev"), "nobody answered inside the window"));
 
         Assert.Equal(
             "keypaste: allowed once. billing:dev was not made Automatic for claude-code: nobody answered inside the window. "
@@ -675,7 +610,7 @@ public sealed class TerminalApprovalChannelTests
             Approver = approver,
         };
 
-        channel.Tell(new AlwaysForNotice(agent, scope, "nobody answered inside the window"));
+        channel.Tell(new AlwaysNotice(agent, Offer(scope), "nobody answered inside the window"));
 
         Assert.EndsWith(
             reach is null
@@ -764,7 +699,7 @@ public sealed class TerminalApprovalChannelTests
         Assert.DoesNotContain("UTC", shown, StringComparison.Ordinal);
 
         static AccessChangePrompt Changing(AgentAccess proposed) =>
-            AccessChangePrompt.For("claude-code", AccessChange.Classify(EffectiveAccess.Defaults, proposed), AccessOrigin.Terminal, string.Empty, TestZones.PlusTwo, ApprovalLimits.DefaultMaximumTtlSeconds);
+            AccessChangePrompt.For("claude-code", AccessChange.Classify(EffectiveAccess.Defaults, proposed), AccessOrigin.Terminal, string.Empty, TestZones.PlusTwo);
 
         static ProjectScope Scope(string name) =>
             ProjectScope.TryParseName(name, out var scope, out var error) ? scope : throw new InvalidOperationException(error);

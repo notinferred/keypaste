@@ -38,7 +38,7 @@ public sealed class AgentsFirstLevelTests
 
     private static readonly string[] _kinds =
     [
-        "Button/AgentHistory", "Button/ShowPrompt", "Button/EndAllowance", "Button/EndAllAllowances", "Button/ConnectTool",
+        "Button/AgentHistory", "Button/ShowPrompt", "Button/ConnectTool",
         "Expander/AgentSettings", "Button/ResetClients",
     ];
 
@@ -117,16 +117,14 @@ public sealed class AgentsFirstLevelTests
 
     /// <summary>A waiting request's Show the prompt and an allowance's End stay the same buttons as they count down, so a press or the focus on one is not lost at a tick.</summary>
     [Fact]
-    public Task Show_the_prompt_and_End_stay_the_same_buttons_as_they_count_down() => HeadlessSession.On(async () =>
+    public Task Show_the_prompt_stays_the_same_button_as_it_counts_down() => HeadlessSession.On(async () =>
     {
         await using var agents = await Agents.StartAsync();
-        await agents.RequestAsync("password");
         agents.Person.Hold = true;
         var waiting = agents.RequestAsync("username");
         await UntilAsync(() => agents.Authority.Activity.Waiting.Count == 1);
         agents.Settle();
         var show = Shown(agents.Window, "ShowPrompt");
-        var end = Shown(agents.Window, "EndAllowance");
         var left = Assert.Single(agents.Model.Waiting).LeftText;
         show.Focus();
         Assert.Same(show, agents.Window.FocusManager?.GetFocusedElement());
@@ -136,7 +134,6 @@ public sealed class AgentsFirstLevelTests
 
         Assert.NotEqual(left, Assert.Single(agents.Model.Waiting).LeftText);
         Assert.Same(show, Shown(agents.Window, "ShowPrompt"));
-        Assert.Same(end, Shown(agents.Window, "EndAllowance"));
         Assert.Same(show, agents.Window.FocusManager?.GetFocusedElement());
 
         agents.Clock.Advance(TimeSpan.FromMinutes(1));
@@ -189,7 +186,6 @@ public sealed class AgentsFirstLevelTests
 
         await agents.RequestAsync("password");
         agents.Settle();
-        Assert.True(agents.Model.HasGrants, "no allowance to show");
         look(agents.Window);
 
         agents.Person.Hold = true;
@@ -346,7 +342,6 @@ public sealed class AgentsFirstLevelTests
                     Entry = "example",
                     Field = field,
                     Reason = "first level",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                     ClientName = "claude-code",
                     ClientLabel = TempVault.Agent,
@@ -393,7 +388,7 @@ public sealed class AgentsFirstLevelTests
         {
             if (!Hold)
             {
-                return ApprovalAnswer.Approved;
+                return ApprovalAnswer.ApprovedOnce;
             }
 
             try

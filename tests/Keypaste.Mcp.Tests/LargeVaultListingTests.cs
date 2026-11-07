@@ -25,7 +25,7 @@ namespace Keypaste.Mcp.Tests;
 /// manager, and it is well over what one sixty-four kibibyte frame holds. Until F.3c that vault
 /// could not be listed at all: the write threw, the connection went down, and it took with it the
 /// grants scoped to it — so listing your own entries silently revoked an approval you had just
-/// given. That is what <see cref="OnALargeVault_AGrantSurvivesAListing"/> is about, and it is the
+/// given. That is what <see cref="OnALargeVault_AConnectionSurvivesAListing"/> is about, and it is the
 /// part a person would actually notice.
 /// </para>
 /// </remarks>
@@ -43,7 +43,6 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private GrantCache? _grants;
     private ApprovalGate? _gate;
     private ApproverListener? _listener;
     private CancellationTokenSource? _stop;
@@ -77,7 +76,6 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved (D-0317).
         _vault.Save();
 
-        _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
 
@@ -90,7 +88,6 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
                     new VaultCredentialSource(() => _vault),
                     new VaultEntryNameLister(() => _vault),
                     _gate,
-                    _grants,
                     TestSession.Settings()),
                 _log.Log));
 
@@ -121,7 +118,6 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         _listener?.Dispose();
         _stop?.Dispose();
         _gate?.Dispose();
-        _grants?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 
@@ -134,7 +130,6 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
             ["entry"] = "env/dev/STRIPE_KEY",
             ["field"] = "password",
             ["reason"] = "deploy the billing service to staging",
-            ["ttl_seconds"] = 300,
         };
 
     private static string TextOf(CallToolResult result) =>
@@ -185,16 +180,16 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
     /// The whole failure in one test. A grant is scoped to the connection the approver minted it
     /// for, and an over-size reply ended that connection — so the second request, which should have
     /// been answered from the cache without troubling anybody, went back to a person instead. The
-    /// audit method is what settles it: <c>grant-cache</c> means "they already said yes to this",
+    /// audit method is what settles it: <c>always-allowed</c> means "they chose Always allow on this",
     /// and <c>prompt</c> means they were asked twice.
     /// </remarks>
     [Fact]
-    public async Task OnALargeVault_AGrantSurvivesAListing()
+    public async Task OnALargeVault_AConnectionSurvivesAListing()
     {
         var (harness, client) = await StartAsync();
         await using var _ = harness;
 
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var first = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
         Assert.Contains(_sentinel, TextOf(first), StringComparison.Ordinal);
@@ -204,8 +199,8 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         var again = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
         Assert.Contains(_sentinel, TextOf(again), StringComparison.Ordinal);
 
-        Assert.Equal(["prompt", "exposure", "grant-cache"], MethodsOf(harness));
-        Assert.Equal(1, _human.Asked);
+        Assert.Equal(["prompt", "exposure", "prompt"], MethodsOf(harness));
+        Assert.Equal(2, _human.Asked);
     }
 
     /// <summary>Answers however the test says, and counts how often it was asked.</summary>

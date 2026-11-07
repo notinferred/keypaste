@@ -2,7 +2,7 @@ namespace Keypaste.Core;
 
 /// <summary>
 /// A project's profiles, which its entries' tags name (D-0370): which names keypaste resolves, which
-/// are protected, and how a set is named in audit lines and grants.
+/// are protected, and how a set is named in audit lines.
 /// </summary>
 public static class EnvProfileNames
 {
@@ -37,7 +37,7 @@ public static class EnvProfileNames
         return true;
     }
 
-    /// <summary>Whether every release of this profile through a session is asked about live, with no grant and no mode.</summary>
+    /// <summary>Whether every release of this profile through a session is asked about live, with no Always allow and no mode.</summary>
     public static bool IsProtected(string profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
@@ -48,7 +48,7 @@ public static class EnvProfileNames
             || name.StartsWith("production-", StringComparison.Ordinal);
     }
 
-    /// <summary>How audit lines and grants name one profile's set: <c>env/&lt;project&gt;</c> for <c>dev</c>, else <c>env/&lt;project&gt;/&lt;profile&gt;</c>; it names no group (D-0416).</summary>
+    /// <summary>How audit lines name one profile's set: <c>env/&lt;project&gt;</c> for <c>dev</c>, else <c>env/&lt;project&gt;/&lt;profile&gt;</c>; it names no group (D-0416).</summary>
     public static string SetName(string project, string profile)
     {
         ArgumentNullException.ThrowIfNull(profile);

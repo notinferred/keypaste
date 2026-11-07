@@ -121,15 +121,15 @@ internal sealed class FakeApprover : IAsyncDisposable
     }
 
     /// <summary>Starts listening and says yes to everything, releasing <see cref="Sentinel"/>.</summary>
-    internal FakeApprover StartApproving(int ttlSeconds = 300)
+    internal FakeApprover StartApproving(int codeSeconds = 0)
     {
         Answer = new CredentialReply
         {
             Decision = AuditDecision.Granted,
             Method = AuditMethod.Prompt,
-            Reason = $"a person approved this request for {ttlSeconds} seconds",
+            Reason = "a person approved this one request",
             Entry = "env/dev/STRIPE_KEY",
-            TtlSeconds = ttlSeconds,
+            CodeSeconds = codeSeconds,
             Value = Sentinel,
         };
 
@@ -137,7 +137,7 @@ internal sealed class FakeApprover : IAsyncDisposable
     }
 
     /// <summary>Starts listening and releases everything under the agent's Automatic mode, asking nobody.</summary>
-    internal FakeApprover StartAutomatic(int ttlSeconds = 300)
+    internal FakeApprover StartAutomatic()
     {
         Answer = new CredentialReply
         {
@@ -145,7 +145,6 @@ internal sealed class FakeApprover : IAsyncDisposable
             Method = AuditMethod.Automatic,
             Reason = "released without asking: billing-bot's mode for this item is Automatic (project billing:dev)",
             Entry = "env/dev/STRIPE_KEY",
-            TtlSeconds = ttlSeconds,
             Value = Sentinel,
         };
 
@@ -208,7 +207,6 @@ internal sealed class FakeApprover : IAsyncDisposable
         Decision = AuditDecision.Denied,
         Method = method,
         Reason = reason,
-        TtlSeconds = 0,
     };
 
     public async ValueTask DisposeAsync()

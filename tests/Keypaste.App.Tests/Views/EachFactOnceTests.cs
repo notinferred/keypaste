@@ -12,7 +12,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Approval;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -340,15 +339,6 @@ public sealed class EachFactOnceTests
         Assert.False(shell.Named<TextBlock>("RevisionFields").IsEffectivelyVisible);
         Assert.True(shell.Named<RevealedValue>("RevisionPassword").IsEffectivelyVisible);
     });
-
-    /// <summary>A timed mode says how long, in the panel, on each row and in the words the access-change prompt uses, which follow what this approver offers.</summary>
-    [Fact]
-    public void A_timed_mode_names_its_duration()
-    {
-        Assert.Equal("Ask, allow for 1 hour", AccessChangePrompt.AllowForDefaultWords);
-        Assert.Equal(AccessChangePrompt.AllowForDefaultWords, AccessChangePrompt.Words(Core.Agents.AgentMode.AllowForAWhile, ApprovalLimits.DefaultMaximumTtlSeconds));
-        Assert.Equal("Ask, allow for 10 minutes", AccessChangePrompt.Words(Core.Agents.AgentMode.AllowForAWhile, 600));
-    }
 
     /// <summary>A revision differing only in what drawing leaves out still counts as changed, and one differing in a field's value says values are not compared.</summary>
     [Fact]

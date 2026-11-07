@@ -28,7 +28,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 **For developers and their agents**
 
-- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Allow for 1 hour, and every request lands in a hash-chained audit log.
+- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Always allow, and every request lands in a hash-chained audit log.
 - Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). [PRODUCT §2](docs/PRODUCT.md) bounds it: no shell, and you approve the exact command.
 - Projects: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
@@ -44,7 +44,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
   <tr>
     <td>An agent's request, in the app</td>
     <td>A project and its <code>.env.keypaste</code></td>
-    <td>Requests, allowances and AI tools</td>
+    <td>Requests and AI tools</td>
   </tr>
 </table>
 
@@ -69,7 +69,7 @@ keypaste: an agent is asking for a credential.
 
   [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
       released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
@@ -308,7 +308,7 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time offers Allow once only; Ask, allow for 1 hour, the default, adds a timed allow, so a repeat of that request goes unasked for that hour, or for up to 15 minutes on a whole run or a command; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Commands and protected environments are always asked. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
+In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time, the default, asks you each time, and Always allow on a prompt releases it once and, once you confirm, keeps answering that item or that exact command without asking until you remove it in Agents; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Protected environments are always asked, and so is any command you did not choose Always allow on. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
 
 ```sh
 keypaste clients
@@ -334,7 +334,7 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 
 Each audit record includes its predecessor's hash. `keypaste log verify` checks the chain and reports its limits on every pass: a complete recomputed chain and records removed from the end can escape detection.
 
-[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, cached grants and audit tampering.
+[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, standing approvals and audit tampering.
 
 [KeePass and agents](docs/keepass-and-agents.md) explains the local approval design and its relation to browser integration.
 

@@ -107,7 +107,7 @@ internal sealed class TempAuditHome : IDisposable
     {
         Tool = "get_credential",
         Client = new AuditClient("claude-code", "1.2.3", "work-laptop"),
-        Args = AuditArgs.ForCredentialRequest(entry, "password", ttlSeconds: 60, "deploying the staging site"),
+        Args = AuditArgs.ForCredentialRequest(entry, "password", "deploying the staging site"),
         Decision = AuditDecision.Granted,
         Method = AuditMethod.Prompt,
         Reason = Reason,

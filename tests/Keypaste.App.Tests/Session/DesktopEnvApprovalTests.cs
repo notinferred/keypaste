@@ -42,7 +42,7 @@ public sealed class DesktopEnvApprovalTests
             Assert.EndsWith("work", Text(window, "DirectoryText"), StringComparison.Ordinal);
 
             await app.ArmAsync();
-            Click(window, "Approve");
+            Click(window, "AllowOnce");
             var answered = await reply.WaitAsync(_wait, Token);
 
             Assert.NotNull(answered);
@@ -139,37 +139,13 @@ public sealed class DesktopEnvApprovalTests
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
 
-            Click(window, "Approve");
+            Click(window, "AllowOnce");
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
             await app.ArmAsync();
-            Click(window, "Approve");
+            Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-        });
-
-    [Fact]
-    public Task EnvAllowForTheHour_TheSameRunIsNotAskedAgain() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskEnv();
-            var window = await app.PromptAsync();
-
-            Assert.Equal("Allow this command for 15 minutes", window.FindControl<Button>("Approve")!.Content);
-            Assert.Contains("exactly this command", Text(window, "TimedCaptionText"), StringComparison.Ordinal);
-
-            await app.ArmAsync();
-            Click(window, "Approve");
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-            await PromptedApp.WithdrawnAsync(window);
-
-            var again = await app.AskEnv().WaitAsync(_wait, Token);
-
-            Assert.Equal(EnvOutcome.Resolved, again?.Set.Outcome);
-            Assert.Equal(Sentinel, Assert.Single(again!.Set.Variables).Value);
-            Assert.Single(app.Windows);
-            Assert.Single(app.Authority.Activity.EnvGrants);
         });
 
     [Fact]
@@ -190,7 +166,6 @@ public sealed class DesktopEnvApprovalTests
             Click(second, "Deny");
 
             Assert.Equal(EnvOutcome.Declined, (await again.WaitAsync(_wait, Token))?.Set.Outcome);
-            Assert.Empty(app.Authority.Activity.EnvGrants);
         });
 
     /// <summary>A command, directory and names the runner sent cannot move the window or its buttons, however long they are.</summary>
@@ -273,5 +248,5 @@ public sealed class DesktopEnvApprovalTests
 
     /// <summary>The window's own buttons; a scrolling box adds its scroll bar's, which move nothing that matters.</summary>
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "Approve")];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "AllowOnce")];
 }

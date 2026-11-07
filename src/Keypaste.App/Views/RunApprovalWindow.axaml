@@ -112,19 +112,17 @@
                    IsVisible="{Binding OnceOnlyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
 
-      <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-          <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
-                  IsCancel="True" Command="{Binding DenyCommand}" />
-          <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
-                  Command="{Binding AllowOnceCommand}" />
-          <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
-                  HorizontalAlignment="Right"
-                  IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
-        </Grid>
-        <TextBlock Name="TimedCaptionText" Classes="caption" Text="{Binding TimedCaption}"
-                   IsVisible="{Binding TimedCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      </StackPanel>
+      <TextBlock Name="AlwaysCaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
+                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
+                Command="{Binding AllowOnceCommand}" />
+        <Button Grid.Column="2" Name="AlwaysAllow" Classes="prompt" Content="Always allow"
+                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysAllowCommand}" />
+      </Grid>
 
     </StackPanel>
   </Border>

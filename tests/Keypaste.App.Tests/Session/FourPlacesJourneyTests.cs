@@ -151,18 +151,13 @@ public sealed class FourPlacesJourneyTests
             var reply = client.RequestAsync(Request(vault, session), Token).AsTask();
             await Until(() => lifetime.Windows.Any(window => window is ApprovalWindow { IsVisible: true }));
             var prompt = lifetime.Windows.OfType<ApprovalWindow>().Single(window => window.IsVisible);
-            await Until(() => prompt.FindControl<Button>("Approve")!.IsEffectivelyEnabled);
-            DesktopApprovalTests.Click(prompt, "Approve");
+            await Until(() => prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            DesktopApprovalTests.Click(prompt, "AllowOnce");
             var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
 
-            // Agents: the waiting count and dot, ending the allowance, and History.
+            // Agents and History.
             Chord(main, PhysicalKey.Digit2);
-            await Until(() => shell.MainNav[1].Count == "1", () => $"grants {app.Authority.Activity.Grants.Count}, row '{shell.MainNav[1].Count}'");
-            Assert.True(shell.MainNav[1].DotLive);
-            AmberElements.AssertOne(main, null, "Agents, an allowance in force");
-            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "EndAllowance", IsEffectivelyVisible: true }));
-            Assert.Empty(app.Authority.Activity.Grants);
             Press(main, Named<Button>(main, "AgentHistory"));
             var history = Assert.IsType<LogViewModel>(shell.Content);
             Assert.True(history.IsAgentHistory);
@@ -203,7 +198,6 @@ public sealed class FourPlacesJourneyTests
         Entry = "Work/github",
         Field = "password",
         Reason = "run the journey's deploy",
-        TtlSeconds = 3600,
         Exposure = ["**"],
         ClientName = _client,
         ClientLabel = _label,

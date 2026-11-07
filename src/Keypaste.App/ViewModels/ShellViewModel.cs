@@ -1363,7 +1363,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         if (status is AuthorityStatus.Serving)
         {
             var activity = Authority!.Activity;
-            var grants = activity.Grants.Count + activity.EnvGrants.Count;
             var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count + activity.WaitingEdits.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
@@ -1374,7 +1373,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                 : waiting > 0
                     ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
                     : "Answering agents · " + ClientCount(clients);
-            SetCount(DestinationKind.AgentActivity, grants + waiting);
+            SetCount(DestinationKind.AgentActivity, waiting);
             AgentsRow.Waiting = AgentsRefusing ? 0 : waiting;
             return;
         }

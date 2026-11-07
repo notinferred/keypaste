@@ -154,7 +154,7 @@ public sealed class AccessCaps
     [
         "keypaste: this computer's limits on each agent, by the --client-label its bridge was started with.",
         "Nothing here gives more than the vault's settings. \"*\" is every agent without rows of its own.",
-        "mode: ask, allow-for-a-while or automatic. values = \"no\": values reach only commands it runs.",
+        "mode: ask or automatic. values = \"no\": values reach only commands it runs.",
         "run = \"off\": no commands. see: [selectors] as --expose takes them.",
         "per_hour = <n> and until = \"<time in UTC>\": Automatic at most n an hour, and only until then, where the row's mode applies.",
         "A row with project = \"<project>\" or \"<project>:<environment>\" holds only mode, per_hour and until.",
@@ -828,9 +828,9 @@ public sealed class AccessCaps
 
         if (table.TryGet(_modeKey, out var modePair))
         {
-            if (modePair.Value.Kind != TomlValueKind.Text || !AgentModes.TryParse(modePair.Value.Text, out var parsed))
+            if (modePair.Value.Kind != TomlValueKind.Text || !AgentModes.TryReadStored(modePair.Value.Text, out var parsed))
             {
-                problem = At(modePair.Line, "mode is \"ask\", \"allow-for-a-while\" or \"automatic\"");
+                problem = At(modePair.Line, "mode is \"ask\" or \"automatic\"");
                 return false;
             }
 

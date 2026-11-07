@@ -232,7 +232,7 @@ public sealed class AccessEditTests
         };
 
         Assert.Equal(Row("billing:dev", AgentMode.Automatic), Assert.Single(applied.Projects));
-        Assert.Equal(AgentMode.AllowForAWhile, applied.Mode);
+        Assert.Equal(AgentMode.Ask, applied.Mode);
         Assert.Equal(Row("billing:dev", AgentMode.Automatic, new AccessLimit { PerHour = 5 }), Assert.Single(edit.Apply(ended).Projects));
         Assert.Equal("project billing:dev, mode automatic, until none", edit.ToString());
     }

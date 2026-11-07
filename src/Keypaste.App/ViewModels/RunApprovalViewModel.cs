@@ -14,8 +14,8 @@ internal sealed record RunVariableRow(string Name, string Source, string Tag);
 /// </summary>
 /// <remarks>
 /// The command and directory are shown whole: the request was refused before anybody was asked if
-/// either held anything a prompt would have to scrub (D-0358). The timed allow covers this command
-/// line on this connection, and the caption says it can change the files that line runs.
+/// either held anything a prompt would have to scrub (D-0358). Always allow covers exactly this command
+/// for this agent, and allows this once before asking the person to confirm that.
 /// </remarks>
 internal sealed class RunApprovalViewModel : PromptViewModel
 {
@@ -43,17 +43,26 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
+        OffersAlways = prompt.Always is not null;
+        AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.Always), () => IsArmed && OffersAlways && !IsAnswered);
         OnceOnlyText = prompt.OnceOnly switch
         {
-            _ when prompt.GrantSeconds > 0 => string.Empty,
-            OnceOnly.AskEveryTime => "This agent is set to Ask every time: no timed allowance is offered.",
+            OnceOnly.None => string.Empty,
+            OnceOnly.Unnamed => "This agent has no name to keep an always under: once only.",
             _ => "This environment is protected: it is asked about every time.",
         };
-        TimedSeconds = prompt.GrantSeconds;
-        TimedCaption = prompt.GrantSeconds > 0
-            ? "This agent can run this command line here again without asking until then, and can change the files it runs (scripts, package.json) in that time."
+        AlwaysCaption = prompt.Always is not null
+            ? "Always allow covers exactly this command for this agent. It allows this once, then asks you to confirm."
             : string.Empty;
     }
+
+    /// <summary>Allows this run once, then asks the person to confirm the command's Always allow row.</summary>
+    internal RelayCommand AlwaysAllowCommand { get; }
+
+    protected override void OnAllowsChanged() => AlwaysAllowCommand.NotifyCanExecuteChanged();
+
+    /// <summary>Whether the prompt offers Always allow.</summary>
+    internal bool OffersAlways { get; }
 
     /// <summary>What keypaste does with the values, and what it cannot stop.</summary>
     internal string Explainer { get; } =
@@ -97,10 +106,9 @@ internal sealed class RunApprovalViewModel : PromptViewModel
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
 
-    /// <summary>Why no timed grant is offered, or empty.</summary>
+    /// <summary>Why no Always allow is offered, or empty.</summary>
     internal string OnceOnlyText { get; }
 
-    internal string TimedCaption { get; }
-
-    protected override int TimedSeconds { get; }
+    /// <summary>What Always allow covers and does, or empty.</summary>
+    internal string AlwaysCaption { get; }
 }

@@ -29,7 +29,7 @@ public sealed record AcafRead(AgentAccess Access, bool Understood, bool Rewritab
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while","limit":{"perHour":20,"until":"2026-12-31T23:59:59Z"},"projects":[{"project":"billing","mode":"automatic"}]}</c>.
+/// <c>{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"ask","limit":{"perHour":20,"until":"2026-12-31T23:59:59Z"},"projects":[{"project":"billing","mode":"automatic"}]}</c>.
 /// A member left out takes the defaults' value, and <c>limit</c> and <c>projects</c> may be left out.
 /// A row names a project, or a project and one environment, as <see cref="ProjectScope.Name"/> does.
 /// </para>
@@ -55,6 +55,16 @@ public static class AcafRecord
     private const string _perHourKey = "perHour";
     private const string _untilKey = "until";
     private const string _projectKey = "project";
+    private const string _alwaysKey = "always";
+    private const string _itemsKey = "items";
+    private const string _commandsKey = "commands";
+    private const string _programKey = "program";
+    private const string _commandKey = "command";
+    private const string _directoryKey = "directory";
+    private const string _variablesKey = "variables";
+    private const string _nameKey = "name";
+    private const string _itemKey = "item";
+    private const string _fieldKey = "field";
     private const string _timestampFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
     // A member named twice would leave the reader to pick one, and the writer may have meant the other (D-0325).
@@ -67,7 +77,7 @@ public static class AcafRecord
     private static readonly DateTimeOffset _narrowestUntil = DateTimeOffset.UnixEpoch;
     private static readonly AccessLimit _narrowestLimit = new() { PerHour = _narrowestPerHour, Until = _narrowestUntil };
 
-    private static readonly string[] _recordOrder = [_versionKey, _seeKey, _valuesKey, _runKey, _modeKey, _limitKey, _projectsKey];
+    private static readonly string[] _recordOrder = [_versionKey, _seeKey, _valuesKey, _runKey, _modeKey, _limitKey, _projectsKey, _alwaysKey];
     private static readonly string[] _rowOrder = [_projectKey, _modeKey, _limitKey];
     private static readonly string[] _limitOrder = [_perHourKey, _untilKey];
 
@@ -141,6 +151,10 @@ public static class AcafRecord
                         break;
                     case _projectsKey:
                         said = said with { Projects = ReadProjects(member.Value, out projectsUnderstood) };
+                        break;
+                    case _alwaysKey:
+                        said = said with { Always = ReadAlways(member.Value, out var alwaysUnderstood) };
+                        understood &= alwaysUnderstood;
                         break;
                     default:
                         understood = false;
@@ -223,6 +237,12 @@ public static class AcafRecord
                 }
 
                 json.WriteEndArray();
+            }
+
+            if (!access.Always.IsEmpty)
+            {
+                json.WritePropertyName(_alwaysKey);
+                AlwaysJson(access.Always).WriteTo(json);
             }
 
             HashSet<string> carried = new(StringComparer.Ordinal);
@@ -309,6 +329,15 @@ public static class AcafRecord
                 }
             }
         }
+        else if (edit.ChangesAlways)
+        {
+            var outcome = ChangeAlways(record, edit);
+
+            if (outcome != AgentAccessWrite.Written)
+            {
+                return outcome;
+            }
+        }
         else if (edit.Project is { } scope)
         {
             var outcome = ChangeRow(record, edit, scope, Read(previous[0]!).Access);
@@ -354,9 +383,220 @@ public static class AcafRecord
             }
         }
 
-        written = JsonNode.DeepEquals(before, record) ? previous[0]! : Text(record);
+        if (JsonNode.DeepEquals(before, record))
+        {
+            written = previous[0]!;
+            return AgentAccessWrite.Written;
+        }
+
+        RetireMode(record);
+        written = Text(record);
         return AgentAccessWrite.Written;
     }
+
+    /// <summary>Writes the retired timed mode's word as what it reads as, in the record and each row, so a change never writes it again.</summary>
+    private static void RetireMode(JsonObject record)
+    {
+        IEnumerable<JsonObject> holders = [record, .. (record[_projectsKey] as JsonArray ?? []).OfType<JsonObject>()];
+
+        foreach (var holder in holders)
+        {
+            if (holder[_modeKey] is JsonValue mode && mode.GetValueKind() == JsonValueKind.String
+                && string.Equals(mode.GetValue<string>(), AgentModes.RetiredWord, StringComparison.Ordinal))
+            {
+                holder[_modeKey] = AgentModes.Name(AgentMode.Ask);
+            }
+        }
+    }
+
+    /// <summary>Adds or removes one Always allow row; a list keypaste cannot read is kept whole, and only a removal, which then removes nothing, leaves it.</summary>
+    private static AgentAccessWrite ChangeAlways(JsonObject record, AccessEdit edit)
+    {
+        var said = AlwaysAllowed.None;
+
+        if (record[_alwaysKey] is { } held)
+        {
+            using var document = JsonDocument.Parse(held.ToJsonString());
+            said = ReadAlways(document.RootElement, out var understood);
+
+            if (!understood)
+            {
+                return edit.Forgets is null ? AgentAccessWrite.AlwaysUnreadable : AgentAccessWrite.Written;
+            }
+        }
+
+        if ((edit.AddsItem is { } item && !said.Items.Contains(item, StringComparer.Ordinal) && said.Items.Count >= AlwaysAllowed.MaximumItems)
+            || (edit.AddsCommand is { } command && !said.Commands.Contains(command) && said.Commands.Count >= AlwaysAllowed.MaximumCommands))
+        {
+            return AgentAccessWrite.TooManyAlways;
+        }
+
+        var always = edit.Apply(AgentAccess.Defaults with { Always = said }).Always;
+
+        if (always.IsEmpty)
+        {
+            record.Remove(_alwaysKey);
+        }
+        else
+        {
+            Put(record, _alwaysKey, AlwaysJson(always), _recordOrder);
+        }
+
+        return AgentAccessWrite.Written;
+    }
+
+    /// <summary>A list of rows as its JSON, each list only when it holds something.</summary>
+    private static JsonObject AlwaysJson(AlwaysAllowed always)
+    {
+        JsonObject json = [];
+
+        if (always.Items.Count > 0)
+        {
+            json[_itemsKey] = new JsonArray([.. always.Items.Select(item => (JsonNode?)JsonValue.Create(item))]);
+        }
+
+        if (always.Commands.Count > 0)
+        {
+            json[_commandsKey] = new JsonArray([.. always.Commands.Select(command => (JsonNode?)new JsonObject
+            {
+                [_programKey] = command.Program,
+                [_commandKey] = new JsonArray([.. command.Command.Select(argument => (JsonNode?)JsonValue.Create(argument))]),
+                [_directoryKey] = command.Directory,
+                [_variablesKey] = new JsonArray([.. command.Variables.Select(variable => (JsonNode?)new JsonObject
+                {
+                    [_nameKey] = variable.Name,
+                    [_itemKey] = variable.Item,
+                    [_fieldKey] = variable.Field,
+                })]),
+            })]);
+        }
+
+        return json;
+    }
+
+    /// <summary>The rows as they say; none when any part of them cannot be read, since a row read wrongly could release what the person never chose.</summary>
+    /// <param name="element">The <c>always</c> member.</param>
+    /// <param name="understood">Whether every part was understood.</param>
+    /// <returns>The rows, or none.</returns>
+    private static AlwaysAllowed ReadAlways(JsonElement element, out bool understood)
+    {
+        understood = false;
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return AlwaysAllowed.None;
+        }
+
+        List<string> items = [];
+        List<AlwaysCommand> commands = [];
+
+        foreach (var member in element.EnumerateObject())
+        {
+            var read = member.Name switch
+            {
+                _itemsKey => TryReadItems(member.Value, items),
+                _commandsKey => TryReadCommands(member.Value, commands),
+                _ => false,
+            };
+
+            if (!read)
+            {
+                return AlwaysAllowed.None;
+            }
+        }
+
+        understood = true;
+        return new AlwaysAllowed { Items = items, Commands = commands };
+    }
+
+    private static bool TryReadItems(JsonElement element, List<string> items)
+    {
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > AlwaysAllowed.MaximumItems)
+        {
+            return false;
+        }
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || !IsItemId(item.GetString()!) || items.Contains(item.GetString()!, StringComparer.Ordinal))
+            {
+                return false;
+            }
+
+            items.Add(item.GetString()!);
+        }
+
+        return true;
+    }
+
+    private static bool TryReadCommands(JsonElement element, List<AlwaysCommand> commands)
+    {
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > AlwaysAllowed.MaximumCommands)
+        {
+            return false;
+        }
+
+        foreach (var row in element.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.Object
+                || row.EnumerateObject().Any(member => member.Name is not (_programKey or _commandKey or _directoryKey or _variablesKey))
+                || !TryText(row, _programKey, out var program)
+                || !TryText(row, _directoryKey, out var directory)
+                || !row.TryGetProperty(_commandKey, out var command)
+                || command.ValueKind != JsonValueKind.Array
+                || command.GetArrayLength() == 0
+                || command.EnumerateArray().Any(argument => argument.ValueKind != JsonValueKind.String)
+                || !row.TryGetProperty(_variablesKey, out var variables)
+                || variables.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            List<AlwaysVariable> read = [];
+
+            foreach (var variable in variables.EnumerateArray())
+            {
+                if (variable.ValueKind != JsonValueKind.Object
+                    || variable.EnumerateObject().Any(member => member.Name is not (_nameKey or _itemKey or _fieldKey))
+                    || !TryText(variable, _nameKey, out var name)
+                    || !TryText(variable, _itemKey, out var item)
+                    || !TryText(variable, _fieldKey, out var field)
+                    || !IsItemId(item))
+                {
+                    return false;
+                }
+
+                read.Add(new AlwaysVariable(name, item, field));
+            }
+
+            var parsed = new AlwaysCommand(program, [.. command.EnumerateArray().Select(argument => argument.GetString()!)], directory, read);
+
+            if (commands.Contains(parsed))
+            {
+                return false;
+            }
+
+            commands.Add(parsed);
+        }
+
+        return true;
+    }
+
+    private static bool TryText(JsonElement holder, string name, out string text)
+    {
+        text = string.Empty;
+
+        if (!holder.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String || value.GetString() is not { Length: > 0 } read)
+        {
+            return false;
+        }
+
+        text = read;
+        return true;
+    }
+
+    /// <summary>Whether text is a UUID as hex, as KeePass's library writes it.</summary>
+    private static bool IsItemId(string text) => text.Length == 32 && text.All(char.IsAsciiHexDigit);
 
     /// <summary>Changes, adds or with a reset removes the row a change names, collapsing two rows for its scope into one.</summary>
     /// <param name="record">The record.</param>
@@ -532,7 +772,7 @@ public static class AcafRecord
     }
 
     private static bool IsKnown(string member) =>
-        member is _versionKey or _seeKey or _valuesKey or _runKey or _modeKey or _limitKey or _projectsKey;
+        member is _versionKey or _seeKey or _valuesKey or _runKey or _modeKey or _limitKey or _projectsKey or _alwaysKey;
 
     /// <summary>The top-level members of a record this version does not know, each copied out of the parsed text.</summary>
     private static List<JsonProperty> Unknown(string? text)
@@ -588,7 +828,7 @@ public static class AcafRecord
     private static bool TryReadMode(JsonElement element, out AgentMode mode)
     {
         mode = AgentMode.Ask;
-        return element.ValueKind == JsonValueKind.String && AgentModes.TryParse(element.GetString()!, out mode);
+        return element.ValueKind == JsonValueKind.String && AgentModes.TryReadStored(element.GetString()!, out mode);
     }
 
     private static bool TryReadSee(JsonElement element, [NotNullWhen(true)] out EntryExposure? see)

@@ -7,7 +7,7 @@ public static class ApprovalAnswers
 {
     /// <summary>Whether the answer releases anything. Every other value is a denial.</summary>
     public static bool Releases(this ApprovalAnswer answer) =>
-        answer is ApprovalAnswer.Approved or ApprovalAnswer.ApprovedOnce;
+        answer is ApprovalAnswer.ApprovedOnce;
 
     /// <summary>The audit method a denial is recorded under.</summary>
     /// <param name="answer">An answer that did not release.</param>

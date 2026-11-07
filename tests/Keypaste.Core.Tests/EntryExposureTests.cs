@@ -298,13 +298,12 @@ public sealed class EntryExposureTests
         {
             using var vault = ReservedVault(directory);
             using var fixture = new ApproverFixture();
-            fixture.Channel.Answer = ApprovalAnswer.Approved;
+            fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
             var handler = new ApproverHandler(
                 new VaultCredentialSource(() => vault),
                 new VaultEntryNameLister(() => vault),
                 fixture.Gate,
-                fixture.Grants,
                 fixture.Settings);
 
             var reply = await handler.RequestAsync(
@@ -313,7 +312,6 @@ public sealed class EntryExposureTests
                     Entry = EntryHandle.For(Name(ReservedGroups.Tokens, "7d2e91c0")),
                     Field = "password",
                     Reason = "read the verifier",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                 },
                 "connection",

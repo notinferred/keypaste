@@ -175,7 +175,7 @@ public sealed class AccessChangeWindowTests
                 AccessChange.Classify(EffectiveAccess.Defaults, many),
                 AccessOrigin.Agent,
                 hostile,
-                TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds));
+                TimeZoneInfo.Utc));
 
             Assert.Equal(ordinaryLayout, imitatingLayout);
             Assert.Equal(ordinaryLayout, unexplainedLayout);
@@ -194,7 +194,7 @@ public sealed class AccessChangeWindowTests
             AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Run = true, Mode = AgentMode.Automatic }),
             origin,
             reason,
-            TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
+            TimeZoneInfo.Utc);
 
     private static ProjectScope Scope(string project) =>
         ProjectScope.TryCreate(project, null, out var scope, out var error) ? scope : throw new InvalidOperationException(error);

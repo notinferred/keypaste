@@ -68,7 +68,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         nameof(Identity), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
         nameof(IsOnly), nameof(AlsoSees), nameof(HasAlsoSees), nameof(SeePattern), nameof(Rows), nameof(HasRows), nameof(NewRowScopes), nameof(NewRowScope),
         nameof(LimitTargets), nameof(OffersLimits), nameof(LimitTarget), nameof(LimitNow), nameof(HeldBack), nameof(IsHeldBack),
-        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen),
+        nameof(AlwaysRows), nameof(HasAlwaysRows), nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen),
     ];
 
     private static readonly string[] _timesOfDay = [@"h\:mm", @"hh\:mm", @"h\:mm\:ss", @"hh\:mm\:ss"];
@@ -76,7 +76,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private static readonly (AgentMode Mode, string Words)[] _modes =
     [
         (AgentMode.Ask, "Ask every time"),
-        (AgentMode.AllowForAWhile, AccessChangePrompt.AllowForDefaultWords),
         (AgentMode.Automatic, "Automatic"),
     ];
 
@@ -144,9 +143,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         : $"These follow the name {Shown}, which this agent's connection was given, not the name the agent calls itself. Any program started with that name gets them."
             + (_state is { HasRecord: false } ? " It has no settings of its own yet, so it gets the defaults." : string.Empty);
 
-    /// <summary>What the modes do, with how long each kind of timed grant lasts.</summary>
+    /// <summary>What the modes do.</summary>
     internal string ModeNote { get; } =
-        $"Automatic releases what it can see without asking, and records each release in history. A timed allow on a whole run of a project, or on a command, lasts {ApprovalLimits.Describe(EnvGrantCache.CeilingSeconds)}.";
+        "Automatic releases what it can see without asking, and records each release in history. Commands still ask.";
 
     /// <summary>That protected environments are always asked, whatever the settings say.</summary>
     internal string ProtectedNote { get; } =
@@ -442,7 +441,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         List<SettingChoice> run =
         [
             new(_run, "off", "Off", !vault.Run),
-            new(_run, "on", "On, each command still asked about", vault.Run),
+            new(_run, "on", "On, asked about unless always allowed", vault.Run),
         ];
         _runChoices = IsEveryOther ? [] : run;
         var scopes = projects.SelectMany(project => project.Environments.Prepend(project.Whole)).ToList();
@@ -483,7 +482,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         }
 
         HeldBack = _state is { HeldBack.Count: > 0 } held
-            ? $"This computer holds {Shown} back from what the vault gives it: {string.Join("; ", held.HeldBack.Select(gain => AccessChangePrompt.Words(gain, held.Vault, Zone, ApprovalLimits.DefaultMaximumTtlSeconds)))}."
+            ? $"This computer holds {Shown} back from what the vault gives it: {string.Join("; ", held.HeldBack.Select(gain => AccessChangePrompt.Words(gain, held.Vault, Zone, item => _authority.AlwaysItem(item).Shown)))}."
             : string.Empty;
         Beneath = _state is { BeneathDefaults: true }
             ? "The vault holds a change not saved yet, another program changed its file, or keypaste does not wholly understand these settings, so for now they apply only beneath the defaults."
@@ -557,19 +556,6 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         {
             var reply = await _authority.ChangeAccessAsync(Agent, edit, _closing.Token).ConfigureAwait(true);
             Message = Said(reply, edit.OnThisClock(reply.Reason, Zone));
-
-            // What it already holds ends too, so the grants listed match what it can now get.
-            if (reply is { Decision: AuditDecision.Granted, Method: AuditMethod.Narrowing })
-            {
-                if (IsEveryOther)
-                {
-                    _authority.RevokeAll();
-                }
-                else
-                {
-                    _authority.RevokeClient(Agent);
-                }
-            }
         }
         catch (OperationCanceledException)
         {
@@ -585,6 +571,56 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             Read();
             _changed?.Invoke();
         }
+    }
+
+    /// <summary>What the person chose Always allow on for this agent, each with its way to remove it.</summary>
+    internal IReadOnlyList<AlwaysRow> AlwaysRows
+    {
+        get
+        {
+            var access = _state?.Vault ?? AgentAccess.Defaults;
+            var runs = access.Run;
+
+            return
+            [
+                .. access.Always.Items.Select(item =>
+                {
+                    var (shown, isProtected) = _authority.AlwaysItem(item);
+
+                    return new AlwaysRow(
+                        shown,
+                        isProtected ? "Item · protected now, so it is still asked about every time" : "Item · every field it can see",
+                        new AlwaysRemoval(AlwaysAllowed.ItemId(item), shown, this));
+                }),
+                .. access.Always.Commands.Select(command =>
+                {
+                    var shown = EnvReleasePrompt.CommandLine(command.Command);
+                    var names = string.Join(", ", command.Variables.Select(variable => variable.Name));
+
+                    return new AlwaysRow(
+                        shown,
+                        runs ? $"Command in {command.Directory} · {names}" : $"Command in {command.Directory} · {names} · Run commands is off, so this does nothing now",
+                        new AlwaysRemoval(command.Id, shown, this));
+                }),
+            ];
+        }
+    }
+
+    /// <summary>Whether anything is always allowed.</summary>
+    internal bool HasAlwaysRows => !(_state?.Vault ?? AgentAccess.Defaults).Always.IsEmpty;
+
+    /// <summary>Removes one Always allow row, which gives the agent nothing more, so it applies at once.</summary>
+    /// <param name="id">The row's short name.</param>
+    /// <returns>Once the settings were read again.</returns>
+    internal Task RemoveAlwaysAsync(string id)
+    {
+        if (!AccessEdit.TryForget(id, out var edit, out var error))
+        {
+            Message = $"Not changed: {error}.";
+            return Task.CompletedTask;
+        }
+
+        return ChangeAsync(edit);
     }
 
     private static string Said(AccessChangeReply reply, string reason)

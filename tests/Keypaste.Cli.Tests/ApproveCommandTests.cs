@@ -42,6 +42,7 @@ public sealed class ApproveCommandTests : IDisposable
             ApprovalLimits.Default,
             retired,
             automatic,
+            [],
             new AgentConsole(stderr, interactive: false));
 
         return stderr.ToString();

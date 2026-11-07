@@ -15,13 +15,23 @@ namespace Keypaste.Core.Approval;
 /// <para>
 /// <b>Resolving and reading are two calls, and the order matters.</b> Resolution yields an
 /// <see cref="EntryName"/>, which structurally cannot carry a secret, so the caller can re-check
-/// its exposure globs and look in the grant cache <em>before</em> anything decrypts a field. A
+/// its exposure globs and check its settings <em>before</em> anything decrypts a field. A
 /// single <c>TryRead(entryArgument, field)</c> would have to read the value before the human had
 /// approved anything, which puts a secret in memory for requests that are about to be denied.
 /// </para>
 /// </remarks>
 public interface ICredentialSource
 {
+    /// <summary>An entry's UUID as hex, which an Always allow row names it by.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>The UUID, or null when it cannot be read, so no row covers it and none is offered.</returns>
+    string? ItemId(EntryName name) => null;
+
+    /// <summary>The name of the entry with a UUID, for a row or a confirmation to show.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>Its name, or null when no live entry has it.</returns>
+    EntryName? ItemNamed(string item) => null;
+
     /// <summary>Finds which entry an agent's <c>entry</c> argument names.</summary>
     /// <param name="entryArgument">The argument exactly as it arrived, handle or path.</param>
     /// <param name="name">The entry it names, when exactly one entry does.</param>
@@ -54,7 +64,7 @@ public interface ICredentialSource
     /// <returns><see langword="true"/> when the field was read and filled in, and is not empty.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
     /// <remarks>
-    /// Call this only after a human has approved the request, or after a live grant has been found.
+    /// Call this only after a human has approved the request, or after a setting they confirmed answers it.
     /// It is the only method in keypaste that turns an entry into a secret on the agent path.
     /// </remarks>
     bool TryRead(
@@ -64,7 +74,7 @@ public interface ICredentialSource
         out CredentialFailure failure,
         out string unfilled);
 
-    /// <summary>Whether a release of this entry is asked about live every time, with no grant and no rule (D-0348).</summary>
+    /// <summary>Whether a release of this entry is asked about live every time, with no Always allow and no rule (D-0348).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
     /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>

@@ -462,7 +462,7 @@ public sealed class ScreenRenderer
 
         foreach (var (make, name) in new (Func<PromptWindow>, string)[]
         {
-            (() => new ApprovalWindow(new ApprovalViewModel(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploying", 3600, "work laptop"))), "55-approval-inactive"),
+            (() => new ApprovalWindow(new ApprovalViewModel(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploying", "work laptop"))), "55-approval-inactive"),
         })
         {
             var prompt = make();
@@ -623,7 +623,6 @@ public sealed class ScreenRenderer
         Project = "acme-api",
         Profile = "dev",
         Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
-        GrantSeconds = 900,
     };
 
     /// <summary>A vault that also needs a YubiKey: the unlock screen offering it, waiting for a touch, a save waiting for one, and adding one in Settings.</summary>
@@ -811,17 +810,27 @@ public sealed class ScreenRenderer
         window.Width = 720;
         window.Height = 520;
         Save(window, output, "29b-agents-720");
-        agents.AskEndAllCommand.Press();
-        Save(window, output, "29c-agents-720-end-all");
-        agents.CancelEndAllCommand.Press();
         window.Height = 1100;
         window.Width = _width;
         window.Height = 1500;
 
-        agents.EndCommand.Press(agents.Grants[0]);
         var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
         claudeRow.IsOpen = true;
         Save(window, output, "27-agents-settings-open");
+        var alwaysItem = authority.Session.Unlocked!.EntryUuid(_apiHome)!;
+        var alwaysStore = new Core.Agents.AgentAccessStore(authority.Session.Unlocked!);
+        alwaysStore.Write("claude-code", AccessEdit.AlwaysItem(alwaysItem));
+        alwaysStore.Write("claude-code", AccessEdit.AlwaysCommand(new Core.Agents.AlwaysCommand(
+            "/usr/local/bin/npm",
+            ["npm", "run", "migrate"],
+            "/home/maya/acme/api",
+            [new Core.Agents.AlwaysVariable("DATABASE_URL", alwaysItem, "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", alwaysItem, "STRIPE_SECRET_KEY")])));
+        authority.Session.Unlocked!.Save();
+        claudeRow.IsOpen = false;
+        agents.Refresh();
+        claudeRow.IsOpen = true;
+        agents.Refresh();
+        Save(window, output, "27b-agents-always-allowed");
         await DrawMore(window, output);
         window.Width = 960;
         Save(window, output, "27-agents-settings-narrow");
@@ -837,8 +846,7 @@ public sealed class ScreenRenderer
         // With nothing waiting, the open pane's Connect action is the frame's one amber.
         await zed.DisposeAsync();
         await Assert.ThrowsAnyAsync<Exception>(() => waiting);
-        // Its grants go with its connection, a moment apart from its waiting request.
-        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0 && authority.Grants().All(grant => grant.Client != "zed"));
+        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0);
         agents.Refresh();
         Save(window, output, "28-agents-quiet");
 
@@ -913,7 +921,6 @@ public sealed class ScreenRenderer
                 Entry = entry,
                 Field = field,
                 Reason = "run the api tests",
-                TtlSeconds = 3600,
                 Exposure = ["env/**"],
                 ClientName = label,
                 ClientLabel = label,
@@ -937,7 +944,7 @@ public sealed class ScreenRenderer
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             }
 
-            return ApprovalAnswer.Approved;
+            return ApprovalAnswer.ApprovedOnce;
         }
     }
 
@@ -1515,7 +1522,7 @@ public sealed class ScreenRenderer
     {
         var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "/home/maya/acme/api";
         var preview = new EnvPreview("acme-api", ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION"]);
-        var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory) with { GrantSeconds = 900 };
+        var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory);
         DrawWindow(new EnvApprovalWindow(new EnvApprovalViewModel(env)), output, "91b-env-approval");
 
         var run = new RunPrompt
@@ -1531,18 +1538,36 @@ public sealed class ScreenRenderer
             Project = "acme-api",
             Profile = "dev",
             Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
-            GrantSeconds = 900,
         };
-        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-once-only");
+        var command = new Core.Agents.AlwaysCommand(run.Program, ["npm", "run", "migrate"], directory, [new Core.Agents.AlwaysVariable("DATABASE_URL", new string('a', 32), "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", new string('a', 32), "STRIPE_SECRET_KEY")]);
+        DrawWindow(
+            new RunApprovalWindow(new RunApprovalViewModel(run with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), run.Command) })),
+            output,
+            "91c-run-approval");
+        DrawWindow(
+            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
+                "work laptop",
+                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = [command] } }),
+                AccessOrigin.Prompt,
+                string.Empty,
+                TimeZoneInfo.Utc))),
+            output,
+            "91f3-access-change-command");
 
         var protectedPrompt = ApprovalPrompt.For(
             "claude-code",
             new EntryName("env/acme-api", ".env.prod"),
             "DATABASE_URL",
             "I need the \u202eproduction database URL to check the schema.",
-            0,
             null);
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt)), output, "91d-approval-once-only");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91d-approval-once-only");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.LimitReached })), output, "91d2-approval-limit-reached");
+        var item = new string('a', 32);
+        DrawWindow(
+            new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { Always = new AlwaysOffer(AccessEdit.AlwaysItem(item), protectedPrompt.Entry) })),
+            output,
+            "91e2-approval-always-item");
 
         Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
         var asked = ApprovalPrompt.For(
@@ -1550,23 +1575,20 @@ public sealed class ScreenRenderer
             new EntryName("env/acme-api", ".env"),
             "STRIPE_SECRET_KEY",
             "Run the webhook tests against the dev Stripe account.",
-            3600,
             "work laptop");
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked with { AlwaysFor = dev })), output, "91e-approval-always-for");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) })), output, "91e-approval-always-for");
 
         var change = AccessChangePrompt.For(
             "work laptop",
             AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
             AccessOrigin.Prompt,
             string.Empty,
-            TimeZoneInfo.Utc,
-            ApprovalLimits.DefaultMaximumTtlSeconds);
+            TimeZoneInfo.Utc);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
         var named = AgentAccess.Defaults with { Mode = AgentMode.Automatic };
         var reset = AccessChangePrompt.ForReset(
             new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named, Understood: true, Rewritable: true))]),
-            TimeZoneInfo.Utc,
-            ApprovalLimits.DefaultMaximumTtlSeconds);
+            TimeZoneInfo.Utc);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(reset)), output, "91f2-access-change-reset");
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
@@ -1578,7 +1600,7 @@ public sealed class ScreenRenderer
             output,
             "91h-terminal-edit");
 
-        var notice = new NoticeWindow(new AlwaysForNotice("work laptop", "acme-api:dev", "another prompt was already waiting for an answer"), _ => { });
+        var notice = new NoticeWindow(new AlwaysNotice("work laptop", TestOffers.Project("acme-api:dev"), "another prompt was already waiting for an answer"), _ => { });
         notice.Show();
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
@@ -2130,7 +2152,6 @@ public sealed class ScreenRenderer
             _apiHome,
             "DATABASE_URL",
             "Run the database migration for the api service.",
-            3600,
             "work laptop");
         var model = new ApprovalViewModel(prompt);
         model.Tick(TimeSpan.FromSeconds(28));
@@ -2154,7 +2175,7 @@ public sealed class ScreenRenderer
                 {
                     Tool = "request_credential",
                     Client = new AuditClient(client, null, null),
-                    Args = AuditArgs.ForCredentialRequest(EntryActivity.KeyOf(entry), "password", 60, "demo"),
+                    Args = AuditArgs.ForCredentialRequest(EntryActivity.KeyOf(entry), "password", "demo"),
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Prompt,
                     Reason = "a person approved this request",
@@ -2228,7 +2249,7 @@ public sealed class ScreenRenderer
             Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
             Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("All items", "list-title"), Text("Allowances", "dialog-title")),
             Row(Text("AI tools and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
-            Row(Button("Connect", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
+            Row(Button("Connect", ""), Button("Allow once", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
             Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
             Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
@@ -2435,11 +2456,10 @@ public sealed class ScreenRenderer
                 {
                     Tool = "request_credential",
                     Client = client,
-                    Args = AuditArgs.ForCredentialRequest(entry, field, 3600, asked),
+                    Args = AuditArgs.ForCredentialRequest(entry, field, asked),
                     Decision = decision,
                     Method = method,
                     Reason = reason,
-                    GrantedSeconds = seconds,
                 };
 
                 Write(TimeSpan.Zero, Credential(cursor, "Work/linear", "password", AuditDecision.Granted, AuditMethod.Prompt, "approved once", 0, "Sign in to Linear to file the bug."));
@@ -2458,12 +2478,12 @@ public sealed class ScreenRenderer
                     Client = claude,
                     Args = AuditArgs.ForRun(null, "Run the migration."),
                     Decision = AuditDecision.Granted,
-                    Method = AuditMethod.GrantCache,
+                    Method = AuditMethod.AlwaysAllowed,
                     Reason = "served from an allowance given 17 minutes ago",
                     Entries = ["env/acme-api/.env"],
                     Command = "npm run migrate",
                 });
-                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.GrantCache, "served from an allowance given 19 minutes ago", asked: "Print the connection string so I can check it."));
+                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.AlwaysAllowed, "served from an allowance given 19 minutes ago", asked: "Print the connection string so I can check it."));
                 Write(TimeSpan.FromMinutes(2), Credential(cursor, "Work/aws-console", "password", AuditDecision.Denied, AuditMethod.Prompt, "the person denied it"));
                 Write(TimeSpan.FromMinutes(18), new AuditRecord
                 {

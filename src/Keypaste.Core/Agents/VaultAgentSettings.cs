@@ -151,6 +151,8 @@ public sealed class VaultAgentSettings(Func<Vault?> unlockedVault, Func<Func<Vau
         AgentAccessWrite.TooManyProjects => string.Create(
             CultureInfo.InvariantCulture,
             $"this agent already has {AgentAccess.MaximumProjects} project rows, the most its settings keep; remove one it no longer needs, then try again"),
+        AgentAccessWrite.AlwaysUnreadable => "the vault holds what this agent is always allowed in a form keypaste cannot read, and adding to it would lose it: fix it in KeePassXC, or reset this agent",
+        AgentAccessWrite.TooManyAlways => "this agent's settings already keep the most they can of what is always allowed; remove one it no longer needs, then try again",
         AgentAccessWrite.ProjectsOverLimit => string.Create(
             CultureInfo.InvariantCulture,
             $"the vault holds more than {AgentAccess.MaximumProjects} project rows for this agent, which keypaste does not read: remove some in KeePassXC, or reset this agent's settings"),

@@ -1,29 +1,24 @@
 using System.Globalization;
-using Keypaste.Core;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Ipc;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// A request waiting for a person, or an allowance in force, as Agents lists it: who, what and for how
-/// long, never a value, and never the reason an agent gave, which only the prompt shows (T-2).
+/// A request waiting for a person, as Agents lists it: who, what and for how long, never a value, and never the reason an agent gave, which only the prompt shows (T-2).
 /// </summary>
 /// <remarks>
 /// Every string comes from the prompt the person was shown, which sanitized the agent's name, its
 /// label and the item once, so the list says exactly what the prompt said. Read again, the same request
-/// or allowance updates its row in place, so the row's buttons are not made again while it counts down.
+/// updates its row in place, so the row's buttons are not made again while it counts down.
 /// </remarks>
 internal sealed partial class ActivityRow : ObservableObject
 {
-    private ActivityRow(int number, ApprovalPrompt prompt, TimeSpan remaining, string lifetime, GrantKey? grant)
+    private ActivityRow(int number, ApprovalPrompt prompt, TimeSpan remaining, string lifetime)
         : this(number, prompt.Client, prompt.Label ?? "none configured", prompt.Entry, prompt.Field, lifetime + " " + Seconds(remaining))
     {
-        Grant = grant;
-        Id = grant is { } key ? GrantId.Of(key) : null;
         Detail = $"{prompt.Entry} · {prompt.Field}";
         LeftText = Humanized(remaining);
-        Fraction = Share(remaining, prompt.TtlSeconds > 0 ? prompt.TtlSeconds : ApprovalLimits.DefaultMaximumTtlSeconds);
     }
 
     private ActivityRow(int number, string client, string label, string entry, string field, string left)
@@ -36,7 +31,7 @@ internal sealed partial class ActivityRow : ObservableObject
         Left = left;
     }
 
-    /// <summary>The row's place in its list, from 1, which is how the driver names one to revoke.</summary>
+    /// <summary>The row's place in its list, from 1, which is how the driver names one.</summary>
     [ObservableProperty]
     internal partial int Number { get; private set; }
 
@@ -52,25 +47,15 @@ internal sealed partial class ActivityRow : ObservableObject
     [ObservableProperty]
     internal partial string Left { get; private set; }
 
-    /// <summary>The agent's grant to revoke, or null for a waiting request or a run's grant.</summary>
-    internal GrantKey? Grant { get; }
-
-    /// <summary>The grant's id, as <c>keypaste grants</c> shows it, or null for a waiting request.</summary>
-    internal string? Id { get; private init; }
-
-    /// <summary>What a grant releases, as the Agents table's second line: the entry and field, or a run's keys and set.</summary>
+    /// <summary>What was asked for, as the Agents table's second line: the entry and field, or a change's words.</summary>
     internal string Detail { get; private init; } = string.Empty;
 
-    /// <summary>A grant's or a waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
+    /// <summary>A waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
     [ObservableProperty]
     internal partial string LeftText { get; private set; } = string.Empty;
 
-    /// <summary>The share of a grant's length still to run, from 0 to 1, for its bar.</summary>
-    [ObservableProperty]
-    internal partial double Fraction { get; private set; }
-
-    /// <summary>What the same request or allowance is known by when it is read again: a grant's id, else what the row names.</summary>
-    internal string Key => Id ?? string.Join('\n', Client, Label, Entry, Field);
+    /// <summary>What the same request is known by when it is read again: what the row names.</summary>
+    internal string Key => string.Join('\n', Client, Label, Entry, Field);
 
     /// <summary>The client and its label on one line.</summary>
     internal string Who => $"{Client} · label {Label}";
@@ -81,10 +66,7 @@ internal sealed partial class ActivityRow : ObservableObject
     /// <summary>What a waiting row says was asked for: the item and field, a run's command, or a change to an agent's settings.</summary>
     internal string Asked => Detail.Length > 0 ? Detail : What;
 
-    /// <summary>What End is announced as: whose allowance, for what.</summary>
-    internal string EndName => $"End {Client}'s allowance for {Detail}";
-
-    /// <summary>Takes the place and time left of the same request or allowance read again.</summary>
+    /// <summary>Takes the place and time left of the same request read again.</summary>
     internal void Update(ActivityRow read)
     {
         ArgumentNullException.ThrowIfNull(read);
@@ -92,30 +74,10 @@ internal sealed partial class ActivityRow : ObservableObject
         Number = read.Number;
         Left = read.Left;
         LeftText = read.LeftText;
-        Fraction = read.Fraction;
     }
 
     internal static ActivityRow Waiting(int number, WaitingRequest waiting) =>
-        new(number, waiting.Prompt, waiting.Remaining, "answered for you in", grant: null);
-
-    internal static ActivityRow Granted(int number, GrantInForce grant) =>
-        new(number, grant.Approved, grant.Remaining, "ends in", grant.Key);
-
-    /// <summary>A timed grant a person gave a repeated <c>keypaste run --session</c> or an agent's run; its names were sanitized for the prompt that gave it.</summary>
-    internal static ActivityRow EnvGranted(int number, EnvGrantInForce grant) =>
-        new(
-            number,
-            grant.Client ?? GrantSummary.EnvClient,
-            grant.Label is { } label ? EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text : "none configured",
-            $"{grant.Project} · {grant.Profile} · {grant.Command}",
-            grant.Client is null ? "set" : "run",
-            "ends in " + Seconds(grant.Remaining))
-        {
-            Id = GrantId.OfEnv(grant.Key),
-            Detail = EnvDetail(grant),
-            LeftText = Humanized(grant.Remaining),
-            Fraction = Share(grant.Remaining, EnvGrantCache.GrantSeconds(ApprovalLimits.Default)),
-        };
+        new(number, waiting.Prompt, waiting.Remaining, "answered for you in");
 
     /// <summary>An agent's run a person is being asked about.</summary>
     internal static ActivityRow WaitingRun(int number, WaitingRun waiting) =>
@@ -134,7 +96,7 @@ internal sealed partial class ActivityRow : ObservableObject
     internal static ActivityRow WaitingEnv(int number, WaitingEnv waiting) =>
         new(
             number,
-            waiting.Prompt.Requester ?? GrantSummary.EnvClient,
+            waiting.Prompt.Requester ?? SessionAuthority.RunnerClient,
             "none configured",
             $"{waiting.Prompt.Project} · {waiting.Prompt.Profile} · {waiting.Prompt.Command}",
             "set",
@@ -178,16 +140,6 @@ internal sealed partial class ActivityRow : ObservableObject
         };
     }
 
-    /// <summary>The entries a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
-    private static string EnvDetail(EnvGrantInForce grant)
-    {
-        var set = $"{grant.Project}/{grant.Profile}";
-
-        return grant.Entries.Count == 0
-            ? $"{grant.Command} · {set}"
-            : $"{string.Join(", ", grant.Entries)} · {set}";
-    }
-
     /// <summary>Whole minutes under an hour, then hours and minutes; rounded up, as <see cref="Seconds"/> is.</summary>
     private static string Humanized(TimeSpan remaining)
     {
@@ -200,10 +152,7 @@ internal sealed partial class ActivityRow : ObservableObject
             : string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h {minutes % 60}m left");
     }
 
-    private static double Share(TimeSpan remaining, int lengthSeconds) =>
-        lengthSeconds <= 0 ? 0 : Math.Clamp(remaining.TotalSeconds / lengthSeconds, 0, 1);
-
-    // Rounded up, so a grant with half a second left does not read as over.
+    // Rounded up, so a request with half a second left does not read as over.
     private static string Seconds(TimeSpan remaining) =>
         string.Create(CultureInfo.InvariantCulture, $"{(int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds))} s");
 }

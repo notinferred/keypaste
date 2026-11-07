@@ -66,6 +66,52 @@ public sealed record AccessEdit
     /// <summary>Whether it is <see cref="VaultSettings"/>, which names nothing to change.</summary>
     public bool UsesVault { get; private init; }
 
+    /// <summary>The item Always allow in a prompt adds a row for, by its UUID as hex, or null.</summary>
+    public string? AddsItem { get; private init; }
+
+    /// <summary>The command Always allow in a prompt adds a row for, or null.</summary>
+    public AlwaysCommand? AddsCommand { get; private init; }
+
+    /// <summary>The short name of the Always allow row this removes, or null.</summary>
+    public string? Forgets { get; private init; }
+
+    /// <summary>Whether it changes the Always allow rows and nothing else.</summary>
+    internal bool ChangesAlways => AddsItem is not null || AddsCommand is not null || Forgets is not null;
+
+    /// <summary>The change Always allow in an item's prompt asks for: that item released to this agent without asking from now on.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>The change. No CLI word or agent request makes it: only the person's answer in a prompt.</returns>
+    public static AccessEdit AlwaysItem(string item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        return new AccessEdit { AddsItem = item };
+    }
+
+    /// <summary>The change Always allow in a run's prompt asks for: exactly that command started without asking from now on.</summary>
+    /// <param name="command">The command's identity.</param>
+    /// <returns>The change. No CLI word or agent request makes it: only the person's answer in a prompt.</returns>
+    public static AccessEdit AlwaysCommand(AlwaysCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        return new AccessEdit { AddsCommand = command };
+    }
+
+    /// <summary>The change that removes one Always allow row, which gives the agent nothing more.</summary>
+    /// <param name="id">The row's short name.</param>
+    /// <param name="edit">The change, when the name has the shape of one.</param>
+    /// <param name="error">Why not, otherwise empty.</param>
+    /// <returns>Whether the name has the shape of a row's.</returns>
+    public static bool TryForget(string id, [NotNullWhen(true)] out AccessEdit? edit, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        edit = AlwaysAllowed.IsId(id) ? new AccessEdit { Forgets = id } : null;
+        error = edit is null ? "an always-allowed row's name is eight lowercase hex characters, as keypaste clients lists it" : string.Empty;
+        return edit is not null;
+    }
+
     /// <summary>
     /// The change Always for in an approval prompt asks for: Automatic for one project environment from
     /// now on, so an end its row had, which may be why the prompt was shown, is removed, and an hourly
@@ -82,7 +128,7 @@ public sealed record AccessEdit
 
     /// <summary>Reads a change from the CLI's words.</summary>
     /// <param name="project"><c>&lt;project&gt;[:&lt;environment&gt;]</c>, or null.</param>
-    /// <param name="mode"><c>ask</c>, <c>allow-for-a-while</c> or <c>automatic</c>, or null.</param>
+    /// <param name="mode"><c>ask</c> or <c>automatic</c>, or null.</param>
     /// <param name="see">Selectors as <c>--expose</c> takes them, or null.</param>
     /// <param name="values"><c>yes</c> or <c>no</c>, or null.</param>
     /// <param name="run"><c>on</c> or <c>off</c>, or null.</param>
@@ -118,7 +164,7 @@ public sealed record AccessEdit
         {
             if (!AgentModes.TryParse(mode, out var known))
             {
-                error = "a mode is ask, allow-for-a-while or automatic";
+                error = "a mode is ask or automatic";
                 return false;
             }
 
@@ -194,6 +240,8 @@ public sealed record AccessEdit
             AccessDimension.Values => Values == true,
             AccessDimension.Run => Run == true,
             AccessDimension.See => See is not null,
+            AccessDimension.AlwaysItem => string.Equals(gain.AlwaysItem, AddsItem, StringComparison.Ordinal),
+            AccessDimension.AlwaysCommand => gain.AlwaysCommand == AddsCommand,
             _ => (Reset || Mode is not null || PerHour is not null || NoPerHour || Until is not null || NoUntil) && Holds(Project, gain.Scope),
         };
 
@@ -212,6 +260,23 @@ public sealed record AccessEdit
         ArgumentNullException.ThrowIfNull(current);
 
         var access = Reset && Project is null ? AgentAccess.Defaults : current;
+
+        if (ChangesAlways)
+        {
+            var always = access.Always;
+
+            if (AddsItem is { } item && !always.Items.Contains(item, StringComparer.Ordinal))
+            {
+                always = always with { Items = [.. always.Items, item] };
+            }
+
+            if (AddsCommand is { } command && !always.Commands.Contains(command))
+            {
+                always = always with { Commands = [.. always.Commands, command] };
+            }
+
+            return access with { Always = Forgets is { } id ? always.Without(id) : always };
+        }
 
         if (Project is { } scope)
         {
@@ -246,6 +311,21 @@ public sealed record AccessEdit
         if (UsesVault)
         {
             return "use the vault's settings";
+        }
+
+        if (AddsItem is { } item)
+        {
+            return $"always allow item {item}";
+        }
+
+        if (AddsCommand is { } command)
+        {
+            return $"always allow command {command.Id}";
+        }
+
+        if (Forgets is { } id)
+        {
+            return $"remove always-allowed {id}";
         }
 
         List<string> parts = [];

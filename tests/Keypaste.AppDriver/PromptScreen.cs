@@ -81,10 +81,9 @@ internal sealed class PromptScreen : IDisposable
                     case "approve" or "once" or "always" or "allow":
                         var allow = Button(window, answer switch
                         {
-                            "once" => "AllowOnce",
-                            "always" => "AlwaysFor",
-                            "allow" => "Allow",
-                            _ => "Approve",
+                            "approve" or "once" => "AllowOnce",
+                            "always" => "AlwaysAllow",
+                            _ => "Allow",
                         });
                         var armedBy = DateTime.UtcNow + _armingWait;
 
@@ -122,7 +121,7 @@ internal sealed class PromptScreen : IDisposable
             async () =>
             {
                 var window = _open ?? throw new DriverException("no prompt is on screen");
-                var allow = new[] { "Approve", "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
+                var allow = new[] { "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
                     ?? throw new DriverException("the prompt has no allow button");
                 var armedBy = DateTime.UtcNow + _armingWait;
 
@@ -138,7 +137,7 @@ internal sealed class PromptScreen : IDisposable
 
                 press();
                 Dispatcher.UIThread.RunJobs();
-                var focus = new[] { "Deny", "AllowOnce", "Approve", "AlwaysFor", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
+                var focus = new[] { "Deny", "AllowOnce", "AlwaysAllow", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
                 return $"prompt raised armed={(allow.IsEffectivelyEnabled ? "true" : "false")} focus={focus}";
             });
 
@@ -166,10 +165,11 @@ internal sealed class PromptScreen : IDisposable
             EnvApprovalWindow =>
                 $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
                 $"directory={Text(window, "DirectoryText")} keys={string.Join(',', Classed(window, "key"))} " +
-                $"entries={string.Join(',', Classed(window, "entry"))} timed={window.FindControl<Button>("Approve")?.IsVisible == true}",
+                $"entries={string.Join(',', Classed(window, "entry"))}",
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
-                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
+                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")} " +
+                $"always={window.FindControl<Button>("AlwaysAllow")?.IsVisible == true}",
             AccessChangeWindow =>
                 $"access-prompt agent={Text(window, "AgentText")} asked={Text(window, "OriginText")} " +
                 $"gains={string.Join("; ", Gains(window))} reason={Text(window, "ReasonText")}",
@@ -181,7 +181,7 @@ internal sealed class PromptScreen : IDisposable
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
-                $"always={(window.FindControl<Button>("AlwaysFor")?.IsVisible == true ? Text(window, "AlwaysText") : "none")}",
+                $"always={(window.FindControl<Button>("AlwaysAllow")?.IsVisible == true ? Text(window, "AlwaysCaptionText") : "none")}",
         });
 
         var withdrawn = window switch

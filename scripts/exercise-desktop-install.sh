@@ -465,8 +465,8 @@ env_run() {
 
 approval() {
   local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$HOME_DIR/audit.jsonl"
-  # y lets install-check see the group the app saved into, which is in no project; h then allows the request for the hour.
-  printf '%s\ny\nh\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  # y lets install-check see the group the app saved into, which is in no project; o then allows the request once.
+  printf '%s\ny\no\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -487,7 +487,7 @@ approval() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"install-check","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_GROUP/$ENTRY_TITLE\",\"field\":\"username\",\"reason\":\"4.7b reads back the username the installed app saved\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_GROUP/$ENTRY_TITLE\",\"field\":\"username\",\"reason\":\"4.7b reads back the username the installed app saved\"}}}"
     sleep 10
   } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "$ENTRY_GROUP/**" --approver "$pipe" \
       --client-label install-check > "$response" 2> "$OUT/mcp-stderr.txt" || true

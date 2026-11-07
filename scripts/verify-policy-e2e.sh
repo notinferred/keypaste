@@ -28,7 +28,7 @@
 # project or in a protected environment does not reach one, if Automatic releases an entry outside
 # the bridge's exposure or to a bridge the operator never labelled, if `*` can be made Automatic, if
 # this computer's ceiling or an unreadable clients.toml leaves Automatic in force, if a spent hourly
-# limit does not fall back to asking, if Automatic raises the TTL ceiling the operator set, if the old
+# limit does not fall back to asking, if the old
 # policy.toml still grants, or if the secret reaches the audit log. Removing any one of those leaves a
 # script that passes while the Automatic path fails open. These checks must never be skipped or
 # soft-passed.
@@ -99,7 +99,7 @@ EOF
 # which ConsoleSecretPrompt reports as no answer and the gate turns into a denial — the second,
 # independent guard described at the top.
 printf '%s\nd\ny\ny\nd\n' "$MASTER" \
-  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 10 --max-ttl 30 >/dev/null 2>"$AGENT_ERR" &
+  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 10 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
 for _ in $(seq 1 100); do
@@ -124,8 +124,8 @@ changes_drawn() { grep -c 'a change would give an agent more' "$AGENT_ERR" 2>/de
 
 # A bridge here is labelled ci-probe and exposed to env/**, unless the call says otherwise.
 ask() {
-  local id="$1" field="$2" out="$3" ttl="$4" entry="${ENTRY}" label=(--client-label "$LABEL") expose=(--expose 'env/**')
-  shift 4
+  local id="$1" field="$2" out="$3" entry="${ENTRY}" label=(--client-label "$LABEL") expose=(--expose 'env/**')
+  shift 3
   case " $* " in *" --entry "*) entry="$2"; shift 2 ;; esac
   case " $* " in *" --unlabelled "*) label=(); shift ;; esac
   case " $* " in *" --expose "*) expose=() ;; esac
@@ -133,8 +133,8 @@ ask() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    jq -cn --argjson id "$id" --arg entry "$entry" --arg field "$field" --argjson ttl "$ttl" \
-      '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci mode probe",ttl_seconds:$ttl}}}'
+    jq -cn --argjson id "$id" --arg entry "$entry" --arg field "$field" \
+      '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci mode probe"}}}'
     await_replies 6 "$out" "$id" || true
   } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" ${label[@]+"${label[@]}"} ${expose[@]+"${expose[@]}"} "$@" \
         >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste mcp exited non-zero"
@@ -178,7 +178,7 @@ clients() { "$CLI" clients "$@" --vault "$VAULT" --approver "$PIPE"; }
 # ================================================= A: an agent with no settings is asked about
 before="$(prompts_drawn)"
 OUT="$WORK/defaults.json"
-ask 2 OTHER_KEY "$OUT" 300
+ask 2 OTHER_KEY "$OUT"
 
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "an agent with no settings was not asked about a request"
 grep -q "$OTHER" "$OUT" && die "the answer d still released the credential, or the old policy.toml granted it"
@@ -251,13 +251,11 @@ tail -n 1 "$AUDIT" | jq -e '.tool == "access_change" and .method == "invalid-req
 # ===================================================== C: Automatic releases with no prompt
 before="$(prompts_drawn)"
 OUT="$WORK/automatic.json"
-ask 3 DEPLOY_KEY "$OUT" 3600
+ask 3 DEPLOY_KEY "$OUT"
 
 released 3 "$SECRET" "$OUT" || die "an Automatic request did not return exactly its value"
 grep -q "$OTHER" "$OUT" && die "an Automatic release carried another field's value"
 [ "$(prompts_drawn)" -eq "$before" ] || die "an Automatic release put a prompt in front of the human"
-jq -e 'select(.id == 3) | .result.structuredContent.expires_in_seconds == 30' <"$OUT" >/dev/null \
-  || die "an Automatic release raised the TTL ceiling the operator set with --max-ttl"
 tail -n 1 "$AUDIT" | jq -e --arg l "$LABEL" '.decision == "granted" and .method == "automatic" and .client.label == $l and .args.field == "DEPLOY_KEY"' >/dev/null \
   || die "the Automatic release was not recorded as automatic, for ci-probe and DEPLOY_KEY"
 grep -q 'without asking (Automatic)' "$AGENT_ERR" || die "the Automatic release was not announced in the approver's terminal"
@@ -267,7 +265,7 @@ grep -q 'without asking (Automatic)' "$AGENT_ERR" || die "the Automatic release 
 # dies quietly. ci is Automatic; web is not.
 before="$(prompts_drawn)"
 OUT="$WORK/other-project.json"
-ask 4 WEB_KEY "$OUT" 300 --entry env/web/.env
+ask 4 WEB_KEY "$OUT" --entry env/web/.env
 
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "a request outside the Automatic project did not reach a person"
 grep -q "$WEB" "$OUT" && die "a request outside the Automatic project released its credential"
@@ -275,7 +273,7 @@ grep -q "$WEB" "$OUT" && die "a request outside the Automatic project released i
 # ================================================ E: a protected environment is asked about anyway
 before="$(prompts_drawn)"
 OUT="$WORK/protected.json"
-ask 5 PROD_KEY "$OUT" 300 --entry env/ci/.env.prod
+ask 5 PROD_KEY "$OUT" --entry env/ci/.env.prod
 
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "a protected environment of an Automatic project did not reach a person"
 grep -q "$PROD" "$OUT" && die "Automatic released an entry in a protected environment"
@@ -283,7 +281,7 @@ grep -q "$PROD" "$OUT" && die "Automatic released an entry in a protected enviro
 # ======================================================== F: Automatic cannot widen past --expose
 before="$(prompts_drawn)"
 OUT="$WORK/outside-exposure.json"
-ask 6 DEPLOY_KEY "$OUT" 300 --expose 'env/web/**'
+ask 6 DEPLOY_KEY "$OUT" --expose 'env/web/**'
 
 grep -q "$SECRET" "$OUT" && die "Automatic released an entry outside the bridge's exposure"
 [ "$(prompts_drawn)" -eq "$before" ] || die "an entry outside the exposure was put in front of a person"
@@ -293,7 +291,7 @@ grep -q "$SECRET" "$OUT" && die "Automatic released an entry outside the bridge'
 # wrote, never on what the client calls itself (THREATS.md T-3).
 before="$(prompts_drawn)"
 OUT="$WORK/unlabelled.json"
-ask 7 SPARE_KEY "$OUT" 300 --unlabelled
+ask 7 SPARE_KEY "$OUT" --unlabelled
 
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "Automatic answered a bridge the operator never labelled"
 grep -q "$SPARE" "$OUT" && die "a bridge the operator never labelled was released a credential"
@@ -308,17 +306,16 @@ if clients '*' --project ci --mode automatic 2>"$ERR"; then die "every agent was
 printf '[[client]]\nlabel = "%s"\nmode = "ask"\n' "$LABEL" >"$CLIENTS"
 before="$(prompts_drawn)"
 OUT="$WORK/ceiling.json"
-ask 8 CEILING_KEY "$OUT" 300
+ask 8 CEILING_KEY "$OUT"
 
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "with this computer's ceiling at Ask every time, an Automatic request did not reach a person"
 grep -q "$CEILING" "$OUT" && die "this computer's ceiling left Automatic in force"
-grep -q 'this agent is set to Ask every time' "$AGENT_ERR" || die "the prompt did not say the agent is set to Ask every time"
 
 # The old form of the file is not this file: unreadable, it refuses rather than grants.
 printf '[[client]]\nlabel = "%s"\npolicy = "ask"\n' "$LABEL" >"$CLIENTS"
 before="$(prompts_drawn)"
 OUT="$WORK/unreadable-ceiling.json"
-ask 9 DEPLOY_KEY "$OUT" 300
+ask 9 DEPLOY_KEY "$OUT"
 
 jq -e 'select(.id == 9) | .result.isError == true' <"$OUT" >/dev/null || die "an unreadable clients.toml did not refuse the request"
 grep -q "$SECRET" "$OUT" && die "an unreadable clients.toml left Automatic in force"
@@ -327,7 +324,7 @@ grep -q "$SECRET" "$OUT" && die "an unreadable clients.toml left Automatic in fo
 rm -f "$CLIENTS"
 before="$(prompts_drawn)"
 OUT="$WORK/ceiling-gone.json"
-ask 10 DEPLOY_KEY "$OUT" 300
+ask 10 DEPLOY_KEY "$OUT"
 
 released 10 "$SECRET" "$OUT" || die "with the ceiling removed, the Automatic request was not released"
 [ "$(prompts_drawn)" -eq "$before" ] || die "with the ceiling removed, an Automatic request reached a person"
@@ -341,12 +338,12 @@ grep -q 'applied at once, since it gives the agent nothing more' "$WORK/limit.tx
 
 before="$(prompts_drawn)"
 OUT="$WORK/within-limit.json"
-ask 11 DEPLOY_KEY "$OUT" 300
+ask 11 DEPLOY_KEY "$OUT"
 released 11 "$SECRET" "$OUT" || die "the hour's one Automatic release was not made"
 [ "$(prompts_drawn)" -eq "$before" ] || die "the hour's one Automatic release reached a person"
 
 OUT="$WORK/limit-spent.json"
-ask 12 DEPLOY_KEY "$OUT" 300
+ask 12 DEPLOY_KEY "$OUT"
 [ "$(prompts_drawn)" -eq $((before + 1)) ] || die "with the hour's limit spent, the request did not fall back to a person"
 grep -q "$SECRET" "$OUT" && die "a release went past the hourly limit unasked"
 

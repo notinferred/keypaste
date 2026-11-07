@@ -131,7 +131,7 @@ public sealed class AuditLogTests : IDisposable
         // happened. The retired "policy" and "policy-limit" are never written again, so a line that
         // carries them was written before agents had modes.
         Assert.Contains("prompt", written, StringComparer.Ordinal);
-        Assert.Contains("grant-cache", written, StringComparer.Ordinal);
+        Assert.Contains("always-allowed", written, StringComparer.Ordinal);
         Assert.Contains("automatic", written, StringComparer.Ordinal);
         Assert.DoesNotContain("policy", written, StringComparer.Ordinal);
         Assert.DoesNotContain("policy-limit", written, StringComparer.Ordinal);
@@ -266,7 +266,7 @@ public sealed class AuditLogTests : IDisposable
     public void AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact()
     {
         var reason = new string('r', 5000);
-        var args = AuditArgs.ForCredentialRequest("k1_0123456789abcdef", "password", 900, reason);
+        var args = AuditArgs.ForCredentialRequest("k1_0123456789abcdef", "password", reason);
 
         using (var log = Open())
         {
@@ -286,7 +286,7 @@ public sealed class AuditLogTests : IDisposable
     [Fact]
     public void TheRequestedFieldIsRecorded_ButNeverAValue()
     {
-        var args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", 900, "deploy billing");
+        var args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", "deploy billing");
 
         using (var log = Open())
         {
@@ -300,13 +300,12 @@ public sealed class AuditLogTests : IDisposable
         Assert.Equal("password", recorded.GetProperty("field").GetString());
         Assert.Equal("env/dev/STRIPE_KEY", recorded.GetProperty("entry").GetString());
         Assert.Equal("path", recorded.GetProperty("entry_kind").GetString());
-        Assert.Equal(900, recorded.GetProperty("ttl_seconds").GetInt32());
     }
 
     [Fact]
     public void AHandleArgument_IsRecordedAsAHandle()
     {
-        var args = AuditArgs.ForCredentialRequest("k1_0123456789abcdef", "password", 60, "why");
+        var args = AuditArgs.ForCredentialRequest("k1_0123456789abcdef", "password", "why");
 
         using (var log = Open())
         {
@@ -360,7 +359,7 @@ public sealed class AuditLogTests : IDisposable
     [Fact]
     public void TheFileIsPlainAscii()
     {
-        var args = AuditArgs.ForCredentialRequest("日本語/エントリ", "password", 60, "理由\u202e");
+        var args = AuditArgs.ForCredentialRequest("日本語/エントリ", "password", "理由\u202e");
 
         using (var log = Open())
         {
@@ -600,7 +599,7 @@ public sealed class AuditLogTests : IDisposable
     public void ARecordThatOnlyJustDoesNotFit_LosesTheAgentsReasonAndNothingElse()
     {
         var reason = new string('r', AuditArgs.ReasonExcerptLength);
-        var args = AuditArgs.ForCredentialRequest("env/dev/KEY", "password", 900, reason);
+        var args = AuditArgs.ForCredentialRequest("env/dev/KEY", "password", reason);
 
         AuditRecord Padded(string glob) => new()
         {
@@ -749,44 +748,12 @@ public sealed class AuditLogTests : IDisposable
     {
         Tool = "request_credential",
         Client = new AuditClient("claude-code", "1.2.3", "work-laptop"),
-        Args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", 900, "deploy"),
+        Args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", "deploy"),
         Decision = AuditDecision.Granted,
         Method = AuditMethod.Prompt,
         Reason = "a person approved this one request",
         Exposure = ["env/**"],
-        GrantedSeconds = grantedSeconds,
     };
-
-    [Theory]
-    [InlineData(3600)]
-    [InlineData(0)]
-    public void AGrantedLine_CarriesGrantedSeconds(int seconds)
-    {
-        using (var log = Open())
-        {
-            Assert.True(log.TryAppend(Grant(seconds), out var error), error);
-        }
-
-        using var parsed = JsonDocument.Parse(Lines()[0]);
-        Assert.Equal(seconds, parsed.RootElement.GetProperty("granted_seconds").GetInt32());
-
-        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out var failure), failure);
-        Assert.Equal(seconds, Assert.Single(entries).GrantedSeconds);
-    }
-
-    [Fact]
-    public void ADeniedLine_HasNone()
-    {
-        using (var log = Open())
-        {
-            Assert.True(log.TryAppend(Denial() with { GrantedSeconds = 3600 }, out var error), error);
-        }
-
-        Assert.DoesNotContain("granted_seconds", Lines()[0], StringComparison.Ordinal);
-
-        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out var failure), failure);
-        Assert.Null(Assert.Single(entries).GrantedSeconds);
-    }
 
     /// <summary>Lines written before a grant's length was recorded sit in one chain with lines that record it.</summary>
     [Fact]
@@ -806,7 +773,6 @@ public sealed class AuditLogTests : IDisposable
 
         Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
         Assert.Equal(0, unreadable);
-        Assert.Equal([null, null, 3600, 0], entries.Select(entry => entry.GrantedSeconds));
     }
 
     [Fact]

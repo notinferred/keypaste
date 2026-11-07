@@ -364,7 +364,7 @@ public sealed class AuditChainTests : IDisposable
 
         using (log)
         {
-            var args = AuditArgs.ForCredentialRequest($"env/dev/{anchor}", "password", 60, "why");
+            var args = AuditArgs.ForCredentialRequest($"env/dev/{anchor}", "password", "why");
             Assert.True(log.TryAppend(Record() with { Args = args }, out var appendError), appendError);
         }
 

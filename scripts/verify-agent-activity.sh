@@ -3,20 +3,20 @@
 # across real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver holding the vault
 # as launch composes the app, with its prompt window drawn on a headless display and clicked. The driver's
 # `activity` prints what the screens' own view models read from the authority and the audit file, and its
-# `revoke` and `show-prompt` press the screen's buttons.
+# `show-prompt` presses the screen's button.
 #
 # A real keypaste mcp request waiting at the unlocked app is listed. Show the prompt, pressed once the prompt
 # has armed, brings it forward with Deny focused and its allows disarmed (D-0456), and Approve then releases
-# only once it has armed again. Its allowance is listed and the history shows the prompted grant from the
-# audit file. End and End all make the same request ask again. A lock empties both lists, and the next
+# only once it has armed again. The history shows the prompted release from the
+# audit file. Each later request asks again. A lock empties the list, and the next
 # unlock starts with nothing listed. A row's settings
 # show what the vault gives the agent; a narrowing chosen there applies at once, to the vault and
 # clients.toml, and a widening opens the app's confirmation window, changes nothing when refused, and once
 # allowed makes the next request Automatic. Each change is one keypaste app line labelled with the agent.
 # History reads a missing audit log as nothing asked yet, and says when one could not be read.
 #
-# NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if Show the prompt leaves the
-# prompt armed or focus off Deny, if an ended allowance still
+# NEGATIVE CONTROL: this fails if a waiting request is not listed, if Show the prompt leaves the
+# prompt armed or focus off Deny, if a released request
 # answers, if history is missing a request's record or is shown for a log that cannot be read, if a
 # narrowing asks or a widening does not, if a refused widening changes anything or an allowed one does not
 # release the next request unasked, or if a credential reaches the driver's output. These checks must never
@@ -72,7 +72,7 @@ start_bridge() {
 # Asks for $ENTRY's field $2, the password unless named.
 ask() {
   local field="${2:-password}"
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$field\",\"reason\":\"ci agent activity probe\",\"ttl_seconds\":60}}}" >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$field\",\"reason\":\"ci agent activity probe\"}}}" >&8
 }
 
 reply() {
@@ -101,20 +101,11 @@ activity() {
   echo activity >&7
   wait_for '^activity end' "$HOLD_OUT" "$ACTIVITIES"
   SHOWN="$WORK/activity-$ACTIVITIES.txt"
-  awk -v n="$ACTIVITIES" '/^activity end/ { seen++; next } seen == n - 1 && /^(unavailable|waiting|grant|history)/' "$HOLD_OUT" >"$SHOWN"
+  awk -v n="$ACTIVITIES" '/^activity end/ { seen++; next } seen == n - 1 && /^(unavailable|waiting|history)/' "$HOLD_OUT" >"$SHOWN"
 }
 
 shows() { grep -qE -- "$1" "$SHOWN" || die "Agent Activity does not show: $2"; }
 omits() { grep -qE -- "$1" "$SHOWN" && die "Agent Activity shows: $2"; return 0; }
-
-REVOKES=0
-revoke() {
-  REVOKES=$((REVOKES + 1))
-  echo "revoke $1" >&7
-  wait_for '^revoked ' "$HOLD_OUT" "$REVOKES"
-}
-
-readonly LISTED="^grant n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password left=ends in [0-9]+ s$"
 
 SETTINGS=0
 SHOWN_SETTINGS=""
@@ -162,17 +153,16 @@ FIRST="$(session_of)"
 [ -e "$AUDIT" ] && die "an audit log exists before any agent asked"
 activity
 omits '^unavailable ' "the authority as unreadable while it serves"
-omits '^(waiting|grant) ' "a request or grant before any agent asked"
+omits '^waiting ' "a request before any agent asked"
 shows '^history-message Nothing has asked' "a missing log as nothing asked yet"
 omits '^history ' "a record while the log is missing"
 
-# ------------------------------------------ the waiting request, then its grant and its audit record
+# ------------------------------------------ the waiting request, then its audit record
 start_bridge first
 ask 3
 wait_for '^prompt client' "$HOLD_OUT" 1
 activity
 shows "^waiting n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password left=answered for you in [0-9]+ s$" "the waiting request"
-omits '^grant ' "a grant before Approve"
 
 # Show the prompt, pressed once the prompt has armed, disarms it for a second with Deny focused; Approve,
 # which waits for the allow to be pressable, then releases.
@@ -191,35 +181,24 @@ last_audit --arg s "$FIRST" '.decision == "granted" and .method == "prompt" and 
 
 activity
 omits '^waiting ' "a request after it was answered"
-shows "$LISTED" "the grant Approve gave"
-shows "^history .*DEPLOY_KEY.*Approved" "the prompted grant from the audit file"
+shows "^history .*DEPLOY_KEY.*Approved" "the prompted release from the audit file"
 
+# ------------------------------------------------------------ the next request is asked again
 ask 4
+wait_for '^prompt client' "$HOLD_OUT" 2
+echo approve >&7
 reply 4
 released 4
-last_audit '.method == "grant-cache"'
-[ "$(prompts)" -eq 1 ] || die "a request inside a live grant raised a prompt"
-
-# ------------------------------------------------------------ End all, then End one, each ask again
-revoke all
-activity
-omits '^grant ' "an allowance after End all"
+last_audit '.method == "prompt" and .decision == "granted"'
 
 ask 5
-wait_for '^prompt client' "$HOLD_OUT" 2
+wait_for '^prompt client' "$HOLD_OUT" 3
 echo approve >&7
 reply 5
 released 5
-last_audit '.method == "prompt" and .decision == "granted"'
-activity
-shows "$LISTED" "the grant after asking again"
-
-revoke 1
-activity
-omits '^grant ' "an allowance after End"
 
 ask 6
-wait_for '^prompt client' "$HOLD_OUT" 3
+wait_for '^prompt client' "$HOLD_OUT" 4
 echo deny >&7
 reply 6
 refused 6
@@ -230,7 +209,7 @@ shows "^history .*DEPLOY_KEY.*Denied" "the refusal from the audit file"
 # Another field, because the refusal above cools the password down for every bridge (D-0425).
 start_bridge second
 ask 3 username
-wait_for '^prompt client' "$HOLD_OUT" 4
+wait_for '^prompt client' "$HOLD_OUT" 5
 activity
 shows '^waiting n=1 ' "the request waiting before the lock"
 
@@ -240,8 +219,8 @@ reply 3
 refused 3
 last_audit --arg s "$FIRST" '.method == "vault-locked" and .session == $s'
 activity
-shows '^unavailable ' "a locked app as unable to read requests and grants"
-omits '^(waiting|grant) ' "a request or grant after the lock"
+shows '^unavailable ' "a locked app as unable to read requests"
+omits '^waiting ' "a request after the lock"
 
 echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
@@ -249,33 +228,18 @@ SECOND="$(session_of)"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
 activity
 omits '^unavailable ' "the new session as unreadable"
-omits '^(waiting|grant) ' "a request or grant from before the lock"
+omits '^waiting ' "a request from before the lock"
 shows "^history .*DEPLOY_KEY.*Approved" "the file's records after a lock, which History reads whole"
 
 # ---------------------------- a row's settings: a narrowing applies at once, a widening only once confirmed
 start_bridge third
 settings_shown
-settings_say "agent=$LABEL mode=allow-for-a-while values=yes run=off see=env/** rows= held=none" "what the vault gives it"
+settings_say "agent=$LABEL mode=ask values=yes run=off see=env/** rows= held=none" "what the vault gives it"
 
-change mode ask
-changed
-[ "$(confirmations)" -eq 0 ] || die "a narrowing asked for confirmation"
-setting_line granted narrowing
-grep -A3 "^label = \"$LABEL\"" "$WORK/home/clients.toml" | grep -qF 'mode = "ask"' || die "the narrowing did not reach clients.toml"
-settings_shown
-settings_say "mode=ask " "the narrowing"
-ask 7
-wait_for '^prompt client' "$HOLD_OUT" 5
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF 'for=once only: this agent is set to Ask every time' \
-  || die "the request after the narrowing was offered a timed grant"
-echo once >&7
-reply 7
-released 7
-
-change mode allow-for-a-while
+change mode automatic
 wait_for '^access-prompt agent=' "$HOLD_OUT" 1
 grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Ask, allow for 1 hour" \
+  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Automatic" \
   || die "the confirmation does not say who gains what, or where it was asked from"
 echo deny >&7
 changed
@@ -290,12 +254,35 @@ changed
 setting_line granted prompt
 settings_shown
 settings_say "mode=automatic " "the confirmed mode"
+
+change mode ask
+changed
+[ "$(confirmations)" -eq 2 ] || die "a narrowing asked for confirmation"
+setting_line granted narrowing
+grep -A3 "^label = \"$LABEL\"" "$WORK/home/clients.toml" | grep -qF 'mode = "ask"' || die "the narrowing did not reach clients.toml"
+settings_shown
+settings_say "mode=ask " "the narrowing"
+ask 7
+wait_for '^prompt client' "$HOLD_OUT" 6
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF 'for=once or always' \
+  || die "the request after the narrowing was not offered once or always"
+echo once >&7
+reply 7
+released 7
+
+change mode automatic
+wait_for '^access-prompt agent=' "$HOLD_OUT" 3
+echo allow >&7
+changed
+setting_line granted prompt
+settings_shown
+settings_say "mode=automatic " "the confirmed mode"
 ask 8
 reply 8
 released 8
 last_audit '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' \
   || die "the request after Automatic was confirmed was not released as automatic"
-[ "$(prompts)" -eq 5 ] || die "a request under Automatic raised a prompt"
+[ "$(prompts)" -eq 6 ] || die "a request under Automatic raised a prompt"
 
 # ----------------------------------------------------------------- an unreadable log is unavailable
 # The app holds the log open from a session's first request until a lock, and Windows deletes no open file.
@@ -318,6 +305,6 @@ wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 echo "ok: Agents listed a real keypaste mcp request waiting at the app, brought its prompt forward disarmed with"
-echo "    Deny focused, listed the allowance Approve gave, showed the audit records since the unlock, made ended"
-echo "    allowances ask again, held nothing after a lock,"
+echo "    Deny focused, showed the audit records since the unlock, asked each"
+echo "    later request again, held nothing after a lock,"
 echo "    read a missing log as no records yet and said an unreadable log was unavailable"

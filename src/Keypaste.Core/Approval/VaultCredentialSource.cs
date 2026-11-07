@@ -39,6 +39,36 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     /// released only after a read of the saved file, which refuses a tag not yet saved. It fails
     /// closed: with no vault, no single such entry or no way to read its tags, the answer is yes.
     /// </remarks>
+    public string? ItemId(EntryName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        try
+        {
+            return _unlockedVault()?.EntryUuid(name);
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public EntryName? ItemNamed(string item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        try
+        {
+            return _unlockedVault()?.EntryNameOf(item);
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
     public bool RequiresLiveApproval(EntryName name)
     {
         ArgumentNullException.ThrowIfNull(name);

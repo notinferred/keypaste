@@ -43,7 +43,6 @@ public sealed class McpConnectionCheckTests
         Assert.Equal("k1_second", (string?)request["arguments"]!["entry"]);
         Assert.Equal("OTHER_TOKEN", (string?)request["arguments"]!["field"]);
         Assert.Equal(McpConnectionCheck.Reason, (string?)request["arguments"]!["reason"]);
-        Assert.Equal(60, (int?)request["arguments"]!["ttl_seconds"]);
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public sealed class AccessCapsTests : IDisposable
     /// <summary>A mode ceiling for agent <paramref name="i"/>, or, given a project, one for that project under a 64-character label.</summary>
     private static CapsRow Ceiling(int i, string? project = null) => project is null
         ? new CapsRow { Label = $"agent-{i}", Mode = AgentMode.Ask }
-        : new CapsRow { Label = $"{i:D64}", Project = Scope(project), Mode = AgentMode.AllowForAWhile };
+        : new CapsRow { Label = $"{i:D64}", Project = Scope(project), Mode = AgentMode.Ask };
 
     /// <summary>Ceilings of many rows, read from the text each row is written as rather than added one at a time.</summary>
     private static AccessCaps Many(IEnumerable<CapsRow> rows)
@@ -39,7 +39,7 @@ public sealed class AccessCapsTests : IDisposable
     public void AFile_RoundTrips()
     {
         var written = Caps(
-            new CapsRow { Label = "claude-code", Mode = AgentMode.AllowForAWhile, Values = false, Run = false, See = See("tag:env:billing", "services/**") },
+            new CapsRow { Label = "claude-code", Mode = AgentMode.Ask, Values = false, Run = false, See = See("tag:env:billing", "services/**") },
             new CapsRow { Label = "claude-code", Project = Scope("billing:staging"), Mode = AgentMode.Ask },
             new CapsRow { Label = "cursor", Run = true, Values = true },
             new CapsRow { Label = AgentNames.Any, See = See() });
@@ -110,15 +110,15 @@ public sealed class AccessCapsTests : IDisposable
     public void AModeCeiling_IsTheEnvironmentsRow_ElseTheProjectsRow_ElseTheAgentsRow()
     {
         var ceiling = Caps(
-            new CapsRow { Label = "a", Mode = AgentMode.AllowForAWhile },
+            new CapsRow { Label = "a", Mode = AgentMode.Ask },
             new CapsRow { Label = "a", Project = Scope("billing"), Mode = AgentMode.Ask },
             new CapsRow { Label = "a", Project = Scope("billing:staging"), Mode = AgentMode.Automatic }).For("a");
 
         Assert.Equal(AgentMode.Automatic, ceiling.ModeFor("billing", "staging"));
         Assert.Equal(AgentMode.Ask, ceiling.ModeFor("billing", "dev"));
         Assert.Equal(AgentMode.Ask, ceiling.ModeFor("billing", null));
-        Assert.Equal(AgentMode.AllowForAWhile, ceiling.ModeFor("other", "dev"));
-        Assert.Equal(AgentMode.AllowForAWhile, ceiling.ModeFor(null, null));
+        Assert.Equal(AgentMode.Ask, ceiling.ModeFor("other", "dev"));
+        Assert.Equal(AgentMode.Ask, ceiling.ModeFor(null, null));
         Assert.Equal(AgentMode.Automatic, AccessCeiling.None.ModeFor("billing", "dev"));
     }
 

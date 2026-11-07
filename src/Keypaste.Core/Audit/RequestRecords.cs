@@ -110,13 +110,11 @@ public static class RequestRecords
     /// <param name="client">Who asked.</param>
     /// <param name="entry">The <c>entry</c> argument as the agent wrote it.</param>
     /// <param name="field">The <c>field</c> argument as the agent wrote it, <c>totp</c> for a TOTP code; one a request may not name is recorded as <c>invalid</c>.</param>
-    /// <param name="ttlSeconds">The lifetime the agent asked for, or <c>-1</c> when it was missing or unusable.</param>
     /// <param name="statedReason">The agent's stated reason, verbatim.</param>
     /// <param name="decision">Whether the field was released.</param>
     /// <param name="method">How that was decided.</param>
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
     /// <param name="resolvedEntry">The entry the owner resolved the argument to, or null when it got no further.</param>
-    /// <param name="grantedSeconds">How long the release stays granted; kept only on a grant.</param>
     /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
     /// <param name="session">The unlocked session that answered, or null.</param>
     /// <param name="vault">The vault's identity key, or null when none was named.</param>
@@ -125,13 +123,11 @@ public static class RequestRecords
         AuditClient client,
         string entry,
         string field,
-        int ttlSeconds,
         string statedReason,
         AuditDecision decision,
         AuditMethod method,
         string reason,
         string? resolvedEntry,
-        int? grantedSeconds,
         IReadOnlyList<string> exposure,
         string? session,
         string? vault)
@@ -141,7 +137,7 @@ public static class RequestRecords
         ArgumentNullException.ThrowIfNull(reason);
         ArgumentNullException.ThrowIfNull(exposure);
 
-        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? field : null, ttlSeconds, statedReason);
+        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? field : null, statedReason);
 
         // The agent is told to prefer a handle, so the argument is usually an opaque k1_… that
         // answers nothing a reader of the log asks; the name it resolved to does.
@@ -164,7 +160,6 @@ public static class RequestRecords
             Reason = reason,
             Exposure = exposure,
             Session = session,
-            GrantedSeconds = decision == AuditDecision.Granted ? grantedSeconds : null,
             Vault = vault,
         };
     }
@@ -176,7 +171,6 @@ public static class RequestRecords
     /// <param name="decision">Whether the values were released.</param>
     /// <param name="method">How that was decided.</param>
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
-    /// <param name="grantedSeconds">How long the release stays granted; kept only on a grant.</param>
     /// <param name="entries">Each entry the run released or asked about, as <see cref="ApprovalPrompt.Shown"/> writes it, or null.</param>
     /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
     /// <param name="session">The unlocked session that answered, or null.</param>
@@ -189,7 +183,6 @@ public static class RequestRecords
         AuditDecision decision,
         AuditMethod method,
         string reason,
-        int? grantedSeconds,
         IReadOnlyList<string>? entries,
         IReadOnlyList<string> exposure,
         string? session,
@@ -215,7 +208,6 @@ public static class RequestRecords
             Reason = reason,
             Exposure = exposure,
             Session = session,
-            GrantedSeconds = decision == AuditDecision.Granted ? grantedSeconds : null,
             Vault = vault,
             Entries = entries,
             Command = shown.Length > AuditRecord.CommandLength ? shown[..(AuditRecord.CommandLength - 1)] + "…" : shown,

@@ -14,7 +14,7 @@ keypaste stores passwords and project environment variables in a local KDBX file
 
 The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
 
-For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Allow for 1 hour, which lets that connection reuse the approval for the hour; silence for 45 seconds denies access. An agent you set to Automatic for a project, a change that waits for your confirmation, gets what it can see there without a prompt, and commands and protected environments are always asked. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
+For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Always allow, which releases it once and, once you confirm, answers that agent without asking from then on; silence for 45 seconds denies access. An agent you set to Automatic for a project, a change that waits for your confirmation, gets what it can see there without a prompt, and protected environments, and any command you did not choose Always allow on, are always asked. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
 
 The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste approve` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Projects screen launches a project's command or a terminal from that session; none of this is published yet.
 
@@ -43,7 +43,7 @@ keypaste: an agent is asking for a credential.
 
   [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
       released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
 ```

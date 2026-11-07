@@ -32,8 +32,6 @@ internal sealed class ApproverFixture : IDisposable
 
     internal ManualClock Clock { get; } = new();
 
-    internal GrantCache Grants { get; }
-
     internal ApprovalGate Gate { get; }
 
     internal ApproverHandler Handler { get; }
@@ -61,23 +59,25 @@ internal sealed class ApproverFixture : IDisposable
     /// </remarks>
     internal ApproverFixture(ApprovalLimits? limits = null)
     {
-        Grants = new GrantCache(Clock);
         Gate = new ApprovalGate(Channel, Clock, limits ?? ApprovalLimits.Default);
         Hourly = new HourlyLimit(Clock);
         Settings.Records[Agent] = SeesAll;
-        Handler = new ApproverHandler(Source, Source, Gate, Grants, Settings, Narration.Add, hourly: Hourly, clock: Clock);
+        Handler = new ApproverHandler(Source, Source, Gate, Settings, Narration.Add, hourly: Hourly, clock: Clock);
     }
 
     public void Dispose()
     {
         Gate.Dispose();
-        Grants.Dispose();
     }
 }
 
 /// <summary>A vault with two entries, one under <c>env/</c> and one well outside it, untagged unless a test tags them.</summary>
 internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 {
+    /// <inheritdoc/>
+    public string? ItemId(EntryName name) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name.GroupPath + "/" + name.Title)))[..32];
+
     private static readonly EntryName[] _entries =
     [
         new EntryName("env/dev", "STRIPE_KEY"),
@@ -234,7 +234,7 @@ internal sealed class FakeChannel : IApprovalChannel
     internal Action? WhileEditing { get; set; }
 
     /// <summary>Every notice that the change Always for asked for did not take effect, in order.</summary>
-    internal List<AlwaysForNotice> Told { get; } = [];
+    internal List<AlwaysNotice> Told { get; } = [];
 
     /// <summary>Completes once a held prompt is up.</summary>
     internal Task Waiting => _waiting.Task;
@@ -276,7 +276,7 @@ internal sealed class FakeChannel : IApprovalChannel
         return ValueTask.FromResult(EditAnswer);
     }
 
-    public void Tell(AlwaysForNotice notice) => Told.Add(notice);
+    public void Tell(AlwaysNotice notice) => Told.Add(notice);
 
     /// <summary>How a pairing's confirmation is answered; a no unless a test says otherwise.</summary>
     internal Func<PairingPrompt, PairingAnswer> AnswerPairing { get; set; } = _ => new PairingAnswer(ApprovalAnswer.Denied, null);

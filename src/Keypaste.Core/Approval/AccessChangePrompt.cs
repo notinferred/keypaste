@@ -12,7 +12,7 @@ public enum AccessOrigin
     /// <summary>The agent itself, through its keypaste tool.</summary>
     Agent = 1,
 
-    /// <summary>The person, choosing Always for in an approval prompt.</summary>
+    /// <summary>The person, choosing Always allow in an approval prompt.</summary>
     Prompt = 2,
 
     /// <summary>The person, in the owner's own agent settings. Never read from a pipe.</summary>
@@ -82,13 +82,13 @@ public sealed record AccessChangePrompt
     /// <summary>The prompt for resetting this computer's ceilings, which keypaste cannot read.</summary>
     /// <param name="records">Every record the vault holds, as <see cref="IAgentSettings.List"/> reads them.</param>
     /// <param name="zone">This computer's time zone, which an end to Automatic is shown in.</param>
-    /// <param name="timedSeconds">The timed grant this approver's prompts offer, which the timed mode is named by.</param>
+    /// <param name="itemShown">An item's name as a person reads it, by its UUID as hex; null names none.</param>
     /// <returns>A prompt naming, for each agent, what the vault's settings give it beyond what an agent with no settings of its own gets.</returns>
     /// <remarks>
     /// What the file held back cannot be read, so the gains are against the defaults rather than against what
     /// applied; a record that applies only beneath the defaults gives nothing beyond them.
     /// </remarks>
-    public static AccessChangePrompt ForReset(AgentRecordList records, TimeZoneInfo zone, int timedSeconds)
+    public static AccessChangePrompt ForReset(AgentRecordList records, TimeZoneInfo zone, Func<string, string>? itemShown = null)
     {
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(zone);
@@ -109,7 +109,7 @@ public sealed record AccessChangePrompt
                 }
 
                 gains.AddRange(agent
-                    .SelectMany(record => AccessChange.Classify(unset, record.Record.Access).Gains.Select(gain => Words(gain, record.Record.Access, zone, timedSeconds)))
+                    .SelectMany(record => AccessChange.Classify(unset, record.Record.Access).Gains.Select(gain => Words(gain, record.Record.Access, zone, itemShown)))
                     .Distinct(StringComparer.Ordinal)
                     .Select(words => $"{shown}: {words}"));
             }
@@ -131,7 +131,7 @@ public sealed record AccessChangePrompt
     public string OriginText => Origin switch
     {
         AccessOrigin.Agent => $"asked by {Agent} through its keypaste tool",
-        AccessOrigin.Prompt => "asked from the approval prompt's Always for",
+        AccessOrigin.Prompt => "asked from the approval prompt's Always allow",
         AccessOrigin.Settings => "asked from this app's agent settings",
         _ => FromTerminalText,
     };
@@ -142,9 +142,9 @@ public sealed record AccessChangePrompt
     /// <param name="origin">Where the request says it came from.</param>
     /// <param name="reason">The requester's own reason, verbatim, or empty.</param>
     /// <param name="zone">This computer's time zone, which an end to Automatic is shown in.</param>
-    /// <param name="timedSeconds">The timed grant this approver's prompts offer, which the timed mode is named by.</param>
+    /// <param name="itemShown">An item's name as a person reads it, by its UUID as hex; null names none.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
-    public static AccessChangePrompt For(string agent, AccessChange change, AccessOrigin origin, string reason, TimeZoneInfo zone, int timedSeconds)
+    public static AccessChangePrompt For(string agent, AccessChange change, AccessOrigin origin, string reason, TimeZoneInfo zone, Func<string, string>? itemShown = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(change);
@@ -159,7 +159,7 @@ public sealed record AccessChangePrompt
         return new AccessChangePrompt
         {
             Agent = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text,
-            Gains = [.. change.Gains.Select(gain => Words(gain, change.Proposed, zone, timedSeconds))],
+            Gains = [.. change.Gains.Select(gain => Words(gain, change.Proposed, zone, itemShown))],
             Origin = origin,
             Reason = shownReason.Text,
             ReasonWasTruncated = reason.Length > ApprovalPrompt.MaximumReasonLength,
@@ -167,19 +167,12 @@ public sealed record AccessChangePrompt
         };
     }
 
-    /// <summary>The timed mode as the app reads it, whose prompts always offer the default grant.</summary>
-    public static string AllowForDefaultWords { get; } = Words(AgentMode.AllowForAWhile, ApprovalLimits.DefaultMaximumTtlSeconds);
-
     /// <summary>A mode as a person reads it.</summary>
     /// <param name="mode">The mode.</param>
-    /// <param name="timedSeconds">The timed grant a value's prompt offers at this approver.</param>
     /// <returns>Its words.</returns>
-    public static string Words(AgentMode mode, int timedSeconds) => mode switch
-    {
-        AgentMode.Ask => "Ask every time",
-        AgentMode.Automatic => "Automatic: released without asking, recorded in history",
-        _ => $"Ask, allow for {ApprovalLimits.Describe(timedSeconds)}",
-    };
+    public static string Words(AgentMode mode) => mode == AgentMode.Automatic
+        ? "Automatic: released without asking, recorded in history"
+        : "Ask every time";
 
     /// <summary>A limit on Automatic as a person reads it, its end on this computer's clock.</summary>
     /// <param name="limit">The limit.</param>
@@ -209,9 +202,9 @@ public sealed record AccessChangePrompt
     /// <param name="gain">The gain.</param>
     /// <param name="proposed">The settings the change would leave the agent with.</param>
     /// <param name="zone">This computer's time zone.</param>
-    /// <param name="timedSeconds">The timed grant a value's prompt offers at this approver.</param>
+    /// <param name="itemShown">An item's name as a person reads it, by its UUID as hex; null names none.</param>
     /// <returns>Its words, naming its project or environment, and the limit Automatic would have.</returns>
-    public static string Words(AccessGain gain, AgentAccess proposed, TimeZoneInfo zone, int timedSeconds)
+    public static string Words(AccessGain gain, AgentAccess proposed, TimeZoneInfo zone, Func<string, string>? itemShown = null)
     {
         ArgumentNullException.ThrowIfNull(gain);
         ArgumentNullException.ThrowIfNull(proposed);
@@ -224,12 +217,25 @@ public sealed record AccessChangePrompt
         {
             AccessDimension.See => $"sees {string.Join(", ", proposed.See.Globs.Select(DisplayTextSanitizer.Escaped))}",
             AccessDimension.Values => "is given values, not only into commands it runs",
+            AccessDimension.Run when proposed.Always.Commands.Count > 0 => "may run commands: each still asked about, except the ones you always allowed",
             AccessDimension.Run => "may run commands, each still asked about",
+            AccessDimension.AlwaysItem => $"gets {itemShown?.Invoke(gain.AlwaysItem!) ?? "an item"} without asking, every field it can see, until you remove it in Agents",
+            AccessDimension.AlwaysCommand => CommandWords(gain.AlwaysCommand!),
             AccessDimension.Mode when decided.Mode == AgentMode.Automatic && !decided.Limit.IsNone =>
                 $"{where}: {Automatic(decided.Limit, zone)}: released without asking, recorded in history",
-            AccessDimension.Mode => $"{where}: {Words(decided.Mode, timedSeconds)}",
+            AccessDimension.Mode => $"{where}: {Words(decided.Mode)}",
             _ => $"{where}: {Automatic(decided.Limit, zone)}",
         };
+    }
+
+    /// <summary>What Always allow on a command gives, and what it cannot promise (T-35).</summary>
+    private static string CommandWords(AlwaysCommand command)
+    {
+        var variables = string.Join(", ", command.Variables.Select(variable => DisplayTextSanitizer.Escaped(variable.Name)));
+
+        return $"runs {DisplayTextSanitizer.Escaped(EnvReleasePrompt.CommandLine(command.Command))} in {DisplayTextSanitizer.Escaped(command.Directory)} "
+            + $"with {variables} without asking, until you remove it in Agents. "
+            + "The command's files can change: keypaste approves this command line, not what it does";
     }
 
     /// <summary>Automatic with its limit, such as <c>Automatic until 2026-12-31 23:59 +02:00, at most 20 an hour</c>.</summary>

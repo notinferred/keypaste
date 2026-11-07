@@ -73,7 +73,7 @@ public sealed class AccessChangeTests
             [new AccessGain(AccessDimension.Mode, Scope("billing"))],
             Gains(AgentAccess.Defaults, AgentAccess.Defaults.WithRow(Row("billing", AgentMode.Automatic))));
 
-        var record = Asks.WithRow(Row("billing", AgentMode.AllowForAWhile));
+        var record = Asks.WithRow(Row("billing", AgentMode.Ask));
 
         Assert.Equal(
             [new AccessGain(AccessDimension.Mode, Scope("billing:staging"))],
@@ -99,7 +99,7 @@ public sealed class AccessChangeTests
 
         Assert.Contains(new AccessGain(AccessDimension.Values, null), gains);
         Assert.Contains(new AccessGain(AccessDimension.See, null), gains);
-        Assert.Contains(new AccessGain(AccessDimension.Mode, null), gains);
+        Assert.DoesNotContain(new AccessGain(AccessDimension.Mode, null), gains);
     }
 
     [Fact]

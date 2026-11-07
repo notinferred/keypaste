@@ -18,7 +18,7 @@ namespace Keypaste.Core.Ipc;
 /// <b>Two clients at once is the case that matters</b>, not an edge case: Claude Desktop and Claude
 /// Code each spawn their own bridge, and both may be connected to one approver. That is why
 /// connections are handled concurrently rather than one at a time, and why each gets its own
-/// connection id and its own grants.
+/// connection id.
 /// </para>
 /// <para>
 /// A connection that misbehaves — a frame that will not parse, a frame over the size limit, a peer
@@ -33,7 +33,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>At most <see cref="MaxConnections"/> are served at once</b>, and one more is closed as soon as
 /// it connects, so a process opening connections it never uses cannot exhaust the approver. Nothing
-/// closes an idle connection: a bridge waits between an agent's requests, and its grants end with it.
+/// closes an idle connection: a bridge waits between an agent's requests.
 /// </para>
 /// <para>
 /// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
@@ -326,14 +326,6 @@ public sealed class ApproverListener : IDisposable
             case ApproverMessageKind.EnvProfile when ApproverProtocol.TryDecode(frame, out EnvRequest? envProfile):
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseEnvAsync(envProfile, connectionId, cancellationToken).ConfigureAwait(false));
-
-            case ApproverMessageKind.Grants when ApproverProtocol.TryDecode(frame, out GrantsRequest? grants):
-                return ApproverProtocol.Encode(
-                    await _handler.GrantsAsync(grants, connectionId, cancellationToken).ConfigureAwait(false));
-
-            case ApproverMessageKind.RevokeGrants when ApproverProtocol.TryDecode(frame, out RevokeGrantsRequest? revoke):
-                return ApproverProtocol.Encode(
-                    await _handler.RevokeGrantsAsync(revoke, connectionId, cancellationToken).ConfigureAwait(false));
 
             case ApproverMessageKind.Lock when ApproverProtocol.TryDecode(frame, out LockRequest? lockNow):
                 return ApproverProtocol.Encode(

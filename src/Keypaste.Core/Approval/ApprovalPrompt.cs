@@ -1,5 +1,3 @@
-using Keypaste.Core.Agents;
-
 namespace Keypaste.Core.Approval;
 
 /// <summary>
@@ -16,7 +14,7 @@ namespace Keypaste.Core.Approval;
 /// </para>
 /// <para>
 /// Every untrusted string is put through <see cref="EntryNameSanitizer"/> by
-/// <see cref="For(string?, EntryName, string, string, int, string?)"/> rather than by the caller, so no
+/// <see cref="For(string?, EntryName, string, string, string?)"/> rather than by the caller, so no
 /// channel can be handed raw text by a caller that forgot. Two of the three are attacker-chosen:
 /// the client name is asserted during an unauthenticated handshake (T-3), and the reason is written
 /// by the agent for the express purpose of persuading the person reading it (T-2).
@@ -76,24 +74,17 @@ public sealed record ApprovalPrompt
     /// </remarks>
     public required bool ReasonWasAltered { get; init; }
 
-    /// <summary>
-    /// How long the timed grant the person may choose instead of "allow once" lasts, in seconds; zero
-    /// offers only "allow once". The approver's ceiling, never the number the agent asked for.
-    /// </summary>
-    public required int TtlSeconds { get; init; }
-
-    /// <summary>Why <see cref="TtlSeconds"/> is zero, when it is.</summary>
+    /// <summary>Why no Always allow is offered, when none is.</summary>
     public OnceOnly OnceOnly { get; init; }
 
-    /// <summary>The project environment the person may make Automatic for this agent from here, or null when that is not offered.</summary>
+    /// <summary>What Always allow would ask the person to confirm, or null when it is not offered.</summary>
     /// <remarks>
-    /// Offered for a named agent asking for an entry in exactly one project and no protected
-    /// environment. Choosing it allows this request once and then asks the person to confirm the
-    /// change, as any change that gives an agent more is confirmed.
+    /// Choosing it allows this request once and then asks the person to confirm the change, as any
+    /// change that gives an agent more is confirmed.
     /// </remarks>
-    public ProjectScope? AlwaysFor { get; init; }
+    public AlwaysOffer? Always { get; init; }
 
-    /// <summary>An entry as every prompt, grant and audit line shows it.</summary>
+    /// <summary>An entry as every prompt and audit line shows it.</summary>
     /// <param name="entry">The entry.</param>
     /// <returns>Group separators kept, everything else scrubbed.</returns>
     public static string Shown(EntryName entry)
@@ -108,7 +99,6 @@ public sealed record ApprovalPrompt
     /// <param name="entry">The entry the request resolved to.</param>
     /// <param name="field">The requested field, already validated against <see cref="CredentialFields"/>.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
-    /// <param name="effectiveTtlSeconds">The timed grant offered, or zero for "allow once" only.</param>
     /// <param name="clientLabel">The bridge's <c>--client-label</c>, or null.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="entry"/>, <paramref name="field"/> or <paramref name="reason"/> is null.</exception>
@@ -117,7 +107,6 @@ public sealed record ApprovalPrompt
         EntryName entry,
         string field,
         string reason,
-        int effectiveTtlSeconds,
         string? clientLabel = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -143,7 +132,6 @@ public sealed record ApprovalPrompt
             Reason = shownReason.Text,
             ReasonWasTruncated = reason.Length > MaximumReasonLength,
             ReasonWasAltered = shownReason.WasAltered,
-            TtlSeconds = effectiveTtlSeconds,
         };
     }
 

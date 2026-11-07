@@ -49,8 +49,6 @@ public static partial class ApproverProtocol
     internal const string CredentialKind = "credential";
     internal const string AttachKind = "attach";
     internal const string EnvKind = "env";
-    internal const string GrantsKind = "grants";
-    internal const string RevokeGrantsKind = "revoke-grants";
     internal const string LockKind = "lock";
     internal const string EnvProfileKind = "env-profile";
     internal const string TokenEnvKind = "token-env";
@@ -88,7 +86,7 @@ public static partial class ApproverProtocol
     internal static string UndeliverableReason(AuditMethod authority) => authority switch
     {
         AuditMethod.Prompt => "a person approved this release and it was too large to send in one reply",
-        AuditMethod.GrantCache => "a person had already approved this release and it was too large to send in one reply",
+        AuditMethod.AlwaysAllowed => "a person had always allowed this release and it was too large to send in one reply",
         AuditMethod.Automatic => "the agent's Automatic mode authorized this release and it was too large to send in one reply",
         _ => "this release was authorized and it was too large to send in one reply",
     };
@@ -421,8 +419,6 @@ public static partial class ApproverProtocol
                 CredentialKind => ApproverMessageKind.Credential,
                 AttachKind => ApproverMessageKind.Attach,
                 EnvKind => ApproverMessageKind.Env,
-                GrantsKind => ApproverMessageKind.Grants,
-                RevokeGrantsKind => ApproverMessageKind.RevokeGrants,
                 LockKind => ApproverMessageKind.Lock,
                 EnvProfileKind => ApproverMessageKind.EnvProfile,
                 TokenEnvKind => ApproverMessageKind.TokenEnv,
@@ -493,7 +489,6 @@ public static partial class ApproverProtocol
                 || !TryString(root, "entry", out var entry)
                 || !TryString(root, "field", out var field)
                 || !TryString(root, "reason", out var reason)
-                || !TryInteger(root, "ttl_seconds", out var ttl)
                 || !TryStrings(root, "exposure", out var exposure))
             {
                 return false;
@@ -504,7 +499,6 @@ public static partial class ApproverProtocol
                 Entry = entry,
                 Field = field,
                 Reason = reason,
-                TtlSeconds = ttl,
                 Exposure = exposure,
                 ClientName = Optional(root, "client"),
                 ClientVersion = Optional(root, "client_version"),
@@ -602,7 +596,7 @@ public static partial class ApproverProtocol
                 || !TryString(root, "decision", out var decision)
                 || !TryInteger(root, "method", out var method)
                 || !TryString(root, "reason", out var reason)
-                || !TryInteger(root, "ttl_seconds", out var ttl))
+                || !TryInteger(root, "code_seconds", out var codeSeconds))
             {
                 return false;
             }
@@ -622,7 +616,7 @@ public static partial class ApproverProtocol
                 Decision = granted ? AuditDecision.Granted : AuditDecision.Denied,
                 Method = Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed,
                 Reason = reason,
-                TtlSeconds = ttl,
+                CodeSeconds = codeSeconds,
                 Entry = Optional(root, "entry"),
                 Value = granted ? value : null,
                 Session = Optional(root, "session"),
@@ -879,66 +873,6 @@ public static partial class ApproverProtocol
         }
     }
 
-    /// <summary>The most grants one reply lists, and the most ids one revoke names.</summary>
-    public const int MaximumGrantRows = 256;
-
-    /// <summary>Encodes a request for the grants in force.</summary>
-    /// <param name="request">The attachment it is made under.</param>
-    /// <returns>The frame's bytes, without a delimiter.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public static byte[] Encode(GrantsRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        return WriteAttached(GrantsKind, request.Vault, request.Session);
-    }
-
-    /// <summary>Encodes the grants in force, bounded to what one frame can carry.</summary>
-    /// <param name="reply">The grants, or why none were listed.</param>
-    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
-    /// <remarks>
-    /// Rows are dropped whole from the end, past <see cref="MaximumGrantRows"/> or past the frame, and
-    /// <c>complete</c> is then false, as a names reply is bounded.
-    /// </remarks>
-    public static byte[] Encode(GrantsReply reply)
-    {
-        ArgumentNullException.ThrowIfNull(reply);
-
-        var rows = reply.Grants.Take(MaximumGrantRows).Select(grant => new GrantRow(grant)).ToList();
-        var kept = Fit(WriteGrants(reply, [], false).Length, rows, Wire.GrantRow);
-        var frame = WriteGrants(reply, rows.Take(kept), reply.Complete && kept == reply.Grants.Count);
-
-        return frame.Length <= MessageFramer.MaximumPayloadBytes
-            ? frame
-            : WriteGrants(reply with { Reason = Undersized }, [], false);
-    }
-
-    private static byte[] WriteGrants(GrantsReply reply, IEnumerable<GrantRow> grants, bool complete) =>
-        JsonSerializer.SerializeToUtf8Bytes(new GrantsReplyFrame(reply, grants, complete), Wire.GrantsReplyFrame);
-
-    /// <summary>Encodes a request to end grants.</summary>
-    /// <param name="request">Which grants, and the attachment it is made under.</param>
-    /// <returns>The frame's bytes, without a delimiter.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public static byte[] Encode(RevokeGrantsRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        return JsonSerializer.SerializeToUtf8Bytes(new RevokeGrantsRequestFrame(request), Wire.RevokeGrantsRequestFrame);
-    }
-
-    /// <summary>Encodes how many grants were ended.</summary>
-    /// <param name="reply">The count, or why none.</param>
-    /// <returns>The frame's bytes, without a delimiter.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
-    public static byte[] Encode(RevokeGrantsReply reply)
-    {
-        ArgumentNullException.ThrowIfNull(reply);
-
-        return JsonSerializer.SerializeToUtf8Bytes(new RevokeGrantsReplyFrame(reply), Wire.RevokeGrantsReplyFrame);
-    }
-
     /// <summary>Encodes a request to lock now.</summary>
     /// <param name="request">The attachment it is made under.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
@@ -965,123 +899,6 @@ public static partial class ApproverProtocol
         ArgumentNullException.ThrowIfNull(reply);
 
         return JsonSerializer.SerializeToUtf8Bytes(new LockReplyFrame(reply), Wire.LockReplyFrame);
-    }
-
-    /// <summary>Decodes a request for the grants in force.</summary>
-    /// <param name="frame">The frame's bytes.</param>
-    /// <param name="request">The decoded request.</param>
-    /// <returns><see langword="true"/> when the frame was a well-formed grants request.</returns>
-    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsRequest? request)
-    {
-        request = TryAttached(frame, GrantsKind, out var vault, out var session, out _)
-            ? new GrantsRequest { Vault = vault, Session = session }
-            : null;
-
-        return request is not null;
-    }
-
-    /// <summary>Decodes the grants in force.</summary>
-    /// <param name="frame">The frame's bytes.</param>
-    /// <param name="reply">The decoded reply.</param>
-    /// <returns><see langword="true"/> when the frame was a well-formed grants reply of at most <see cref="MaximumGrantRows"/> rows.</returns>
-    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsReply? reply)
-    {
-        reply = null;
-
-        if (!TryParse(frame, out var document))
-        {
-            return false;
-        }
-
-        using (document)
-        {
-            var root = document.RootElement;
-
-            if (!IsKind(root, GrantsKind)
-                || !TryBoolean(root, "answered", out var answered)
-                || !TryString(root, "reason", out var reason)
-                || !root.TryGetProperty("grants", out var rows)
-                || rows.ValueKind != JsonValueKind.Array
-                || rows.GetArrayLength() > MaximumGrantRows)
-            {
-                return false;
-            }
-
-            var grants = new List<GrantSummary>(rows.GetArrayLength());
-
-            foreach (var row in rows.EnumerateArray())
-            {
-                if (row.ValueKind != JsonValueKind.Object
-                    || !TryString(row, "id", out var id)
-                    || !TryString(row, "kind", out var kind)
-                    || !TryString(row, "client", out var client)
-                    || !TryString(row, "scope", out var scope)
-                    || !TryString(row, "field", out var field)
-                    || !TryInteger(row, "seconds_left", out var seconds)
-                    || seconds < 0)
-                {
-                    return false;
-                }
-
-                grants.Add(new GrantSummary(id, kind, client, scope, field, seconds));
-            }
-
-            reply = new GrantsReply(answered, grants, TrueOnly(root, "complete"), reason);
-            return true;
-        }
-    }
-
-    /// <summary>Decodes a request to end grants.</summary>
-    /// <param name="frame">The frame's bytes.</param>
-    /// <param name="request">The decoded request.</param>
-    /// <returns><see langword="true"/> when the frame was well formed: at most <see cref="MaximumGrantRows"/> ids, each one a <see cref="GrantId"/>.</returns>
-    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsRequest? request)
-    {
-        request = null;
-
-        if (!TryAttached(frame, RevokeGrantsKind, out var vault, out var session, out var root)
-            || !TryStrings(root, "ids", out var ids)
-            || ids.Count > MaximumGrantRows
-            || !ids.All(GrantId.IsId)
-            || !root.TryGetProperty("client", out var clientElement)
-            || clientElement.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)
-            || !TryBoolean(root, "all", out var all))
-        {
-            return false;
-        }
-
-        request = new RevokeGrantsRequest(ids, clientElement.GetString(), all) { Vault = vault, Session = session };
-        return true;
-    }
-
-    /// <summary>Decodes how many grants were ended.</summary>
-    /// <param name="frame">The frame's bytes.</param>
-    /// <param name="reply">The decoded reply.</param>
-    /// <returns><see langword="true"/> when the frame was a well-formed revoke reply.</returns>
-    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsReply? reply)
-    {
-        reply = null;
-
-        if (!TryParse(frame, out var document))
-        {
-            return false;
-        }
-
-        using (document)
-        {
-            var root = document.RootElement;
-
-            if (!IsKind(root, RevokeGrantsKind)
-                || !TryInteger(root, "revoked", out var revoked)
-                || revoked < 0
-                || !TryString(root, "reason", out var reason))
-            {
-                return false;
-            }
-
-            reply = new RevokeGrantsReply(revoked, reason);
-            return true;
-        }
     }
 
     /// <summary>Decodes a request to lock now.</summary>
@@ -1145,7 +962,7 @@ public static partial class ApproverProtocol
     /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     /// <remarks>
-    /// Rows are dropped whole from the end, as a grants reply's are, and <c>complete</c> is then false, so
+    /// Rows are dropped whole from the end, and <c>complete</c> is then false, so
     /// the requester asks for the rest from after the ones it got. A first row too long for a frame of its
     /// own is sent without its project rows, saying how many it left out, so every agent is listed.
     /// </remarks>
@@ -1178,7 +995,7 @@ public static partial class ApproverProtocol
     {
         var access = AcafRecord.Read(row.Record).Access;
 
-        return row with { Record = AcafRecord.Write(access with { Projects = [] }), ProjectsNotShown = access.Projects.Count };
+        return row with { Record = AcafRecord.Write(access with { Projects = [], Always = AlwaysAllowed.None }), ProjectsNotShown = access.Projects.Count };
     }
 
     /// <summary>Encodes a request to change one agent's settings.</summary>
@@ -1315,6 +1132,7 @@ public static partial class ApproverProtocol
             PerHour = Optional(root, "per_hour"),
             Until = Optional(root, "until"),
             Reset = TrueOnly(root, "reset"),
+            Forget = Optional(root, "forget"),
             Vault = vault,
             Session = session,
         };
@@ -2045,8 +1863,6 @@ public static partial class ApproverProtocol
                 || !TryString(root, "reason", out var reason)
                 || !TryInteger(root, "method", out var method)
                 || !Enum.IsDefined((AuditMethod)method)
-                || !TryInteger(root, "granted_seconds", out var granted)
-                || granted < 0
                 || !TryStrings(root, "entries", out var entries)
                 || !TryPairs(root, "problems", "reason", out var problems))
             {
@@ -2083,7 +1899,6 @@ public static partial class ApproverProtocol
 
             reply = new RunReply(set, (AuditMethod)method, reason)
             {
-                GrantedSeconds = granted,
                 Entries = entries,
                 Session = Optional(root, "session"),
                 Recorded = TrueOnly(root, "recorded"),

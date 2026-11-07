@@ -15,10 +15,10 @@ public enum AuditDecision
 /// An agent reads a refusal and decides whether to try again: <see cref="OutOfScope"/> means never,
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
-/// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/>, <see cref="Automatic"/>,
+/// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="AlwaysAllowed"/>, <see cref="Automatic"/>,
 /// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="Merged"/> and <see cref="Removed"/> ever accompany <see cref="AuditDecision.Granted"/>.
-/// <see cref="Automatic"/> is the one release no person saw, so it must never be logged as
-/// <see cref="Prompt"/> or <see cref="GrantCache"/>, which both claim a person acted.
+/// <see cref="Automatic"/> and <see cref="AlwaysAllowed"/> are the releases no person saw, so they must
+/// never be logged as <see cref="Prompt"/>, which claims a person acted on this request.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
 /// </remarks>
 public enum AuditMethod
@@ -43,9 +43,9 @@ public enum AuditMethod
     /// <summary>A person was shown this specific request and answered it (docs/PRODUCT.md law 3.2).</summary>
     Prompt = 5,
 
-    /// <summary>Served from a grant a person had already given, inside its TTL. Still a line of its
-    /// own, and it records the reason given for <em>this</em> request — the one nobody read.</summary>
-    GrantCache = 6,
+    /// <summary>Released without asking by an Always allow row a person confirmed, never a person's
+    /// approval of this request. It records the reason given for <em>this</em> request, the one nobody read.</summary>
+    AlwaysAllowed = 6,
 
     /// <summary>Nobody answered inside the window. Silence is a denial.</summary>
     TimedOut = 7,
@@ -114,7 +114,7 @@ public enum AuditMethod
     InjectOnly = 22,
 
     /// <summary>Released without asking because the agent's mode for the entry is Automatic, a setting the person confirmed.</summary>
-    /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/> or <see cref="GrantCache"/>.</remarks>
+    /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/>.</remarks>
     Automatic = 23,
 
     /// <summary>The agent's settings do not let it run commands, so a run was refused before anything was resolved.</summary>
@@ -202,8 +202,6 @@ public sealed record AuditArgs
     /// <summary>Which field was requested, or <c>invalid</c> when it was not one keypaste knows.</summary>
     public string? Field { get; init; }
 
-    /// <summary>The lifetime the agent asked for, or <c>-1</c> when it was missing or unparseable.</summary>
-    public int? TtlSeconds { get; init; }
 
     /// <summary>The opening of the agent's stated reason, sanitized and capped.</summary>
     public string? ReasonExcerpt { get; init; }
@@ -213,7 +211,7 @@ public sealed record AuditArgs
 
     /// <summary>Lowercase hex SHA-256 of the raw reason.</summary>
     /// <remarks>
-    /// It carries its weight on a <see cref="AuditMethod.GrantCache"/> line, where nobody was shown
+    /// It carries its weight on a <see cref="AuditMethod.AlwaysAllowed"/> line, where nobody was shown
     /// anything: comparing that hash with the earlier <see cref="AuditMethod.Prompt"/> line's is how
     /// a reason that changed after approval becomes visible (THREATS.md T-12).
     /// </remarks>
@@ -244,7 +242,7 @@ public sealed record AuditArgs
     /// log</c> renders it in a table a human reads. Keeping all three of an excerpt, the true length
     /// and a hash serves that reader without letting the log quietly lie about what was cut.
     /// </remarks>
-    public static AuditArgs ForCredentialRequest(string entry, string? field, int ttlSeconds, string reason)
+    public static AuditArgs ForCredentialRequest(string entry, string? field, string reason)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(reason);
@@ -261,7 +259,6 @@ public sealed record AuditArgs
             Entry = entryText,
             EntryKind = EntryHandle.Classify(entry),
             Field = field ?? "invalid",
-            TtlSeconds = ttlSeconds,
             ReasonExcerpt = excerpt,
             ReasonLength = reason.Length,
             ReasonSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(reason))),
@@ -313,9 +310,6 @@ public sealed record AuditRecord
     /// <summary>The unlocked session that answered, or null when the request reached none.</summary>
     public string? Session { get; init; }
 
-    /// <summary>How long what was released stays granted, in seconds: zero for a person's "allow once".</summary>
-    /// <remarks>Written only on a <see cref="AuditDecision.Granted"/> line, and absent from lines written before it existed.</remarks>
-    public int? GrantedSeconds { get; init; }
 
     /// <summary>The vault the request named, as <c>VaultIdentity.Key</c>, or null when none was configured.</summary>
     /// <remarks>Absent from lines written before it existed, which a reader counts for no vault in particular.</remarks>

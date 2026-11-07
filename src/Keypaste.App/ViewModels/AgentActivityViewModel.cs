@@ -5,29 +5,27 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Agents: the request waiting for the person, the allowances in force, the AI tools on this computer
+/// Agents: the request waiting for the person, the AI tools on this computer
 /// and the agents that asked, each with its settings, and what was recorded since the app was unlocked.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Waiting requests and allowances are read from the session authority</b> that answers agents
+/// <b>Waiting requests are read from the session authority</b> that answers agents
 /// (D-0330), never from the prompt window's events, so the list says what the next request would
-/// meet. Nothing here answers a request: Show the prompt brings its window forward (D-0456), and End
-/// ends an allowance there.
+/// meet. Nothing here answers a request: Show the prompt brings its window forward (D-0456).
 /// </para>
 /// <para>
 /// <b>The AI tools are looked for in the background</b> each time the screen opens, as
 /// <c>keypaste setup</c> finds them, and again once a Connect or Disconnect has run (D-0455). Each
 /// row is kept by its key, updated in place and left where it is listed, so an open Settings disclosure,
 /// its unsaved edits, an open pane and the focus or open drop-down in them survive the refresh; so do a
-/// waiting request's and an allowance's buttons. One Connect pane is open at a time, and while its plan
+/// waiting request's buttons. One Connect pane is open at a time, and while its plan
 /// or check runs no other Connect, Connect again or Disconnect can start.
 /// </para>
 /// <para>
@@ -62,7 +60,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private AgentRow? _connecting;
 
     private readonly ObservableCollection<ActivityRow> _waiting = [];
-    private readonly ObservableCollection<ActivityRow> _grants = [];
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
@@ -102,8 +99,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         DisconnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: true), row => row is { OffersDisconnect: true } && CanConnect);
         CloseConnectionCommand = new RelayCommand(CloseConnection, () => Connection is { IsBusy: false });
 
-        EndCommand = new RelayCommand<ActivityRow>(End, row => row?.Id is not null);
-        EndAllCommand = new RelayCommand(EndAll, () => _grants.Count > 0);
 
         Refresh();
         Look();
@@ -189,9 +184,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     [ObservableProperty]
     internal partial string Status { get; private set; } = string.Empty;
 
-    /// <summary>Why waiting requests and allowances cannot be read, or empty when they were.</summary>
+    /// <summary>Why waiting requests cannot be read, or empty when they were.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting), nameof(NoGrants))]
+    [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting))]
     internal partial string Unavailable { get; private set; } = string.Empty;
 
     internal bool IsAvailable => Unavailable.Length == 0;
@@ -205,34 +200,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     internal bool HasWaiting => _waiting.Count > 0;
 
-    /// <summary>The allowances in force, soonest to end first.</summary>
-    internal IReadOnlyList<ActivityRow> Grants => _grants;
-
-    internal bool NoGrants => IsAvailable && _grants.Count == 0;
-
-    internal bool HasGrants => _grants.Count > 0;
-
     /// <summary>The audit log history is read from.</summary>
     internal string AuditPath => _auditPath;
-
-    /// <summary>Ends the allowance a row lists, so the next matching request asks again.</summary>
-    internal RelayCommand<ActivityRow> EndCommand { get; }
-
-    /// <summary>Ends every allowance given since this unlock.</summary>
-    internal RelayCommand EndAllCommand { get; }
-
-    /// <summary>Whether End all waits on its confirmation: every allowance goes, and none comes back.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OffersEndAll))]
-    internal partial bool IsConfirmingEndAll { get; private set; }
-
-    internal bool OffersEndAll => HasGrants && !IsConfirmingEndAll;
-
-    [RelayCommand]
-    private void AskEndAll() => IsConfirmingEndAll = true;
-
-    [RelayCommand]
-    private void CancelEndAll() => IsConfirmingEndAll = false;
 
     private bool CanConnect => _connector is not null && _authority is not null && Connection is not { IsBusy: true };
 
@@ -299,7 +268,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
         List<ActivityRow> waiting = [];
-        List<ActivityRow> grants = [];
 
         if (status is AuthorityStatus.Serving serving)
         {
@@ -317,28 +285,17 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
                 .. activity.WaitingChanges.Select((request, i) => ActivityRow.WaitingChange(env + i + 1, request)),
                 .. activity.WaitingEdits.Select((request, i) => ActivityRow.WaitingEdit(change + i + 1, request)),
             ];
-            grants =
-            [
-                .. activity.Grants.Select((grant, i) => ActivityRow.Granted(i + 1, grant)),
-                .. activity.EnvGrants.Select((grant, i) => ActivityRow.EnvGranted(activity.Grants.Count + i + 1, grant)),
-            ];
         }
         else
         {
-            Unavailable = "Waiting requests and allowances can't be read, because this app is not answering agents for this vault. Lock and unlock the vault to try again.";
+            Unavailable = "Waiting requests can't be read, because this app is not answering agents for this vault. Lock and unlock the vault to try again.";
         }
 
         Relist(_waiting, waiting);
-        Relist(_grants, grants);
         OnPropertyChanged(nameof(HasWaiting));
-        OnPropertyChanged(nameof(HasGrants));
-        OnPropertyChanged(nameof(OffersEndAll));
-        IsConfirmingEndAll = IsConfirmingEndAll && _grants.Count > 0;
         OnPropertyChanged(nameof(FormsArePrimary));
         OnPropertyChanged(nameof(NothingWaiting));
         ShowPromptCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(NoGrants));
-        EndAllCommand.NotifyCanExecuteChanged();
 
         var (caps, records) = ReadClients(force);
 
@@ -579,12 +536,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         : state.HeldBack.Count > 0 ? "less on this computer"
         : null;
 
-    private static string Words(AgentMode mode) => mode switch
-    {
-        AgentMode.Ask => "Ask every time",
-        AgentMode.Automatic => "Automatic",
-        _ => AccessChangePrompt.AllowForDefaultWords,
-    };
+    private static string Words(AgentMode mode) => mode == AgentMode.Automatic ? "Automatic" : "Ask every time";
 
     /// <summary>The panel a row's Settings opens, which re-reads the screen after each change.</summary>
     private AgentSettingsViewModel? OpenAgentSettings(string agent) =>
@@ -744,28 +696,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         Read(force: false);
-    }
-
-    private void End(ActivityRow? row)
-    {
-        if (row?.Id is { } id)
-        {
-            var ended = _authority?.Revoke(id) == true;
-            Read(force: false);
-
-            if (ended)
-            {
-                _toast($"Ended {row.Client}'s allowance.", ToastTone.Success);
-            }
-        }
-    }
-
-    private void EndAll()
-    {
-        IsConfirmingEndAll = false;
-        _authority?.RevokeAll();
-        Read(force: false);
-        _toast("Ended every allowance.", ToastTone.Success);
     }
 
     public void Dispose()

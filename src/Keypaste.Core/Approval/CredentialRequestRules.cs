@@ -20,9 +20,8 @@ public static class CredentialRequestRules
     /// <param name="entry">The entry, handle or path.</param>
     /// <param name="field">The field asked for.</param>
     /// <param name="reason">The agent's reason.</param>
-    /// <param name="ttlSeconds">The lifetime asked for.</param>
     /// <returns>The argument and its rule, or null when the request is well formed.</returns>
-    public static CredentialRequestProblem? Check(string entry, string field, string reason, int ttlSeconds)
+    public static CredentialRequestProblem? Check(string entry, string field, string reason)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(field);
@@ -41,13 +40,6 @@ public static class CredentialRequestRules
         if (reason.Length is 0 or > MaximumReasonLength)
         {
             return new("reason", Length(MaximumReasonLength));
-        }
-
-        if (ttlSeconds is < 1 or > ApprovalLimits.MaximumRequestableTtlSeconds)
-        {
-            return new(
-                "ttl_seconds",
-                string.Create(CultureInfo.InvariantCulture, $"must be between 1 and {ApprovalLimits.MaximumRequestableTtlSeconds}"));
         }
 
         return null;

@@ -36,7 +36,6 @@ public sealed class OwnerDenialTests : IDisposable
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
 
     [Fact]
@@ -148,7 +147,6 @@ public sealed class OwnerDenialTests : IDisposable
     private sealed class Owner : IAsyncDisposable, IApprovalChannel
     {
         private readonly Vault _vault;
-        private readonly GrantCache _grants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
         private readonly ApproverListener _listener;
         private readonly CancellationTokenSource _stop = new();
@@ -168,7 +166,6 @@ public sealed class OwnerDenialTests : IDisposable
                 new VaultCredentialSource(() => _vault),
                 new VaultEntryNameLister(() => _vault),
                 _gate,
-                _grants,
                 TestSession.Settings());
 
             IApproverHandler authority = new SessionAuthority(
@@ -205,7 +202,7 @@ public sealed class OwnerDenialTests : IDisposable
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {
             Asked++;
-            return ValueTask.FromResult(ApprovalAnswer.Approved);
+            return ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
         }
 
         public async ValueTask DisposeAsync()
@@ -225,7 +222,6 @@ public sealed class OwnerDenialTests : IDisposable
             _stop.Dispose();
             Lock();
             _gate.Dispose();
-            _grants.Dispose();
             _vault.Dispose();
             Log.Dispose();
         }

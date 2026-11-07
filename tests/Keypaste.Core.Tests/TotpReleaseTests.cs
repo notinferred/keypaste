@@ -45,28 +45,25 @@ public sealed class TotpReleaseTests : IDisposable
     public async Task An_allowed_request_releases_the_current_code_once_for_the_seconds_it_has_left()
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await approver.Handler.RequestAsync(Request(_github), "conn-1", Token);
 
         Assert.Equal(AuditDecision.Granted, reply.Decision);
         Assert.Equal(AuditMethod.Prompt, reply.Method);
         Assert.Equal(_codeAt09, reply.Value);
-        Assert.Equal(1, reply.TtlSeconds);
         Assert.Equal("api/GitHub", reply.Entry);
 
         var prompt = approver.Channel.LastPrompt!;
         Assert.Equal(CredentialFields.Totp, prompt.Field);
-        Assert.Equal(0, prompt.TtlSeconds);
-        Assert.Equal(OnceOnly.TotpCode, prompt.OnceOnly);
-        Assert.Equal(0, approver.Grants.Count);
+        Assert.Equal(OnceOnly.None, prompt.OnceOnly);
     }
 
     [Fact]
     public async Task The_next_code_is_asked_about_again_and_is_the_next_periods()
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var first = await approver.Handler.RequestAsync(Request(_github), "conn-1", Token);
         approver.Clock.Advance(TimeSpan.FromSeconds(2));
@@ -74,7 +71,6 @@ public sealed class TotpReleaseTests : IDisposable
 
         Assert.Equal(_codeAt09, first.Value);
         Assert.Equal(_codeAt11, second.Value);
-        Assert.Equal(29, second.TtlSeconds);
         Assert.Equal(AuditMethod.Prompt, second.Method);
         Assert.Equal(2, approver.Channel.Asked);
     }
@@ -108,9 +104,7 @@ public sealed class TotpReleaseTests : IDisposable
 
         Assert.Equal(AuditMethod.Automatic, reply.Method);
         Assert.Equal(_codeAt09, reply.Value);
-        Assert.Equal(1, reply.TtlSeconds);
         Assert.Equal(0, approver.Channel.Asked);
-        Assert.Equal(0, approver.Grants.Count);
     }
 
     [Theory]
@@ -123,7 +117,7 @@ public sealed class TotpReleaseTests : IDisposable
     public async Task No_field_the_seed_is_read_from_is_asked_about_or_read(string field)
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var source = new VaultCredentialSource(() => _vault, approver.Clock);
 
         var reply = await approver.Handler.RequestAsync(Request(_github, field), "conn-1", Token);
@@ -208,13 +202,11 @@ public sealed class TotpReleaseTests : IDisposable
             AuditClient.Of("claude-code", "1.0", "claude-code"),
             "api/GitHub",
             field,
-            60,
             "sign in to finish the deploy",
             AuditDecision.Granted,
             AuditMethod.Prompt,
             "a person approved this one request",
             "api/GitHub",
-            1,
             ["api/**"],
             null,
             null);
@@ -226,7 +218,7 @@ public sealed class TotpReleaseTests : IDisposable
     public async Task Nothing_the_operator_is_told_holds_the_code_or_the_seed()
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await approver.Handler.RequestAsync(Request(_github), "conn-1", Token);
 
@@ -245,7 +237,6 @@ public sealed class TotpReleaseTests : IDisposable
         Entry = $"{entry.GroupPath}/{entry.Title}",
         Field = field,
         Reason = "sign in to finish the deploy",
-        TtlSeconds = 60,
         Exposure = ["api/**"],
         ClientName = "claude-code",
         ClientLabel = "claude-code",
@@ -257,13 +248,11 @@ public sealed class TotpReleaseTests : IDisposable
         internal Approver(Vault vault, AgentAccess? access = null)
         {
             Settings.Records["claude-code"] = access ?? ApproverFixture.SeesAll;
-            Grants = new GrantCache(Clock);
             Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
             Handler = new ApproverHandler(
                 new VaultCredentialSource(() => vault, Clock),
                 new VaultEntryNameLister(() => vault),
                 Gate,
-                Grants,
                 Settings,
                 Narration.Add,
                 clock: Clock);
@@ -275,8 +264,6 @@ public sealed class TotpReleaseTests : IDisposable
 
         internal ManualClock Clock { get; } = new(_at09);
 
-        internal GrantCache Grants { get; }
-
         internal ApprovalGate Gate { get; }
 
         internal ApproverHandler Handler { get; }
@@ -286,7 +273,6 @@ public sealed class TotpReleaseTests : IDisposable
         public void Dispose()
         {
             Gate.Dispose();
-            Grants.Dispose();
         }
     }
 }

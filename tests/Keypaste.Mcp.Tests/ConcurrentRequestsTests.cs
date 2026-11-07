@@ -53,7 +53,6 @@ public sealed class ConcurrentRequestsTests
             ["entry"] = entry,
             ["field"] = "password",
             ["reason"] = "deploy the billing service to staging",
-            ["ttl_seconds"] = 300,
         };
 
     /// <summary>Waits until a call has genuinely reached the approver and parked there.</summary>

@@ -21,25 +21,6 @@ public sealed class EntryActivityRowsTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    [Fact]
-    public async Task ARowWithAGrant_IsInUse_AndTheCardSaysWhose()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-        Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-
-        using var screen = app.Screen();
-        var row = screen.Entries.Rows.Single(entry => entry.Path == "example");
-
-        Assert.True(row.IsInUse);
-        Assert.Equal("in use", row.LastUsedText);
-
-        screen.Entries.Selected = row;
-        Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail!.AgentAccessSummary);
-        Assert.Equal("in use", screen.Entries.Detail.LastUsedText);
-        Assert.Single(screen.Entries.Detail.AgentAccess!.Grants);
-    }
-
     [Theory]
     [InlineData(30, "30m ago", true)]
     [InlineData(180, "3h ago", false)]
@@ -72,7 +53,7 @@ public sealed class EntryActivityRowsTests
             _ => true).Problem("add them") is null);
         app.Audit("days", key, ago: TimeSpan.FromDays(3));
         app.Audit("minutes", key, ago: TimeSpan.FromMinutes(30));
-        app.Person.Answer = ApprovalAnswer.Approved;
+        app.Person.Answer = ApprovalAnswer.ApprovedOnce;
         Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
 
         using var screen = app.Screen();
@@ -145,25 +126,6 @@ public sealed class EntryActivityRowsTests
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
             Assert.Equal("ci-probe can see it · nothing released", screen.Entries.Detail.AgentAccessSummary);
-        }
-    }
-
-    /// <summary>A grant in force is what the card says first, while an attached agent can also see the item.</summary>
-    [Fact]
-    public async Task TheAgentAccessCard_PutsAGrantBeforeTheAgentsThatCanSeeTheItem()
-    {
-        await using var app = await App.StartAsync();
-
-        await using (await app.AttachBridgeAsync(TempVault.Agent))
-        {
-            app.Person.Answer = ApprovalAnswer.Approved;
-            Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-
-            using var screen = app.Screen();
-            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
-
-            Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
-            Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail.AgentAccessSummary);
         }
     }
 
@@ -277,7 +239,6 @@ public sealed class EntryActivityRowsTests
                     Entry = "example",
                     Field = "password",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                     ClientName = "claude-code",
                     ClientLabel = "ci-probe",
@@ -299,7 +260,7 @@ public sealed class EntryActivityRowsTests
                     {
                         Tool = "request_credential",
                         Client = new AuditClient("some-client", null, label),
-                        Args = AuditArgs.ForCredentialRequest(entry, "password", 60, "deploy"),
+                        Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy"),
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.Prompt,
                         Reason = "a person approved this request",

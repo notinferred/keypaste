@@ -465,13 +465,13 @@ public sealed class RunToolTests : IDisposable
     [Fact]
     public async Task NoValues_RefusesRequestCredential_WithTheRunHint()
     {
-        await using var owner = Owner.Start(this, ApprovalAnswer.Approved, clients: "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
+        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, clients: "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
 
         var result = await client.CallToolAsync(
             ToolText.CredentialToolName,
-            new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy", ["ttl_seconds"] = 60 },
+            new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy" },
             cancellationToken: Token);
 
         Assert.True(result.IsError);
@@ -490,7 +490,7 @@ public sealed class RunToolTests : IDisposable
 
         await client.CallToolAsync(
             ToolText.CredentialToolName,
-            new Dictionary<string, object?> { ["entry"] = "env/dev/STRIPE_KEY", ["field"] = "password", ["reason"] = "deploy", ["ttl_seconds"] = 60 },
+            new Dictionary<string, object?> { ["entry"] = "env/dev/STRIPE_KEY", ["field"] = "password", ["reason"] = "deploy" },
             cancellationToken: Token);
 
         var attached = Assert.Single(harness.Approver.Attached);
@@ -507,7 +507,7 @@ public sealed class RunToolTests : IDisposable
 
         await client.CallToolAsync(
             ToolText.CredentialToolName,
-            new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy", ["ttl_seconds"] = 60 },
+            new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy" },
             cancellationToken: Token);
 
         Assert.Equal(
@@ -519,8 +519,6 @@ public sealed class RunToolTests : IDisposable
     private sealed class Owner : IAsyncDisposable, IApprovalChannel
     {
         private readonly Vault _vault;
-        private readonly GrantCache _grants = new(TimeProvider.System);
-        private readonly EnvGrantCache _envGrants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
         private readonly ApproverListener _listener;
         private readonly CancellationTokenSource _stop = new();
@@ -564,7 +562,6 @@ public sealed class RunToolTests : IDisposable
                 new VaultCredentialSource(() => _vault),
                 new VaultEntryNameLister(() => _vault),
                 _gate,
-                _grants,
                 new VaultAgentSettings(() => _vault, _ => AgentSave.Unchanged, new AccessCapsSource(path)));
 
             var authority = new SessionAuthority(
@@ -572,7 +569,7 @@ public sealed class RunToolTests : IDisposable
                 () => _lifetime,
                 handler,
                 audit: () => Log.Log,
-                new SessionEnvironments(_gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, TimeProvider.System, _envGrants));
+                new SessionEnvironments(_gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, TimeProvider.System));
 
             PipeName = "keypaste-run-tool-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             _listener = new ApproverListener(PipeName, new Counting(authority, this));
@@ -623,8 +620,6 @@ public sealed class RunToolTests : IDisposable
             _stop.Dispose();
             _lifetime.Dispose();
             _gate.Dispose();
-            _grants.Dispose();
-            _envGrants.Dispose();
             _vault.Dispose();
             Log.Dispose();
         }

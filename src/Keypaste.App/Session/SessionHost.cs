@@ -24,7 +24,7 @@ namespace Keypaste.App.Session;
 /// </para>
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
-/// <see cref="SessionLifetime"/>, so a lock withdraws what is waiting and zeroes the grants given,
+/// <see cref="SessionLifetime"/>, so a lock withdraws what is waiting,
 /// before the listeners stop.
 /// </para>
 /// <para>
@@ -375,42 +375,14 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
     }
 
-    /// <summary>Ends every grant given to a bridge started with this label.</summary>
-    /// <param name="label">The raw label.</param>
-    internal void RevokeClient(string label)
+    /// <summary>What an Always allow row's item is now, for an agent's settings to list.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Its name, and whether a protected tag keeps it asked about.</returns>
+    internal (string Shown, bool IsProtected) AlwaysItem(string item)
     {
         lock (_gate)
         {
-            _hosted?.RevokeClient(label);
-        }
-    }
-
-    /// <summary>Ends one grant in the authority, so the next matching request is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    internal void Revoke(GrantKey key)
-    {
-        lock (_gate)
-        {
-            _hosted?.Revoke(key);
-        }
-    }
-
-    /// <summary>Ends one timed grant a person gave a repeated <c>keypaste run --session</c>.</summary>
-    /// <param name="key">The grant, as <see cref="ApproverActivity.EnvGrants"/> listed it.</param>
-    internal void RevokeEnvGrant(string key)
-    {
-        lock (_gate)
-        {
-            _hosted?.RevokeEnvGrant(key);
-        }
-    }
-
-    /// <summary>Ends every grant in the authority.</summary>
-    internal void RevokeAll()
-    {
-        lock (_gate)
-        {
-            _hosted?.RevokeAll();
+            return _hosted?.AlwaysItem(item) ?? ("an item no longer in this vault", false);
         }
     }
 
@@ -445,38 +417,6 @@ internal sealed class SessionHost : IDisposable
         lock (_gate)
         {
             return _hosted?.RecordRun(set, lifetimeId) == true;
-        }
-    }
-
-    /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
-    internal IReadOnlyList<GrantSummary> Grants() => GrantSummary.Of(Activity);
-
-    /// <summary>Ends the grant with this id, as <c>keypaste grants revoke</c> names it.</summary>
-    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
-    /// <returns>Whether a grant with that id was in force.</returns>
-    internal bool Revoke(string id)
-    {
-        ArgumentNullException.ThrowIfNull(id);
-
-        lock (_gate)
-        {
-            var activity = _hosted?.Activity ?? ApproverActivity.None;
-
-            if (activity.Grants.FirstOrDefault(
-                    inForce => string.Equals(GrantId.Of(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } grant)
-            {
-                _hosted!.Revoke(grant.Key);
-                return true;
-            }
-
-            if (activity.EnvGrants.FirstOrDefault(
-                    inForce => string.Equals(GrantId.OfEnv(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } envGrant)
-            {
-                _hosted!.RevokeEnvGrant(envGrant.Key);
-                return true;
-            }
-
-            return false;
         }
     }
 
@@ -607,7 +547,7 @@ internal sealed class SessionHost : IDisposable
 
         private bool AnswersAgents => _agents is { IsCompleted: false };
 
-        internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
+        internal (string Shown, bool IsProtected) AlwaysItem(string item) => _server.Authority.AlwaysItem(item);
 
         internal bool ShowPrompt() => AnswersAgents && _channel is WindowApprovalChannel prompt && prompt.BringForward();
 
@@ -636,12 +576,6 @@ internal sealed class SessionHost : IDisposable
             !AnswersAgents
                 ? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering))
                 : _server.Authority.ResetCapsAsync(Surface, cancellationToken);
-
-        internal void Revoke(GrantKey key) => _server.Authority.Revoke(key);
-
-        internal void RevokeEnvGrant(string key) => _server.Authority.RevokeEnvGrant(key);
-
-        internal void RevokeAll() => _server.Authority.RevokeAll();
 
         internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId) =>
             _launches is { } launches && _launching is { IsCompleted: false } && _server.Authority.IssueLaunch(claim, lifetimeId) is { } pass
@@ -688,8 +622,6 @@ internal sealed class SessionHost : IDisposable
                         new AccessCapsSource(KeypasteHome.ClientsPath(session.Home))),
                     Hourly = hourly,
                     Audit = audit.Open,
-                    WatchEdits = edited => session.Edited += edited,
-                    UnwatchEdits = edited => session.Edited -= edited,
                     LockNow = requestLock,
                     Clock = session.Clock,
 

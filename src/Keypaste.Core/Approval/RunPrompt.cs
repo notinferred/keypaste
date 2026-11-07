@@ -65,26 +65,24 @@ public sealed record RunPrompt
     /// <summary>The variables, in the order the command receives them.</summary>
     public required IReadOnlyList<RunPromptVariable> Variables { get; init; }
 
-    /// <summary>How long the timed grant lasts if the person chooses it; zero offers only "allow once".</summary>
-    public int GrantSeconds { get; init; }
-
-    /// <summary>Why <see cref="GrantSeconds"/> is zero, when it is.</summary>
+    /// <summary>Why no Always allow is offered, when none is.</summary>
     public OnceOnly OnceOnly { get; init; }
+
+    /// <summary>What Always allow would ask the person to confirm, or null when it is not offered.</summary>
+    public AlwaysOffer? Always { get; init; }
 
     /// <summary>Builds the prompt for a request <see cref="RunRequestRules"/> accepted.</summary>
     /// <param name="request">The request.</param>
     /// <param name="project">The project, or the mixed name for references.</param>
     /// <param name="profile">The profile, or the mixed name.</param>
     /// <param name="variables">The variables and where each comes from.</param>
-    /// <param name="grantSeconds">The timed grant offered, or zero.</param>
-    /// <param name="onceOnly">Why none is offered.</param>
+    /// <param name="onceOnly">Why no Always allow is offered.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
     public static RunPrompt For(
         RunRequest request,
         string project,
         string profile,
         IReadOnlyList<RunPromptVariable> variables,
-        int grantSeconds,
         OnceOnly onceOnly)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -92,7 +90,7 @@ public sealed record RunPrompt
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(variables);
 
-        var named = ApprovalPrompt.For(request.ClientName, new EntryName(string.Empty, project), "password", request.Reason, 0, request.ClientLabel);
+        var named = ApprovalPrompt.For(request.ClientName, new EntryName(string.Empty, project), "password", request.Reason, request.ClientLabel);
 
         return new RunPrompt
         {
@@ -107,7 +105,6 @@ public sealed record RunPrompt
             Project = EntryNameSanitizer.Sanitize(project).Text,
             Profile = EntryNameSanitizer.Sanitize(profile).Text,
             Variables = variables,
-            GrantSeconds = grantSeconds,
             OnceOnly = onceOnly,
         };
     }

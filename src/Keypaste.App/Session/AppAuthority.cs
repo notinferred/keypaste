@@ -153,10 +153,6 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was removed, and why not.</returns>
     internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
 
-    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    internal void Revoke(GrantKey key) => _host.Revoke(key);
-
     /// <summary>The MCP clients attached to the live session, as they describe themselves (display only).</summary>
     internal IReadOnlyList<Core.Clients.ConnectedClient> Clients => _host.Clients;
 
@@ -174,9 +170,10 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>Whether a prompt waits for the person's answer on screen; called on the UI thread.</summary>
     internal bool IsAsking => _host.IsAsking;
 
-    /// <summary>Ends every grant given to a bridge started with this label, as a stricter ceiling for it does.</summary>
-    /// <param name="label">The raw label.</param>
-    internal void RevokeClient(string label) => _host.RevokeClient(label);
+    /// <summary>What an Always allow row's item is now, for an agent's settings to list.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Its name, and whether a protected tag keeps it asked about.</returns>
+    internal (string Shown, bool IsProtected) AlwaysItem(string item) => _host.AlwaysItem(item);
 
     /// <summary>What applies to an agent's requests now, or null when nothing here answers or its settings cannot be read.</summary>
     /// <param name="label">The bridge's raw label, or null.</param>
@@ -207,17 +204,6 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>What became of it.</returns>
     internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken) =>
         _host.ResetCapsAsync(cancellationToken);
-
-    /// <summary>Ends every grant this session has given.</summary>
-    internal void RevokeAll() => _host.RevokeAll();
-
-    /// <summary>The grants in force with the ids <c>keypaste grants</c> shows, never a value.</summary>
-    internal IReadOnlyList<GrantSummary> Grants() => _host.Grants();
-
-    /// <summary>Ends the grant with this id.</summary>
-    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
-    /// <returns>Whether a grant with that id was in force.</returns>
-    internal bool Revoke(string id) => _host.Revoke(id);
 
     /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>

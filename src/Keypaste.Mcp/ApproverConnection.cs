@@ -247,7 +247,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             // A request that was withdrawn is not an owner that died, and the difference decides whether to
             // send it again. The connection is finished either way, but re-sending would put a request
             // nobody is waiting for in front of a person, on a fresh connection whose id scopes a different
-            // grant and cooldown; and one that can ask a person may already have been answered.
+            // cooldown; and one that can ask a person may already have been answered.
             if (withdrawn.IsCancellationRequested || !retry)
             {
                 await DropAsync().ConfigureAwait(false);

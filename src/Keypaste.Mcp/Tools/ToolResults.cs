@@ -49,7 +49,7 @@ internal static class ToolResults
     /// <summary>The one result in keypaste that carries a credential.</summary>
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
-    /// <param name="ttlSeconds">How long the grant lasts.</param>
+    /// <param name="codeSeconds">How long a TOTP code stays current; zero for any other field.</param>
     /// <param name="method">Whether a person answered this request or the agent's Automatic mode covered it.</param>
     /// <returns>A success result carrying exactly one field value and nothing else.</returns>
     /// <remarks>
@@ -65,7 +65,7 @@ internal static class ToolResults
     /// message is the credential and the terms it came with.
     /// </para>
     /// </remarks>
-    internal static CallToolResult Release(string field, string value, int ttlSeconds, AuditMethod method) => new()
+    internal static CallToolResult Release(string field, string value, int codeSeconds, AuditMethod method) => new()
     {
         IsError = false,
         Content =
@@ -78,19 +78,18 @@ internal static class ToolResults
                 // claim keypaste asks to be trusted on.
                 Text = (method switch
                 {
-                    AuditMethod.Automatic => ToolText.ReleasedAutomatically(field, ttlSeconds),
-                    AuditMethod.Prompt when ttlSeconds == 0 => ToolText.ReleasedOnce(field),
-                    _ => ToolText.Released(field, ttlSeconds),
-                }) + value,
+                    AuditMethod.Automatic => ToolText.ReleasedAutomatically(field),
+                    AuditMethod.AlwaysAllowed => ToolText.ReleasedByAlways(field),
+                    _ => ToolText.ReleasedOnce(field),
+                }) + (codeSeconds > 0 ? ToolText.CodeLasts(codeSeconds) : string.Empty) + value,
             },
         ],
-        StructuredContent = Structured(field, value, ttlSeconds),
+        StructuredContent = Structured(field, value, codeSeconds),
     };
 
     /// <summary>A run's result: how it ended and its scrubbed output. It carries no value.</summary>
     /// <param name="names">The variables injected.</param>
     /// <param name="method">How the release was decided.</param>
-    /// <param name="grantedSeconds">How long the grant lasts or has left.</param>
     /// <param name="exitCode">The exit code, or null when it was stopped.</param>
     /// <param name="timeoutSeconds">The run's timeout.</param>
     /// <param name="stdout">Standard output, scrubbed.</param>
@@ -99,14 +98,13 @@ internal static class ToolResults
     internal static CallToolResult Ran(
         IReadOnlyList<string> names,
         AuditMethod method,
-        int grantedSeconds,
         int? exitCode,
         int timeoutSeconds,
         ScrubbedText stdout,
         ScrubbedText stderr)
     {
         var replacements = stdout.Replacements + stderr.Replacements;
-        var header = ToolText.Ran(names, method, grantedSeconds, exitCode, timeoutSeconds, replacements);
+        var header = ToolText.Ran(names, method, exitCode, timeoutSeconds, replacements);
 
         using var buffer = new MemoryStream(1024);
 
@@ -131,7 +129,6 @@ internal static class ToolResults
             }
 
             writer.WriteEndArray();
-            writer.WriteNumber("granted_seconds", grantedSeconds);
             writer.WriteString("stdout", stdout.Text);
             writer.WriteString("stderr", stderr.Text);
             writer.WriteBoolean("stdout_truncated", stdout.Truncated);
@@ -156,7 +153,7 @@ internal static class ToolResults
         };
     }
 
-    private static JsonElement Structured(string field, string value, int ttlSeconds)
+    private static JsonElement Structured(string field, string value, int codeSeconds)
     {
         using var buffer = new MemoryStream(256);
 
@@ -165,7 +162,7 @@ internal static class ToolResults
             writer.WriteStartObject();
             writer.WriteString("field", field);
             writer.WriteString("value", value);
-            writer.WriteNumber("expires_in_seconds", ttlSeconds);
+            writer.WriteNumber("expires_in_seconds", codeSeconds);
             writer.WriteEndObject();
         }
 

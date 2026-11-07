@@ -10,8 +10,8 @@ namespace Keypaste.Mcp.Tools;
 /// The SDK can build a schema by reflecting over a C# method signature, and it compiles perfectly
 /// well under this repository's trim and AOT analysers — that was checked, not assumed (D-0019).
 /// It is still not used here, because of what it generates: no <c>additionalProperties: false</c>,
-/// no enum on <c>field</c>, no bounds on <c>reason</c> or <c>ttl_seconds</c>, no behaviour hints at
-/// all, and <c>ttl_seconds</c> renamed to <c>ttlSeconds</c> because that is what the parameter was
+/// no enum on <c>field</c>, no bounds on <c>reason</c>, no behaviour hints at all, and names taken
+/// from whatever the parameter was
 /// called.
 /// </para>
 /// <para>
@@ -61,15 +61,9 @@ internal static class ToolSchemas
               "minLength": 1,
               "maxLength": 2000,
               "description": "Shown verbatim to the human who approves or denies. Be specific and honest."
-            },
-            "ttl_seconds": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 3600,
-              "description": "How long you would like it for. The person chooses once or an allowance for a set time; a release under an Automatic mode honours this number. A TOTP code lasts only until it changes, whatever you ask."
             }
           },
-          "required": ["entry", "field", "reason", "ttl_seconds"],
+          "required": ["entry", "field", "reason"],
           "additionalProperties": false
         }
         """;
@@ -145,8 +139,8 @@ internal static class ToolSchemas
           "properties": {
             "mode": {
               "type": "string",
-              "enum": ["ask", "allow-for-a-while", "automatic"],
-              "description": "ask: the person is asked every time. allow-for-a-while: asked, and they may allow for an hour. automatic: released without asking, within until and per_hour. With project, for that project or environment only."
+              "enum": ["ask", "automatic"],
+              "description": "ask: the person is asked every time. automatic: released without asking, within until and per_hour. With project, for that project or environment only."
             },
             "project": {
               "type": "string",

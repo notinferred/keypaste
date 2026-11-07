@@ -60,7 +60,6 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Entry = "env/dev/STRIPE_KEY",
         Field = field,
         Reason = "deploy billing to staging",
-        TtlSeconds = 60,
         Exposure = ["**"],
         ClientName = "claude-code",
         ClientVersion = "2.1.0",
@@ -88,7 +87,6 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(ApproverFixture.Sentinel, reply.Value);
         Assert.Equal(0, _fixture.Channel.Asked);
         Assert.Equal(["automatic"], Lines("method"));
-        Assert.Equal(0, _fixture.Grants.Count);
     }
 
     /// <summary>An agent given no values learns nothing of the vault from a credential request: nothing is even resolved.</summary>
@@ -129,7 +127,182 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(0, _fixture.Channel.AccessAsked);
     }
 
-    /// <summary>A limit that is spent asks, with the timed grant offered, rather than refusing.</summary>
+    /// <summary>Always allow on an item in no project releases once, asks to confirm, and from then on releases by its row on a line of its own kind.</summary>
+    [Fact]
+    public async Task AlwaysAllow_ReleasesOnce_ThenAsks_AndARowHoldsOnlyOnceConfirmed()
+    {
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var refused = await client.RequestAsync(Credential(), Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (refused!.Decision, refused.Method));
+        Assert.Equal(ApproverFixture.Sentinel, refused.Value);
+        Assert.Equal(1, _fixture.Channel.AccessAsked);
+        Assert.Equal(AccessOrigin.Prompt, _fixture.Channel.LastAccessPrompt!.Origin);
+        Assert.Contains("without asking", Assert.Single(_fixture.Channel.LastAccessPrompt.Gains), StringComparison.Ordinal);
+        Assert.Empty(_fixture.Settings.Records[_agent].Always.Items);
+
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        var confirmed = await client.RequestAsync(Credential(), Token);
+
+        Assert.Equal(AuditMethod.Prompt, confirmed!.Method);
+        Assert.Single(_fixture.Settings.Records[_agent].Always.Items);
+
+        var asked = _fixture.Channel.Asked;
+        var served = await client.RequestAsync(Credential("username"), Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.AlwaysAllowed), (served!.Decision, served.Method));
+        Assert.Equal(asked, _fixture.Channel.Asked);
+        Assert.Equal("always-allowed", Lines("method")[^1]);
+        Assert.Contains("released without asking", Lines("reason")[^1], StringComparison.Ordinal);
+    }
+
+    /// <summary>A protected tag added to an item already always allowed asks again, once only, whatever its row says.</summary>
+    [Fact]
+    public async Task AProtectedTag_OutranksARow()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        Assert.Equal(AuditMethod.AlwaysAllowed, (await client.RequestAsync(Credential(), Token))!.Method);
+
+        _fixture.Source.Tagged[_stripe] = ["env:billing:prod"];
+        _fixture.Source.Protected.Add(_stripe);
+
+        var asked = await client.RequestAsync(Credential(), Token);
+
+        Assert.Equal(AuditMethod.Prompt, asked!.Method);
+        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
+        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastPrompt.OnceOnly);
+    }
+
+    /// <summary>A refusal still cooling outranks a row, and a row reaches no further than what the agent sees.</summary>
+    [Fact]
+    public async Task ACooldownAndWhatTheAgentSees_OutrankARow()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll;
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        Assert.Equal(AuditMethod.Prompt, (await client.RequestAsync(Credential(), Token))!.Method);
+
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        Assert.Equal(AuditMethod.Cooldown, (await client.RequestAsync(Credential(), Token))!.Method);
+
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Values = false, Always = new AlwaysAllowed { Items = [row] } };
+        Assert.Equal(AuditMethod.InjectOnly, (await client.RequestAsync(Credential("username"), Token))!.Method);
+
+        _fixture.Settings.Records[_agent] = AgentAccess.Defaults with { Always = new AlwaysAllowed { Items = [row] } };
+        Assert.Equal(AuditMethod.OutOfScope, (await client.RequestAsync(Credential("username"), Token))!.Method);
+    }
+
+    /// <summary>An unnamed bridge has nowhere to keep a row, so it is offered none, and a row's item is asked about by the same name nowhere else.</summary>
+    [Fact]
+    public async Task AnUnnamedBridge_IsOfferedNoAlways()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        _fixture.Source.Tagged[_stripe] = ["env:billing"];
+        await client.RequestAsync(Credential("STRIPE_SECRET_KEY", label: null), Token);
+
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
+        Assert.Equal(OnceOnly.Unnamed, _fixture.Channel.LastPrompt.OnceOnly);
+    }
+
+    /// <summary>A prompt shown because an Automatic limit was reached offers once only, and no row bypasses the limit.</summary>
+    [Fact]
+    public async Task AReachedLimit_OffersOnceOnly_AndNoRowBypassesIt()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with
+        {
+            Mode = AgentMode.Automatic,
+            Limit = new AccessLimit { PerHour = 1 },
+            Always = new AlwaysAllowed { Items = [row] },
+        };
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        Assert.Equal(AuditMethod.Automatic, (await client.RequestAsync(Credential(), Token))!.Method);
+
+        var asked = await client.RequestAsync(Credential("username"), Token);
+
+        Assert.Equal(AuditMethod.Prompt, asked!.Method);
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
+        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastPrompt.OnceOnly);
+
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with
+        {
+            Mode = AgentMode.Automatic,
+            Limit = new AccessLimit { Until = _fixture.Clock.GetUtcNow().AddMinutes(-1) },
+            Always = new AlwaysAllowed { Items = [row] },
+        };
+
+        var ended = await client.RequestAsync(Credential("url"), Token);
+
+        Assert.Equal(AuditMethod.Prompt, ended!.Method);
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
+        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastPrompt.OnceOnly);
+    }
+
+    /// <summary>Always allow is an answer only where it was offered; elsewhere nothing is released.</summary>
+    [Fact]
+    public async Task AnAlwaysAnswerNobodyOffered_ReleasesNothing()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        _fixture.Source.Tagged[_stripe] = ["env:billing"];
+        var reply = await client.RequestAsync(Credential("STRIPE_SECRET_KEY", label: null), Token);
+
+        Assert.Equal(AuditDecision.Denied, reply!.Decision);
+        Assert.Null(reply.Value);
+        Assert.Equal(0, _fixture.Channel.AccessAsked);
+    }
+
+    /// <summary>An agent's own tool cannot remove what is always allowed or add to it: the pipe's one word for it is refused from an agent.</summary>
+    [Fact]
+    public async Task AnAgent_CannotChangeWhatIsAlwaysAllowed()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.ChangeAccessAsync(Asked() with { Forget = "0011aabb" }, Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.InvalidRequest), (reply!.Decision, reply.Method));
+    }
+
+    /// <summary>A person's terminal removes a row at once, naming it by its short name.</summary>
+    [Fact]
+    public async Task AForget_RemovesTheRowAtOnce()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.ChangeAccessAsync(Change() with { Forget = AlwaysAllowed.ItemId(row) }, Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (reply!.Decision, reply.Method));
+        Assert.Equal(0, _fixture.Channel.AccessAsked);
+        Assert.Empty(_fixture.Settings.Records[_agent].Always.Items);
+    }
+
+    /// <summary>A limit that is spent asks, once only, rather than refusing.</summary>
     [Fact]
     public async Task ASpentHourlyLimit_AsksInstead()
     {
@@ -143,7 +316,6 @@ public sealed class SessionAuthorityAccessTests : IDisposable
 
         Assert.Equal((AuditMethod.Automatic, AuditMethod.Prompt), (first!.Method, second!.Method));
         Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Equal(ApprovalLimits.Default.MaximumTtlSeconds, _fixture.Channel.LastPrompt!.TtlSeconds);
 
         _fixture.Clock.Advance(TimeSpan.FromHours(1) + ApprovalLimits.Default.DenialCooldown + TimeSpan.FromSeconds(1));
         Assert.Equal(AuditMethod.Automatic, (await client.RequestAsync(Credential(), Token))!.Method);
@@ -154,21 +326,19 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     public async Task AlwaysFor_AllowsOnce_ThenAsksBeforeMakingTheEnvironmentAutomatic()
     {
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
 
         var reply = await client.RequestAsync(Credential("STRIPE_SECRET_KEY"), Token);
 
-        Assert.Equal((AuditMethod.Prompt, 0), (reply!.Method, reply.TtlSeconds));
-        Assert.Equal(ApproverFixture.Sentinel, reply.Value);
-        Assert.Equal(Scope("billing:dev"), _fixture.Channel.LastPrompt!.AlwaysFor);
+        Assert.Equal(ApproverFixture.Sentinel, reply!.Value);
+        Assert.Equal("billing:dev", _fixture.Channel.LastPrompt!.Always!.Covers);
         Assert.Equal(AccessOrigin.Prompt, _fixture.Channel.LastAccessPrompt!.Origin);
         Assert.Contains(Row("billing:dev", AgentMode.Automatic), _fixture.Settings.Records[_agent].Projects);
         Assert.Equal(["access_change", "request_credential"], Lines("tool"));
         Assert.Equal(["prompt", "prompt"], Lines("method"));
-        Assert.Equal(0, _fixture.Grants.Count);
 
         var next = await client.RequestAsync(Credential("STRIPE_SECRET_KEY"), Token);
         Assert.Equal(AuditMethod.Automatic, next!.Method);
@@ -180,7 +350,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     public async Task AlwaysFor_Refused_KeepsItToTheOneRelease()
     {
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         _fixture.Channel.AccessAnswer = ApprovalAnswer.Denied;
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
@@ -202,7 +372,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     public async Task AlwaysFor_WhoseChangeIsNotSaved_TellsThePersonWhy()
     {
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
         _fixture.Settings.Saving = new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
         await using var owner = Owner.Start(this);
@@ -229,9 +399,9 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     public async Task AlwaysFor_KeepsThePersonForItsConfirmation()
     {
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
-        var other = ApprovalPrompt.For("codex", new EntryName("personal", "bank"), "password", "another agent's request", 0);
+        var other = ApprovalPrompt.For("codex", new EntryName("personal", "bank"), "password", "another agent's request");
         Task<ApprovalAnswer>? between = null;
         _fixture.Source.During = () => between ??= _fixture.Gate.AskAsync("between", other, Token).AsTask();
         await using var owner = Owner.Start(this);
@@ -242,36 +412,26 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(ApproverFixture.Sentinel, reply!.Value);
         Assert.Equal(ApprovalAnswer.Busy, await between!);
         Assert.Equal((1, 1), (_fixture.Channel.Asked, _fixture.Channel.AccessAsked));
-        Assert.Equal(ApprovalAnswer.AlwaysForProject, await _fixture.Gate.AskAsync("after", other, Token));
+        Assert.Equal(ApprovalAnswer.Always, await _fixture.Gate.AskAsync("after", other, Token));
     }
 
-    /// <summary>
-    /// Always for on an environment whose Automatic has passed its end asks to make it Automatic with no
-    /// end, its hourly limit kept, rather than writing the row as it was and calling that applied, so the
-    /// next request is released.
-    /// </summary>
+    /// <summary>An environment whose Automatic has passed its end asks, once only: an Always there would bypass the limit the person set.</summary>
     [Fact]
-    public async Task AlwaysFor_WhereAutomaticHasEnded_AsksToMakeItAutomaticWithNoEnd()
+    public async Task WhereAutomaticHasEnded_ItAsksOnceOnly()
     {
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
         var ended = new AccessLimit { Until = _fixture.Clock.GetUtcNow().AddHours(-1), PerHour = 5 };
         _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Projects = [Row("billing:dev", AgentMode.Automatic, ended)] };
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
-        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
 
         var reply = await client.RequestAsync(Credential("STRIPE_SECRET_KEY"), Token);
 
         Assert.Equal(ApproverFixture.Sentinel, reply!.Value);
-        Assert.Equal(Scope("billing:dev"), _fixture.Channel.LastPrompt!.AlwaysFor);
-        Assert.Equal(1, _fixture.Channel.AccessAsked);
-        Assert.Equal(Row("billing:dev", AgentMode.Automatic, new AccessLimit { PerHour = 5 }), Assert.Single(_fixture.Settings.Records[_agent].Projects));
-        Assert.Empty(_fixture.Channel.Told);
-
-        var next = await client.RequestAsync(Credential("STRIPE_SECRET_KEY"), Token);
-        Assert.Equal(AuditMethod.Automatic, next!.Method);
-        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
+        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastPrompt.OnceOnly);
+        Assert.Equal(0, _fixture.Channel.AccessAsked);
     }
 
     /// <summary>
@@ -285,7 +445,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         _fixture.Source.Tagged[_stripe] = ["env:billing"];
         _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Projects = [Row("billing:dev", AgentMode.Automatic)] };
         _fixture.Settings.Unreadable.Add(_agent);
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
 
@@ -357,14 +517,15 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     [Fact]
     public async Task AnAlwaysForAnswer_ToAPromptThatDidNotOfferIt_ReleasesNothing()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.AlwaysForProject;
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
         _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
+        _fixture.Source.Protected.Add(_stripe);
 
         var reply = await client.RequestAsync(Credential(), Token);
 
-        Assert.Null(_fixture.Channel.LastPrompt!.AlwaysFor);
+        Assert.Null(_fixture.Channel.LastPrompt!.Always);
         Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (reply!.Decision, reply.Method));
         Assert.Null(reply.Value);
         Assert.Equal((0, 0), (_fixture.Source.Reads, _fixture.Channel.AccessAsked));
@@ -374,6 +535,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     [Fact]
     public async Task ANarrowing_AppliesAtOnce_AndAWidening_WaitsForThePerson()
     {
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync(withClient: false);
 
@@ -416,6 +578,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     [Fact]
     public async Task APersonsNarrowing_ReachesTheVault_WhenThisComputersCeilingsCannotKeepIt()
     {
+        _fixture.Settings.Records[_agent] = AgentAccess.Defaults with { Mode = AgentMode.Automatic };
         _fixture.Settings.Caps = Full();
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync(withClient: false);
@@ -443,6 +606,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     [Fact]
     public async Task AnAgentsNarrowing_ThatThisComputersCeilingsCannotKeep_IsRefused()
     {
+        _fixture.Settings.Records[_agent] = AgentAccess.Defaults with { Mode = AgentMode.Automatic };
         _fixture.Settings.Caps = Full();
         await using var owner = Owner.Start(this);
         await using var client = await owner.AttachAsync();
@@ -554,16 +718,16 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.False(held.Understood);
         Assert.Equal((false, AgentMode.Automatic), (held.Said.Values, held.Said.Mode));
 
-        var lowered = await client.ChangeAccessAsync(Change() with { Mode = "allow-for-a-while" }, Token);
+        var lowered = await client.ChangeAccessAsync(Change() with { Mode = "ask" }, Token);
         var refused = await client.RequestAsync(Credential("STRIPE_SECRET_KEY"), Token);
 
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (lowered!.Decision, lowered.Method));
         Assert.Equal(AuditMethod.InjectOnly, refused!.Method);
         Assert.Equal((0, 1), (_fixture.Channel.AccessAsked, _fixture.Channel.Asked));
-        Assert.Equal(AgentMode.AllowForAWhile, Held(vault).Said.Mode);
+        Assert.Equal(AgentMode.Ask, Held(vault).Said.Mode);
         Assert.True(new AccessCapsSource(ClientsPath).TryCurrent(out var caps, out var problem), problem);
         var ceiling = Assert.Single(caps.Rows);
-        Assert.Equal((false, AgentMode.AllowForAWhile), (ceiling.Values, ceiling.Mode));
+        Assert.Equal((false, AgentMode.Ask), (ceiling.Values, ceiling.Mode));
     }
 
     /// <summary>
@@ -638,7 +802,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         var asked = await client.RequestAsync(Credential(), Token);
 
         Assert.Equal(AuditMethod.Prompt, asked!.Method);
-        Assert.Equal(OnceOnly.AskEveryTime, _fixture.Channel.LastPrompt!.OnceOnly);
+        Assert.Equal(OnceOnly.None, _fixture.Channel.LastPrompt!.OnceOnly);
 
         _fixture.Settings.Caps = Parsed("[[client]]\nlabel = \"claude-code\"\nvalues = \"no\"\n");
         var held = await client.RequestAsync(Credential("username"), Token);
@@ -910,7 +1074,6 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         _fixture.Source,
         _fixture.Source,
         _fixture.Gate,
-        _fixture.Grants,
         new VaultAgentSettings(
             () => vault,
             edit =>

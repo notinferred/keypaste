@@ -382,7 +382,7 @@ baseline() {
 
 audit_record() {
   local pipe="keypaste-upgrade-check-$$-$RANDOM" agent_pid
-  printf '%s\nh\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  printf '%s\no\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -393,7 +393,7 @@ audit_record() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upgrade-check","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"env/$PROJECT/$HOME_ENTRY\",\"field\":\"$VARIABLE\",\"reason\":\"4.7d writes one audit record before the upgrade\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"env/$PROJECT/$HOME_ENTRY\",\"field\":\"$VARIABLE\",\"reason\":\"4.7d writes one audit record before the upgrade\"}}}"
     sleep 5
   } | "$KP" mcp --vault "$VAULT_NATIVE" --expose 'env/**' --approver "$pipe" --client-label upgrade-check \
       > "$OUT/mcp-response.jsonl" 2> "$OUT/mcp-stderr.txt" || true

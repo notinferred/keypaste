@@ -19,7 +19,7 @@ internal sealed partial class NoticeWindow : PromptWindow
     /// <summary>A notice whose second button opens the agent's settings in the main window.</summary>
     /// <param name="notice">What did not take effect.</param>
     /// <param name="openSettings">Shows the main window with the named agent's settings open, or null to offer Close alone.</param>
-    internal NoticeWindow(AlwaysForNotice notice, Action<string>? openSettings = null)
+    internal NoticeWindow(AlwaysNotice notice, Action<string>? openSettings = null)
         : this()
     {
         ArgumentNullException.ThrowIfNull(notice);
@@ -38,7 +38,9 @@ internal sealed partial class NoticeWindow : PromptWindow
         };
     }
 
-    /// <summary>What the window says: what was not made Automatic and why, and where to try again.</summary>
-    internal static string Said(AlwaysForNotice notice) =>
-        $"{notice.Unmade} To try again, open {notice.Agent}'s settings on the Agents screen.";
+    /// <summary>What the window says: what did not take effect and why, and where to try again.</summary>
+    internal static string Said(AlwaysNotice notice) =>
+        notice.Offer.IsProject
+            ? $"{notice.Unmade} To try again, open {notice.Agent}'s settings on the Agents screen."
+            : $"{notice.Unmade} To try again, choose Always allow the next time it asks.";
 }

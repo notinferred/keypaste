@@ -5,7 +5,7 @@
                     xmlns:ctl="using:Keypaste.App.Controls"
                     x:Class="Keypaste.App.Views.NoticeWindow"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
-                    Title="{x:Static res:Strings.KeypasteAlwaysForDidNotTakeEffect}"
+                    Title="{x:Static res:Strings.KeypasteAlwaysAllowDidNotTakeEffect}"
                     Width="508"
                     SizeToContent="Height"
                     CanResize="False"
@@ -32,7 +32,7 @@
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
           <TextBlock Classes="prompt-title size-16" Text="{x:Static res:Strings.AllowedOnce}" />
-          <TextBlock Classes="prompt-sub size-13" Text="{x:Static res:Strings.AlwaysForDidNotTakeEffect}" />
+          <TextBlock Classes="prompt-sub size-13" Text="{x:Static res:Strings.AlwaysAllowDidNotTakeEffect}" />
         </StackPanel>
       </Grid>
 

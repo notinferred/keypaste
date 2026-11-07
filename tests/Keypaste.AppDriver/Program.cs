@@ -124,7 +124,7 @@ internal static class Program
         "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
         "             unsaved-edit <entry-path> <password>, unsaved-move <entry-path> <group-path>, unsaved-delete <entry-path>,\n" +
         "             unsaved-rename <group-path> <name>, write-open <file>, and with the app's own\n" +
-        "             prompt: approve, once, always, allow, deny, close, show-prompt; activity, revoke <n | all>;\n" +
+        "             prompt: approve, once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
@@ -1365,9 +1365,6 @@ internal sealed class Driver(string home)
                     Unpair(authority, command["unpair ".Length..]);
                     break;
 
-                case ["revoke", var which]:
-                    Revoke(authority, which);
-                    break;
 
                 case ["show-prompt"]:
                     Console.Out.WriteLine(await (screen ?? throw new DriverException("show-prompt needs the app's own prompt"))
@@ -1491,11 +1488,6 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine($"waiting n={row.Number} {Describe(row)}");
         }
 
-        foreach (var row in model.Grants)
-        {
-            Console.Out.WriteLine($"grant n={row.Number} {Describe(row)}");
-        }
-
         // What Agents › History draws, read by that screen's own view model, which shows the whole file.
         using var history = new LogViewModel(home, agentsOnly: true);
 
@@ -1510,25 +1502,6 @@ internal sealed class Driver(string home)
         }
 
         Console.Out.WriteLine("activity end");
-    }
-
-    /// <summary>Presses End on one listed allowance, or End all.</summary>
-    private void Revoke(AppAuthority authority, string which)
-    {
-        using var model = OpenActivity(authority);
-
-        if (which == "all")
-        {
-            Press(model.EndAllCommand, "End all");
-        }
-        else
-        {
-            var row = model.Grants.SingleOrDefault(grant => grant.Number.ToString(CultureInfo.InvariantCulture) == which)
-                ?? throw new DriverException($"Agents lists no allowance {which}");
-            model.EndCommand.Execute(row);
-        }
-
-        Console.Out.WriteLine($"revoked {which}, {model.Grants.Count} left");
     }
 
     /// <summary>Presses Show the prompt on Agents, on the prompt's display thread, as the person's click does.</summary>
@@ -1895,7 +1868,7 @@ internal sealed class Driver(string home)
         {
             Console.Out.WriteLine($"asking {prompt.Entry}");
             Console.Out.WriteLine("approved");
-            return ValueTask.FromResult(ApprovalAnswer.Approved);
+            return ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
         }
 
         public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)

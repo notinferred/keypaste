@@ -7,7 +7,7 @@ import Status from '../../../components/Status.astro';
 
 <Status id="agent-approvals" />
 
-An AI agent connected over MCP can see the entry names you expose and ask for one field of one entry, with a reason. You see which client is asking, for what and why, and you deny or allow it; an allowance lasts a limited time, and the release being built offers allow once or allow for an hour. In the release being built you can also set an agent to Automatic for a project you choose, after confirming that change: what it can see there is released without asking you, and still recorded. Every request lands in a local audit log, allowed or refused. Today the question appears in the terminal where `keypaste agent` runs; the desktop app asks in its own prompt window.
+An AI agent connected over MCP can see the entry names you expose and ask for one field of one entry, with a reason. You see which client is asking, for what and why, and you deny or allow it, and the release being built offers allow once or always allow, which holds only once you confirm it and which you can remove. In the release being built you can also set an agent to Automatic for a project you choose, after confirming that change: what it can see there is released without asking you, and still recorded. Every request lands in a local audit log, allowed or refused. Today the question appears in the terminal where `keypaste agent` runs; the desktop app asks in its own prompt window.
 
 ## How it works
 
@@ -20,7 +20,7 @@ sequenceDiagram
   C->>B: one field of one entry, and a reason
   B->>O: over a named pipe, to the unlocked session
   O->>Y: who asks, for what, and why
-  Y-->>O: deny, allow once, or allow for an hour
+  Y-->>O: deny, allow once, or always allow
   O->>O: one audit line, allowed or refused
   O-->>B: one field, only if you allowed it
   B-->>C: the value, or a refusal
@@ -37,7 +37,7 @@ flowchart LR
   e3@{ animate: true }
 ```
 
-The bridge your AI tool starts holds no vault and can never ask for your master password. The process holding the unlocked vault re-checks what the agent may see, reads the field only after your answer or a setting you confirmed, and writes the audit line before it replies. Locking the app, or stopping `keypaste agent`, refuses whatever is waiting and ends every allowance.
+The bridge your AI tool starts holds no vault and can never ask for your master password. The process holding the unlocked vault re-checks what the agent may see, reads the field only after your answer or a setting you confirmed, and writes the audit line before it replies. Locking the app, or stopping `keypaste agent`, refuses whatever is waiting and stops every release.
 
 ## What it does
 
@@ -49,7 +49,7 @@ The bridge your AI tool starts holds no vault and can never ask for your master 
 
 ## Limits
 
-A value you release is the agent's from then on: an allowance's time limit ends its reuse, not the agent's copy, and keypaste cannot revoke the credential at its issuer. The reason is the agent's own words, and the prompt says so. An Automatic release has nobody reading it, and anyone who can open the vault, in KeePassXC for example, can change an agent's settings without keypaste asking. An agent that runs commands as you can reach things around the prompt, such as its own configuration; [the security model](/how-it-works/security/) lists them.
+A value you release is the agent's from then on, and keypaste cannot revoke the credential at its issuer. The reason is the agent's own words, and the prompt says so. An Automatic release has nobody reading it, and anyone who can open the vault, in KeePassXC for example, can change an agent's settings without keypaste asking. An agent that runs commands as you can reach things around the prompt, such as its own configuration; [the security model](/how-it-works/security/) lists them.
 
 ## Read more
 

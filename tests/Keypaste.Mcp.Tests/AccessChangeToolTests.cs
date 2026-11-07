@@ -362,7 +362,7 @@ public sealed class AccessChangeToolTests : IDisposable
         Assert.Equal((ToolText.AccessDenied, ToolText.AccessCooldown), (TextOf(refused), TextOf(cooled)));
         Assert.Equal(ToolText.AccessNarrowed, TextOf(narrowed));
         Assert.Equal(2, owner.Prompts.Count);
-        Assert.Equal(AgentMode.AllowForAWhile, owner.Settings.Records[McpHarness.ClientLabel].Mode);
+        Assert.Equal(AgentMode.Ask, owner.Settings.Records[McpHarness.ClientLabel].Mode);
         Assert.False(Assert.Single(owner.Settings.Caps.Rows).Values);
         Assert.Single(owner.Settings.Written);
 
@@ -380,7 +380,6 @@ public sealed class AccessChangeToolTests : IDisposable
     private sealed class Owner : IAsyncDisposable, IApprovalChannel
     {
         private readonly SessionLifetime _lifetime = new("access-tool-session");
-        private readonly GrantCache _grants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
         private readonly ApproverListener _listener;
         private readonly CancellationTokenSource _stop = new();
@@ -395,7 +394,6 @@ public sealed class AccessChangeToolTests : IDisposable
                 new VaultCredentialSource(() => null),
                 new VaultEntryNameLister(() => null),
                 _gate,
-                _grants,
                 Settings,
                 clock: clock);
             var authority = new SessionAuthority(VaultIdentity.Of(test._directory, test.VaultPath), () => _lifetime, handler, () => Log.Log);
@@ -440,7 +438,6 @@ public sealed class AccessChangeToolTests : IDisposable
             _listener.Dispose();
             _stop.Dispose();
             _gate.Dispose();
-            _grants.Dispose();
             _lifetime.Dispose();
             Log.Dispose();
         }

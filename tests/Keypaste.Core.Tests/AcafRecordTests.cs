@@ -21,7 +21,7 @@ public sealed class AcafRecordTests
     public void TheDefaults_AreWrittenAsTheSpecificationShowsThem()
     {
         Assert.Equal(
-            """{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while"}""",
+            """{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"ask"}""",
             AcafRecord.Write(AgentAccess.Defaults));
     }
 
@@ -38,7 +38,7 @@ public sealed class AcafRecordTests
             Projects =
             [
                 Row("billing", AgentMode.Automatic, new AccessLimit { PerHour = 5 }),
-                Row("billing:staging", AgentMode.AllowForAWhile),
+                Row("billing:staging", AgentMode.Ask),
             ],
         };
 
@@ -50,7 +50,7 @@ public sealed class AcafRecordTests
         Assert.Equal(access, read.Access);
         Assert.Same(read.Access, read.Said);
         Assert.Contains("\"until\":\"2026-12-31T23:59:59Z\"", text, StringComparison.Ordinal);
-        Assert.Contains("\"projects\":[{\"project\":\"billing\",\"mode\":\"automatic\",\"limit\":{\"perHour\":5}},{\"project\":\"billing:staging\",\"mode\":\"allow-for-a-while\"}]", text, StringComparison.Ordinal);
+        Assert.Contains("\"projects\":[{\"project\":\"billing\",\"mode\":\"automatic\",\"limit\":{\"perHour\":5}},{\"project\":\"billing:staging\",\"mode\":\"ask\"}]", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public sealed class AcafRecordTests
         var rows = Enumerable.Range(0, AgentAccess.MaximumProjects + 1).Select(i => $$"""{"project":"p{{i}}","mode":"automatic"}""");
         var tooMany = AcafRecord.Read($$"""{"acaf":1,"projects":[{{string.Join(',', rows)}}]}""");
 
-        Assert.Equal([Row("billing", AgentMode.AllowForAWhile, new AccessLimit { PerHour = 4, Until = _until })], twice.Said.Projects);
+        Assert.Equal([Row("billing", AgentMode.Ask, new AccessLimit { PerHour = 4, Until = _until })], twice.Said.Projects);
         Assert.Empty(tooMany.Said.Projects);
         Assert.False(twice.Understood || tooMany.Understood);
     }
@@ -289,8 +289,8 @@ public sealed class AcafRecordTests
             """{"acaf":1,"mode":"ask","projects":[{"project":"billing","mode":"automatic"},{"project":"billing:qa","mode":"automatic","limit":{"perHour":3}}],"colour":"red"}""",
             Written(Edit(project: "billing:qa", perHour: "3"), record));
         Assert.Equal(
-            """{"acaf":1,"mode":"ask","projects":[{"project":"billing","mode":"automatic"},{"project":"shop","mode":"allow-for-a-while"}],"colour":"red"}""",
-            Written(Edit(project: "shop", mode: "allow-for-a-while"), record));
+            """{"acaf":1,"mode":"ask","projects":[{"project":"billing","mode":"automatic"},{"project":"shop","mode":"ask"}],"colour":"red"}""",
+            Written(Edit(project: "shop", mode: "ask"), record));
         Assert.Equal(
             """{"acaf":1,"mode":"ask","projects":[{"project":"shop","mode":"ask","limit":{"until":"2026-12-31T23:59:59Z"}}]}""",
             Written(Edit(project: "shop", until: "2026-12-31T23:59:59Z"), """{"acaf":1,"mode":"ask"}"""));
@@ -389,7 +389,7 @@ public sealed class AcafRecordTests
             Run = true,
             Mode = AgentMode.Ask,
             Limit = new AccessLimit { PerHour = 4 },
-            Projects = [Row("billing", AgentMode.Automatic, new AccessLimit { Until = _until }), Row("shop:qa", AgentMode.AllowForAWhile)],
+            Projects = [Row("billing", AgentMode.Automatic, new AccessLimit { Until = _until }), Row("shop:qa", AgentMode.Ask)],
         };
 
         AccessEdit[] changes =

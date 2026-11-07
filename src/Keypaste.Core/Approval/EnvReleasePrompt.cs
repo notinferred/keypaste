@@ -51,9 +51,6 @@ public sealed record EnvReleasePrompt
     /// <summary>The profile the set belongs to, sanitized.</summary>
     public string Profile { get; init; } = EnvProfileNames.Default;
 
-    /// <summary>How long a timed grant would last if the person chooses one; zero offers only "allow once".</summary>
-    public int GrantSeconds { get; init; }
-
     /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise. A prompt with a requester never offers a timed grant.</summary>
     public string? Requester { get; init; }
 

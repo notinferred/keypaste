@@ -57,8 +57,6 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
             Settings = TestSession.Settings(),
             Hourly = new HourlyLimit(TimeProvider.System),
             Audit = () => _unwritable ? null : _log?.Log,
-            WatchEdits = _ => { },
-            UnwatchEdits = _ => { },
         });
         _serving = _server.RunAsync(_stop.Token);
 
@@ -92,7 +90,6 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
 
     /// <summary>

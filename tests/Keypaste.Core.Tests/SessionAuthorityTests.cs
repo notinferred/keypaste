@@ -35,7 +35,6 @@ public sealed class SessionAuthorityTests : IDisposable
         Entry = "env/dev/STRIPE_KEY",
         Field = "password",
         Reason = "deploy billing to staging",
-        TtlSeconds = 60,
         Exposure = ["env/**"],
         ClientLabel = ApproverFixture.Agent,
         Vault = vault ?? VaultPath,
@@ -66,7 +65,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AnAttachedRequest_IsDecidedAndNamesTheSession()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -82,7 +81,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ARequestFromAConnectionThatNeverAttached_IsRefusedUnasked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -121,7 +120,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ARequestNamingAnotherVaultThanItsAttachment_IsRefused()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -136,7 +135,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ARequestFromASessionThatEnded_IsRefusedAfterTheVaultIsUnlockedAgain()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -158,7 +157,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ARequestPresentingTheNewSessionOnAnOldAttachment_IsRefused()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -175,7 +174,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ALockedOwner_RefusesAttachmentAndEveryRequest()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
 
@@ -246,54 +245,20 @@ public sealed class SessionAuthorityTests : IDisposable
         var waiting = Assert.Single(owner.Authority.Activity.Waiting);
         Assert.Equal("env/dev/STRIPE_KEY", waiting.Prompt.Entry, StringComparer.Ordinal);
         Assert.Equal(ApproverFixture.Agent, waiting.Prompt.Label, StringComparer.Ordinal);
-        Assert.Empty(owner.Authority.Activity.Grants);
 
         _fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
         await pending.AsTask().WaitAsync(_connectTimeout, Token);
 
         _fixture.Channel.Hold = false;
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await client.RequestAsync(Request("session-one"), Token);
 
         var activity = owner.Authority.Activity;
         Assert.Empty(activity.Waiting);
-        Assert.Equal("env/dev/STRIPE_KEY", Assert.Single(activity.Grants).Approved.Entry, StringComparer.Ordinal);
 
         _lifetime!.End();
 
         Assert.Same(ApproverActivity.None, owner.Authority.Activity);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ARevokeThroughTheAuthority_MakesTheSameRequestAskAgain(bool all)
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await ConnectAsync(owner.PipeName);
-
-        await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        await client.RequestAsync(Request("session-one"), Token);
-        var reused = await client.RequestAsync(Request("session-one"), Token);
-        Assert.Equal(AuditMethod.GrantCache, reused!.Method);
-
-        if (all)
-        {
-            owner.Authority.RevokeAll();
-        }
-        else
-        {
-            owner.Authority.Revoke(Assert.Single(owner.Authority.Activity.Grants).Key);
-        }
-
-        Assert.Empty(owner.Authority.Activity.Grants);
-
-        var again = await client.RequestAsync(Request("session-one"), Token);
-
-        Assert.Equal(AuditMethod.Prompt, again!.Method);
-        Assert.Equal(AuditDecision.Granted, again.Decision);
-        Assert.Equal(2, _fixture.Channel.Asked);
     }
 
     [Fact]
@@ -323,9 +288,8 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AnApprovalRacingTheLock_ReleasesNothingAndKeepsNoGrant()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var lifetime = _lifetime!;
-        lifetime.Own(_fixture.Grants);
         _fixture.Source.During = lifetime.End;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
@@ -338,7 +302,6 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(AuditMethod.VaultLocked, reply.Method);
         Assert.Equal("the vault was locked before this was released", reply.Reason);
         Assert.Null(reply.Value);
-        Assert.Equal(0, _fixture.Grants.Count);
     }
 
     /// <summary>A reload withdraws what is waiting as a lock does while the session stays (D-0412).</summary>
@@ -388,41 +351,6 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.True(lifetime.IsLive);
     }
 
-    /// <summary>
-    /// A timed allow whose release a reload withdraws as the vault is read keeps no grant either, so the
-    /// agent's next request is asked about anew rather than served from the copy the reload replaced:
-    /// the reload's withdrawal ends the grants, as the owner's server hands it to, and the allowance was
-    /// asked for before it (D-0412).
-    /// </summary>
-    [Fact]
-    public async Task AnAllowanceRacingAReload_ReleasesNothingAndKeepsNoGrant()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        var lifetime = _lifetime!;
-        lifetime.OnWithdraw(() => _fixture.Grants.RevokeEntries(VaultEdit.Everything));
-        _fixture.Source.During = () =>
-        {
-            _fixture.Source.During = null;
-            lifetime.Withdraw();
-        };
-        await using var owner = Owner.Start(this);
-        await using var client = await ConnectAsync(owner.PipeName);
-
-        await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var reply = await client.RequestAsync(Request("session-one"), Token);
-
-        Assert.NotNull(reply);
-        Assert.Equal((AuditDecision.Denied, AuditMethod.VaultChanged), (reply.Decision, reply.Method));
-        Assert.Null(reply.Value);
-        Assert.Equal(0, _fixture.Grants.Count);
-
-        var again = await client.RequestAsync(Request("session-one"), Token);
-
-        Assert.NotNull(again);
-        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (again.Decision, again.Method));
-        Assert.Equal(2, _fixture.Channel.Asked);
-    }
-
     [Fact]
     public async Task AnAutomaticReleaseRacingTheLock_IsRefused()
     {
@@ -443,34 +371,6 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     [Fact]
-    public async Task AGrantGivenBeforeALock_ReleasesNothingAfterTheNextUnlock()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        _lifetime!.Own(_fixture.Grants);
-        await using var owner = Owner.Start(this);
-        await using var client = await ConnectAsync(owner.PipeName);
-
-        await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var granted = await client.RequestAsync(Request("session-one"), Token);
-        Assert.NotNull(granted);
-        Assert.Equal(AuditMethod.Prompt, granted.Method);
-        Assert.Equal(1, _fixture.Grants.Count);
-
-        _lifetime.End();
-        Assert.Equal(0, _fixture.Grants.Count);
-
-        _lifetime = new SessionLifetime("session-two");
-        _fixture.Channel.Answer = ApprovalAnswer.Denied;
-        await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var again = await client.RequestAsync(Request("session-two"), Token);
-
-        Assert.NotNull(again);
-        Assert.Equal(AuditDecision.Denied, again.Decision);
-        Assert.Equal(AuditMethod.Prompt, again.Method);
-        Assert.Equal(2, _fixture.Channel.Asked);
-    }
-
-    [Fact]
     public async Task AListingRacingTheLock_IsRefused()
     {
         _fixture.Source.During = _lifetime!.End;
@@ -488,7 +388,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AfterAnotherProgramSavesTheVault_RequestsAndListingsAreRefusedAsChanged_AndNothingIsAsked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         using var vault = SavedVault("v1");
         await using var owner = Owner.Start(this, Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
@@ -497,7 +397,6 @@ public sealed class SessionAuthorityTests : IDisposable
         var before = await client.RequestAsync(Request("session-one"), Token);
         Assert.NotNull(before);
         Assert.Equal("v1", before.Value);
-        Assert.Equal(1, _fixture.Grants.Count);
 
         var external = SaveElsewhere("external");
 
@@ -513,7 +412,6 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Empty(listing.Names);
         Assert.Equal(AuditMethod.VaultChanged, listing.Refusal);
         Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Equal(0, _fixture.Grants.Count);
         Assert.Equal(external, File.ReadAllBytes(VaultPath));
         Assert.Contains(_fixture.Narration, line => line.Contains("restart keypaste approve", StringComparison.Ordinal));
     }
@@ -525,7 +423,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AGrantGivenBeforeAnExternalChange_IsGoneEvenIfTheFileIsPutBack()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         using var vault = SavedVault("v1");
         await using var owner = Owner.Start(this, Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
@@ -572,18 +470,14 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(0, policed.Channel.Asked);
     }
 
-    public static TheoryData<string, string, string, string, int> OutsideTheLimits => new()
+    public static TheoryData<string, string, string, string> OutsideTheLimits => new()
     {
-        { "entry", string.Empty, "password", "deploy", 60 },
-        { "entry", new string('a', CredentialRequestRules.MaximumEntryLength + 1), "password", "deploy", 60 },
-        { "field", "env/dev/STRIPE_KEY", "password,username", "deploy", 60 },
-        { "field", "env/dev/STRIPE_KEY", "otp", "deploy", 60 },
-        { "reason", "env/dev/STRIPE_KEY", "password", string.Empty, 60 },
-        { "reason", "env/dev/STRIPE_KEY", "password", new string('r', CredentialRequestRules.MaximumReasonLength + 1), 60 },
-        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", 0 },
-        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", -5 },
-        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", ApprovalLimits.MaximumRequestableTtlSeconds + 1 },
-        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", int.MaxValue },
+        { "entry", string.Empty, "password", "deploy" },
+        { "entry", new string('a', CredentialRequestRules.MaximumEntryLength + 1), "password", "deploy" },
+        { "field", "env/dev/STRIPE_KEY", "password,username", "deploy" },
+        { "field", "env/dev/STRIPE_KEY", "otp", "deploy" },
+        { "reason", "env/dev/STRIPE_KEY", "password", string.Empty },
+        { "reason", "env/dev/STRIPE_KEY", "password", new string('r', CredentialRequestRules.MaximumReasonLength + 1) },
     };
 
     /// <summary>
@@ -593,15 +487,15 @@ public sealed class SessionAuthorityTests : IDisposable
     [Theory]
     [MemberData(nameof(OutsideTheLimits))]
     public async Task ARequestOutsideTheToolsLimits_IsRefusedAsInvalidByTheOwner_Unasked(
-        string argument, string entry, string field, string reason, int ttl)
+        string argument, string entry, string field, string reason)
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
         var reply = await client.RequestAsync(
-            Request("session-one") with { Entry = entry, Field = field, Reason = reason, TtlSeconds = ttl }, Token);
+            Request("session-one") with { Entry = entry, Field = field, Reason = reason }, Token);
 
         Assert.NotNull(reply);
         Assert.Equal(AuditDecision.Denied, reply.Decision);
@@ -613,28 +507,12 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(0, _fixture.Source.Reads);
     }
 
-    [Fact]
-    public async Task TheLongestRequestableTtl_IsStillGranted_AtTheOwnersCeiling()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await ConnectAsync(owner.PipeName);
-        await client.AttachAsync(new AttachRequest(VaultPath), Token);
-
-        var reply = await client.RequestAsync(
-            Request("session-one") with { TtlSeconds = ApprovalLimits.MaximumRequestableTtlSeconds }, Token);
-
-        Assert.NotNull(reply);
-        Assert.Equal(AuditDecision.Granted, reply.Decision);
-        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, reply.TtlSeconds);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task AnUnexposedEntry_IsRefusedByTheOwner_ByPathAndByHandle_Unasked(bool byHandle)
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -656,10 +534,9 @@ public sealed class SessionAuthorityTests : IDisposable
     [Theory]
     [InlineData("field named twice")]
     [InlineData("field as a list")]
-    [InlineData("no ttl_seconds")]
     public async Task AMalformedRequest_EndsTheConnectionUnanswered_AndAsksNobody(string shape)
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
 
         var wellFormed = Encoding.UTF8.GetString(ApproverProtocol.Encode(Request("session-one")));
@@ -667,7 +544,7 @@ public sealed class SessionAuthorityTests : IDisposable
         {
             "field named twice" => "{\"field\":\"username\"," + wellFormed[1..],
             "field as a list" => wellFormed.Replace("\"field\":\"password\"", "\"field\":[\"password\",\"username\"]", StringComparison.Ordinal),
-            _ => wellFormed.Replace(",\"ttl_seconds\":60", string.Empty, StringComparison.Ordinal),
+            _ => wellFormed,
         };
 
         Assert.NotEqual(wellFormed, frame);
@@ -683,7 +560,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task ALiveOnlyEntry_ThroughTheSession_IsAskedEveryTime()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         using var vault = SavedVault("unused");
         var prod = new EntryName("env/acme", "API_KEY");
         vault.AddEntry(new VaultEntry { GroupPath = prod.GroupPath, Title = prod.Title, Password = "prod-sentinel" });
@@ -700,10 +577,7 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(AuditMethod.Prompt, first?.Method);
         Assert.Equal(AuditMethod.Prompt, second?.Method);
         Assert.Equal("prod-sentinel", second?.Value);
-        Assert.Equal(0, first?.TtlSeconds);
-        Assert.Equal(0, _fixture.Channel.LastPrompt!.TtlSeconds);
         Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Empty(owner.Authority.Activity.Grants);
     }
 
     public void Dispose()
@@ -744,7 +618,6 @@ public sealed class SessionAuthorityTests : IDisposable
             new VaultCredentialSource(() => vault),
             new VaultEntryNameLister(() => vault),
             fixture.Gate,
-            fixture.Grants,
             fixture.Settings,
             fixture.Narration.Add,
             hourly: fixture.Hourly,

@@ -68,7 +68,9 @@ public sealed class AgentSettingsViewTests
     public Task A_chip_keeps_the_keyboard_after_its_change() => HeadlessSession.On(async () =>
     {
         using var panel = new SettingsPanel();
-        var ask = panel.Chip("mode", "Ask every time");
+        panel.Model.IsMoreOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var ask = panel.Chip("values", "No, only into commands it runs");
         ask.Focus(NavigationMethod.Tab);
         Assert.Same(ask, panel.Focused);
 
@@ -76,10 +78,33 @@ public sealed class AgentSettingsViewTests
         await panel.Model.Changing;
         Dispatcher.UIThread.RunJobs();
 
-        var now = panel.Chip("mode", "Ask every time");
+        var now = panel.Chip("values", "No, only into commands it runs");
         Assert.NotSame(ask, now);
         Assert.True(Assert.IsType<SettingChoice>(now.DataContext).IsChosen);
         Assert.Same(now, panel.Focused);
+    });
+
+    /// <summary>What is always allowed is listed by name, each with a way to remove it, and removing one applies at once.</summary>
+    [Fact]
+    public Task What_is_always_allowed_is_listed_and_each_can_be_removed() => HeadlessSession.On(async () =>
+    {
+        using var panel = new SettingsPanel();
+        var item = panel.Vault.EntryUuid(new EntryName("env/billing", ".env"))!;
+        var command = new AlwaysCommand("/usr/bin/npm", ["npm", "test"], "/work", [new AlwaysVariable("STRIPE_KEY", item, "STRIPE_KEY")]);
+        var store = new AgentAccessStore(panel.Vault);
+        store.Write("ci-probe", AccessEdit.AlwaysItem(item));
+        store.Write("ci-probe", AccessEdit.AlwaysCommand(command));
+        panel.Vault.Save();
+
+        using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
+
+        Assert.Equal(["env/billing/.env", "npm test"], model.AlwaysRows.Select(row => row.What));
+        Assert.Contains("STRIPE_KEY", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
+        Assert.Contains("Run commands is off", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
+
+        await model.RemoveAlwaysAsync(command.Id);
+
+        Assert.Equal(["env/billing/.env"], model.AlwaysRows.Select(row => row.What));
     });
 
     /// <summary>A pick keeps the keyboard as it is toggled, and a pick whose environment is gone hands it to its group's first chip.</summary>
@@ -149,6 +174,8 @@ public sealed class AgentSettingsViewTests
         internal Window Window { get; }
 
         internal Vault Vault => _authority.Session.Unlocked!;
+
+        internal AppAuthority Authority => _authority;
 
         internal IInputElement? Focused => Window.FocusManager?.GetFocusedElement();
 

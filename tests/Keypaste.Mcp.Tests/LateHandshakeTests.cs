@@ -33,7 +33,6 @@ public sealed class LateHandshakeTests
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy",
-        ["ttl_seconds"] = 60,
     };
 
     [Fact]

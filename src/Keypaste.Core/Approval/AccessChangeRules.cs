@@ -13,7 +13,10 @@ namespace Keypaste.Core.Approval;
 public static class AccessChangeRules
 {
     /// <summary>The rule for <c>mode</c>.</summary>
-    public const string ModeRule = "must be ask, allow-for-a-while or automatic";
+    public const string ModeRule = "must be ask or automatic";
+
+    /// <summary>The rule for <c>forget</c>, which the tool never sends: only its person removes what they always allowed.</summary>
+    public const string ForgetRule = "is not one an agent may give: only its person changes what is always allowed";
 
     /// <summary>The rule for <c>project</c>.</summary>
     public const string ProjectRule = "must be <project> or <project>:<environment>, as an item's project tag names it after env:";
@@ -65,6 +68,11 @@ public static class AccessChangeRules
         if (request.Reset)
         {
             return new("reset", ResetRule);
+        }
+
+        if (request.Forget is not null)
+        {
+            return new("forget", ForgetRule);
         }
 
         if (request.Mode is { } mode && !AgentModes.TryParse(mode, out _))

@@ -34,7 +34,7 @@ public sealed record ProjectAccess
 /// <para>
 /// <see cref="Defaults"/> is what keypaste did before these settings existed, and what an agent with
 /// no settings gets: every project's variables, values when a person allows them, no commands, and
-/// the timed mode.
+/// asked every time.
 /// </para>
 /// <para>
 /// A row beats the default for the items it covers, and an environment's row beats its project's.
@@ -47,11 +47,12 @@ public sealed record AgentAccess
     public const int MaximumProjects = 256;
 
     private readonly EntryExposure _see = EntryExposure.Default;
-    private readonly AgentMode _mode = AgentMode.AllowForAWhile;
+    private readonly AgentMode _mode = AgentMode.Ask;
     private readonly AccessLimit _limit = AccessLimit.None;
     private readonly IReadOnlyList<ProjectAccess> _projects = [];
+    private readonly AlwaysAllowed _always = AlwaysAllowed.None;
 
-    /// <summary>Today's behaviour: every project's variables, values when allowed, no commands, the timed mode.</summary>
+    /// <summary>Every project's variables, values when allowed, no commands, asked every time.</summary>
     public static AgentAccess Defaults { get; } = new();
 
     /// <summary>What it can see, in <c>--expose</c>'s selectors.</summary>
@@ -64,7 +65,7 @@ public sealed record AgentAccess
     /// <summary>Whether it is given values; when not, values reach only commands it runs.</summary>
     public bool Values { get; init; } = true;
 
-    /// <summary>Whether it may run commands, each of which still asks.</summary>
+    /// <summary>Whether it may run commands, each of which still asks unless the person chose Always allow on it.</summary>
     public bool Run { get; init; }
 
     /// <summary>Its mode where no row covers an item.</summary>
@@ -104,6 +105,13 @@ public sealed record AgentAccess
         }
     }
 
+    /// <summary>The items and exact commands the person chose Always allow on.</summary>
+    public AlwaysAllowed Always
+    {
+        get => _always;
+        init => _always = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
     /// <summary>These settings with one row set, replacing the row for the same scope.</summary>
     /// <param name="row">The row.</param>
     /// <returns>The new settings.</returns>
@@ -134,7 +142,8 @@ public sealed record AgentAccess
         && Run == other.Run
         && Mode == other.Mode
         && Limit == other.Limit
-        && Projects.SequenceEqual(other.Projects);
+        && Projects.SequenceEqual(other.Projects)
+        && Always == other.Always;
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Values, Run, Mode, Limit, Projects.Count);

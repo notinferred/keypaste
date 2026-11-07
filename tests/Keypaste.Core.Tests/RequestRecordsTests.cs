@@ -57,7 +57,6 @@ public sealed class RequestRecordsTests : IDisposable
             AuditDecision.Granted,
             AuditMethod.Prompt,
             "a person approved this one run",
-            0,
             entries ?? ["env/acme-api/DATABASE_URL"],
             _exposure,
             _session,
@@ -107,7 +106,6 @@ public sealed class RequestRecordsTests : IDisposable
         Assert.Equal(_exposure, line.Exposure);
         Assert.Null(line.Session);
         Assert.Equal(_vault, line.Vault);
-        Assert.Null(line.GrantedSeconds);
         Assert.Null(line.Entries);
         Assert.Null(line.Command);
         Assert.Null(line.CommandSha256);
@@ -129,15 +127,14 @@ public sealed class RequestRecordsTests : IDisposable
     public void ACredentialGrant_RecordsWhatWasAskedAndHowLongItWasGranted()
     {
         var line = RequestRecords.Credential(
-            _client, "env/dev/STRIPE_KEY", "password", 900, "deploy billing",
-            AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request", null, 900, _exposure, _session, _vault);
+            _client, "env/dev/STRIPE_KEY", "password", "deploy billing",
+            AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request", null, _exposure, _session, _vault);
 
         Assert.Equal(AuditTools.Credential, line.Tool);
         Assert.Equal(_client, line.Client);
-        Assert.Equal(AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", 900, "deploy billing"), line.Args);
+        Assert.Equal(AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", "deploy billing"), line.Args);
         Assert.Equal(EntryAddressKind.Path, line.Args.EntryKind);
         Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request"), (line.Decision, line.Method, line.Reason));
-        Assert.Equal(900, line.GrantedSeconds);
         Assert.Equal(_exposure, line.Exposure);
         Assert.Equal((_session, _vault), (line.Session, line.Vault));
         Assert.Null(line.Entries);
@@ -148,11 +145,11 @@ public sealed class RequestRecordsTests : IDisposable
     public void ACredentialAskedByHandle_RecordsTheEntryItResolvedTo()
     {
         var resolved = RequestRecords.Credential(
-            _client, "k1_0123456789abcdef", "password", 60, "why",
-            AuditDecision.Denied, AuditMethod.Prompt, "a person refused this request", "env/dev/STRIPE_KEY", null, _exposure, _session, _vault);
+            _client, "k1_0123456789abcdef", "password", "why",
+            AuditDecision.Denied, AuditMethod.Prompt, "a person refused this request", "env/dev/STRIPE_KEY", _exposure, _session, _vault);
         var unresolved = RequestRecords.Credential(
-            _client, "k1_0123456789abcdef", "password", 60, "why",
-            AuditDecision.Denied, AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge", null, null, _exposure, null, _vault);
+            _client, "k1_0123456789abcdef", "password", "why",
+            AuditDecision.Denied, AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge", null, _exposure, null, _vault);
 
         Assert.Equal("env/dev/STRIPE_KEY", resolved.Args.Entry);
         Assert.Equal(EntryAddressKind.Path, resolved.Args.EntryKind);
@@ -164,12 +161,10 @@ public sealed class RequestRecordsTests : IDisposable
     public void ACredentialDenial_KeepsNoGrantLength_AndAFieldKeypasteDoesNotReleaseIsInvalid()
     {
         var line = RequestRecords.Credential(
-            _client, "env/dev/STRIPE_KEY", "Recovery codes", 900, "why",
-            AuditDecision.Denied, AuditMethod.InvalidRequest, "the request did not satisfy the tool's schema", null, 900, _exposure, null, _vault);
+            _client, "env/dev/STRIPE_KEY", "Recovery codes", "why",
+            AuditDecision.Denied, AuditMethod.InvalidRequest, "the request did not satisfy the tool's schema", null, _exposure, null, _vault);
 
         Assert.Equal("invalid", line.Args.Field);
-        Assert.Equal(900, line.Args.TtlSeconds);
-        Assert.Null(line.GrantedSeconds);
     }
 
     [Fact]
@@ -181,7 +176,6 @@ public sealed class RequestRecordsTests : IDisposable
         Assert.Equal(_client, line.Client);
         Assert.Equal(AuditArgs.ForRun("env/acme-api/staging", "run the pending migration"), line.Args);
         Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt, "a person approved this one run"), (line.Decision, line.Method, line.Reason));
-        Assert.Equal(0, line.GrantedSeconds);
         Assert.Equal(["env/acme-api/DATABASE_URL"], line.Entries!);
         Assert.Equal("npm run migrate", line.Command);
         Assert.Equal(AuditRecord.HashOf(["/usr/bin/npm", "run", "migrate"]), line.CommandSha256);
@@ -199,14 +193,12 @@ public sealed class RequestRecordsTests : IDisposable
             AuditDecision.Denied,
             AuditMethod.OutOfScope,
             "a reference is outside what this agent can see through this bridge",
-            0,
             null,
             _exposure,
             null,
             _vault);
 
         Assert.Null(line.Args.Entry);
-        Assert.Null(line.GrantedSeconds);
         Assert.Null(line.Entries);
         Assert.Equal(AuditRecord.HashOf(["npm", "run", "migrate"]), line.CommandSha256);
     }
@@ -216,7 +208,7 @@ public sealed class RequestRecordsTests : IDisposable
     {
         var line = RequestRecords.Run(
             _client, Asked(command: [], profile: null), null, AuditDecision.Denied, AuditMethod.InvalidRequest,
-            "the request did not satisfy the tool's schema", 0, null, _exposure, null, _vault);
+            "the request did not satisfy the tool's schema", null, _exposure, null, _vault);
 
         Assert.Equal("env/acme-api", line.Args.Entry);
         Assert.Equal(string.Empty, line.Command);
@@ -300,7 +292,6 @@ public sealed class RequestRecordsTests : IDisposable
         Assert.Equal(["env/acme-api/DATABASE_URL", "services/Stripe"], line.Entries!);
         Assert.Equal((_session, _vault), (line.Session, line.Vault));
         Assert.Empty(line.Exposure);
-        Assert.Null(line.GrantedSeconds);
         Assert.Null(line.Command);
     }
 
@@ -352,8 +343,8 @@ public sealed class RequestRecordsTests : IDisposable
                 RequestRecords.TokenRun("acme-api", "staging", token, Released(), _session, _vault),
                 RequestRecords.Listed(_client, 2, _exposure, _session, _vault),
                 RequestRecords.Credential(
-                    _client, "env/dev/STRIPE_KEY", "password", 900, "deploy billing",
-                    AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request", "env/dev/STRIPE_KEY", 900, _exposure, _session, _vault),
+                    _client, "env/dev/STRIPE_KEY", "password", "deploy billing",
+                    AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request", "env/dev/STRIPE_KEY", _exposure, _session, _vault),
                 RunLine(),
             ];
 

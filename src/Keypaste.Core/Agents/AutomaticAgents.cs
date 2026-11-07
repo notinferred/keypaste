@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Keypaste.Core.Agents;
 
 /// <summary>
@@ -58,5 +60,21 @@ public static class AutomaticAgents
         {
             yield return row.Scope;
         }
+    }
+
+    /// <summary>The named agents with rows the person chose Always allow on, each with how many, as a record wholly understood holds them.</summary>
+    /// <param name="records">Every record the vault holds.</param>
+    /// <returns>Each agent's name and count.</returns>
+    public static IReadOnlyList<string> AlwaysAllowed(IReadOnlyList<AgentRecord> records)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+
+        return
+        [
+            .. records
+                .Where(record => AgentNames.IsNamed(record.Name) && record.Record.Understood && !record.Record.Access.Always.IsEmpty)
+                .DistinctBy(record => record.Name, StringComparer.Ordinal)
+                .Select(record => string.Create(CultureInfo.InvariantCulture, $"{record.Name} ({record.Record.Access.Always.Items.Count + record.Record.Access.Always.Commands.Count})")),
+        ];
     }
 }

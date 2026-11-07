@@ -210,7 +210,7 @@ public sealed class CultureAgreementTests : IDisposable
                     {
                         Tool = "request_credential",
                         Client = new AuditClient(client, "1.2.3", "work"),
-                        Args = AuditArgs.ForCredentialRequest("env/INDIA/Title", "Password", seconds, "for -1.5"),
+                        Args = AuditArgs.ForCredentialRequest("env/INDIA/Title", "Password", "for -1.5"),
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.Exposure,
                         Reason = Invariant($"released for {seconds}s"),

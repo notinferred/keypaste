@@ -564,11 +564,6 @@ public sealed class AuditLog : IDisposable
             }
 
             WriteOptional(writer, "field", args.Field);
-            if (args.TtlSeconds is { } ttl)
-            {
-                writer.WriteNumber("ttl_seconds", ttl);
-            }
-
             if (withReasonExcerpt)
             {
                 WriteOptional(writer, "reason_excerpt", args.ReasonExcerpt);
@@ -585,11 +580,6 @@ public sealed class AuditLog : IDisposable
             writer.WriteString("decision", Wire(record.Decision));
             writer.WriteString("method", Wire(record.Method));
             writer.WriteString("reason", record.Reason);
-
-            if (record.Decision == AuditDecision.Granted && record.GrantedSeconds is { } granted)
-            {
-                writer.WriteNumber("granted_seconds", granted);
-            }
 
             writer.WriteStartArray("exposure");
             foreach (var glob in record.Exposure)
@@ -665,7 +655,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.InvalidRequest => "invalid-request",
         AuditMethod.Exposure => "exposure",
         AuditMethod.Prompt => "prompt",
-        AuditMethod.GrantCache => "grant-cache",
+        AuditMethod.AlwaysAllowed => "always-allowed",
         AuditMethod.TimedOut => "timed-out",
         AuditMethod.Cancelled => "cancelled",
         AuditMethod.NoApprover => "no-approver",

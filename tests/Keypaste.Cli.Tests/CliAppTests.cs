@@ -72,7 +72,7 @@ public sealed class CliAppTests
 
         Assert.Equal(GroupedHelp, redirected.ToString());
         Assert.DoesNotContain(ConsoleStyleTests.Escape, redirected.ToString(), StringComparison.Ordinal);
-        Assert.Contains("  \u001b[38;5;214mgrants" + Styling.SystemConsoleStyle.Reset + "      list or revoke", terminal.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  \u001b[38;5;214mtoken" + Styling.SystemConsoleStyle.Reset + "       create scoped", terminal.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -175,7 +175,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(27, verbs.Count);
+        Assert.Equal(26, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -211,7 +211,6 @@ public sealed class CliAppTests
             "  approve     approve agents' requests in this terminal",
             "  clients     show or change what each agent can see and do",
             "  doctor      check the vault, the AI tools and the app, and say what to fix",
-            "  grants      list or revoke time-boxed access",
             "  token       create scoped, inject-only tokens",
             "  log         show the hash-chained activity log",
             "",
@@ -232,7 +231,7 @@ public sealed class CliAppTests
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
-            "                    attachment ls, env ls, log, grants, doctor, token ls,",
+            "                    attachment ls, env ls, log, doctor, token ls,",
             "                    share ls, clients",
             "  -h, --help        help for any command",
             "",

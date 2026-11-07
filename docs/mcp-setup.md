@@ -2,7 +2,7 @@
 
 keypaste ships an MCP server, `keypaste mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
 
-The bridge holds no vault and checks exposure; the approver handles consent, grants and each agent's settings, and records each request it answers. Start the current terminal approver yourself:
+The bridge holds no vault and checks exposure; the approver handles consent and each agent's settings, and records each request it answers. Start the current terminal approver yourself:
 
 ```sh
 keypaste approve --vault ~/vaults/personal.kdbx
@@ -172,9 +172,9 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 `list_entry_names` takes no arguments and returns, for each exposed entry, its group path and name, the fields that may be asked for and its project tags. It cannot return a value or widen exposure.
 
-`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to the process holding the vault, which asks the person or, in source, releases it without asking when the agent's settings make it Automatic for the entry, and returns one field or, in source, with `field` set to `totp`, the entry's current TOTP code, never its seed. The person chooses whether an approval is reused, except for a code, which changes and is allowed once each time; `--max-ttl` sets how long, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
+`request_credential` takes `entry`, `field` and `reason`. It forwards the request to the process holding the vault, which asks the person or, in source, releases it without asking when the agent's settings make it Automatic for the entry or hold an Always allow row for it, and returns one field or, in source, with `field` set to `totp`, the entry's current TOTP code, never its seed. The returned credential has no lifetime keypaste can enforce once it has left. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
-In source, `request_access_change` asks for a change to this agent's own settings, and never another's: `mode` (`ask`, `allow-for-a-while` or `automatic`), optionally for one `project` (`billing` or `billing:staging`), `see` (selectors that replace what it sees), `values` (`yes` or `no`), `run` (`on` or `off`), a limit on Automatic, `until` (a date, which ends at the close of that day on this computer, or a time, on this computer's clock unless it names its offset) and `per_hour` (1 to 1000), which the bridge and the owner each accept only as bounds, never a limit's removal, and a required `reason` of at most 2000 characters; the tool asks the agent to ask for the shortest time its task needs, and the confirmation shows the limit. A change that gives the agent nothing more applies at once on this computer, even while nothing holds the vault, unless the bridge's `--audit-log` is outside its keypaste home and it was given no `--clients`, when it says to run `keypaste setup` again; one that gives it more is shown to the person with the reason and applies only if they confirm it, and after any request for more from an agent or a terminal is refused or goes unanswered, the next from any of them is refused for a minute. The settings follow the bridge's `--client-label`, so a bridge started without one is refused without asking anybody.
+In source, `request_access_change` asks for a change to this agent's own settings, and never another's: `mode` (`ask` or `automatic`), optionally for one `project` (`billing` or `billing:staging`), `see` (selectors that replace what it sees), `values` (`yes` or `no`), `run` (`on` or `off`), a limit on Automatic, `until` (a date, which ends at the close of that day on this computer, or a time, on this computer's clock unless it names its offset) and `per_hour` (1 to 1000), which the bridge and the owner each accept only as bounds, never a limit's removal, and a required `reason` of at most 2000 characters; the tool asks the agent to ask for the shortest time its task needs, and the confirmation shows the limit. A change that gives the agent nothing more applies at once on this computer, even while nothing holds the vault, unless the bridge's `--audit-log` is outside its keypaste home and it was given no `--clients`, when it says to run `keypaste setup` again; one that gives it more is shown to the person with the reason and applies only if they confirm it, and after any request for more from an agent or a terminal is refused or goes unanswered, the next from any of them is refused for a minute. The settings follow the bridge's `--client-label`, so a bridge started without one is refused without asking anybody.
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
@@ -204,12 +204,11 @@ jq -c . < ~/.keypaste/audit.jsonl
 {"v":2,"ts":"2026-07-26T14:03:11.482Z","seq":1,"pid":48122,
  "client":{"name":"claude-code","version":"1.2.3","label":"claude-code","transport":"stdio"},
  "tool":"request_credential",
- "args":{"entry":"env/dev/STRIPE_KEY","entry_kind":"path","field":"password","ttl_seconds":900,
+ "args":{"entry":"env/dev/STRIPE_KEY","entry_kind":"path","field":"password",
          "reason_excerpt":"deploy the billing service to staging","reason_len":37,
          "reason_sha256":"..."},
  "decision":"granted","method":"prompt",
- "reason":"a person approved this request for 1 hour",
- "granted_seconds":3600,
+ "reason":"a person approved this one request",
  "exposure":["env/**"],
  "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
@@ -219,8 +218,8 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `method` | What happened |
 |---|---|
 | `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
-| `grant-cache` | A live approval was reused without showing the new reason. Compare with its original `prompt` record. |
 | `automatic` | In source: released without prompting, because the agent's settings make it Automatic for the entry ([policy.md](policy.md)). |
+| `always-allowed` | A person chose Always allow on this item or this exact command and confirmed it, so nobody was asked about this request. It is never a person's approval of the request. |
 | `policy` / `policy-limit` | Written by `v0.3.0`: a standing rule in `policy.toml` released the field without prompting, or had spent its `max_per_hour` allowance. Nothing in source writes them. |
 | `undeliverable` | A person or the agent's Automatic mode authorized the request, but the value exceeded the reply limit. Nothing was released; the reason identifies the authorization source. |
 | `exposure` | A listing, naming only what the agent can see. |
@@ -240,7 +239,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 
 Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt` or `grant-cache` like a credential's.
 
-A granted line carries `granted_seconds`: how long the release may be reused, which is the hour a person chose, `0` for "allow once", or an Automatic release's lifetime. Lines written before it existed have none.
+A line `v0.3.0` or earlier source wrote may carry `granted_seconds`, the time a person chose; source writes none now. Lines written before it existed have none.
 
 The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 
@@ -351,7 +350,7 @@ For protocol errors, inspect wrappers and shell profiles for text written to std
 
 ## FAQ
 
-Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or, in source, the agent's Automatic mode, which you confirmed. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
+Can the agent see my passwords? Each successful request returns one field of one entry under a human approval or, in source, a setting you confirmed: the agent's Automatic mode or an Always allow row. Repeated approved requests can accumulate credentials. keypaste cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
 
 Can it see my entry names? Only the ones it can see, the least of its settings and `--expose`, which both default to `tag:env:*`, the entries tagged into a project, and only while the app or `keypaste approve` holds its vault unlocked. Through a tag it reaches only an entry's project variables, never its password field, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in (D-0465); a pattern naming a group, such as `--expose 'services/**'`, reaches whole entries.
 
@@ -361,10 +360,10 @@ Will it see my desktop edits immediately? No. The current terminal approver hold
 
 The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester.
 
-Do I have to approve every single call? No. In source, after Allow for 1 hour (`h` at the terminal), a repeat request for the same field of the same entry, from the same connection, is served without asking again until the hour is up; Allow once (`o`) keeps nothing. Shorten the hour with `--max-ttl` on the agent. `v0.3.0` asks `[y/N]` and keeps an approval for up to 300 seconds. In source, setting an agent to Automatic for a project, which waits for your confirmation, releases what it can see there without a prompt ([agent settings](policy.md)); in `v0.3.0` a policy rule can.
+Do I have to approve every single call? No. In source, Always allow (`a` at the terminal), once you confirm it, releases that item, or starts that exact command, to that agent without asking until you remove it in its settings; Allow once (`o`) keeps nothing. `v0.3.0` asks `[y/N]` and keeps an approval for up to 300 seconds. In source, setting an agent to Automatic for a project, which waits for your confirmation, releases what it can see there without a prompt ([agent settings](policy.md)); in `v0.3.0` a policy rule can.
 
 Does anything leave my machine? The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
 
 A client can claim another client's name, but authorization does not use that name. Agents' settings follow the configured `--client-label`, which the client's own handshake cannot change, although another local program can launch a bridge with the same arguments and an agent that can edit its client's configuration can change its label. [THREATS.md](../THREATS.md) T-3 and T-14 describe the boundary.
 
-Should I point this at my personal vault? The default exposure is `tag:env:*`; only the project variables of tagged entries are available through this bridge. Review those entries, the agent's settings and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.
+Should I point this at my personal vault? The default exposure is `tag:env:*`; only the project variables of tagged entries are available through this bridge. Review those entries, the agent's settings and the client's retention behavior before using real credentials. Each approval is one release, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.

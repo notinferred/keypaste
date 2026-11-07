@@ -292,7 +292,6 @@ public sealed class AppAuthorityTests
         Entry = "example",
         Field = "password",
         Reason = "deploy",
-        TtlSeconds = 60,
         Exposure = ["**"],
         ClientLabel = TempVault.Agent,
         Vault = vault,

@@ -109,14 +109,9 @@
         <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
           <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                   IsCancel="True" Command="{Binding DenyCommand}" />
-          <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
+          <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
                   Command="{Binding AllowOnceCommand}" />
-          <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
-                  HorizontalAlignment="Right"
-                  IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
         </Grid>
-        <TextBlock Name="TimedCaptionText" Classes="caption" Text="{Binding TimedCaption}"
-                   IsVisible="{Binding TimedCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
 
     </StackPanel>

@@ -103,6 +103,26 @@
 
     </Grid>
 
+    <!-- What the person chose Always allow on, each with its way to remove it. Names only, never a value. -->
+    <StackPanel Name="AlwaysAllowedList" Spacing="8" IsVisible="{Binding !IsEveryOther}">
+      <TextBlock Classes="label" Text="{x:Static res:Strings.AlwaysAllowed}" />
+      <TextBlock Classes="caption" Text="{x:Static res:Strings.NothingIsAlwaysAllowed}" TextWrapping="Wrap" IsVisible="{Binding !HasAlwaysRows}" />
+      <ItemsControl Name="AlwaysRows" ItemsSource="{Binding AlwaysRows}" IsVisible="{Binding HasAlwaysRows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AlwaysRow">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,8">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="mono size-12" Text="{Binding What}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" Text="{Binding Detail}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="1" Name="RemoveAlways" Classes="sm size-12" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Center"
+                      Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
     <!-- An Expander, so a screen reader hears it open or closed. It will not close while anything inside is set: a setting never looks unset. -->
     <Expander Name="MoreSettings" Header="{x:Static res:Strings.More}" IsExpanded="{Binding IsMoreOpen, Mode=TwoWay}"
               AutomationProperties.Name="{x:Static res:Strings.MoreSettingsGivingValuesPatternsProjectRowsX451a25}">

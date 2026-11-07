@@ -82,7 +82,7 @@ keypaste approve --vault ~/keypaste-demo.kdbx
 ```
 Master password:
 keypaste: watching /home/you/keypaste-demo.kdbx
-keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for unlock 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, an allowance lasts at most 1 hour
+keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for unlock 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer.
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
@@ -144,12 +144,12 @@ keypaste: an agent is asking for a credential.
 
   [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
       released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
 Your run may use different arguments. Claude writes the reason. `agent` is the sanitized name the AI tool gave itself, which nothing checks; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `item` is the resolved vault item, and `field` is the requested allowed field.
 
-`o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. `a` releases it once and then asks you, in a confirmation of its own, whether to make `demo:dev` Automatic for claude-code, so that what it can see there is released without asking from then on and each release is still recorded; deny that confirmation and it stays one release. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
+`o` releases it for this request only. `a` releases it once and then asks you, in a confirmation of its own, whether to make `demo:dev` Automatic for claude-code, so that what it can see there is released without asking from then on and each release is still recorded; deny that confirmation and it stays one release. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 
 Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
 
@@ -157,12 +157,12 @@ Claude may call `list_entry_names` first to find the entry, or go straight to th
 
 ### Approve
 
-Press `h`:
+Press `o`:
 
 ```
-keypaste: allowed for 1 hour.
+keypaste: allowed once.
 ────────────────────────────────────────────────────────────
-keypaste: released env/demo/.env to claude-code for 3600s
+keypaste: released env/demo/.env to claude-code once
 ```
 
 Claude sets the variable for the child process and runs the deploy again:
@@ -242,7 +242,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 
 ## Limits
 
-The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. TTL limits cached approval reuse; it cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. In source, an agent you set to Automatic for an item's project or environment is not asked about it ([agent settings](policy.md)); the demo's claude-code has no settings of its own, so every request comes to you.
+The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. keypaste cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. In source, an agent you set to Automatic for an item's project or environment is not asked about it ([agent settings](policy.md)); the demo's claude-code has no settings of its own, so every request comes to you.
 
 ## Verifying it yourself
 

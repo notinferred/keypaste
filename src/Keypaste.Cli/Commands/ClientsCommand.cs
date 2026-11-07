@@ -32,7 +32,7 @@ internal static class ClientsCommand
 
     private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent whose settings to change; \"*\" is every other agent");
     private static readonly Option<string> _project = Syntax.Value("--project", "project[:environment]", "the project row to change");
-    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|allow-for-a-while|automatic", "how it is asked");
+    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|automatic", "how it is asked");
     private static readonly Option<string[]> _see = Syntax.Values("--see", "selector", "what it can see, as often as you like");
     private static readonly Option<string> _values = Syntax.Value("--values", "yes|no", "whether it may read values");
     private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may run commands");
@@ -40,6 +40,7 @@ internal static class ClientsCommand
     private static readonly Option<string> _until = Syntax.Value(
         "--until", "date|time|none", "when Automatic ends: a date at its close, a time on this computer's clock unless it ends in Z or an offset");
     private static readonly Option<bool> _reset = Syntax.Flag("--reset", "go back to the defaults");
+    private static readonly Option<string> _forget = Syntax.Value("--forget", "id", "remove one always-allowed item or command, by the id this verb lists");
 
     internal static CliVerb Command { get; } = new(
         "clients",
@@ -51,7 +52,7 @@ internal static class ClientsCommand
             + "only a change that lowers this computer's limits can be made.",
         Execute)
     {
-        _agent, _project, _mode, _see, _values, _run, _perHour, _until, _reset, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
+        _agent, _project, _mode, _see, _values, _run, _perHour, _until, _reset, _forget, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -74,6 +75,20 @@ internal static class ClientsCommand
         if (!AgentNames.IsValid(agent, out var nameError))
         {
             return Usage(context, nameError);
+        }
+
+        if (line.GetValue(_forget) is { } forget)
+        {
+            if (new[] { _project, _mode, _values, _run, _perHour, _until }.Any(option => line.GetValue(option) is not null)
+                || line.GetValue(_see) is { Length: > 0 }
+                || line.GetValue(_reset))
+            {
+                return Usage(context, "--forget removes one always-allowed row, so it takes nothing else to change");
+            }
+
+            return AccessEdit.TryForget(forget, out var forgetting, out var forgetError)
+                ? ChangeAsync(line, clients, agent, forgetting, new AccessChangeRequest(agent, string.Empty) { Origin = AccessOrigin.Terminal, Forget = forget }, context).GetAwaiter().GetResult()
+                : Usage(context, forgetError);
         }
 
         var see = line.GetValue(_see) ?? [];
@@ -115,7 +130,7 @@ internal static class ClientsCommand
     }
 
     private static bool HasChange(ParseResult line) =>
-        new[] { _project, _mode, _values, _run, _perHour, _until }.Any(option => line.GetValue(option) is not null)
+        new[] { _project, _mode, _values, _run, _perHour, _until, _forget }.Any(option => line.GetValue(option) is not null)
         || line.GetValue(_see) is { Length: > 0 }
         || line.GetValue(_reset);
 
@@ -358,6 +373,31 @@ internal static class ClientsCommand
         }
 
         Table(writer, style, ["AGENT", "PROJECT", "MODE", "VALUES", "RUN", "SEES"], rows);
+
+        List<string[]> always =
+        [
+            .. agents.SelectMany(agent =>
+            {
+                var said = AcafRecord.Read(agent.Record).Access.Always;
+                var name = EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text;
+
+                return said.Items
+                    .Select(item => new[] { name, AlwaysAllowed.ItemId(item), $"item {item}" })
+                    .Concat(said.Commands.Select(command => new[]
+                    {
+                        name,
+                        command.Id,
+                        $"{DisplayTextSanitizer.Escaped(EnvReleasePrompt.CommandLine(command.Command))} in {DisplayTextSanitizer.Escaped(command.Directory)}",
+                    }));
+            }),
+        ];
+
+        if (always.Count > 0)
+        {
+            writer.WriteLine();
+            writer.WriteLine(style.Paint(writer, Tone.Muted, "  always allowed: released without asking. keypaste clients <agent> --forget <id> removes one"));
+            Table(writer, style, ["AGENT", "ID", "WHAT"], always);
+        }
 
         if (caps.Rows.Count == 0)
         {

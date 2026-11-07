@@ -265,7 +265,6 @@ public sealed class SessionOwnershipTests
                     Entry = "env/dev/STRIPE_KEY",
                     Field = "password",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["env/**"],
                     Vault = vault,
                     Session = attached.Session!,

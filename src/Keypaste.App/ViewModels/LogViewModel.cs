@@ -120,7 +120,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
 
     internal string Subtitle => IsAgentHistory
         ? "What agents and tokens asked for, and what came of it. Kept on this machine, each line tied to the one before it, so an edit shows."
-        : "Every agent request, allowance, token run and share. Kept on this machine, each line tied to the one before it, so an edit shows.";
+        : "Every agent request, token run and share. Kept on this machine, each line tied to the one before it, so an edit shows.";
 
     internal IReadOnlyList<LogFilterOption> Filters { get; } =
     [

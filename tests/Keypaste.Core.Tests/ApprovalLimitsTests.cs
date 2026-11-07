@@ -16,7 +16,4 @@ public sealed class ApprovalLimitsTests
     public void Describe_ReadsAsAPersonSaysIt(int seconds, string expected) =>
         Assert.Equal(expected, ApprovalLimits.Describe(seconds));
 
-    [Fact]
-    public void ThePersonsTimedGrant_DefaultsToAnHour() =>
-        Assert.Equal(3600, ApprovalLimits.Default.MaximumTtlSeconds);
 }

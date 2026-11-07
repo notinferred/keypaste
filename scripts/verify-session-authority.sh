@@ -63,7 +63,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
     await_replies "${WAIT_SECONDS:-30}" "$out" 2 || true
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci session probe\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci session probe\"}}}"
     if [ -n "$prompt" ]; then
       wait_for '^prompt client' "$HOLD_OUT" "$prompt"
       echo deny >&7
@@ -80,7 +80,7 @@ ask_automatic() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/ci/.env","field":"AUTO_KEY","reason":"ci automatic probe","ttl_seconds":60}}}'
+    printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/ci/.env","field":"AUTO_KEY","reason":"ci automatic probe"}}}'
     await_replies "${WAIT_SECONDS:-30}" "$out" 2 || true
   } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
     || die "keypaste mcp exited non-zero"

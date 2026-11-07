@@ -142,7 +142,7 @@ public sealed class AgentSettingsViewModelTests
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBox>(), box => box.IsEffectivelyVisible);
 
-        Segment(window, "ModeChoices", "Ask, allow for 1 hour", isChecked: true);
+        Segment(window, "ModeChoices", "Ask every time", isChecked: true);
         var automatic = Segment(window, "ModeChoices", "Automatic", isChecked: false);
         var toggle = ControlAutomationPeer.CreatePeerForElement(automatic).GetProvider<IToggleProvider>();
         Assert.NotNull(toggle);
@@ -152,7 +152,7 @@ public sealed class AgentSettingsViewModelTests
 
         Assert.False(automatic.IsChecked);
         Assert.True(model.IsChanging);
-        Segment(window, "ModeChoices", "Ask, allow for 1 hour", isChecked: true);
+        Segment(window, "ModeChoices", "Ask every time", isChecked: true);
 
         answer.SetResult(ApprovalAnswer.ApprovedOnce);
         await model.Changing.WaitAsync(_connect, Token);
@@ -167,7 +167,7 @@ public sealed class AgentSettingsViewModelTests
         await using var app = await App.StartAsync();
         using var model = app.Settings();
 
-        Assert.Equal("Ask, allow for 1 hour", Chosen(model.ModeChoices));
+        Assert.Equal("Ask every time", Chosen(model.ModeChoices));
         Assert.Equal("Yes", Chosen(model.ValueChoices));
         Assert.Equal("Off", Chosen(model.RunChoices));
         Assert.Equal("All projects", Chosen(model.SeeScopes));
@@ -184,13 +184,13 @@ public sealed class AgentSettingsViewModelTests
     }
 
     [Fact]
-    public async Task A_narrowing_applies_at_once_in_the_vault_and_on_this_computer_and_ends_the_agents_grants()
+    public async Task A_narrowing_applies_at_once_in_the_vault_and_on_this_computer()
     {
         await using var app = await App.StartAsync();
-        app.Person.Credential = ApprovalAnswer.Approved;
-        Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-        Assert.Single(app.Authority.Activity.Grants);
+        app.Person.Change = ApprovalAnswer.ApprovedOnce;
         using var model = app.Settings();
+        await model.ChooseAsync(Choice(model.ModeChoices, "Automatic"));
+        app.Person.Changes.Clear();
 
         await model.ChooseAsync(Choice(model.ModeChoices, "Ask every time"));
 
@@ -199,7 +199,6 @@ public sealed class AgentSettingsViewModelTests
         Assert.StartsWith("Changed: ", model.Message, StringComparison.Ordinal);
         Assert.Equal(AgentMode.Ask, Assert.Single(app.Caps().Rows).Mode);
         Assert.Equal(AgentMode.Ask, app.Record().Mode);
-        Assert.Empty(app.Authority.Activity.Grants);
 
         var line = app.LastLine();
         Assert.Equal(
@@ -214,7 +213,7 @@ public sealed class AgentSettingsViewModelTests
         app.Person.Change = ApprovalAnswer.Denied;
         using var model = app.Settings();
 
-        await model.ChooseAsync(Choice(model.RunChoices, "On, each command still asked about"));
+        await model.ChooseAsync(Choice(model.RunChoices, "On, asked about unless always allowed"));
 
         var asked = Assert.Single(app.Person.Changes);
         Assert.Equal(("ci-probe", AccessOrigin.Settings), (asked.Agent, asked.Origin));
@@ -227,7 +226,7 @@ public sealed class AgentSettingsViewModelTests
         Assert.Equal(("denied", "prompt"), (app.LastLine().Decision, app.LastLine().Method));
 
         // Refusing their own change holds nothing back: trying it again asks again.
-        await model.ChooseAsync(Choice(model.RunChoices, "On, each command still asked about"));
+        await model.ChooseAsync(Choice(model.RunChoices, "On, asked about unless always allowed"));
 
         Assert.Equal(2, app.Person.Changes.Count);
         Assert.Equal(("denied", "prompt"), (app.LastLine().Decision, app.LastLine().Method));
@@ -259,7 +258,7 @@ public sealed class AgentSettingsViewModelTests
         await using var app = await App.StartAsync();
         using var model = app.Settings(AgentNames.Any);
 
-        Assert.Equal(["Ask every time", "Ask, allow for 1 hour"], model.ModeChoices.Select(choice => choice.Words));
+        Assert.Equal(["Ask every time"], model.ModeChoices.Select(choice => choice.Words));
         Assert.Empty(model.RunChoices);
         Assert.False(model.OffersRun);
         Assert.Contains("only take away", model.Identity, StringComparison.Ordinal);
@@ -330,7 +329,7 @@ public sealed class AgentSettingsViewModelTests
 
         Assert.Empty(app.Person.Changes);
         var row = Assert.Single(model.Rows);
-        Assert.Equal(("billing:dev", "Ask, allow for 1 hour"), (row.Name, Chosen(row.Modes)));
+        Assert.Equal(("billing:dev", "Ask every time"), (row.Name, Chosen(row.Modes)));
         Assert.DoesNotContain("billing:dev", model.NewRowScopes);
 
         await model.ChooseAsync(Choice(row.Modes, "Automatic"));
@@ -617,7 +616,6 @@ public sealed class AgentSettingsViewModelTests
                     Entry = $"{_item.GroupPath}/{_item.Title}",
                     Field = "STRIPE_KEY",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                     ClientName = "claude",
                     ClientLabel = "ci-probe",

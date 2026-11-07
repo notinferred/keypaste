@@ -177,7 +177,7 @@ internal static class CliApp
         ("AGENTS",
         [
             SetupCommand.Command, _mcp, ApproveCommand.Command, ClientsCommand.Command, DoctorCommand.Command,
-            GrantsCommand.Command, TokenCommand.Command, LogCommand.Command,
+            TokenCommand.Command, LogCommand.Command,
         ]),
         ("VAULT",
         [
@@ -232,7 +232,7 @@ internal static class CliApp
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine($"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
-        writer.WriteLine("                    attachment ls, env ls, log, grants, doctor, token ls,");
+        writer.WriteLine("                    attachment ls, env ls, log, doctor, token ls,");
         writer.WriteLine("                    share ls, clients");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();

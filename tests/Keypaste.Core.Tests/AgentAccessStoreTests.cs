@@ -91,7 +91,7 @@ public sealed class AgentAccessStoreTests : IDisposable
         var access = EffectiveAccess.Create(_agent, records, AccessCaps.Empty);
 
         Assert.Equal(SavedRead.Unsaved, records.State);
-        Assert.Equal(AgentMode.AllowForAWhile, access.Item(["env:billing"], DateTimeOffset.UtcNow).Mode);
+        Assert.Equal(AgentMode.Ask, access.Item(["env:billing"], DateTimeOffset.UtcNow).Mode);
         Assert.False(access.Values);
     }
 
@@ -110,7 +110,7 @@ public sealed class AgentAccessStoreTests : IDisposable
         var records = Store.Read(_agent);
 
         Assert.Equal(SavedRead.ChangedOnDisk, records.State);
-        Assert.Equal(AgentMode.AllowForAWhile, EffectiveAccess.Create(_agent, records, AccessCaps.Empty).Item([], DateTimeOffset.UtcNow).Mode);
+        Assert.Equal(AgentMode.Ask, EffectiveAccess.Create(_agent, records, AccessCaps.Empty).Item([], DateTimeOffset.UtcNow).Mode);
 
         var reloaded = _vault.Reload();
         _vault.Dispose();
@@ -501,7 +501,7 @@ public sealed class AgentAccessStoreTests : IDisposable
         var record = Assert.Single(Store.Read(_agent).Own);
 
         Assert.False(record.Understood);
-        Assert.Equal(AgentMode.AllowForAWhile, EffectiveAccess.Create(_agent, Store.Read(_agent), AccessCaps.Empty).Item([], DateTimeOffset.UtcNow).Mode);
+        Assert.Equal(AgentMode.Ask, EffectiveAccess.Create(_agent, Store.Read(_agent), AccessCaps.Empty).Item([], DateTimeOffset.UtcNow).Mode);
     }
 
     /// <summary>

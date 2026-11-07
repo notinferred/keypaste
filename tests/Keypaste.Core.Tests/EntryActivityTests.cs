@@ -36,23 +36,12 @@ public sealed class EntryActivityTests
         EntryActivity.Build(audit ?? [], _vault, live ?? ApproverActivity.None, session ?? [], _now);
 
     [Fact]
-    public void AGrantInForce_IsInUse()
-    {
-        var grant = new EnvGrantInForce("k", "acme-api", "dev", "npm test", TimeSpan.FromMinutes(5)) { Entries = ["env/acme-api/STRIPE_KEY"] };
-
-        var activity = Build(live: ApproverActivity.None with { EnvGrants = [grant] });
-
-        Assert.Equal(EntryUseState.InUse, activity.Use(_stripe).State);
-        Assert.Equal(EntryUseState.Idle, activity.Use(_github).State);
-    }
-
-    [Fact]
     public void AWaitingCredentialEnvOrRun_IsInUse()
     {
-        var credential = new WaitingRequest(ApprovalPrompt.For("claude", _github, "password", "why", 0), TimeSpan.FromSeconds(30));
+        var credential = new WaitingRequest(ApprovalPrompt.For("claude", _github, "password", "why"), TimeSpan.FromSeconds(30));
         var env = new WaitingEnv(EnvReleasePrompt.For(new EnvPreview("acme-api", ["STRIPE_KEY"]), ["npm", "test"], "/work"), TimeSpan.FromSeconds(30));
 
-        Assert.Equal(EntryUseState.InUse, Build(live: new ApproverActivity([credential], [])).Use(_github).State);
+        Assert.Equal(EntryUseState.InUse, Build(live: new ApproverActivity([credential])).Use(_github).State);
         Assert.Equal(EntryUseState.InUse, Build(live: ApproverActivity.None with { WaitingEnvs = [env] }).Use(_stripe).State);
     }
 
@@ -112,19 +101,16 @@ public sealed class EntryActivityTests
     }
 
     [Fact]
-    public void Access_ListsClientsNewestFirst_WithGrants()
+    public void Access_ListsClientsNewestFirst()
     {
-        var grant = new EnvGrantInForce("k", "p", "dev", "npm test", TimeSpan.FromMinutes(5)) { Client = "Claude", Entries = ["personal/github"] };
         var activity = Build(
             [Line("personal/github", 50, label: "cursor"), Line("personal/github", 20, label: "claude-code"), Line("personal/github", 90, label: "cursor")],
-            ApproverActivity.None with { EnvGrants = [grant] });
+            ApproverActivity.None);
 
         var access = activity.Access(_github);
 
         Assert.Equal(["claude-code", "cursor"], access.Clients.Select(client => client.Client));
         Assert.Equal(2, access.Clients[1].Releases);
-        Assert.Equal("run", Assert.Single(access.Grants).Kind);
-        Assert.Equal(EntryUseState.InUse, access.Use.State);
         Assert.False(access.Waiting);
     }
 

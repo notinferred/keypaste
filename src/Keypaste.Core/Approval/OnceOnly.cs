@@ -1,17 +1,17 @@
 namespace Keypaste.Core.Approval;
 
-/// <summary>Why a prompt offers no timed grant, so a channel can say so.</summary>
+/// <summary>Why a prompt offers no Always allow, so a channel can say so.</summary>
 public enum OnceOnly
 {
-    /// <summary>A timed grant is offered, or nothing says why not.</summary>
+    /// <summary>Always allow is offered.</summary>
     None = 0,
 
-    /// <summary>What is asked for lives in a protected profile, which is asked about every time.</summary>
+    /// <summary>What is asked for lives in a protected environment, which is asked about every time.</summary>
     ProtectedProfile = 1,
 
-    /// <summary>The agent's mode for what is asked for is Ask every time.</summary>
-    AskEveryTime = 2,
+    /// <summary>An Automatic limit, its end or its hourly count, was reached, and Always would bypass a limit the person set.</summary>
+    LimitReached = 2,
 
-    /// <summary>What is asked for is a TOTP code, which a timed grant would hand out after it changed (D-0480).</summary>
-    TotpCode = 3,
+    /// <summary>The agent has no name of its own, so its settings have nowhere to keep it.</summary>
+    Unnamed = 3,
 }

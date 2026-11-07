@@ -11,7 +11,7 @@
 # leave exactly one line, cancelled, which the app records. Each case uses
 # a new bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of
 # their own, because a refusal cools that field down for every bridge (D-0425). For an entry in one
-# project environment the prompt offers Always for it: pressed, it holds the release while the app's
+# project environment the prompt offers Always allow it: pressed, it holds the release while the app's
 # confirmation asks to make that environment Automatic; refused, the request is released once and nothing
 # changes; allowed, the next request for the entry is released with no prompt and recorded as automatic.
 # A terminal's `keypaste set`, piped its value alone, is asked about in the app's own window, which names
@@ -20,7 +20,7 @@
 #
 # NEGATIVE CONTROL: this fails if a request is released without a press of Approve, if Approve does not
 # release it, if an audit line names the wrong method, session or label, if an abandoned request leaves
-# no line or two, if a prompt stays up after its request is answered or abandoned, if Always for is not
+# no line or two, if a prompt stays up after its request is answered or abandoned, if Always allow is not
 # offered or releases before its confirmation is answered, or if a refused confirmation changes anything
 # or an allowed one does not release the next request unasked, if a terminal's edit is saved without its
 # Allow, draws its value, or changes anything once denied. These checks must never be skipped or
@@ -37,7 +37,7 @@ readonly API_ENTRY='api/OpenAI'
 readonly API_PASSWORD='SENTINEL-DESKTOP-OPENAI-PASSWORD-51c7'
 readonly API_KEY='SENTINEL-DESKTOP-OPENAI-API-KEY-6d08'
 readonly RECOVERY='SENTINEL-DESKTOP-RECOVERY-CODES-7e19'
-# Entries in one environment of a project, for Always for: one whose confirmation is refused, one allowed.
+# Entries in one environment of a project, for Always allow: one whose confirmation is refused, one allowed.
 readonly STAGING_ENTRY='env/ci/STAGING_KEY'
 readonly RELEASE_ENTRY='env/ci/RELEASE_KEY'
 
@@ -81,7 +81,7 @@ PROMPTS=0
 request() {
   local id="$1" entry="$2" field="$3"
   jq -cn --argjson id "$id" --arg entry "$entry" --arg field "$field" \
-    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci desktop approval probe",ttl_seconds:60}}}' >&8
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci desktop approval probe"}}}' >&8
 }
 
 # Starts a bridge whose standard input stays open, asks for the credential, and waits for the prompt.
@@ -177,7 +177,7 @@ FIRST="$(session_of)"
 # ------------------------------------------------------------- Approve releases, and says so
 raise_prompt approve
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "label=$LABEL entry=$ENTRY field=password for=once, or for 1 hour" \
+  | grep -qF "label=$LABEL entry=$ENTRY field=password for=once or always" \
   || die "the prompt does not show the label, entry, field and what the person can allow"
 echo approve >&7
 answered 30
@@ -193,7 +193,7 @@ grep -q "$SECRET" "$HOLD_OUT" && die "the credential reached the app's output"
 # ------------------------------------------------------------- one custom field, by name (C.5a)
 raise_prompt field-once OPENAI_API_KEY "$API_ENTRY" 'api/**'
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once, or for 1 hour" \
+  | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once or always" \
   || die "the prompt does not name the custom field"
 echo once >&7
 answered 30
@@ -201,22 +201,22 @@ withdrawn
 jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.isError == false and .result.structuredContent.value == $v' <"$OUT" >/dev/null \
   || die "Allow once did not return exactly the custom field's value"
 tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" \
-  '.decision == "granted" and .method == "prompt" and .args.field == "OPENAI_API_KEY" and .session == $s and .granted_seconds == 0' >/dev/null \
+  '.decision == "granted" and .method == "prompt" and .args.field == "OPENAI_API_KEY" and .session == $s ' >/dev/null \
   || die "the custom field's release was not audited with its field as allowed once"
 
-# Allowed for an hour on one connection, it serves that field alone: the password still draws a prompt,
-# and a field that never leaves is refused by the bridge with no prompt at all.
-raise_prompt field-hour OPENAI_API_KEY "$API_ENTRY" 'api/**'
+# Allowed once more on one connection, the password still draws a prompt of its own, and a field that
+# never leaves is refused by the bridge with no prompt at all.
+raise_prompt field-again OPENAI_API_KEY "$API_ENTRY" 'api/**'
 echo approve >&7
 reply_to 3
 withdrawn
 jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.structuredContent.value == $v' <"$OUT" >/dev/null \
-  || die "Allow for 1 hour did not return the custom field's value"
+  || die "Allow once did not return the custom field's value"
 request 4 "$API_ENTRY" password
 PROMPTS=$((PROMPTS + 1))
 wait_for '^prompt client' "$HOLD_OUT" "$PROMPTS"
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$API_ENTRY field=password" \
-  || die "a password request under the custom field's grant did not draw its own prompt"
+  || die "a password request after the custom field's release did not draw its own prompt"
 echo deny >&7
 reply_to 4
 withdrawn
@@ -282,45 +282,45 @@ exec 8>&-
 cancelled_once "$logged" "$FIRST" "the request whose bridge went away"
 grep -q "$SECRET" "$OUT" && die "a request whose bridge went away reached the client"
 
-# --------------------- Always for allows once and then asks; refused it stays one release, allowed it is Automatic
+# --------------------- Always allow allows once and then asks; refused it stays one release, allowed it is Automatic
 raise_prompt always-refused password "$STAGING_ENTRY"
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "entry=$STAGING_ENTRY field=password for=once, or for 1 hour always=Always for ci:staging" \
-  || die "the prompt does not offer Always for the entry's environment"
+  | grep -qF "entry=$STAGING_ENTRY field=password for=once or always always=Always allow makes ci:staging Automatic" \
+  || die "the prompt does not offer Always allow the entry's environment"
 echo always >&7
 wait_for '^access-prompt agent=' "$HOLD_OUT" 1
 grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=asked from the approval prompt's Always for gains=ci:staging: Automatic" \
+  | grep -qF "agent=$LABEL asked=asked from the approval prompt's Always allow gains=ci:staging: Automatic" \
   || die "the confirmation does not say who gains what, or where it was asked from"
-jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 && die "the release came back before the change Always for asked for was answered"
+jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 && die "the release came back before the change Always allow asked for was answered"
 echo deny >&7
 answered 30
 withdrawn
 wait_for '^access-prompt withdrawn' "$HOLD_OUT" 1
-jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always for did not release the request once"
+jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always allow did not release the request once"
 tail -n 2 "$AUDIT" | jq -e -s --arg l "$LABEL" '.[0].tool == "access_change" and .[0].decision == "denied" and .[0].client.label == $l
-    and .[1].tool == "request_credential" and .[1].decision == "granted" and .[1].method == "prompt" and .[1].granted_seconds == 0' >/dev/null \
-  || die "a refused Always for was not recorded as one release and one refused change: $(tail -n 2 "$AUDIT")"
+    and .[1].tool == "request_credential" and .[1].decision == "granted" and .[1].method == "prompt"' >/dev/null \
+  || die "a refused Always allow was not recorded as one release and one refused change: $(tail -n 2 "$AUDIT")"
 
 raise_prompt always-allowed password "$RELEASE_ENTRY"
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$RELEASE_ENTRY field=password for=once, or for 1 hour always=Always for ci:dev" \
-  || die "the prompt does not offer Always for ci:dev"
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$RELEASE_ENTRY field=password for=once or always always=Always allow makes ci:dev Automatic" \
+  || die "the prompt does not offer Always allow ci:dev"
 echo always >&7
 wait_for '^access-prompt agent=' "$HOLD_OUT" 2
 echo allow >&7
 reply_to 3
 withdrawn
 wait_for '^access-prompt withdrawn' "$HOLD_OUT" 2
-jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always for did not release the request"
+jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always allow did not release the request"
 tail -n 2 "$AUDIT" | jq -e -s '.[0].tool == "access_change" and .[0].decision == "granted" and .[0].method == "prompt"
     and .[1].tool == "request_credential" and .[1].decision == "granted" and .[1].method == "prompt"' >/dev/null \
-  || die "an allowed Always for was not recorded as a confirmed change and a release: $(tail -n 2 "$AUDIT")"
+  || die "an allowed Always allow was not recorded as a confirmed change and a release: $(tail -n 2 "$AUDIT")"
 request 4 "$RELEASE_ENTRY" password
 reply_to 4
 exec 8>&-
-jq -e 'select(.id == 4) | .result.isError == false' <"$OUT" >/dev/null || die "the request after Always for was not released"
+jq -e 'select(.id == 4) | .result.isError == false' <"$OUT" >/dev/null || die "the request after Always allow was not released"
 tail -n 1 "$AUDIT" | jq -e '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' >/dev/null \
-  || die "the request after Always for was not recorded as released automatically"
+  || die "the request after Always allow was not recorded as released automatically"
 [ "$(grep -c '^prompt client' "$HOLD_OUT")" -eq "$PROMPTS" ] || die "a request under Automatic drew a prompt"
 
 # ------------------------------------------------- a terminal's edit is asked about in the window (D-0464)

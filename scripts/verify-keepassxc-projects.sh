@@ -15,9 +15,9 @@
 # the file byte-identical.
 #
 # Then a real `keypaste approve` holds the 4.1 vault and a real `keypaste mcp`, exposed to the entries,
-# asks for passwords. An untagged-for-prod entry answered with the hour gets it, and so does
+# asks for passwords. An untagged-for-prod entry answered once gets it, and so does
 # env/billing/prod/DB. The entry tagged env:billing:prod, and one KeePassXC tagged env:billing:Prod
-# through `keepassxc-cli merge`, are offered Allow once only: the hour is refused and once is honoured.
+# through `keepassxc-cli merge`, are offered Allow once only: an always is refused and once is honoured.
 #
 # A third vault KeePassXC makes holds fields on entries tagged env:billing, a staging entry also tagged
 # env:billing:prod, and the same untagged entries. `keypaste run` gives a child exactly the tagged
@@ -82,7 +82,7 @@
 # entry, the newer record whole and the older in its history.
 #
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, a
-# child holding OLD_KEY must fail the one the runs rest on, and the hour must be honoured for an entry
+# child holding OLD_KEY must fail the one the runs rest on, and once must be honoured for an entry
 # no tag protects. The two copies' records of each agent changed or created in both must differ, so the
 # merge can show which one won.
 #
@@ -266,7 +266,7 @@ printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$grouped")" "$(native "$dir/
   || die "keepassxc-cli could not merge the newer copy"
 grep -qx 'env:billing:Prod' <<<"$(tags "$grouped" services/Other)" || die "the merge did not bring env:billing:Prod"
 
-step "a real keypaste approve and keypaste mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
+step "a real keypaste approve and keypaste mcp: an always is refused for a protected tag, and once honoured otherwise, under a prod path too"
 pipe="keypaste-projects-$$-$(date +%s)"
 # The home's log, which every owner and bridge here writes; each phase reads the lines it gained.
 audit="$KEYPASTE_HOME/audit.jsonl"
@@ -276,10 +276,10 @@ agent_err="$dir/agent.err"
 # terminal; with no settings it would see only project variables, never a password.
 agent_settings "$kp" "$(native "$grouped")" "$pw" 'projects-probe --see services/** --see env/**' \
   || die "could not save projects-probe's settings in the KeePassXC vault"
-# One answer per request, in order: the hour for the dev entry, once then the hour for the prod entry
-# (once first, because refusing the hour cools that field down for every bridge, D-0425), the hour for
-# the entry KeePassXC tagged through the merge, and the hour for env/billing/prod/DB.
-printf '%s\nh\no\nh\nh\nh\n' "$pw" | "$kp" approve --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
+# One answer per request, in order: once for the dev entry, once then always for the prod entry (once first,
+# because refusing always cools that field down for every bridge, D-0425), always for the entry KeePassXC
+# tagged through the merge, and once for env/billing/prod/DB.
+printf '%s\no\no\na\na\no\n' "$pw" | "$kp" approve --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
   >/dev/null 2>"$agent_err" &
 agent_pid=$!
 for _ in $(seq 1 100); do
@@ -295,7 +295,7 @@ ask() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"projects-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"password\",\"reason\":\"projects gate\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"password\",\"reason\":\"projects gate\"}}}"
     await_replies "${WAIT_SECONDS:-30}" "$out" "$id" || true
   } | "$kp" mcp --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
         --client-label projects-probe >"$out" 2>"$dir/ask-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/ask-$id.err")"
@@ -303,11 +303,11 @@ ask() {
 }
 granted() { jq -e --argjson id "$1" 'select(.id == $id) | .result.isError == false' >/dev/null; }
 
-ask 2 services/Stripe | granted 2 || die "the dev entry answered with the hour was not released (the hour is not honoured, so the control fails)"
+ask 2 services/Stripe | granted 2 || die "the dev entry answered once was not released, so the control fails"
 ask 3 services/Database | granted 3 || die "the prod-tagged entry answered once was not released"
-ask 4 services/Database | granted 4 && die "the prod-tagged entry was released for the hour"
-ask 5 services/Other | granted 5 && die "the entry KeePassXC tagged env:billing:Prod was released for the hour"
-ask 6 env/billing/prod/DB | granted 6 || die "the untagged env/billing/prod/DB answered with the hour was not released: a path protected it"
+ask 4 services/Database | granted 4 && die "the prod-tagged entry was released on an Always allow"
+ask 5 services/Other | granted 5 && die "the entry KeePassXC tagged env:billing:Prod was released on an Always allow"
+ask 6 env/billing/prod/DB | granted 6 || die "the untagged env/billing/prod/DB answered once was not released: a path protected it"
 
 [ "$(tr -d '\r' <"$agent_err" | grep -c 'it is asked about every time')" = 3 ] \
   || die "keypaste approve did not say three times that the entry is asked about every time: $(cat "$agent_err")"
@@ -527,8 +527,8 @@ trap 'cleanup; kill "${expose_pid:-}" 2>/dev/null || true' EXIT
 # confirmed at keypaste approve's terminal; with no settings its run would be refused unasked.
 agent_settings "$kp" "$(native "$exposed")" "$pw" 'exposed-probe --run on' \
   || die "could not turn exposed-probe's commands on in the KeePassXC vault"
-# The hour for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
-printf '%s\nh\no\n' "$pw" | "$kp" approve --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
+# Once for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
+printf '%s\no\no\n' "$pw" | "$kp" approve --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
   >/dev/null 2>"$expose_err" &
 expose_pid=$!
 for _ in $(seq 1 100); do
@@ -547,7 +547,7 @@ replied() { # waits for the answer to one id
 }
 credential() {
   jq -cn --argjson id "$1" --arg field "$2" \
-    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:$field,reason:"C.5b gate",ttl_seconds:60}}}'
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:$field,reason:"C.5b gate"}}}'
 }
 : >"$expose_out"
 {
@@ -607,8 +607,8 @@ cleanup_fields() {
   exec 7>&- 2>/dev/null || true
 }
 trap cleanup_fields EXIT
-# The hour for the dev run, then once for the staging run, whose Shared entry is also tagged env:billing:prod.
-printf '%s\nh\no\n' "$pw" | "$kp" approve --vault "$(native "$fields")" --approver "$fields_pipe" --approval-timeout 30 \
+# Once for the dev run, then once for the staging run, whose Shared entry is also tagged env:billing:prod.
+printf '%s\no\no\n' "$pw" | "$kp" approve --vault "$(native "$fields")" --approver "$fields_pipe" --approval-timeout 30 \
   >/dev/null 2>"$fields_err" &
 fields_pid=$!
 for _ in $(seq 1 100); do
@@ -682,9 +682,9 @@ app_run() {
   grep -qi 'password' "$dir/app-$label.err" && die "${label}: the runner asked for a password"
   return 0
 }
-app_run dev 'keys=DATABASE_URL,STRIPE_SECRET_KEY entries=services/Database,services/Stripe timed=True' \
+app_run dev 'keys=DATABASE_URL,STRIPE_SECRET_KEY entries=services/Database,services/Stripe' \
   approve "$dev_set" billing
-app_run staging 'keys=SHARED_KEY entries=services/Shared timed=False' \
+app_run staging 'keys=SHARED_KEY entries=services/Shared' \
   once "$shared_set" billing -p staging
 grep -qF -- '-c1b' "$hold_out" && die "a value reached the app's output"
 exec 7>&-
@@ -1096,7 +1096,7 @@ newer_kept() {
 [ "$(agents_in "$acaf")" = "acaf-both acaf-first acaf-second" ] || die "KeePassXC lists the agents $(agents_in "$acaf")"
 for agent in acaf-both acaf-first acaf-second; do
   same "$(record_of "$acaf" "$agent")" \
-    '{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while","projects":[{"project":"billing","mode":"automatic"}]}' \
+    '{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"ask","projects":[{"project":"billing","mode":"automatic"}]}' \
     || die "KeePassXC reads ${agent}'s record as $(record_of "$acaf" "$agent")"
   [ "$(uuid_of "$acaf" "$agent")" = "$(acaf_id "$agent")" ] || die "${agent}'s entry has the UUID $(uuid_of "$acaf" "$agent"), not $(acaf_id "$agent")"
 done
@@ -1151,7 +1151,7 @@ ask_as() {
   id=$((asks + 1))
   out="$dir/acaf-$id.out"
   call=$(jq -cn --argjson id "$id" \
-    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:"STRIPE_SECRET_KEY",reason:"ACAF gate",ttl_seconds:60}}}')
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:"STRIPE_SECRET_KEY",reason:"ACAF gate"}}}')
   : >"$out"
   {
     jq -cn --arg name "$label" '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:$name,version:"1.0.0"}}}'
@@ -1212,7 +1212,7 @@ twin_second=$(record_of "$second" acaf-twin)
 jq -e '.values == false and .projects == [{"project":"billing","mode":"automatic"}]' <<<"$first_only" >/dev/null \
   || die "the first copy's acaf-first reads ${first_only}"
 jq -e '.values == false and .run == false' <<<"$both_first" >/dev/null || die "the first copy's acaf-both reads ${both_first}"
-jq -e '.mode == "allow-for-a-while" and .values == false and (has("projects") | not)' <<<"$twin_first" >/dev/null \
+jq -e '.mode == "ask" and .values == false and (has("projects") | not)' <<<"$twin_first" >/dev/null \
   || die "the first copy's acaf-twin reads ${twin_first}"
 jq -e '.projects == [{"project":"billing","mode":"ask"}]' <<<"$second_only" >/dev/null || die "the second copy's acaf-second reads ${second_only}"
 jq -e '.values == true and .run == true' <<<"$both_second" >/dev/null || die "the second copy's acaf-both reads ${both_second}"
@@ -1265,7 +1265,7 @@ for merged in "$into_first" "$into_second"; do
   [ "$(answered "$logged")" = '[["acaf-first","request_credential","denied","inject-only"],["acaf-second","request_credential","granted","prompt"],["acaf-both","request_credential","granted","automatic"],["acaf-twin","request_credential","granted","automatic"]]' ] \
     || die "${name}: the owner did not record what each record says: $(answered "$logged")"
   [ "$(said_held 'an agent is asking for a credential')" = 1 ] || die "${name}: keypaste approve was not asked exactly once: $(cat "$held_err")"
-  [ "$(said_held 'this agent is set to Ask every time')" = 1 ] || die "${name}: acaf-second's prompt did not say it is asked every time: $(cat "$held_err")"
+  [ "$(said_held 'then asks you to make')" = 1 ] || die "${name}: acaf-second's prompt did not say it is asked every time: $(cat "$held_err")"
   release
 done
 
@@ -1296,7 +1296,7 @@ for merged in "$again" "$into_first"; do
   refused || die "${name}: acaf-twin, given no values by the narrowing, was released STRIPE_SECRET_KEY: ${reply}"
   [ "$(answered "$logged")" = '[["acaf-both","request_credential","granted","prompt"],["acaf-twin","request_credential","denied","inject-only"]]' ] \
     || die "${name}: the owner did not record what each record says: $(answered "$logged")"
-  [ "$(said_held 'this agent is set to Ask every time')" = 1 ] || die "${name}: acaf-both's prompt did not say it is asked every time: $(cat "$held_err")"
+  [ "$(said_held 'then asks you to make')" = 1 ] || die "${name}: acaf-both's prompt did not say it is asked every time: $(cat "$held_err")"
   release
 done
 grep -qF sk_test_projects "$audit" && die "a released value reached the audit log"
@@ -1313,7 +1313,7 @@ sleep 2
 agent_settings "$kp" "$(native "$new_second")" "$pw" 'acaf-new --mode ask' || die "could not create acaf-new in the second fresh copy"
 new_older=$(record_of "$new_first" acaf-new)
 new_newer=$(record_of "$new_second" acaf-new)
-jq -e '.values == false and .mode == "allow-for-a-while"' <<<"$new_older" >/dev/null || die "the first fresh copy's acaf-new reads ${new_older}"
+jq -e '.values == false and .mode == "ask"' <<<"$new_older" >/dev/null || die "the first fresh copy's acaf-new reads ${new_older}"
 jq -e '.values == true and .mode == "ask"' <<<"$new_newer" >/dev/null || die "the second fresh copy's acaf-new reads ${new_newer}"
 cp "$new_first" "$dir/acaf-new-into-first.kdbx"
 merge_into "$dir/acaf-new-into-first.kdbx" "$new_second"

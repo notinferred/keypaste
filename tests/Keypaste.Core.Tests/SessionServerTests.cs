@@ -15,22 +15,6 @@ public sealed class SessionServerTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
-    /// <summary>Every owner watches its edits while it serves, so an edit withdraws the grants naming what it touched (D-0318).</summary>
-    [Fact]
-    public void Edits_are_watched_while_serving_and_no_longer_once_disposed()
-    {
-        using var lifetime = new SessionLifetime();
-        List<EventHandler<VaultEdit>> watching = [];
-
-        using (SessionServer.Listen(UniqueName(), Options(lifetime, watching)))
-        {
-            var handler = Assert.Single(watching);
-            handler(this, VaultEdit.Of(new EntryName("env/acme", "API_KEY")));
-        }
-
-        Assert.Empty(watching);
-    }
-
     /// <summary>The authority is built before the endpoint is bound, so a name another listener holds leaves no edit watched behind.</summary>
     [Fact]
     public void A_name_already_held_leaves_no_edit_watched()
@@ -81,8 +65,6 @@ public sealed class SessionServerTests : IDisposable
         Settings = IAgentSettings.Defaults,
         Hourly = new HourlyLimit(TimeProvider.System),
         Audit = () => null,
-        WatchEdits = watching.Add,
-        UnwatchEdits = handler => watching.Remove(handler),
     };
 
     private static string UniqueName() =>

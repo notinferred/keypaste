@@ -53,9 +53,9 @@ public static class Strings
     public static string AgentsWithoutALabel => Manager.GetString("AgentsWithoutALabel", CultureInfo.CurrentUICulture)!;
     public static string All => Manager.GetString("All", CultureInfo.CurrentUICulture)!;
     public static string AllItems => Manager.GetString("AllItems", CultureInfo.CurrentUICulture)!;
-    public static string Allowances => Manager.GetString("Allowances", CultureInfo.CurrentUICulture)!;
     public static string AllowedOnce => Manager.GetString("AllowedOnce", CultureInfo.CurrentUICulture)!;
-    public static string AlwaysForDidNotTakeEffect => Manager.GetString("AlwaysForDidNotTakeEffect", CultureInfo.CurrentUICulture)!;
+    public static string AlwaysAllowDidNotTakeEffect => Manager.GetString("AlwaysAllowDidNotTakeEffect", CultureInfo.CurrentUICulture)!;
+    public static string AlwaysAllowed => Manager.GetString("AlwaysAllowed", CultureInfo.CurrentUICulture)!;
     public static string AnswerInThePromptWindow => Manager.GetString("AnswerInThePromptWindow", CultureInfo.CurrentUICulture)!;
     public static string AnsweringAgents => Manager.GetString("AnsweringAgents", CultureInfo.CurrentUICulture)!;
     public static string Appearance => Manager.GetString("Appearance", CultureInfo.CurrentUICulture)!;
@@ -190,11 +190,6 @@ public static class Strings
     public static string EditPreviewAndRunValue => Manager.GetString("EditPreviewAndRunValue", CultureInfo.CurrentUICulture)!;
     public static string Empty => Manager.GetString("Empty", CultureInfo.CurrentUICulture)!;
     public static string EmptyTrash => Manager.GetString("EmptyTrash", CultureInfo.CurrentUICulture)!;
-    public static string End => Manager.GetString("End", CultureInfo.CurrentUICulture)!;
-    public static string EndAll => Manager.GetString("EndAll", CultureInfo.CurrentUICulture)!;
-    public static string EndAllAllowances => Manager.GetString("EndAllAllowances", CultureInfo.CurrentUICulture)!;
-    public static string EndAllowance => Manager.GetString("EndAllowance", CultureInfo.CurrentUICulture)!;
-    public static string EndEveryAllowanceTheNextRequestAsksAgain => Manager.GetString("EndEveryAllowanceTheNextRequestAsksAgain", CultureInfo.CurrentUICulture)!;
     public static string EndToEndEncryptedTheKeyLivesX3e20ff => Manager.GetString("EndToEndEncryptedTheKeyLivesX3e20ff", CultureInfo.CurrentUICulture)!;
     public static string EnterFullScreen => Manager.GetString("EnterFullScreen", CultureInfo.CurrentUICulture)!;
     public static string EnvKeypaste => Manager.GetString("EnvKeypaste", CultureInfo.CurrentUICulture)!;
@@ -283,7 +278,7 @@ public static class Strings
     public static string KeyMenu => Manager.GetString("KeyMenu", CultureInfo.CurrentUICulture)!;
     public static string KeyName => Manager.GetString("KeyName", CultureInfo.CurrentUICulture)!;
     public static string KeyValue => Manager.GetString("KeyValue", CultureInfo.CurrentUICulture)!;
-    public static string KeypasteAlwaysForDidNotTakeEffect => Manager.GetString("KeypasteAlwaysForDidNotTakeEffect", CultureInfo.CurrentUICulture)!;
+    public static string KeypasteAlwaysAllowDidNotTakeEffect => Manager.GetString("KeypasteAlwaysAllowDidNotTakeEffect", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHasntOpenedThisFileBefore => Manager.GetString("KeypasteHasntOpenedThisFileBefore", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHelp => Manager.GetString("KeypasteHelp", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHome => Manager.GetString("KeypasteHome", CultureInfo.CurrentUICulture)!;
@@ -369,7 +364,6 @@ public static class Strings
     public static string NewVaultLabel => Manager.GetString("NewVaultLabel", CultureInfo.CurrentUICulture)!;
     public static string NoAIToolsFound => Manager.GetString("NoAIToolsFound", CultureInfo.CurrentUICulture)!;
     public static string NoActivityYet => Manager.GetString("NoActivityYet", CultureInfo.CurrentUICulture)!;
-    public static string NoAllowanceIsInForceSoTheX69bc1f => Manager.GetString("NoAllowanceIsInForceSoTheX69bc1f", CultureInfo.CurrentUICulture)!;
     public static string NoAttachments => Manager.GetString("NoAttachments", CultureInfo.CurrentUICulture)!;
     public static string NoBrowserIsPairedWithThisVault => Manager.GetString("NoBrowserIsPairedWithThisVault", CultureInfo.CurrentUICulture)!;
     public static string NoCustomFields => Manager.GetString("NoCustomFields", CultureInfo.CurrentUICulture)!;
@@ -385,6 +379,7 @@ public static class Strings
     public static string NotStoredSendItAnotherWayThanXdd068f => Manager.GetString("NotStoredSendItAnotherWayThanXdd068f", CultureInfo.CurrentUICulture)!;
     public static string Notes => Manager.GetString("Notes", CultureInfo.CurrentUICulture)!;
     public static string NothingInThisLogMatchesThisFilter => Manager.GetString("NothingInThisLogMatchesThisFilter", CultureInfo.CurrentUICulture)!;
+    public static string NothingIsAlwaysAllowed => Manager.GetString("NothingIsAlwaysAllowed", CultureInfo.CurrentUICulture)!;
     public static string Now => Manager.GetString("Now", CultureInfo.CurrentUICulture)!;
     public static string OffByDefaultWhenALimitIsX11e963 => Manager.GetString("OffByDefaultWhenALimitIsX11e963", CultureInfo.CurrentUICulture)!;
     public static string OnThisMachine => Manager.GetString("OnThisMachine", CultureInfo.CurrentUICulture)!;
@@ -446,6 +441,7 @@ public static class Strings
     public static string Refresh => Manager.GetString("Refresh", CultureInfo.CurrentUICulture)!;
     public static string Reload => Manager.GetString("Reload", CultureInfo.CurrentUICulture)!;
     public static string Remove => Manager.GetString("Remove", CultureInfo.CurrentUICulture)!;
+    public static string RemoveAlwaysAllowed => Manager.GetString("RemoveAlwaysAllowed", CultureInfo.CurrentUICulture)!;
     public static string RemoveAttachment => Manager.GetString("RemoveAttachment", CultureInfo.CurrentUICulture)!;
     public static string RemoveField => Manager.GetString("RemoveField", CultureInfo.CurrentUICulture)!;
     public static string RemoveKey => Manager.GetString("RemoveKey", CultureInfo.CurrentUICulture)!;

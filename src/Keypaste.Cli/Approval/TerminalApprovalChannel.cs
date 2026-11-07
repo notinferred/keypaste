@@ -1,7 +1,6 @@
 using System.Globalization;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Approval;
@@ -29,10 +28,9 @@ namespace Keypaste.Cli.Approval;
 /// already sanitized and capped by <see cref="ApprovalPrompt"/> — no control characters, no
 /// newlines, no bidirectional overrides — so it cannot draw a second dialog inside this one or move
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
-/// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once,
-/// <c>h</c> allows for the timed allowance when one is offered, <c>a</c> allows once and then asks to make
-/// the entry's project environment Automatic when that is offered, and every other answer, Enter and
-/// silence included, is a denial (D-0326).
+/// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once, <c>a</c>
+/// allows once and then asks to confirm Always allow when that is offered, and every other answer,
+/// Enter and silence included, is a denial (D-0326).
 /// </para>
 /// <para>
 /// A change that gives an agent more is confirmed the same way, with <c>y</c> the only key that
@@ -45,8 +43,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 {
     internal const string Rule = "────────────────────────────────────────────────────────────";
 
-    private const string _choices = "oh";
-    private const string _alwaysChoices = "oha";
+    private const string _choices = "o";
+    private const string _alwaysChoices = "oa";
     private const string _confirmChoices = "y";
 
     private readonly ISecretPrompt _prompt;
@@ -77,7 +75,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(request.TtlSeconds, started, cancellationToken, request.AlwaysFor);
+        return AnswerAsync(started, cancellationToken, request.Always);
     }
 
     public async ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt request, CancellationToken cancellationToken)
@@ -179,7 +177,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(OfferedSeconds(request), started, cancellationToken);
+        return AnswerAsync(started, cancellationToken);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(RunPrompt request, CancellationToken cancellationToken)
@@ -188,7 +186,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(request.GrantSeconds, started, cancellationToken);
+        return AnswerAsync(started, cancellationToken, request.Always);
     }
 
     /// <summary>The vault <c>keypaste clients</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
@@ -197,13 +195,13 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     /// <summary>The pipe <c>keypaste clients</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
     internal string? Approver { get; init; }
 
-    public void Tell(AlwaysForNotice notice)
+    public void Tell(AlwaysNotice notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
 
         var again = RetryCommand(notice) is { } command
             ? $"To ask for it again: {command}"
-            : "`keypaste clients` can ask for it again.";
+            : notice.Offer.IsProject ? "`keypaste clients` can ask for it again." : "Choose [a] again the next time it asks.";
 
         _console.WriteLine(_console.Paint(Tone.Danger, $"keypaste: allowed once. {notice.Unmade} {again}"));
     }
@@ -219,19 +217,19 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     }
 
     /// <summary>
-    /// The command that asks again for what Always for asked, reaching this owner, when each name in it is
+    /// The command that asks again for what Always allow asked of a project environment, reaching this owner, when each name in it is
     /// one a shell passes on as written and no command line reads as an option; otherwise null.
     /// </summary>
-    private string? RetryCommand(AlwaysForNotice notice)
+    private string? RetryCommand(AlwaysNotice notice)
     {
-        string?[] named = [notice.Agent, notice.Scope, Vault, Approver];
+        string?[] named = [notice.Agent, notice.Offer.Covers, Vault, Approver];
 
-        if (!named.All(name => name is null || IsPlain(name)))
+        if (!notice.Offer.IsProject || !named.All(name => name is null || IsPlain(name)))
         {
             return null;
         }
 
-        return $"keypaste clients {notice.Agent} --project {notice.Scope} --mode automatic"
+        return $"keypaste clients {notice.Agent} --project {notice.Offer.Covers} --mode automatic"
             + (Vault is { } vault ? $" --vault {vault}" : string.Empty)
             + (Approver is { } approver ? $" --approver {approver}" : string.Empty);
     }
@@ -241,19 +239,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         && name[0] != '-'
         && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or ':' or '/');
 
-    /// <summary>The timed allowance an env prompt offers: none to a requester that is not the person's own run.</summary>
-    private static int OfferedSeconds(EnvReleasePrompt request) =>
-        request.Requester is null ? request.GrantSeconds : 0;
-
-    private async ValueTask<ApprovalAnswer> AnswerAsync(int grantSeconds, long started, CancellationToken cancellationToken, ProjectScope? alwaysFor = null)
+    private async ValueTask<ApprovalAnswer> AnswerAsync(long started, CancellationToken cancellationToken, AlwaysOffer? always = null)
     {
         char? choice;
 
         try
         {
             choice = await ChooseAsync(
-                alwaysFor is null ? _choices : _alwaysChoices,
-                () => Choice(grantSeconds, alwaysFor, Remaining(started)),
+                always is null ? _choices : _alwaysChoices,
+                () => Choice(always, Remaining(started)),
                 cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -264,8 +258,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var answer = choice switch
         {
             'o' => ApprovalAnswer.ApprovedOnce,
-            'h' when grantSeconds > 0 => ApprovalAnswer.Approved,
-            'a' when alwaysFor is not null => ApprovalAnswer.AlwaysForProject,
+            'a' when always is not null => ApprovalAnswer.Always,
             _ => ApprovalAnswer.Denied,
         };
 
@@ -273,9 +266,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             Environment.NewLine,
             answer switch
             {
-                ApprovalAnswer.Approved => _console.Paint(Tone.Ok, $"keypaste: allowed for {ApprovalLimits.Describe(grantSeconds)}."),
                 ApprovalAnswer.ApprovedOnce => _console.Paint(Tone.Ok, "keypaste: allowed once."),
-                ApprovalAnswer.AlwaysForProject => _console.Paint(Tone.Ok, $"keypaste: allowed once. Confirm below to make {alwaysFor!.Name} Automatic."),
+                ApprovalAnswer.Always => _console.Paint(Tone.Ok, "keypaste: allowed once. Confirm below to always allow it."),
                 _ => _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."),
             },
             RuleLine));
@@ -326,10 +318,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
     /// <summary>The choice line: what each key does, and how long is left to press one, at one width while it counts down.</summary>
     /// <remarks>Its colours, when stderr shows any, are the same escapes on every redraw, so the width stays one.</remarks>
-    private string Choice(int grantSeconds, ProjectScope? alwaysFor, int secondsLeft) =>
+    private string Choice(AlwaysOffer? always, int secondsLeft) =>
         _console.Paint(Tone.Accent, "[d] deny  [o] once  ")
-        + (grantSeconds > 0 ? _console.Paint(Tone.Ok, $"[h] {ApprovalLimits.Describe(grantSeconds)}") + "  " : string.Empty)
-        + (alwaysFor is not null ? _console.Paint(Tone.Ok, $"[a] always for {alwaysFor.Name}") + "  " : string.Empty)
+        + (always is not null ? _console.Paint(Tone.Ok, "[a] always") + "  " : string.Empty)
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";
 
@@ -390,16 +381,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         lines.Add("  [d] deny: the run gets nothing.");
         lines.Add("  [o] once: the run starts this command one time with every value in its environment.");
 
-        var offered = OfferedSeconds(request);
-
-        if (offered > 0)
+        if (request.Requester is null)
         {
-            var duration = ApprovalLimits.Describe(offered);
-            lines.Add($"  [h] {duration}: the same, and any program of yours can run exactly this command here again for {duration} without asking.");
-        }
-        else if (request.Requester is null)
-        {
-            lines.Add("  this environment is protected: it is asked about every time.");
+            lines.Add("  a run names no agent to keep an always under, so it is asked about every time.");
         }
 
         return string.Join(Environment.NewLine, lines);
@@ -440,26 +424,31 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
         lines.Add(string.Empty);
 
-        if (request.TtlSeconds == 0)
+        if (request.Always is { IsProject: true } project)
         {
-            lines.Add(request.OnceOnly switch
-            {
-                OnceOnly.AskEveryTime => _askEveryTimeLine,
-                OnceOnly.TotpCode => "  a TOTP code changes every period: no timed allowance is offered.",
-                _ => "  this item is in a protected environment: it is asked about every time.",
-            });
-        }
-
-        if (request.AlwaysFor is { } scope)
-        {
-            lines.Add($"  [a] allows this once, then asks you to make {scope.Name} Automatic for {request.Label ?? request.Client}:");
+            lines.Add($"  [a] allows this once, then asks you to make {project.Covers} Automatic for {request.Label ?? request.Client}:");
             lines.Add("      released without asking you from then on, and recorded in history.");
+        }
+        else if (request.Always is not null)
+        {
+            lines.Add($"  [a] allows this once, then asks you to always allow this item for {request.Label ?? request.Client}:");
+            lines.Add("      released without asking you from then on, and recorded in history.");
+        }
+        else if (request.OnceOnly != OnceOnly.None)
+        {
+            lines.Add(OnceOnlyLine(request.OnceOnly));
         }
 
         return string.Join(Environment.NewLine, lines);
     }
 
-    private const string _askEveryTimeLine = "  this agent is set to Ask every time: no timed allowance is offered.";
+    /// <summary>Why a prompt offers no Always allow, on a line of its own.</summary>
+    private static string OnceOnlyLine(OnceOnly onceOnly) => onceOnly switch
+    {
+        OnceOnly.LimitReached => "  this agent's Automatic limit was reached: once only, so the limit you set still holds.",
+        OnceOnly.Unnamed => "  this agent's connection has no name, so keypaste has nowhere to keep an always: once only.",
+        _ => "  this item is in a protected environment: it is asked about every time.",
+    };
 
     /// <summary>The agent as both prompts name it: the client it says it is, then the label its bridge was started with.</summary>
     private static string Named(string client, string? label) => label is { } shown ? $"{client} ({shown})" : client;
@@ -597,15 +586,16 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         lines.Add("  the values and reveal them, so approve only a command you would run yourself.");
         lines.Add(string.Empty);
 
-        lines.Add(request.OnceOnly switch
+        if (request.Always is null && request.OnceOnly == OnceOnly.None)
         {
-            _ when request.GrantSeconds > 0 =>
-                $"  [h] lets {request.Label ?? request.Client} run this command line here again for {ApprovalLimits.Describe(request.GrantSeconds)} without asking."
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        lines.Add(request.Always is not null
+            ? $"  [a] allows this once, then asks you to let {request.Label ?? request.Client} run exactly this command here without asking."
                 + Environment.NewLine
-                + "  It can change the files that command runs (scripts, package.json) in that time.",
-            OnceOnly.AskEveryTime => _askEveryTimeLine,
-            _ => "  this environment is protected: it is asked about every time.",
-        });
+                + "  The command's files can change (scripts, package.json): keypaste approves the command line, not what it does."
+            : OnceOnlyLine(request.OnceOnly).Replace("this item is in a protected environment", "this environment is protected", StringComparison.Ordinal));
 
         return string.Join(Environment.NewLine, lines);
     }

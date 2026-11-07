@@ -6,43 +6,36 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// The approver's decision procedure: resolve, re-scope, check the grant, release under the agent's
-/// mode or ask a human, release one field.
+/// The approver's decision procedure: resolve, re-scope, honour a refusal, release under the agent's
+/// mode or what the person always allowed, or ask a human, release one field.
 /// </summary>
 /// <remarks>
 /// <para>
 /// It lives in the core with no I/O of its own — no terminal, no dialog, no pipe — so every
-/// ordering that matters is reachable from a unit test. What it talks to are five seams: where
-/// entries are resolved and read, where names come from, where a human is, what they have already
-/// said yes to, and each agent's settings, which say what the agent may see and get and how it is asked.
+/// ordering that matters is reachable from a unit test. What it talks to are four seams: where
+/// entries are resolved and read, where names come from, where a human is, and each agent's settings,
+/// which say what the agent may see and get, how it is asked and what the person always allowed.
 /// </para>
 /// <para>
 /// <b>The order is the security property.</b> An agent given no values is refused before anything
 /// is resolved, so it learns nothing of the vault from a credential request. Then resolve, then
-/// re-check what the agent can see, then look for a live grant, then honour a refusal a person just
-/// gave, then release under an Automatic mode, and only then ask a person; read the field last of
-/// all. Reading earlier would put a secret in memory for requests that are about to be refused, and
+/// re-check what the agent can see, then honour a refusal a person just gave, then release under an
+/// Automatic mode or an Always allow row, and only then ask a person; read the field last of all. Reading earlier would put a secret in memory for requests that are about to be refused, and
 /// asking earlier would let an agent raise a prompt for an entry it was never allowed to name.
 /// </para>
 /// <para>
-/// <b>Where Automatic sits in that order.</b> After the reach re-check, because what an agent sees is
-/// the least of the bridge's <c>--expose</c>, its settings and this computer's ceilings, and no mode
-/// reaches past it. After the grant cache, because a live grant is a decision a person made about this
-/// exact request and re-attributing it to a mode would be a lie in the log. After the cooldown, because
-/// a person's explicit no outranks a mode. And in here rather than inside <see cref="ApprovalGate"/>,
-/// because a release nobody is asked about must not be able to collide with a prompt somebody is in
-/// the middle of answering.
+/// <b>Where Automatic and Always allow sit in that order.</b> After the reach re-check, because what
+/// an agent sees is the least of the bridge's <c>--expose</c>, its settings and this computer's
+/// ceilings, and neither reaches past it. After the cooldown, because a person's explicit no outranks
+/// both. And in here rather than inside <see cref="ApprovalGate"/>, because a release nobody is asked
+/// about must not be able to collide with a prompt somebody is in the middle of answering.
 /// </para>
 /// <para>
-/// A person answers once or for the timed grant the prompt offers, which lasts the approver's
-/// ceiling whatever the agent asked for. An entry in a protected profile, or one whose mode is Ask
-/// every time, skips the grant cache and Automatic and is offered no timed grant, so it is asked about
-/// every time; a protected entry is so whatever any setting says.
-/// </para>
-/// <para>
-/// A TOTP code is offered no timed grant either: a grant holds the value it released, and a code is
-/// stale once its period ends. It is released once or under an Automatic mode, and the lifetime the
-/// reply carries is the code's time left in its period.
+/// A person answers once or Always allow, which releases once and then asks them to confirm the change.
+/// A protected entry skips Automatic and Always allow and offers none, so it is asked about every time
+/// whatever any setting says, and so is one whose tag became protected after they chose it. A request
+/// asked about because an Automatic limit was reached offers none either, since an Always there would
+/// bypass a limit the person set, and no Always allow row answers it.
 /// </para>
 /// </remarks>
 public sealed class ApproverHandler
@@ -50,25 +43,23 @@ public sealed class ApproverHandler
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;
     private readonly ApprovalGate _gate;
-    private readonly GrantCache _grants;
     private readonly IAgentSettings _settings;
     private readonly HourlyLimit _hourly;
     private readonly TimeProvider _clock;
     private readonly Action<string>? _narrate;
     private readonly Func<EntryName, bool> _requiresLiveApproval;
 
-    /// <summary>Builds the handler over its five seams.</summary>
+    /// <summary>Builds the handler over its four seams.</summary>
     /// <param name="source">Where entries are resolved and one field is read.</param>
     /// <param name="lister">Where names come from. Deliberately not the same seam.</param>
     /// <param name="gate">Where a human is asked, and where the deadline lives.</param>
-    /// <param name="grants">What a human has already said yes to.</param>
     /// <param name="settings">
     /// Each agent's settings and this computer's ceilings; <see cref="IAgentSettings.Defaults"/> holds
     /// every agent to the defaults, which is what keypaste did before they existed.
     /// </param>
     /// <param name="narrate">Optional: a line of running commentary for the operator's terminal.</param>
     /// <param name="requiresLiveApproval">
-    /// Which entries are asked about every time, with no grant and no Automatic release; null means the
+    /// Which entries are asked about every time, with no Always allow and no Automatic release; null means the
     /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>), so a host that
     /// forgets it still asks live about a protected environment, by tag.
     /// </param>
@@ -77,7 +68,7 @@ public sealed class ApproverHandler
     /// restarted owner does.
     /// </param>
     /// <param name="clock">What an Automatic limit's time is judged against, and whose time zone a confirmation shows it in; null is the system clock.</param>
-    /// <exception cref="ArgumentNullException">Any of the five seams is null.</exception>
+    /// <exception cref="ArgumentNullException">Any of the four seams is null.</exception>
     /// <remarks>
     /// <paramref name="settings"/> is not nullable, and "every agent gets the defaults" is the value
     /// <see cref="IAgentSettings.Defaults"/>. A nullable seam makes every future reader work out what
@@ -87,7 +78,6 @@ public sealed class ApproverHandler
         ICredentialSource source,
         IEntryNameLister lister,
         ApprovalGate gate,
-        GrantCache grants,
         IAgentSettings settings,
         Action<string>? narrate = null,
         Func<EntryName, bool>? requiresLiveApproval = null,
@@ -97,13 +87,11 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(lister);
         ArgumentNullException.ThrowIfNull(gate);
-        ArgumentNullException.ThrowIfNull(grants);
         ArgumentNullException.ThrowIfNull(settings);
 
         _source = source;
         _lister = lister;
         _gate = gate;
-        _grants = grants;
         _settings = settings;
         _clock = clock ?? TimeProvider.System;
         _hourly = hourly ?? new HourlyLimit(_clock);
@@ -113,9 +101,14 @@ public sealed class ApproverHandler
 
     /// <summary>Whether a release of this entry is asked about live every time, by the rule this handler applies.</summary>
     /// <param name="name">The entry.</param>
-    /// <returns><see langword="true"/> when no grant, mode or token may release it unprompted.</returns>
+    /// <returns><see langword="true"/> when no mode, Always allow row or token may release it unprompted.</returns>
     /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule.</remarks>
     public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
+
+    /// <summary>An entry's UUID as hex, for the release paths beside this one to name it by in an Always allow row.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>The UUID, or null when it cannot be read.</returns>
+    public string? ItemId(EntryName name) => _source.ItemId(name);
 
     /// <summary>An entry's own tags, as the exposure and the agent's settings read them.</summary>
     /// <param name="name">The entry.</param>
@@ -198,7 +191,7 @@ public sealed class ApproverHandler
 
     /// <summary>Decides one credential request, asking a human if it has to.</summary>
     /// <param name="request">What the agent asked for.</param>
-    /// <param name="connectionId">Who is asking, and what any resulting grant is scoped to.</param>
+    /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
     /// <returns>The decision, and the field value on the one path that has one.</returns>
     public async ValueTask<CredentialReply> RequestAsync(
@@ -209,7 +202,7 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Reason, request.TtlSeconds) is { } problem)
+        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Reason) is { } problem)
         {
             return Refused(AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}");
         }
@@ -225,8 +218,7 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Failed, Unusable(unusable));
         }
 
-        // Before anything is resolved, so an agent given no values learns nothing of the vault from
-        // a credential request, and before the grant cache, so a grant it held earlier serves nothing.
+        // Before anything is resolved, so an agent given no values learns nothing of the vault from a credential request.
         if (!access.Values)
         {
             return Refused(AuditMethod.InjectOnly, "this agent is given no values; they reach only commands it runs");
@@ -261,82 +253,69 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.OutOfScope, "this agent reaches the item through a project tag, which lets it see only the item's project variables");
         }
 
-        var handle = EntryHandle.For(name);
-        var display = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, 0).Entry;
-        var key = new GrantKey(connectionId, handle, request.Field);
+        var display = ApprovalPrompt.Shown(name);
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), request.Field);
         var isProtected = _requiresLiveApproval(name);
         var item = access.Item(tags, _clock.GetUtcNow());
 
-        // A protected profile, or an entry whose mode is Ask every time, is asked about every time:
-        // no grant serves it and no mode releases it.
-        var onceOnly = isProtected
-            ? OnceOnly.ProtectedProfile
-            : item.Mode == AgentMode.Ask ? OnceOnly.AskEveryTime : OnceOnly.None;
-        var liveOnly = onceOnly != OnceOnly.None;
-        var isCode = string.Equals(request.Field, CredentialFields.Totp, StringComparison.Ordinal);
-
-        // Declared before the try so the copy the cache hands out is zeroed on every path — the
-        // repo's idiom for a disposable that only exists on one branch.
-        ReleasedField? live = null;
-
-        try
-        {
-            if (!liveOnly && _grants.TryUse(key, out live, out var remaining))
-            {
-                return Deliver(
-                    new CredentialReply
-                    {
-                        Decision = AuditDecision.Granted,
-                        Method = AuditMethod.GrantCache,
-                        Reason = "served from an allowance a person had already given, inside its lifetime",
-                        Entry = display,
-                        TtlSeconds = (int)remaining.TotalSeconds,
-                        Value = live.Value.ToString(),
-                    },
-                    display,
-                    Invariant($"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)"));
-            }
-        }
-        finally
-        {
-            live?.Dispose();
-        }
-
-        // Before Automatic, not after. A person who refused this exact request a moment ago has
-        // said something more specific and more recent than any mode, and a mode must never
-        // resurrect a decision they just made.
-        if (_gate.IsInCooldown(CooldownKey(key)))
+        // Before Automatic and Always allow, not after. A person who refused this exact request a moment
+        // ago has said something more specific and more recent than any setting, and a setting must
+        // never resurrect a decision they just made.
+        if (_gate.IsInCooldown(cooldownKey))
         {
             _narrate?.Invoke($"refused {display}: {Explain(ApprovalAnswer.Cooldown)}");
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
         // A limit that is spent asks instead: the person is the fallback, never a refusal.
-        if (!liveOnly && access.TryAutomatic(item, _hourly))
+        if (!isProtected && access.TryAutomatic(item, _hourly))
         {
-            return Automatic(request, name, display, key, access.Label!, cancellationToken);
+            return Unasked(
+                request,
+                name,
+                display,
+                cooldownKey,
+                access.Label!,
+                AuditMethod.Automatic,
+                shown => $"released without asking: {shown}'s mode for this item is Automatic",
+                "Automatic",
+                cancellationToken);
         }
 
-        // The person chooses once or the timed grant on screen, so its length is the approver's
-        // ceiling and never the agent's ttl_seconds.
-        var grantSeconds = liveOnly || isCode ? 0 : _gate.Limits.MaximumTtlSeconds;
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel) with
+        // Where it is Automatic and still reached here, its hourly limit is spent; no row bypasses that.
+        var limitReached = item.LimitReached || item.Mode == AgentMode.Automatic;
+        var itemId = _source.ItemId(name);
+
+        if (!isProtected && !limitReached && itemId is not null && access.AlwaysAllows(itemId))
         {
-            OnceOnly = onceOnly == OnceOnly.None && isCode ? OnceOnly.TotpCode : onceOnly,
-            AlwaysFor = isProtected || item.Mode == AgentMode.Automatic ? null : AlwaysFor(access, tags),
+            return Unasked(
+                request,
+                name,
+                display,
+                cooldownKey,
+                access.Label!,
+                AuditMethod.AlwaysAllowed,
+                shown => $"released without asking: a person always allowed this item for {shown}",
+                "Always allow",
+                cancellationToken);
+        }
+
+        var offer = isProtected || limitReached ? null : Offer(access, itemId, tags, display);
+        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, request.ClientLabel) with
+        {
+            OnceOnly = isProtected ? OnceOnly.ProtectedProfile : limitReached ? OnceOnly.LimitReached : offer is null ? OnceOnly.Unnamed : OnceOnly.None,
+            Always = offer,
         };
 
-        // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
-        var generation = _grants.Generation;
-        var (answer, kept) = await _gate.AskKeepingAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
+        var (answer, kept) = await _gate.AskKeepingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            var reply = Answered(request, name, display, key, prompt, grantSeconds, generation, answer, cancellationToken);
+            var reply = Answered(request, name, display, cooldownKey, prompt, answer, cancellationToken);
 
-            // Always for's release goes with the slot the gate kept, so its confirmation follows with
+            // Always allow's release goes with the slot the gate kept, so its confirmation follows with
             // no other request in front of the person between them.
-            if (reply.AlwaysFor is null)
+            if (reply.Always is null)
             {
                 return reply;
             }
@@ -356,20 +335,18 @@ public sealed class ApproverHandler
         CredentialRequest request,
         EntryName name,
         string display,
-        GrantKey key,
+        string cooldownKey,
         ApprovalPrompt prompt,
-        int grantSeconds,
-        long generation,
         ApprovalAnswer answer,
         CancellationToken cancellationToken)
     {
-        var alwaysFor = answer == ApprovalAnswer.AlwaysForProject ? prompt.AlwaysFor : null;
+        var always = answer == ApprovalAnswer.Always ? prompt.Always : null;
 
-        // Always for allows this one request and then asks for the change; on a prompt that did not
+        // Always allow allows this one request and then asks for the change; on a prompt that did not
         // offer it, it is an answer nobody could have meant, so nothing is released.
-        if (answer == ApprovalAnswer.AlwaysForProject)
+        if (answer == ApprovalAnswer.Always)
         {
-            answer = alwaysFor is null ? ApprovalAnswer.Failed : ApprovalAnswer.ApprovedOnce;
+            answer = always is null ? ApprovalAnswer.Failed : ApprovalAnswer.ApprovedOnce;
         }
 
         if (!answer.Releases())
@@ -386,69 +363,45 @@ public sealed class ApproverHandler
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, key, unfilled, display, prompt.Client);
+            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, prompt.Client);
         }
 
         using (released)
         {
-            // Stored even when the reply below turns out not to fit. The size belongs to the
-            // entry rather than to the request, so every retry would end the same way — and
-            // re-prompting for each one is THREATS.md T-11 with a lever attached. From the
-            // cache, the second ask is refused without troubling anybody, and the copy is
-            // zeroed at its ordinary TTL. A once answer keeps nothing, so it asks again, and so
-            // does a timed one given while Revoke all, an edit or a reload ended the grants: it
-            // is released once and said to be.
-            var timed = answer == ApprovalAnswer.Approved
-                && grantSeconds > 0
-                && _grants.Store(key, released, TimeSpan.FromSeconds(grantSeconds), prompt, generation);
-
             return Deliver(
                 new CredentialReply
                 {
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Prompt,
-                    Reason = timed
-                        ? $"a person approved this request for {ApprovalLimits.Describe(grantSeconds)}"
-                        : "a person approved this one request",
+                    Reason = "a person approved this one request",
                     Entry = display,
-                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : timed ? grantSeconds : 0,
+                    CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
                     Value = released.Value.ToString(),
-                    AlwaysFor = alwaysFor,
+                    Always = always,
                 },
                 display,
-                timed
-                    ? Invariant($"released {display} to {prompt.Client} for {grantSeconds}s")
-                    : $"released {display} to {prompt.Client} once");
+                $"released {display} to {prompt.Client} once",
+                cooldownKey);
         }
     }
 
-    /// <summary>Releases a field because the agent's mode for it is Automatic, a setting the person confirmed.</summary>
+    /// <summary>Releases a field nobody is asked about, because of a setting the person confirmed: an Automatic mode or an Always allow row.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>The approver's ceiling applies.</b> The lifetime the agent is told is its ask clamped by
-    /// <see cref="ApprovalLimits"/>, the one place that arithmetic lives.
-    /// </para>
-    /// <para>
-    /// <b>It does not seed the grant cache.</b> Doing so would serve every later request inside the
-    /// TTL for free and off the hourly limit, turning a limit on releases into a limit on grants; it
-    /// would hide releases two onward behind <c>grant-cache</c> lines that claim a person; and nobody
-    /// is being asked twice anyway. The cost is one vault read per call, which is CPU spent to buy an
-    /// accurate log.
-    /// </para>
-    /// <para>
-    /// The read is still last of all, exactly as on the prompted path: a mode that covers the entry is
-    /// not a reason to decrypt anything until the release itself is certain.
-    /// </para>
+    /// Its line names which setting it was, and never a person, since nobody saw this request. The read is
+    /// still last of all, exactly as on the prompted path: a setting that covers the entry is not a reason
+    /// to decrypt anything until the release itself is certain.
     /// </remarks>
-    private CredentialReply Automatic(
+    private CredentialReply Unasked(
         CredentialRequest request,
         EntryName name,
         string display,
-        GrantKey key,
+        string cooldownKey,
         string agent,
+        AuditMethod method,
+        Func<string, string> why,
+        string setting,
         CancellationToken cancellationToken)
     {
-        var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
         var shown = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text;
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
@@ -458,7 +411,7 @@ public sealed class ApproverHandler
 
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, key, unfilled, display, shown);
+            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, shown);
         }
 
         using (released)
@@ -469,32 +422,49 @@ public sealed class ApproverHandler
                 new CredentialReply
                 {
                     Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Automatic,
-                    Reason = $"released without asking: {shown}'s mode for this item is Automatic",
+                    Method = method,
+                    Reason = why(shown),
                     Entry = display,
-                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : ttl,
+                    CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
                     Value = released.Value.ToString(),
                 },
                 display,
-                $"released {display} to {shown} without asking (Automatic)");
+                $"released {display} to {shown} without asking ({setting})");
         }
     }
 
     /// <summary>
-    /// The project environment a person may make Automatic from the prompt: offered for a named agent
-    /// asking for an entry in exactly one project, never for a protected one, and not where Automatic
-    /// already applies and only its hourly limit is spent.
+    /// What Always allow offers a named agent: an item in exactly one project environment makes that
+    /// environment Automatic, and any other item gets a row of its own, by its UUID.
     /// </summary>
-    private static ProjectScope? AlwaysFor(EffectiveAccess access, IReadOnlyList<string> tags)
+    private static AlwaysOffer? Offer(EffectiveAccess access, string? itemId, IReadOnlyList<string> tags, string display)
     {
+        if (access.Label is null)
+        {
+            return null;
+        }
+
         var members = tags.Select(ProjectTag.Read).Where(tag => tag.Kind == ProjectTagKind.Member).ToList();
 
-        return access.Label is not null
-            && members is [{ Project: { } project, Environment: { } environment }]
-            && ProjectScope.TryCreate(project, environment, out var scope, out _)
-                ? scope
-                : null;
+        if (members is [{ Project: { } project, Environment: { } environment }] && ProjectScope.TryCreate(project, environment, out var scope, out _))
+        {
+            return new AlwaysOffer(AccessEdit.Automatic(scope), scope.Name);
+        }
+
+        return itemId is null ? null : new AlwaysOffer(AccessEdit.AlwaysItem(itemId), display);
     }
+
+    /// <summary>The name of an item a row or a confirmation names, as a person reads it.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Its name, or words saying it is not in this vault.</returns>
+    public string ShownItem(string item) =>
+        _source.ItemNamed(item) is { } name ? ApprovalPrompt.Shown(name) : "an item no longer in this vault";
+
+    /// <summary>Whether a protected tag keeps an item asked about, whatever its Always allow row says.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Whether the item is there and asked about every time.</returns>
+    public bool IsProtectedItem(string item) =>
+        _source.ItemNamed(item) is { } name && _requiresLiveApproval(name);
 
     /// <summary>Every agent's settings the vault holds, as keypaste reads them.</summary>
     /// <returns>The settings, saying when they apply only beneath the defaults.</returns>
@@ -528,6 +498,13 @@ public sealed class ApproverHandler
         if (request.Origin == AccessOrigin.Agent && AccessChangeRules.Check(request) is { } problem)
         {
             return ValueTask.FromResult(Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, $"the {problem.Argument} argument {problem.Rule}"));
+        }
+
+        if (request.Forget is { } forget)
+        {
+            return AccessEdit.TryForget(forget, out var forgetting, out var forgetError)
+                ? ChangeAccessAsync(request.Agent, forgetting, request.Origin, request.Reason, cancellationToken)
+                : ValueTask.FromResult(Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, forgetError));
         }
 
         if (!AccessEdit.TryCreate(
@@ -582,12 +559,12 @@ public sealed class ApproverHandler
         CancellationToken cancellationToken) =>
         ChangeAccessAsync(agent, edit, origin, reason, null, cancellationToken);
 
-    /// <summary>Changes one agent's settings, asking any confirmation in the slot Always for kept when there is one.</summary>
+    /// <summary>Changes one agent's settings, asking any confirmation in the slot Always allow kept when there is one.</summary>
     /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
     /// <param name="edit">The change.</param>
     /// <param name="origin">Where the request says it came from.</param>
     /// <param name="reason">The requester's own reason, or empty.</param>
-    /// <param name="kept">The slot the release's prompt kept (<see cref="CredentialReply"/>), or null.</param>
+    /// <param name="kept">The slot the release's prompt kept, or null.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>What became of it.</returns>
     internal async ValueTask<AccessChangeReply> ChangeAccessAsync(
@@ -616,7 +593,7 @@ public sealed class ApproverHandler
         KeptSlot? kept,
         CancellationToken cancellationToken)
     {
-        // Always for tells the person why where they answered, once the release it allowed has left.
+        // Always allow tells the person why where they answered, once the release it allowed has left.
         var narrate = origin == AccessOrigin.Prompt ? null : _narrate;
 
         if (!AgentNames.IsValid(agent, out var nameError))
@@ -663,12 +640,12 @@ public sealed class ApproverHandler
             return Changed(AuditDecision.Denied, AuditMethod.Failed, refusal);
         }
 
-        var prompt = AccessChangePrompt.For(agent, change, origin, reason, _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds) with { StaysBeneathDefaults = !written.Understood };
+        var prompt = AccessChangePrompt.For(agent, change, origin, reason, _clock.LocalTimeZone, ShownItem) with { StaysBeneathDefaults = !written.Understood };
 
         // Every request for more over the pipe shares one cooldown, whatever it asks for and whichever
         // agent it names, since both the name and the origin are the requester's own claim: no program
         // can keep a confirmation in front of the person by rewording, renaming or switching to a
-        // terminal. The app's own settings and Always for come only from the person at the owner, never
+        // terminal. The app's own settings and Always allow come only from the person at the owner, never
         // over the pipe, so their refusals hold nothing back and nothing holds them back.
         var overThePipe = origin is AccessOrigin.Agent or AccessOrigin.Terminal;
         string[] cooldownKeys = overThePipe ? [ApprovalGate.AskedForMore] : [];
@@ -727,19 +704,21 @@ public sealed class ApproverHandler
     }
 
     /// <summary>
-    /// A change as made, and for Always for's, whether it left the agent Automatic for that environment
-    /// here: when it did not, the reply says why, so the person who chose it is told rather than left to
-    /// find each later request still asked about.
+    /// A change as made, and for Always allow's, whether it left what it covers answered unasked here:
+    /// when it did not, the reply says why, so the person who chose it is told rather than left to find
+    /// each later request still asked about.
     /// </summary>
     private AccessChangeReply Made(string agent, AccessEdit edit, AccessOrigin origin, AcafRead written, AccessChangeReply reply)
     {
-        if (origin != AccessOrigin.Prompt || reply is not { Decision: AuditDecision.Granted, Unapplied: null } || edit.Project is not { } scope)
+        if (origin != AccessOrigin.Prompt || reply is not { Decision: AuditDecision.Granted, Unapplied: null })
         {
             return reply;
         }
 
         var why = !TryAccess(agent, out var after, out var problem) ? Unusable(problem)
-            : after.IsAutomaticIn(scope, _clock.GetUtcNow()) ? null
+            : (edit.Project is { } scope && after.IsAutomaticIn(scope, _clock.GetUtcNow()))
+                || (edit.AddsItem is { } item && after.AlwaysAllows(item))
+                || (edit.AddsCommand is { } command && after.AlwaysAllows(command)) ? null
             : written.Understood ? "keypaste still asks before releasing it there"
             : AccessChangePrompt.BeneathDefaultsText;
 
@@ -771,7 +750,7 @@ public sealed class ApproverHandler
                     $"keypaste could not read this computer's limits, so it left the file as it is: {problem}; fix what keeps it from being read, or move it away yourself");
         }
 
-        var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds);
+        var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone, ShownItem);
         var answer = await _gate.AskAsync([], prompt, coolUnanswered: false, cancellationToken).ConfigureAwait(false);
 
         if (!answer.Releases())
@@ -920,45 +899,24 @@ public sealed class ApproverHandler
     /// <summary>Why an agent request was refused when its settings could not be read.</summary>
     private static string Unusable(string problem) => $"agent settings are not usable: {problem}";
 
-    /// <summary>Tells the person who chose Always for that the change it asked for did not take effect.</summary>
-    /// <param name="notice">What to tell them, from <see cref="AlwaysForNotice.For"/>.</param>
-    public void Tell(AlwaysForNotice notice) => _gate.Tell(notice);
+    /// <summary>Tells the person who chose Always allow that the change it asked for did not take effect.</summary>
+    /// <param name="notice">What to tell them, from <see cref="AlwaysNotice.For"/>.</param>
+    public void Tell(AlwaysNotice notice) => _gate.Tell(notice);
 
-    /// <summary>What a person is being asked about now and the grants they have given that are in force.</summary>
-    /// <returns>The waiting request, if any, and every live grant, none carrying a value.</returns>
+    /// <summary>What a person is being asked about now.</summary>
+    /// <returns>The waiting request, if any, carrying no value.</returns>
     public ApproverActivity Activity() =>
-        new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce())
+        new(_gate.Waiting is { } waiting ? [waiting] : [])
         {
             WaitingChanges = _gate.WaitingChange is { } change ? [change] : [],
             WaitingEdits = _gate.WaitingEdit is { } edit ? [edit] : [],
         };
 
-    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    /// <remarks>No cooldown starts: a revoked grant is a decision withdrawn, not a request refused.</remarks>
-    public void Revoke(GrantKey key) => _grants.Revoke(key);
-
-    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now.</summary>
-    /// <param name="agent">Whether a grant, as <see cref="Activity"/> lists it, was given to the agent.</param>
-    /// <returns>How many grants ended.</returns>
-    public int RevokeAgent(Func<GrantInForce, bool> agent) => _grants.RevokeAgent(agent);
-
-    /// <summary>Ends every grant, so each request they would have answered is asked again.</summary>
-    public void RevokeAll() => _grants.RevokeEntries(VaultEdit.Everything);
-
-    /// <summary>Revokes the grants scoped to a connection that has gone.</summary>
-    /// <param name="connectionId">The connection that ended.</param>
-    public void Disconnected(string connectionId)
-    {
-        ArgumentNullException.ThrowIfNull(connectionId);
-
-        _grants.Revoke(connectionId);
-    }
-
     /// <summary>Hands back a release the peer can actually be sent, or a refusal saying why not.</summary>
     /// <param name="granted">The release, already authorized and already read.</param>
     /// <param name="display">The sanitized entry, for the refusal and the terminal.</param>
     /// <param name="narration">What to tell the operator when the release does leave.</param>
+    /// <param name="askedUnder">The cooldown a person was asked under, which an undeliverable release cools, or null where nobody was.</param>
     /// <returns><paramref name="granted"/>, or a denial under <see cref="AuditMethod.Undeliverable"/>.</returns>
     /// <remarks>
     /// <para>
@@ -974,11 +932,17 @@ public sealed class ApproverHandler
     /// as a person's (THREATS.md T-16).
     /// </para>
     /// </remarks>
-    private CredentialReply Deliver(CredentialReply granted, string display, string narration)
+    private CredentialReply Deliver(CredentialReply granted, string display, string narration, string? askedUnder = null)
     {
         if (!ApproverProtocol.Fits(granted))
         {
             _narrate?.Invoke($"could not deliver {display}: the reply is larger than one message");
+
+            // The size belongs to the entry, so every retry would end the same way, and asking again for each is T-11 with a lever attached.
+            if (askedUnder is not null)
+            {
+                _gate.CoolDown(askedUnder);
+            }
 
             return Refused(
                 AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(granted.Method), display);
@@ -997,7 +961,7 @@ public sealed class ApproverHandler
     /// A placeholder refusal cools the field down as a person's refusal does: asking again ends the same way
     /// until somebody edits the item, so each retry would otherwise put the same question to a person for nothing.
     /// </remarks>
-    private CredentialReply Unread(CredentialFailure failure, GrantKey key, string unfilled, string display, string client)
+    private CredentialReply Unread(CredentialFailure failure, string cooldownKey, string field, string unfilled, string display, string client)
     {
         if (IsStale(failure))
         {
@@ -1009,9 +973,9 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Failed, Explain(failure), display);
         }
 
-        var reason = unfilled.Length > 0 ? $"the item's {key.Field} {unfilled}" : Explain(failure);
+        var reason = unfilled.Length > 0 ? $"the item's {field} {unfilled}" : Explain(failure);
 
-        _gate.CoolDown(CooldownKey(key));
+        _gate.CoolDown(cooldownKey);
         _narrate?.Invoke($"refused {display} for {client}: {reason}; edit the item so keypaste can fill it in");
 
         return Refused(AuditMethod.Unfillable, reason, display);
@@ -1024,18 +988,8 @@ public sealed class ApproverHandler
     /// <param name="failure">Which way it no longer matches.</param>
     /// <param name="what">What was refused, for the operator's terminal.</param>
     /// <returns>The refusal's reason.</returns>
-    /// <remarks>
-    /// A file somebody else wrote zeroes every grant: each holds a value from the copy that is now
-    /// stale, which is not served again; the owner serves its merge with that file once saved, or what
-    /// a person reloads.
-    /// </remarks>
     private string Stale(CredentialFailure failure, string what)
     {
-        if (failure == CredentialFailure.ChangedOnDisk)
-        {
-            _grants.RevokeEntries(VaultEdit.Everything);
-        }
-
         _narrate?.Invoke(failure == CredentialFailure.ChangedOnDisk
             ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste approve to serve what the file holds now"
             : $"refused {what}: {Explain(failure)}");
@@ -1053,13 +1007,6 @@ public sealed class ApproverHandler
             ? Refused(AuditMethod.Cancelled, "the request was withdrawn before anything was read", display)
             : null;
 
-    /// <summary>
-    /// What counts as "the same request" for the cooldown: the same field of the same entry, whichever
-    /// connection asks and whether a run reaches it, so a client that reconnects or starts another
-    /// bridge is refused without a second prompt (T-11).
-    /// </summary>
-    private static string CooldownKey(GrantKey key) => ApprovalGate.FieldKey(key.Handle, key.Field);
-
     /// <summary>Why a request for more was not put to the person, and when it can be asked again.</summary>
     private string CoolingDown() => _gate.CoolingDown("make it in the app's own agent settings, which do not wait");
 
@@ -1072,7 +1019,6 @@ public sealed class ApproverHandler
         Method = method,
         Reason = reason,
         Entry = entry,
-        TtlSeconds = 0,
     };
 
     private static string Explain(ApprovalAnswer answer) => answer switch

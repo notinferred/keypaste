@@ -91,28 +91,18 @@
       <TextBlock Classes="prompt-note size-13"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
-      <!-- Always for has a place of its own, kept whether the prompt offers it or not, so Deny and the
-           allows never move (D-0326, T-2). It is armed with them. Its caption wraps to two lines at
-           most inside the same height. -->
-      <Grid Name="AlwaysSlot" Height="34" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-        <Button Grid.Column="0" Name="AlwaysFor" Classes="prompt" MaxWidth="220"
-                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysForCommand}"
-                AutomationProperties.Name="{Binding AlwaysLabel}">
-          <TextBlock Name="AlwaysText" Text="{Binding AlwaysLabel}" TextTrimming="CharacterEllipsis" />
-        </Button>
-        <TextBlock Grid.Column="1" Name="AlwaysCaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
-                   TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                   IsVisible="{Binding OffersAlways}" />
-      </Grid>
+      <!-- Always allow's caption has a place of its own, kept whether the prompt offers it or not, so
+           the buttons never move (D-0326, T-2). No button is the default. -->
+      <TextBlock Name="AlwaysCaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
+                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
 
-      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                 IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
                 Command="{Binding AllowOnceCommand}" />
-        <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
-                HorizontalAlignment="Right"
-                IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
+        <Button Grid.Column="2" Name="AlwaysAllow" Classes="prompt" Content="Always allow"
+                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysAllowCommand}" />
       </Grid>
 
     </StackPanel>

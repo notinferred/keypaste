@@ -37,9 +37,8 @@
   <data name="AgentsAndTheCLI" xml:space="preserve"><value>Agents and the CLI</value></data>
   <data name="All" xml:space="preserve"><value>All</value></data>
   <data name="AllItems" xml:space="preserve"><value>All items</value></data>
-  <data name="Allowances" xml:space="preserve"><value>Allowances</value></data>
   <data name="AllowedOnce" xml:space="preserve"><value>Allowed once</value></data>
-  <data name="AlwaysForDidNotTakeEffect" xml:space="preserve"><value>Always for did not take effect</value></data>
+  <data name="AlwaysAllowDidNotTakeEffect" xml:space="preserve"><value>Always allow did not take effect</value></data>
   <data name="AnsweringAgents" xml:space="preserve"><value>Answering agents</value></data>
   <data name="AnswerInThePromptWindow" xml:space="preserve"><value>Answer in the prompt window</value></data>
   <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
@@ -168,15 +167,12 @@
   <data name="EditPreviewAndRunValue" xml:space="preserve"><value>Edit, preview and run {0}</value></data>
   <data name="Empty" xml:space="preserve"><value>(empty)</value></data>
   <data name="EmptyTrash" xml:space="preserve"><value>Empty Trash</value></data>
-  <data name="End" xml:space="preserve"><value>End</value></data>
-  <data name="EndAll" xml:space="preserve"><value>End all</value></data>
-  <data name="EndAllAllowances" xml:space="preserve"><value>End all allowances</value></data>
   <data name="EndToEndEncryptedTheKeyLivesX3e20ff" xml:space="preserve"><value>End-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it.</value></data>
   <data name="EnterFullScreen" xml:space="preserve"><value>Enter full screen</value></data>
   <data name="EnvKeypaste" xml:space="preserve"><value>.env.keypaste</value></data>
   <data name="EnvironmentName" xml:space="preserve"><value>Environment name</value></data>
   <data name="Environments" xml:space="preserve"><value>Environments</value></data>
-  <data name="EveryAgentRequestAllowanceTokenRunAndX73000f" xml:space="preserve"><value>Every agent request, allowance, token run and share on this machine, with a check that none was changed.</value></data>
+  <data name="EveryAgentRequestAllowanceTokenRunAndX73000f" xml:space="preserve"><value>Every agent request, token run and share on this machine, with a check that none was changed.</value></data>
   <data name="EverythingRunInThatTerminalCanReadX8c42c2" xml:space="preserve"><value>Everything run in that terminal can read these values.</value></data>
   <data name="Expires" xml:space="preserve"><value>Expires</value></data>
   <data name="Export" xml:space="preserve"><value>Export</value></data>
@@ -244,7 +240,7 @@
   <data name="KeyFile" xml:space="preserve"><value>Key file</value></data>
   <data name="KeyName" xml:space="preserve"><value>Key name</value></data>
   <data name="KeyValue" xml:space="preserve"><value>Key value</value></data>
-  <data name="KeypasteAlwaysForDidNotTakeEffect" xml:space="preserve"><value>keypaste: Always for did not take effect</value></data>
+  <data name="KeypasteAlwaysAllowDidNotTakeEffect" xml:space="preserve"><value>keypaste: Always allow did not take effect</value></data>
   <data name="KeypasteHasntOpenedThisFileBefore" xml:space="preserve"><value>keypaste hasn't opened this file before:</value></data>
   <data name="KeypasteHelp" xml:space="preserve"><value>keypaste help</value></data>
   <data name="KeypasteHome" xml:space="preserve"><value>keypaste home</value></data>
@@ -316,7 +312,6 @@
   <data name="NewValue" xml:space="preserve"><value>New value</value></data>
   <data name="NewVault" xml:space="preserve"><value>New vault</value></data>
   <data name="NoActivityYet" xml:space="preserve"><value>No activity yet</value></data>
-  <data name="NoAllowanceIsInForceSoTheX69bc1f" xml:space="preserve"><value>No allowance is in force, so the next request asks you.</value></data>
   <data name="NoAttachments" xml:space="preserve"><value>No attachments.</value></data>
   <data name="NoBrowserIsPairedWithThisVault" xml:space="preserve"><value>No browser is paired with this vault.</value></data>
   <data name="NoCustomFields" xml:space="preserve"><value>No custom fields.</value></data>
@@ -563,7 +558,6 @@
   <data name="AddAYubiKeyLabel" xml:space="preserve"><value>Add a YubiKey…</value></data>
   <data name="CreateAKeyFileLabel" xml:space="preserve"><value>Create a key file…</value></data>
   <data name="ResetClientsToml" xml:space="preserve"><value>Reset clients.toml</value></data>
-  <data name="EndEveryAllowanceTheNextRequestAsksAgain" xml:space="preserve"><value>End every allowance? Each agent's next request asks you again.</value></data>
   <data name="LearnMore" xml:space="preserve"><value>Learn more</value></data>
   <data name="LearnMoreAboutWhatItCanSee" xml:space="preserve"><value>Learn more about what it can see</value></data>
   <data name="LearnMoreAboutTokenScopes" xml:space="preserve"><value>Learn more about token scopes</value></data>
@@ -630,7 +624,6 @@
   <data name="VerifyChain" xml:space="preserve"><value>Verify chain</value></data>
   <data name="ViewMenu" xml:space="preserve"><value>View</value></data>
   <data name="WindowMenu" xml:space="preserve"><value>Window</value></data>
-  <data name="EndAllowance" xml:space="preserve"><value>End allowance</value></data>
   <data name="RevokeToken" xml:space="preserve"><value>Revoke token</value></data>
   <data name="AgentHistory" xml:space="preserve"><value>Agent history</value></data>
   <data name="RestoreAsAnotherName" xml:space="preserve"><value>Restore as another name</value></data>
@@ -645,4 +638,7 @@
   <data name="SomeLinuxDesktopsShowNoTrayIcon" xml:space="preserve"><value>Some Linux desktops show no tray icon.</value></data>
   <data name="HidingTheAppIsNotMinimizing" xml:space="preserve"><value>Hiding the app with ⌘H is not minimizing either.</value></data>
   <data name="OpenAgents" xml:space="preserve"><value>Open Agents</value></data>
+  <data name="AlwaysAllowed" xml:space="preserve"><value>Always allowed</value></data>
+  <data name="RemoveAlwaysAllowed" xml:space="preserve"><value>Remove always allowed</value></data>
+  <data name="NothingIsAlwaysAllowed" xml:space="preserve"><value>Nothing is always allowed. Choose Always allow on a prompt, and it is listed here.</value></data>
 </root>

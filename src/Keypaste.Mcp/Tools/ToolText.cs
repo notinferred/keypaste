@@ -1,5 +1,4 @@
 using System.Globalization;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Mcp.Tools;
@@ -85,8 +84,8 @@ internal static class ToolText
         Asks for a change to this agent's own keypaste settings: what it can see (see), whether it is
         handed values (values), whether it may ask to run commands (run), and its mode (mode), for this
         agent as a whole or for one project or environment (project). The modes are ask (the person is
-        asked every time), allow-for-a-while (asked, and they may allow for an hour) and automatic (what
-        this agent can see is released without asking, and still recorded). Commands are always asked.
+        asked every time) and automatic (what this agent can see is released without asking, and still
+        recorded). Commands are asked about unless the person chose Always allow on that exact command.
         Automatic can end at a time (until) and be held to at most so many values an hour (per_hour);
         past either, the person is asked again. When you ask for automatic, ask for the shortest time
         your task needs, and the person sees that limit before confirming.
@@ -253,7 +252,6 @@ internal static class ToolText
     /// <summary>The first lines of a run's result, before its output.</summary>
     /// <param name="names">The variables injected.</param>
     /// <param name="method">How the release was decided.</param>
-    /// <param name="grantedSeconds">How long a grant lasts or has left.</param>
     /// <param name="exitCode">The exit code, or null when it was stopped.</param>
     /// <param name="timeoutSeconds">The timeout, for a stopped run.</param>
     /// <param name="replacements">How many occurrences were replaced.</param>
@@ -261,20 +259,18 @@ internal static class ToolText
     internal static string Ran(
         IReadOnlyList<string> names,
         AuditMethod method,
-        int grantedSeconds,
         int? exitCode,
         int timeoutSeconds,
         int replacements)
     {
-        var how = method == AuditMethod.GrantCache
-            ? $"under their earlier approval, {ApprovalLimits.Describe(grantedSeconds)} left"
-            : grantedSeconds > 0 ? $"for {ApprovalLimits.Describe(grantedSeconds)} on this connection" : "once";
         var exit = exitCode is { } code
             ? string.Create(CultureInfo.InvariantCulture, $"exit code: {code}")
             : string.Create(CultureInfo.InvariantCulture, $"exit code: none; timed out after {timeoutSeconds} s and was stopped");
 
         return string.Join('\n',
-            $"keypaste: RAN. A person approved running this command with {string.Join(", ", names)} in its environment {how}.",
+            method == AuditMethod.AlwaysAllowed
+                ? $"keypaste: RAN without asking. A person always allowed exactly this command with {string.Join(", ", names)} in its environment."
+                : $"keypaste: RAN. A person approved running this command with {string.Join(", ", names)} in its environment once.",
             exit,
             string.Create(
                 CultureInfo.InvariantCulture,
@@ -475,8 +471,7 @@ internal static class ToolText
     /// governs entries an agent may <em>not</em> have.
     /// It never says a person approved it, because an Automatic release reaches this same sentence and
     /// nobody is asked on that path (T-16).
-    /// "Do not retry": inside the grant's lifetime a retry is answered without troubling anybody, and
-    /// after it a retry puts the same question in front of a person for the same result.
+    /// "Do not retry": a retry puts the same question in front of a person for the same result.
     /// </remarks>
     internal const string Undeliverable = """
         keypaste: DENIED. This request was authorized, and then keypaste could not return the value:
@@ -537,23 +532,11 @@ internal static class ToolText
         to narrow what this agent can see, in its keypaste settings.
         """;
 
-    /// <summary>What is said around a released credential. The value follows on its own line.</summary>
+    /// <summary>What is said around a credential a person released for this one request. The value follows on its own line.</summary>
     /// <remarks>
     /// The value is in a model's context the moment it is returned and no wording changes that. What
     /// the wording can narrow is what happens next, which is the part only the model can honour.
     /// </remarks>
-    internal static string Released(string field, int ttlSeconds) =>
-        $"""
-        keypaste: APPROVED. A person released the "{field}" of this item, for {ttlSeconds} seconds.
-
-        Use it for the task you gave as your reason and nothing else. Do not print it, do not write
-        it into a file or a commit, and do not repeat it back in a message - it is a live credential.
-        Ask again if you need it after it expires. This release was recorded in the audit log.
-
-        """;
-
-    /// <summary>What is said around a credential a person released for this one request.</summary>
-    /// <remarks>Nothing is kept for a later request, so it asks again rather than saying when it expires.</remarks>
     internal static string ReleasedOnce(string field) =>
         $"""
         keypaste: APPROVED ONCE. A person released the "{field}" of this item for this request only.
@@ -566,22 +549,39 @@ internal static class ToolText
 
     /// <summary>What is said around a credential released under the agent's Automatic mode, with nobody asked.</summary>
     /// <remarks>
-    /// Separate from <see cref="Released"/> because that one says "a person released" and on this path
+    /// Separate from <see cref="ReleasedOnce"/> because that one says "a person released" and on this path
     /// nobody did — telling a model a human approved something no human saw is exactly the claim
     /// keypaste asks to be trusted on.
     /// It names neither the project nor the setting that covered it: an agent that learns which parts
     /// of the vault are released without asking has been handed a map of where to aim.
     /// </remarks>
-    internal static string ReleasedAutomatically(string field, int ttlSeconds) =>
+    internal static string ReleasedAutomatically(string field) =>
         $"""
         keypaste: APPROVED without asking, because the user set this agent to Automatic for it. The
-        "{field}" of this item was released for {ttlSeconds} seconds. Nobody was asked this time.
+        "{field}" of this item was released. Nobody was asked this time.
 
         Use it for the task you gave as your reason and nothing else. Do not print it, do not write
         it into a file or a commit, and do not repeat it back in a message - it is a live credential.
-        Ask again if you need it after it expires. This release was recorded in the audit log.
+        Ask again if you need it again. This release was recorded in the audit log.
 
         """;
+
+    /// <summary>What is said around a credential released by an Always allow row, with nobody asked this time.</summary>
+    /// <remarks>It claims no person saw this request, and it names no row, for the reason <see cref="ReleasedAutomatically"/> names no setting.</remarks>
+    internal static string ReleasedByAlways(string field) =>
+        $"""
+        keypaste: APPROVED without asking, because the user always allowed this agent this item. The
+        "{field}" of this item was released. Nobody was asked this time.
+
+        Use it for the task you gave as your reason and nothing else. Do not print it, do not write
+        it into a file or a commit, and do not repeat it back in a message - it is a live credential.
+        Ask again if you need it again. This release was recorded in the audit log.
+
+        """;
+
+    /// <summary>How long a released TOTP code stays current, said after the rest.</summary>
+    internal static string CodeLasts(int seconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"This TOTP code stays current for {seconds} more seconds.\n\n");
 
     /// <summary>The refusal an agent reads for each way of saying no.</summary>
     /// <remarks>

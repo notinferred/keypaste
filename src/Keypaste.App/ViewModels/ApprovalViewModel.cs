@@ -4,8 +4,8 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>One credential request in front of the person at this desktop, answered once.</summary>
 /// <remarks>
-/// Always for exists only when the prompt offers it, and is armed with the allows: it allows this one
-/// request and then asks the person to confirm making that project environment Automatic.
+/// Always allow exists only when the prompt offers it, and is armed with the allows: it allows this
+/// one request and then asks the person to confirm the change.
 /// </remarks>
 internal sealed class ApprovalViewModel : PromptViewModel
 {
@@ -13,20 +13,24 @@ internal sealed class ApprovalViewModel : PromptViewModel
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
-        OffersAlways = prompt.AlwaysFor is not null;
-        AlwaysLabel = prompt.AlwaysFor is { } scope ? $"Always for {scope.Name}" : string.Empty;
-        AlwaysForCommand = new RelayCommand(() => Decide(ApprovalAnswer.AlwaysForProject), () => IsArmed && OffersAlways && !IsAnswered);
+        OffersAlways = prompt.Always is not null;
+        AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.Always), () => IsArmed && OffersAlways && !IsAnswered);
+        AlwaysCaption = prompt.Always switch
+        {
+            { IsProject: true } offer => $"Always allow makes {offer.Covers} Automatic for this agent. It allows this once, then asks you to confirm.",
+            not null => "Always allow covers this item for this agent. It allows this once, then asks you to confirm.",
+            _ => string.Empty,
+        };
 
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
         Field = prompt.Field;
-        TimedSeconds = prompt.TtlSeconds;
         Lifetime = prompt.OnceOnly switch
         {
-            _ when prompt.TtlSeconds > 0 => $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}",
-            OnceOnly.AskEveryTime => "once only: this agent is set to Ask every time",
-            OnceOnly.TotpCode => "once only: a TOTP code changes every period",
+            OnceOnly.None => "once or always",
+            OnceOnly.LimitReached => "once only: its Automatic limit was reached",
+            OnceOnly.Unnamed => "once only: this agent has no name to keep it under",
             _ => "once only: protected environment",
         };
         Reason = prompt.Reason;
@@ -40,19 +44,16 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
     }
 
-    /// <summary>Allows this request once, then asks the person to make its project environment Automatic for the agent.</summary>
-    internal RelayCommand AlwaysForCommand { get; }
+    /// <summary>Allows this request once, then asks the person to confirm the change Always allow names.</summary>
+    internal RelayCommand AlwaysAllowCommand { get; }
 
-    protected override void OnAllowsChanged() => AlwaysForCommand.NotifyCanExecuteChanged();
+    protected override void OnAllowsChanged() => AlwaysAllowCommand.NotifyCanExecuteChanged();
 
-    /// <summary>Whether the prompt offers Always for, which then has its own place on it.</summary>
+    /// <summary>Whether the prompt offers Always allow.</summary>
     internal bool OffersAlways { get; }
 
-    /// <summary>What the Always for button says, naming the project environment.</summary>
-    internal string AlwaysLabel { get; }
-
-    /// <summary>What Always for does, said beside it.</summary>
-    internal string AlwaysCaption { get; } = "Allows once, then asks to make it Automatic";
+    /// <summary>What Always allow covers and does, said above the buttons in a place kept whether it is offered or not.</summary>
+    internal string AlwaysCaption { get; }
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
@@ -67,7 +68,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     internal string Field { get; }
 
-    /// <summary>What the person can allow: once, or once and the timed grant, never the lifetime the agent asked for.</summary>
+    /// <summary>What the person can allow: once, or once and always.</summary>
     internal string Lifetime { get; }
 
     /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
@@ -81,6 +82,4 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
-
-    protected override int TimedSeconds { get; }
 }

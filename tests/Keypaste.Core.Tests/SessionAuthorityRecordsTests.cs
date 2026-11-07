@@ -70,7 +70,6 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Entry = "env/dev/STRIPE_KEY",
         Field = "password",
         Reason = "deploy billing to staging",
-        TtlSeconds = 60,
         Exposure = ["env/**"],
         ClientName = "claude-code",
         ClientVersion = "2.1.0",
@@ -120,8 +119,6 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
             Settings = settings,
             Hourly = new HourlyLimit(TimeProvider.System),
             Audit = () => _log.Log,
-            WatchEdits = _ => { },
-            UnwatchEdits = _ => { },
         }))
         {
             using var stop = new CancellationTokenSource();
@@ -192,7 +189,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     [Fact]
     public async Task ACredentialGrant_IsRecordedBeforeItsReplyIsRead_WithoutItsValue()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -206,10 +203,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Equal("billing-bot", line.GetProperty("client").GetProperty("label").GetString());
         Assert.Equal("env/dev/STRIPE_KEY", line.GetProperty("args").GetProperty("entry").GetString());
         Assert.Equal("password", line.GetProperty("args").GetProperty("field").GetString());
-        Assert.Equal(60, line.GetProperty("args").GetProperty("ttl_seconds").GetInt32());
         Assert.Equal("granted", line.GetProperty("decision").GetString());
         Assert.Equal("prompt", line.GetProperty("method").GetString());
-        Assert.Equal(reply.TtlSeconds, line.GetProperty("granted_seconds").GetInt32());
         Assert.Equal("session-one", line.GetProperty("session").GetString());
         Assert.Equal(VaultKey, line.GetProperty("vault").GetString());
         Assert.DoesNotContain(ApproverFixture.Sentinel, _log.Text(), StringComparison.Ordinal);
@@ -261,7 +256,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     [Fact]
     public async Task ARequestRefusedAtAdmission_IsRecordedUnderNoSession()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
 
         await using (var unattached = await ConnectAsync(owner))
@@ -388,7 +383,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     [Fact]
     public async Task AnOwnerWhoseLogWillNotOpen_RefusesEveryRequest_BeforeAnybodyIsAsked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, audit: () => null);
         await using var client = await AttachedAsync(owner);
 
@@ -428,7 +423,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     public async Task AFailureWhileDeciding_IsRecordedAsFailed_AndToldAsUnexpected()
     {
         var told = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         _fixture.Source.During = () => throw new InvalidOperationException("the disk went away");
         await using var owner = Owner.Start(this, unexpected: told.Enqueue);
         await using var client = await AttachedAsync(owner);

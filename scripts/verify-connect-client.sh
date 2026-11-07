@@ -11,7 +11,7 @@
 # may hold other tools of the catalogue, so only the rows of these two are asserted.
 #
 # The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
-# grants` reaches the app with no --vault. Agents finds both tools and offers Connect on each. Cancelling a plan
+# clients` reaches the app with no --vault. Agents finds both tools and offers Connect on each. Cancelling a plan
 # writes nothing. Running it registers exactly the command the plan showed, under the tool's own id, naming no
 # vault and offering run with every item in reach, and the tool's row then says Connected. The check starts that
 # command, which finds the chosen vault, raises the app's prompt for the one item Claude Code's settings let it
@@ -202,8 +202,8 @@ FIRST="$(session_of)"
 # ------------------------------------------ the first unlock chose the vault, and the CLI uses it unnamed
 CHOSEN="$(env -u KEYPASTE_VAULT "$CLI" use 2>&1 | tr -d '\r\357\273\277')" || die "keypaste use printed no chosen vault: [$CHOSEN]"
 same_file "$CHOSEN" "$VAULT" || die "the first unlock chose [$CHOSEN], not the vault it unlocked [$VAULT]"
-GRANTS="$(env -u KEYPASTE_VAULT "$CLI" grants 2>&1)" || die "keypaste grants with no --vault failed: $GRANTS"
-case "$GRANTS" in *"nothing holds"*) die "keypaste grants with no --vault did not reach the app holding the chosen vault: $GRANTS" ;; esac
+LISTED="$(env -u KEYPASTE_VAULT "$CLI" clients 2>&1)" || die "keypaste clients with no --vault failed: $LISTED"
+case "$LISTED" in *"nothing holds"*) die "keypaste clients with no --vault did not reach the app holding the chosen vault: $LISTED" ;; esac
 
 # ----------------------------------------------- Agents finds both tools; a cancelled plan writes nothing
 expect_state "$CLAUDE" connect "before Connect"

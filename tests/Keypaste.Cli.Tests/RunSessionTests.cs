@@ -62,7 +62,7 @@ public sealed class RunSessionTests : IDisposable
     [Fact]
     public async Task An_approved_run_starts_the_child_with_the_set_and_asks_no_password()
     {
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(0, Run("dev"));
 
@@ -97,7 +97,7 @@ public sealed class RunSessionTests : IDisposable
             vault.Save();
         }
 
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(0, Run("dev"));
 
@@ -141,7 +141,7 @@ public sealed class RunSessionTests : IDisposable
     [Fact]
     public async Task An_unknown_project_exits_3_and_an_unusable_set_names_its_entries_unasked()
     {
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(CliApp.ExitNotFound, Run("missing"));
         _harness.AssertExit(CliApp.ExitInternalError, Run("broken"));
@@ -173,7 +173,7 @@ public sealed class RunSessionTests : IDisposable
     {
         AddStaging(("TOKEN", "staging-token"));
 
-        await using (var owner = Owner(ApprovalAnswer.Approved))
+        await using (var owner = Owner(ApprovalAnswer.ApprovedOnce))
         {
             _harness.AssertExit(0, RunProfile("staging", "dev"));
 
@@ -203,7 +203,7 @@ public sealed class RunSessionTests : IDisposable
             Assert.Contains("said no", _harness.Err, StringComparison.Ordinal);
         }
 
-        await using (var locked = Owner(ApprovalAnswer.Approved))
+        await using (var locked = Owner(ApprovalAnswer.ApprovedOnce))
         {
             locked.Lifetime.End();
             _harness.AssertExit(CliApp.ExitInternalError, RunProfile("staging", "dev"));
@@ -224,7 +224,7 @@ public sealed class RunSessionTests : IDisposable
     {
         AddStaging(("TOKEN", "staging-token"), ("OTHER", "other-value"));
         var file = WriteFile("API_TOKEN=kp://dev/staging/TOKEN\nHTTPS_PROXY=http://proxy.internal:3128\n");
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(0, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
@@ -253,7 +253,7 @@ public sealed class RunSessionTests : IDisposable
     public async Task RunSession_ALiteralThePromptWouldShorten_IsRefusedUnasked()
     {
         var file = WriteFile($"API_TOKEN=kp://dev/dev/TOKEN\nNODE_OPTIONS=\"{new string(' ', 1100)}--require ./x.js\"\n");
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
@@ -267,7 +267,7 @@ public sealed class RunSessionTests : IDisposable
     {
         var literals = string.Concat(Enumerable.Range(0, 200).Select(i => $"LITERAL_{i}={new string('x', 400)}\n"));
         var file = WriteFile($"API_TOKEN=kp://dev/dev/TOKEN\n{literals}");
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
@@ -281,7 +281,7 @@ public sealed class RunSessionTests : IDisposable
     public async Task RunSession_EntryReferences_AreRefused()
     {
         var file = WriteFile("API_TOKEN=kp://dev/dev/TOKEN\nGH=kp:///work/github\n");
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
@@ -302,7 +302,7 @@ public sealed class RunSessionTests : IDisposable
         }
 
         var file = WriteFile("A=kp://dev/staging/TOKEN\nB=kp://dev/staging/TOKEN\n");
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
 
         _harness.AssertExit(0, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
@@ -350,7 +350,7 @@ public sealed class RunSessionTests : IDisposable
             vault.Save();
         }
 
-        await using var owner = Owner(confirmedInTheApp ? ApprovalAnswer.Denied : ApprovalAnswer.Approved);
+        await using var owner = Owner(confirmedInTheApp ? ApprovalAnswer.Denied : ApprovalAnswer.ApprovedOnce);
 
         if (confirmedInTheApp)
         {
@@ -375,7 +375,7 @@ public sealed class RunSessionTests : IDisposable
     [Fact]
     public async Task A_spent_pass_starts_nothing_and_says_so_unasked()
     {
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
         Confirmed(owner);
         _harness.AssertExit(0, RunLaunched("dev"));
         _harness.Stderr.GetStringBuilder().Clear();
@@ -401,7 +401,7 @@ public sealed class RunSessionTests : IDisposable
     [InlineData(false)]
     public async Task A_refused_run_from_the_app_waits_for_Return_only_when_someone_can_type(bool terminal)
     {
-        await using var owner = Owner(ApprovalAnswer.Approved);
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
         Confirmed(owner);
         owner.Lifetime.End();
         _harness.Prompt.Interactive = terminal;
@@ -423,7 +423,7 @@ public sealed class RunSessionTests : IDisposable
     [Fact]
     public async Task A_run_from_the_app_finding_nothing_answering_says_to_press_Run_in_the_app_again()
     {
-        await using (var owner = Owner(ApprovalAnswer.Approved))
+        await using (var owner = Owner(ApprovalAnswer.ApprovedOnce))
         {
             Confirmed(owner);
         }

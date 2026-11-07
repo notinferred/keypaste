@@ -25,7 +25,6 @@ public sealed class ApproverClientTests
         Entry = entry,
         Field = "password",
         Reason = "deploy billing to staging",
-        TtlSeconds = 300,
         Exposure = ["env/**"],
         ClientName = "claude-code",
     };
@@ -134,7 +133,6 @@ public sealed class ApproverClientTests
                 Method = AuditMethod.Prompt,
                 Reason = "a person approved this request",
                 Entry = request.Entry,
-                TtlSeconds = 300,
                 Value = "sk_live_client_sentinel",
             };
         }

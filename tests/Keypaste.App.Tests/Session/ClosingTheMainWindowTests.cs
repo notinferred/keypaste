@@ -376,7 +376,6 @@ public sealed class ClosingTheMainWindowTests
                 Entry = "env/ci/DEPLOY_KEY",
                 Field = "password",
                 Reason = "deploy the billing service",
-                TtlSeconds = 60,
                 Exposure = ["env/**"],
                 ClientName = "claude-code",
                 ClientLabel = "f21",

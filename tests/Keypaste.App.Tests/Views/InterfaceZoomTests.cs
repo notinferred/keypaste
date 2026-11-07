@@ -31,7 +31,6 @@ public sealed class InterfaceZoomTests
         Project = "acme-api",
         Profile = "dev",
         Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL")],
-        GrantSeconds = 900,
     };
 
     private static RunApprovalWindow Open(RunPrompt prompt, ScreenArea? area = null)
@@ -461,7 +460,7 @@ public sealed class InterfaceZoomTests
         Assert.True(window.ClientSize.Width <= area.Size.Width + 1, $"{window.ClientSize} on {area.Size}");
         Assert.True(window.ClientSize.Height <= area.Size.Height + 1, $"{window.ClientSize} on {area.Size}");
 
-        foreach (var name in new[] { "Deny", "AllowOnce", "Approve", "ReasonText" })
+        foreach (var name in new[] { "Deny", "AllowOnce", "AllowOnce", "ReasonText" })
         {
             var control = window.FindControl<Control>(name)!;
             var box = name == "ReasonText" ? control.FindAncestorOfType<Border>()! : control;
@@ -477,14 +476,14 @@ public sealed class InterfaceZoomTests
     {
         var window = Open(Run());
         var size = window.ClientSize;
-        var approve = InWindow(window.FindControl<Button>("Approve")!, window);
+        var approve = InWindow(window.FindControl<Button>("AllowOnce")!, window);
 
         InterfaceZoom.Set(200);
         WindowInput.Drain();
         DrawnFrame.Capture(window);
 
         Assert.Equal(size, window.ClientSize);
-        Assert.Equal(approve, InWindow(window.FindControl<Button>("Approve")!, window));
+        Assert.Equal(approve, InWindow(window.FindControl<Button>("AllowOnce")!, window));
         window.Close();
     });
 

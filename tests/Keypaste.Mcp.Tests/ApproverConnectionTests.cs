@@ -27,7 +27,6 @@ public sealed class ApproverConnectionTests
         Entry = entry,
         Field = "password",
         Reason = "deploy the billing service to staging",
-        TtlSeconds = 300,
         Exposure = ["env/**"],
         ClientName = "claude-code",
     };

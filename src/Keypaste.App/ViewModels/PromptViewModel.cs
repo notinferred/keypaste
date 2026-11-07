@@ -15,7 +15,7 @@ namespace Keypaste.App.ViewModels;
 /// can appear under a pointer that was about to click something else, and that click is not an
 /// approval (D-0326). Bringing the prompt forward from Agents disarms it for another
 /// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing (D-0456), and so does a click
-/// that brings it back from another window. Denying needs no delay. The timed allow exists only when the prompt offers a timed grant.
+/// that brings it back from another window. Denying needs no delay.
 /// </para>
 /// </remarks>
 internal abstract partial class PromptViewModel : ObservableObject
@@ -28,24 +28,14 @@ internal abstract partial class PromptViewModel : ObservableObject
 
     protected PromptViewModel()
     {
-        ApproveCommand = new RelayCommand(() => Decide(ApprovalAnswer.Approved), () => IsArmed && OffersTimed && !IsAnswered);
         AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && !IsAnswered);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
     }
-
-    /// <summary>Allows this request and keeps the timed grant the prompt offers.</summary>
-    internal RelayCommand ApproveCommand { get; }
 
     /// <summary>Allows this request and keeps nothing.</summary>
     internal RelayCommand AllowOnceCommand { get; }
 
     internal RelayCommand DenyCommand { get; }
-
-    /// <summary>Whether the prompt offers a timed grant beside "allow once".</summary>
-    internal bool OffersTimed => TimedSeconds > 0;
-
-    /// <summary>What the timed allow button says.</summary>
-    internal virtual string TimedLabel => $"Allow for {ApprovalLimits.Describe(TimedSeconds)}";
 
     /// <summary>How long is left to answer, as <c>m:ss</c>.</summary>
     [ObservableProperty]
@@ -56,12 +46,9 @@ internal abstract partial class PromptViewModel : ObservableObject
 
     internal bool IsAnswered => _answer.Task.IsCompleted;
 
-    /// <summary>How long the timed grant lasts, or zero when the prompt offers only "allow once".</summary>
-    protected abstract int TimedSeconds { get; }
-
     /// <summary>Whether the prompt has been up long enough for an allow to be pressed.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ApproveCommand), nameof(AllowOnceCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AllowOnceCommand))]
     protected partial bool IsArmed { get; private set; }
 
     partial void OnIsArmedChanged(bool value) => OnAllowsChanged();
@@ -133,7 +120,6 @@ internal abstract partial class PromptViewModel : ObservableObject
         if (_answer.TrySetResult(answer))
         {
             OnPropertyChanged(nameof(IsAnswered));
-            ApproveCommand.NotifyCanExecuteChanged();
             AllowOnceCommand.NotifyCanExecuteChanged();
             DenyCommand.NotifyCanExecuteChanged();
             OnAllowsChanged();

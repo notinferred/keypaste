@@ -36,7 +36,7 @@ public sealed class LogVerbTests : IDisposable
         {
             Tool = "request_credential",
             Client = new AuditClient(client, "1.0", client),
-            Args = AuditArgs.ForCredentialRequest(entry, "password", 900, "deploy the billing service"),
+            Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy the billing service"),
             Decision = decision,
             Method = method,
             Reason = decision == AuditDecision.Granted ? "a person approved this request" : "nobody was asked",
@@ -437,19 +437,17 @@ public sealed class LogVerbTests : IDisposable
     }
 
     [Fact]
-    public void Log_Json_SaysHowLongAPersonsGrantLasts()
+    public void Log_Json_ListsEachLine()
     {
         Write(
             new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
-            Record("claude-code", "env/dev/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt) with { GrantedSeconds = 3600 },
+            Record("claude-code", "env/dev/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt),
             Record("claude-desktop", "env/dev/DB_URL", AuditDecision.Denied, AuditMethod.OutOfScope));
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
 
         using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
-        var records = document.RootElement.EnumerateArray().ToList();
-        Assert.Equal(3600, records[0].GetProperty("granted_seconds").GetInt32());
-        Assert.Equal(System.Text.Json.JsonValueKind.Null, records[1].GetProperty("granted_seconds").ValueKind);
+        Assert.Equal(2, document.RootElement.GetArrayLength());
     }
 
     [Fact]

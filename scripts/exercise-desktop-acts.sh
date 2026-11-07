@@ -1023,7 +1023,7 @@ mcp_start() {
 mcp_say() { printf '%s\n' "$1" >&8; }
 
 mcp_request() {
-  mcp_say "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_FIELD\",\"field\":\"$FIELD\",\"reason\":\"$2\",\"ttl_seconds\":60}}}"
+  mcp_say "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_FIELD\",\"field\":\"$FIELD\",\"reason\":\"$2\"}}}"
 }
 
 replied() {

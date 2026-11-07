@@ -20,7 +20,6 @@ public sealed class ApproverProtocolTests
         Entry = "env/dev/STRIPE_KEY",
         Field = "password",
         Reason = reason,
-        TtlSeconds = 900,
         Exposure = ["env/**"],
         ClientName = "claude-code",
         ClientVersion = "1.2.3",
@@ -33,7 +32,6 @@ public sealed class ApproverProtocolTests
         Method = AuditMethod.Prompt,
         Reason = "a person approved this request",
         Entry = "env/dev/STRIPE_KEY",
-        TtlSeconds = 300,
         Value = value,
     };
 
@@ -50,7 +48,6 @@ public sealed class ApproverProtocolTests
         Assert.Equal(original.Entry, decoded.Entry, StringComparer.Ordinal);
         Assert.Equal(original.Field, decoded.Field, StringComparer.Ordinal);
         Assert.Equal(original.Reason, decoded.Reason, StringComparer.Ordinal);
-        Assert.Equal(original.TtlSeconds, decoded.TtlSeconds);
         Assert.Equal(original.Exposure, decoded.Exposure);
         Assert.Equal(original.ClientName, decoded.ClientName, StringComparer.Ordinal);
         Assert.Equal(original.ClientVersion, decoded.ClientVersion, StringComparer.Ordinal);
@@ -471,7 +468,7 @@ public sealed class ApproverProtocolTests
     public void AGrantedReplyWithNoValue_IsRefused()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","ttl_seconds":300}""");
+            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":300}""");
 
         Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply);
@@ -516,12 +513,12 @@ public sealed class ApproverProtocolTests
     [InlineData("\"a string\"")]
     [InlineData("""{"v":2}""")]
     [InlineData("""{"v":2,"kind":"credential"}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"nonsense","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":1,"field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":"nine","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[7]}""")]
-    [InlineData("""{"v":2,"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","field":"notes","reason":"r","ttl_seconds":1,"exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"nonsense","entry":"a","field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":1,"field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":9,"exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[7]}""")]
+    [InlineData("""{"v":2,"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","field":"notes","reason":"r","exposure":[]}""")]
     public void AMalformedFrame_IsRefusedRatherThanThrowing(string json)
     {
         var frame = Encoding.UTF8.GetBytes(json);
@@ -554,7 +551,7 @@ public sealed class ApproverProtocolTests
     public void AnUnknownMethod_BecomesAFailureRatherThanLosingTheReply()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"denied","method":9999,"reason":"who knows","ttl_seconds":0}""");
+            """{"v":2,"kind":"credential","decision":"denied","method":9999,"reason":"who knows","code_seconds":0}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Equal(AuditMethod.Failed, reply.Method);
@@ -569,7 +566,7 @@ public sealed class ApproverProtocolTests
     public void ADeniedReplyCarryingAValue_ArrivesWithoutIt()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","ttl_seconds":0,"value":"sk_live_smuggled"}""");
+            """{"v":2,"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","code_seconds":0,"value":"sk_live_smuggled"}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply.Value);
@@ -583,7 +580,7 @@ public sealed class ApproverProtocolTests
     public void AReplyNamingItsValueTwice_IsRefused()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","ttl_seconds":60,"value":"first","value":"second"}""");
+            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":60,"value":"first","value":"second"}""");
 
         Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply);
@@ -626,7 +623,6 @@ public sealed class ApproverProtocolTests
         Assert.Equal(AuditDecision.Denied, reply.Decision);
         Assert.Equal(AuditMethod.Undeliverable, reply.Method);
         Assert.Null(reply.Value);
-        Assert.Equal(0, reply.TtlSeconds);
 
         // The entry survives, because the audit line the bridge writes out of this reply exists to
         // answer which entry it was.
@@ -661,7 +657,7 @@ public sealed class ApproverProtocolTests
     /// </remarks>
     [Theory]
     [InlineData(AuditMethod.Prompt)]
-    [InlineData(AuditMethod.GrantCache)]
+    [InlineData(AuditMethod.AlwaysAllowed)]
     [InlineData(AuditMethod.Automatic)]
     public void AnUndeliverableReply_NamesTheAuthorityItHad(AuditMethod authority)
     {
@@ -853,7 +849,7 @@ public sealed class ApproverProtocolTests
     [Theory]
     [InlineData("""{"v":1,"kind":"names","exposure":["env/**"]}""")]
     [InlineData("""{"v":2,"kind":"names","exposure":["env/**"]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[]}""")]
     public void ARequestNamingNoVaultOrSession_IsRefused(string frame)
     {
         var bytes = Encoding.UTF8.GetBytes(frame);
@@ -967,8 +963,8 @@ public sealed class ApproverProtocolTests
         };
 
     private const string _namesFrame = """{"v":2,"kind":"names","unlocked":true,"reason":"","complete":true,"names":[]""";
-    private const string _credentialFrame = """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","value":"sk_live_sentinel","ttl_seconds":60""";
-    private const string _runFrame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[]""";
+    private const string _credentialFrame = """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","value":"sk_live_sentinel","code_seconds":60""";
+    private const string _runFrame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
 
     [Theory]
     [InlineData(true)]

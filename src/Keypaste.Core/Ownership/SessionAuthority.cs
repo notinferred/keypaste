@@ -32,7 +32,7 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
 /// lifetime the runner attached to, never a later one, with the person asked through the owner's
-/// own gate (D-0341) unless a timed grant they gave the same run still covers the same names
+/// own gate (D-0341) and nothing else answers it
 /// (THREATS.md T-34). A request carrying the launch pass the app's own Run confirmation issued is
 /// that person's answer: it is released unasked only when it is exactly the request the confirmation
 /// named and the set still has the names, items and protection it showed (D-0452). The app's launch
@@ -42,7 +42,7 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// An agent's <c>run</c> is refused unasked unless the agent's settings let it run commands, and is
 /// otherwise resolved the same way, against what the agent can see, and asked about as the exact
-/// program, command line, directory and variable names, unless a timed grant that person gave the same
+/// program, command line, directory and variable names, unless that person chose Always allow on exactly the same
 /// command line on the same connection still covers the same names (D-0358). No mode releases a run.
 /// The owner runs nothing: the bridge starts the command.
 /// </para>
@@ -57,7 +57,7 @@ namespace Keypaste.Core.Ownership;
 /// deciding included, and a release whose line cannot be written is refused (THREATS.md T-6). While
 /// that log will not open, every request is refused before anybody is asked. Nothing the asker sends
 /// moves that log, so a bridge configured to log elsewhere, or a program speaking the pipe directly, is
-/// recorded all the same (T-14). Attaching, listing grants or settings and locking release nothing and
+/// recorded all the same (T-14). Attaching, listing settings and locking release nothing and
 /// are not recorded.
 /// </para>
 /// <para>
@@ -68,6 +68,9 @@ namespace Keypaste.Core.Ownership;
 /// </remarks>
 public sealed class SessionAuthority : IApproverHandler
 {
+    /// <summary>Who a set released to <c>keypaste run --session</c> is listed as given to.</summary>
+    public const string RunnerClient = "keypaste run";
+
     private const string _lockedReason = "the vault is locked";
     private const string _unrecordedNarration = "the audit log could not be written, so nothing was sent";
     private const string _launchSpent = "the run you confirmed in the app expired or was already used";
@@ -135,19 +138,18 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>Read the way every request reads it, so a status built on it says what an agent would meet.</remarks>
     public string? Serving => Live()?.Id;
 
-    /// <summary>What the current session has waiting for a person and has granted, or nothing while no session is live.</summary>
+    /// <summary>What the current session has waiting for a person, or nothing while no session is live.</summary>
     public ApproverActivity Activity =>
         Live() is null
             ? ApproverActivity.None
             : _inner.Activity() with
             {
-                EnvGrants = _environments?.Grants?.InForce() ?? [],
                 WaitingRuns = _environments?.Gate.WaitingRun is { } run ? [run] : [],
                 WaitingEnvs = _environments?.Gate.WaitingEnv is { } env ? [env] : [],
             };
 
     /// <summary>The bridges attached to the live session that said who their client is, the most recently active first.</summary>
-    /// <remarks>Runners, <c>keypaste grants</c> and <c>keypaste lock</c> say nothing and are not listed.</remarks>
+    /// <remarks>Runners and <c>keypaste lock</c> say nothing and are not listed.</remarks>
     public IReadOnlyList<ConnectedClient> Clients
     {
         get
@@ -188,46 +190,11 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>Ends every grant given to a bridge started with this <c>--client-label</c>, credential and run alike.</summary>
-    /// <param name="label">The raw label.</param>
-    /// <remarks>What a stricter ceiling for that agent does to what it already holds, so the Agents list matches it.</remarks>
-    public void RevokeClient(string label)
-    {
-        ArgumentNullException.ThrowIfNull(label);
-
-        if (Live() is null)
-        {
-            return;
-        }
-
-        var shown = EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text;
-
-        RevokeAgent(
-            grant => string.Equals(grant.Approved.Label, shown, StringComparison.Ordinal),
-            grant => string.Equals(grant.Label, label, StringComparison.Ordinal));
-    }
-
-    /// <summary>Ends one grant of the current session, so the next request it would have answered is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    public void Revoke(GrantKey key)
-    {
-        if (Live() is not null)
-        {
-            _inner.Revoke(key);
-        }
-    }
-
-    /// <summary>Ends one timed grant a person gave a repeated <c>keypaste run --session</c>.</summary>
-    /// <param name="key">The grant, as <see cref="ApproverActivity.EnvGrants"/> listed it.</param>
-    public void RevokeEnvGrant(string key)
-    {
-        ArgumentNullException.ThrowIfNull(key);
-
-        if (Live() is not null)
-        {
-            _environments?.Grants?.Revoke(key);
-        }
-    }
+    /// <summary>What an Always allow row's item is now, for an agent's settings to list.</summary>
+    /// <param name="item">The item's UUID as hex.</param>
+    /// <returns>Its name, and whether a protected tag keeps it asked about.</returns>
+    public (string Shown, bool IsProtected) AlwaysItem(string item) =>
+        Live() is null ? ("an item no longer in this vault", false) : (_inner.ShownItem(item), _inner.IsProtectedItem(item));
 
     /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it (D-0452).</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
@@ -279,7 +246,7 @@ public sealed class SessionAuthority : IApproverHandler
             return false;
         }
 
-        Record(lifetime, EntriesOf(set), GrantSummary.EnvClient, "run --session");
+        Record(lifetime, EntriesOf(set), RunnerClient, "run --session");
         return true;
     }
 
@@ -290,16 +257,6 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(pass);
 
         _environments?.Launches?.Withdraw(pass);
-    }
-
-    /// <summary>Ends every grant of the current session, agents' and runs' alike.</summary>
-    public void RevokeAll()
-    {
-        if (Live() is not null)
-        {
-            _inner.RevokeAll();
-            _environments?.Grants?.RevokeAll();
-        }
     }
 
     /// <inheritdoc/>
@@ -404,13 +361,11 @@ public sealed class SessionAuthority : IApproverHandler
                 AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
                 request.Entry,
                 request.Field,
-                request.TtlSeconds,
                 request.Reason,
                 reply.Decision,
                 reply.Method,
                 reply.Reason,
                 reply.Entry,
-                reply.TtlSeconds,
                 request.Exposure,
                 reply.Session,
                 VaultNamed(request.Vault)));
@@ -431,15 +386,24 @@ public sealed class SessionAuthority : IApproverHandler
             waiting,
             withdrawn.Token).ConfigureAwait(false);
 
-        AlwaysForNotice? unmade = null;
+        AlwaysNotice? unmade = null;
 
         // Asked before the commit, so a lock while the person decides still withdraws the release, and
         // in the slot the release's prompt kept, which is given back whatever became of it.
         using (reply.Kept)
         {
-            if (reply is { Decision: AuditDecision.Granted, AlwaysFor: { } scope } && request.ClientLabel is { } agent)
+            if (reply is { Decision: AuditDecision.Granted, Always: { } offer } && request.ClientLabel is { } agent)
             {
-                unmade = await AlwaysAsync(request, agent, scope, reply.Kept, lifetime, waiting, withdrawn.Token).ConfigureAwait(false);
+                unmade = await AlwaysAsync(
+                    AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
+                    agent,
+                    offer,
+                    reply.Kept,
+                    lifetime,
+                    request.Session,
+                    request.Vault,
+                    waiting,
+                    withdrawn.Token).ConfigureAwait(false);
             }
         }
 
@@ -473,25 +437,24 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <summary>
-    /// After a person chose Always for on a release: asks them to confirm making that project
-    /// environment Automatic for the agent, as any change that gives an agent more is confirmed, and
-    /// records the change on its own line.
+    /// After a person chose Always allow on a release: asks them to confirm the widening, as any change
+    /// that gives an agent more is confirmed, and records the change on its own line.
     /// </summary>
     /// <returns>What to tell them once the release has left when the change did not take effect, otherwise null.</returns>
-    /// <remarks>Whatever they answer, the release they already allowed stands as allowed once.</remarks>
-    private async ValueTask<AlwaysForNotice?> AlwaysAsync(
-        CredentialRequest request,
+    /// <remarks>Whatever they answer, the release they already allowed stands as allowed once, and nothing beyond it holds until they confirm.</remarks>
+    private async ValueTask<AlwaysNotice?> AlwaysAsync(
+        AuditClient client,
         string agent,
-        ProjectScope scope,
+        AlwaysOffer offer,
         KeptSlot? kept,
         SessionLifetime lifetime,
+        string session,
+        string vault,
         CancellationToken waiting,
         CancellationToken cancellationToken)
     {
-        var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
-
         var reply = await Decided(
-            token => _inner.ChangeAccessAsync(agent, AccessEdit.Automatic(scope), AccessOrigin.Prompt, string.Empty, kept, token),
+            token => _inner.ChangeAccessAsync(agent, offer.Change, AccessOrigin.Prompt, string.Empty, kept, token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason) { Unapplied = reason },
             waiting,
@@ -499,14 +462,14 @@ public sealed class SessionAuthority : IApproverHandler
 
         _recorder.Recorded(
             reply,
-            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
+            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, session, VaultNamed(vault)));
 
-        return AlwaysForNotice.For(agent, scope, reply);
+        return AlwaysNotice.For(agent, offer, reply);
     }
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Reading settings releases nothing, so it is not recorded, as listing grants is not. The listing
+    /// Reading settings releases nothing, so it is not recorded. The listing
     /// starts after the rows the request says it already has, so one too long for a frame is read in turns.
     /// </remarks>
     public ValueTask<AccessListReply> ListAccessAsync(AccessListRequest request, string connectionId, CancellationToken cancellationToken)
@@ -698,7 +661,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <summary>
-    /// Merges another program's save with the open vault for this owner, as D-0542 and D-0543 say: withdraws every grant and every
+    /// Merges another program's save with the open vault for this owner, as D-0542 and D-0543 say: withdraws every
     /// request waiting on a person, merges and saves, puts the merged copy in place in the same session, and records a merge it saved.
     /// </summary>
     /// <param name="open">The vault the live session serves, whose file another program saved.</param>
@@ -710,7 +673,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <returns>What became of the merge; after a refusal agents stay refused, the open copy still differing from its file (D-0317).</returns>
     /// <remarks>
     /// Agents are refused from the detection to the merged copy's save, because the open copy no longer matches its file. The
-    /// withdrawal at the start ends every grant, counted as a reload's is (D-0516), and answers each request waiting on a person as
+    /// withdrawal at the start answers each request waiting on a person as
     /// the vault having been merged; afterwards a request is answered from the merged copy and asked again unless Automatic. A merge
     /// the owner saved is recorded on one line naming items and agents, never a value (D-0545); one that took nothing writes none.
     /// </remarks>
@@ -815,9 +778,9 @@ public sealed class SessionAuthority : IApproverHandler
             decided,
             RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key, confirmedInApp));
 
-        if (_environments is { } environments)
+        if (reply.Set.Outcome == EnvOutcome.Resolved)
         {
-            Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
+            Record(admitted, EntriesOf(reply.Set), RunnerClient, "run --session");
         }
 
         return reply;
@@ -884,7 +847,6 @@ public sealed class SessionAuthority : IApproverHandler
             "\u0002", .. request.FileLines ?? []]);
         var fileLines = (request.FileLines ?? []).Select(ShownLine).ToList();
         var answer = ApprovalAnswer.NoChannel;
-        var fromGrant = false;
         string? refused = null;
         var refusedOutcome = EnvOutcome.Invalid;
 
@@ -918,39 +880,12 @@ public sealed class SessionAuthority : IApproverHandler
                     return false;
                 }
 
-                // A set holding a member of a protected environment is asked about live: no timed grant is offered or used.
-                var grantSeconds = preview.RequiresLiveApproval ? 0 : EnvGrantCache.GrantSeconds(environments.Gate.Limits);
-                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds, FileLines = fileLines };
+                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { FileLines = fileLines };
 
-                // Names only: the resolver reads the set again after this, so a grant releases the
-                // latest saved values, and a changed name list is asked about again.
-                if (!preview.RequiresLiveApproval && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
-                {
-                    environments.Narrate?.Invoke(
-                        Invariant($"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` under an allowance ({(int)remaining.TotalSeconds}s left)"));
-                    fromGrant = true;
-                    return true;
-                }
-
-                // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
-                var generation = environments.Grants?.Generation ?? 0;
                 answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
                 // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
                 withdrawn.ThrowIfCancellationRequested();
-
-                if (answer == ApprovalAnswer.Approved && grantSeconds > 0)
-                {
-                    environments.Grants?.Store(
-                        cooldownKey,
-                        prompt.Project,
-                        prompt.Profile,
-                        prompt.Command,
-                        preview.Keys,
-                        TimeSpan.FromSeconds(grantSeconds),
-                        generation,
-                        entries: [.. preview.Sources.Select(source => source.Entry).Distinct()]);
-                }
 
                 return answer.Releases();
             },
@@ -969,7 +904,7 @@ public sealed class SessionAuthority : IApproverHandler
         // As the run path records them; an approval the runner hung up on before it was used is a cancellation.
         var method = delivered.Set.Outcome switch
         {
-            EnvOutcome.Resolved => fromGrant ? AuditMethod.GrantCache : AuditMethod.Prompt,
+            EnvOutcome.Resolved => AuditMethod.Prompt,
             EnvOutcome.Declined => answer.Releases() ? AuditMethod.Cancelled : answer.ToAuditMethod(),
             _ => MethodOf(delivered.Set.Outcome),
         };
@@ -983,16 +918,15 @@ public sealed class SessionAuthority : IApproverHandler
     /// The order is the security property. Admitted, then the request's rules, then the exposure and
     /// the agent's settings, a run refused unresolved when they do not let it run commands, then
     /// resolved under the admitted lifetime; the person is asked about the names the set holds once
-    /// what the agent can see, the name rule and the audit line's room are checked, unless a timed grant
-    /// this connection holds for the same command line covers the same names. The set is read again
+    /// what the agent can see, the name rule and the audit line's room are checked, unless the person chose
+    /// Always allow on exactly this command, and a refusal is not cooling. The set is read again
     /// after the answer, so an edit saved meanwhile is what leaves. A release whose names are not the
     /// ones the request named, or that one frame cannot carry, is refused before it is recorded.
     /// </para>
     /// <para>
     /// A missing project, a missing profile, an unusable set and one outside the exposure all come back
     /// as <see cref="AuditMethod.OutOfScope"/>, so a run cannot map the vault (THREATS.md T-4); the
-    /// reason, which only the audit line keeps, says which. No mode releases a run: Automatic asks, and
-    /// Ask every time offers no timed grant.
+    /// reason, which only the audit line keeps, says which. No mode releases a run: Automatic asks.
     /// </para>
     /// </remarks>
     public async ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
@@ -1019,7 +953,6 @@ public sealed class SessionAuthority : IApproverHandler
                 reply.Set.Outcome == EnvOutcome.Resolved ? AuditDecision.Granted : AuditDecision.Denied,
                 reply.Method,
                 reply.Reason,
-                reply.GrantedSeconds,
                 reply.Entries,
                 request.Exposure,
                 reply.Session,
@@ -1031,6 +964,9 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var client = ConnectedClient.Named(request.ClientLabel, request.ClientName);
+        var waiting = admitted.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
 
         var decided = await Decided(
             token => DecideRunAsync(request, asked, connectionId, admitted, token),
@@ -1039,6 +975,33 @@ public sealed class SessionAuthority : IApproverHandler
             CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
+        AlwaysNotice? unmade = null;
+
+        // As a credential's: before the commit, in the slot the prompt kept, whatever became of the run.
+        using (decided.Kept)
+        {
+            if (decided is { Always: { } offer, Set.Outcome: EnvOutcome.Resolved } && request.ClientLabel is { } agent)
+            {
+                unmade = await AlwaysAsync(
+                    AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
+                    agent,
+                    offer,
+                    decided.Kept,
+                    admitted,
+                    request.Session,
+                    request.Vault,
+                    waiting,
+                    withdrawn.Token).ConfigureAwait(false);
+            }
+        }
+
+        // The set was read before this question: a lock or a reload while the person answered it refuses the run.
+        if (decided is { Always: not null, Set.Outcome: EnvOutcome.Resolved } && !admitted.TryCommitAfter(waiting))
+        {
+            var (method, reason) = WithdrawnBy(admitted, "this was released");
+            decided = RunRefused(request, OutcomeOf(method), method, reason, decided.Entries);
+        }
+
         var delivered = Deliverable(asked, decided with { Session = request.Session });
         var answered = Answer(delivered);
 
@@ -1046,12 +1009,17 @@ public sealed class SessionAuthority : IApproverHandler
         {
             Record(admitted, answered.Entries, client, "run");
 
-            // Every run is narrated with its command, a grant-served one too: the grant approved a
+            // Every run is narrated with its command, one under Always allow too: the row approved a
             // command line, not what the files it runs do (T-35).
             var command = EnvReleasePrompt.CommandLine(request.Command);
-            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.GrantCache
-                ? Invariant($"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` under an allowance ({answered.GrantedSeconds}s left)")
-                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` {(answered.GrantedSeconds > 0 ? Invariant($"for {answered.GrantedSeconds}s") : "once")}");
+            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.AlwaysAllowed
+                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` without asking (Always allow)"
+                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` once");
+
+            if (unmade is not null)
+            {
+                _inner.Tell(unmade);
+            }
         }
         else if (delivered.Set.Outcome == EnvOutcome.Resolved)
         {
@@ -1119,14 +1087,10 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var command = EnvReleasePrompt.CommandLine(request.Command);
-        string[] mode = document is null
-            ? ["set", request.Project!, request.Profile, .. (request.Keys ?? []).Order(StringComparer.Ordinal)]
-            : ["refs", .. request.References!.Select(reference => reference.Name + "=" + reference.Reference)];
-        var runKey = string.Join('\0', ["run", connectionId, request.Directory, request.Program, .. request.Command, "\u0001", .. mode]);
-
         var answer = ApprovalAnswer.NoChannel;
         var method = AuditMethod.Prompt;
-        var granted = 0;
+        AlwaysOffer? chosen = null;
+        KeptSlot? kept = null;
         IReadOnlyList<string> shown = [];
         string? refused = null;
         var refusedMethod = AuditMethod.InvalidRequest;
@@ -1160,28 +1124,8 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            var now = environments.Clock.GetUtcNow();
-            var onceOnly = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name))
-                ? OnceOnly.ProtectedProfile
-                : entries.Any(entry => access.Item(_inner.Tags(entry.Name), now).Mode == AgentMode.Ask) ? OnceOnly.AskEveryTime : OnceOnly.None;
-            var grantSeconds = onceOnly == OnceOnly.None ? EnvGrantCache.GrantSeconds(environments.Gate.Limits) : 0;
-
-            // Names only: the resolver reads again after this, so a grant releases the latest saved
-            // values, and a changed name list is asked about again.
-            if (onceOnly == OnceOnly.None && environments.Grants?.TryUse(runKey, preview.Keys, out var remaining) == true)
-            {
-                method = AuditMethod.GrantCache;
-                granted = (int)remaining.TotalSeconds;
-                return true;
-            }
-
-            var prompt = RunPrompt.For(
-                request,
-                preview.Project,
-                preview.Profile,
-                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))],
-                grantSeconds,
-                onceOnly);
+            var isProtected = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name));
+            var identity = isProtected ? null : Identity(request, entries, preview.Keys);
 
             // A denial cools down every run of this connection and each field it asked for, whichever
             // connection asks next and whether a run or a credential request reaches it: another argument,
@@ -1191,30 +1135,41 @@ public sealed class SessionAuthority : IApproverHandler
                 "run\0" + connectionId,
                 .. entries.Select(entry => ApprovalGate.FieldKey(EntryHandle.For(entry.Name), entry.Field)).Distinct(StringComparer.Ordinal),
             ];
-            // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
-            var generation = environments.Grants?.Generation ?? 0;
-            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
+
+            // Exact and failing closed: anything but this program, these arguments, this directory and
+            // these names from these items' fields asks. A refusal still cooling outranks the row.
+            if (identity is not null && access.AlwaysAllows(identity) && !cooldownKeys.Any(environments.Gate.IsInCooldown))
+            {
+                method = AuditMethod.AlwaysAllowed;
+                return true;
+            }
+
+            var offer = identity is not null && access.Label is not null
+                ? new AlwaysOffer(AccessEdit.AlwaysCommand(identity), command)
+                : null;
+            var prompt = RunPrompt.For(
+                request,
+                preview.Project,
+                preview.Profile,
+                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))],
+                isProtected ? OnceOnly.ProtectedProfile : offer is null ? OnceOnly.Unnamed : OnceOnly.None) with
+            {
+                Always = offer,
+            };
+
+            (answer, kept) = await environments.Gate.AskKeepingAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();
 
-            // A timed allow given while Revoke all, an edit or a reload ended the grants releases this run once.
-            var timed = answer == ApprovalAnswer.Approved
-                && grantSeconds > 0
-                && environments.Grants?.Store(
-                    runKey,
-                    prompt.Project,
-                    prompt.Profile,
-                    command,
-                    preview.Keys,
-                    TimeSpan.FromSeconds(grantSeconds),
-                    generation,
-                    prompt.Client,
-                    request.ClientLabel,
-                    [.. entries.Select(entry => entry.Name)]) != false;
-
             method = AuditMethod.Prompt;
-            granted = timed ? grantSeconds : 0;
+
+            if (answer == ApprovalAnswer.Always && offer is not null)
+            {
+                chosen = offer;
+                answer = ApprovalAnswer.ApprovedOnce;
+            }
+
             return answer.Releases();
         }
 
@@ -1223,24 +1178,40 @@ public sealed class SessionAuthority : IApproverHandler
             environments.VaultFor,
             environments.Clock);
 
-        var resolved = document is null
-            ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
-            : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
+        EnvResolved resolved;
 
-        Settled(environments, resolved);
+        try
+        {
+            resolved = document is null
+                ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
+                : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            kept?.Dispose();
+            throw;
+        }
 
         if (resolved.Outcome == EnvOutcome.Resolved)
         {
-            return new RunReply(resolved, method, method == AuditMethod.GrantCache
-                ? "served from a run a person had approved on this connection"
-                : granted > 0
-                    ? $"a person approved this command line for {ApprovalLimits.Describe(granted)} on this connection"
-                    : "a person approved this one run")
+            var reply = new RunReply(resolved, method, method == AuditMethod.AlwaysAllowed
+                ? "started without asking: a person always allowed exactly this command for this agent"
+                : "a person approved this one run")
             {
-                GrantedSeconds = granted,
                 Entries = shown,
+                Always = chosen,
+                Kept = chosen is null ? null : kept,
             };
+
+            if (chosen is null)
+            {
+                kept?.Dispose();
+            }
+
+            return reply;
         }
+
+        kept?.Dispose();
 
         if (refused is not null)
         {
@@ -1452,29 +1423,22 @@ public sealed class SessionAuthority : IApproverHandler
         return (int)buffer.Length;
     }
 
-    /// <summary>After a set was released to a runner: records it in the ledger, and ends every env and run grant when the file changed under the owner.</summary>
-    private void Settled(
-        SessionEnvironments environments,
-        SessionLifetime admitted,
-        EnvResolved resolved,
-        string client,
-        string how)
+    /// <summary>A command's identity for Always allow, or null when any of its items cannot be named by UUID, so no row covers it.</summary>
+    private AlwaysCommand? Identity(RunRequest request, IReadOnlyList<(EntryName Name, string Field)> entries, IReadOnlyList<string> keys)
     {
-        Settled(environments, resolved);
+        List<AlwaysVariable> variables = [];
 
-        if (resolved.Outcome == EnvOutcome.Resolved)
+        foreach (var (entry, key) in entries.Zip(keys))
         {
-            Record(admitted, EntriesOf(resolved), client, how);
-        }
-    }
+            if (_inner.ItemId(entry.Name) is not { } item)
+            {
+                return null;
+            }
 
-    /// <summary>After a set was resolved: ends every env and run grant when the file changed under the owner.</summary>
-    private static void Settled(SessionEnvironments environments, EnvResolved resolved)
-    {
-        if (resolved.Outcome == EnvOutcome.ChangedOnDisk)
-        {
-            environments.Grants?.RevokeEntries(VaultEdit.Everything);
+            variables.Add(new AlwaysVariable(key, item, entry.Field));
         }
+
+        return new AlwaysCommand(request.Program, request.Command, request.Directory, variables);
     }
 
     private void Record(SessionLifetime lifetime, IEnumerable<string> entries, string client, string how)
@@ -1636,7 +1600,6 @@ public sealed class SessionAuthority : IApproverHandler
             var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with
             {
                 Requester = $"token '{EntryNameSanitizer.Sanitize(info.Name).Text}' ({info.Prefix})",
-                GrantSeconds = 0,
             };
             answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
@@ -1667,64 +1630,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>Names only: <see cref="GrantSummary"/> has no member a value could travel in (D-0351).</remarks>
-    public ValueTask<GrantsReply> GrantsAsync(GrantsRequest request, string connectionId, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
-        {
-            return ValueTask.FromResult(new GrantsReply(false, [], true, refusal.Reason));
-        }
-
-        return ValueTask.FromResult(new GrantsReply(true, GrantSummary.Of(Activity), true, string.Empty));
-    }
-
-    /// <inheritdoc/>
-    public ValueTask<RevokeGrantsReply> RevokeGrantsAsync(
-        RevokeGrantsRequest request,
-        string connectionId,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
-        {
-            return ValueTask.FromResult(new RevokeGrantsReply(0, refusal.Reason));
-        }
-
-        if (request.All)
-        {
-            var all = Activity;
-            RevokeAll();
-            return ValueTask.FromResult(new RevokeGrantsReply(all.Grants.Count + all.EnvGrants.Count, string.Empty));
-        }
-
-        var endedForAgent = request.Client is { } named
-            ? RevokeAgent(
-                grant => string.Equals(grant.Approved.Client, named, StringComparison.Ordinal),
-                grant => string.Equals(grant.Client ?? GrantSummary.EnvClient, named, StringComparison.Ordinal))
-            : 0;
-
-        var activity = Activity;
-        var ids = request.Ids.Select(id => id.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-        var ended = activity.Grants.Where(grant => ids.Contains(GrantId.Of(grant.Key))).ToList();
-        var endedEnv = activity.EnvGrants.Where(grant => ids.Contains(GrantId.OfEnv(grant.Key))).ToList();
-
-        foreach (var grant in ended)
-        {
-            _inner.Revoke(grant.Key);
-        }
-
-        foreach (var grant in endedEnv)
-        {
-            RevokeEnvGrant(grant.Key);
-        }
-
-        return ValueTask.FromResult(new RevokeGrantsReply(endedForAgent + ended.Count + endedEnv.Count, string.Empty));
     }
 
     /// <inheritdoc/>
@@ -1945,15 +1850,9 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(connectionId);
 
         _attached.TryRemove(connectionId, out _);
-        _inner.Disconnected(connectionId);
-        _environments?.Grants?.RevokePrefix("run\0" + connectionId + "\0");
     }
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
-
-    /// <summary>Ends every grant one agent holds, credential and run alike, and keeps none a person is being asked about now (D-0516).</summary>
-    private int RevokeAgent(Func<GrantInForce, bool> credential, Func<EnvGrantInForce, bool> run) =>
-        _inner.RevokeAgent(credential) + (_environments?.Grants?.RevokeAgent(run) ?? 0);
 
     /// <summary>Completes once the lifetime has ended, or once nobody is waiting for the answer.</summary>
     private static async Task EndedAsync(SessionLifetime lifetime, CancellationToken cancellationToken)

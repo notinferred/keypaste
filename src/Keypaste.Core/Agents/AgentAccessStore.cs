@@ -50,6 +50,12 @@ public enum AgentAccessWrite
     /// keypaste reads as none, so a change to one of them could not be judged.
     /// </summary>
     ProjectsOverLimit = 7,
+
+    /// <summary>A row would be added to an <c>always</c> member keypaste cannot read, which would lose it.</summary>
+    AlwaysUnreadable = 8,
+
+    /// <summary>A row would be added to an <c>always</c> list already holding the most a record keeps.</summary>
+    TooManyAlways = 9,
 }
 
 /// <summary>

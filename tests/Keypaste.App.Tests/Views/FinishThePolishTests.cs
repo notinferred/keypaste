@@ -334,7 +334,7 @@ public sealed class FinishThePolishTests
         var channel = new WindowApprovalChannel(new ManualClock(AppClock.Start), TimeSpan.FromSeconds(45));
         var calm = new CalmPermission(notifications, () => channel.IsAsking);
 
-        var answer = channel.AskAsync(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploying", 3600, "work laptop"), withdraw.Token);
+        var answer = channel.AskAsync(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploying", "work laptop"), withdraw.Token);
 
         Assert.True(channel.IsAsking);
         calm.Offer();

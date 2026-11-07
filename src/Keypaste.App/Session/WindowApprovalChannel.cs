@@ -131,7 +131,7 @@ internal sealed class WindowApprovalChannel(
             {
                 // A notice that cannot be shown changes nothing: the request stays refused, and its line says why.
                 _pairingNotice = null;
-                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
+                unexpected?.Invoke(ex, CrashReporting.AlwaysNoticeSite);
             }
         });
     }
@@ -160,7 +160,7 @@ internal sealed class WindowApprovalChannel(
         return true;
     }
 
-    public void Tell(AlwaysForNotice notice)
+    public void Tell(AlwaysNotice notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
 
@@ -175,7 +175,7 @@ internal sealed class WindowApprovalChannel(
             catch (Exception ex)
             {
                 // A notice that cannot be shown changes nothing: the release stands, and the change's line says why it did not.
-                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
+                unexpected?.Invoke(ex, CrashReporting.AlwaysNoticeSite);
             }
         });
     }

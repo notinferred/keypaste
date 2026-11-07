@@ -254,7 +254,6 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         return ToolResults.Ran(
             names,
             reply.Method,
-            reply.GrantedSeconds,
             result.ExitCode,
             call.TimeoutSeconds,
             scrubber.Scrub(result.Stdout),
@@ -389,7 +388,6 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
                 AuditDecision.Denied,
                 verdict.Method,
                 verdict.Reason,
-                grantedSeconds: null,
                 Entries,
                 options.Exposure.Globs,
                 Session,

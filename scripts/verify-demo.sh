@@ -23,9 +23,9 @@
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
 # output, if the approval dialog the shipped approver draws differs by one character from the block in
-# EITHER page, if the `[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev` choice line or the two
+# EITHER page, if the `[d] deny  [o] once  [a] always` choice line or the two
 # lines the approver draws to say what `[a]` does are missing from either, if either stops carrying the
-# dialog at all, if a request allowed for an hour or once does not return the
+# dialog at all, if a request allowed once does not return the
 # credential with the lifetime the person chose, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
 # either page's, if either committed fixture is missing or not executable, if an option the page
@@ -145,7 +145,7 @@ project_var "$CLI" "$VAULT" "$MASTER" "$PROJECT" "$KEY" "$SECRET" || die "could 
 # --------------------------------------------------------------------------- start the approver
 # One answer per request on stdin: h, then o, then d. ConsoleSecretPrompt reads redirected input a
 # byte at a time precisely so this works.
-printf '%s\nh\no\nd\n' "$MASTER" \
+printf '%s\no\no\nd\n' "$MASTER" \
   | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -174,7 +174,7 @@ ask() {
     done
 
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$KEY\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$KEY\",\"reason\":\"$REASON\"}}}"
     await_replies 8 "$out" "$id" || true
   } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
@@ -237,7 +237,7 @@ done
 # ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
 # is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF "[d] deny  [o] once  [h] 1 hour  [a] always for $PROJECT:dev" "$page" \
+  grep -qF "[d] deny  [o] once  [a] always" "$page" \
     || die "$page does not show the choices a person actually answers"
 done
 
@@ -260,22 +260,17 @@ grep -q "$SECRET" "$OUT" || die "an approved request did not return the credenti
 jq -e --arg s "$SECRET" 'select(.id == 2) | .result.structuredContent.value == $s' <"$OUT" >/dev/null \
   || die "the structured result does not carry the released value"
 
-# The person chose an hour; the agent asked for 900 and does not decide it.
-jq -e 'select(.id == 2) | .result.structuredContent.expires_in_seconds == 3600' <"$OUT" >/dev/null \
-  || die "the released grant does not last the hour the person chose, which the page states as 1 hour"
-
 [ -f "$AUDIT" ] || die "no audit log was written"
 grep -q '"decision":"granted"' "$AUDIT" || die "the approval was not recorded as granted"
 grep -q '"method":"prompt"'    "$AUDIT" || die "the approval was not recorded as coming from a person"
-grep -q '"granted_seconds":3600' "$AUDIT" || die "the approval's audit line does not carry the hour granted"
 grep -q "$SECRET" "$AUDIT" && die "the audit log contains the released credential"
 
 grep -qF "$REASON" "$AGENT_ERR" || die "the agent's stated reason was not shown to the human"
-grep -qF 'keypaste: allowed for 1 hour.' "$AGENT_ERR" || die "the approver did not say how long it allowed the request for"
-in_doc 'keypaste: allowed for 1 hour.' "the timed allow's line"
+grep -qF 'keypaste: allowed once.' "$AGENT_ERR" || die "the approver did not say it allowed the request once"
+in_doc 'keypaste: allowed once.' "the allow's line"
 
 # ------------------------------------------------------------------------------ once: nothing is kept
-# A second bridge, so a second connection that the first one's grant does not cover.
+# A second bridge, so a second connection, asked again like any other.
 OUT="$WORK/once-stdout.txt"
 ERR="$WORK/once-stderr.txt"
 ask 3 "$OUT" "$ERR"
@@ -286,13 +281,12 @@ jq -e --arg s "$SECRET" 'select(.id == 3) | .result.structuredContent.value == $
   || die "a request allowed once did not return the credential"
 jq -e 'select(.id == 3) | .result.structuredContent.expires_in_seconds == 0' <"$OUT" >/dev/null \
   || die "a request allowed once reported a lifetime nobody granted"
-grep '"method":"prompt"' "$AUDIT" | grep '"decision":"granted"' | grep -q '"granted_seconds":0' \
-  || die "the once release was not audited as a person's grant of 0 seconds"
+[ "$(grep '"method":"prompt"' "$AUDIT" | grep -c '"decision":"granted"')" -eq 2 ] \
+  || die "the two once releases were not audited as a person's"
 
 # ------------------------------------------------------------------------------- D. the paired no
-# A third bridge, so a third connection: the first one's grant belongs to a process that has gone,
-# which is what makes this a fresh question rather than a cache hit. Without this the checks above
-# would pass on an approver whose only behaviour is yes.
+# A third bridge, so a third connection. Without this the checks above would pass on an approver whose
+# only behaviour is yes.
 OUT="$WORK/deny-stdout.txt"
 ERR="$WORK/deny-stderr.txt"
 ask 4 "$OUT" "$ERR"
@@ -336,7 +330,7 @@ grep -q "$SECRET" "$OUT" && die "keypaste log printed the credential"
 "$CLI" log --help     >"$WORK/log-help.txt"     2>&1 || true
 "$CLI" mcp --help     >"$WORK/mcp-help.txt"     2>&1 || true
 
-for opt in --vault --approver --approval-timeout --max-ttl; do
+for opt in --vault --approver --approval-timeout; do
   grep -q -- "$opt" "$WORK/approve-help.txt" || die "keypaste approve no longer offers $opt, which $DOC tells you to type"
 done
 for opt in --since --denied --client; do

@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 public sealed class AgentConsoleTests
 {
-    private const string _choice = "[d] deny  [o] once  [h] 1 hour  45s › ";
+    private const string _choice = "[d] deny  [o] once  45s › ";
 
     private static readonly string _nl = Environment.NewLine;
 
@@ -49,64 +49,6 @@ public sealed class AgentConsoleTests
 
         Assert.DoesNotContain('\u001b', stderr.ToString());
         Assert.Equal(["keypaste: short", _choice.TrimEnd(), string.Empty], Screen(stderr.ToString()));
-    }
-
-    /// <summary>
-    /// Narration from many connections while the prompt redraws its countdown, as the real prompt
-    /// does: one write of the drawn line to the same writer. Every piece of output between carriage
-    /// returns and newlines is a whole narration line or a whole choice line.
-    /// </summary>
-    [Fact]
-    public async Task ConcurrentNarration_NeverSplicesIntoTheChoiceLine()
-    {
-        const string choice = "[d] deny  [o] once  [h] 1 hour  45s › ";
-        const int writers = 8;
-        const int linesEach = 200;
-
-        using var inner = new StringWriter();
-        var stderr = TextWriter.Synchronized(inner);
-        var console = new AgentConsole(stderr, interactive: true);
-        using var stop = new CancellationTokenSource();
-
-        console.BeginChoice(() => choice);
-
-        var ticking = Task.Run(() =>
-        {
-            for (var ticks = 0; ticks < 50_000 && !stop.IsCancellationRequested; ticks++)
-            {
-                stderr.Write(AgentConsole.Drawn(choice));
-                Thread.Yield();
-            }
-        }, TestContext.Current.CancellationToken);
-
-        var narrating = Enumerable.Range(0, writers)
-            .Select(writer => Task.Run(() =>
-            {
-                for (var i = 0; i < linesEach; i++)
-                {
-                    console.WriteLine($"keypaste: narration {writer}-{i}");
-                }
-            }, TestContext.Current.CancellationToken))
-            .ToArray();
-
-        await Task.WhenAll(narrating);
-        await stop.CancelAsync();
-        await ticking;
-        console.EndChoice();
-
-        var pieces = inner.ToString()
-            .Split(_nl)
-            .SelectMany(line => line.Split('\r'))
-            .Where(piece => !string.IsNullOrWhiteSpace(piece))
-            .ToList();
-
-        Assert.All(pieces, piece => Assert.True(
-            piece == choice || piece.StartsWith("keypaste: narration ", StringComparison.Ordinal) && !piece.Contains('[', StringComparison.Ordinal),
-            $"a spliced line: |{piece}|"));
-
-        var narrated = pieces.Where(piece => piece != choice).ToList();
-        Assert.Equal(writers * linesEach, narrated.Count);
-        Assert.Equal(writers * linesEach, narrated.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
@@ -166,5 +108,63 @@ public sealed class AgentConsoleTests
     public void Clearing_APaintedLine_BlanksOnlyTheColumnsItShows()
     {
         Assert.Equal("\r   \r", AgentConsole.Cleared("\u001b[38;5;214mabc\u001b[0m"));
+    }
+
+    /// <summary>
+    /// Narration from many connections while the prompt redraws its countdown, as the real prompt
+    /// does: one write of the drawn line to the same writer. Every piece of output between carriage
+    /// returns and newlines is a whole narration line or a whole choice line.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentNarration_NeverSplicesIntoTheChoiceLine()
+    {
+        const string choice = "[d] deny  [o] once  45s › ";
+        const int writers = 8;
+        const int linesEach = 200;
+
+        using var inner = new StringWriter();
+        var stderr = TextWriter.Synchronized(inner);
+        var console = new AgentConsole(stderr, interactive: true);
+        using var stop = new CancellationTokenSource();
+
+        console.BeginChoice(() => choice);
+
+        var ticking = Task.Run(() =>
+        {
+            for (var ticks = 0; ticks < 50_000 && !stop.IsCancellationRequested; ticks++)
+            {
+                stderr.Write(AgentConsole.Drawn(choice));
+                Thread.Yield();
+            }
+        }, TestContext.Current.CancellationToken);
+
+        var narrating = Enumerable.Range(0, writers)
+            .Select(writer => Task.Run(() =>
+            {
+                for (var i = 0; i < linesEach; i++)
+                {
+                    console.WriteLine($"keypaste: narration {writer}-{i}");
+                }
+            }, TestContext.Current.CancellationToken))
+            .ToArray();
+
+        await Task.WhenAll(narrating);
+        await stop.CancelAsync();
+        await ticking;
+        console.EndChoice();
+
+        var pieces = inner.ToString()
+            .Split(_nl)
+            .SelectMany(line => line.Split('\r'))
+            .Where(piece => !string.IsNullOrWhiteSpace(piece))
+            .ToList();
+
+        Assert.All(pieces, piece => Assert.True(
+            piece == choice || piece.StartsWith("keypaste: narration ", StringComparison.Ordinal) && !piece.Contains('[', StringComparison.Ordinal),
+            $"a spliced line: |{piece}|"));
+
+        var narrated = pieces.Where(piece => piece != choice).ToList();
+        Assert.Equal(writers * linesEach, narrated.Count);
+        Assert.Equal(writers * linesEach, narrated.Distinct(StringComparer.Ordinal).Count());
     }
 }

@@ -29,13 +29,32 @@ public sealed class ClientsVerbTests : IDisposable
     }
 
     [Fact]
+    public void Forget_RefusesAnythingElseToChange_AndAMisshapenName()
+    {
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--forget", "0011aabb", "--run", "off"));
+        Assert.Contains("--forget removes one always-allowed row", _harness.Err, StringComparison.Ordinal);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--forget", "not-a-row"));
+        Assert.Contains("eight lowercase hex characters", _harness.Err, StringComparison.Ordinal);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "--forget", "0011aabb"));
+    }
+
+    [Fact]
+    public void TheRetiredModeWord_IsRefusedAsANewSetting()
+    {
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--mode", "allow-for-a-while"));
+        Assert.Contains("a mode is ask or automatic", _harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WithNoOwner_TheListShowsTheDefaults_AndSaysTheVaultsSettingsAreNotShown()
     {
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
 
         Assert.Contains("  AGENT", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("*   (default)", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("allow-for-a-while  yes     off  tag:env:*", _harness.Out, StringComparison.Ordinal);
+        Assert.Contains("ask   yes     off  tag:env:*", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("so only this computer's limits are shown", _harness.Err, StringComparison.Ordinal);
     }
 

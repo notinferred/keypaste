@@ -29,7 +29,7 @@ public sealed class AccessCapsChangeTests
     {
         var record = Automatic with { Run = true, See = See("**"), Projects = [Row("billing", AgentMode.Automatic)] };
         var current = EffectiveAccess.Create(_agent, AgentAccessBuilders.Own(record), AccessCaps.Empty);
-        var proposed = record with { Mode = AgentMode.Ask, Run = false, Values = false, See = See("env/**"), Projects = [Row("billing", AgentMode.AllowForAWhile)] };
+        var proposed = record with { Mode = AgentMode.Ask, Run = false, Values = false, See = See("env/**"), Projects = [Row("billing", AgentMode.Ask)] };
         var change = AccessChange.Classify(current, proposed);
         Assert.True(change.IsNarrowing);
 
@@ -38,10 +38,10 @@ public sealed class AccessCapsChangeTests
         var row = Own(lowered);
         Assert.Equal((AgentMode.Ask, false, false), (row.Mode, row.Values, row.Run));
         Assert.Equal(["env/**"], row.See!.Globs);
-        Assert.Equal(AgentMode.AllowForAWhile, Own(lowered, Scope("billing")).Mode);
+        Assert.Equal(AgentMode.Ask, Own(lowered, Scope("billing")).Mode);
 
         var held = EffectiveAccess.Create(_agent, AgentAccessBuilders.Own(record), lowered);
-        Assert.Equal(AgentMode.AllowForAWhile, held.Item(["env:billing"], DateTimeOffset.UnixEpoch).Mode);
+        Assert.Equal(AgentMode.Ask, held.Item(["env:billing"], DateTimeOffset.UnixEpoch).Mode);
         Assert.Equal(AgentMode.Ask, held.Item([], DateTimeOffset.UnixEpoch).Mode);
         Assert.False(held.Values || held.Run);
     }
@@ -94,14 +94,14 @@ public sealed class AccessCapsChangeTests
         var lifted = caps.Lifted(_agent, change);
 
         Assert.Null(Own(lifted).Values);
-        Assert.Equal(AgentMode.AllowForAWhile, Own(lifted).Mode);
+        Assert.Equal(AgentMode.Ask, Own(lifted).Mode);
         Assert.Equal(AgentMode.Automatic, Own(lifted, Scope("billing:dev")).Mode);
         Assert.Contains(lifted.Rows, row => row.Label == AgentNames.Any && row.Mode == AgentMode.Ask && row.Values == false);
         Assert.Contains(lifted.Rows, row => row.Label == "cursor" && row.Run == false);
 
         var after = EffectiveAccess.Create(_agent, AgentAccessBuilders.Own(proposed), lifted);
         Assert.Equal(AgentMode.Automatic, after.Item(["env:billing"], DateTimeOffset.UnixEpoch).Mode);
-        Assert.Equal(AgentMode.AllowForAWhile, after.Item(["env:billing:staging"], DateTimeOffset.UnixEpoch).Mode);
+        Assert.Equal(AgentMode.Ask, after.Item(["env:billing:staging"], DateTimeOffset.UnixEpoch).Mode);
         Assert.True(after.Values);
     }
 
@@ -121,7 +121,7 @@ public sealed class AccessCapsChangeTests
     [Fact]
     public void WithNoOwner_OnlyALoweringIsMade()
     {
-        var caps = Caps(new CapsRow { Label = _agent, Mode = AgentMode.AllowForAWhile, See = See("env/**") });
+        var caps = Caps(new CapsRow { Label = _agent, Mode = AgentMode.Ask, See = See("env/**") });
 
         Assert.True(caps.TryLower(_agent, Edit(mode: "ask", values: "no", run: "off", see: ["env/billing/**"]), out var lowered));
         Assert.Equal((AgentMode.Ask, false, false), (Own(lowered).Mode, Own(lowered).Values, Own(lowered).Run));
@@ -133,7 +133,6 @@ public sealed class AccessCapsChangeTests
         Assert.False(caps.TryLower(_agent, Edit(perHour: AccessEdit.None), out _));
         Assert.False(caps.TryLower(_agent, Edit(until: AccessEdit.None), out _));
         Assert.False(caps.TryLower(_agent, Edit(see: ["**"]), out _));
-        Assert.False(Caps(new CapsRow { Label = _agent, Mode = AgentMode.Ask }).TryLower(_agent, Edit(mode: "allow-for-a-while"), out _));
     }
 
     /// <summary>
@@ -154,7 +153,7 @@ public sealed class AccessCapsChangeTests
         Assert.Equal((AgentMode.Automatic, new AccessLimit { Until = _end }), (row.Mode, row.Limit));
         var held = EffectiveAccess.Create(_agent, AgentAccessBuilders.Own(record), lowered);
         Assert.Equal(AgentMode.Automatic, held.Item(["env:billing"], _end.AddMinutes(-1)).Mode);
-        Assert.Equal(AgentMode.AllowForAWhile, held.Item(["env:billing"], _end).Mode);
+        Assert.Equal(AgentMode.Ask, held.Item(["env:billing"], _end).Mode);
         Assert.Equal(AgentMode.Automatic, held.Item([], _end).Mode);
 
         var limited = record with { Projects = [Row("billing:dev", AgentMode.Automatic, new AccessLimit { PerHour = 5 })] };
@@ -234,7 +233,7 @@ public sealed class AccessCapsChangeTests
         Assert.Equal(AgentMode.Ask, Own(billing, Scope("billing:staging")).Mode);
         Assert.Equal(AgentMode.Automatic, Own(billing, Scope("shop")).Mode);
 
-        Assert.True(caps.TryLower(_agent, Edit(mode: "allow-for-a-while"), out var agent));
-        Assert.All(agent.Rows, row => Assert.Equal(AgentMode.AllowForAWhile, row.Mode));
+        Assert.True(caps.TryLower(_agent, Edit(mode: "ask"), out var agent));
+        Assert.All(agent.Rows, row => Assert.Equal(AgentMode.Ask, row.Mode));
     }
 }

@@ -63,14 +63,12 @@ public sealed class ServerToolsTests
     private static Dictionary<string, object?> Credential(
         string entry = "k1_0123456789abcdef",
         string field = "password",
-        string reason = "deploy the billing service to staging",
-        int ttl = 900) =>
+        string reason = "deploy the billing service to staging") =>
         new()
         {
             ["entry"] = entry,
             ["field"] = field,
             ["reason"] = reason,
-            ["ttl_seconds"] = ttl,
         };
 
     /// <summary>
@@ -644,8 +642,6 @@ public sealed class ServerToolsTests
         Assert.Equal(CredentialRequestRules.MaximumEntryLength, properties.GetProperty("entry").GetProperty("maxLength").GetInt32());
         Assert.Equal(1, properties.GetProperty("reason").GetProperty("minLength").GetInt32());
         Assert.Equal(CredentialRequestRules.MaximumReasonLength, properties.GetProperty("reason").GetProperty("maxLength").GetInt32());
-        Assert.Equal(1, properties.GetProperty("ttl_seconds").GetProperty("minimum").GetInt32());
-        Assert.Equal(ApprovalLimits.MaximumRequestableTtlSeconds, properties.GetProperty("ttl_seconds").GetProperty("maximum").GetInt32());
     }
 
     /// <summary>
@@ -743,7 +739,7 @@ public sealed class ServerToolsTests
     public async Task AOnceRelease_SaysThisRequestOnly_AndExpiresInZero()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartApproving(ttlSeconds: 0);
+        harness.Approver.StartApproving();
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
@@ -759,17 +755,15 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task ATimedRelease_StatesItsSeconds()
+    public async Task ACodeRelease_SaysHowLongItStaysCurrent()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartApproving(ttlSeconds: 3600);
+        harness.Approver.StartApproving(codeSeconds: 21);
         var client = await harness.StartAsync();
 
-        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY", ttl: 60));
-        var text = TextOf(result);
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
 
-        Assert.Contains("for 3600 seconds", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("APPROVED ONCE", text, StringComparison.Ordinal);
-        Assert.Equal(3600, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
+        Assert.Contains("stays current for 21 more seconds", TextOf(result), StringComparison.Ordinal);
+        Assert.Equal(21, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
     }
 }

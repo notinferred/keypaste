@@ -5,7 +5,7 @@ namespace Keypaste.App.ViewModels;
 /// <summary>A change that would give an agent more, in front of the person at this desktop, confirmed once.</summary>
 /// <remarks>
 /// Allow is armed after the prompt has been up a moment, as every allow is, and is the only answer that
-/// changes anything; it offers no timed grant. Where the change says it came from is a claim, and the
+/// changes anything. Where the change says it came from is a claim, and the
 /// requester's reason is its own words, shown as such. A change with no reason, which is every change
 /// the person makes in this app, says so in the same box, under no caption and with no line about
 /// whose words it holds, so the window is the same size either way.
@@ -73,6 +73,4 @@ internal sealed class AccessChangeViewModel : PromptViewModel
 
     /// <summary>What allowing does, and when the agent gets it.</summary>
     internal string Explainer { get; }
-
-    protected override int TimedSeconds => 0;
 }

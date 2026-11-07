@@ -26,8 +26,8 @@ public sealed class EffectiveAccessTests
         Assert.True(access.Values);
         Assert.False(access.Run);
         Assert.False(access.MayRun(bridgeOffersRun: true));
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access));
         Assert.Equal(ExposureReach.ProjectFields, access.Reach(See("**"), _item, ["env:billing"]));
         Assert.Equal(ExposureReach.None, access.Reach(See("**"), _item, []));
     }
@@ -50,12 +50,12 @@ public sealed class EffectiveAccessTests
     {
         var access = EffectiveAccess.Create(
             _agent,
-            Own(Asks with { Projects = [Row("billing", AgentMode.Automatic), Row("billing:staging", AgentMode.AllowForAWhile)] }),
+            Own(Asks with { Projects = [Row("billing", AgentMode.Automatic), Row("billing:staging", AgentMode.Ask)] }),
             AccessCaps.Empty);
 
         Assert.Equal(AgentMode.Automatic, Mode(access, "env:billing"));
         Assert.Equal(AgentMode.Automatic, Mode(access, "env:billing:qa"));
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing:staging"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing:staging"));
         Assert.Equal(AgentMode.Ask, Mode(access, "env:shop"));
         Assert.Equal(AgentMode.Ask, Mode(access));
         Assert.Equal(AgentMode.Ask, Mode(access, "env:Billing", "team"));
@@ -100,7 +100,7 @@ public sealed class EffectiveAccessTests
         var access = EffectiveAccess.Create(label, records, AccessCaps.Empty);
 
         Assert.Null(access.Label);
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
         Assert.False(access.Run);
         Assert.False(access.TryAutomatic(access.Item(["env:billing"], _now), new HourlyLimit(TimeProvider.System)));
     }
@@ -120,7 +120,7 @@ public sealed class EffectiveAccessTests
         Assert.True(recorded.Values);
 
         var widening = EffectiveAccess.Create("cursor", Any(Automatic with { Run = true, See = See("**") }), AccessCaps.Empty);
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(widening, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(widening, "env:billing"));
         Assert.False(widening.Run);
         Assert.Equal(ExposureReach.None, widening.Reach(See("**"), _item, []));
     }
@@ -131,7 +131,7 @@ public sealed class EffectiveAccessTests
         var records = new AgentRecords(SavedRead.Current, [new AcafRead(Automatic with { Run = true }, false, true)], []);
         var access = EffectiveAccess.Create(_agent, records, AccessCaps.Empty);
 
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
         Assert.False(access.Run);
 
         var narrowing = EffectiveAccess.Create(_agent, new AgentRecords(SavedRead.Current, [new AcafRead(Asks with { Values = false }, false, false)], []), AccessCaps.Empty);
@@ -148,7 +148,7 @@ public sealed class EffectiveAccessTests
     {
         var access = EffectiveAccess.Create(_agent, new AgentRecords(state, [Understood(Automatic with { Run = true })], []), AccessCaps.Empty);
 
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
         Assert.False(access.Run);
     }
 
@@ -170,13 +170,13 @@ public sealed class EffectiveAccessTests
     public void ThisComputersCeilings_NarrowEveryDimension()
     {
         var caps = Caps(
-            new CapsRow { Label = _agent, Mode = AgentMode.AllowForAWhile, Values = false, Run = false, See = See("tag:env:billing") },
+            new CapsRow { Label = _agent, Mode = AgentMode.Ask, Values = false, Run = false, See = See("tag:env:billing") },
             new CapsRow { Label = _agent, Project = Scope("billing:staging"), Mode = AgentMode.Ask });
         var access = EffectiveAccess.Create(_agent, Own(Automatic with { Run = true, See = See("**") }), caps);
 
         Assert.False(access.Values);
         Assert.False(access.MayRun(bridgeOffersRun: true));
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
         Assert.Equal(AgentMode.Ask, Mode(access, "env:billing:staging"));
         Assert.Equal(ExposureReach.ProjectFields, access.Reach(See("**"), _item, ["env:billing"]));
         Assert.Equal(ExposureReach.None, access.Reach(See("**"), _item, ["env:shop"]));
@@ -195,9 +195,9 @@ public sealed class EffectiveAccessTests
             AccessCaps.Empty);
 
         Assert.Equal(AgentMode.Automatic, Mode(access, "env:shop"));
-        Assert.Equal(AgentMode.AllowForAWhile, access.Item(["env:shop"], _now.AddHours(1)).Mode);
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing"));
-        Assert.Equal(AgentMode.AllowForAWhile, Mode(access, "env:billing", "env:shop"));
+        Assert.Equal(AgentMode.Ask, access.Item(["env:shop"], _now.AddHours(1)).Mode);
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing"));
+        Assert.Equal(AgentMode.Ask, Mode(access, "env:billing", "env:shop"));
     }
 
     [Fact]

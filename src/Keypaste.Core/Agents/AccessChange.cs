@@ -17,12 +17,25 @@ public enum AccessDimension
 
     /// <summary>A limit on Automatic that allows more, or none.</summary>
     Limit = 4,
+
+    /// <summary>An item released without asking, by its Always allow row.</summary>
+    AlwaysItem = 5,
+
+    /// <summary>An exact command started without asking, by its Always allow row.</summary>
+    AlwaysCommand = 6,
 }
 
 /// <summary>One thing a change gives an agent that it does not have now.</summary>
 /// <param name="Dimension">What it gains.</param>
 /// <param name="Scope">The project or environment a mode or limit is gained in, or null for the agent's default or the whole agent.</param>
-public sealed record AccessGain(AccessDimension Dimension, ProjectScope? Scope);
+public sealed record AccessGain(AccessDimension Dimension, ProjectScope? Scope)
+{
+    /// <summary>The item an Always allow row gives, by its UUID as hex; otherwise null.</summary>
+    public string? AlwaysItem { get; init; }
+
+    /// <summary>The command an Always allow row gives; otherwise null.</summary>
+    public AlwaysCommand? AlwaysCommand { get; init; }
+}
 
 /// <summary>A requested change to an agent's settings, classified against what applies to it now.</summary>
 /// <remarks>
@@ -123,6 +136,16 @@ public sealed class AccessChange
             {
                 gains.Add(new AccessGain(AccessDimension.Limit, scope));
             }
+        }
+
+        foreach (var item in proposed.Always.Items.Where(item => !current.AlwaysAllows(item)))
+        {
+            gains.Add(new AccessGain(AccessDimension.AlwaysItem, null) { AlwaysItem = item });
+        }
+
+        foreach (var command in proposed.Always.Commands.Where(command => !current.AlwaysAllows(command)))
+        {
+            gains.Add(new AccessGain(AccessDimension.AlwaysCommand, null) { AlwaysCommand = command });
         }
 
         return new AccessChange(proposed, gains);

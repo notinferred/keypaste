@@ -43,6 +43,4 @@ internal sealed class TerminalEditViewModel : PromptViewModel
 
     /// <summary>What allowing does.</summary>
     internal string Explainer { get; } = "Allowing saves this in the vault now. Allow only a change you made yourself.";
-
-    protected override int TimedSeconds => 0;
 }

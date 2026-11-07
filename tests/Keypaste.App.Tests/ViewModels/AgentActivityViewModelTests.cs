@@ -17,19 +17,6 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </summary>
 public sealed class AgentActivityViewModelTests
 {
-    [Fact]
-    public void End_all_asks_first_and_Cancel_ends_nothing()
-    {
-        using var model = new AgentActivityViewModel(null, null, new ManualClock(AppClock.Start));
-
-        model.AskEndAllCommand.Press();
-        Assert.True(model.IsConfirmingEndAll);
-        Assert.False(model.OffersEndAll);
-
-        model.CancelEndAllCommand.Press();
-        Assert.False(model.IsConfirmingEndAll);
-    }
-
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -51,7 +38,6 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("answered for you in 45 s", waiting.Left);
         Assert.Equal("45s left", waiting.LeftText);
         Assert.True(model.HasWaiting);
-        Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
@@ -96,111 +82,6 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task An_approved_request_is_listed_as_a_grant_with_its_remaining_lifetime_and_no_value()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-
-        var reply = await app.RequestAsync();
-        Assert.Equal(AuditMethod.Prompt, reply!.Method);
-
-        using var model = app.Model();
-
-        var grant = Assert.Single(model.Grants);
-        Assert.Equal("example · password", grant.What);
-        Assert.Equal("claude-code · label ci-probe", grant.Who);
-        Assert.Equal("ends in 3600 s", grant.Left);
-        Assert.NotNull(grant.Grant);
-        Assert.True(model.EndAllCommand.CanExecute(null));
-
-        app.Clock.Advance(TimeSpan.FromSeconds(10));
-
-        Assert.Equal("ends in 3590 s", Assert.Single(model.Grants).Left);
-        Assert.DoesNotContain(reply.Value!, Everything(model), StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task End_ends_the_allowance_in_the_authority_so_the_same_request_is_asked_again(bool all)
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-
-        await app.RequestAsync();
-        Assert.Equal(AuditMethod.GrantCache, (await app.RequestAsync())!.Method);
-
-        using var model = app.Model();
-
-        if (all)
-        {
-            model.EndAllCommand.Press();
-        }
-        else
-        {
-            model.EndCommand.Press(Assert.Single(model.Grants));
-        }
-
-        Assert.Empty(model.Grants);
-        Assert.Empty(app.Authority.Activity.Grants);
-        Assert.False(model.EndAllCommand.CanExecute(null));
-
-        var again = await app.RequestAsync();
-
-        Assert.Equal(AuditMethod.Prompt, again!.Method);
-        Assert.Equal(2, app.Person.Asked);
-    }
-
-    [Fact]
-    public async Task EndById_EndsThatAllowance()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-
-        await using var second = await app.ConnectAsync();
-        await app.RequestAsync();
-        await app.RequestAsync(second);
-
-        using var model = app.Model();
-
-        Assert.Equal(2, model.Grants.Count);
-        var listed = app.Authority.Grants();
-        Assert.Equal(model.Grants.Select(row => row.Id).Order(StringComparer.Ordinal), listed.Select(grant => grant.Id).Order(StringComparer.Ordinal));
-        Assert.All(model.Grants, row => Assert.Equal(GrantId.Of(row.Grant!.Value), row.Id));
-        Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 3600), grant));
-
-        var ended = model.Grants[0];
-        model.EndCommand.Press(ended);
-
-        var kept = Assert.Single(model.Grants);
-        Assert.NotEqual(ended.Id, kept.Id);
-        Assert.Equal(kept.Id, Assert.Single(app.Authority.Grants()).Id);
-        Assert.False(app.Authority.Revoke(ended.Id!));
-        Assert.True(app.Authority.Revoke(kept.Id!.ToUpperInvariant()));
-        Assert.Empty(app.Authority.Grants());
-    }
-
-    [Fact]
-    public async Task A_lock_empties_both_lists_because_the_authority_holds_nothing()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-        await app.RequestAsync();
-
-        using var model = app.Model();
-        Assert.Single(model.Grants);
-
-        app.Authority.Session.Lock(VaultLockReason.Manual);
-        model.Refresh();
-
-        Assert.Same(ApproverActivity.None, app.Authority.Activity);
-        Assert.Empty(model.Grants);
-        Assert.Empty(model.Waiting);
-        Assert.True(model.IsUnavailable);
-        Assert.False(model.NoGrants);
-    }
-
-    [Fact]
     public void Without_an_authority_nothing_is_read_and_the_screen_says_so()
     {
         using var home = new TempAuditHome();
@@ -208,62 +89,7 @@ public sealed class AgentActivityViewModelTests
 
         Assert.True(model.IsUnavailable);
         Assert.Empty(model.Waiting);
-        Assert.Empty(model.Grants);
         Assert.False(model.NothingWaiting);
-    }
-
-    [Fact]
-    public async Task A_disposed_screen_stops_reading()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-        await app.RequestAsync();
-
-        var model = app.Model();
-        var before = Assert.Single(model.Grants);
-        model.Dispose();
-
-        app.Clock.Advance(TimeSpan.FromSeconds(5));
-
-        Assert.Same(before, Assert.Single(model.Grants));
-    }
-
-    [Fact]
-    public void A_runs_timed_grant_is_listed_by_the_id_keypaste_grants_revokes_it_by()
-    {
-        var row = ActivityRow.EnvGranted(3, new EnvGrantInForce("key", "acme-api", "staging", "npm start", TimeSpan.FromSeconds(899.5)));
-
-        Assert.Equal(3, row.Number);
-        Assert.Equal(GrantId.OfEnv("key"), row.Id);
-        Assert.Null(row.Grant);
-        Assert.Equal("keypaste run · label none configured", row.Who);
-        Assert.Equal("acme-api · staging · npm start · set", row.What);
-        Assert.Equal("ends in 900 s", row.Left);
-    }
-
-    [Fact]
-    public async Task An_allowance_row_says_its_time_left_as_the_table_shows_it_and_End_says_so()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-        await app.RequestAsync();
-
-        List<string> said = [];
-        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: (message, _) => said.Add(message));
-
-        var grant = Assert.Single(model.Grants);
-        Assert.Equal(("claude-code", "example · password", "1h left", 1d), (grant.Client, grant.Detail, grant.LeftText, grant.Fraction));
-
-        app.Clock.Advance(TimeSpan.FromSeconds(181));
-
-        grant = Assert.Single(model.Grants);
-        Assert.Equal("57m left", grant.LeftText);
-        Assert.Equal(3419d / 3600, grant.Fraction, 3);
-
-        model.EndCommand.Press(grant);
-
-        Assert.Empty(model.Grants);
-        Assert.Equal(["Ended claude-code's allowance."], said);
     }
 
     /// <summary>
@@ -334,11 +160,11 @@ public sealed class AgentActivityViewModelTests
     {
         await using var app = await App.StartAsync(vault =>
             Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Mode = AgentMode.Ask })));
-        app.Person.Answer = ApprovalAnswer.Approved;
+        app.Person.Answer = ApprovalAnswer.ApprovedOnce;
 
         using var model = app.Model();
         var claude = model.Rows.Single(row => row.Key == "claude-code");
-        Assert.StartsWith("Ask every time · ", claude.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Automatic", claude.Summary, StringComparison.Ordinal);
 
         Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
         Assert.Equal(AuditDecision.Granted, (await app.Authority.ChangeAccessAsync("claude-code", edit, Token)).Decision);
@@ -429,7 +255,7 @@ public sealed class AgentActivityViewModelTests
     public async Task Rows_hold_the_agents_that_asked_then_the_tools_found_then_every_other_agent()
     {
         await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
+        app.Person.Answer = ApprovalAnswer.ApprovedOnce;
         await app.RequestAsync();
         var tools = app.Tools().ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable().VsCodeMoved();
 
@@ -517,8 +343,23 @@ public sealed class AgentActivityViewModelTests
             '\n',
             [
                 model.Status, model.Unavailable,
-                .. model.Waiting.Concat(model.Grants).Select(row => $"{row.Who} {row.What} {row.Left}"),
+                .. model.Waiting.Select(row => $"{row.Who} {row.What} {row.Left}"),
             ]);
+
+    [Fact]
+    public async Task A_lock_empties_the_list_because_the_authority_holds_nothing()
+    {
+        await using var app = await App.StartAsync();
+
+        using var model = app.Model();
+
+        app.Authority.Session.Lock(VaultLockReason.Manual);
+        model.Refresh();
+
+        Assert.Same(ApproverActivity.None, app.Authority.Activity);
+        Assert.Empty(model.Waiting);
+        Assert.True(model.IsUnavailable);
+    }
 
     /// <summary>The app's authority on a manual clock with a scripted person, attached to over its real endpoint.</summary>
     private sealed class App : IAsyncDisposable
@@ -601,7 +442,6 @@ public sealed class AgentActivityViewModelTests
                     Entry = "example",
                     Field = "password",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                     ClientName = "claude-code",
                     ClientLabel = "ci-probe",
@@ -621,7 +461,7 @@ public sealed class AgentActivityViewModelTests
                 {
                     Tool = "request_credential",
                     Client = new AuditClient("claude-code", null, "ci-probe"),
-                    Args = AuditArgs.ForCredentialRequest(entry, "password", 60, "deploy"),
+                    Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy"),
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Prompt,
                     Reason = "a person approved this request",

@@ -67,7 +67,6 @@ public sealed class ApproverRunProtocolTests
     {
         var reply = new RunReply(EnvResolved.Released("acme-api", [new EnvVariable("DATABASE_URL", _sentinel)], "staging"), AuditMethod.Prompt, "a person approved this one run")
         {
-            GrantedSeconds = 900,
             Entries = ["env/acme-api/staging/DATABASE_URL"],
             Session = "session-one",
         };
@@ -77,7 +76,6 @@ public sealed class ApproverRunProtocolTests
         Assert.True(ApproverProtocol.TryDecode(frame, out RunReply? decoded));
         Assert.Equal(EnvOutcome.Resolved, decoded.Set.Outcome);
         Assert.Equal(_sentinel, Assert.Single(decoded.Set.Variables).Value);
-        Assert.Equal(900, decoded.GrantedSeconds);
         Assert.Equal(reply.Entries, decoded.Entries);
         Assert.Equal(AuditMethod.Prompt, decoded.Method);
         Assert.Empty(decoded.Set.Fills);
@@ -101,7 +99,7 @@ public sealed class ApproverRunProtocolTests
     [Fact]
     public void AReplyWithVariablesOnARefusal_IsRejected()
     {
-        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[],"variables":[{"key":"A","value":"leaked"}]}""";
+        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[],"variables":[{"key":"A","value":"leaked"}]}""";
 
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _));
     }
@@ -109,8 +107,8 @@ public sealed class ApproverRunProtocolTests
     [Fact]
     public void FillsOnARefusalOrUnderAnotherVariable_AreRejected()
     {
-        const string released = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":0,"reason":"ok","method":5,"granted_seconds":0,"entries":[],"problems":[],"variables":[{"key":"A","value":"pre-x-post"}]""";
-        const string refused = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[]""";
+        const string released = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":0,"reason":"ok","method":5,"entries":[],"problems":[],"variables":[{"key":"A","value":"pre-x-post"}]""";
+        const string refused = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
 
         Assert.True(Decodes(released + "}"));
         Assert.True(Decodes(released + ""","fills":[{"key":"A","value":"x"}]}"""));
@@ -125,7 +123,7 @@ public sealed class ApproverRunProtocolTests
     [Fact]
     public void AReplyWithAnUndefinedMethod_IsRejected()
     {
-        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":999,"granted_seconds":0,"entries":[],"problems":[]}""";
+        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":999,"entries":[],"problems":[]}""";
 
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _));
     }
