@@ -37,7 +37,6 @@
     "item": { "type": "string", "pattern": "^[0-9a-fA-F]{32}$" },
     "always": {
       "type": "object",
-      "required": ["items"],
       "additionalProperties": false,
       "properties": {
         "items": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/item" } }

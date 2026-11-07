@@ -12,6 +12,11 @@ public sealed record ItemAccess(AgentMode Mode, IReadOnlyList<RowLimit> Limits)
 {
     /// <summary>Whether the mode was Automatic and its end has passed, so the request is asked about, once only.</summary>
     public bool LimitReached { get; init; }
+
+    /// <summary>The mode before a passed end applied: the Automatic one it holds back while <see cref="LimitReached"/>; otherwise <see cref="Mode"/>.</summary>
+    public AgentMode ModeBeforeEnd => LimitReached ? HeldBack : Mode;
+
+    internal AgentMode HeldBack { get; init; }
 }
 
 /// <summary>
@@ -184,7 +189,7 @@ public sealed class EffectiveAccess
 
         if (deciding.Any(row => row.Limit.Until is { } until && until <= now))
         {
-            return new ItemAccess(AgentMode.Ask, []) { LimitReached = true };
+            return new ItemAccess(AgentMode.Ask, []) { LimitReached = true, HeldBack = mode };
         }
 
         return new ItemAccess(

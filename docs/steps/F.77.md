@@ -74,6 +74,19 @@ These await the founder's review:
 
 At `80b25b8f`: ci 42419330456 (fast tier) green; dev desktop 42419346481 and dev desktop-gates 42419346500 green on Linux. Locally: the touched Core, CLI, MCP and App classes, `verify-mcp-run.sh` against the Release CLI, the ScreenRenderer at every theme and zoom, and `verify.sh compile`.
 
+## Security review
+
+A read-only review of Automatic with commands found these, each checked against the source and fixed at its cause:
+
+- **A reset of this computer's limits said nothing of commands.** `AccessChangePrompt.ForReset` now marks each agent whose vault record is Automatic with commands with May run commands on, and the confirmation, in the app and at `keypaste approve`, names them in the commands sentence.
+- **A limit that allows more said nothing of commands.** Renewing a passed end, `--until none` or raising `--per-hour` on an agent already in Automatic with commands with May run commands on brings its unasked commands back, so it now says the sentence too; under plain Automatic it does not.
+- **A run under plain Automatic with a passed end said its limit was reached**, though plain Automatic never starts a run. `ItemAccess.ModeBeforeEnd` keeps the mode a passed end held back, and the run prompt gives the limit as its reason only where that mode was Automatic with commands.
+- **ACAF v1.2's schema required `items`** where the reader and writer treat `"always":{}` as holding no row; the schema and the page now match the reader.
+- **Stale comments** in `SessionAuthority` (Always allow on a command line, "No mode releases a run") and `OutputScrubber` now say what the code does.
+- **PRODUCT's 2026-09-25 amendment** said "This is not arbitrary shell execution: no shell starts it"; the v1.23 draft now says keypaste starts the program named, never a shell of its own, and that Automatic with commands starts any command the agent names, `sh -c` included. The paragraph above it, "MCP remains bounded credential access: exposed names and one approved field, not arbitrary shell execution", is unchanged and awaits the founder.
+
+Tests added: `SessionAuthorityRunTests.AProjectRow_StartsItsOwnItemsUnasked_AndAMixedSetAsks` and `APassedEnd_AsksAboutTheRun_NamingTheLimitOnlyWhereItHeldARunBack`, `SessionAuthorityAccessTests.AnAgentsRequestForAutomaticWithCommands_ReachesThePersonWithTheCommandsSentence`, `ApprovalPromptTests.EveryGainThatStartsCommandsUnasked_SaysSo`, `ALimitGainUnderPlainAutomatic_SaysNothingOfCommands` and `AReset_NamesEachAgentWhoseCommandsWouldStartUnasked`, `AlwaysAllowRecordTests.An_always_object_without_items_holds_no_row_and_is_understood`, and `AccessChangeWindowTests.A_commands_caution_stays_in_sight_outside_the_gains` over the prompt's, Settings', an agent's and a reset's wording. The ScreenRenderer draws `91f6-access-change-reset-commands`.
+
 ## Open
 
 - `ApproverProtocol`'s always-not-shown count can no longer be reached: once project rows are left out, 256 item UUIDs always fit one reply. It stays, untested by a reply that needs it.

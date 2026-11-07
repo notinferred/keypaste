@@ -50,7 +50,7 @@ public sealed record AccessChangePrompt
         + AccessCaps.KeptSuffix + ", or the next free name, so no copy kept before is replaced";
 
     /// <summary>What a person must know before the agent's commands start without asking (T-35), said wherever that is confirmed.</summary>
-    public string CommandCaution => $"{Agent} can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.";
+    public string CommandCaution => $"{CommandAgents ?? Agent} can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.";
 
     /// <summary>The agent's name, sanitized.</summary>
     public required string Agent { get; init; }
@@ -72,6 +72,9 @@ public sealed record AccessChangePrompt
 
     /// <summary>Whether it would start the agent's commands without asking, so <see cref="CommandCaution"/> is said.</summary>
     public bool AnswersCommand { get; init; }
+
+    /// <summary>The agents <see cref="CommandCaution"/> names when they are not <see cref="Agent"/>, as a reset names each one.</summary>
+    public string? CommandAgents { get; init; }
 
     /// <summary>The <c>keypaste clients</c> arguments that take back what Always allow would add, after the agent's name; null for any other change.</summary>
     public string? Undo { get; init; }
@@ -104,6 +107,7 @@ public sealed record AccessChangePrompt
 
         List<AcafRead> any = [.. records.Records.Where(record => !AgentNames.IsNamed(record.Name)).Select(record => record.Record)];
         List<string> gains = [];
+        List<string> runners = [];
 
         if (records.State == SavedRead.Current)
         {
@@ -115,6 +119,11 @@ public sealed record AccessChangePrompt
                 if (agent.Any(record => !record.Record.Understood))
                 {
                     continue;
+                }
+
+                if (agent.Any(record => AccessChange.Classify(unset, record.Record.Access).Gains.Any(gain => RunsUnasked(gain, record.Record.Access))))
+                {
+                    runners.Add(shown);
                 }
 
                 gains.AddRange(agent
@@ -133,6 +142,8 @@ public sealed record AccessChangePrompt
             ReasonWasTruncated = false,
             ReasonWasAltered = false,
             ResetsCeilings = true,
+            AnswersCommand = runners.Count > 0,
+            CommandAgents = runners.Count > 0 ? string.Join(", ", runners) : null,
         };
     }
 
@@ -178,10 +189,10 @@ public sealed record AccessChangePrompt
         };
     }
 
-    /// <summary>Whether a gain starts commands without asking: Automatic with commands where the agent may run them.</summary>
+    /// <summary>Whether a gain starts commands without asking: Automatic with commands where the agent may run them, or a limit on it that allows more.</summary>
     private static bool RunsUnasked(AccessGain gain, AgentAccess proposed) => proposed.Run && gain.Dimension switch
     {
-        AccessDimension.Mode => proposed.Decide(gain.Scope?.Project, gain.Scope?.Environment).Mode == AgentMode.AutomaticCommands,
+        AccessDimension.Mode or AccessDimension.Limit => proposed.Decide(gain.Scope?.Project, gain.Scope?.Environment).Mode == AgentMode.AutomaticCommands,
         AccessDimension.Run => proposed.Mode == AgentMode.AutomaticCommands || proposed.Projects.Any(row => row.Mode == AgentMode.AutomaticCommands),
         _ => false,
     };

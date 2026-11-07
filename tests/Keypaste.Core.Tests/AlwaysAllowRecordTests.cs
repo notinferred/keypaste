@@ -28,6 +28,15 @@ public sealed class AlwaysAllowRecordTests
     }
 
     [Fact]
+    public void An_always_object_without_items_holds_no_row_and_is_understood()
+    {
+        var read = AcafRecord.Read("""{"acaf":1,"always":{}}""");
+
+        Assert.True(read.Understood);
+        Assert.True(read.Access.Always.IsEmpty);
+    }
+
+    [Fact]
     public void The_retired_word_reads_as_ask_and_a_change_never_writes_it_again()
     {
         const string stored = """{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while","projects":[{"project":"billing","mode":"allow-for-a-while"}]}""";

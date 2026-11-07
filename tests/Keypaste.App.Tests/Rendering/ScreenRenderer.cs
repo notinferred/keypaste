@@ -1639,6 +1639,10 @@ public sealed class ScreenRenderer
             new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named, Understood: true, Rewritable: true))]),
             TimeZoneInfo.Utc);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(reset)), output, "91f2-access-change-reset");
+        var resetCommands = AccessChangePrompt.ForReset(
+            new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named with { Mode = AgentMode.AutomaticCommands, Run = true }, Understood: true, Rewritable: true))]),
+            TimeZoneInfo.Utc);
+        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(resetCommands)), output, "91f6-access-change-reset-commands");
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
             {

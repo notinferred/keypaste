@@ -261,4 +261,62 @@ public sealed class ApprovalPromptTests
         Assert.Contains(asked.Gains, gain => gain.Contains("Automatic with commands", StringComparison.Ordinal));
         Assert.False(AccessChangePrompt.For("claude-code", runOff, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc).AnswersCommand);
     }
+
+    /// <summary>Every change that lets an Automatic with commands agent start commands unasked again says so: run turned on under the mode alone, the mode on a project row, and a limit that allows more.</summary>
+    [Theory]
+    [InlineData("run")]
+    [InlineData("row")]
+    [InlineData("renewed")]
+    [InlineData("no end")]
+    [InlineData("per hour")]
+    public void EveryGainThatStartsCommandsUnasked_SaysSo(string kind)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var commands = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true };
+        var (current, proposed) = kind switch
+        {
+            "run" => (commands with { Run = false }, commands),
+            "row" => (commands with { Mode = Agents.AgentMode.Ask }, commands with { Mode = Agents.AgentMode.Ask, Projects = [AgentAccessBuilders.Row("acme-api", Agents.AgentMode.AutomaticCommands)] }),
+            "renewed" => (commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(-1) } }, commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(1) } }),
+            "no end" => (commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(1) } }, commands),
+            _ => (commands with { Limit = new Agents.AccessLimit { PerHour = 5 } }, commands with { Limit = new Agents.AccessLimit { PerHour = 50 } }),
+        };
+        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Create("claude-code", AgentAccessBuilders.Own(current), Agents.AccessCaps.Empty), proposed);
+
+        var asked = AccessChangePrompt.For("claude-code", change, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc);
+
+        Assert.NotEmpty(change.Gains);
+        Assert.True(asked.AnswersCommand);
+        Assert.StartsWith("claude-code can now run commands", asked.CommandCaution, StringComparison.Ordinal);
+    }
+
+    /// <summary>A limit that allows more under plain Automatic starts no command, so it says nothing of commands.</summary>
+    [Fact]
+    public void ALimitGainUnderPlainAutomatic_SaysNothingOfCommands()
+    {
+        var automatic = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.Automatic, Run = true };
+        var change = Agents.AccessChange.Classify(
+            Agents.EffectiveAccess.Create("claude-code", AgentAccessBuilders.Own(automatic with { Limit = new Agents.AccessLimit { PerHour = 5 } }), Agents.AccessCaps.Empty),
+            automatic);
+
+        Assert.NotEmpty(change.Gains);
+        Assert.False(AccessChangePrompt.For("claude-code", change, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc).AnswersCommand);
+    }
+
+    /// <summary>Resetting this computer's limits names each agent the vault's settings would let start commands unasked.</summary>
+    [Fact]
+    public void AReset_NamesEachAgentWhoseCommandsWouldStartUnasked()
+    {
+        var commands = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true };
+        var records = new Agents.AgentRecordList(SavedRead.Current, [
+            new Agents.AgentRecord("claude-code", AgentAccessBuilders.Understood(commands)),
+            new Agents.AgentRecord("codex", AgentAccessBuilders.Understood(commands with { Mode = Agents.AgentMode.Automatic })),
+        ]);
+
+        var reset = AccessChangePrompt.ForReset(records, TimeZoneInfo.Utc);
+
+        Assert.True(reset.AnswersCommand);
+        Assert.Equal("claude-code can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", reset.CommandCaution);
+        Assert.False(AccessChangePrompt.ForReset(new Agents.AgentRecordList(SavedRead.Current, [records.Records[1]]), TimeZoneInfo.Utc).AnswersCommand);
+    }
 }

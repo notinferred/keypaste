@@ -66,17 +66,20 @@ public sealed class AccessChangeWindowTests
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
         });
 
-    /// <summary>What a command's Always allow cannot promise is said outside the gains' scrolling box, so a long command never pushes it out of sight (T-35).</summary>
-    [Fact]
-    public Task A_commands_caution_stays_in_sight_outside_the_gains() =>
+    /// <summary>The sentence that commands would start unasked is said outside the gains' scrolling box whatever asked for the change, a reset included, so a long list never pushes it out of sight (T-35).</summary>
+    [Theory]
+    [InlineData(AccessOrigin.Prompt, false)]
+    [InlineData(AccessOrigin.Settings, false)]
+    [InlineData(AccessOrigin.Agent, false)]
+    [InlineData(AccessOrigin.Settings, true)]
+    public Task A_commands_caution_stays_in_sight_outside_the_gains(AccessOrigin origin, bool reset) =>
         HeadlessSession.On(async () =>
         {
             var screen = new Screen();
-            var asking = screen.Ask(Prompt(AccessOrigin.Prompt, string.Empty) with { AnswersCommand = true });
+            var asking = screen.Ask(Prompt(origin, string.Empty) with { AnswersCommand = true, ResetsCeilings = reset });
             var window = await screen.ShownAsync();
 
-            Assert.Contains("can now run commands with the values it can see, without asking", Text(window, "ExplainerText"), StringComparison.Ordinal);
-            Assert.Contains("on Agents", Text(window, "ExplainerText"), StringComparison.Ordinal);
+            Assert.Contains("ci-probe can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", Text(window, "ExplainerText"), StringComparison.Ordinal);
 
             Click(window, "Deny");
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));

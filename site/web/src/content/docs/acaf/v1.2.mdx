@@ -95,7 +95,7 @@ A **limit** object has one or both of `perHour`, an integer from 1 to 1000 writt
 
 A **project row** has `project`, `mode` and optionally `limit`, and no other member. `project` is a project's name, which covers every environment of it, or a project's name, `:` and an environment's, which covers that one: `"project":"billing"` covers billing's `dev` and `staging` alike, and `"project":"billing:staging"` covers `staging` alone. It is never written as a tag, since the tag `env:billing` on an entry puts it in billing's `dev` alone. No two rows of a record have the same scope.
 
-An **always** object has `items`, an array of at most 256 entries' UUIDs, and no other member. An entry's UUID is written as the 32 hexadecimal digits KeePass's library writes it in, and no two are alike. A row has no end time: it holds until the person removes it.
+An **always** object has no member but `items`, an array of at most 256 entries' UUIDs, and an object without it holds no row. An entry's UUID is written as the 32 hexadecimal digits KeePass's library writes it in, and no two are alike. A row has no end time: it holds until the person removes it.
 
 A **selector** is 1 to 128 characters, not only white space, with no control character and no `\`:
 

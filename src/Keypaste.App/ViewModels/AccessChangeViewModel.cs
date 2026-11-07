@@ -36,7 +36,7 @@ internal sealed class AccessChangeViewModel : PromptViewModel
         var caution = prompt.AnswersCommand ? $" {prompt.CommandCaution}" : string.Empty;
         Explainer = prompt switch
         {
-            { ResetsCeilings: true } => $"Allowing {AccessChangePrompt.ResetText}. Allow only a change you expected.",
+            { ResetsCeilings: true } => $"Allowing {AccessChangePrompt.ResetText}.{caution} Allow only a change you expected.",
             { StaysBeneathDefaults: true } => $"Allowing saves this in the vault, but {AccessChangePrompt.BeneathDefaultsText}.{caution} Allow only a change you expected.",
             { Origin: AccessOrigin.Prompt } => $"Allowing saves this in the vault. You can remove it in this agent's settings on Agents.{caution}",
             _ => $"Allowing saves this in the vault, and the agent gets it from its next request.{caution} Allow only a change you expected.",

@@ -979,6 +979,22 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     /// it names and whether an agent or a terminal sends it, and says when to try again, while an agent
     /// can still narrow itself, only on this computer, and the person's own change in the app is asked.
     /// </summary>
+    /// <summary>An agent's own request for Automatic with commands reaches the person saying its commands would start unasked and that nothing approves what they do.</summary>
+    [Fact]
+    public async Task AnAgentsRequestForAutomaticWithCommands_ReachesThePersonWithTheCommandsSentence()
+    {
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+        await using var agent = await owner.AttachAsync();
+
+        var refused = await agent.ChangeAccessAsync(Asked() with { Mode = "automatic-commands", Run = "on" }, Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt), (refused!.Decision, refused.Method));
+        var asked = _fixture.Channel.LastAccessPrompt!;
+        Assert.Equal((AccessOrigin.Agent, true), (asked.Origin, asked.AnswersCommand));
+        Assert.Equal($"{_agent} can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", asked.CommandCaution);
+    }
+
     [Fact]
     public async Task ARefusedRequestForMore_HoldsBackTheNextFromAnyAgentOrTerminal_ButNotTheApp()
     {

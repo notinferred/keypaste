@@ -123,7 +123,7 @@ public sealed class ApproverHandler
             return true;
         }
 
-        limitReached = access.Run && items.All(item => item.LimitReached || item.Mode == AgentMode.AutomaticCommands) && items.Any(item => item.LimitReached || item.Mode == AgentMode.AutomaticCommands);
+        limitReached = access.Run && items.All(item => item.ModeBeforeEnd == AgentMode.AutomaticCommands);
         return false;
     }
 

@@ -211,6 +211,49 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(1, _fixture.Channel.Asked);
     }
 
+    /// <summary>A project row of Automatic with commands starts a run of that project's items unasked where the agent's own mode asks, and a set mixing in an item no such row covers asks.</summary>
+    [Fact]
+    public async Task AProjectRow_StartsItsOwnItemsUnasked_AndAMixedSetAsks()
+    {
+        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Ask, Projects = [Row("acme-api", AgentMode.AutomaticCommands)] };
+        _fixture.Source.Tagged[new EntryName("env/acme-api", ".env")] = ["env:acme-api"];
+        _fixture.Source.Tagged[new EntryName("personal", "github")] = ["env:billing"];
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        Assert.Equal(AuditMethod.AutomaticCommands, (await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL")), Token))!.Method);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var untagged = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
+        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Projects = [Row("billing", AgentMode.Automatic)] };
+        var automatic = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
+
+        Assert.Equal((AuditMethod.Prompt, AuditMethod.Prompt), (untagged!.Method, automatic!.Method));
+        Assert.Equal(2, _fixture.Channel.Asked);
+        Assert.Equal(OnceOnly.None, _fixture.Channel.LastRunPrompt!.OnceOnly);
+    }
+
+    /// <summary>A passed end asks about a run Automatic with commands would have started, saying its limit was reached; under plain Automatic, which never starts a run, the prompt names no limit.</summary>
+    [Fact]
+    public async Task APassedEnd_AsksAboutTheRun_NamingTheLimitOnlyWhereItHeldARunBack()
+    {
+        var passed = new AccessLimit { Until = _fixture.Clock.GetUtcNow().AddMinutes(-1) };
+        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Limit = passed };
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastRunPrompt!.OnceOnly);
+
+        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic, Limit = passed };
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+
+        Assert.Equal(2, _fixture.Channel.Asked);
+        Assert.Equal(OnceOnly.None, _fixture.Channel.LastRunPrompt!.OnceOnly);
+    }
+
     [Fact]
     public async Task AnApprovedRun_ReleasesTheSet_AndNamesItsEntries()
     {

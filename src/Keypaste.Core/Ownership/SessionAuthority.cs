@@ -41,9 +41,9 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// An agent's <c>run</c> is refused unasked unless the agent's settings let it run commands, and is
-/// otherwise resolved the same way, against what the agent can see, and asked about as the exact
-/// program, command line, directory and variable names, unless that person chose Always allow on exactly the same
-/// command line on the same connection still covers the same names (D-0358). No mode releases a run.
+/// otherwise resolved the same way, against what the agent can see, and asked about once as the exact
+/// program, command line, directory and variable names, never Always allowed. Only Automatic with commands
+/// for every item of the set starts it unasked, and a protected item or a reached limit still asks (T-35).
 /// The owner runs nothing: the bridge starts the command.
 /// </para>
 /// <para>
