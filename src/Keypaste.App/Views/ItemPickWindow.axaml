@@ -76,7 +76,7 @@
                   <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <TextBlock Classes="caption mono" Text="{Binding Field}" HorizontalAlignment="Right"
                                MaxWidth="140" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="mono size-14" Text="••••••••" HorizontalAlignment="Right"
+                    <TextBlock Classes="size-14" Text="••••••••" HorizontalAlignment="Right"
                                Foreground="{DynamicResource KpTextSecondary}" />
                   </StackPanel>
                 </Grid>
