@@ -1171,7 +1171,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             outcome == DeletionOutcome.Recycled
                 ? new Undoable(
                     vault => PutBack(vault, recycled),
-                    () => ShowPutBack(row),
+                    () => Reselect(row.Name),
                     Restores: true)
                 : null,
             outcome == DeletionOutcome.Recycled
@@ -1179,24 +1179,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 : $"Deleted {name}. This vault has no Trash, so nothing can put it back.");
     }
 
-    /// <summary>Puts a deleted item back under its own title, or beside the other item of a pair, which core will not make, under a free one.</summary>
     private static bool PutBack(Vault vault, RecycledEntryId recycled) =>
-        vault.RestoreRecycled(recycled) switch
-        {
-            RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot => true,
-            RestoreOutcome.DestinationOccupied => vault.RestoreRecycledRenamed(recycled, out _) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot,
-            _ => false,
-        };
-
-    private void ShowPutBack(EntryRow row)
-    {
-        Reselect(row.Name);
-
-        if (_selection is { } item && item.Title != row.Title)
-        {
-            Notice = $"Restored as {EntryNameSanitizer.Sanitize(item.Title).Text}, because another item here is called {row.DisplayTitle}.";
-        }
-    }
+        vault.RestoreRecycled(recycled) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot;
 
     /// <summary>The format's one mention, for a first delete, which saves the file as KDBX 4.1 (D-0247); empty for a file there already.</summary>
     private string FirstDeleteNote() =>

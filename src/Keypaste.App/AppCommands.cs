@@ -308,7 +308,6 @@ internal sealed class AppCommands
         var renameGroup = Routed(Strings.RenameGroupLabel, Items, items => items.BeginRenameGroupCommand);
         var moveGroup = Routed(Strings.MoveGroupLabel, Items, items => items.BeginMoveGroupCommand);
         var deleteGroup = Routed(Strings.DeleteGroup, Items, items => items.BeginDeleteGroupCommand);
-        var restoreAs = Routed(Strings.RestoreAsAnotherName, () => Trash() is { OffersRestoreAs: true } trash ? trash : null, trash => trash.RestoreAsCommand) with { Says = () => Trash()?.RestoreAsLabel is { Length: > 0 } label ? label : Strings.RestoreAsAnotherName };
         var emptyTrash = Routed(Strings.EmptyTrash, Trash, trash => trash.EmptyCommand);
         var copyField = Routed(Strings.CopyValueMenu, Field, field => field.CopyValueCommand);
         var replaceField = Routed(Strings.ReplaceValueLabel, Field, field => field.ReplaceCommand);
@@ -370,7 +369,7 @@ internal sealed class AppCommands
         var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
         _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, generatePassword, history, _line, _delete];
-        _trashMenu = [restore, restoreAs, _line, purge, emptyTrash];
+        _trashMenu = [restore, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
         _projectMenu = [openProject, _line, addKey, addEnvironment, addItem, _line, runInTerminal, openTerminal, copyRunCommand, exportReferences];
@@ -399,7 +398,7 @@ internal sealed class AppCommands
             Folder(Strings.Revision, copyRevision, restoreRevision),
             _line,
             Folder(Strings.Group, renameGroup, moveGroup, _line, deleteGroup),
-            Folder(Strings.Trash, restore, restoreAs, purge, _line, emptyTrash),
+            Folder(Strings.Trash, restore, purge, _line, emptyTrash),
             Folder(Strings.ShareLinks, checkLinks, revokeLink),
             Folder(Strings.Recommendations, moveNoteKey, restoreLostTag, openWeakPassword, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
         ]);

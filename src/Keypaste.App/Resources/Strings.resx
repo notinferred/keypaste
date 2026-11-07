@@ -626,7 +626,6 @@
   <data name="WindowMenu" xml:space="preserve"><value>Window</value></data>
   <data name="RevokeToken" xml:space="preserve"><value>Revoke token</value></data>
   <data name="AgentHistory" xml:space="preserve"><value>Agent history</value></data>
-  <data name="RestoreAsAnotherName" xml:space="preserve"><value>Restore as another name</value></data>
   <data name="ExampleItemPath" xml:space="preserve"><value>Work/github</value></data>
   <data name="ExampleProjectDirectory" xml:space="preserve"><value>~/code/acme-api</value></data>
   <data name="ExampleWebAddress" xml:space="preserve"><value>https://example.com</value></data>

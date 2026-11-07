@@ -475,7 +475,6 @@ public static class Strings
     public static string Restore => Manager.GetString("Restore", CultureInfo.CurrentUICulture)!;
     public static string RestoreABackup => Manager.GetString("RestoreABackup", CultureInfo.CurrentUICulture)!;
     public static string RestoreABackupLabel => Manager.GetString("RestoreABackupLabel", CultureInfo.CurrentUICulture)!;
-    public static string RestoreAsAnotherName => Manager.GetString("RestoreAsAnotherName", CultureInfo.CurrentUICulture)!;
     public static string RestoreTag => Manager.GetString("RestoreTag", CultureInfo.CurrentUICulture)!;
     public static string RestoreThisBackup => Manager.GetString("RestoreThisBackup", CultureInfo.CurrentUICulture)!;
     public static string RestoreThisRevision => Manager.GetString("RestoreThisRevision", CultureInfo.CurrentUICulture)!;

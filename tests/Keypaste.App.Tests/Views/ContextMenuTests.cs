@@ -198,7 +198,7 @@ public sealed class ContextMenuTests
         var row = Container(shell.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.ItemsSource == trash.Rows), trash.Rows.Single());
 
         var menu = RightClick(shell.Window, row);
-        Assert.Equal(["Restore", "Restore as another name", "-", "Delete for good", "Empty Trash"], Headers(menu));
+        Assert.Equal(["Restore", "-", "Delete for good", "Empty Trash"], Headers(menu));
         menu.Hide();
 
         Choose(FromTheKeyboard(shell.Window, row, PhysicalKey.ContextMenu, RawInputModifiers.None), "Restore");

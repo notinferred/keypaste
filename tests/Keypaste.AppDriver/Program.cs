@@ -104,7 +104,6 @@ internal static class Program
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
         "       trash-restore <vault> <title>\n" +
-        "       trash-restore-as <vault> <title>\n" +
         "       revision-restore <vault> <entry-path> <row | oldest>\n" +
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
@@ -191,7 +190,6 @@ internal static class Program
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
                 ["trash-restore", var vault, var title] => await driver.RestoreRecycledAsync(vault, title).ConfigureAwait(true),
-                ["trash-restore-as", var vault, var title] => await driver.RestoreRecycledAsAsync(vault, title).ConfigureAwait(true),
                 ["revision-restore", var vault, var entry, var row] => await driver.RestoreRevisionAsync(vault, entry, row).ConfigureAwait(true),
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
@@ -872,26 +870,6 @@ internal sealed class Driver(string home)
         WithTrashAsync(vault, title, trash =>
         {
             Press(trash.RestoreCommand, "Restore");
-            return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
-        });
-
-    /// <summary>Presses Restore and, once it is refused for a taken name, the Restore as it offers.</summary>
-    internal Task<int> RestoreRecycledAsAsync(string vault, string title) =>
-        WithTrashAsync(vault, title, trash =>
-        {
-            Press(trash.RestoreCommand, "Restore");
-
-            if (trash.Error is null)
-            {
-                throw new DriverException($"Restore put '{title}' back under its own name, so nothing offered another");
-            }
-
-            if (!trash.OffersRestoreAs)
-            {
-                return Refused(trash.Error);
-            }
-
-            Press(trash.RestoreAsCommand, "Restore as");
             return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
         });
 

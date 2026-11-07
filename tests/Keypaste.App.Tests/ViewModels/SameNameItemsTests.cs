@@ -300,9 +300,10 @@ public sealed class SameNameItemsTests : IDisposable
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(username, context.Entries.Selected!.Username);
-        Assert.Equal("Mail (restored)", context.Entries.Selected.Title);
+        Assert.Equal("Mail", context.Entries.Selected.Title);
         Assert.Equal(username + "-password", context.Entries.Detail!.Reveal());
-        Assert.Equal("Restored as Mail (restored), because another item here is called Mail.", context.Entries.Notice);
+        Assert.Equal(2, context.Entries.Rows.Count(row => row.GroupPath == "services" && row.Title == "Mail"));
+        Assert.Equal(username + "-password", Saved(username).Password);
         Assert.Equal(other + "-password", Saved(other).Password);
     }
 
@@ -330,15 +331,13 @@ public sealed class SameNameItemsTests : IDisposable
 
         trash.Selected = trash.Rows.Single(row => row.Id == two);
         trash.RestoreCommand.Press();
-
-        // The name is taken now, so Trash offers a free one rather than making a pair core refuses to make.
-        Assert.True(trash.OffersRestoreAs);
-        trash.RestoreAsCommand.Press();
+        Assert.Null(trash.Error);
+        Assert.Empty(trash.Rows);
 
         var vault = context.Session.Unlocked!;
 
-        Assert.Equal(passwords[one.UuidHex], vault.Find(new EntryName("services", "Mail"))!.Password);
-        Assert.Equal(passwords[two.UuidHex], vault.Find(new EntryName("services", "Mail (restored)"))!.Password);
+        Assert.Equal(passwords[one.UuidHex], vault.Find(new EntryName("services", "Mail") { Uuid = one.UuidHex })!.Password);
+        Assert.Equal(passwords[two.UuidHex], vault.Find(new EntryName("services", "Mail") { Uuid = two.UuidHex })!.Password);
     }
 
     [Theory]

@@ -333,91 +333,33 @@ public sealed class TrashTests : IDisposable
         Assert.True(trash.HasError);
     }
 
-    /// <summary>
-    /// The refusal D-0249 requires, writing nothing, and the offer of the first free
-    /// <c>(restored)</c> title in its place, which also writes nothing until it is taken.
-    /// </summary>
+    /// <summary>A restore whose name another item has taken since goes back under its own title, beside that item, with its history.</summary>
     [Fact]
-    public void A_restore_is_refused_when_the_name_has_been_taken_again_and_offers_another_title()
+    public void A_restore_goes_back_under_its_own_title_when_another_item_has_taken_it()
     {
-        using var context = new Context(_vaultPath);
+        string restoredUuid;
 
-        Delete(context, "servers/production");
-        Add(context, "servers/production");
-
-        var trash = context.NewTrash();
-        trash.Selected = Assert.Single(trash.Rows);
-
-        var before = Digest(_vaultPath);
-        trash.RestoreCommand.Press();
-
-        Assert.Null(trash.Notice);
-        Assert.NotNull(trash.Error);
-        Assert.Contains("cannot go back under its own name", trash.Error, StringComparison.Ordinal);
-        Assert.DoesNotContain("KeePassXC", trash.Error, StringComparison.Ordinal);
-        Assert.True(trash.OffersRestoreAs);
-        Assert.Equal("Restore as production (restored)", trash.RestoreAsLabel, StringComparer.Ordinal);
-        Assert.True(trash.RestoreAsCommand.CanExecute(null));
-        Assert.Equal(before, Digest(_vaultPath));
-        Assert.Single(trash.Rows);
-    }
-
-    /// <summary>
-    /// Taking the offer puts the deleted entry back, with its history, under the first free title, the
-    /// <c>(restored)</c> one being taken too, and leaves the entry holding the name as it was.
-    /// </summary>
-    [Fact]
-    public void Restore_as_puts_it_back_under_the_first_free_restored_title()
-    {
         using (var context = new Context(_vaultPath))
         {
             Delete(context, "servers/production");
             Add(context, "servers/production");
-            Add(context, "servers/production (restored)");
 
             var trash = context.NewTrash();
             trash.Selected = Assert.Single(trash.Rows);
+            restoredUuid = trash.Selected.Id.UuidHex;
             trash.RestoreCommand.Press();
 
-            Assert.Equal("Restore as production (restored 2)", trash.RestoreAsLabel, StringComparer.Ordinal);
-
-            trash.RestoreAsCommand.Press();
-
-            Assert.Equal("production is back in servers as production (restored 2).", trash.Notice, StringComparer.Ordinal);
+            Assert.Equal("production is back in servers.", trash.Notice, StringComparer.Ordinal);
             Assert.Null(trash.Error);
-            Assert.False(trash.OffersRestoreAs);
             Assert.True(trash.IsEmpty);
         }
 
         using var reopened = Vault.Open(_vaultPath, _master);
-        var back = new EntryName("servers", "production (restored 2)");
+        var back = new EntryName("servers", "production") { Uuid = restoredUuid };
 
+        Assert.Equal(2, reopened.ReadEntries().Count(entry => entry.GroupPath == "servers" && entry.Title == "production"));
         Assert.Equal("v1", reopened.Find(back)?.Password, StringComparer.Ordinal);
         Assert.Equal("v0", Assert.Single(reopened.ReadHistory(back)!).Fields.Password, StringComparer.Ordinal);
-        Assert.NotEqual("v1", reopened.Find(new EntryName("servers", "production"))?.Password, StringComparer.Ordinal);
-        Assert.NotNull(reopened.Find(new EntryName("servers", "production (restored)")));
-    }
-
-    /// <summary>Choosing another row drops the offer and the refusal naming it, which concerned only the row they were made for.</summary>
-    [Fact]
-    public void The_offer_of_another_title_goes_with_the_selection()
-    {
-        using var context = new Context(_vaultPath);
-
-        Delete(context, "servers/production");
-        Add(context, "servers/production");
-        Delete(context, "env/billing/.env");
-
-        var trash = context.NewTrash();
-        trash.Selected = trash.Rows.Single(row => row.Title == "production");
-        trash.RestoreCommand.Press();
-        Assert.True(trash.OffersRestoreAs);
-
-        trash.Selected = trash.Rows.Single(row => row.Title == ".env");
-
-        Assert.False(trash.OffersRestoreAs);
-        Assert.False(trash.RestoreAsCommand.CanExecute(null));
-        Assert.Null(trash.Error);
     }
 
     /// <summary>
@@ -718,7 +660,7 @@ public sealed class TrashTests : IDisposable
     }
 
     [Fact]
-    public void Restore_puts_every_selected_row_back_in_one_save_and_names_the_ones_it_cannot()
+    public void Restore_puts_every_selected_row_back_in_one_save_a_taken_name_included()
     {
         using var context = new Context(_vaultPath);
 
@@ -737,14 +679,14 @@ public sealed class TrashTests : IDisposable
         trash.Selected = trash.Rows[0];
         trash.RestoreCommand.Press();
 
-        Assert.Equal("1 item is back.", trash.Notice);
-        Assert.Contains("staging", trash.Error, StringComparison.Ordinal);
+        Assert.Equal("2 items are back.", trash.Notice);
+        Assert.Null(trash.Error);
         Assert.Empty(trash.SelectedRows);
-        Assert.Contains(context.Entries.Rows.Select(row => row.Path), path => path == "servers/staging");
-        Assert.Single(trash.Rows);
+        Assert.True(trash.IsEmpty);
 
         using var reopened = Vault.Open(_vaultPath, _master);
         Assert.NotNull(reopened.Find("servers/production"));
+        Assert.Equal(2, reopened.ReadEntries().Count(entry => entry.GroupPath == "servers" && entry.Title == "staging"));
     }
 
     /// <summary>A key removed on the env card leaves its entry, whose history keeps it, and puts nothing in the bin.</summary>
