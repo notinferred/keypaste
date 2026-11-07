@@ -545,8 +545,7 @@
   <data name="NewVaultLabel" xml:space="preserve"><value>New vault…</value></data>
   <data name="EditFieldsLabel" xml:space="preserve"><value>Edit fields…</value></data>
   <data name="SharedNameNothingTells" xml:space="preserve"><value>Another item here has this title, and nothing in the list tells them apart. Rename or move one.</value></data>
-  <data name="SharedNameActivity" xml:space="preserve"><value>Recorded under this title, which another item also has, so this may be the other item's. An agent asking for this title is refused.</value></data>
-  <data name="SharedNameLastUsedTip" xml:space="preserve"><value>Recorded under this title, which another item also has. Open the item for what is recorded.</value></data>
+  <data name="SharedNameActivity" xml:space="preserve"><value>Another item has this title, so this shows only what keypaste recorded for this item. When an agent asks for the title, you pick which item it gets.</value></data>
   <data name="RenameOrMoveLabel" xml:space="preserve"><value>Rename or move…</value></data>
   <data name="AddFieldLabel" xml:space="preserve"><value>Add field…</value></data>
   <data name="AddAttachmentLabel" xml:space="preserve"><value>Add attachment…</value></data>

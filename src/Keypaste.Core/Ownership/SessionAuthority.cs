@@ -368,7 +368,8 @@ public sealed class SessionAuthority : IApproverHandler
                 reply.Entry,
                 request.Exposure,
                 reply.Session,
-                VaultNamed(request.Vault)));
+                VaultNamed(request.Vault),
+                reply.Item));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
@@ -411,7 +412,7 @@ public sealed class SessionAuthority : IApproverHandler
         {
             // The released string is dropped here, never sent: the lock or the reload came before the release.
             var (method, reason) = WithdrawnBy(lifetime, reply.Decision == AuditDecision.Granted ? "this was released" : "anybody answered");
-            reply = CredentialRefused(method, reason) with { Entry = reply.Entry };
+            reply = CredentialRefused(method, reason) with { Entry = reply.Entry, Item = reply.Item };
         }
 
         var delivered = Deliverable(reply with { Session = request.Session });
@@ -420,7 +421,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (answered is { Decision: AuditDecision.Granted, Entry: { } entry })
         {
-            Record(lifetime, [entry], client, AuditLog.Wire(answered.Method));
+            Record(lifetime, [entry], client, AuditLog.Wire(answered.Method), answered.Item);
 
             // Only now, so "allowed once" is said of a release that left.
             if (unmade is not null)
@@ -1355,7 +1356,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
 
-    private void Record(SessionLifetime lifetime, IEnumerable<string> entries, string client, string how)
+    private void Record(SessionLifetime lifetime, IEnumerable<string> entries, string client, string how, string? item = null)
     {
         lock (_ledgerGate)
         {
@@ -1365,7 +1366,7 @@ public sealed class SessionAuthority : IApproverHandler
                 _ledger = ledger;
             }
 
-            ledger.Ledger.Record(entries, client, how, _clock.GetUtcNow());
+            ledger.Ledger.Record(entries, client, how, _clock.GetUtcNow(), item);
         }
     }
 

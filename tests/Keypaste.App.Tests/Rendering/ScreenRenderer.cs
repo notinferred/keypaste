@@ -1654,6 +1654,8 @@ public sealed class ScreenRenderer
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
 
+        DrawPickers(output);
+
         var arming = new ApprovalWindow(new ApprovalViewModel(asked with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) }));
         arming.Show();
         Save(arming, output, "91j-approval-arming");
@@ -1664,6 +1666,53 @@ public sealed class ScreenRenderer
         locked.Show();
         Save(locked, output, "91i-locked-notice");
         locked.Close();
+    }
+
+    /// <summary>The picker armed with nothing picked, with an item picked, with a protected one picked, and with as many items as it offers.</summary>
+    private static void DrawPickers(string output)
+    {
+        static ItemCandidate Candidate(int number, string username, string url, bool protectedItem) => new()
+        {
+            Name = new EntryName("work", "GitHub"),
+            Item = new string((char)('a' + number), 32),
+            Title = "GitHub",
+            Group = "work",
+            Username = username,
+            Url = url,
+            OnceOnly = protectedItem ? OnceOnly.ProtectedProfile : OnceOnly.None,
+            Always = protectedItem ? null : new AlwaysOffer(AccessEdit.AlwaysItem(new string((char)('a' + number), 32)), "work/GitHub"),
+        };
+
+        var pair = ApprovalPrompt.For("claude-code", new EntryName("work", "GitHub"), "password", "Push the release branch to the company repository.", "work laptop") with
+        {
+            Candidates =
+            [
+                Candidate(0, "dana@acme.example", "https://github.com", protectedItem: false),
+                Candidate(1, "dana-personal", "https://github.com/login", protectedItem: true),
+            ],
+        };
+        var many = pair with
+        {
+            Candidates = [.. Enumerable.Range(0, ApprovalPrompt.MaximumCandidates).Select(number => Candidate(number, $"bot-{number + 1}", "https://github.com", protectedItem: false))],
+        };
+
+        foreach (var (prompt, pick, name) in new (ApprovalPrompt, int?, string)[]
+        {
+            (pair, null, "91k-picker-nothing-picked"),
+            (pair, 0, "91k2-picker-picked"),
+            (pair, 1, "91k3-picker-protected-picked"),
+            (many, 3, "91k4-picker-most-items"),
+        })
+        {
+            var picker = new ItemPickViewModel(prompt);
+            var window = new ItemPickWindow(picker);
+            picker.Tick(TimeSpan.FromSeconds(28));
+            picker.Arm();
+            picker.Picked = pick is { } index ? picker.Rows[index] : null;
+            window.Show();
+            Save(window, output, name);
+            window.Close();
+        }
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)

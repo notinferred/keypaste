@@ -521,8 +521,6 @@
                               Orientation="Horizontal"
                               HorizontalAlignment="Right"
                               Spacing="6"
-                              Background="Transparent"
-                              ToolTip.Tip="{Binding LastUsedTip}"
                               IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Classes="size-13 muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
                     <Border Classes="dot info" IsVisible="{Binding IsInUse}" />

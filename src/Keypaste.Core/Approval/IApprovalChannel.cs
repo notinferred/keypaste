@@ -28,6 +28,17 @@ public interface IApprovalChannel
     /// <returns>What the human said, or why they were not asked.</returns>
     ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken);
 
+    /// <summary>Shows a request more than one item answers to and waits for the person to pick one and answer.</summary>
+    /// <param name="prompt">What to show, its <see cref="ApprovalPrompt.Candidates"/> the items. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the person said and which candidate they picked, or why they were not asked.</returns>
+    /// <remarks>
+    /// No candidate is picked until the person picks one, and no allow can be pressed before that. A channel that cannot
+    /// show a picker has asked nobody, which is a no.
+    /// </remarks>
+    ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ItemPick.NoChannel);
+
     /// <summary>Shows a request for a project's env set to a human and waits for their answer.</summary>
     /// <param name="prompt">What to show. Already sanitized; render it as inert text.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>

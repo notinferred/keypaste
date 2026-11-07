@@ -253,6 +253,10 @@ public sealed record CredentialReply
     /// <summary>The entry the request resolved to, sanitized, or null when it resolved to none.</summary>
     public string? Entry { get; init; }
 
+    /// <summary>The UUID, as hex, of the one item the reply is about, which its audit line names; never on the wire.</summary>
+    /// <remarks>Null when the request reached no single item, as a picker nobody picked from has not.</remarks>
+    internal string? Item { get; init; }
+
     /// <summary>How many seconds a released TOTP code has left in its period; zero for any other field.</summary>
     public int CodeSeconds { get; init; }
 

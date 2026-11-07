@@ -8,12 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.76 — Let the person pick the item an agent asked for.** Needs: none. Worked first after K and B (founder, 2026-11-03, D-0684).
-  - People keep two items for one website, and an agent's request that more than one item answers to is refused with "more than one item answers to that name" (`CredentialFailure.Ambiguous`, `VaultCredentialSource`), so the agent is left to guess another name. Instead, the app says the agent is requesting a credential and asks the person to pick one.
-  - The picker is not closed to the person: each item that answers shows its title, group, username, URL and the field the agent asked for, so the person sees the field they are picking, its value masked as everywhere else.
-  - It is the agent's prompt, keeping the prompt's rules (D-0326, D-0456, D-0634): no default, focus on Deny, the allows disarmed for a second and a fixed layout. Exactly the picked item's one field is released, and the owner's log names that item.
-  - Accepted when tests on the request path show a request two items answer to opening the picker, the picked item's field released and logged, Deny and a lock releasing nothing, and a request one item answers to unchanged.
-
 ## T5 — Desktop delivery
 
 The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.

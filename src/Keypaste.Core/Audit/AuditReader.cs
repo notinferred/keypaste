@@ -37,6 +37,9 @@ public sealed record AuditEntry
     /// <summary>The entry the agent named, or empty for a call that names none.</summary>
     public string Entry { get; init; } = string.Empty;
 
+    /// <summary>The UUID, as hex, of the item the line is about, or empty where the line names none, as every line before items were named.</summary>
+    public string Item { get; init; } = string.Empty;
+
     /// <summary>The field the agent asked for, or empty.</summary>
     public string Field { get; init; } = string.Empty;
 
@@ -337,6 +340,7 @@ public static class AuditReader
                 Name = name,
                 Tool = Text(root, "tool"),
                 Entry = EntryPath(args, "entry"),
+                Item = Text(args, "item"),
                 Field = Text(args, "field"),
                 Decision = Text(root, "decision"),
                 Method = Text(root, "method"),

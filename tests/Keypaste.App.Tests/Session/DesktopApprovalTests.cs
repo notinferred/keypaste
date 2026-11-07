@@ -66,6 +66,82 @@ public sealed class DesktopApprovalTests
             AutomationSurface.AssertNothingExposes(window, Sentinel);
         });
 
+    internal const string PairPath = "services/Mail";
+
+    /// <summary>Two items, one name: the picker's case.</summary>
+    internal static void SeedPair(Core.Vault vault)
+    {
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = "alice", Url = "https://mail.example.com", Password = "alice-" + Sentinel });
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = "bob", Password = "bob-" + Sentinel });
+    }
+
+    /// <summary>
+    /// A request two items answer to opens the picker with neither picked: after the arming second the allows stay off
+    /// until the person picks one, and Allow once then releases that item's field alone, which no control exposes (F.76).
+    /// </summary>
+    [Theory]
+    [InlineData(0, "alice")]
+    [InlineData(1, "bob")]
+    public Task The_picker_releases_the_picked_items_field_alone(int row, string username) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync(seed: SeedPair);
+            var reply = app.Ask(entry: PairPath, exposure: "services/**");
+            var window = Assert.IsType<ItemPickWindow>(await app.PromptAsync());
+            var list = window.FindControl<ListBox>("Candidates")!;
+
+            Assert.Equal(PairPath, Text(window, "EntryText"));
+            Assert.Equal(2, list.ItemCount);
+            Assert.Null(list.SelectedItem);
+            Assert.Same(window.FindControl<Button>("Deny"), window.FocusManager?.GetFocusedElement());
+
+            Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+
+            var item = list.ContainerFromIndex(row)!;
+            WindowInput.Press(window, item);
+            WindowInput.Release(window, item);
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
+            var answered = await reply.WaitAsync(_wait, Token);
+
+            Assert.NotNull(answered);
+            Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (answered.Decision, answered.Method));
+            Assert.Equal($"{username}-{Sentinel}", answered.Value);
+            await PromptedApp.WithdrawnAsync(window);
+            AutomationSurface.AssertNothingExposes(window, Sentinel);
+        });
+
+    [Theory]
+    [InlineData("deny")]
+    [InlineData("lock")]
+    public Task A_picked_item_denied_or_locked_releases_nothing(string how) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync(seed: SeedPair);
+            var reply = app.Ask(entry: PairPath, exposure: "services/**");
+            var window = await app.PromptAsync();
+            var list = window.FindControl<ListBox>("Candidates")!;
+            list.SelectedIndex = 0;
+            await app.ArmAsync();
+
+            if (how == "deny")
+            {
+                Click(window, "Deny");
+            }
+            else
+            {
+                app.Authority.Session.Lock(VaultLockReason.Manual);
+            }
+
+            var answered = await reply.WaitAsync(_wait, Token);
+
+            Assert.NotNull(answered);
+            Assert.Equal(AuditDecision.Denied, answered.Decision);
+            Assert.Equal(how == "deny" ? AuditMethod.Prompt : AuditMethod.VaultLocked, answered.Method);
+            Assert.Null(answered.Value);
+            await PromptedApp.WithdrawnAsync(window);
+        });
+
     public static TheoryData<string, AuditMethod> Refusals => new()
     {
         { "deny", AuditMethod.Prompt },
@@ -1173,7 +1249,8 @@ public sealed class DesktopApprovalTests
         /// <param name="around">What the gate asks instead of the app's prompt, given that prompt.</param>
         /// <param name="notifications">The system the app's notifications go to, or null to post none.</param>
         /// <param name="inFront">Whether keypaste is in front when a prompt appears; it is not, unless this says so.</param>
-        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null, FakeNotifications? notifications = null, Func<bool>? inFront = null)
+        /// <param name="seed">What else the vault holds, written before it is saved.</param>
+        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null, FakeNotifications? notifications = null, Func<bool>? inFront = null, Action<Core.Vault>? seed = null)
         {
             var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "agents.kdbx");
@@ -1189,6 +1266,7 @@ public sealed class DesktopApprovalTests
                 created.AddEntry(new VaultEntry { GroupPath = "api", Title = "OpenAI", Password = Sentinel });
                 Assert.True(created.SetFields(new EntryName("api", "OpenAI"), [new FieldWrite("OPENAI_API_KEY", ApiKeySentinel)]));
                 TempVault.Sees(created, Label);
+                seed?.Invoke(created);
                 created.Save();
             }
 

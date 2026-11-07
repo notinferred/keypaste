@@ -248,6 +248,20 @@ internal sealed class FakeChannel : IApprovalChannel
         return AnswerAsync(cancellationToken);
     }
 
+    /// <summary>Which candidate a picker is answered with, by its place; none unless a test says otherwise.</summary>
+    internal Func<ApprovalPrompt, int?> Pick { get; set; } = _ => null;
+
+    /// <summary>How many pickers were asked, of all the prompts <see cref="Asked"/> counts.</summary>
+    internal int PickersAsked { get; private set; }
+
+    public async ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    {
+        LastPrompt = prompt;
+        PickersAsked++;
+        var answer = await AnswerAsync(cancellationToken).ConfigureAwait(false);
+        return new ItemPick(answer, Pick(prompt));
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         LastEnvPrompt = prompt;

@@ -48,8 +48,24 @@ public interface ICredentialSource
         [NotNullWhen(true)] out EntryName? name,
         out CredentialFailure failure);
 
+    /// <summary>Every item an agent's <c>entry</c> argument names, by the rule <see cref="TryResolve"/> applies, for the person to pick one.</summary>
+    /// <param name="entryArgument">The argument exactly as it arrived, handle or path.</param>
+    /// <param name="items">The items, each carrying its UUID, in the vault's order.</param>
+    /// <param name="failure">Why none could be read.</param>
+    /// <returns><see langword="true"/> when the vault could be read.</returns>
+    /// <remarks>
+    /// Each item's username and URL are for the person picking, who sees them on Items too, and never for the agent.
+    /// Nothing here reads a field the agent asked for.
+    /// </remarks>
+    bool TryChoose(string entryArgument, out IReadOnlyList<AnsweringItem> items, out CredentialFailure failure)
+    {
+        items = [];
+        failure = CredentialFailure.Ambiguous;
+        return false;
+    }
+
     /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465), or computes its current TOTP code.</summary>
-    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
+    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>, or one of <see cref="TryChoose"/>'s, which is read only while its UUID and its name still agree.</param>
     /// <param name="field">
     /// Which field, exactly as the tool schema spells it, or <see cref="CredentialFields.Totp"/> for the code, which is
     /// released with how long it stays current and never with its seed (D-0480).

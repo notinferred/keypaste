@@ -28,7 +28,7 @@ internal abstract partial class PromptViewModel : ObservableObject
 
     protected PromptViewModel()
     {
-        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && !IsAnswered);
+        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && CanAllow && !IsAnswered);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
     }
 
@@ -68,6 +68,9 @@ internal abstract partial class PromptViewModel : ObservableObject
             IsArmed = true;
         }
     }
+
+    /// <summary>Whether what an allow would release is decided yet, as a picker's is only once an item is picked.</summary>
+    protected virtual bool CanAllow => true;
 
     /// <summary>What the prompt asks, in the words of its heading, for a screen reader.</summary>
     protected abstract string Asks { get; }

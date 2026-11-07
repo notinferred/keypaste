@@ -118,6 +118,7 @@ public static class RequestRecords
     /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
     /// <param name="session">The unlocked session that answered, or null.</param>
     /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <param name="item">The UUID, as hex, of the one item the owner decided about, which tells it from another of its name; null when it reached none.</param>
     /// <returns>The record to append.</returns>
     public static AuditRecord Credential(
         AuditClient client,
@@ -130,7 +131,8 @@ public static class RequestRecords
         string? resolvedEntry,
         IReadOnlyList<string> exposure,
         string? session,
-        string? vault)
+        string? vault,
+        string? item = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(field);
@@ -147,6 +149,7 @@ public static class RequestRecords
             {
                 Entry = EntryNameSanitizer.SanitizePath(resolvedEntry, maximumLength: AuditArgs.EntryLength).Text,
                 EntryKind = EntryAddressKind.Path,
+                Item = item,
             };
         }
 

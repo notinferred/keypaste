@@ -203,6 +203,9 @@ public sealed record AuditArgs
     /// <summary>Whether that argument was a handle, a path, or neither.</summary>
     public EntryAddressKind? EntryKind { get; init; }
 
+    /// <summary>The UUID, as hex, of the item the request was decided about, which tells it from another of its name.</summary>
+    public string? Item { get; init; }
+
     /// <summary>Which field was requested, or <c>invalid</c> when it was not one keypaste knows.</summary>
     public string? Field { get; init; }
 

@@ -83,6 +83,82 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("keypaste: denied. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
+    private static ApprovalPrompt Picker(AlwaysOffer? always = null) =>
+        ApprovalPrompt.For("claude-code", new EntryName("services", "Mail"), "password", "send the report", "mail-bot") with
+        {
+            Candidates =
+            [
+                Candidate("alice", "https://mail.example.com", always, always is null ? OnceOnly.ProtectedProfile : OnceOnly.None),
+                Candidate("bob", string.Empty, null, OnceOnly.ProtectedProfile),
+            ],
+        };
+
+    private static ItemCandidate Candidate(string username, string url, AlwaysOffer? always, OnceOnly onceOnly) => new()
+    {
+        Name = new EntryName("services", "Mail"),
+        Item = username == "alice" ? "0123456789ABCDEF0123456789ABCDEF" : "FEDCBA9876543210FEDCBA9876543210",
+        Title = "Mail",
+        Group = "services",
+        Username = username,
+        Url = url,
+        Always = always,
+        OnceOnly = onceOnly,
+    };
+
+    /// <summary>The picker numbers each item, takes the number of the one picked, then asks about that one as any request is asked.</summary>
+    [Theory]
+    [InlineData("1", "o", ApprovalAnswer.ApprovedOnce, 0)]
+    [InlineData("2", "o", ApprovalAnswer.ApprovedOnce, 1)]
+    [InlineData("2", "d", ApprovalAnswer.Denied, 1)]
+    public async Task The_picker_takes_the_number_of_an_item_then_an_answer(string number, string answer, ApprovalAnswer expected, int picked)
+    {
+        var rig = Build(number, answer);
+
+        var pick = await rig.Channel.AskToPickAsync(Picker(), Token);
+        var shown = rig.Stderr.ToString();
+
+        Assert.Equal((expected, (int?)picked), (pick.Answer, pick.Picked));
+        Assert.Contains("keypaste: an agent is asking for a credential, and 2 items answer to it.", shown, StringComparison.Ordinal);
+        Assert.Contains("  asked    services/Mail", shown, StringComparison.Ordinal);
+        Assert.Contains("  [1] Mail  services  alice  https://mail.example.com", shown, StringComparison.Ordinal);
+        Assert.Contains("  [2] Mail  services  bob", shown, StringComparison.Ordinal);
+        Assert.Contains($"  picked   [{picked + 1}] Mail  services", shown, StringComparison.Ordinal);
+        Assert.Contains("this item is in a protected environment", shown, StringComparison.Ordinal);
+        Assert.Equal("[d] deny  [1-2] pick  45s › ", rig.Prompt.PromptsSeen[0]);
+        Assert.Equal("[d] deny  [o] once  45s › ", rig.Prompt.PromptsSeen[1]);
+    }
+
+    /// <summary>Anything but an item's number denies before any allow is offered, and so does [a] on an item that offers no Always allow.</summary>
+    [Theory]
+    [InlineData("d")]
+    [InlineData("3")]
+    [InlineData("o")]
+    [InlineData("")]
+    public async Task Anything_but_a_number_denies_with_nothing_picked(string answer)
+    {
+        var rig = Build(answer, "o");
+
+        var pick = await rig.Channel.AskToPickAsync(Picker(), Token);
+
+        Assert.Equal((ApprovalAnswer.Denied, (int?)null), (pick.Answer, pick.Picked));
+        Assert.Single(rig.Prompt.PromptsSeen);
+        Assert.Contains("keypaste: denied. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Always_is_offered_for_the_picked_item_only_when_it_offers_one()
+    {
+        var offering = Build("1", "a");
+        var refusing = Build("2", "a");
+
+        var always = await offering.Channel.AskToPickAsync(Picker(new AlwaysOffer(AccessEdit.AlwaysItem("0123456789ABCDEF0123456789ABCDEF"), "services/Mail")), Token);
+        var once = await refusing.Channel.AskToPickAsync(Picker(new AlwaysOffer(AccessEdit.AlwaysItem("0123456789ABCDEF0123456789ABCDEF"), "services/Mail")), Token);
+
+        Assert.Equal((ApprovalAnswer.Always, (int?)0), (always.Answer, always.Picked));
+        Assert.Contains("[a] allows this once, then asks you to always allow this item for mail-bot", offering.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Equal(ApprovalAnswer.Denied, once.Answer);
+    }
+
     /// <summary>End of input — a closed pipe, a Ctrl+D — is a denial, not a hang and not a yes.</summary>
     [Fact]
     public async Task EndOfInput_Denies()

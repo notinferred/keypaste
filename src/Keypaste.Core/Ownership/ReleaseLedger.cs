@@ -5,7 +5,11 @@ namespace Keypaste.Core.Ownership;
 /// <param name="Client">Who received it, as a screen names them.</param>
 /// <param name="How">How it left: an audit method's word, or <c>run</c>, <c>run --session</c> or <c>token</c>.</param>
 /// <param name="At">When it was committed.</param>
-public sealed record ReleaseSeen(string Entry, string Client, string How, DateTimeOffset At);
+public sealed record ReleaseSeen(string Entry, string Client, string How, DateTimeOffset At)
+{
+    /// <summary>The UUID, as hex, of the one item released, or null where the release names none.</summary>
+    public string? Item { get; init; }
+}
 
 /// <summary>
 /// The releases one unlocked lifetime committed, newest first, held in memory only (D-0361).
@@ -27,7 +31,8 @@ public sealed class ReleaseLedger
     /// <param name="client">Who received them.</param>
     /// <param name="how">How they left.</param>
     /// <param name="at">When.</param>
-    public void Record(IEnumerable<string> entries, string client, string how, DateTimeOffset at)
+    /// <param name="item">The UUID of the one item released, which tells it from another of its name, or null.</param>
+    public void Record(IEnumerable<string> entries, string client, string how, DateTimeOffset at, string? item = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(client);
@@ -37,7 +42,7 @@ public sealed class ReleaseLedger
         {
             foreach (var entry in entries)
             {
-                _rows.AddFirst(new ReleaseSeen(entry, client, how, at));
+                _rows.AddFirst(new ReleaseSeen(entry, client, how, at) { Item = item });
 
                 if (_rows.Count > MaximumRows)
                 {

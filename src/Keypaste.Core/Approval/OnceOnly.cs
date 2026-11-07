@@ -14,4 +14,7 @@ public enum OnceOnly
 
     /// <summary>The agent has no name of its own, so its settings have nowhere to keep it.</summary>
     Unnamed = 3,
+
+    /// <summary>The agent is Automatic for the item, so an Always allow row would add nothing and could pass a limit the person set.</summary>
+    Automatic = 4,
 }

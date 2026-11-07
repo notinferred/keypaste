@@ -27,23 +27,37 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
         Field = prompt.Field;
-        Lifetime = prompt.OnceOnly switch
-        {
-            OnceOnly.None => string.Empty,
-            OnceOnly.LimitReached => "once only: its Automatic limit was reached",
-            OnceOnly.Unnamed => "once only: this agent has no name",
-            _ => "once only: protected environment",
-        };
+        Lifetime = LifetimeText(prompt.OnceOnly);
         Reason = prompt.Reason;
-        Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
-        {
-            (true, true) => "The item and the reason are not what the vault holds and the agent sent: both were scrubbed.",
-            (true, false) => "The item is not what the vault holds: the stored name was scrubbed.",
-            (false, true) => "The reason is not what the agent sent: it was scrubbed.",
-            _ => string.Empty,
-        };
-        Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
+        Scrubbed = ScrubbedText(prompt);
+        Truncation = TruncationText(prompt);
     }
+
+    /// <summary>Whose words a reason is, said under it whatever it says.</summary>
+    internal const string AttributionText = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+
+    /// <summary>Why a request can be allowed only once, or empty where Always allow is offered.</summary>
+    internal static string LifetimeText(OnceOnly onceOnly) => onceOnly switch
+    {
+        OnceOnly.None => string.Empty,
+        OnceOnly.LimitReached => "once only: its Automatic limit was reached",
+        OnceOnly.Unnamed => "once only: this agent has no name",
+        OnceOnly.Automatic => "once only: it is Automatic for this agent",
+        _ => "once only: protected environment",
+    };
+
+    /// <summary>What was scrubbed from the item or the reason, or nothing.</summary>
+    internal static string ScrubbedText(ApprovalPrompt prompt) => (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
+    {
+        (true, true) => "The item and the reason are not what the vault holds and the agent sent: both were scrubbed.",
+        (true, false) => "The item is not what the vault holds: the stored name was scrubbed.",
+        (false, true) => "The reason is not what the agent sent: it was scrubbed.",
+        _ => string.Empty,
+    };
+
+    /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
+    internal static string TruncationText(ApprovalPrompt prompt) =>
+        prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
 
     /// <summary>Allows this request once, then asks the person to confirm the change Always allow names.</summary>
     internal RelayCommand AlwaysAllowCommand { get; }
@@ -82,7 +96,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
     internal string Scrubbed { get; }
 
     /// <summary>Whose words the reason is, said under it whatever it says.</summary>
-    internal string Attribution { get; } = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+    internal string Attribution { get; } = AttributionText;
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }

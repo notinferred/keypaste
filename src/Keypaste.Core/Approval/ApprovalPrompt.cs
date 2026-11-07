@@ -37,6 +37,9 @@ public sealed record ApprovalPrompt
     /// <summary>The longest client name a human is shown.</summary>
     public const int MaximumClientLength = 64;
 
+    /// <summary>The most items a picker offers; a name more of them answer to is refused as it was before there was a picker.</summary>
+    public const int MaximumCandidates = 9;
+
     /// <summary>What the requesting client calls itself, sanitized. Never proof of anything.</summary>
     public required string Client { get; init; }
 
@@ -86,6 +89,16 @@ public sealed record ApprovalPrompt
     /// change that gives an agent more is confirmed.
     /// </remarks>
     public AlwaysOffer? Always { get; init; }
+
+    /// <summary>The items the person picks one from, when more than one answers to the request; empty otherwise.</summary>
+    /// <remarks>
+    /// A picker's own <see cref="Always"/> is null and its <see cref="OnceOnly"/> none: what Always allow would cover belongs to each candidate.
+    /// <see cref="Entry"/> is the name they share.
+    /// </remarks>
+    public IReadOnlyList<ItemCandidate> Candidates { get; init; } = [];
+
+    /// <summary>The UUID of the one item asked about, as hex, or null when the prompt is a picker or the UUID could not be read.</summary>
+    public string? Item { get; init; }
 
     /// <summary>An entry as every prompt and audit line shows it.</summary>
     /// <param name="entry">The entry.</param>

@@ -192,6 +192,46 @@ public sealed class ApprovalGate : IDisposable
         return (answer, kept);
     }
 
+    /// <summary>
+    /// Asks a human to pick one of the items a credential request names and answer it, under the same window, slot and
+    /// cooldown, keeping the slot when they answer Always allow on a candidate that offers it.
+    /// </summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
+    /// <param name="prompt">What the human is shown, its candidates the items.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>
+    /// The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal;
+    /// and for Always allow the slot, which the caller asks the confirmation in and then disposes.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
+    public async ValueTask<(ItemPick Pick, KeptSlot? Kept)> AskPickingAsync(
+        string cooldownKey,
+        ApprovalPrompt prompt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        int? picked = null;
+        KeptSlot? kept = null;
+
+        ItemCandidate? Picked() => picked is { } index && index >= 0 && index < prompt.Candidates.Count ? prompt.Candidates[index] : null;
+
+        var answer = await AskThroughAsync(
+            [cooldownKey],
+            new Asked(prompt, null, null, null, null),
+            async token =>
+            {
+                var said = await _channel.AskToPickAsync(prompt, token).ConfigureAwait(false);
+                picked = said.Picked;
+                return said.Answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always && Picked() is null ? ApprovalAnswer.Denied : said.Answer;
+            },
+            cancellationToken,
+            keep: answered => answered == ApprovalAnswer.Always && Picked() is { Always: not null } ? kept = new KeptSlot(this) : null).ConfigureAwait(false);
+
+        return (new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always ? picked : null), kept);
+    }
+
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown.</param>

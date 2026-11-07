@@ -78,6 +78,40 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return AnswerAsync(started, cancellationToken, request.Always);
     }
 
+    /// <summary>Lists the items a request names by number, reads the number of the one the person picks, then asks about that one as any request is asked.</summary>
+    public async ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        var numbers = string.Concat(Enumerable.Range(1, request.Candidates.Count).Select(number => number.ToString(CultureInfo.InvariantCulture)));
+        _console.WriteLine(RenderPicker(request, RuleLine));
+
+        char? choice;
+
+        try
+        {
+            choice = await ChooseAsync(numbers, () => Picking(request.Candidates.Count, Remaining(started)), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return new ItemPick(Withdrawn("Nothing was released."), null);
+        }
+
+        if (choice is not { } digit || numbers.IndexOf(digit, StringComparison.Ordinal) is var picked && picked < 0)
+        {
+            _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."), RuleLine));
+            return new ItemPick(ApprovalAnswer.Denied, null);
+        }
+
+        var candidate = request.Candidates[picked];
+        List<string> lines = [string.Empty, $"  picked   [{picked + 1}] {Described(candidate)}"];
+        lines.AddRange(AlwaysLines(candidate.Always, candidate.OnceOnly, request.Label ?? request.Client));
+        _console.WriteLine(string.Join(Environment.NewLine, lines));
+
+        return new ItemPick(await AnswerAsync(started, cancellationToken, candidate.Always).ConfigureAwait(false), picked);
+    }
+
     public async ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -324,6 +358,13 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";
 
+    /// <summary>The picker's choice line: deny first, then the numbers that pick an item.</summary>
+    private string Picking(int count, int secondsLeft) =>
+        _console.Paint(Tone.Accent, "[d] deny  ")
+        + _console.Paint(Tone.Accent, count == 1 ? "[1] pick  " : string.Create(CultureInfo.InvariantCulture, $"[1-{count}] pick  "))
+        + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
+        + " ";
+
     /// <summary>The confirmation's choice line: deny first, and the one key that allows.</summary>
     private string Confirmation(int secondsLeft) =>
         _console.Paint(Tone.Accent, "[d] deny  ")
@@ -423,23 +464,72 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         lines.Add(string.Empty);
         lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
         lines.Add(string.Empty);
-
-        if (request.Always is { IsProject: true } project)
-        {
-            lines.Add($"  [a] allows this once, then asks you to make {project.Covers} Automatic for {request.Label ?? request.Client}:");
-            lines.Add("      released without asking you from then on, and recorded in history.");
-        }
-        else if (request.Always is not null)
-        {
-            lines.Add($"  [a] allows this once, then asks you to always allow this item for {request.Label ?? request.Client}:");
-            lines.Add("      released without asking you from then on, and recorded in history.");
-        }
-        else if (request.OnceOnly != OnceOnly.None)
-        {
-            lines.Add(OnceOnlyLine(request.OnceOnly));
-        }
+        lines.AddRange(AlwaysLines(request.Always, request.OnceOnly, request.Label ?? request.Client));
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>The picker: the agent, the name it asked for and the field, each item answering to it by number, and the agent's claim last.</summary>
+    private static string RenderPicker(ApprovalPrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            string.Create(CultureInfo.InvariantCulture, $"keypaste: an agent is asking for a credential, and {request.Candidates.Count} items answer to it."),
+            string.Empty,
+            $"  agent    {Named(request.Client, request.Label)}",
+            $"  asked    {request.Entry}",
+            $"  field    {request.Field}, its value not shown here",
+            string.Empty,
+            "  Pick the one item to send, by its number:",
+        ];
+
+        lines.AddRange(request.Candidates.Select((candidate, index) => string.Create(CultureInfo.InvariantCulture, $"  [{index + 1}] {Described(candidate)}")));
+        lines.Add(string.Empty);
+        lines.Add("  the agent says it needs this because:");
+        lines.Add($"    {request.Reason}");
+
+        if (request.ReasonWasTruncated)
+        {
+            lines.Add("    (cut short — the full text is hashed in the audit log)");
+        }
+
+        if (request.EntryWasAltered || request.ReasonWasAltered)
+        {
+            lines.Add(string.Empty);
+            lines.Add("  Characters that cannot be shown were scrubbed from the names or the reason above.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>One candidate on a line: its title, then its group, username and URL where it has them.</summary>
+    private static string Described(ItemCandidate candidate) =>
+        string.Join(
+            "  ",
+            new[] { candidate.Title, candidate.Group.Length > 0 ? candidate.Group : "top level", candidate.Username, candidate.Url }.Where(part => part.Length > 0));
+
+    /// <summary>What <c>[a]</c> would ask to confirm, or why there is no <c>[a]</c>.</summary>
+    private static IEnumerable<string> AlwaysLines(AlwaysOffer? always, OnceOnly onceOnly, string agent)
+    {
+        if (always is { IsProject: true } project)
+        {
+            yield return $"  [a] allows this once, then asks you to make {project.Covers} Automatic for {agent}:";
+            yield return "      released without asking you from then on, and recorded in history.";
+        }
+        else if (always is not null)
+        {
+            yield return $"  [a] allows this once, then asks you to always allow this item for {agent}:";
+            yield return "      released without asking you from then on, and recorded in history.";
+        }
+        else if (onceOnly != OnceOnly.None)
+        {
+            yield return OnceOnlyLine(onceOnly);
+        }
     }
 
     /// <summary>Why a prompt offers no Always allow, on a line of its own.</summary>
@@ -447,6 +537,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     {
         OnceOnly.LimitReached => "  this agent's Automatic limit was reached: once only, so that limit holds.",
         OnceOnly.Unnamed => string.Join(Environment.NewLine, Wrapped(ApprovalPrompt.UnnamedText, "  ")),
+        OnceOnly.Automatic => "  this agent is Automatic for this item: once only, so its limits hold.",
         _ => "  this item is in a protected environment: it is asked about every time.",
     };
 

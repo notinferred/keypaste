@@ -63,6 +63,17 @@ internal sealed class WindowApprovalChannel(
         return ShowAsync(request, () => new ApprovalWindow(request), cancellationToken);
     }
 
+    /// <summary>Asks the person to pick which of the items a request names the agent gets, in a prompt window of its own.</summary>
+    public async ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new ItemPickViewModel(prompt);
+        var answer = await ShowAsync(request, () => new ItemPickWindow(request), cancellationToken).ConfigureAwait(false);
+
+        return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always ? request.PickedIndex : null);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);

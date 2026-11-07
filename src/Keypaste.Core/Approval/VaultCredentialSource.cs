@@ -160,6 +160,31 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     }
 
     /// <inheritdoc/>
+    public bool TryChoose(string entryArgument, out IReadOnlyList<AnsweringItem> items, out CredentialFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(entryArgument);
+
+        items = [];
+
+        if (!TryReadEntries(out var entries, out failure))
+        {
+            return false;
+        }
+
+        List<VaultEntry> named = EntryHandle.LooksLikeHandle(entryArgument)
+            ? [.. entries.Where(entry => string.Equals(EntryHandle.For(EntryName.Of(entry)), entryArgument, StringComparison.Ordinal))]
+            : [];
+
+        if (named.Count == 0)
+        {
+            named = [.. entries.Where(entry => string.Equals(entry.Path, entryArgument, StringComparison.Ordinal))];
+        }
+
+        items = [.. named.Where(entry => entry.Uuid is not null).Select(entry => new AnsweringItem(EntryName.Of(entry) with { Uuid = entry.Uuid }, entry.Username, entry.Url))];
+        return true;
+    }
+
+    /// <inheritdoc/>
     public bool TryRead(
         EntryName name,
         string field,
@@ -186,11 +211,13 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
 
         // Looked up by name rather than carried over from TryResolve, because the vault can be
         // edited while the human is deciding, and the entry they approved is the one identified by
-        // name — not a position in a list read before they answered.
+        // name — not a position in a list read before they answered. One the person picked from several
+        // is the item with its UUID, and only while it still has the name they saw.
         var entry = Single(
             entries,
             candidate => string.Equals(candidate.GroupPath, name.GroupPath, StringComparison.Ordinal)
-                && string.Equals(candidate.Title, name.Title, StringComparison.Ordinal),
+                && string.Equals(candidate.Title, name.Title, StringComparison.Ordinal)
+                && (name.Uuid is null || string.Equals(candidate.Uuid, name.Uuid, StringComparison.Ordinal)),
             out failure);
 
         if (entry is null)

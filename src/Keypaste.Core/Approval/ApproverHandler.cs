@@ -248,17 +248,38 @@ public sealed class ApproverHandler
 
         if (!_source.TryResolve(request.Entry, out var name, out var failure))
         {
-            // A name that resolves to nothing and one outside what the agent sees get the same answer:
-            // telling them apart would let an agent enumerate entries in parts of the vault it was
-            // never allowed to see (THREATS.md T-4). The audit line's reason still records which.
-            return failure switch
+            if (failure == CredentialFailure.Ambiguous && _source.TryChoose(request.Entry, out var items, out failure))
             {
-                CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
-                _ when IsStale(failure) => Refused(AuditMethod.VaultChanged, Stale(failure, "a request")),
-                _ => Refused(AuditMethod.OutOfScope, Explain(failure)),
-            };
+                return await PickAsync(request, access, exposure, items, cancellationToken).ConfigureAwait(false);
+            }
+
+            return Unresolved(failure);
         }
 
+        return await DecideAsync(request, access, exposure, name, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>A request that named no single item refused, saying why.</summary>
+    /// <remarks>
+    /// A name that resolves to nothing and one outside what the agent sees get the same answer:
+    /// telling them apart would let an agent enumerate entries in parts of the vault it was
+    /// never allowed to see (THREATS.md T-4). The audit line's reason still records which.
+    /// </remarks>
+    private CredentialReply Unresolved(CredentialFailure failure) => failure switch
+    {
+        CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
+        _ when IsStale(failure) => Refused(AuditMethod.VaultChanged, Stale(failure, "a request")),
+        _ => Refused(AuditMethod.OutOfScope, Explain(failure)),
+    };
+
+    /// <summary>Decides a request one item answers to, from the re-check of what the agent can see on.</summary>
+    private async ValueTask<CredentialReply> DecideAsync(
+        CredentialRequest request,
+        EffectiveAccess access,
+        EntryExposure exposure,
+        EntryName name,
+        CancellationToken cancellationToken)
+    {
         // The re-check that makes handles safe. The bridge can test a path against its globs
         // before forwarding, but it cannot resolve a handle or read a tag without the vault, so
         // without this a handle would be the way around what the agent may see.
@@ -279,6 +300,7 @@ public sealed class ApproverHandler
         var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), request.Field);
         var isProtected = _requiresLiveApproval(name);
         var item = access.Item(tags, _clock.GetUtcNow());
+        var itemId = _source.ItemId(name);
 
         // Before Automatic and Always allow, not after. A person who refused this exact request a moment
         // ago has said something more specific and more recent than any setting, and a setting must
@@ -295,6 +317,7 @@ public sealed class ApproverHandler
             return Unasked(
                 request,
                 name,
+                itemId,
                 display,
                 cooldownKey,
                 access.Label!,
@@ -308,13 +331,13 @@ public sealed class ApproverHandler
 
         // Where it is Automatic and still reached here, its hourly limit is spent; no row bypasses that.
         var limitReached = item.LimitReached || item.Mode >= AgentMode.Automatic;
-        var itemId = _source.ItemId(name);
 
         if (!isProtected && !limitReached && itemId is not null && access.AlwaysAllows(itemId))
         {
             return Unasked(
                 request,
                 name,
+                itemId,
                 display,
                 cooldownKey,
                 access.Label!,
@@ -329,16 +352,108 @@ public sealed class ApproverHandler
         {
             OnceOnly = isProtected ? OnceOnly.ProtectedProfile : limitReached ? OnceOnly.LimitReached : offer is null ? OnceOnly.Unnamed : OnceOnly.None,
             Always = offer,
+            Item = itemId,
         };
 
         var (answer, kept) = await _gate.AskKeepingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
 
+        return Kept(() => Answered(request, name, itemId, display, cooldownKey, prompt, answer, "a person approved this one request", cancellationToken), kept);
+    }
+
+    /// <summary>
+    /// Asks the person to pick which of the items an agent's request names it gets, when more than one it can see does:
+    /// the agent did not name one item, so nothing is released unasked, whatever its mode or a row says of any of them.
+    /// </summary>
+    /// <remarks>
+    /// Only the items the agent can see are offered, so one it cannot see is never shown to be there; when that leaves one,
+    /// the request is decided as one naming it. Exactly the picked item's field is read, by its UUID, once the person allows it.
+    /// </remarks>
+    private async ValueTask<CredentialReply> PickAsync(
+        CredentialRequest request,
+        EffectiveAccess access,
+        EntryExposure exposure,
+        IReadOnlyList<AnsweringItem> items,
+        CancellationToken cancellationToken)
+    {
+        var now = _clock.GetUtcNow();
+        List<(AnsweringItem Item, IReadOnlyList<string> Tags)> seen =
+        [
+            .. items
+                .Select(item => (Item: item, Tags: _source.Tags(item.Name)))
+                .Where(item => access.Reach(exposure, item.Item.Name, item.Tags) is var reach && reach != ExposureReach.None && EntryExposure.Permits(reach, request.Field)),
+        ];
+
+        switch (seen.Count)
+        {
+            case 0:
+                return Refused(AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge");
+            case 1:
+                return await DecideAsync(request, access, exposure, seen[0].Item.Name, cancellationToken).ConfigureAwait(false);
+            case > ApprovalPrompt.MaximumCandidates:
+                return Refused(AuditMethod.OutOfScope, $"more than {ApprovalPrompt.MaximumCandidates} items this agent can see answer to that name, too many to pick from; a person can rename or move some");
+        }
+
+        var shared = seen[0].Item.Name;
+        var display = ApprovalPrompt.Shown(shared);
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), request.Field);
+
+        if (_gate.IsInCooldown(cooldownKey))
+        {
+            _narrate?.Invoke($"refused {display}: {Explain(ApprovalAnswer.Cooldown)}");
+            return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
+        }
+
+        List<ItemCandidate> candidates = [.. seen.Select(item => Candidate(access, item.Item, item.Tags, now))];
+        var prompt = ApprovalPrompt.For(request.ClientName, shared, request.Field, request.Reason, request.ClientLabel) with { Candidates = candidates };
+        var (pick, kept) = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
+        var picked = pick.Picked is { } index ? candidates[index] : null;
+
+        return Kept(
+            () => Answered(
+                request,
+                picked?.Name ?? shared,
+                picked?.Item,
+                display,
+                cooldownKey,
+                prompt with { Always = picked?.Always },
+                pick.Answer,
+                "a person picked this item and approved this one request",
+                cancellationToken),
+            kept);
+    }
+
+    /// <summary>One item on a picker, with what Always allow would cover were it picked, on the terms a prompt naming it alone offers it.</summary>
+    private ItemCandidate Candidate(EffectiveAccess access, AnsweringItem answering, IReadOnlyList<string> tags, DateTimeOffset now)
+    {
+        var name = answering.Name;
+        var item = access.Item(tags, now);
+        var itemId = name.Uuid!;
+        var once = _requiresLiveApproval(name) ? OnceOnly.ProtectedProfile
+            : item.LimitReached ? OnceOnly.LimitReached
+            : item.Mode >= AgentMode.Automatic ? OnceOnly.Automatic
+            : OnceOnly.None;
+        var offer = once == OnceOnly.None ? Offer(access, itemId, tags, ApprovalPrompt.Shown(name)) : null;
+
+        return new ItemCandidate
+        {
+            Name = name,
+            Item = itemId,
+            Title = EntryNameSanitizer.Sanitize(name.Title).Text,
+            Group = EntryNameSanitizer.SanitizePath(name.GroupPath).Text,
+            Username = DisplayTextSanitizer.Sanitize(answering.Username).Text,
+            Url = DisplayTextSanitizer.Sanitize(answering.Url).Text,
+            OnceOnly = once == OnceOnly.None && offer is null ? OnceOnly.Unnamed : once,
+            Always = offer,
+        };
+    }
+
+    /// <summary>A prompted reply, carrying the slot the gate kept when the person chose Always allow, so its confirmation follows with no other request in front of them.</summary>
+    private static CredentialReply Kept(Func<CredentialReply> answered, KeptSlot? kept)
+    {
         try
         {
-            var reply = Answered(request, name, display, cooldownKey, prompt, answer, cancellationToken);
+            var reply = answered();
 
-            // Always allow's release goes with the slot the gate kept, so its confirmation follows with
-            // no other request in front of the person between them.
             if (reply.Always is null)
             {
                 return reply;
@@ -354,14 +469,17 @@ public sealed class ApproverHandler
         }
     }
 
+
     /// <summary>A prompted request once the person has answered.</summary>
     private CredentialReply Answered(
         CredentialRequest request,
         EntryName name,
+        string? itemId,
         string display,
         string cooldownKey,
         ApprovalPrompt prompt,
         ApprovalAnswer answer,
+        string approved,
         CancellationToken cancellationToken)
     {
         var always = answer == ApprovalAnswer.Always ? prompt.Always : null;
@@ -376,18 +494,18 @@ public sealed class ApproverHandler
         if (!answer.Releases())
         {
             _narrate?.Invoke($"refused {display} for {prompt.Client}: {Explain(answer)}");
-            return Refused(answer.ToAuditMethod(), Explain(answer), display);
+            return Refused(answer.ToAuditMethod(), Explain(answer), display) with { Item = itemId };
         }
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
         {
-            return withdrawn;
+            return withdrawn with { Item = itemId };
         }
 
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, prompt.Client);
+            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, prompt.Client) with { Item = itemId };
         }
 
         using (released)
@@ -397,8 +515,9 @@ public sealed class ApproverHandler
                 {
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Prompt,
-                    Reason = "a person approved this one request",
+                    Reason = approved,
                     Entry = display,
+                    Item = itemId,
                     CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
                     Value = released.Value.ToString(),
                     Always = always,
@@ -418,6 +537,7 @@ public sealed class ApproverHandler
     private CredentialReply Unasked(
         CredentialRequest request,
         EntryName name,
+        string? itemId,
         string display,
         string cooldownKey,
         string agent,
@@ -449,6 +569,7 @@ public sealed class ApproverHandler
                     Method = method,
                     Reason = why(shown),
                     Entry = display,
+                    Item = itemId,
                     CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
                     Value = released.Value.ToString(),
                 },

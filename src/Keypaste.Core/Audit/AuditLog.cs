@@ -563,6 +563,7 @@ public sealed class AuditLog : IDisposable
                 writer.WriteString("entry_kind", Wire(kind));
             }
 
+            WriteOptional(writer, "item", args.Item);
             WriteOptional(writer, "field", args.Field);
             if (withReasonExcerpt)
             {

@@ -537,7 +537,6 @@ public static class Strings
     public static string ShareALink => Manager.GetString("ShareALink", CultureInfo.CurrentUICulture)!;
     public static string ShareLinks => Manager.GetString("ShareLinks", CultureInfo.CurrentUICulture)!;
     public static string SharedNameActivity => Manager.GetString("SharedNameActivity", CultureInfo.CurrentUICulture)!;
-    public static string SharedNameLastUsedTip => Manager.GetString("SharedNameLastUsedTip", CultureInfo.CurrentUICulture)!;
     public static string SharedNameNothingTells => Manager.GetString("SharedNameNothingTells", CultureInfo.CurrentUICulture)!;
     public static string ShowAll => Manager.GetString("ShowAll", CultureInfo.CurrentUICulture)!;
     public static string ShowGroupsAndProjects => Manager.GetString("ShowGroupsAndProjects", CultureInfo.CurrentUICulture)!;

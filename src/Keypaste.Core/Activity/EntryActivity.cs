@@ -56,7 +56,9 @@ public sealed class EntryActivity
 
     private readonly DateTimeOffset _now;
     private readonly Dictionary<string, Dictionary<string, ClientAccess>> _released = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, ClientAccess>> _releasedItems = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _waitingItems = new(StringComparer.Ordinal);
     private readonly ApproverActivity _live;
     private readonly IReadOnlyList<AgentReach> _reach;
 
@@ -109,19 +111,30 @@ public sealed class EntryActivity
 
             foreach (var named in entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [])
             {
-                activity.Released(Key(named), client, how, at, counted: true);
+                Released(activity._released, Key(named), client, how, at, counted: true);
+            }
+
+            if (entry.Item.Length > 0)
+            {
+                Released(activity._releasedItems, entry.Item, client, how, at, counted: true);
             }
         }
 
         // Every other release the ledger holds is also an audit line: it moves the time, not the count.
         foreach (var seen in session)
         {
-            activity.Released(Key(seen.Entry), seen.Client, seen.How, seen.At, counted: seen.How == "run --session");
+            Released(activity._released, Key(seen.Entry), seen.Client, seen.How, seen.At, counted: seen.How == "run --session");
+
+            if (seen.Item is { } item)
+            {
+                Released(activity._releasedItems, item, seen.Client, seen.How, seen.At, counted: false);
+            }
         }
 
         foreach (var waiting in live.Waiting)
         {
             activity._waiting.Add(Key(waiting.Prompt.Entry));
+            activity._waitingItems.UnionWith(waiting.Prompt.Item is { } item ? [item] : waiting.Prompt.Candidates.Select(candidate => candidate.Item));
         }
 
         foreach (var run in live.WaitingRuns)
@@ -149,15 +162,19 @@ public sealed class EntryActivity
 
     /// <summary>An entry's state and last use.</summary>
     /// <param name="entry">The entry.</param>
+    /// <param name="byItem">
+    /// Whether to read only what names the entry's own UUID, for an item another shares its name with, whose name alone
+    /// cannot say which of them an agent received.
+    /// </param>
     /// <returns>In use, recent or idle.</returns>
-    public EntryUse Use(EntryName entry)
+    public EntryUse Use(EntryName entry, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var key = KeyOf(entry);
-        DateTimeOffset? last = _released.TryGetValue(key, out var clients) ? clients.Values.Max(access => access.LastAt) : null;
+        var (released, waiting) = Recorded(entry, byItem);
+        DateTimeOffset? last = released is { } clients ? clients.Values.Max(access => access.LastAt) : null;
 
-        var state = InUse(entry, key)
+        var state = waiting
             ? EntryUseState.InUse
             : last is { } at && _now - at <= RecentWindow ? EntryUseState.Recent : EntryUseState.Idle;
 
@@ -170,8 +187,9 @@ public sealed class EntryActivity
     /// </summary>
     /// <param name="entry">The entry.</param>
     /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern reads.</param>
+    /// <param name="byItem">Whether to read only what names the entry's own UUID, as <see cref="Use"/> does.</param>
     /// <returns>Whether the Agent access card belongs on its pane.</returns>
-    public bool AgentsCanSee(EntryName entry, IReadOnlyList<string> tags)
+    public bool AgentsCanSee(EntryName entry, IReadOnlyList<string> tags, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tags);
@@ -181,7 +199,7 @@ public sealed class EntryActivity
             return true;
         }
 
-        var access = Access(entry);
+        var access = Access(entry, byItem);
         return access.Clients.Count > 0 || access.Waiting;
     }
 
@@ -203,32 +221,41 @@ public sealed class EntryActivity
 
     /// <summary>What the Agent access card shows for an entry.</summary>
     /// <param name="entry">The entry.</param>
+    /// <param name="byItem">Whether to read only what names the entry's own UUID, as <see cref="Use"/> does.</param>
     /// <returns>Its use, its clients newest first and whether a request waits on it.</returns>
-    public EntryAgentAccess Access(EntryName entry)
+    public EntryAgentAccess Access(EntryName entry, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var key = KeyOf(entry);
-        var handle = EntryHandle.For(entry);
+        var (released, waiting) = Recorded(entry, byItem);
 
-        IReadOnlyList<ClientAccess> clients = _released.TryGetValue(key, out var byClient)
+        IReadOnlyList<ClientAccess> clients = released is { } byClient
             ? [.. byClient.Values.OrderByDescending(access => access.LastAt).ThenBy(access => access.Client, StringComparer.Ordinal)]
             : [];
 
-        return new EntryAgentAccess(Use(entry), clients, _waiting.Contains(key));
+        return new EntryAgentAccess(Use(entry, byItem), clients, waiting);
     }
 
-    private bool InUse(EntryName entry, string key)
+    /// <summary>What is recorded of an entry, by its name or by its UUID, and whether a waiting request names it.</summary>
+    private (Dictionary<string, ClientAccess>? Released, bool Waiting) Recorded(EntryName entry, bool byItem)
     {
-        return _waiting.Contains(key);
+        if (byItem)
+        {
+            return entry.Uuid is { } item
+                ? (_releasedItems.GetValueOrDefault(item), _waitingItems.Contains(item))
+                : (null, false);
+        }
+
+        var key = KeyOf(entry);
+        return (_released.GetValueOrDefault(key), _waiting.Contains(key));
     }
 
-    private void Released(string key, string client, string how, DateTimeOffset at, bool counted)
+    private static void Released(Dictionary<string, Dictionary<string, ClientAccess>> released, string key, string client, string how, DateTimeOffset at, bool counted)
     {
-        if (!_released.TryGetValue(key, out var byClient))
+        if (!released.TryGetValue(key, out var byClient))
         {
             byClient = new Dictionary<string, ClientAccess>(StringComparer.Ordinal);
-            _released[key] = byClient;
+            released[key] = byClient;
         }
 
         byClient[client] = byClient.TryGetValue(client, out var known)
