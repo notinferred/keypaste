@@ -124,7 +124,7 @@ internal static class Program
         "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
         "             unsaved-edit <entry-path> <password>, unsaved-move <entry-path> <group-path>, unsaved-delete <entry-path>,\n" +
         "             unsaved-rename <group-path> <name>, write-open <file>, and with the app's own\n" +
-        "             prompt: approve, once, always, allow, deny, close, show-prompt; activity;\n" +
+        "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
@@ -1407,7 +1407,7 @@ internal sealed class Driver(string home)
                     await agents.ChangeAsync(label, change).ConfigureAwait(true);
                     break;
 
-                case [("approve" or "once" or "always" or "allow" or "deny" or "close") and var answer]:
+                case [("once" or "always" or "allow" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;

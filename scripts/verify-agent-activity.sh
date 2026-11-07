@@ -173,7 +173,7 @@ RAISED="$(grep '^prompt raised ' "$HOLD_OUT" | tail -1)"
 activity
 shows "^waiting n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password " "the request still waiting after Show the prompt"
 
-echo approve >&7
+echo once >&7
 reply 3
 released 3
 grep -q "$SECRET" "$OUT" || die "the approved reply does not carry the credential"
@@ -186,14 +186,14 @@ shows "^history .*DEPLOY_KEY.*Approved" "the prompted release from the audit fil
 # ------------------------------------------------------------ the next request is asked again
 ask 4
 wait_for '^prompt client' "$HOLD_OUT" 2
-echo approve >&7
+echo once >&7
 reply 4
 released 4
 last_audit '.method == "prompt" and .decision == "granted"'
 
 ask 5
 wait_for '^prompt client' "$HOLD_OUT" 3
-echo approve >&7
+echo once >&7
 reply 5
 released 5
 

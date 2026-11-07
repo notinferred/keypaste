@@ -599,7 +599,7 @@ tail -n 1 "$audit" | jq -e '.decision == "granted" and .method == "prompt" and .
   || die "the app's release was not audited with its field as allowed once: $(tail -n 1 "$audit")"
 
 app_prompt again OPENAI_API_KEY
-echo approve >&7
+echo once >&7
 app_reply 3
 withdrawn
 jq -e --arg v "$api_key" 'select(.id == 3) | .result.structuredContent.value == $v' <"$bridge_out" >/dev/null \

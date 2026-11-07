@@ -179,7 +179,7 @@ raise_prompt approve
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
   | grep -qF "label=$LABEL entry=$ENTRY field=password for=once or always" \
   || die "the prompt does not show the label, entry, field and what the person can allow"
-echo approve >&7
+echo once >&7
 answered 30
 withdrawn
 jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Approve did not release the credential"
@@ -207,7 +207,7 @@ tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" \
 # Allowed once more on one connection, the password still draws a prompt of its own, and a field that
 # never leaves is refused by the bridge with no prompt at all.
 raise_prompt field-again OPENAI_API_KEY "$API_ENTRY" 'api/**'
-echo approve >&7
+echo once >&7
 reply_to 3
 withdrawn
 jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.structuredContent.value == $v' <"$OUT" >/dev/null \

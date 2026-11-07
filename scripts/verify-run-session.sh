@@ -162,7 +162,7 @@ case "$PROMPT_LINE" in
   "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/ci/.env,env/ci/.env") ;;
   *) die "the prompt does not name the project, the command, the directory, the variable names and their entries: $PROMPT_LINE" ;;
 esac
-echo approve >&7
+echo once >&7
 withdrawn
 released "Approve in the app"
 grep -qE "$DEPLOY|$DATABASE" "$HOLD_OUT" && die "a value reached the app's output"

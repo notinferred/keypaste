@@ -292,7 +292,9 @@ public sealed class ContextMenuTests
         agents.Model.DisconnectCommand.Press(claude);
         await agents.Model.Opening;
         WindowInput.Drain();
-        var whilePaneIsOpen = RightClick(agents.Window, card);
+
+        // On its name, since the middle of an open card is one of the pane's own controls.
+        var whilePaneIsOpen = RightClick(agents.Window, card.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == claude.Title));
         Assert.False(Item(whilePaneIsOpen, "Disconnect…").IsEffectivelyEnabled);
         whilePaneIsOpen.Hide();
     });
