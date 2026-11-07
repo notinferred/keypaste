@@ -210,12 +210,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     internal void Refresh() => Read(force: true);
 
     /// <summary>The status as the screen says it, with no agent Automatic.</summary>
-    internal static string Describe(AuthorityStatus status) => Describe(status, []);
+    internal static string Describe(AuthorityStatus status) => Describe(status, [], []);
 
     /// <summary>The status as the screen says it.</summary>
     /// <param name="status">Who answers agents.</param>
     /// <param name="automatic">Each agent released to without asking now, with where, as <see cref="AutomaticAgents.Named"/> names it.</param>
-    internal static string Describe(AuthorityStatus status, IReadOnlyList<string> automatic) => status switch
+    /// <param name="alwaysAllowed">Each agent with rows the person chose Always allow on, as <see cref="AutomaticAgents.AlwaysAllowed"/> names it.</param>
+    internal static string Describe(AuthorityStatus status, IReadOnlyList<string> automatic, IReadOnlyList<string> alwaysAllowed) => status switch
     {
         AuthorityStatus.Serving serving =>
             string.Create(
@@ -223,9 +224,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
                 $"This app (process {serving.Owner.ProcessId}, unlock {serving.Session}) holds this vault for agents while it is unlocked. ")
             + "AI tools connected to this vault reach it here and can list the item names they are allowed to see. "
             + "Each credential request is asked about in a prompt window, and nothing is released unless you allow it, "
-            + (automatic.Count == 0
-                ? "or you set that agent to Automatic for it in its settings."
-                : $"except what these agents are Automatic for: {string.Join("; ", automatic)}."),
+            + (automatic.Count, alwaysAllowed.Count) switch
+            {
+                (0, 0) => "or you set that agent to Automatic for it in its settings.",
+                (_, 0) => $"except what these agents are Automatic for: {string.Join("; ", automatic)}.",
+                (0, _) => $"except what you always allowed for these agents: {string.Join("; ", alwaysAllowed)}.",
+                _ => $"except what these agents are Automatic for: {string.Join("; ", automatic)}, and what you always allowed for these agents: {string.Join("; ", alwaysAllowed)}.",
+            },
         AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason.TrimEnd('.')}. Lock and unlock the vault to try again.",
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now. Lock and unlock the vault to try again.",
@@ -303,7 +308,11 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(HasUnnamedAgentsNote));
 
         // With clients.toml unreadable every agent request is refused, so nobody is answered without asking.
-        var said = Describe(status, status is AuthorityStatus.Serving && caps is not null ? AutomaticAgents.Named(records, caps, _clock.GetUtcNow()) : []);
+        var answersUnasked = status is AuthorityStatus.Serving && caps is not null;
+        var said = Describe(
+            status,
+            answersUnasked ? AutomaticAgents.Named(records, caps!, _clock.GetUtcNow()) : [],
+            answersUnasked ? AutomaticAgents.AlwaysAllowed(records) : []);
         Status = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
             ? $"{said} {Unrecorded(unopened)}"
             : said;

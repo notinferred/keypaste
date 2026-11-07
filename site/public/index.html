@@ -208,7 +208,7 @@ keypaste: an agent is asking for a credential.
 [d] deny  [o] once  [a] always  45s ›
 </pre>
         </div>
-        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
+        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back. That does not erase the client's copies or revoke the credential later. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
       </figure>
     </div>
   </div>
@@ -253,7 +253,7 @@ keypaste run dev -- npm start</pre>
       <figure class="demo">
         <img src="/demo/keypaste-demo.gif" width="960" height="734" loading="lazy"
              alt="An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.">
-        <figcaption>Rendered from the source's output for the next release before its prompt offered Always for, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
+        <figcaption>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
       </figure>
     </div>
   </section>

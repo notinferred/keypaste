@@ -52,7 +52,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 ![An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.](docs/demo/keypaste-demo.gif)
 
-<sub>Rendered from the source's output for the next release before its prompt offered Always for, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
+<sub>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
 
 ```
 ────────────────────────────────────────────────────────────
@@ -298,9 +298,9 @@ In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns gr
 
 A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a setting you confirmed that makes that agent Automatic for the entry. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
 
-An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. Matching requests can reuse a live approval. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
+An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. In `v0.3.0` matching requests can reuse a live approval; in source each is asked again unless you chose Always allow on it. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
 
-The TTL expires keypaste's cached approval. It does not erase the client's copies or revoke the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
+`v0.3.0`'s TTL expires its cached approval, and in source removing an Always allow row stops later releases. Neither erases the client's copies or revokes the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
 
 In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose` globs in your client configuration widen it. In 0.5.0 an agent sees every project's variables, the custom fields named like environment variables on entries tagged into a project, until you change its settings, and an `--expose` in the client configuration can only narrow that.
 
@@ -315,7 +315,7 @@ keypaste clients
 keypaste clients claude-code --project billing:dev --mode automatic --per-hour 20
 ```
 
-The app's Agents screen sets the same things, and its prompt's Always for button makes an item's environment Automatic after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1](https://keypaste.com/acaf/v1/), a published format other KeePass apps can read.
+The app's Agents screen sets the same things, and its prompt's Always allow button keeps answering that item or command, or makes an item's one environment Automatic, after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1.2](https://keypaste.com/acaf/v1.2/), a published format other KeePass apps can read.
 
 ### Seeing what happened
 

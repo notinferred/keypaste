@@ -361,7 +361,8 @@ public sealed record AccessListRequest
 /// How many project rows <paramref name="Record"/> leaves out because the whole record would not fit one
 /// reply; none for a whole record.
 /// </param>
-public sealed record AccessRow(string Name, string Record, bool Understood, int ProjectsNotShown = 0);
+/// <param name="AlwaysNotShown">How many Always allow rows it leaves out for the same reason, which still release; none for a whole record.</param>
+public sealed record AccessRow(string Name, string Record, bool Understood, int ProjectsNotShown = 0, int AlwaysNotShown = 0);
 
 /// <summary>The agents' settings the vault holds, or why none were listed.</summary>
 /// <param name="Answered">Whether the owner admitted the request at all.</param>
@@ -436,7 +437,7 @@ public sealed record AccessChangeReply(AuditDecision Decision, AuditMethod Metho
     /// Why the change does not apply on this computer as asked, in keypaste's own words: what refused it,
     /// or what keeps a change the person confirmed from applying here; null when it applies. Never sent.
     /// </summary>
-    internal string? Unapplied { get; init; }
+    public string? Unapplied { get; init; }
 
     /// <summary>Where a reset set an unreadable <c>clients.toml</c> aside; null for every other change. Never sent.</summary>
     public string? Kept { get; init; }

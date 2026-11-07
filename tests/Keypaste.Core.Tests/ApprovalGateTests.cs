@@ -34,9 +34,9 @@ public sealed class ApprovalGateTests
     }
 
     /// <summary>
-    /// Always for keeps the one slot for the confirmation that follows it: nothing else is put in front of
+    /// Always allow keeps the one slot for the confirmation that follows it: nothing else is put in front of
     /// the person between them, the confirmation is asked in it, and only giving it back frees it. A
-    /// prompt that offered no Always for keeps nothing.
+    /// prompt that offered no Always allow keeps nothing.
     /// </summary>
     [Fact]
     public async Task AlwaysFor_KeepsTheSlotForItsConfirmation_UntilItIsGivenBack()

@@ -67,7 +67,7 @@ internal sealed class PromptScreen : IDisposable
     }
 
     /// <summary>
-    /// Answers the prompt on screen: <c>approve</c> (the timed allow), <c>once</c>, <c>always</c> (Always for),
+    /// Answers the prompt on screen: <c>once</c>, <c>always</c> (Always allow),
     /// <c>allow</c> (a change's confirmation), <c>deny</c> or <c>close</c>.
     /// </summary>
     internal Task AnswerAsync(string answer) =>
@@ -78,10 +78,10 @@ internal sealed class PromptScreen : IDisposable
 
                 switch (answer)
                 {
-                    case "approve" or "once" or "always" or "allow":
+                    case "once" or "always" or "allow":
                         var allow = Button(window, answer switch
                         {
-                            "approve" or "once" => "AllowOnce",
+                            "once" => "AllowOnce",
                             "always" => "AlwaysAllow",
                             _ => "Allow",
                         });
@@ -180,7 +180,7 @@ internal sealed class PromptScreen : IDisposable
                 $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={(window.FindControl<Button>("AlwaysAllow")?.IsVisible == true ? "once or always" : Text(window, "LifetimeText"))} " +
                 $"always={(window.FindControl<Button>("AlwaysAllow")?.IsVisible == true ? Text(window, "AlwaysCaptionText") : "none")}",
         });
 

@@ -36,8 +36,6 @@ public sealed record SessionServerOptions
     /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
     public required Func<AuditLog?> Audit { get; init; }
 
-
-
     /// <summary>What <c>keypaste lock</c> runs, or null to refuse it.</summary>
     public Action? LockNow { get; init; }
 

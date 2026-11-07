@@ -607,6 +607,15 @@ public sealed class ApproverHandler
             return Changed(AuditDecision.Denied, AuditMethod.Failed, Unusable(problem));
         }
 
+        // Said, not Access: a record read only beneath the defaults still holds its rows, and removing one is still a removal.
+        if (edit.Forgets is { } forgetting && !records.Own.Any(record => record.Said.Always.Holds(forgetting)))
+        {
+            return Changed(
+                AuditDecision.Denied,
+                AuditMethod.InvalidRequest,
+                $"{EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text} has no always-allowed row named {forgetting}, so nothing was removed; keypaste clients lists each row's name");
+        }
+
         var current = EffectiveAccess.Create(agent, records, caps);
         var writable = _settings.TryPreview(agent, edit, out var preview, out var refusal);
         var written = preview ?? Unwritten(agent, records, edit);
@@ -824,6 +833,20 @@ public sealed class ApproverHandler
         {
             narrate?.Invoke($"did not change {agent}'s settings: {unkept}; {saved.Reason}");
             return Changed(AuditDecision.Denied, MethodOf(saved), $"{unkept}, and the vault was not saved: {saved.Reason}");
+        }
+
+        // Only the vault holds a row, and this computer's ceilings cannot take one away, so what lowered them is not the removal.
+        if (!saved.Holds && (edit.Forgets is not null || (edit.Reset && edit.Project is null && records.Own.Any(record => !record.Said.Always.IsEmpty))))
+        {
+            var unsaved = $"the vault was not saved: {saved.Reason}";
+            narrate?.Invoke($"did not remove what {agent} is always allowed: {unsaved}");
+
+            return Changed(
+                AuditDecision.Denied,
+                MethodOf(saved),
+                edit.Forgets is not null
+                    ? $"{unsaved}, so the row still releases"
+                    : $"this computer's limits were lowered, but {unsaved}, so what is always allowed for it still releases");
         }
 
         _narrate?.Invoke($"changed {agent}'s settings: {OnThisClock(edit)}");

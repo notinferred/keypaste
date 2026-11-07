@@ -320,7 +320,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     /// <remarks>Its colours, when stderr shows any, are the same escapes on every redraw, so the width stays one.</remarks>
     private string Choice(AlwaysOffer? always, int secondsLeft) =>
         _console.Paint(Tone.Accent, "[d] deny  [o] once  ")
-        + (always is not null ? _console.Paint(Tone.Ok, "[a] always") + "  " : string.Empty)
+        + (always is not null ? _console.Paint(Tone.Accent, "[a] always  ") : string.Empty)
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";
 
@@ -445,10 +445,29 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     /// <summary>Why a prompt offers no Always allow, on a line of its own.</summary>
     private static string OnceOnlyLine(OnceOnly onceOnly) => onceOnly switch
     {
-        OnceOnly.LimitReached => "  this agent's Automatic limit was reached: once only, so the limit you set still holds.",
-        OnceOnly.Unnamed => "  this agent's connection has no name, so keypaste has nowhere to keep an always: once only.",
+        OnceOnly.LimitReached => "  this agent's Automatic limit was reached: once only, so that limit holds.",
+        OnceOnly.Unnamed => string.Join(Environment.NewLine, Wrapped(ApprovalPrompt.UnnamedText, "  ")),
         _ => "  this item is in a protected environment: it is asked about every time.",
     };
+
+    /// <summary>Text cut at spaces to fit the terminal's 80 columns, every line indented; a word longer than that keeps its own line.</summary>
+    private static IEnumerable<string> Wrapped(string text, string indent)
+    {
+        var line = indent;
+
+        foreach (var word in text.Split(' '))
+        {
+            if (line.Length > indent.Length && line.Length + 1 + word.Length > 80)
+            {
+                yield return line;
+                line = indent;
+            }
+
+            line += line.Length > indent.Length ? $" {word}" : word;
+        }
+
+        yield return line;
+    }
 
     /// <summary>The agent as both prompts name it: the client it says it is, then the label its bridge was started with.</summary>
     private static string Named(string client, string? label) => label is { } shown ? $"{client} ({shown})" : client;
@@ -467,6 +486,16 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         ];
 
         lines.AddRange(request.Gains.Select((gain, index) => (index == 0 ? "  gains    " : "           ") + gain));
+
+        if (request.AnswersCommand)
+        {
+            lines.AddRange(Wrapped(AccessChangePrompt.CommandCautionText, "           "));
+        }
+
+        if (request.Undo is { } undo)
+        {
+            lines.Add($"  undo     keypaste clients {request.Agent} {undo}");
+        }
 
         if (request.Reason.Length > 0)
         {
@@ -592,9 +621,10 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         }
 
         lines.Add(request.Always is not null
-            ? $"  [a] allows this once, then asks you to let {request.Label ?? request.Client} run exactly this command here without asking."
-                + Environment.NewLine
-                + "  The command's files can change (scripts, package.json): keypaste approves the command line, not what it does."
+            ? string.Join(Environment.NewLine, Wrapped(
+                $"[a] allows this once, then asks you to let {request.Label ?? request.Client} run exactly this command here without asking. "
+                    + "The command's files can change: keypaste approves the command line, not what it does.",
+                "  "))
             : OnceOnlyLine(request.OnceOnly).Replace("this item is in a protected environment", "this environment is protected", StringComparison.Ordinal));
 
         return string.Join(Environment.NewLine, lines);

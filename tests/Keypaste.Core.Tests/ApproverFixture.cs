@@ -233,7 +233,7 @@ internal sealed class FakeChannel : IApprovalChannel
     /// <summary>Runs while a terminal's edit is on screen, before it is answered.</summary>
     internal Action? WhileEditing { get; set; }
 
-    /// <summary>Every notice that the change Always for asked for did not take effect, in order.</summary>
+    /// <summary>Every notice that the change Always allow asked for did not take effect, in order.</summary>
     internal List<AlwaysNotice> Told { get; } = [];
 
     /// <summary>Completes once a held prompt is up.</summary>

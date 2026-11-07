@@ -66,13 +66,29 @@ public sealed class AccessChangeWindowTests
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
         });
 
+    /// <summary>What a command's Always allow cannot promise is said outside the gains' scrolling box, so a long command never pushes it out of sight (T-35).</summary>
+    [Fact]
+    public Task A_commands_caution_stays_in_sight_outside_the_gains() =>
+        HeadlessSession.On(async () =>
+        {
+            var screen = new Screen();
+            var asking = screen.Ask(Prompt(AccessOrigin.Prompt, string.Empty) with { AnswersCommand = true });
+            var window = await screen.ShownAsync();
+
+            Assert.Contains(AccessChangePrompt.CommandCautionText, Text(window, "ExplainerText"), StringComparison.Ordinal);
+            Assert.Contains("on Agents", Text(window, "ExplainerText"), StringComparison.Ordinal);
+
+            Click(window, "Deny");
+            Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
+        });
+
     /// <summary>
     /// A change with no reason says where the person chose it, or that none was given, in the reason's
     /// box, with no caption calling it the request's reason and no line saying keypaste did not write it.
     /// </summary>
     [Theory]
     [InlineData(AccessOrigin.Settings, "You chose this.")]
-    [InlineData(AccessOrigin.Prompt, "You chose this.")]
+    [InlineData(AccessOrigin.Prompt, "You allowed this request once. Deny keeps it to that one.")]
     [InlineData(AccessOrigin.Terminal, "No reason was given.")]
     public Task A_change_with_no_reason_says_where_it_was_chosen_and_claims_nobody_wrote_it(AccessOrigin origin, string said) =>
         HeadlessSession.On(async () =>

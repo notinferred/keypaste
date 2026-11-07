@@ -173,7 +173,6 @@ internal sealed class FakeApprover : IAsyncDisposable
             writer.WriteNumber("outcome", (int)outcome);
             writer.WriteString("reason", "the fake approver answered");
             writer.WriteNumber("method", (int)method);
-            writer.WriteNumber("granted_seconds", 0);
             writer.WriteStartArray("entries");
             writer.WriteEndArray();
             writer.WriteString("session", "fake-session");

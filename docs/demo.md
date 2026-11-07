@@ -226,7 +226,7 @@ Latest: seq 2, hash d1845344153201c850ac949d108d24d4243931aa38c82f909558910aac78
 
 Every verification reports the limits of the chain: complete recomputation and deletion of final records can escape detection. `--expect <hash>` detects loss of a previously observed record; [Connecting keypaste to Claude](mcp-setup.md) explains its use.
 
-Repeat the credential request on the same MCP connection while its approval remains live and the second release reads `grant-cache (!)` instead of `prompt`. Restarting the client creates a new connection and requires a new approval. That mark means the credential was served from the approval you already gave, under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
+Repeat the credential request and it asks again, since Allow once keeps nothing. Had you chosen Always allow and confirmed it, the second release would read `always-allowed` instead of `prompt`, with `(!)` when its reason differs from the one you read: the credential was released under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
 
 ## When it does not go like this
 

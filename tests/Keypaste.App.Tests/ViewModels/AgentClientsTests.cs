@@ -73,7 +73,7 @@ public sealed class AgentClientsTests
     }
 
     /// <summary>
-    /// The Always for notice opens an agent's settings by name, as its row's Settings does, and still when no
+    /// The Always allow notice opens an agent's settings by name, as its row's Settings does, and still when no
     /// row shows that agent yet, which then gets one; a second open leaves the same settings open.
     /// </summary>
     [Fact]

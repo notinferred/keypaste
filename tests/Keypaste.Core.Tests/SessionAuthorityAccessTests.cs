@@ -12,13 +12,13 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The owner applying each agent's settings, over a real pipe: Automatic releases unasked and on its
-/// own line, an agent given no values is refused before anything resolves, Always for asks before it
+/// own line, an agent given no values is refused before anything resolves, Always allow asks before it
 /// widens anything, <c>*</c> never gives more than the defaults, a spent limit asks, a widening waits
 /// for the person while a narrowing applies at once, <c>clients.toml</c> only ever narrows, and an
 /// agent's own request is about itself and gives its reason; a request for more from an agent or a
 /// terminal, once refused or unanswered, holds back the next from any of them; a change to settings keypaste does not wholly understand is judged by what
 /// the agent could do before and after it; a narrowing the person makes holds wherever it can be
-/// kept, saying where it could not; Always for whose change does not take effect says why once the
+/// kept, saying where it could not; Always allow whose change does not take effect says why once the
 /// release has left; and the person's own changes in the app neither wait on a cooldown nor start one.
 /// </summary>
 public sealed class SessionAuthorityAccessTests : IDisposable
@@ -302,6 +302,56 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Empty(_fixture.Settings.Records[_agent].Always.Items);
     }
 
+    /// <summary>A name no row has is a mistake to say, not a change made: nothing is reported as removed, and nothing is.</summary>
+    [Fact]
+    public async Task AForgetNamingNoRow_IsRefused_AndSaysSo()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.ChangeAccessAsync(Change() with { Forget = "0011aabb" }, Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.InvalidRequest), (reply!.Decision, reply.Method));
+        Assert.Contains("no always-allowed row named 0011aabb", reply.Reason, StringComparison.Ordinal);
+        Assert.Single(_fixture.Settings.Records[_agent].Always.Items);
+    }
+
+    /// <summary>Only the vault holds a row, so a removal it did not save is refused: the row still releases, and the reply says so.</summary>
+    [Fact]
+    public async Task AForgetTheVaultDidNotSave_IsRefused_AndTheRowStillReleases()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        var held = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        _fixture.Settings.Records[_agent] = held;
+        _fixture.Settings.Saving = new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.ChangeAccessAsync(Change() with { Forget = AlwaysAllowed.ItemId(row) }, Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (reply!.Decision, reply.Method));
+        Assert.Contains("the vault was not saved: the disk is full, so the row still releases", reply.Reason, StringComparison.Ordinal);
+        Assert.Equal(held, _fixture.Settings.Records[_agent]);
+    }
+
+    /// <summary>A whole agent's reset the vault did not save lowers this computer's limits, and does not claim to have taken away what those cannot hold.</summary>
+    [Fact]
+    public async Task AResetTheVaultDidNotSave_SaysWhatIsAlwaysAllowedStillReleases()
+    {
+        var row = _fixture.Source.ItemId(_stripe)!;
+        _fixture.Settings.Records[_agent] = ApproverFixture.SeesAll with { Always = new AlwaysAllowed { Items = [row] } };
+        _fixture.Settings.Saving = new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.ChangeAccessAsync(Change() with { Reset = true }, Token);
+
+        Assert.Equal(AuditDecision.Denied, reply!.Decision);
+        Assert.Contains("what is always allowed for it still releases", reply.Reason, StringComparison.Ordinal);
+    }
+
     /// <summary>A limit that is spent asks, once only, rather than refusing.</summary>
     [Fact]
     public async Task ASpentHourlyLimit_AsksInstead()
@@ -321,7 +371,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(AuditMethod.Automatic, (await client.RequestAsync(Credential(), Token))!.Method);
     }
 
-    /// <summary>Always for allows this one request, then asks the person before the environment becomes Automatic, on a line of its own.</summary>
+    /// <summary>Always allow allows this one request, then asks the person before the environment becomes Automatic, on a line of its own.</summary>
     [Fact]
     public async Task AlwaysFor_AllowsOnce_ThenAsksBeforeMakingTheEnvironmentAutomatic()
     {
@@ -364,7 +414,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     }
 
     /// <summary>
-    /// When the change Always for asks for is confirmed and cannot be saved, the release stands once and
+    /// When the change Always allow asks for is confirmed and cannot be saved, the release stands once and
     /// the person is told, where they answered, what was not made Automatic and why, instead of the
     /// operator's terminal saying it on a line of its own.
     /// </summary>
@@ -391,7 +441,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     }
 
     /// <summary>
-    /// Always for keeps the prompt's one slot until its confirmation is answered, so another request
+    /// Always allow keeps the prompt's one slot until its confirmation is answered, so another request
     /// arriving between the two is refused as busy rather than put in front of the person who was just
     /// told to confirm, and the slot is free again once the change is made.
     /// </summary>
@@ -435,7 +485,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     }
 
     /// <summary>
-    /// Always for whose change gives nothing, because the agent's saved settings already make the
+    /// Always allow whose change gives nothing, because the agent's saved settings already make the
     /// environment Automatic but keypaste does not wholly understand them, tells the person why it is still
     /// asked about rather than calling it made.
     /// </summary>
@@ -513,7 +563,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Empty(owner.Authority.Activity.Waiting);
     }
 
-    /// <summary>An Always for answer to a prompt that did not offer it is an answer nobody could have meant: nothing is read or changed.</summary>
+    /// <summary>An Always allow answer to a prompt that did not offer it is an answer nobody could have meant: nothing is read or changed.</summary>
     [Fact]
     public async Task AnAlwaysForAnswer_ToAPromptThatDidNotOfferIt_ReleasesNothing()
     {

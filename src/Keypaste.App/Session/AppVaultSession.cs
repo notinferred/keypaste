@@ -33,8 +33,8 @@ namespace Keypaste.App.Session;
 /// <para>
 /// <b>Every lock ends the unlock's <see cref="SessionLifetime"/> first</b>, before the vault is
 /// disposed, whatever the reason: manual, idle, minimize, an access change, a replaced vault or
-/// shutdown. That one transition is what withdraws requests an agent has waiting and zeroes the
-/// grants they were given (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
+/// shutdown. That one transition is what withdraws requests an agent has waiting
+/// (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
 /// </para>
 /// <para>
 /// <b>Another program's save is merged through the owner serving the unlock</b> (D-0542, D-0622, D-0638). Every write, reload,
@@ -587,7 +587,7 @@ internal sealed class AppVaultSession : IDisposable
         {
             // The vault's ownership transfers to this session, and every route out of it — Lock,
             // Dispose, and a second TryUnlock replacing it — disposes it. CA2000 cannot see a
-            // lifetime that leaves the method. Same shape and same reason as GrantCache.Store.
+            // lifetime that leaves the method.
 #pragma warning disable CA2000
             opened = Vault.Open(path, master, keyfilePath, hardwareKey);
 #pragma warning restore CA2000

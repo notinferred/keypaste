@@ -47,13 +47,15 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.Always), () => IsArmed && OffersAlways && !IsAnswered);
         OnceOnlyText = prompt.OnceOnly switch
         {
-            OnceOnly.None => string.Empty,
-            OnceOnly.Unnamed => "This agent has no name to keep an always under: once only.",
+            OnceOnly.None or OnceOnly.Unnamed => string.Empty,
             _ => "This environment is protected: it is asked about every time.",
         };
-        AlwaysCaption = prompt.Always is not null
-            ? "Always allow covers exactly this command for this agent. It allows this once, then asks you to confirm."
-            : string.Empty;
+        AlwaysCaption = prompt switch
+        {
+            { Always: not null } => "Always allow covers exactly this command for this agent. It allows this once, then asks you to confirm.",
+            { OnceOnly: OnceOnly.Unnamed } => ApprovalPrompt.UnnamedText,
+            _ => string.Empty,
+        };
     }
 
     /// <summary>Allows this run once, then asks the person to confirm the command's Always allow row.</summary>

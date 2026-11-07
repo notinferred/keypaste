@@ -111,6 +111,13 @@ public sealed record AlwaysAllowed
         return text.Length == 8 && text.All(char.IsAsciiHexDigitLower);
     }
 
+    /// <summary>Whether a row has this short name.</summary>
+    /// <param name="id">The short name.</param>
+    /// <returns><see langword="true"/> when an item or a command has it.</returns>
+    public bool Holds(string id) =>
+        Items.Any(item => string.Equals(ItemId(item), id, StringComparison.Ordinal))
+        || Commands.Any(command => string.Equals(command.Id, id, StringComparison.Ordinal));
+
     /// <summary>Whether another holds the same rows, in the same order.</summary>
     /// <param name="other">The other list.</param>
     /// <returns><see langword="true"/> when every row matches.</returns>

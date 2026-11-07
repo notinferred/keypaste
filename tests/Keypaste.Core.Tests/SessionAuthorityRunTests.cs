@@ -3,6 +3,7 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Xunit;
 using static Keypaste.Core.Tests.AgentAccessBuilders;
@@ -133,7 +134,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         Assert.Equal((EnvOutcome.Resolved, AuditMethod.Prompt), (first!.Set.Outcome, first.Method));
         var gain = Assert.Single(_fixture.Channel.LastAccessPrompt!.Gains);
-        Assert.Contains("The command's files can change: keypaste approves this command line, not what it does", gain, StringComparison.Ordinal);
+        Assert.Contains(Program, gain, StringComparison.Ordinal);
+        Assert.Contains("DATABASE_URL from ", gain, StringComparison.Ordinal);
+        Assert.Contains(" · DATABASE_URL", gain, StringComparison.Ordinal);
+        Assert.True(_fixture.Channel.LastAccessPrompt.AnswersCommand);
+        Assert.Contains("keypaste approves this command line, not what it does", AccessChangePrompt.CommandCautionText, StringComparison.Ordinal);
         Assert.Single(_fixture.Settings.Records[_label].Always.Commands);
 
         var asked = _fixture.Channel.Asked;
@@ -224,6 +229,89 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(EnvOutcome.Resolved, reply!.Set.Outcome);
         Assert.Null(_fixture.Channel.LastRunPrompt!.Always);
         Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt.OnceOnly);
+    }
+
+    /// <summary>A protected tag added to an item a command's row already draws on asks again, once only, whatever the row says.</summary>
+    [Fact]
+    public async Task AProtectedTagAddedLater_OutranksACommandsRow()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        await client.ReleaseRunAsync(Run(), Token);
+        Assert.Single(_fixture.Settings.Records[_label].Always.Commands);
+
+        Assert.True(_vault.AddTag(new EntryName("env/acme-api", ".env"), "env:acme-api:prod"));
+        _vault.Save();
+        var asked = _fixture.Channel.Asked;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        var reply = await client.ReleaseRunAsync(Run(), Token);
+
+        Assert.Equal((EnvOutcome.Resolved, AuditMethod.Prompt), (reply!.Set.Outcome, reply.Method));
+        Assert.Equal(asked + 1, _fixture.Channel.Asked);
+        Assert.Null(_fixture.Channel.LastRunPrompt!.Always);
+        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt.OnceOnly);
+    }
+
+    /// <summary>The same command is exact at the owner: another directory, program, set of variables, item or field is another command, and asks.</summary>
+    [Fact]
+    public async Task AnythingDifferent_AsksAtTheOwner()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        await client.ReleaseRunAsync(Run(), Token);
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        Assert.Equal(AuditMethod.AlwaysAllowed, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+
+        var elsewhere = Directory.CreateDirectory(Path.Combine(_directory, "elsewhere")).FullName;
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run() with { Directory = elsewhere }, Token))!.Method);
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run() with { Program = Program + "x" }, Token))!.Method);
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run() with { Keys = ["DATABASE_URL"] }, Token))!.Method);
+
+        // The same name from another item, once the set's variable is rewritten to come from it.
+        var row = Assert.Single(_fixture.Settings.Records[_label].Always.Commands);
+        var moved = new AlwaysCommand(row.Program, row.Command, row.Directory, [.. row.Variables.Select(variable => variable with { Item = new string('0', 32) })]);
+        _fixture.Settings.Records[_label] = _fixture.Settings.Records[_label] with { Always = new AlwaysAllowed { Commands = [moved] } };
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+
+        var refielded = new AlwaysCommand(row.Program, row.Command, row.Directory, [.. row.Variables.Select(variable => variable with { Field = "password" })]);
+        _fixture.Settings.Records[_label] = _fixture.Settings.Records[_label] with { Always = new AlwaysAllowed { Commands = [refielded] } };
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+    }
+
+    /// <summary>A link pointed somewhere else keeps its spelling and is another command: the row binds to what it finally names.</summary>
+    [Fact]
+    public async Task ALinkPointedElsewhere_IsAnotherCommand()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var first = Path.Combine(_directory, "first");
+        var second = Path.Combine(_directory, "second");
+        var link = Path.Combine(_directory, "tool");
+        File.WriteAllText(first, "#!/bin/sh\n");
+        File.WriteAllText(second, "#!/bin/sh\n");
+        File.CreateSymbolicLink(link, first);
+        _fixture.Channel.Answer = ApprovalAnswer.Always;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        await client.ReleaseRunAsync(Run() with { Program = link }, Token);
+        Assert.Equal(RunProgram.FinalTarget(first), Assert.Single(_fixture.Settings.Records[_label].Always.Commands).Program);
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        Assert.Equal(AuditMethod.AlwaysAllowed, (await client.ReleaseRunAsync(Run() with { Program = link }, Token))!.Method);
+
+        File.Delete(link);
+        File.CreateSymbolicLink(link, second);
+
+        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run() with { Program = link }, Token))!.Method);
     }
 
     /// <summary>A refusal still cooling outranks a command's row.</summary>

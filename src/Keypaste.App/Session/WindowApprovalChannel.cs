@@ -10,13 +10,13 @@ namespace Keypaste.App.Session;
 /// Asks the person at this desktop, in a prompt window of its own, whether an agent may have one
 /// field or a <c>keypaste run --session</c> may have a project's variables, and
 /// whether a change that gives an agent more may take effect; and tells them, in a window of its own,
-/// when the change Always for asked for did not.
+/// when the change Always allow asked for did not.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
 /// screen, counts down the gate's window on it and reports the answer. Anything but a press of an
-/// allow, or of Always for where the prompt offers it, is a denial: Deny, Escape, closing the window,
+/// allow, or of Always allow where the prompt offers it, is a denial: Deny, Escape, closing the window,
 /// and every withdrawal, whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
@@ -28,7 +28,7 @@ namespace Keypaste.App.Session;
 /// </remarks>
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
-/// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
+/// <param name="openSettings">What the Always allow notice's Open settings does with the agent's name, or null to offer Close alone.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 /// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>

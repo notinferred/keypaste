@@ -51,7 +51,7 @@ public sealed record EnvReleasePrompt
     /// <summary>The profile the set belongs to, sanitized.</summary>
     public string Profile { get; init; } = EnvProfileNames.Default;
 
-    /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise. A prompt with a requester never offers a timed grant.</summary>
+    /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise.</summary>
     public string? Requester { get; init; }
 
     /// <summary>The reference file's variable names and literals, each sanitized; empty outside reference-file mode.</summary>

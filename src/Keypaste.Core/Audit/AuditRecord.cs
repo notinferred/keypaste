@@ -202,7 +202,6 @@ public sealed record AuditArgs
     /// <summary>Which field was requested, or <c>invalid</c> when it was not one keypaste knows.</summary>
     public string? Field { get; init; }
 
-
     /// <summary>The opening of the agent's stated reason, sanitized and capped.</summary>
     public string? ReasonExcerpt { get; init; }
 
@@ -309,7 +308,6 @@ public sealed record AuditRecord
 
     /// <summary>The unlocked session that answered, or null when the request reached none.</summary>
     public string? Session { get; init; }
-
 
     /// <summary>The vault the request named, as <c>VaultIdentity.Key</c>, or null when none was configured.</summary>
     /// <remarks>Absent from lines written before it existed, which a reader counts for no vault in particular.</remarks>

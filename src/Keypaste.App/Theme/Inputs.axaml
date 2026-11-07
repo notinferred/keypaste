@@ -226,7 +226,7 @@
       </ItemsPanelTemplate>
     </Setter>
   </Style>
-  <!-- Time running out, such as a grant's or the clipboard's, is quiet: the time in words beside it says it. -->
+  <!-- Time running out, such as the clipboard's, is quiet: the time in words beside it says it. -->
   <Style Selector="ctl|KpIcon.spinning">
     <Style.Animations>
       <Animation Duration="0:0:1" IterationCount="Infinite">

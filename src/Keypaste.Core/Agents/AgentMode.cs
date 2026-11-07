@@ -6,7 +6,7 @@ public enum AgentMode
     /// <summary>Ask every time: a person answers each request.</summary>
     Ask = 0,
 
-    /// <summary>Automatic: what the agent can see is released without asking and recorded in history. Commands still ask.</summary>
+    /// <summary>Automatic: what the agent can see is released without asking and recorded in history. It never answers a command.</summary>
     Automatic = 1,
 }
 

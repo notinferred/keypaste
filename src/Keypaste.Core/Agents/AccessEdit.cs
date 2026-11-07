@@ -113,7 +113,7 @@ public sealed record AccessEdit
     }
 
     /// <summary>
-    /// The change Always for in an approval prompt asks for: Automatic for one project environment from
+    /// The change Always allow in an approval prompt asks for: Automatic for one project environment from
     /// now on, so an end its row had, which may be why the prompt was shown, is removed, and an hourly
     /// limit stays.
     /// </summary>

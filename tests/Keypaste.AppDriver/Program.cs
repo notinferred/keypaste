@@ -45,7 +45,7 @@ namespace Keypaste.AppDriver;
 /// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
-/// comes down, and the lines <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> and <c>close</c> click its buttons through
+/// comes down, and the lines <c>once</c>, <c>always</c>, <c>allow</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
 /// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
 /// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in

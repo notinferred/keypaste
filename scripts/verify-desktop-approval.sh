@@ -290,7 +290,7 @@ grep '^prompt client' "$HOLD_OUT" | tail -1 \
 echo always >&7
 wait_for '^access-prompt agent=' "$HOLD_OUT" 1
 grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=asked from the approval prompt's Always allow gains=ci:staging: Automatic" \
+  | grep -qF "agent=$LABEL asked=you chose Always allow on the prompt gains=ci:staging: Automatic" \
   || die "the confirmation does not say who gains what, or where it was asked from"
 jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 && die "the release came back before the change Always allow asked for was answered"
 echo deny >&7

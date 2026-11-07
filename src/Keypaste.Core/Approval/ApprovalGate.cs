@@ -13,7 +13,7 @@ public sealed record WaitingRequest(ApprovalPrompt Prompt, TimeSpan Remaining);
 public sealed record WaitingRun(RunPrompt Prompt, TimeSpan Remaining);
 
 /// <summary>
-/// The gate's one slot, kept from a person's Always for answer for the confirmation that follows it, so
+/// The gate's one slot, kept from a person's Always allow answer for the confirmation that follows it, so
 /// no other request can come in front of them between the two.
 /// </summary>
 /// <remarks>Disposing it gives the slot back, once; the confirmation asked in it leaves it kept.</remarks>
@@ -530,7 +530,7 @@ public sealed class ApprovalGate : IDisposable
         return _cooldowns.TryGetValue(cooldownKey, out var refusal) ? refusal.Standing(_clock) : TimeSpan.Zero;
     }
 
-    /// <summary>Tells the person, through the channel, that the change Always for asked for did not take effect.</summary>
+    /// <summary>Tells the person, through the channel, that the change Always allow asked for did not take effect.</summary>
     /// <param name="notice">What to tell them.</param>
     /// <exception cref="ArgumentNullException"><paramref name="notice"/> is null.</exception>
     /// <remarks>

@@ -159,7 +159,7 @@ The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on 
 4. **Amber appears once per view**, for the primary action or a live signal, and carries ink text.
 5. **Machine-readable text is mono**, everything else is Instrument Sans.
 6. **Depth is lightness.** Shadows belong to overlays only.
-7. **Every grant names its duration**, in the interface and in the copy about it.
+7. **Every allow says how long it lasts**, in the interface and in the copy about it.
 
 ## Checking a screen
 

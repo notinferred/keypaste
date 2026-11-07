@@ -115,7 +115,7 @@ public sealed class AgentsFirstLevelTests
         Assert.NotNull(gemini.Connection);
     });
 
-    /// <summary>A waiting request's Show the prompt and an allowance's End stay the same buttons as they count down, so a press or the focus on one is not lost at a tick.</summary>
+    /// <summary>A waiting request's Show the prompt stays the same button as they count down, so a press or the focus on one is not lost at a tick.</summary>
     [Fact]
     public Task Show_the_prompt_stays_the_same_button_as_it_counts_down() => HeadlessSession.On(async () =>
     {
@@ -175,7 +175,7 @@ public sealed class AgentsFirstLevelTests
     /// <summary>
     /// Drives Agents through every state it can be in, calling <paramref name="look"/> in each with every
     /// disclosure and pane closed: tools found in each state, an agent of no tool, one with no name and Every other
-    /// agent; an allowance with history; a request waiting; a change waiting; an unusable clients.toml; not serving.
+    /// agent; history; a request waiting; a change waiting; an unusable clients.toml; not serving.
     /// </summary>
     internal static async Task EveryStateAsync(Action<Window> look)
     {

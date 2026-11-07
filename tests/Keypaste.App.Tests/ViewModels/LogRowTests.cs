@@ -47,6 +47,7 @@ public sealed class LogRowTests
     /// <summary>A release nobody was asked about says which kind it was: an agent's Automatic mode, or a rule in a line written before agents had modes.</summary>
     [Theory]
     [InlineData("automatic", "Automatic")]
+    [InlineData("always-allowed", "Always")]
     [InlineData("policy", "By rule")]
     public void A_release_nobody_was_asked_about_says_so(string method, string result)
     {

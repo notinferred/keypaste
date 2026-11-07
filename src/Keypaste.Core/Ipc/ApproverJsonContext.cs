@@ -281,6 +281,7 @@ internal sealed class AccessRowFrame(AccessRow row)
     public string Record => row.Record;
     public bool Understood => row.Understood;
     public int? ProjectsNotShown => row.ProjectsNotShown > 0 ? row.ProjectsNotShown : null;
+    public int? AlwaysNotShown => row.AlwaysNotShown > 0 ? row.AlwaysNotShown : null;
 }
 
 internal sealed class AccessChangeRequestFrame(AccessChangeRequest request)

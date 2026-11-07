@@ -220,7 +220,7 @@ public sealed class AccessEditTests
         Assert.Equal("see x\\u200B/**", see.ToString());
     }
 
-    /// <summary>Always for makes one environment Automatic from now on: an end its row had goes, and its hourly limit stays.</summary>
+    /// <summary>Always allow makes one environment Automatic from now on: an end its row had goes, and its hourly limit stays.</summary>
     [Fact]
     public void AlwaysFor_IsAutomaticForOneEnvironment_WithNoEnd()
     {

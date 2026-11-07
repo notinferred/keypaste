@@ -64,8 +64,8 @@
             <TextBlock Grid.Column="1" Classes="tag size-13" Text="value goes to the agent" VerticalAlignment="Center" />
           </Grid>
         </Border>
-        <StackPanel Orientation="Horizontal">
-          <TextBlock Classes="prompt-note size-13" TextWrapping="NoWrap" Text="You can allow it " />
+        <StackPanel Orientation="Horizontal" Height="20">
+          <TextBlock Classes="prompt-note size-13" TextWrapping="NoWrap" Text="You can allow it " IsVisible="{Binding IsOnceOnly}" />
           <TextBlock Name="LifetimeText" Classes="prompt-note size-13" TextWrapping="NoWrap" Text="{Binding Lifetime}"
                      Foreground="{DynamicResource KpTextSecondary}" />
         </StackPanel>

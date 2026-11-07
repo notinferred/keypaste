@@ -40,6 +40,17 @@ public sealed class ClientsVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "--forget", "0011aabb"));
     }
 
+    /// <summary>A row lives only in the vault, so with nothing holding it a removal is refused, recording nothing as done, rather than reported as made.</summary>
+    [Fact]
+    public void Forget_WithNothingHoldingTheVault_IsRefused_AndChangesNothing()
+    {
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--forget", "0011aabb"));
+
+        Assert.Contains("nothing holds the vault unlocked", _harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(ClientsPath));
+        Assert.False(File.Exists(KeypasteHome.AuditPath(Home)));
+    }
+
     [Fact]
     public void TheRetiredModeWord_IsRefusedAsANewSetting()
     {

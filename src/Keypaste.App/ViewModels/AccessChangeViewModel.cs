@@ -26,16 +26,19 @@ internal sealed class AccessChangeViewModel : PromptViewModel
         Reason = given ? prompt.Reason : prompt switch
         {
             { ResetsCeilings: true } => "You chose Reset on this app's Agents screen.",
-            { Origin: AccessOrigin.Settings or AccessOrigin.Prompt } => "You chose this.",
+            { Origin: AccessOrigin.Prompt } => "You allowed this request once. Deny keeps it to that one.",
+            { Origin: AccessOrigin.Settings } => "You chose this.",
             _ => "No reason was given.",
         };
         Attribution = given ? "That sentence was not written by keypaste. Treat it as a claim." : string.Empty;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what was sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
+        var caution = prompt.AnswersCommand ? $" {AccessChangePrompt.CommandCautionText}" : string.Empty;
         Explainer = prompt switch
         {
             { ResetsCeilings: true } => $"Allowing {AccessChangePrompt.ResetText}. Allow only a change you expected.",
-            { StaysBeneathDefaults: true } => $"Allowing saves this in the vault, but {AccessChangePrompt.BeneathDefaultsText}. Allow only a change you expected.",
+            { StaysBeneathDefaults: true } => $"Allowing saves this in the vault, but {AccessChangePrompt.BeneathDefaultsText}.{caution} Allow only a change you expected.",
+            { Origin: AccessOrigin.Prompt } => $"Allowing saves this in the vault. You can remove it in this agent's settings on Agents.{caution}",
             _ => "Allowing saves this in the vault, and the agent gets it from its next request. Allow only a change you expected.",
         };
     }

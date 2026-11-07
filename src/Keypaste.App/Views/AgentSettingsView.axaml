@@ -112,8 +112,10 @@
           <DataTemplate x:DataType="vm:AlwaysRow">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,8">
               <StackPanel Spacing="2" VerticalAlignment="Center">
-                <TextBlock Classes="mono size-12" Text="{Binding What}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="mono size-12" Text="{Binding What}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding What}" />
                 <TextBlock Classes="caption" Text="{Binding Detail}" TextWrapping="Wrap" />
+                <TextBlock Classes="mono size-12" Text="{Binding Identity}" TextWrapping="Wrap" IsVisible="{Binding HasIdentity}"
+                           Foreground="{DynamicResource KpTextSecondary}" />
               </StackPanel>
               <Button Grid.Column="1" Name="RemoveAlways" Classes="sm size-12" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Center"
                       Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveName}" />
@@ -121,6 +123,8 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      <TextBlock Name="AlwaysMessageText" Classes="body" ctl:Announcer.Says="{Binding AlwaysMessage}" Text="{Binding AlwaysMessage}"
+                 IsVisible="{Binding HasAlwaysMessage}" TextWrapping="Wrap" />
     </StackPanel>
 
     <!-- An Expander, so a screen reader hears it open or closed. It will not close while anything inside is set: a setting never looks unset. -->

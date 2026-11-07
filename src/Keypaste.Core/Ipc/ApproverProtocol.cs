@@ -144,8 +144,8 @@ public static partial class ApproverProtocol
     /// <b>This method is total: no reply, however large, can produce a frame the framer will
     /// refuse.</b> That refusal is correct where it is — a truncated frame is a message that says
     /// something other than what was sent — but it reaches
-    /// <see cref="ApproverListener"/>'s outermost <c>catch</c>, which ends the connection and
-    /// revokes the grants scoped to it. So an ordinary thousand-entry vault could cost a person the
+    /// <see cref="ApproverListener"/>'s outermost <c>catch</c>, which ends the connection.
+    /// So an ordinary thousand-entry vault could cost a person the
     /// approval they had already given, and the agent was told only that something went wrong.
     /// </para>
     /// <para>
@@ -180,7 +180,7 @@ public static partial class ApproverProtocol
         var fitted = kept == reply.Names.Count ? reply : reply with { Names = [.. reply.Names.Take(kept)], Complete = false };
 
         // Belt and braces. Everything above says this cannot happen; this is what stops an error in
-        // that reasoning costing a connection and its grants rather than a listing (law 3.7).
+        // that reasoning costing a connection rather than a listing (law 3.7).
         return WriteNames(fitted).Length <= MessageFramer.MaximumPayloadBytes
             ? fitted
             : reply with { Names = [], Reason = Undersized, Complete = false };
@@ -229,8 +229,7 @@ public static partial class ApproverProtocol
     /// <b>This method is total</b>, for the reason <see cref="Encode(NamesReply)"/> gives and one
     /// more: <c>notes</c> is a releasable field and a KDBX note has no length limit, so a
     /// <em>granted</em> reply could exceed a frame. The write then threw,
-    /// <see cref="ApproverListener"/>'s outermost <c>catch</c> ended the connection, and the
-    /// <c>finally</c> revoked the grants scoped to it — after a person had approved the release,
+    /// <see cref="ApproverListener"/>'s outermost <c>catch</c> ended the connection — after a person had approved the release,
     /// which the agent was then told had gone wrong.
     /// </para>
     /// <para>
@@ -260,7 +259,7 @@ public static partial class ApproverProtocol
         var refusal = WriteCredential(Bounded(reply, reply.Entry));
 
         // Belt and braces: the entry is capped by EntryNameSanitizer long before it gets here, and
-        // this stops an error in that reasoning costing a connection and its grants (law 3.7).
+        // this stops an error in that reasoning costing a connection (law 3.7).
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
             ? refusal
             : WriteCredential(Bounded(reply, entry: null));
@@ -964,7 +963,8 @@ public static partial class ApproverProtocol
     /// <remarks>
     /// Rows are dropped whole from the end, and <c>complete</c> is then false, so
     /// the requester asks for the rest from after the ones it got. A first row too long for a frame of its
-    /// own is sent without its project rows, saying how many it left out, so every agent is listed.
+    /// own is sent without its project rows, then without its Always allow rows too, saying how many it left
+    /// out, so every agent is listed.
     /// </remarks>
     public static byte[] Encode(AccessListReply reply)
     {
@@ -980,6 +980,12 @@ public static partial class ApproverProtocol
             kept = Fit(envelope, rows.Take(1), Wire.AccessRowFrame);
         }
 
+        if (kept == 0 && rows.Count > 0)
+        {
+            rows[0] = new AccessRowFrame(WithoutProjects(reply.Agents[0], dropAlways: true));
+            kept = Fit(envelope, rows.Take(1), Wire.AccessRowFrame);
+        }
+
         var frame = WriteAccessList(reply, rows.Take(kept), reply.Complete && kept == reply.Agents.Count);
 
         return frame.Length <= MessageFramer.MaximumPayloadBytes
@@ -990,12 +996,17 @@ public static partial class ApproverProtocol
     private static byte[] WriteAccessList(AccessListReply reply, IEnumerable<AccessRowFrame> agents, bool complete) =>
         JsonSerializer.SerializeToUtf8Bytes(new AccessListReplyFrame(reply, agents, complete), Wire.AccessListReplyFrame);
 
-    /// <summary>An agent's row with its settings for the whole agent alone, saying how many project rows it leaves out.</summary>
-    private static AccessRow WithoutProjects(AccessRow row)
+    /// <summary>An agent's row with its project rows, and when asked its Always allow rows, left out, saying how many.</summary>
+    private static AccessRow WithoutProjects(AccessRow row, bool dropAlways = false)
     {
         var access = AcafRecord.Read(row.Record).Access;
 
-        return row with { Record = AcafRecord.Write(access with { Projects = [], Always = AlwaysAllowed.None }), ProjectsNotShown = access.Projects.Count };
+        return row with
+        {
+            Record = AcafRecord.Write(access with { Projects = [], Always = dropAlways ? AlwaysAllowed.None : access.Always }),
+            ProjectsNotShown = access.Projects.Count,
+            AlwaysNotShown = dropAlways ? access.Always.Items.Count + access.Always.Commands.Count : 0,
+        };
     }
 
     /// <summary>Encodes a request to change one agent's settings.</summary>
@@ -1095,7 +1106,15 @@ public static partial class ApproverProtocol
                     return false;
                 }
 
-                agents.Add(new AccessRow(name, record, understood, notShown));
+                var alwaysNotShown = 0;
+
+                if (row.TryGetProperty("always_not_shown", out _)
+                    && (!TryInteger(row, "always_not_shown", out alwaysNotShown) || alwaysNotShown is < 1 or > AlwaysAllowed.MaximumItems + AlwaysAllowed.MaximumCommands))
+                {
+                    return false;
+                }
+
+                agents.Add(new AccessRow(name, record, understood, notShown, alwaysNotShown));
             }
 
             reply = new AccessListReply(answered, agents, TrueOnly(root, "complete"), reason);

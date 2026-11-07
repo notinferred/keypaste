@@ -45,7 +45,7 @@ flowchart TD
   ask -->|allow| released
 ```
 
-Automatic is a setting you confirm for one agent, for a project or environment it can see; commands and production environments are always asked. Every error on this path refuses. If the audit record cannot be written, the value is not released.
+Automatic is a setting you confirm for one agent, for a project or environment it can see; Always allow, which you confirm too, covers one item or one exact command. Production environments are always asked, and so is any command you did not choose Always allow on. Every error on this path refuses. If the audit record cannot be written, the value is not released.
 
 ## What locking does
 
@@ -74,7 +74,7 @@ Agent approvals use the first today: one approved field goes back to the agent. 
 ## Rules that never change
 
 - Your master key never leaves your machine, not even inside an encrypted backup.
-- Agents never get the vault. Each release is one credential with one scope and a time limit, after your answer or a setting you confirmed. The default is no.
+- Agents never get the vault. Each release is one credential with one scope, after your answer or a setting you confirmed. The default is no.
 - Every agent request is logged on your machine, allowed or refused.
 - keypaste never writes a secret to disk unencrypted.
 - Telemetry never includes a secret or an entry name, and any usage count is opt-in.

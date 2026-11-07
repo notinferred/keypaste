@@ -209,7 +209,7 @@ public sealed class ApprovalPromptTests
         Assert.True(ApprovalLimits.MinimumWindowSeconds <= ApprovalLimits.DefaultWindowSeconds);
     }
 
-    /// <summary>A change asked for with no reason, as Always for and the app's own settings ask, shows none rather than a placeholder.</summary>
+    /// <summary>A change asked for with no reason, as Always allow and the app's own settings ask, shows none rather than a placeholder.</summary>
     [Fact]
     public void AChangeWithNoReason_ShowsNone_AndOneScrubbedAwayIsSaidToBe()
     {

@@ -35,7 +35,7 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <!-- A dialog's, a card's or an inline form's heading: "Allowances", "Rename or move". -->
+  <!-- A dialog's, a card's or an inline form's heading: "Always allowed", "Rename or move". -->
   <Style Selector=":is(TextBlock).dialog-title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="16" />

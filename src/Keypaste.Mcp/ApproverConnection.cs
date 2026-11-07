@@ -128,10 +128,10 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal TimeSpan AnswerBound { get; init; } = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
     /// <summary>
-    /// The longest a credential request may take: two windows and the same margin, because Always for's
-    /// confirmation can follow its release in the one exchange.
+    /// The longest a credential request or a run may take: two windows and the same margin, because
+    /// Always allow's confirmation is answered before its release leaves, in the one exchange.
     /// </summary>
-    internal TimeSpan CredentialBound { get; init; } = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
+    internal TimeSpan ReleaseBound { get; init; } = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
 
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
@@ -145,7 +145,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal ValueTask<Exchange<RunReply>> RunAsync(RunRequest request, CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.ReleaseRunAsync(request with { Vault = vaultPath, Session = session }, token),
-            AnswerBound,
+            ReleaseBound,
             cancellationToken,
             retry: false);
 
@@ -171,7 +171,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.RequestAsync(request with { Vault = vaultPath, Session = session }, token),
-            CredentialBound,
+            ReleaseBound,
             cancellationToken,
             retry: false);
 

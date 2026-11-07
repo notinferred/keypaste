@@ -195,7 +195,7 @@ public static class Strings
     public static string EnvKeypaste => Manager.GetString("EnvKeypaste", CultureInfo.CurrentUICulture)!;
     public static string EnvironmentName => Manager.GetString("EnvironmentName", CultureInfo.CurrentUICulture)!;
     public static string Environments => Manager.GetString("Environments", CultureInfo.CurrentUICulture)!;
-    public static string EveryAgentRequestAllowanceTokenRunAndX73000f => Manager.GetString("EveryAgentRequestAllowanceTokenRunAndX73000f", CultureInfo.CurrentUICulture)!;
+    public static string EveryAgentRequestTokenRunAndShareOnThisMachine => Manager.GetString("EveryAgentRequestTokenRunAndShareOnThisMachine", CultureInfo.CurrentUICulture)!;
     public static string EverythingRunInThatTerminalCanReadX8c42c2 => Manager.GetString("EverythingRunInThatTerminalCanReadX8c42c2", CultureInfo.CurrentUICulture)!;
     public static string ExampleItemPath => Manager.GetString("ExampleItemPath", CultureInfo.CurrentUICulture)!;
     public static string ExampleProjectDirectory => Manager.GetString("ExampleProjectDirectory", CultureInfo.CurrentUICulture)!;

@@ -157,6 +157,13 @@ internal static class ClientsCommand
             WriteTable(agents, caps, context);
         }
 
+        foreach (var agent in agents.Where(agent => agent.AlwaysNotShown > 0))
+        {
+            context.Stderr.WriteLine(
+                $"{_verb}: {EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text} has {agent.AlwaysNotShown} always-allowed rows not shown here, "
+                + "more than one reply carries, and they still release; the app's Agents screen shows them all and removes each");
+        }
+
         foreach (var agent in agents.Where(agent => agent.ProjectsNotShown > 0))
         {
             context.Stderr.WriteLine(
@@ -387,7 +394,7 @@ internal static class ClientsCommand
                     {
                         name,
                         command.Id,
-                        $"{DisplayTextSanitizer.Escaped(EnvReleasePrompt.CommandLine(command.Command))} in {DisplayTextSanitizer.Escaped(command.Directory)}",
+                        $"{AccessChangePrompt.CommandLine(command)} ({DisplayTextSanitizer.Escaped(command.Program)}) in {DisplayTextSanitizer.Escaped(command.Directory)}, with {AccessChangePrompt.Variables(command)}",
                     }));
             }),
         ];
@@ -472,6 +479,11 @@ internal static class ClientsCommand
                 if (agent.ProjectsNotShown > 0)
                 {
                     json.WriteNumber("projects_not_shown", agent.ProjectsNotShown);
+                }
+
+                if (agent.AlwaysNotShown > 0)
+                {
+                    json.WriteNumber("always_not_shown", agent.AlwaysNotShown);
                 }
 
                 json.WritePropertyName("record");

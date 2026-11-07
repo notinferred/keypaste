@@ -172,7 +172,7 @@
   <data name="EnvKeypaste" xml:space="preserve"><value>.env.keypaste</value></data>
   <data name="EnvironmentName" xml:space="preserve"><value>Environment name</value></data>
   <data name="Environments" xml:space="preserve"><value>Environments</value></data>
-  <data name="EveryAgentRequestAllowanceTokenRunAndX73000f" xml:space="preserve"><value>Every agent request, token run and share on this machine, with a check that none was changed.</value></data>
+  <data name="EveryAgentRequestTokenRunAndShareOnThisMachine" xml:space="preserve"><value>Every agent request, token run and share on this machine, with a check that none was changed.</value></data>
   <data name="EverythingRunInThatTerminalCanReadX8c42c2" xml:space="preserve"><value>Everything run in that terminal can read these values.</value></data>
   <data name="Expires" xml:space="preserve"><value>Expires</value></data>
   <data name="Export" xml:space="preserve"><value>Export</value></data>
@@ -485,7 +485,7 @@
   <data name="Theme" xml:space="preserve"><value>Theme</value></data>
   <data name="Then" xml:space="preserve"><value>Then</value></data>
   <data name="ThisStaysOpenWhileAnythingHereIsX9a6bbb" xml:space="preserve"><value>This stays open while anything here is set.</value></data>
-  <data name="ThroughAnAgentOrATokenAXbc5a7a" xml:space="preserve"><value>Through an agent or a token, a prod environment is asked about live every time and never kept in an allowance.</value></data>
+  <data name="ThroughAnAgentOrATokenAXbc5a7a" xml:space="preserve"><value>Through an agent or a token, a prod environment is asked about live every time, whatever is always allowed.</value></data>
   <data name="Time" xml:space="preserve"><value>Time</value></data>
   <data name="TimeDaysAgoShort" xml:space="preserve"><value>{0}d ago</value></data>
   <data name="TimeHoursAgoShort" xml:space="preserve"><value>{0}h ago</value></data>

@@ -14,7 +14,7 @@ namespace Keypaste.Cli.Tests;
 /// <remarks>
 /// This is the display half of THREATS.md T-2. The reason arrives already sanitized and capped, so
 /// what is under test here is that the channel does not undo that — and that the default is no:
-/// <c>o</c> allows once, <c>h</c> allows for the timed allowance when one is offered, and everything
+/// <c>o</c> allows once, <c>a</c> asks to always allow when that is offered, and everything
 /// else denies.
 /// </remarks>
 public sealed class TerminalApprovalChannelTests
@@ -366,7 +366,10 @@ public sealed class TerminalApprovalChannelTests
         var offered = RunPromptFor() with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), "npm run migrate") };
 
         Assert.Equal(ApprovalAnswer.Always, await rig.Channel.AskAsync(offered, Token));
-        Assert.Contains("The command's files can change (scripts, package.json): keypaste approves the command line, not what it does.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        var said = rig.Stderr.ToString();
+        Assert.Contains("The command's files can change", said, StringComparison.Ordinal);
+        Assert.Contains("not what it does.", said, StringComparison.Ordinal);
+        Assert.All(said.Split('\n'), line => Assert.True(line.Length <= 80 || !line.Contains("files can change", StringComparison.Ordinal), line));
     }
 
     [Fact]
@@ -555,8 +558,8 @@ public sealed class TerminalApprovalChannelTests
 
     [Theory]
     [InlineData(OnceOnly.ProtectedProfile, "  this item is in a protected environment: it is asked about every time.")]
-    [InlineData(OnceOnly.LimitReached, "  this agent's Automatic limit was reached: once only, so the limit you set still holds.")]
-    [InlineData(OnceOnly.Unnamed, "  this agent's connection has no name, so keypaste has nowhere to keep an always: once only.")]
+    [InlineData(OnceOnly.LimitReached, "  this agent's Automatic limit was reached: once only, so that limit holds.")]
+    [InlineData(OnceOnly.Unnamed, "  This agent has no name, so Always allow is not offered. Start its bridge with")]
     public async Task TheCredentialDialog_SaysWhyItIsOnceOnly(OnceOnly onceOnly, string why)
     {
         var rig = Build("d");

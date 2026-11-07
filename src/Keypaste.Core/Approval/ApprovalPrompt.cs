@@ -31,6 +31,9 @@ public sealed record ApprovalPrompt
     /// <summary>The longest reason a human is shown, whatever the schema allows.</summary>
     public const int MaximumReasonLength = 400;
 
+    /// <summary>Why a prompt offers no Always allow to an agent with no name, and what gives it one.</summary>
+    public const string UnnamedText = "This agent has no name, so Always allow is not offered. Start its bridge with --client-label to name it.";
+
     /// <summary>The longest client name a human is shown.</summary>
     public const int MaximumClientLength = 64;
 

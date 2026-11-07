@@ -54,7 +54,7 @@ keypaste: an agent is asking for a credential.
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. TTL controls approval reuse, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
+`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. Removing an Always allow row stops later releases, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
 
 ## Before using this material
 

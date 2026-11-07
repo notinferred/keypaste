@@ -1680,7 +1680,7 @@
                     </Border>
                   </StackPanel>
 
-                  <!-- Agent access: who received this entry and what grant covers it now, never a value, shown
+                  <!-- Agent access: who received this entry and when, never a value, shown
                        only when agents can see the entry (N.5). -->
                   <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
                     <Border x:Name="AgentAccessCard" Classes="card" IsVisible="{Binding ShowsAgentAccess}">

@@ -18,8 +18,7 @@ public enum SavedRead
 
 /// <summary>Which entries one change to an open vault touched.</summary>
 /// <remarks>
-/// A rename or a move touches the name it left and the name it took, because a grant is held under
-/// a name and either could otherwise answer with a value the vault no longer holds there (D-0318).
+/// A rename or a move touches the name it left and the name it took (D-0318).
 /// </remarks>
 public sealed class VaultEdit
 {

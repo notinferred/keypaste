@@ -145,7 +145,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     /// <summary>What the modes do.</summary>
     internal string ModeNote { get; } =
-        "Automatic releases what it can see without asking, and records each release in history. Commands still ask.";
+        "Automatic releases what it can see without asking, and records each release in history. A command is never answered by a mode: it still asks unless you chose Always allow on exactly that command.";
 
     /// <summary>That protected environments are always asked, whatever the settings say.</summary>
     internal string ProtectedNote { get; } =
@@ -542,7 +542,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     }
 
     /// <summary>Asks the authority for one change, then reads the settings again.</summary>
-    private async Task ChangeAsync(AccessEdit edit)
+    /// <param name="edit">The change.</param>
+    /// <param name="answered">What to do with the answer, where it is said beside what was pressed; null says it in <see cref="Message"/>.</param>
+    private async Task ChangeAsync(AccessEdit edit, Action<AccessChangeReply>? answered = null)
     {
         if (!CanChange || _disposed)
         {
@@ -550,12 +552,20 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         }
 
         IsChanging = true;
-        Message = "If this gives the agent more, confirm it in the window keypaste opened.";
+        Message = answered is null ? "If this gives the agent more, confirm it in the window keypaste opened." : string.Empty;
 
         try
         {
             var reply = await _authority.ChangeAccessAsync(Agent, edit, _closing.Token).ConfigureAwait(true);
-            Message = Said(reply, edit.OnThisClock(reply.Reason, Zone));
+
+            if (answered is null)
+            {
+                Message = Said(reply, edit.OnThisClock(reply.Reason, Zone));
+            }
+            else
+            {
+                answered(reply);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -573,7 +583,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         }
     }
 
-    /// <summary>What the person chose Always allow on for this agent, each with its way to remove it.</summary>
+    /// <summary>What is released to this agent without asking: what the person chose Always allow on and each project row set to Automatic, each with its way to remove it.</summary>
     internal IReadOnlyList<AlwaysRow> AlwaysRows
     {
         get
@@ -590,24 +600,43 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
                     return new AlwaysRow(
                         shown,
                         isProtected ? "Item · protected now, so it is still asked about every time" : "Item · every field it can see",
-                        new AlwaysRemoval(AlwaysAllowed.ItemId(item), shown, this));
+                        string.Empty,
+                        new AlwaysRemoval(() => RemoveAlwaysAsync(AlwaysAllowed.ItemId(item)), this));
                 }),
-                .. access.Always.Commands.Select(command =>
-                {
-                    var shown = EnvReleasePrompt.CommandLine(command.Command);
-                    var names = string.Join(", ", command.Variables.Select(variable => variable.Name));
-
-                    return new AlwaysRow(
-                        shown,
-                        runs ? $"Command in {command.Directory} · {names}" : $"Command in {command.Directory} · {names} · Run commands is off, so this does nothing now",
-                        new AlwaysRemoval(command.Id, shown, this));
-                }),
+                .. access.Always.Commands.Select(command => new AlwaysRow(
+                    AccessChangePrompt.CommandLine(command),
+                    runs ? "Command" : "Command · May run commands is off, so this does nothing now",
+                    string.Join(
+                        Environment.NewLine,
+                        DisplayTextSanitizer.Escaped(command.Program),
+                        $"in {DisplayTextSanitizer.Escaped(command.Directory)}",
+                        AccessChangePrompt.Variables(command, item => _authority.AlwaysItem(item).Shown, Environment.NewLine)),
+                    new AlwaysRemoval(() => RemoveAlwaysAsync(command.Id), this))),
+                .. access.Projects.Where(row => row.Mode == AgentMode.Automatic).Select(row => new AlwaysRow(
+                    DisplayTextSanitizer.Escaped(row.Scope.Name),
+                    AutomaticRowDetail(row),
+                    string.Empty,
+                    new AlwaysRemoval(() => RemoveAutomaticRowAsync(row.Scope), this))),
             ];
         }
     }
 
-    /// <summary>Whether anything is always allowed.</summary>
-    internal bool HasAlwaysRows => !(_state?.Vault ?? AgentAccess.Defaults).Always.IsEmpty;
+    /// <summary>Whether anything is listed as always allowed.</summary>
+    internal bool HasAlwaysRows
+    {
+        get
+        {
+            var access = _state?.Vault ?? AgentAccess.Defaults;
+            return !access.Always.IsEmpty || access.Projects.Any(row => row.Mode == AgentMode.Automatic);
+        }
+    }
+
+    /// <summary>What became of the last removal from the list, said beside the list; or empty.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAlwaysMessage))]
+    internal partial string AlwaysMessage { get; private set; } = string.Empty;
+
+    internal bool HasAlwaysMessage => AlwaysMessage.Length > 0;
 
     /// <summary>Removes one Always allow row, which gives the agent nothing more, so it applies at once.</summary>
     /// <param name="id">The row's short name.</param>
@@ -616,11 +645,46 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     {
         if (!AccessEdit.TryForget(id, out var edit, out var error))
         {
-            Message = $"Not changed: {error}.";
+            AlwaysMessage = $"Not removed: {error}.";
             return Task.CompletedTask;
         }
 
-        return ChangeAsync(edit);
+        var access = _state?.Vault ?? AgentAccess.Defaults;
+        var command = access.Always.Commands.FirstOrDefault(held => string.Equals(held.Id, id, StringComparison.Ordinal));
+        var item = access.Always.Items.FirstOrDefault(held => string.Equals(AlwaysAllowed.ItemId(held), id, StringComparison.Ordinal));
+        var shown = command is not null ? AccessChangePrompt.CommandLine(command) : item is not null ? _authority.AlwaysItem(item).Shown : id;
+        var after = command is not null || (access.Mode != AgentMode.Automatic && access.Projects.All(row => row.Mode != AgentMode.Automatic))
+            ? "The next request for it asks you."
+            : "The next request for it follows this agent's Automatic settings.";
+
+        return ChangeAsync(edit, reply => AlwaysMessage = Removal(reply, shown, after));
+    }
+
+    /// <summary>Removes a project row set to Automatic from the list, so what it covers takes the rest of the agent's settings.</summary>
+    private Task RemoveAutomaticRowAsync(ProjectScope scope)
+    {
+        if (!AccessEdit.TryCreate(scope.Name, null, null, null, null, null, null, true, out var edit, out var error))
+        {
+            AlwaysMessage = $"Not removed: {error}.";
+            return Task.CompletedTask;
+        }
+
+        return ChangeAsync(edit, reply => AlwaysMessage = Removal(reply, DisplayTextSanitizer.Escaped(scope.Name), "It follows the rest of this agent's settings now."));
+    }
+
+    private static string AutomaticRowDetail(ProjectAccess row)
+    {
+        var kind = row.Scope.Environment is null ? "Project" : "Project environment";
+
+        return row.Scope.Environment is { } environment && EnvProfileNames.IsProtected(environment)
+            ? $"{kind} · protected, so it is still asked about every time"
+            : $"{kind} · Automatic: released without asking, recorded in history";
+    }
+
+    private static string Removal(AccessChangeReply reply, string shown, string after)
+    {
+        var said = reply.Decision == AuditDecision.Granted ? $"Removed {shown}. {after}" : $"Not removed: {reply.Unapplied ?? reply.Reason}.";
+        return reply.Recorded ? said : said + " The audit log could not record it. Check that it can be written.";
     }
 
     private static string Said(AccessChangeReply reply, string reason)

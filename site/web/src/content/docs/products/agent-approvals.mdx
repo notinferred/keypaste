@@ -44,7 +44,7 @@ The bridge your AI tool starts holds no vault and can never ask for your master 
 - `keypaste setup` connects Claude Code and Codex and prints the configuration for Cursor and Claude Desktop; connecting every common AI tool in one step is being built.
 - An agent sees your project variables by default. In the release being built, each agent has settings kept in your vault: what it can see, whether it is given values, whether it may run commands, and whether it is asked every time, asked with an hour on offer, or Automatic for a project or environment, optionally at most so many an hour or until a date. A change that gives an agent more waits for your confirmation; one that gives it less applies at once.
 - Commands an agent asks to run, and anything in a production environment, are asked about every time.
-- The settings are stored in the [Agent Credential Access Format](/acaf/v1/), which other KeePass apps can read and keep. The published `v0.3.0` instead reads standing rules you write in `policy.toml`.
+- The settings are stored in the [Agent Credential Access Format](/acaf/v1.2/), which other KeePass apps can read and keep. The published `v0.3.0` instead reads standing rules you write in `policy.toml`.
 - `keypaste log` shows the record, and `keypaste log verify` checks that nobody edited it.
 
 ## Limits
@@ -55,5 +55,5 @@ A value you release is the agent's from then on, and keypaste cannot revoke the 
 
 - [Connecting keypaste to Claude](https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md)
 - [How to read an approval](https://github.com/notinferred/keypaste/blob/main/docs/approvals.md) and [agent settings and modes](https://github.com/notinferred/keypaste/blob/main/docs/policy.md)
-- [The Agent Credential Access Format, version 1](/acaf/v1/)
+- [The Agent Credential Access Format, version 1.2](/acaf/v1.2/)
 - [Agents without values](/products/agents-without-values/), the next step

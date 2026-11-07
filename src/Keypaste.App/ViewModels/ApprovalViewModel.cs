@@ -19,6 +19,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
         {
             { IsProject: true } offer => $"Always allow makes {offer.Covers} Automatic for this agent. It allows this once, then asks you to confirm.",
             not null => "Always allow covers this item for this agent. It allows this once, then asks you to confirm.",
+            _ when prompt.OnceOnly == OnceOnly.Unnamed => ApprovalPrompt.UnnamedText,
             _ => string.Empty,
         };
 
@@ -28,9 +29,9 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Field = prompt.Field;
         Lifetime = prompt.OnceOnly switch
         {
-            OnceOnly.None => "once or always",
+            OnceOnly.None => string.Empty,
             OnceOnly.LimitReached => "once only: its Automatic limit was reached",
-            OnceOnly.Unnamed => "once only: this agent has no name to keep it under",
+            OnceOnly.Unnamed => "once only: this agent has no name",
             _ => "once only: protected environment",
         };
         Reason = prompt.Reason;
@@ -68,8 +69,11 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     internal string Field { get; }
 
-    /// <summary>What the person can allow: once, or once and always.</summary>
+    /// <summary>Why it can be allowed only once; empty where the buttons already say what can be chosen.</summary>
     internal string Lifetime { get; }
+
+    /// <summary>Whether <see cref="Lifetime"/> has anything to say.</summary>
+    internal bool IsOnceOnly => Lifetime.Length > 0;
 
     /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
     internal string Reason { get; }

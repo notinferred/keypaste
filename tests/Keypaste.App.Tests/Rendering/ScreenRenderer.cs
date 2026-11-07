@@ -825,12 +825,30 @@ public sealed class ScreenRenderer
             ["npm", "run", "migrate"],
             "/home/maya/acme/api",
             [new Core.Agents.AlwaysVariable("DATABASE_URL", alwaysItem, "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", alwaysItem, "STRIPE_SECRET_KEY")])));
+        var longMigration = new Core.Agents.AlwaysCommand(
+            "/usr/local/lib/node_modules/npm/bin/npm-cli.js",
+            ["npm", "run", "migrate", "--", "--schema", "billing", "--target", "2026-11-07T12-00-00-add-invoice-reconciliation-tables", "--lock-timeout", "120", "--statement-timeout", "600", "--dry-run=false"],
+            "/home/maya/acme/api/services/billing/migrations",
+            [new Core.Agents.AlwaysVariable("DATABASE_URL", alwaysItem, "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", alwaysItem, "STRIPE_SECRET_KEY")]);
+        alwaysStore.Write("claude-code", AccessEdit.AlwaysCommand(longMigration));
+        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var alwaysProject, out var alwaysError), alwaysError);
+        alwaysStore.Write("claude-code", AccessEdit.Automatic(alwaysProject));
         authority.Session.Unlocked!.Save();
         claudeRow.IsOpen = false;
         agents.Refresh();
         claudeRow.IsOpen = true;
         agents.Refresh();
+        var tall = window.Height;
+        window.Height = 2400;
         Save(window, output, "27b-agents-always-allowed");
+        window.Width = 720;
+        Save(window, output, "27b-agents-always-allowed-narrow");
+        window.Width = _width;
+        var alwaysSettings = window.GetVisualDescendants().OfType<AgentSettingsView>().First(view => view.IsEffectivelyVisible);
+        var alwaysModel = Assert.IsType<AgentSettingsViewModel>(alwaysSettings.DataContext);
+        await alwaysModel.RemoveAlwaysAsync(longMigration.Id);
+        Save(window, output, "27c-agents-always-removed");
+        window.Height = tall;
         await DrawMore(window, output);
         window.Width = 960;
         Save(window, output, "27-agents-settings-narrow");
@@ -1433,7 +1451,7 @@ public sealed class ScreenRenderer
             [],
             string.Empty,
             ApproverActivity.None,
-            [new ReleaseSeen("services/Mail", "claude-code", "allowance", AppClock.Start.AddMinutes(-4))],
+            [new ReleaseSeen("services/Mail", "claude-code", "always allowed", AppClock.Start.AddMinutes(-4))],
             AppClock.Start,
             [new AgentReach("claude-code", (_, _) => ExposureReach.Entry)]);
         items.Detail!.Apply(released);
@@ -1539,7 +1557,13 @@ public sealed class ScreenRenderer
             Profile = "dev",
             Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
         };
-        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-once-only");
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91c-run-once-only");
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { Label = null, OnceOnly = OnceOnly.Unnamed })), output, "91c2-run-unnamed");
+        var longCommand = new Core.Agents.AlwaysCommand(
+            run.Program,
+            ["npm", "run", "migrate", "--", "--schema", "billing", "--target", "2026-11-07T12-00-00-add-invoice-reconciliation-tables", "--lock-timeout", "120", "--statement-timeout", "600", "--dry-run=false"],
+            directory,
+            [new Core.Agents.AlwaysVariable("DATABASE_URL", new string('a', 32), "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", new string('a', 32), "STRIPE_SECRET_KEY"), new Core.Agents.AlwaysVariable("STRIPE_RESTRICTED_KEY", new string('a', 32), "STRIPE_RESTRICTED_KEY")]);
         var command = new Core.Agents.AlwaysCommand(run.Program, ["npm", "run", "migrate"], directory, [new Core.Agents.AlwaysVariable("DATABASE_URL", new string('a', 32), "DATABASE_URL"), new Core.Agents.AlwaysVariable("STRIPE_SECRET_KEY", new string('a', 32), "STRIPE_SECRET_KEY")]);
         DrawWindow(
             new RunApprovalWindow(new RunApprovalViewModel(run with { Always = new AlwaysOffer(AccessEdit.AlwaysCommand(command), run.Command) })),
@@ -1551,9 +1575,30 @@ public sealed class ScreenRenderer
                 AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = [command] } }),
                 AccessOrigin.Prompt,
                 string.Empty,
-                TimeZoneInfo.Utc))),
+                TimeZoneInfo.Utc,
+                _ => "env/acme-api/.env"))),
             output,
             "91f3-access-change-command");
+        DrawWindow(
+            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
+                "work laptop",
+                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = [longCommand] } }),
+                AccessOrigin.Prompt,
+                string.Empty,
+                TimeZoneInfo.Utc,
+                _ => "env/acme-api/.env"))),
+            output,
+            "91f5-access-change-long-command");
+        DrawWindow(
+            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
+                "work laptop",
+                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Items = [new string('a', 32)] } }),
+                AccessOrigin.Prompt,
+                string.Empty,
+                TimeZoneInfo.Utc,
+                _ => "api/Stripe"))),
+            output,
+            "91f4-access-change-item");
 
         var protectedPrompt = ApprovalPrompt.For(
             "claude-code",
@@ -1564,10 +1609,12 @@ public sealed class ScreenRenderer
         DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91d-approval-once-only");
         DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.LimitReached })), output, "91d2-approval-limit-reached");
         var item = new string('a', 32);
+        var ordinary = ApprovalPrompt.For("claude-code", new EntryName("api", "Stripe"), "password", "Run the webhook tests against the dev Stripe account.", "work laptop");
         DrawWindow(
-            new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { Always = new AlwaysOffer(AccessEdit.AlwaysItem(item), protectedPrompt.Entry) })),
+            new ApprovalWindow(new ApprovalViewModel(ordinary with { Always = new AlwaysOffer(AccessEdit.AlwaysItem(item), ordinary.Entry) })),
             output,
             "91e2-approval-always-item");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(ordinary with { Label = null, OnceOnly = OnceOnly.Unnamed })), output, "91e3-approval-unnamed");
 
         Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
         var asked = ApprovalPrompt.For(
@@ -1605,7 +1652,7 @@ public sealed class ScreenRenderer
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
 
-        var arming = new ApprovalWindow(new ApprovalViewModel(asked));
+        var arming = new ApprovalWindow(new ApprovalViewModel(asked with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) }));
         arming.Show();
         Save(arming, output, "91j-approval-arming");
         arming.Close();
@@ -2153,7 +2200,8 @@ public sealed class ScreenRenderer
             "DATABASE_URL",
             "Run the database migration for the api service.",
             "work laptop");
-        var model = new ApprovalViewModel(prompt);
+        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
+        var model = new ApprovalViewModel(prompt with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) });
         model.Tick(TimeSpan.FromSeconds(28));
         model.Arm();
         var window = new ApprovalWindow(model);
@@ -2247,7 +2295,7 @@ public sealed class ScreenRenderer
         page.Children.AddRange(
         [
             Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
-            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("All items", "list-title"), Text("Allowances", "dialog-title")),
+            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("All items", "list-title"), Text("Always allowed", "dialog-title")),
             Row(Text("AI tools and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
             Row(Button("Connect", ""), Button("Allow once", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
@@ -2479,11 +2527,11 @@ public sealed class ScreenRenderer
                     Args = AuditArgs.ForRun(null, "Run the migration."),
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.AlwaysAllowed,
-                    Reason = "served from an allowance given 17 minutes ago",
+                    Reason = "released without asking: a person always allowed this item for claude-code",
                     Entries = ["env/acme-api/.env"],
                     Command = "npm run migrate",
                 });
-                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.AlwaysAllowed, "served from an allowance given 19 minutes ago", asked: "Print the connection string so I can check it."));
+                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.AlwaysAllowed, "released without asking: a person always allowed this item for claude-code", asked: "Print the connection string so I can check it."));
                 Write(TimeSpan.FromMinutes(2), Credential(cursor, "Work/aws-console", "password", AuditDecision.Denied, AuditMethod.Prompt, "the person denied it"));
                 Write(TimeSpan.FromMinutes(18), new AuditRecord
                 {

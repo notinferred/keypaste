@@ -370,7 +370,7 @@ public sealed class AccessCaps
 
         caps = null;
 
-        if (edit.Reset || edit.NoPerHour || edit.NoUntil || edit.Values == true || edit.Run == true)
+        if (edit.Reset || edit.ChangesAlways || edit.NoPerHour || edit.NoUntil || edit.Values == true || edit.Run == true)
         {
             return false;
         }

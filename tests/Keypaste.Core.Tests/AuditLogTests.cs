@@ -775,6 +775,28 @@ public sealed class AuditLogTests : IDisposable
         Assert.Equal(0, unreadable);
     }
 
+    /// <summary>T-12: a release under an Always allow row under words the person never read is marked, and one under the words they read is not.</summary>
+    [Theory]
+    [InlineData("the reason they read", false)]
+    [InlineData("another reason", true)]
+    public void AnAlwaysAllowedLine_UnderAReasonNobodyRead_IsMarked(string reason, bool unread)
+    {
+        AuditRecord Line(AuditMethod method, string said) => Denial("request_credential", AuditArgs.ForCredentialRequest("k1_0123456789abcdef", "password", said)) with
+        {
+            Decision = AuditDecision.Granted,
+            Method = method,
+        };
+
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Line(AuditMethod.Prompt, "the reason they read"), out var error), error);
+            Assert.True(log.TryAppend(Line(AuditMethod.AlwaysAllowed, reason), out error), error);
+        }
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out var failure), failure);
+        Assert.Equal(unread, entries[^1].ReasonUnread);
+    }
+
     [Fact]
     public void TryReadFrom_ReadsOnlyNewCompleteLines()
     {

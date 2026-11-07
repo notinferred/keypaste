@@ -69,7 +69,7 @@ In source, the Agents screen lists the AI tools it finds on this computer, looki
 
 The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start `~/.local/bin/keypaste` with `mcp`: the script that starts the image with `cli`, which Settings also makes for your terminal and which a newer AppImage re-points when it starts. Connect and `setup` create it first when it is absent; when that path holds a file keypaste did not write, the preview names it and the pane's Connect replaces it, keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the screen's History. A tool shown Connected, or whose configuration keypaste cannot read, has Disconnect under its row's Settings, and a Connected one also has Connect again, for a moved vault or app. Disconnect reads the tool's configuration first and says when keypaste is not connected there; otherwise its pane shows the removal, and its Disconnect takes keypaste out of the tool and leaves its other servers alone.
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Always allow or Deny each end the check. A released password is discarded unread, and the audit record appears in the screen's History. A tool shown Connected, or whose configuration keypaste cannot read, has Disconnect under its row's Settings, and a Connected one also has Connect again, for a moved vault or app. Disconnect reads the tool's configuration first and says when keypaste is not connected there; otherwise its pane shows the removal, and its Disconnect takes keypaste out of the tool and leaves its other servers alone.
 
 No master password, keyfile or session identifier is written into a client's configuration.
 
@@ -182,7 +182,7 @@ Anyone who can edit the vault can influence its entry names. keypaste removes co
 
 Add `--allow-run` to the bridge's arguments and it offers another tool, `run`. In source, `keypaste setup` and the desktop's Connect add it, and an agent still runs nothing until you turn run on in its settings, in the app or with `keypaste clients <agent> --run on`, which waits for your confirmation; a configuration written before keeps the arguments it was given until setup or Connect runs again.
 
-`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny, Allow once or allow for up to 15 minutes; the timed choice covers only that command line in that directory on that connection. `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
+`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny, Allow once or Always allow. Always allow covers only that program, every argument in order, that directory and each variable from that item and field, holds only once confirmed, and approves the command line, not what it does ([T-35](../THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
 
 The app or `keypaste approve` records the run before it answers; the bridge then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
 
@@ -190,7 +190,7 @@ The scrubbing is a safety net, not a boundary: a command can still print a value
 
 ## Seeing and ending access
 
-In source, the earlier spellings `keypaste agent`, `keypaste mcp serve`, `keypaste mcp setup` and `keypaste mcp policy` are refused, each naming the command that replaced it. From another terminal, `keypaste grants --vault <path>` lists the grants the process holding that vault has given, one row per agent, entry and field with an id and the time left, and never a value; `--json` prints the same rows as one JSON array. `keypaste grants revoke <id>` ends one grant, `keypaste grants revoke <agent>` ends every grant that agent holds, and `--all` ends them all. `keypaste lock --vault <path>` asks the desktop app or `keypaste approve` holding the vault to lock now: every grant ends and `keypaste approve` stops. None of these asks for a password; they reach the holder over the same per-user endpoint as `keypaste run --session`, and nothing holding the vault is not an error.
+In source, the earlier spellings `keypaste agent`, `keypaste mcp serve`, `keypaste mcp setup` and `keypaste mcp policy` are refused, each naming the command that replaced it. From another terminal, `keypaste lock --vault <path>` asks the desktop app or `keypaste approve` holding the vault to lock now: every release stops and `keypaste approve` ends. It asks for no password; it reaches the holder over the same per-user endpoint as `keypaste run --session`, and nothing holding the vault is not an error.
 
 ## The audit log
 
@@ -220,6 +220,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
 | `automatic` | In source: released without prompting, because the agent's settings make it Automatic for the entry ([policy.md](policy.md)). |
 | `always-allowed` | A person chose Always allow on this item or this exact command and confirmed it, so nobody was asked about this request. It is never a person's approval of the request. |
+| `grant-cache` | Written by `v0.3.0`, and by source before Always allow: a live approval on the same connection served the request. Nothing in source writes it. |
 | `policy` / `policy-limit` | Written by `v0.3.0`: a standing rule in `policy.toml` released the field without prompting, or had spent its `max_per_hour` allowance. Nothing in source writes them. |
 | `undeliverable` | A person or the agent's Automatic mode authorized the request, but the value exceeded the reply limit. Nothing was released; the reason identifies the authorization source. |
 | `exposure` | A listing, naming only what the agent can see. |
@@ -237,9 +238,9 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
 
-Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt` or `grant-cache` like a credential's.
+Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt` or `always-allowed` like a credential's.
 
-A line `v0.3.0` or earlier source wrote may carry `granted_seconds`, the time a person chose; source writes none now. Lines written before it existed have none.
+A line an earlier build from source wrote may carry `granted_seconds`, the time a person chose; `v0.3.0` and source write none.
 
 The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 
@@ -259,7 +260,7 @@ keypaste log --client claude-code --since 2h
   time (UTC)           agent        item                decision  method
   2026-07-26 14:03:09  claude-code  -                   granted   exposure
   2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
-  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
+  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   always-allowed (!)
 
 (!) served from an earlier approval, under a reason you never saw.
 ```

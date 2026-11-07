@@ -99,12 +99,53 @@ public sealed class AgentSettingsViewTests
         using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
 
         Assert.Equal(["env/billing/.env", "npm test"], model.AlwaysRows.Select(row => row.What));
-        Assert.Contains("STRIPE_KEY", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
-        Assert.Contains("Run commands is off", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
+        Assert.Contains("/usr/bin/npm", model.AlwaysRows[1].Identity, StringComparison.Ordinal);
+        Assert.Contains("STRIPE_KEY from env/billing/.env · STRIPE_KEY", model.AlwaysRows[1].Identity, StringComparison.Ordinal);
+        Assert.Contains("May run commands is off", model.AlwaysRows[1].Detail, StringComparison.Ordinal);
 
         await model.RemoveAlwaysAsync(command.Id);
 
         Assert.Equal(["env/billing/.env"], model.AlwaysRows.Select(row => row.What));
+        Assert.Equal("Removed npm test. The next request for it asks you.", model.AlwaysMessage);
+    });
+
+    /// <summary>Text from a merged record draws as escapes, so nothing in a row can hide or reorder what the person checks.</summary>
+    [Fact]
+    public Task A_stored_command_draws_with_its_hidden_characters_as_escapes() => HeadlessSession.On(() =>
+    {
+        using var panel = new SettingsPanel();
+        var command = new AlwaysCommand("/usr/bin/\u202enpm", ["npm", "te\u202est"], "/wo\u202erk", [new AlwaysVariable("KE\u202eY", new string('0', 32), "fie\u202eld")]);
+        new AgentAccessStore(panel.Vault).Write("ci-probe", AccessEdit.AlwaysCommand(command));
+        panel.Vault.Save();
+
+        using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
+        var row = Assert.Single(model.AlwaysRows);
+
+        Assert.DoesNotContain('\u202e', row.What);
+        Assert.DoesNotContain('\u202e', row.Identity);
+        return Task.CompletedTask;
+    });
+
+    /// <summary>Always allow on an item in one project environment makes that row Automatic, so the list names it and takes it back, and never says nothing is always allowed.</summary>
+    [Fact]
+    public Task A_project_row_set_to_automatic_is_listed_and_removed_from_the_list() => HeadlessSession.On(async () =>
+    {
+        using var panel = new SettingsPanel();
+        Assert.True(ProjectScope.TryCreate("billing", "dev", out var scope, out var error), error);
+        new AgentAccessStore(panel.Vault).Write("ci-probe", AccessEdit.Automatic(scope));
+        panel.Vault.Save();
+
+        using var model = new AgentSettingsViewModel(panel.Authority, "ci-probe");
+
+        Assert.True(model.HasAlwaysRows);
+        var row = Assert.Single(model.AlwaysRows);
+        Assert.Equal("billing:dev", row.What);
+        Assert.Contains("Automatic", row.Detail, StringComparison.Ordinal);
+
+        await row.Remove.Run();
+
+        Assert.False(model.HasAlwaysRows);
+        Assert.Equal("Removed billing:dev. It follows the rest of this agent's settings now.", model.AlwaysMessage);
     });
 
     /// <summary>A pick keeps the keyboard as it is toggled, and a pick whose environment is gone hands it to its group's first chip.</summary>

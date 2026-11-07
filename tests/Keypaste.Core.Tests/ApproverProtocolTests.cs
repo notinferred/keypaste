@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Keypaste.Core.Agents;
@@ -256,6 +257,29 @@ public sealed class ApproverProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply with { Agents = [.. reply.Agents.Skip(1)] }), out AccessListReply? rest));
         Assert.True(rest.Complete);
         Assert.Equal(("codex", 0), (Assert.Single(rest.Agents).Name, rest.Agents[0].ProjectsNotShown));
+    }
+
+    /// <summary>A record whose rows would not fit one frame is sent without them, saying how many still release, so none goes unmentioned.</summary>
+    [Fact]
+    public void AnAccessList_SaysHowManyAlwaysAllowRowsDidNotFit()
+    {
+        List<AlwaysCommand> commands =
+        [
+            .. Enumerable.Range(0, AlwaysAllowed.MaximumCommands).Select(i => new AlwaysCommand(
+                "/usr/bin/npm",
+                [.. Enumerable.Range(0, 200).Select(_ => new string('é', 100)), i.ToString(CultureInfo.InvariantCulture)],
+                "/work",
+                [])),
+        ];
+        var huge = AcafRecord.Write(AgentAccess.Defaults with { Always = new AlwaysAllowed { Commands = commands } });
+
+        var frame = ApproverProtocol.Encode(new AccessListReply(true, [new AccessRow("claude-code", huge, true)], true, string.Empty));
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out AccessListReply? reply));
+        var row = Assert.Single(reply.Agents);
+        Assert.Equal(AlwaysAllowed.MaximumCommands, row.AlwaysNotShown);
+        Assert.True(AcafRecord.Read(row.Record).Access.Always.IsEmpty);
     }
 
     /// <summary>An ordinary entry with no fields or tags, encoding to ninety-eight bytes with its separating comma.</summary>

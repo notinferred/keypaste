@@ -5,7 +5,7 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.App.Views;
 
-/// <summary>Tells the person, where they chose Always for, that the change it asked for did not take effect.</summary>
+/// <summary>Tells the person, where they chose Always allow, that the change it asked for did not take effect.</summary>
 internal sealed partial class NoticeWindow : PromptWindow
 {
     public NoticeWindow()

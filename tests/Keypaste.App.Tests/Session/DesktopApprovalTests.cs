@@ -24,7 +24,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// A request over the app's real endpoint raises the app's own prompt window, drawn by Skia and
-/// clicked through the platform's hit-testing, and only a press of Allow once or the timed allow
+/// clicked through the platform's hit-testing, and only a press of Allow once or Always allow
 /// releases (V-4.4).
 /// </summary>
 public sealed class DesktopApprovalTests
@@ -51,7 +51,7 @@ public sealed class DesktopApprovalTests
             Assert.Equal(Label, Text(window, "LabelText"));
             Assert.Equal(EntryPath, Text(window, "EntryText"));
             Assert.Equal("password", Text(window, "FieldText"));
-            Assert.Equal("once or always", Text(window, "LifetimeText"));
+            Assert.Equal(string.Empty, Text(window, "LifetimeText"));
 
             await app.ArmAsync();
             Click(window, "AllowOnce");
@@ -741,7 +741,7 @@ public sealed class DesktopApprovalTests
         });
 
     [Fact]
-    public Task A_custom_field_is_named_on_the_prompt_and_a_grant_for_it_serves_no_other_field() =>
+    public Task A_custom_field_is_named_on_the_prompt_and_allowing_it_answers_no_other_field() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -757,11 +757,12 @@ public sealed class DesktopApprovalTests
             Assert.Equal(ApiKeySentinel, once!.Value);
             await PromptedApp.WithdrawnAsync(window);
 
-            var timed = app.Ask(entry: OpenAiPath, exposure: "api/**", field: "OPENAI_API_KEY");
+            var again = app.Ask(entry: OpenAiPath, exposure: "api/**", field: "OPENAI_API_KEY");
             var second = await app.PromptAsync(count: 2);
             await app.ArmAsync();
             Click(second, "AllowOnce");
             await PromptedApp.WithdrawnAsync(second);
+            Assert.Equal(ApiKeySentinel, (await again.WaitAsync(_wait, Token))!.Value);
 
             var password = app.Ask(entry: OpenAiPath, exposure: "api/**");
             var third = await app.PromptAsync(count: 3);
@@ -876,7 +877,7 @@ public sealed class DesktopApprovalTests
 
             var confirm = Assert.IsType<AccessChangeWindow>(await app.PromptAsync(count: 2));
             Assert.Equal(Label, Text(confirm, "AgentText"));
-            Assert.Equal("asked from the approval prompt's Always allow", Text(confirm, "OriginText"));
+            Assert.Equal("you chose Always allow on the prompt", Text(confirm, "OriginText"));
             Assert.False(reply.IsCompleted, "the release came back before the change it asked for was answered");
             await app.ArmAsync("Allow");
             Click(confirm, "Allow");

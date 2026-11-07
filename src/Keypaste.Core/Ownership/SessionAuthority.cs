@@ -1438,7 +1438,9 @@ public sealed class SessionAuthority : IApproverHandler
             variables.Add(new AlwaysVariable(key, item, entry.Field));
         }
 
-        return new AlwaysCommand(request.Program, request.Command, request.Directory, variables);
+        return RunProgram.FinalTarget(request.Program) is { } program
+            ? new AlwaysCommand(program, request.Command, request.Directory, variables)
+            : null;
     }
 
     private void Record(SessionLifetime lifetime, IEnumerable<string> entries, string client, string how)
@@ -1460,8 +1462,8 @@ public sealed class SessionAuthority : IApproverHandler
     /// <para>
     /// The order is the security property. The token is verified against the vault as its file holds
     /// it, never echoed and never distinguished between unknown and revoked; its scope must cover the
-    /// set; a protected profile needs the token to allow it and then a live answer every time, with
-    /// no grant ever stored. Nobody is asked otherwise.
+    /// set; a protected profile needs the token to allow it and then a live answer every time.
+    /// Nobody is asked otherwise.
     /// </para>
     /// <para>
     /// This owner, not the runner, writes the audit line of every request it reads before it replies,

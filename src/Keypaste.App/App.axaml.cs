@@ -311,7 +311,7 @@ internal sealed partial class App : Application, IDisposable
         _window.Activate();
     }
 
-    /// <summary>Shows the window on Agents with one agent's settings open, as the Always for notice asks.</summary>
+    /// <summary>Shows the window on Agents with one agent's settings open, as the Always allow notice asks.</summary>
     /// <param name="agent">The agent's name.</param>
     internal void OpenAgentSettings(string agent)
     {
