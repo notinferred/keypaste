@@ -1,6 +1,6 @@
 # F.77 — Once or Always
 
-Completed 2026-11-07 on `f77-once-or-always`, source only and not merged: the founder reviews PRODUCT's re-ratification, the ACAF v1.2 page and every site change first. Runs are named in the batch's report.
+Completed 2026-11-07 on `f77-once-or-always`, source only and not merged: the founder reviews PRODUCT's re-ratification, the ACAF v1.2 page and every site change first. The last fast tier is ci 42413831106 at `2b725955`, with dev desktop 42414492775 and dev desktop-gates 42413830289 green there on Linux.
 
 ## Amendments
 
