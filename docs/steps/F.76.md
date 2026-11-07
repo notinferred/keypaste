@@ -1,6 +1,6 @@
 # F.76 — Let the person pick the item an agent asked for
 
-Completed 2026-11-07 on `f76-picker`, built on F.77's unmerged `f77-once-or-always` at `8ebdebd0`, source only and not merged. Implemented only, in RELEASE's terms: no person has used this, and no package holds it.
+Completed 2026-11-07 on `f76-picker` at `224e6a77`, built on F.77's unmerged `f77-once-or-always` at `8ebdebd0`, source only and not merged. Implemented only, in RELEASE's terms: no person has used this, and no package holds it.
 
 ## Amendments
 
@@ -32,7 +32,7 @@ Locally: those classes, with `ApprovalGateTests`, `ApproverHandlerTests`, `Appro
 
 ## Runs
 
-Pending.
+At `224e6a77`: ci 42424561684 (fast tier) and dev desktop 42424571604 green on Linux. Dev desktop-gates 42423099497 green on Linux at `0bdf2b05`, which differs from `224e6a77` by two rule tests and the mask's face. At `0bdf2b05`, ci 42422858537 failed `ApprovalPromptTests.ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline`, which lists the prompt's members and now argues for `Candidates` and `Item`, and dev desktop 42423097375 failed `LanguageAndRegionTests.Every_word_a_view_shows_comes_from_the_resources`, which now counts the picker among the prompts whose words stay in their view, and `DesignScaleTests.Mono_is_12_to_13_outside_a_mask`, repaired by drawing the picker's mask in the interface face; ci 42423396821 was green at `a0d4fae4` between them.
 
 ## Limits and follow-ups
 
