@@ -81,6 +81,9 @@ public sealed record ApprovalPrompt
     /// <remarks><see cref="Entry"/> is the name they share.</remarks>
     public IReadOnlyList<ItemCandidate> Candidates { get; init; } = [];
 
+    /// <summary>Whether the person is offered Always allow and, on one item, Always block: only for a named agent while keypaste has room to remember.</summary>
+    public bool OffersAlways { get; init; }
+
     /// <summary>The UUID of the one item asked about, as hex, or null when the prompt is a picker or the UUID could not be read.</summary>
     public string? Item { get; init; }
 

@@ -4,11 +4,13 @@ namespace Keypaste.Core.Approval;
 /// What came back from asking a human. One value releases a credential.
 /// </summary>
 /// <remarks>
-/// Seven of the eight mean deny, and they are distinct only so the audit line and the refusal an
+/// All but two mean deny, and they are distinct only so the audit line and the refusal an
 /// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. docs/PRODUCT.md law
 /// 3.2 makes deny the default and law 3.7 makes every error path a denial, so the safe way to read
 /// this enum is: <see cref="ApprovedOnce"/> releases; anything else is a no.
-/// <see cref="ApprovalAnswers.Releases"/> reads it that way.
+/// <see cref="ApprovalAnswers.Releases"/> reads it that way. <see cref="AlwaysAllowed"/> releases only on the
+/// credential path that offered it, which reads it itself; the gate turns either always into a denial on any
+/// prompt that did not offer it.
 /// </remarks>
 public enum ApprovalAnswer
 {
@@ -41,4 +43,10 @@ public enum ApprovalAnswer
 
     /// <summary>A human allowed this one request and nothing after it.</summary>
     ApprovedOnce = 8,
+
+    /// <summary>A human allowed this request and confirmed that this agent always gets this item's field, or the item they picked, without asking.</summary>
+    AlwaysAllowed = 9,
+
+    /// <summary>A human refused this request and confirmed that this agent is always refused this item's field without asking.</summary>
+    AlwaysBlocked = 10,
 }

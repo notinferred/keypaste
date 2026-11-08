@@ -5,10 +5,15 @@ namespace Keypaste.App.ViewModels;
 /// <summary>One credential request in front of the person at this desktop, answered once.</summary>
 internal sealed class ApprovalViewModel : PromptViewModel
 {
+    private readonly bool _offersAlways;
+    private readonly string? _agent;
+
     internal ApprovalViewModel(ApprovalPrompt prompt)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
+        _offersAlways = prompt.OffersAlways;
+        _agent = prompt.Label;
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
@@ -20,6 +25,28 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     /// <summary>Whose words a reason is, said under it whatever it says.</summary>
     internal const string AttributionText = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+
+    /// <inheritdoc/>
+    internal override bool OffersAlways => _offersAlways;
+
+    /// <inheritdoc/>
+    internal override bool OffersAlwaysBlock => _offersAlways;
+
+    /// <inheritdoc/>
+    protected override string Choices => ChoicesText(_offersAlways, _agent);
+
+    /// <inheritdoc/>
+    protected override string Confirmation(ApprovalAnswer always) => always == ApprovalAnswer.AlwaysBlocked
+        ? $"Always refuse {_agent} this item's {Field} without asking you? Remove it on its page in Agents to be asked again."
+        : $"Always give {_agent} this item's {Field} without asking you? Remove it on its page in Agents to be asked again.";
+
+    /// <summary>What is said above a prompt's choices: what an always keeps, or why none is offered.</summary>
+    internal static string ChoicesText(bool offersAlways, string? agent) => (offersAlways, agent) switch
+    {
+        (true, _) => $"An always answer is kept for {agent} on this computer until you remove it.",
+        (false, null) => "This agent's bridge has no --client-label, so keypaste can't remember an answer for it.",
+        _ => $"keypaste keeps at most {Keypaste.Core.Agents.AgentRules.MaximumRemembered} always answers. Remove some on an agent's page to add another.",
+    };
 
     /// <summary>What was scrubbed from the item or the reason, or nothing.</summary>
     internal static string ScrubbedText(ApprovalPrompt prompt) => (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch

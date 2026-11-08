@@ -20,7 +20,7 @@ sequenceDiagram
   C->>B: one field of one entry, and a reason
   B->>O: over a named pipe, to the unlocked session
   O->>Y: who asks, for what, and why
-  Y-->>O: deny, allow once, or always allow
+  Y-->>O: deny, allow once, always allow or always block
   O->>O: one audit line, allowed or refused
   O-->>B: one field, only if you allowed it
   B-->>C: the value, or a refusal
@@ -49,7 +49,7 @@ The bridge your AI tool starts holds no vault and can never ask for your master 
 
 ## Limits
 
-A value you release is the agent's from then on, and keypaste cannot revoke the credential at its issuer. The reason is the agent's own words, and the prompt says so. A release you allowed in advance has nobody reading it, and the rules are the same for every agent, so another program running as you that starts keypaste's bridge gets whatever you allowed. An agent that runs commands as you can reach things around the prompt, such as its own configuration; [the security model](/how-it-works/security/) lists them.
+A value you release is the agent's from then on, and keypaste cannot revoke the credential at its issuer. The reason is the agent's own words, and the prompt says so. A release you allowed in advance has nobody reading it, and another program running as you that starts keypaste's bridge gets whatever you allowed for every agent, and under an agent's name what you allowed or always allowed for that agent. An agent that runs commands as you can reach things around the prompt, such as its own configuration; [the security model](/how-it-works/security/) lists them.
 
 ## Read more
 

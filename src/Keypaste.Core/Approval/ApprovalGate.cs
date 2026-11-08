@@ -128,14 +128,17 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken, always: prompt.OffersAlways);
     }
 
     /// <summary>Asks a human to pick one of the items a credential request names and answer it, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown, its candidates the items.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal.</returns>
+    /// <returns>
+    /// The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal;
+    /// a picker offers no Always block, so one is a refusal too.
+    /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
     public async ValueTask<ItemPick> AskPickingAsync(
         string cooldownKey,
@@ -154,11 +157,17 @@ public sealed class ApprovalGate : IDisposable
             {
                 var said = await _channel.AskToPickAsync(prompt, token).ConfigureAwait(false);
                 picked = said.Picked is { } index && index >= 0 && index < prompt.Candidates.Count ? index : null;
-                return said.Answer == ApprovalAnswer.ApprovedOnce && picked is null ? ApprovalAnswer.Denied : said.Answer;
+                return said.Answer switch
+                {
+                    ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed when picked is null => ApprovalAnswer.Denied,
+                    ApprovalAnswer.AlwaysBlocked => ApprovalAnswer.Denied,
+                    _ => said.Answer,
+                };
             },
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            always: prompt.OffersAlways).ConfigureAwait(false);
 
-        return new ItemPick(answer, answer == ApprovalAnswer.ApprovedOnce ? picked : null);
+        return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed ? picked : null);
     }
 
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
@@ -255,7 +264,8 @@ public sealed class ApprovalGate : IDisposable
         Asked listed,
         Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
         CancellationToken cancellationToken,
-        bool coolUnanswered = false)
+        bool coolUnanswered = false,
+        bool always = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -281,6 +291,11 @@ public sealed class ApprovalGate : IDisposable
             _asking = new Asking(listed.Prompt, listed.Run, listed.Env, listed.Edit, Deadline.Starting(_clock, Limits.Window));
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
+
+            if (!always && answer is ApprovalAnswer.AlwaysAllowed or ApprovalAnswer.AlwaysBlocked)
+            {
+                answer = ApprovalAnswer.Denied;
+            }
 
             // One the owner withdrew, by a lock or a reload, went unanswered by nobody's choice, so it holds nothing back.
             if (answer == ApprovalAnswer.Denied

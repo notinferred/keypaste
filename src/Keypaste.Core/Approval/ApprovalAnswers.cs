@@ -14,7 +14,7 @@ public static class ApprovalAnswers
     /// <returns>The method; a person's no is <see cref="AuditMethod.Prompt"/>.</returns>
     public static AuditMethod ToAuditMethod(this ApprovalAnswer answer) => answer switch
     {
-        ApprovalAnswer.Denied => AuditMethod.Prompt,
+        ApprovalAnswer.Denied or ApprovalAnswer.AlwaysBlocked => AuditMethod.Prompt,
         ApprovalAnswer.TimedOut => AuditMethod.TimedOut,
         ApprovalAnswer.Cancelled => AuditMethod.Cancelled,
         ApprovalAnswer.Busy => AuditMethod.Busy,

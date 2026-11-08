@@ -140,6 +140,11 @@ internal sealed class AppAuthority : IDisposable
     internal bool TryRules([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Core.Agents.AgentRules? rules, out string? ignored) =>
         _host.TryRules(out rules, out ignored);
 
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    internal string? ItemShown(string item) => _host.ItemShown(item);
+
     /// <summary>Changes this computer's agent rules, sealed with the vault's key and recorded.</summary>
     /// <param name="agent">The agent the change is about.</param>
     /// <param name="change">The new rules from those that hold now.</param>

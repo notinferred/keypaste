@@ -188,6 +188,21 @@ internal sealed class SessionHost : IDisposable
         return hosted is not null && hosted.TryRules(out rules, out ignored);
     }
 
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when nothing here answers agents or no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    internal string? ItemShown(string item)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        return hosted?.ItemShown(item);
+    }
+
     /// <summary>Changes this computer's agent rules for the person at this app, sealed and recorded as keypaste app.</summary>
     /// <param name="agent">The agent the change is about.</param>
     /// <param name="change">The new rules from those that hold now.</param>
@@ -494,6 +509,8 @@ internal sealed class SessionHost : IDisposable
             ignored = null;
             return AnswersAgents && _server.Authority.TryRules(out rules, out ignored);
         }
+
+        internal string? ItemShown(string item) => AnswersAgents ? _server.Authority.ItemShown(item) : null;
 
         internal RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change) =>
             AnswersAgents ? _server.Authority.ChangeRules(agent, change, Surface, out _) : new RulesChangeReply(false, _notAnswering);

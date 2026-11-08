@@ -476,6 +476,11 @@ public sealed class SessionAuthority : IApproverHandler
         return new RulesChangeReply(changed, said) { Recorded = recorded };
     }
 
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    public string? ItemShown(string item) => _inner.ItemShown(item);
+
     /// <summary>The rules this owner decides by now, and why the file's are ignored when they are.</summary>
     /// <param name="rules">The rules, when they could be read.</param>
     /// <param name="ignored">Why the file's rules are ignored and the defaults hold, or null.</param>
@@ -924,11 +929,15 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            List<FieldCategory> blocked = [.. entries.Select(entry => _inner.Category(entry.Name, entry.Field)).Where(category => rules.RuleFor(category) == CategoryRule.Block)];
+            // Decided for this agent, as its own requests are, so a run is no way around an agent's Block or an item's Always block.
+            var blocked = entries
+                .Select(entry => (Category: _inner.Category(entry.Name, entry.Field), Item: _inner.ItemId(entry.Name), entry.Field))
+                .Select(entry => (entry.Category, Decided: rules.Decide(request.ClientLabel, entry.Item, entry.Field, entry.Category)))
+                .FirstOrDefault(entry => entry.Decided.Rule == CategoryRule.Block);
 
-            if (blocked.Count > 0)
+            if (blocked.Decided.Rule == CategoryRule.Block)
             {
-                (refused, refusedMethod) = ($"a variable of the set is in a blocked category: {ApproverHandler.Blocked(blocked[0])}", AuditMethod.Blocked);
+                (refused, refusedMethod) = ($"a variable of the set is in a blocked category: {ApproverHandler.Blocked(blocked.Category, blocked.Decided.Level)}", AuditMethod.Blocked);
                 return false;
             }
 

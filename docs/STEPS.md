@@ -8,17 +8,14 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.78b — Let an agent's page and a prompt's answer override a category.** Needs: none ([F.78a](steps/F.78a.md)). Founder, 2026-11-07.
-  - An agent's page may set any category differently for that agent. A prompt offers Deny, Allow once, Always allow and Always block, the always choices remembered for that agent and that item's field once the person confirms them, each listed with Remove on the agent's page; the picker's Always allow remembers the pick for that name. The most specific answer wins: an item's field, then the agent's category, then Settings. Passkeys stay Blocked. Overrides and remembered answers live in F.78a's sealed `agents.toml`, so one written outside keypaste is ignored.
-  - Accepted when tests on the request path show the three levels deciding in that order, a confirmation needed before an always holds, Remove asking again, the picker's remembered pick answering only that agent's requests for that name, and a lock releasing nothing.
 - [ ] **F.78c — Give cards and identities categories of their own.** Needs: none ([F.78a](steps/F.78a.md)). Founder, 2026-11-07.
   - An entry whose fields carry the names keypaste's importers write for a card or an identity has its secret fields decided as card or identity values; any other entry's protected fields stay protected custom fields, so an unrecognized card releases nothing more.
   - Accepted when tests show an imported card's and identity's fields decided by their own categories and a hand-made one decided as protected custom fields.
-- [ ] **F.79 — Let an agent ask the person to save a value.** Needs: F.78b. Founder, 2026-11-07, for 1.0.0.
+- [ ] **F.79 — Let an agent ask the person to save a value.** Needs: none ([F.78b](steps/F.78b.md)). Founder, 2026-11-07, for 1.0.0.
   - An agent names where a value belongs (project or item, field or variable name) and why; the app asks the person to type, paste or generate the value with keypaste's password or passphrase generator, shows where it will go, and saves it only on their action. The agent never receives the value, only whether it was saved, and the request is logged. It keeps the prompts' rules: no default, focus on Cancel, the save disarmed for a second, a fixed layout.
   - PRODUCT is amended, dated, since agents organizing the vault (T7) otherwise follows 1.0.0.
   - Accepted when tests show a saved value reaching the named place and never the agent, a cancel or lock saving nothing, and an existing value replaced only after the person confirms it.
-- [ ] **F.80 — Let a request wait its turn.** Needs: F.78b. Founder, 2026-11-07.
+- [ ] **F.80 — Let a request wait its turn.** Needs: none ([F.78b](steps/F.78b.md)). Founder, 2026-11-07.
   - A request arriving while a prompt is open waits its turn instead of being refused as busy, so two tabs of one agent are each answered. A looping agent cannot pile prompts up: the founder settles the bound before it is built, with a few waiting per agent and the refusal cooldown as the starting proposal.
   - Accepted when tests show two concurrent requests each prompted in order, a cancelled or timed-out request leaving the queue, a lock emptying it, and the bound holding.
 

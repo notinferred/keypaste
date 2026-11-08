@@ -25,7 +25,7 @@ Every value an agent asks for falls in one category, and each category is Ask, A
 | Notes | An item's notes |
 | Attachments | One attachment of an item, asked for by name, at most 5 MiB |
 
-Ask puts each request to you, and the prompt offers Deny and Allow once ([approvals](approvals.md)). Allow releases without asking you and records each release; it takes effect only once you confirm, in Settings, that every agent will receive every value of that kind without asking. Block refuses without asking you. A passkey's fields are always blocked, since its private key signs in wherever it is registered. Whether a custom field is a project variable depends only on its item's project tag, never on the field's name.
+Ask puts each request to you, and the prompt offers Deny and Allow once, and Always allow and Always block for an agent whose bridge has a label ([approvals](approvals.md)). Allow releases without asking you and records each release; it takes effect only once you confirm, in Settings, that every agent will receive every value of that kind without asking. Block refuses without asking you. A passkey's fields are always blocked, since its private key signs in wherever it is registered. Whether a custom field is a project variable depends only on its item's project tag, never on the field's name.
 
 After you refuse a request, the same field is refused for a minute without asking you again; changing that field's category in Settings ends the wait at once.
 
@@ -53,7 +53,7 @@ An attachment's line is a `request_credential` line whose field is `attachment` 
 
 ## Limits
 
-An allowed release has nobody reading the agent's reason, and the agent keeps what it was given. The rules are the same for every agent, so another program running as you that starts a bridge gets whatever is allowed ([THREATS](../THREATS.md) T-14), and an Allow covers values added later, such as an item tagged into a project afterwards (T-13).
+An allowed release has nobody reading the agent's reason, and the agent keeps what it was given. Another program running as you that starts a bridge gets whatever is allowed for every agent, and under an agent's label what is allowed or always allowed for that agent ([THREATS](../THREATS.md) T-14), and an Allow covers values added later, such as an item tagged into a project afterwards (T-13).
 
 ## Verifying it yourself
 

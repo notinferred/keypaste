@@ -63,6 +63,7 @@
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         <Border Classes="prompt-reason" Height="164" Padding="4">
           <ListBox Name="Candidates" ItemsSource="{Binding Rows}" SelectedItem="{Binding Picked}" SelectionMode="Single"
+                   IsEnabled="{Binding IsChoosing}"
                    AutomationProperties.Name="Items that answer to this request">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:PickRow">
@@ -106,15 +107,24 @@
       <TextBlock Classes="prompt-note size-13"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
-      <!-- Its line is kept once an item is picked and the caption empties, so the buttons never move (T-2). -->
-      <TextBlock Name="PickCaptionText" Classes="prompt-note size-13" Text="{Binding PickCaption}"
-                 Height="20" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+      <!-- Each slot keeps its place and width at both steps, so no button moves under the pointer, and the caption keeps its
+           two lines whatever it says (D-0326, T-2). No button is the default. -->
+      <TextBlock Name="CaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
+                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
 
-      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+      <Grid ColumnDefinitions="Auto,112,112,112,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                 IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
-                Command="{Binding AllowOnceCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+        <Button Grid.Column="1" Name="Back" Classes="prompt" Content="Back" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsConfirming}" Command="{Binding BackCommand}" />
+        <Button Grid.Column="2" Name="AlwaysAllow" Classes="prompt" Content="Always allow" HorizontalAlignment="Stretch"
+                IsVisible="{Binding ShowsAlwaysAllow}" Command="{Binding AlwaysAllowCommand}" />
+        <Button Grid.Column="2" Name="ConfirmAlways" Classes="prompt primary" Content="{Binding ConfirmLabel}" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsConfirming}" Command="{Binding ConfirmAlwaysCommand}" />
+        <Button Grid.Column="3" Name="AlwaysBlock" Classes="prompt" Content="Always block" HorizontalAlignment="Stretch"
+                IsVisible="{Binding ShowsAlwaysBlock}" Command="{Binding AlwaysBlockCommand}" />
       </Grid>
 
     </StackPanel>

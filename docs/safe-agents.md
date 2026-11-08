@@ -106,7 +106,7 @@ Cursor's documentation does not say whether a sandboxed command can read other p
 
 A sandbox confines the agent's own commands. Everything outside it still runs as you, and keypaste's limits there stand:
 
-- Anything that can reach the vault's holder through a bridge gets every kind of value you allowed without a prompt, since the rules are the same for every agent (T-14).
+- Anything that can reach the vault's holder through a bridge gets every kind of value you allowed for every agent without a prompt, and under an agent's label what you allowed or always allowed for that agent (T-14).
 - A command an agent runs through keypaste's `run` tool receives the values, and the agent often wrote what that command does (T-35).
 - An agent's settings bind only the bridge that names them (T-36).
 - A process running as you outside the sandbox can read memory, files and keystrokes and talk to keypaste's pipe (T-10, T-18).

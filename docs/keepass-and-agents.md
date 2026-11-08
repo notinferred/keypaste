@@ -59,7 +59,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
 One keystroke later the deploy runs, and the exchange is two lines you can read back:

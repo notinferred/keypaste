@@ -237,9 +237,8 @@ done
 # ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
 # is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF "[d] deny  [o] once  " "$page" \
-    || die "$page does not show the choices a person actually answers"
-  grep -qF "[a] always" "$page" && die "$page still shows an [a] always choice no prompt offers"
+  grep -qF "[d] deny  [o] once  [a] always  [b] block  " "$page" \
+    || die "$page does not show the choices a person actually answers a labelled agent with"
 done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
 

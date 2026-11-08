@@ -28,7 +28,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 **For developers and their agents**
 
-- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny or Allow once, or allow a kind of value for every agent in Settings, and every request lands in a hash-chained audit log.
+- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once, or Always allow or Always block for that agent and item, or allow a kind of value for every agent in Settings or for one on its page, and every request lands in a hash-chained audit log.
 - Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). [PRODUCT §2](docs/PRODUCT.md) bounds it: no shell, and you approve the exact command.
 - Projects: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
@@ -67,7 +67,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.

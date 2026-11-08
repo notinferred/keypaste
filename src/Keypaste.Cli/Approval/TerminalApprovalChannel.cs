@@ -29,7 +29,9 @@ namespace Keypaste.Cli.Approval;
 /// newlines, no bidirectional overrides — so it cannot draw a second dialog inside this one or move
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
 /// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once, and
-/// every other answer, Enter and silence included, is a denial (D-0326).
+/// every other answer, Enter and silence included, is a denial (D-0326). Where the prompt offers them,
+/// <c>a</c> and <c>b</c> ask to confirm an Always allow or an Always block with <c>y</c>, and any other
+/// answer to that is a denial too.
 /// </para>
 /// </remarks>
 internal sealed class TerminalApprovalChannel : IApprovalChannel
@@ -67,7 +69,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(started, cancellationToken);
+        return AnswerAsync(started, Always.Of(request, request.Field, blocks: true), cancellationToken);
     }
 
     /// <summary>Lists the items a request names by number, reads the number of the one the person picks, then asks about that one as any request is asked.</summary>
@@ -98,7 +100,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         _console.WriteLine(string.Join(Environment.NewLine, string.Empty, $"  picked   [{picked + 1}] {Described(request.Candidates[picked])}"));
 
-        return new ItemPick(await AnswerAsync(started, cancellationToken).ConfigureAwait(false), picked);
+        var always = Always.Of(request, $"the {request.Field} of {Described(request.Candidates[picked])} when it asks for {request.Entry},", blocks: false);
+
+        return new ItemPick(await AnswerAsync(started, always, cancellationToken).ConfigureAwait(false), picked);
     }
 
     public async ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt request, CancellationToken cancellationToken)
@@ -168,7 +172,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(started, cancellationToken);
+        return AnswerAsync(started, always: null, cancellationToken);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(RunPrompt request, CancellationToken cancellationToken)
@@ -177,7 +181,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(started, cancellationToken);
+        return AnswerAsync(started, always: null, cancellationToken);
     }
 
     public void Tell(PairingNotice notice)
@@ -190,29 +194,61 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             + "To pair it, start keypaste approve with --pair-browser <name>, then connect again."));
     }
 
-    private async ValueTask<ApprovalAnswer> AnswerAsync(long started, CancellationToken cancellationToken)
+    private async ValueTask<ApprovalAnswer> AnswerAsync(long started, Always? always, CancellationToken cancellationToken)
     {
+        var choices = _choices + (always is null ? string.Empty : always.Blocks ? "ab" : "a");
         char? choice;
 
         try
         {
-            choice = await ChooseAsync(_choices, () => Choice(Remaining(started)), cancellationToken).ConfigureAwait(false);
+            choice = await ChooseAsync(choices, () => Choice(always, Remaining(started)), cancellationToken).ConfigureAwait(false);
+
+            if (always is not null && choice is 'a' or 'b')
+            {
+                var allows = choice == 'a';
+                _console.WriteLine(string.Join(
+                    Environment.NewLine,
+                    string.Empty,
+                    $"  {(allows ? "Always give" : "Always refuse")} {always.Agent} {always.What} without asking you?",
+                    "  Remove it on the agent's page in the keypaste app to be asked again."));
+                var confirmed = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), allows ? "always allow" : "always block"), cancellationToken).ConfigureAwait(false) == 'y';
+
+                return Said(
+                    confirmed ? allows ? ApprovalAnswer.AlwaysAllowed : ApprovalAnswer.AlwaysBlocked : ApprovalAnswer.Denied);
+            }
         }
         catch (OperationCanceledException)
         {
             return Withdrawn("Nothing was released.");
         }
 
-        var answer = choice == 'o' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
+        return Said(choice == 'o' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied);
+    }
 
+    private ApprovalAnswer Said(ApprovalAnswer answer)
+    {
         _console.WriteLine(string.Join(
             Environment.NewLine,
-            answer == ApprovalAnswer.ApprovedOnce
-                ? _console.Paint(Tone.Ok, "keypaste: allowed once.")
-                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."),
+            answer switch
+            {
+                ApprovalAnswer.ApprovedOnce => _console.Paint(Tone.Ok, "keypaste: allowed once."),
+                ApprovalAnswer.AlwaysAllowed => _console.Paint(Tone.Ok, "keypaste: allowed, and always from now on."),
+                ApprovalAnswer.AlwaysBlocked => _console.Paint(Tone.Danger, "keypaste: denied, and always from now on. Nothing was released."),
+                _ => _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."),
+            },
             RuleLine));
 
         return answer;
+    }
+
+    /// <summary>What a prompt's always answers keep, for the agent its bridge names, or null when it offers none.</summary>
+    /// <param name="Agent">The agent's name.</param>
+    /// <param name="What">What the agent would always get, as the confirmation names it.</param>
+    /// <param name="Blocks">Whether Always block is offered too.</param>
+    private sealed record Always(string Agent, string What, bool Blocks)
+    {
+        internal static Always? Of(ApprovalPrompt prompt, string what, bool blocks) =>
+            prompt.OffersAlways && prompt.Label is { } agent ? new Always(agent, blocks ? $"this item's {what}" : what, blocks) : null;
     }
 
     /// <summary>Reads one choice under a countdown, the choice line drawn and cleared around it.</summary>
@@ -258,8 +294,13 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
     /// <summary>The choice line: what each key does, and how long is left to press one, at one width while it counts down.</summary>
     /// <remarks>Its colours, when stderr shows any, are the same escapes on every redraw, so the width stays one.</remarks>
-    private string Choice(int secondsLeft) =>
-        _console.Paint(Tone.Accent, "[d] deny  [o] once  ")
+    private string Choice(Always? always, int secondsLeft) =>
+        _console.Paint(Tone.Accent, always switch
+        {
+            null => "[d] deny  [o] once  ",
+            { Blocks: true } => "[d] deny  [o] once  [a] always  [b] block  ",
+            _ => "[d] deny  [o] once  [a] always  ",
+        })
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";
 
@@ -270,10 +311,10 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";
 
-    /// <summary>The confirmation's choice line: deny first, and the one key that allows.</summary>
-    private string Confirmation(int secondsLeft) =>
+    /// <summary>The confirmation's choice line: deny first, and the one key that confirms.</summary>
+    private string Confirmation(int secondsLeft, string confirms = "allow") =>
         _console.Paint(Tone.Accent, "[d] deny  ")
-        + _console.Paint(Tone.Ok, "[y] allow")
+        + _console.Paint(Tone.Ok, $"[y] {confirms}")
         + "  "
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
         + " ";

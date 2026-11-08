@@ -70,8 +70,22 @@ public sealed class AgentRulesFile(string path)
     private const string _usernameKey = "username";
     private const string _nameKey = "name";
     private const string _runKey = "run";
+    private const string _alwaysTable = "always";
+    private const string _pickTable = "pick";
+    private const string _agentKey = "agent";
+    private const string _itemKey = "item";
+    private const string _fieldKey = "field";
+    private const string _ruleKey = "rule";
 
-    private static readonly TomlLimits _limits = TomlLimits.Policy with { Tables = AgentRules.MaximumAgents + 2 };
+    // Room for every agent and every remembered answer, each naming a field or an attachment and a name up to a request's length.
+    private static readonly TomlLimits _limits = TomlLimits.Policy with
+    {
+        Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + 2,
+        Lines = 2048,
+        Bytes = 256 * 1024,
+        LineLength = 1024,
+        StringLength = Approval.CredentialRequestRules.MaximumEntryLength + 128,
+    };
 
     /// <summary>The file.</summary>
     public string Path { get; } = path ?? throw new ArgumentNullException(nameof(path));
@@ -199,9 +213,15 @@ public sealed class AgentRulesFile(string path)
             return false;
         }
 
-        if (rules.Agents.FirstOrDefault(agent => !new TomlWriter(_limits).CanWrite(_nameKey, agent.Name)) is { } unwritable)
+        if (rules.Agents.FirstOrDefault(agent => !CanWrite(agent.Name)) is { } unwritable)
         {
             problem = $"an agent's name cannot be written: {unwritable.Name}";
+            return false;
+        }
+
+        if (rules.Answers.Any(answer => !CanWrite(answer.Field)) || rules.Picks.Any(pick => !CanWrite(pick.Name) || !CanWrite(pick.Field)))
+        {
+            problem = "a remembered answer names a field or an item that cannot be written";
             return false;
         }
 
@@ -242,10 +262,30 @@ public sealed class AgentRulesFile(string path)
         foreach (var agent in rules.Agents)
         {
             writer.BlankLine().Table(_agentTable).Text(_nameKey, agent.Name).Number(_runKey, agent.Run ? 1 : 0, "1 lets it ask to run commands, each run asked");
+
+            foreach (var category in FieldCategories.Ruled)
+            {
+                if (rules.RuleFor(agent.Name, category) is { } own)
+                {
+                    writer.Text(FieldCategories.Key(category), Word(own));
+                }
+            }
+        }
+
+        foreach (var answer in rules.Answers)
+        {
+            writer.BlankLine().Table(_alwaysTable).Text(_agentKey, answer.Agent).Text(_itemKey, answer.Item).Text(_fieldKey, answer.Field).Text(_ruleKey, Word(answer.Rule));
+        }
+
+        foreach (var pick in rules.Picks)
+        {
+            writer.BlankLine().Table(_pickTable).Text(_agentKey, pick.Agent).Text(_nameKey, pick.Name).Text(_fieldKey, pick.Field).Text(_itemKey, pick.Item);
         }
 
         return writer;
     }
+
+    private static bool CanWrite(string value) => new TomlWriter(_limits).CanWrite(_nameKey, value);
 
     private static bool TryParse(TomlDocument document, [NotNullWhen(true)] out AgentRules? rules, out string? seal, out string error)
     {
@@ -253,6 +293,9 @@ public sealed class AgentRulesFile(string path)
         seal = null;
         var parsed = AgentRules.Defaults;
         List<KnownAgent> agents = [];
+        List<AgentCategoryRule> agentCategories = [];
+        List<RememberedAnswer> answers = [];
+        List<RememberedPick> picks = [];
         var sawRules = false;
 
         foreach (var table in document.Tables)
@@ -284,12 +327,28 @@ public sealed class AgentRulesFile(string path)
 
                     break;
                 case _agentTable:
-                    if (!TryAgent(table, out var agent, out error))
+                    if (!TryAgent(table, out var agent, agentCategories, out error))
                     {
                         return false;
                     }
 
                     agents.Add(agent);
+                    break;
+                case _alwaysTable:
+                    if (!TryAnswer(table, out var answer, out error))
+                    {
+                        return false;
+                    }
+
+                    answers.Add(answer);
+                    break;
+                case _pickTable:
+                    if (!TryPick(table, out var pick, out error))
+                    {
+                        return false;
+                    }
+
+                    picks.Add(pick);
                     break;
                 default:
                     error = $"{At(table.Line)}: [[{table.Name}]] is not a section keypaste reads here";
@@ -303,7 +362,20 @@ public sealed class AgentRulesFile(string path)
             return false;
         }
 
-        rules = parsed with { Agents = agents };
+        if (answers.Count + picks.Count > AgentRules.MaximumRemembered)
+        {
+            error = $"keypaste reads at most {AgentRules.MaximumRemembered} [[{_alwaysTable}]] and [[{_pickTable}]] sections";
+            return false;
+        }
+
+        if (answers.GroupBy(answer => (answer.Agent, answer.Item, answer.Field)).Any(same => same.Count() > 1)
+            || picks.GroupBy(pick => (pick.Agent, pick.Name, pick.Field)).Any(same => same.Count() > 1))
+        {
+            error = "two sections remember an answer for the same agent and field";
+            return false;
+        }
+
+        rules = (parsed with { Agents = agents }).Read(agentCategories, answers, picks);
         error = string.Empty;
         return true;
     }
@@ -352,7 +424,7 @@ public sealed class AgentRulesFile(string path)
         return true;
     }
 
-    private static bool TryAgent(TomlTable table, [NotNullWhen(true)] out KnownAgent? agent, out string error)
+    private static bool TryAgent(TomlTable table, [NotNullWhen(true)] out KnownAgent? agent, List<AgentCategoryRule> agentCategories, out string error)
     {
         agent = null;
 
@@ -375,13 +447,80 @@ public sealed class AgentRulesFile(string path)
             run = runs.Value.Number == 1;
         }
 
-        if (table.Pairs.FirstOrDefault(pair => pair.Key is not (_nameKey or _runKey)) is { } unknown)
+        foreach (var pair in table.Pairs.Where(pair => pair.Key is not (_nameKey or _runKey)))
         {
-            error = $"{At(unknown.Line)}: {unknown.Key} is not a key keypaste reads in [[agent]]";
-            return false;
+            var category = FieldCategories.Ruled.FirstOrDefault(ruled => string.Equals(FieldCategories.Key(ruled), pair.Key, StringComparison.Ordinal));
+
+            if (category == FieldCategory.Username)
+            {
+                error = $"{At(pair.Line)}: {pair.Key} is not a key keypaste reads in [[agent]]";
+                return false;
+            }
+
+            if (pair.Value.Kind != TomlValueKind.Text || !TryWord(pair.Value.Text, out var rule))
+            {
+                error = $"{At(pair.Line)}: {pair.Key} is ask, allow or block";
+                return false;
+            }
+
+            agentCategories.Add(new AgentCategoryRule(name.Value.Text, category, rule));
         }
 
         agent = new KnownAgent(name.Value.Text, run);
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryAnswer(TomlTable table, [NotNullWhen(true)] out RememberedAnswer? answer, out string error)
+    {
+        answer = null;
+
+        if (!TryTexts(table, [_agentKey, _itemKey, _fieldKey, _ruleKey], out var texts, out error))
+        {
+            return false;
+        }
+
+        if (!AgentNames.IsNamed(texts[0]) || !AgentRules.IsItem(texts[1]) || texts[2].Length == 0 || !TryWord(texts[3], out var rule) || rule == CategoryRule.Ask)
+        {
+            error = $"{At(table.Line)}: an [[{_alwaysTable}]] section names an agent, an item's UUID and a field, and its rule is allow or block";
+            return false;
+        }
+
+        answer = new RememberedAnswer(texts[0], texts[1].ToLowerInvariant(), texts[2], rule);
+        return true;
+    }
+
+    private static bool TryPick(TomlTable table, [NotNullWhen(true)] out RememberedPick? pick, out string error)
+    {
+        pick = null;
+
+        if (!TryTexts(table, [_agentKey, _nameKey, _fieldKey, _itemKey], out var texts, out error))
+        {
+            return false;
+        }
+
+        if (!AgentNames.IsNamed(texts[0]) || texts[1].Length == 0 || texts[2].Length == 0 || !AgentRules.IsItem(texts[3]))
+        {
+            error = $"{At(table.Line)}: a [[{_pickTable}]] section names an agent, the name it asked for, a field and an item's UUID";
+            return false;
+        }
+
+        pick = new RememberedPick(texts[0], texts[1], texts[2], texts[3].ToLowerInvariant());
+        return true;
+    }
+
+    /// <summary>A section's quoted words, exactly these keys and no other.</summary>
+    private static bool TryTexts(TomlTable table, string[] keys, [NotNullWhen(true)] out string[]? texts, out string error)
+    {
+        texts = null;
+
+        if (table.Pairs.Count != keys.Length || keys.Any(key => !table.TryGet(key, out var pair) || pair.Value.Kind != TomlValueKind.Text))
+        {
+            error = $"{At(table.Line)}: [[{table.Name}]] holds {string.Join(", ", keys)}, each a quoted word";
+            return false;
+        }
+
+        texts = [.. keys.Select(key => table.TryGet(key, out var pair) ? pair.Value.Text : string.Empty)];
         error = string.Empty;
         return true;
     }

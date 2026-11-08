@@ -16,7 +16,7 @@ namespace Keypaste.App.Session;
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
 /// screen, counts down the gate's window on it and reports the answer. Anything but a press of an
-/// allow, or of Always allow where the prompt offers it, is a denial: Deny, Escape, closing the window,
+/// allow, or a confirmed Always allow where the prompt offers it, is a denial: Deny, Escape, closing the window,
 /// and every withdrawal, whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
@@ -69,7 +69,7 @@ internal sealed class WindowApprovalChannel(
         var request = new ItemPickViewModel(prompt);
         var answer = await ShowAsync(request, () => new ItemPickWindow(request), cancellationToken).ConfigureAwait(false);
 
-        return new ItemPick(answer, answer == ApprovalAnswer.ApprovedOnce ? request.PickedIndex : null);
+        return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed ? request.PickedIndex : null);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
@@ -226,6 +226,7 @@ internal sealed class WindowApprovalChannel(
                     _ = ArmAsync(request, shown, cancellationToken);
                 };
                 shown.Deactivated += (_, _) => request.Disarm();
+                request.Disarmed += (_, _) => _ = ArmAsync(request, shown, cancellationToken);
                 _showing = new Showing(request, shown, cancellationToken);
                 Shown?.Invoke(this, shown);
                 _ = ArmAsync(request, shown, cancellationToken);

@@ -87,6 +87,38 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Equal(edited, File.ReadAllText(_file.Path));
     }
 
+    /// <summary>An Always allow confirmed on a prompt is sealed like any change, so the next request is released unasked.</summary>
+    [Fact]
+    public async Task An_always_answered_on_a_prompt_is_sealed_and_holds()
+    {
+        _channel.Answer = ApprovalAnswer.AlwaysAllowed;
+
+        var first = await RequestAsync();
+        var second = await RequestAsync();
+
+        Assert.Equal((AuditMethod.Prompt, AuditMethod.Allowed), (first.Method, second.Method));
+        Assert.Equal(1, _channel.Asked);
+        Assert.Null(_rules.Ignored);
+    }
+
+    /// <summary>A remembered answer written into the file by hand, with or without the old seal, is ignored and asked.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_hand_written_always_answer_is_ignored_and_asked(bool keepsTheSeal)
+    {
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        Assert.True(_file.TryReadFile(out var sealedRead, out problem), problem);
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+        var edited = sealedRead.Rules.Remembering(new RememberedAnswer(_agent, item, "password", CategoryRule.Allow), confirmed: true);
+        Assert.True(_file.TryWrite(edited, keepsTheSeal ? sealedRead.Seal : null, out problem), problem);
+
+        var reply = await RequestAsync();
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt, null), (reply.Decision, reply.Method, reply.Value));
+        Assert.Equal(SealedAgentRules.IgnoredText, _rules.Ignored);
+    }
+
     /// <summary>A file this owner sealed, put back after a later sealed change, is ignored: the seal covers the vault's count of changes.</summary>
     [Fact]
     public async Task An_older_sealed_file_put_back_is_ignored_and_asked()

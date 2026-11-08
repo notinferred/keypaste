@@ -22,12 +22,16 @@ internal sealed record PickRow(string Title, string Details, string Field)
 internal sealed partial class ItemPickViewModel : PromptViewModel
 {
     private readonly IReadOnlyList<ItemCandidate> _candidates;
+    private readonly bool _offersAlways;
+    private readonly string? _agent;
     private int _picked = -1;
 
     internal ItemPickViewModel(ApprovalPrompt prompt)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
+        _offersAlways = prompt.OffersAlways;
+        _agent = prompt.Label;
         _candidates = prompt.Candidates;
         Rows = [.. _candidates.Select(candidate => new PickRow(candidate.Title, Details(candidate), prompt.Field))];
 
@@ -45,7 +49,7 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     /// <summary>The row the person picked, or null until they pick one.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PickCaption))]
+    [NotifyPropertyChangedFor(nameof(AlwaysCaption))]
     internal partial PickRow? Picked { get; set; }
 
     partial void OnPickedChanged(PickRow? value)
@@ -56,8 +60,18 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
             Volatile.Write(ref _picked, value is null ? -1 : IndexOf(value));
         }
 
-        AllowOnceCommand.NotifyCanExecuteChanged();
+        Refresh();
     }
+
+    /// <inheritdoc/>
+    internal override bool OffersAlways => _offersAlways;
+
+    /// <inheritdoc/>
+    protected override string Choices => Picked is null ? "Pick an item to allow it. Nothing is picked for you." : ApprovalViewModel.ChoicesText(_offersAlways, _agent);
+
+    /// <inheritdoc/>
+    protected override string Confirmation(ApprovalAnswer always) =>
+        $"Always give {_agent} {Picked?.Title}'s {Picked?.Field} when it asks for {Entry}, without asking you? Remove it on its page in Agents to be asked again.";
 
     /// <summary>Where the row picked as the person answered is among the candidates, or null; safe from any thread.</summary>
     internal int? PickedIndex => Volatile.Read(ref _picked) is >= 0 and var index ? index : null;
@@ -76,9 +90,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     }
 
     protected override bool CanAllow => Picked is not null;
-
-    /// <summary>What is said above the buttons until the person picks an item.</summary>
-    internal string PickCaption => Picked is null ? "Pick an item to allow it. Nothing is picked for you." : string.Empty;
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }

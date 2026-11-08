@@ -392,6 +392,38 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(ApprovalAnswer.Denied, await hour.Channel.AskAsync(Prompt(), Token));
     }
 
+    private static ApprovalPrompt Offering() =>
+        ApprovalPrompt.For("Claude Code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy billing", "claude-code") with { OffersAlways = true };
+
+    /// <summary>An always holds only once the person confirms it with <c>y</c>; anything else is a refusal that keeps nothing (F.78b).</summary>
+    [Theory]
+    [InlineData("a", "y", ApprovalAnswer.AlwaysAllowed, "keypaste: allowed, and always from now on.")]
+    [InlineData("b", "y", ApprovalAnswer.AlwaysBlocked, "keypaste: denied, and always from now on.")]
+    [InlineData("a", "", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
+    [InlineData("a", "o", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
+    [InlineData("b", "n", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
+    public async Task An_offered_always_is_confirmed_with_y_or_refused(string choice, string confirmation, ApprovalAnswer expected, string said)
+    {
+        var rig = Build(choice, confirmation);
+
+        Assert.Equal(expected, await rig.Channel.AskAsync(Offering(), Token));
+        Assert.Contains("[a] always  [b] block", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+        Assert.Contains(said, rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains(choice == "a" ? "Always give claude-code this item's password without asking you?" : "Always refuse claude-code this item's password without asking you?", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_picker_offers_Always_allow_alone_for_the_item_picked()
+    {
+        var rig = Build("2", "a", "y");
+
+        var pick = await rig.Channel.AskToPickAsync(Picker() with { Label = "claude-code", OffersAlways = true }, Token);
+
+        Assert.Equal(new ItemPick(ApprovalAnswer.AlwaysAllowed, 1), pick);
+        Assert.Contains("[a] always  ", rig.Prompt.PromptsSeen[1], StringComparison.Ordinal);
+        Assert.DoesNotContain("[b]", rig.Prompt.PromptsSeen[1], StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AnEnvRun_OffersOnceOnly()
     {

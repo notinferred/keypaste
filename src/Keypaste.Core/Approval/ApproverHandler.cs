@@ -79,6 +79,11 @@ public sealed class ApproverHandler
     /// <returns>The UUID, or null when it cannot be read.</returns>
     public string? ItemId(EntryName name) => _source.ItemId(name);
 
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    public string? ItemShown(string item) => _source.ItemNamed(item) is { } name ? ApprovalPrompt.Shown(name) : null;
+
     /// <summary>An entry's own tags, as the exposure and the categories read them.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>Its tags, or none when they cannot be read.</returns>
@@ -111,31 +116,30 @@ public sealed class ApproverHandler
 
         if (_rules.TryRead(out var after, out _))
         {
-            HashSet<FieldCategory> moved = [.. Enum.GetValues<FieldCategory>().Where(category => before?.RuleFor(category) != after.RuleFor(category))];
-            _gate.ClearCooldowns(key => CategoryOf(key) is { } category && moved.Contains(category));
+            _gate.ClearCooldowns(key => Moved(before, after, key));
         }
 
         return true;
     }
 
-    /// <summary>The category a cooldown key's field falls in, as <see cref="Category"/> reads it, or null for a key naming no field, such as a run's.</summary>
-    private FieldCategory? CategoryOf(string cooldownKey)
+    /// <summary>Whether a change to the rules moved how a cooldown key's field is decided, for any agent; never for a key naming no field, such as a run's.</summary>
+    private bool Moved(AgentRules? before, AgentRules after, string cooldownKey)
     {
         var bar = cooldownKey.IndexOf('|', StringComparison.Ordinal);
 
         if (bar < 0)
         {
-            return null;
+            return false;
         }
 
-        var field = cooldownKey[(bar + 1)..];
+        var subject = cooldownKey[(bar + 1)..];
+        var resolved = _source.TryResolve(cooldownKey[..bar], out var name, out _);
+        var item = resolved ? _source.ItemId(name!) : null;
+        var category = subject.StartsWith(_attachmentKey, StringComparison.Ordinal) ? FieldCategory.Attachment
+            : resolved ? Category(name!, subject)
+            : FieldCategories.Of(subject, []);
 
-        if (field.StartsWith(_attachmentKey, StringComparison.Ordinal))
-        {
-            return FieldCategory.Attachment;
-        }
-
-        return _source.TryResolve(cooldownKey[..bar], out var name, out _) ? Category(name, field) : FieldCategories.Of(field, []);
+        return before is null || !string.Equals(before.Governing(item, subject, category), after.Governing(item, subject, category), StringComparison.Ordinal);
     }
 
     /// <summary>Which category one field of an entry falls in.</summary>
@@ -278,15 +282,18 @@ public sealed class ApproverHandler
         var display = ApprovalPrompt.Shown(name);
         var itemId = _source.ItemId(name);
         var category = Category(name, request.Field);
-        var rule = rules.RuleFor(category);
+        var subject = Subject(request);
+        var agent = Named(request);
+        var decided = rules.Decide(agent, itemId, subject, category);
 
-        if (rule == CategoryRule.Block)
+        if (decided.Rule == CategoryRule.Block)
         {
-            _narrate?.Invoke($"refused {display}: {Blocked(category)}");
-            return Refused(AuditMethod.Blocked, Blocked(category), display) with { Item = itemId };
+            var blocked = Blocked(category, decided.Level);
+            _narrate?.Invoke($"refused {display}: {blocked}");
+            return Refused(AuditMethod.Blocked, blocked, display) with { Item = itemId };
         }
 
-        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), Subject(request));
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), subject);
 
         // Before Allow, not after. A person who refused this exact request a moment ago has said something more
         // specific and more recent than the rule that held then; only changing that rule ends the refusal.
@@ -296,15 +303,45 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
-        if (rule == CategoryRule.Allow)
+        if (decided.Rule == CategoryRule.Allow)
         {
-            return Unasked(request, name, itemId, display, cooldownKey, category, cancellationToken);
+            return Unasked(request, name, itemId, display, cooldownKey, Allowed(category, decided.Level), AllowedBy(category, decided.Level), cancellationToken);
         }
 
-        var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with { Item = itemId };
+        var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with
+        {
+            Item = itemId,
+            OffersAlways = agent is not null && itemId is not null && rules.HasRoom,
+        };
         var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
+        var unremembered = answer switch
+        {
+            ApprovalAnswer.AlwaysAllowed => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Allow), confirmed: true)),
+            ApprovalAnswer.AlwaysBlocked => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Block), confirmed: true)),
+            _ => null,
+        };
+        var approved = answer != ApprovalAnswer.AlwaysAllowed ? "a person approved this one request"
+            : unremembered is null ? "a person approved this request and always allows this item's field to this agent"
+            : $"a person approved this one request; keypaste could not remember Always allow: {unremembered}";
 
-        return Answered(request, name, itemId, display, cooldownKey, prompt.Client, answer, "a person approved this one request", cancellationToken);
+        return Answered(request, name, itemId, display, cooldownKey, prompt.Client, answer, unremembered, approved, cancellationToken);
+    }
+
+    /// <summary>The agent a request's answers are remembered for: its bridge's label when it names one, otherwise null, which Settings alone decides.</summary>
+    private static string? Named(CredentialRequest request) => AgentNames.IsNamed(request.ClientLabel) ? request.ClientLabel : null;
+
+    /// <summary>Remembers a person's confirmed always as this owner changes the rules.</summary>
+    /// <returns>Null once it holds, otherwise why it does not.</returns>
+    private string? Remember(Func<AgentRules, AgentRules> change)
+    {
+        try
+        {
+            return TryChangeRules(change, out var problem) ? null : problem;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return ex.Message;
+        }
     }
 
     /// <summary>
@@ -323,13 +360,15 @@ public sealed class ApproverHandler
         IReadOnlyList<AnsweringItem> items,
         CancellationToken cancellationToken)
     {
+        var agent = Named(request);
+        var subject = Subject(request);
         List<AnsweringItem> seen = [.. items.Where(item => Reaches(exposure, item.Name, request.Field))];
-        List<AnsweringItem> offered = [.. seen.Where(item => rules.RuleFor(Category(item.Name, request.Field)) != CategoryRule.Block)];
+        List<AnsweringItem> offered = [.. seen.Where(item => rules.Decide(agent, item.Name.Uuid, subject, Category(item.Name, request.Field)).Rule != CategoryRule.Block)];
 
         switch (offered.Count)
         {
             case 0 when seen.Count > 0:
-                return Refused(AuditMethod.Blocked, "every item answering to that name holds the field in a category the person blocks for agents");
+                return Refused(AuditMethod.Blocked, "every item answering to that name holds the field in a category the person blocks for this agent");
             case 0:
                 return Refused(AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge");
             case 1:
@@ -340,7 +379,7 @@ public sealed class ApproverHandler
 
         var shared = offered[0].Name;
         var display = ApprovalPrompt.Shown(shared);
-        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), Subject(request));
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), subject);
 
         if (_gate.IsInCooldown(cooldownKey))
         {
@@ -348,10 +387,37 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
+        // The pick is an answer for its item, so it outranks a category's rule, as an item's own Always allow does.
+        if (agent is not null
+            && rules.PickFor(agent, request.Entry, subject) is { } kept
+            && seen.FirstOrDefault(item => string.Equals(item.Name.Uuid, kept, StringComparison.OrdinalIgnoreCase)) is { } always
+            && rules.DecidePicked(agent, kept, subject, Category(always.Name, request.Field)) == CategoryRule.Allow)
+        {
+            return Unasked(
+                request,
+                always.Name,
+                always.Name.Uuid,
+                display,
+                cooldownKey,
+                "released without asking: the person always picks this item for that name for this agent",
+                "this pick always allowed",
+                cancellationToken);
+        }
+
         List<ItemCandidate> candidates = [.. offered.Select(Candidate)];
-        var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with { Candidates = candidates };
+        var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with
+        {
+            Candidates = candidates,
+            OffersAlways = agent is not null && rules.HasRoom,
+        };
         var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
         var picked = pick.Picked is { } index ? candidates[index] : null;
+        var unremembered = pick.Answer == ApprovalAnswer.AlwaysAllowed && picked is not null
+            ? Remember(held => held.Remembering(new RememberedPick(agent!, request.Entry, subject, picked.Item), confirmed: true))
+            : null;
+        var approved = pick.Answer != ApprovalAnswer.AlwaysAllowed ? "a person picked this item and approved this one request"
+            : unremembered is null ? "a person picked this item and always gives it to this agent for that name"
+            : $"a person picked this item and approved this one request; keypaste could not remember Always allow: {unremembered}";
 
         return Answered(
             request,
@@ -361,7 +427,8 @@ public sealed class ApproverHandler
             cooldownKey,
             prompt.Client,
             pick.Answer,
-            "a person picked this item and approved this one request",
+            unremembered,
+            approved,
             cancellationToken);
     }
 
@@ -385,13 +452,23 @@ public sealed class ApproverHandler
         string cooldownKey,
         string client,
         ApprovalAnswer answer,
+        string? unremembered,
         string approved,
         CancellationToken cancellationToken)
     {
-        if (!answer.Releases())
+        if (!answer.Releases() && answer != ApprovalAnswer.AlwaysAllowed)
         {
-            _narrate?.Invoke($"refused {display} for {client}: {Explain(answer)}");
-            return Refused(answer.ToAuditMethod(), Explain(answer), display) with { Item = itemId };
+            // A block that could not be kept still holds this field back as a refusal does.
+            if (answer == ApprovalAnswer.AlwaysBlocked && unremembered is not null)
+            {
+                _gate.CoolDown(cooldownKey);
+            }
+
+            var refused = answer != ApprovalAnswer.AlwaysBlocked ? Explain(answer)
+                : unremembered is null ? "a person refused this request and always refuses this item's field to this agent"
+                : $"a person refused this request; keypaste could not remember Always block: {unremembered}";
+            _narrate?.Invoke($"refused {display} for {client}: {refused}");
+            return Refused(answer.ToAuditMethod(), refused, display) with { Item = itemId };
         }
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
@@ -420,11 +497,11 @@ public sealed class ApproverHandler
                 ForAttachment = request.Attachment is not null,
             },
             display,
-            $"released {display} to {client} once",
+            answer == ApprovalAnswer.AlwaysAllowed && unremembered is null ? $"released {display} to {client}, and always from now on" : $"released {display} to {client} once",
             cooldownKey);
     }
 
-    /// <summary>Releases a field nobody is asked about, because its category is Allow: a URL, a username shown, or a rule the person confirmed.</summary>
+    /// <summary>Releases a field nobody is asked about, because an Allow decides it: a URL, a username shown, a rule the person confirmed or an answer they told keypaste to remember.</summary>
     /// <remarks>
     /// Its line names the category, and never a person, since nobody saw this request. The read is still
     /// last of all, exactly as on the prompted path.
@@ -435,7 +512,8 @@ public sealed class ApproverHandler
         string? itemId,
         string display,
         string cooldownKey,
-        FieldCategory category,
+        string why,
+        string allowedBy,
         CancellationToken cancellationToken)
     {
         var client = ApprovalPrompt.For(request.ClientName, name, request.Field, string.Empty, request.ClientLabel).Client;
@@ -452,13 +530,6 @@ public sealed class ApproverHandler
             return Unread(readFailure, cooldownKey, request.Field, unfilled, display, client) with { Item = itemId };
         }
 
-        var why = category switch
-        {
-            FieldCategory.Url => "released without asking: agents see an item's URL",
-            FieldCategory.Username => "released without asking: agents see an item's username",
-            _ => $"released without asking: the person allows {FieldCategories.Shown(category)} for every agent",
-        };
-
         // One line on the operator's terminal either way, and the only live signal that this
         // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
         return Deliver(
@@ -474,8 +545,26 @@ public sealed class ApproverHandler
                 ForAttachment = request.Attachment is not null,
             },
             display,
-            $"released {display} to {client} without asking ({FieldCategories.Shown(category)} allowed)");
+            $"released {display} to {client} without asking ({allowedBy})");
     }
+
+    /// <summary>Why a field an Allow decides was released, naming the answer that allowed it.</summary>
+    private static string Allowed(FieldCategory category, RuleLevel level) => (category, level) switch
+    {
+        (_, RuleLevel.Item) => $"released without asking: the person always allows this item's {FieldCategories.One(category)} to this agent",
+        (_, RuleLevel.Agent) => $"released without asking: the person allows {FieldCategories.Shown(category)} for this agent",
+        (FieldCategory.Url, _) => "released without asking: agents see an item's URL",
+        (FieldCategory.Username, _) => "released without asking: agents see an item's username",
+        _ => $"released without asking: the person allows {FieldCategories.Shown(category)} for every agent",
+    };
+
+    /// <summary>The answer that allowed a release, as the operator's terminal names it.</summary>
+    private static string AllowedBy(FieldCategory category, RuleLevel level) => level switch
+    {
+        RuleLevel.Item => $"this item's {FieldCategories.One(category)} always allowed",
+        RuleLevel.Agent => $"{FieldCategories.Shown(category)} allowed for this agent",
+        _ => $"{FieldCategories.Shown(category)} allowed",
+    };
 
     /// <summary>What a request's cooldown key names within its item: the field, or the attachment by its name.</summary>
     private static string Subject(CredentialRequest request) =>
@@ -502,10 +591,15 @@ public sealed class ApproverHandler
 
     /// <summary>Why a request for a Blocked category was refused.</summary>
     /// <param name="category">The field's category.</param>
+    /// <param name="level">Which answer blocked it.</param>
     /// <returns>The reason.</returns>
-    public static string Blocked(FieldCategory category) => category == FieldCategory.Passkey
-        ? "a passkey's fields are never released to agents"
-        : $"the person blocks {FieldCategories.Shown(category)} for agents";
+    public static string Blocked(FieldCategory category, RuleLevel level = RuleLevel.Settings) => (category, level) switch
+    {
+        (FieldCategory.Passkey, _) => "a passkey's fields are never released to agents",
+        (_, RuleLevel.Item) => $"the person always refuses this item's {FieldCategories.One(category)} to this agent",
+        (_, RuleLevel.Agent) => $"the person blocks {FieldCategories.Shown(category)} for this agent",
+        _ => $"the person blocks {FieldCategories.Shown(category)} for agents",
+    };
 
     /// <summary>Why an agent request was refused when the rules could not be read.</summary>
     private static string Unusable(string problem) => $"agent rules are not usable: {problem}";

@@ -43,7 +43,34 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.Equal(CategoryRule.Allow, read.RuleFor(FieldCategory.ProjectVariable));
     }
 
+    [Fact]
+    public void An_agents_own_rules_and_remembered_answers_read_back_as_themselves()
+    {
+        const string item = "0123456789abcdef0123456789abcdef";
+        var written = AgentRules.Defaults
+            .With("claude-code", FieldCategory.Password, CategoryRule.Block)
+            .Allowing("claude-code", FieldCategory.Notes, confirmed: true)
+            .Remembering(new RememberedAnswer("claude-code", item, "password", CategoryRule.Allow), confirmed: true)
+            .Remembering(new RememberedAnswer("cursor", item, "attachment:deploy key.pem", CategoryRule.Block), confirmed: true)
+            .Remembering(new RememberedPick("claude-code", "services/Mail", "password", item.ToUpperInvariant()), confirmed: true);
+
+        Assert.True(File.TryWrite(written, seal: null, out var problem), problem);
+        Assert.True(File.TryRead(out var read, out problem), problem);
+
+        Assert.Equal(written, read);
+        Assert.Equal(AgentRulesFile.Canonical(written), AgentRulesFile.Canonical(read));
+        Assert.Equal(CategoryRule.Block, read.RuleFor("claude-code", FieldCategory.Password));
+        Assert.Null(read.RuleFor("cursor", FieldCategory.Password));
+        Assert.Equal(item, read.PickFor("claude-code", "services/Mail", "password"));
+        Assert.Null(read.PickFor("cursor", "services/Mail", "password"));
+    }
+
     [Theory]
+    [InlineData("[[agent]]\nname = \"a\"\npassword = \"sometimes\"\n", "line 3")]
+    [InlineData("[[agent]]\nname = \"a\"\npasskey = \"allow\"\n", "line 3")]
+    [InlineData("[[always]]\nagent = \"a\"\nitem = \"0123\"\nfield = \"password\"\nrule = \"allow\"\n", "line 1")]
+    [InlineData("[[always]]\nagent = \"a\"\nitem = \"0123456789abcdef0123456789abcdef\"\nfield = \"password\"\nrule = \"ask\"\n", "line 1")]
+    [InlineData("[[pick]]\nagent = \"*\"\nname = \"Mail\"\nfield = \"password\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
     [InlineData("[[rules]]\npassword = \"sometimes\"\n", "line 2")]
     [InlineData("[[rules]]\npasskey = \"allow\"\n", "line 2")]
     [InlineData("[[client]]\nlabel = \"claude-code\"\n", "line 1")]
