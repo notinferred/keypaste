@@ -1393,7 +1393,7 @@ selftest() {
         '{"act":"connect","fact":"command","value":"/home/runner/.local/bin/keypaste mcp"}' \
         '{"act":"connect","fact":"has_vault","value":"false"}' \
         '{"act":"connect","fact":"server","value":"{\"name\":\"keypaste\"}"}' \
-        '{"act":"connect","fact":"tools","value":"list_entries request_credential request_access_change"}' \
+        '{"act":"connect","fact":"tools","value":"list_entries request_credential"}' \
         '{"act":"approve-deny","fact":"expected_sha256","value":"b2"}' \
         '{"act":"approve-deny","fact":"allow_unfocused","value":"not enabled"}' \
         '{"act":"approve-deny","fact":"allow_activated","value":"enabled"}' \

@@ -43,13 +43,12 @@ readonly ERR="$WORK/stderr.txt"
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/dev/STRIPE_KEY","field":"password","reason":"ci probe"}}}'
-  printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"request_access_change","arguments":{"mode":"automatic","reason":"ci probe"}}}'
 
   # Hold the pipe open until every call is answered. Closing stdin is how an MCP client says
   # goodbye, and the server takes it at its word: closed sooner, it shuts down before it has answered
   # anything, and the gate sees an empty stdout that looks like a protocol failure rather than a race
   # in the harness.
-  await_replies 5 "$OUT" 2 3 4 5 || true
+  await_replies 5 "$OUT" 2 3 4 || true
 } | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
@@ -63,14 +62,14 @@ while IFS= read -r line; do
     || die "a line on stdout is not JSON: $line"
 done <"$OUT"
 
-# 2. Exactly three tools, with the names the documentation promises.
+# 2. Exactly two tools, with the names the documentation promises.
 tools="$(jq -c 'select(.id == 2) | .result.tools' <"$OUT" | head -n 1)"
 [ -n "$tools" ] || die "no tools/list response"
 
 count="$(printf '%s' "$tools" | jq 'length')"
-[ "$count" = "3" ] || die "expected exactly 3 tools, got $count"
+[ "$count" = "2" ] || die "expected exactly 2 tools, got $count"
 
-for want in list_entry_names request_credential request_access_change; do
+for want in list_entry_names request_credential; do
   printf '%s' "$tools" | jq -e --arg n "$want" 'any(.[]; .name == $n)' >/dev/null \
     || die "tool $want is missing"
 done
@@ -84,13 +83,13 @@ printf '%s' "$tools" | jq -e 'all(.[]; .annotations.openWorldHint == false)' >/d
 # 4. Every call refuses, because this script starts no approver — not because the bridge is unable to
 #    grant. That distinction matters: read as "the bridge cannot release anything" this assertion
 #    would be evidence for a claim it does not make. scripts/verify-approval-e2e.sh is where a
-#    release is proved possible; here, with nobody to ask, a granted credential or a change made
-#    would mean the bridge had decided something itself, which is the one unacceptable outcome.
+#    release is proved possible; here, with nobody to ask, a granted credential would mean the
+#    bridge had decided something itself, which is the one unacceptable outcome.
 # Slurped deliberately. `select(...) | ...` over a stream leaves jq's -e status depending on
 # whether the LAST input produced output, and jq 1.6 (ubuntu-22.04) and 1.7+ disagree when it
 # did not. `any` over one slurped array yields exactly one value, so the status means the same
 # thing on every runner image.
-for id in 3 4 5; do
+for id in 3 4; do
   jq -se --argjson id "$id" 'any(.[]; .id == $id and .result.isError == true)' <"$OUT" >/dev/null \
     || die "call $id did not return isError=true"
 done
@@ -99,11 +98,10 @@ done
 #    was granted.
 [ -f "$AUDIT" ] || die "no audit log was written"
 lines="$(grep -c . "$AUDIT")"
-[ "$lines" = "3" ] || die "expected 3 audit lines, got $lines"
+[ "$lines" = "2" ] || die "expected 2 audit lines, got $lines"
 
 grep -q '"tool":"list_entry_names"' "$AUDIT" || die "the listing call was not audited"
 grep -q '"tool":"request_credential"' "$AUDIT" || die "the credential call was not audited"
-grep -q '"tool":"access_change"' "$AUDIT" || die "the request for a change to the agent's settings was not audited"
 grep -q '"decision":"denied"' "$AUDIT" || die "no denial was recorded"
 grep -q '"label":"ci-probe"' "$AUDIT" || die "the operator-supplied client label was not recorded"
 
@@ -154,7 +152,7 @@ RUN_OUT="$WORK/run-stdout.txt"
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
-[ "$(printf '%s' "$run_tools" | jq 'length')" = "4" ] || die "--allow-run did not list exactly 4 tools"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "3" ] || die "--allow-run did not list exactly 3 tools"
 printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
   || die "run is missing destructiveHint=true or openWorldHint=true"
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
@@ -191,16 +189,15 @@ for renamed in serve=approve setup=setup policy=clients; do
 done
 
 policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json)" || die "keypaste clients --json exited non-zero"
-printf '%s' "$policies" | jq -e '. == []' >/dev/null \
-  || die "keypaste clients --json printed '$policies' for a home with no clients.toml, not []"
+printf '%s' "$policies" | jq -e '(map(select(.kind == "category")) | all(.rule == (if .category == "passkeys" then "block" else "ask" end))) and (map(select(.kind == "agent")) == [])' >/dev/null \
+  || die "keypaste clients --json printed '$policies' for a home with no agents.toml, not every value asked and no agent"
 
-# With nothing holding a vault, a lower ceiling is the one change that can be made, and the list shows it as a row.
-KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --mode ask 2>/dev/null \
-  || die "keypaste clients did not lower cursor's ceiling with nothing holding a vault"
-policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json)" || die "keypaste clients --json exited non-zero"
-printf '%s' "$policies" | jq -e '. == [{"kind":"ceiling","label":"cursor","mode":"ask"}]' >/dev/null \
-  || die "keypaste clients --json printed '$policies', not cursor's one ceiling"
+# With nothing holding a vault, nothing can be sealed: run on is refused, and run off is written unsealed.
+if KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run on 2>/dev/null; then die "keypaste clients turned run on with nothing holding a vault"; fi
+KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run off 2>/dev/null \
+  || die "keypaste clients did not turn cursor's run off with nothing holding a vault"
+grep -q '^\[\[seal\]\]' "$HOME_DIR/agents.toml" && die "a change made with nothing holding a vault left agents.toml looking sealed"
 
-echo "ok: keypaste mcp speaks MCP over stdio, exposes three tools, denies every call, audits them,"
+echo "ok: keypaste mcp speaks MCP over stdio, exposes two tools, denies every call, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
 echo "    prints one help for every help form, and refuses mcp serve, setup and policy naming their replacements"

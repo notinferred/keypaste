@@ -298,10 +298,12 @@ candidate() { # candidate <version>
 
 # --- the data whose survival is the point ---------------------------------------------------------
 
-# The five files a user would lose: the vault, the app's two settings files, this computer's ceilings and the audit;
-# on macOS also Open at login's LaunchAgent.
+# The five files a user would lose: the vault, the app's two settings files, this computer's agent rules and the
+# audit; on macOS also Open at login's LaunchAgent. The rules are agents.toml, or clients.toml where the CLI that
+# made the data is a release from before agents.toml.
+rules_file() { if [ -f "$HOME_DIR/clients.toml" ]; then printf 'clients.toml'; else printf 'agents.toml'; fi; }
 data_files() {
-  printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/clients.toml" "$HOME_DIR/audit.jsonl"
+  printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/$(rules_file)" "$HOME_DIR/audit.jsonl"
   if [ "$PLATFORM" = macos ]; then printf '%s\n' "$LAUNCH_AGENT"; fi
 }
 
@@ -359,10 +361,12 @@ fixture() {
       || { echo "keypaste env set $value failed"; return 1; }
   done
 
-  # A ceiling this computer keeps for the agent, made before any recent vault names one to hold it.
-  "$KP" clients upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste clients did not write a ceiling'; return 1; }
-  "$KP" clients --json 2>/dev/null | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}]' >/dev/null \
-    || { echo 'keypaste clients --json does not read the ceiling back'; return 1; }
+  # The agent's run off in this computer's rules, made before any recent vault names one to hold it: a ceiling in
+  # clients.toml from a release before agents.toml, an unsealed agents.toml from one after it.
+  "$KP" clients upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste clients did not write the agent rules'; return 1; }
+  "$KP" clients --json 2>/dev/null \
+    | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}] or any(.[]; .kind == "agent" and .name == "upgrade-check" and .run == "off")' >/dev/null \
+    || { echo 'keypaste clients --json does not read the agent rules back'; return 1; }
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
   printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
   echo "vault $VAULT_NATIVE with $ENTRY and env/$PROJECT, made by $("$KP" --version | tr -d "$CR")"

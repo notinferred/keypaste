@@ -9,18 +9,16 @@
 # has armed, brings it forward with Deny focused and its allows disarmed (D-0456), and Approve then releases
 # only once it has armed again. The history shows the prompted release from the
 # audit file. Each later request asks again. A lock empties the list, and the next
-# unlock starts with nothing listed. A row's settings
-# show what the vault gives the agent; a narrowing chosen there applies at once, to the vault and
-# clients.toml, and a widening opens the app's confirmation window, changes nothing when refused, and once
-# allowed makes the next request Automatic. Each change is one keypaste app line labelled with the agent.
+# unlock starts with nothing listed. A row's settings show whether the agent may run commands; turning it
+# on or off there is made at once and sealed in agents.toml with the vault's key, each change one keypaste
+# app line labelled with the agent, and each request is still asked.
 # History reads a missing audit log as nothing asked yet, and says when one could not be read.
 #
 # NEGATIVE CONTROL: this fails if a waiting request is not listed, if Show the prompt leaves the
 # prompt armed or focus off Deny, if a released request
-# answers, if history is missing a request's record or is shown for a log that cannot be read, if a
-# narrowing asks or a widening does not, if a refused widening changes anything or an allowed one does not
-# release the next request unasked, or if a credential reaches the driver's output. These checks must never
-# be skipped or soft-passed.
+# answers, if history is missing a request's record or is shown for a log that cannot be read, if a run
+# change is not sealed or not recorded, if a request after it is not asked, or if a credential reaches the
+# driver's output. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-activity-master-pw'
@@ -125,7 +123,6 @@ change() {
   echo "setting $LABEL $*" >&7
 }
 changed() { wait_for '^setting-done ' "$HOLD_OUT" "$CHANGES"; }
-confirmations() { grep -c '^access-prompt agent=' "$HOLD_OUT" || true; }
 
 # The last line is the probe's settings change from the panel, with the decision and method given.
 setting_line() {
@@ -138,9 +135,6 @@ setting_line() {
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
-# The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
-# confirmed at keypaste approve's terminal before the app holds the vault.
-agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/**" || die "could not save the probe's settings in the vault"
 
 exec 7>&-
 exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -206,9 +200,10 @@ activity
 shows "^history .*DEPLOY_KEY.*Denied" "the refusal from the audit file"
 
 # ------------------------------------------------ a lock empties both lists; the next session has none
-# Another field, because the refusal above cools the password down for every bridge (D-0425).
+# Another field, because the refusal above cools the password down for every bridge (D-0425); notes, since
+# agents see a username unasked.
 start_bridge second
-ask 3 username
+ask 3 notes
 wait_for '^prompt client' "$HOLD_OUT" 5
 activity
 shows '^waiting n=1 ' "the request waiting before the lock"
@@ -231,58 +226,31 @@ omits '^unavailable ' "the new session as unreadable"
 omits '^waiting ' "a request from before the lock"
 shows "^history .*DEPLOY_KEY.*Approved" "the file's records after a lock, which History reads whole"
 
-# ---------------------------- a row's settings: a narrowing applies at once, a widening only once confirmed
+# --------------------------------------- a row's settings: run on and off are made at once and sealed
 start_bridge third
 settings_shown
-settings_say "agent=$LABEL mode=ask values=yes run=off see=env/** rows= held=none" "what the vault gives it"
+settings_say "agent=$LABEL run=off" "that the agent may not run commands"
 
-change mode automatic
-wait_for '^access-prompt agent=' "$HOLD_OUT" 1
-grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Automatic" \
-  || die "the confirmation does not say who gains what, or where it was asked from"
-echo deny >&7
+change run on
 changed
-setting_line denied prompt
+setting_line granted rules-changed
+grep -q '^\[\[seal\]\]' "$WORK/home/agents.toml" || die "the app wrote agents.toml without its seal"
 settings_shown
-settings_say "mode=ask " "the mode a refused widening left"
+settings_say "run=on" "run turned on"
 
-change mode automatic
-wait_for '^access-prompt agent=' "$HOLD_OUT" 2
-echo allow >&7
-changed
-setting_line granted prompt
-settings_shown
-settings_say "mode=automatic " "the confirmed mode"
-
-change mode ask
-changed
-[ "$(confirmations)" -eq 2 ] || die "a narrowing asked for confirmation"
-setting_line granted narrowing
-grep -A3 "^label = \"$LABEL\"" "$WORK/home/clients.toml" | grep -qF 'mode = "ask"' || die "the narrowing did not reach clients.toml"
-settings_shown
-settings_say "mode=ask " "the narrowing"
 ask 7
 wait_for '^prompt client' "$HOLD_OUT" 6
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF 'for=once or always' \
-  || die "the request after the narrowing was not offered once or always"
 echo once >&7
 reply 7
 released 7
+last_audit '.tool == "request_credential" and .decision == "granted" and .method == "prompt"' \
+  || die "the request after run was turned on was not asked about and allowed once"
 
-change mode automatic
-wait_for '^access-prompt agent=' "$HOLD_OUT" 3
-echo allow >&7
+change run off
 changed
-setting_line granted prompt
+setting_line granted rules-changed
 settings_shown
-settings_say "mode=automatic " "the confirmed mode"
-ask 8
-reply 8
-released 8
-last_audit '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' \
-  || die "the request after Automatic was confirmed was not released as automatic"
-[ "$(prompts)" -eq 6 ] || die "a request under Automatic raised a prompt"
+settings_say "run=off" "run turned off"
 
 # ----------------------------------------------------------------- an unreadable log is unavailable
 # The app holds the log open from a session's first request until a lock, and Windows deletes no open file.

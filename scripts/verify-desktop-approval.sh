@@ -10,19 +10,15 @@
 # take the prompt down. The client cancelling, closing the bridge's input and the bridge going away each
 # leave exactly one line, cancelled, which the app records. Each case uses
 # a new bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of
-# their own, because a refusal cools that field down for every bridge (D-0425). For an entry in one
-# project environment the prompt offers Always allow it: pressed, it holds the release while the app's
-# confirmation asks to make that environment Automatic; refused, the request is released once and nothing
-# changes; allowed, the next request for the entry is released with no prompt and recorded as automatic.
-# A terminal's `keypaste set`, piped its value alone, is asked about in the app's own window, which names
+# their own, because a refusal cools that field down for every bridge (D-0425). The prompt offers Deny and
+# Allow once only. A terminal's `keypaste set`, piped its value alone, is asked about in the app's own window, which names
 # the command and the item and says where it came from but never draws the value; Allow saves it and
 # records it, and a denied `keypaste rm` changes nothing (D-0464).
 #
 # NEGATIVE CONTROL: this fails if a request is released without a press of Approve, if Approve does not
 # release it, if an audit line names the wrong method, session or label, if an abandoned request leaves
-# no line or two, if a prompt stays up after its request is answered or abandoned, if Always allow is not
-# offered or releases before its confirmation is answered, or if a refused confirmation changes anything
-# or an allowed one does not release the next request unasked, if a terminal's edit is saved without its
+# no line or two, if a prompt stays up after its request is answered or abandoned, if a prompt offers more
+# than Allow once, if a terminal's edit is saved without its
 # Allow, draws its value, or changes anything once denied. These checks must never be skipped or
 # soft-passed.
 set -euo pipefail
@@ -177,7 +173,7 @@ FIRST="$(session_of)"
 # ------------------------------------------------------------- Approve releases, and says so
 raise_prompt approve
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "label=$LABEL entry=$ENTRY field=password for=once or always" \
+  | grep -qF "label=$LABEL entry=$ENTRY field=password for=once always=none" \
   || die "the prompt does not show the label, entry, field and what the person can allow"
 echo once >&7
 answered 30
@@ -193,7 +189,7 @@ grep -q "$SECRET" "$HOLD_OUT" && die "the credential reached the app's output"
 # ------------------------------------------------------------- one custom field, by name (C.5a)
 raise_prompt field-once OPENAI_API_KEY "$API_ENTRY" 'api/**'
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once or always" \
+  | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once always=none" \
   || die "the prompt does not name the custom field"
 echo once >&7
 answered 30
@@ -240,13 +236,14 @@ for value in "$API_PASSWORD" "$API_KEY" "$RECOVERY"; do
 done
 
 # ---------------------------------------------------------------- Deny and closing refuse
-raise_prompt deny username
+# Notes and a TOTP code, which agents do not see unasked as they see a username or a URL.
+raise_prompt deny notes
 echo deny >&7
 answered 30
 withdrawn
 denied_as prompt "$FIRST" "Deny"
 
-raise_prompt close url
+raise_prompt close totp
 echo close >&7
 answered 30
 withdrawn
@@ -281,47 +278,6 @@ withdrawn
 exec 8>&-
 cancelled_once "$logged" "$FIRST" "the request whose bridge went away"
 grep -q "$SECRET" "$OUT" && die "a request whose bridge went away reached the client"
-
-# --------------------- Always allow allows once and then asks; refused it stays one release, allowed it is Automatic
-raise_prompt always-refused password "$STAGING_ENTRY"
-grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "entry=$STAGING_ENTRY field=password for=once or always always=Always allow makes ci:staging Automatic" \
-  || die "the prompt does not offer Always allow the entry's environment"
-echo always >&7
-wait_for '^access-prompt agent=' "$HOLD_OUT" 1
-grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
-  | grep -qF "agent=$LABEL asked=you chose Always allow on the prompt gains=ci:staging: Automatic" \
-  || die "the confirmation does not say who gains what, or where it was asked from"
-jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 && die "the release came back before the change Always allow asked for was answered"
-echo deny >&7
-answered 30
-withdrawn
-wait_for '^access-prompt withdrawn' "$HOLD_OUT" 1
-jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always allow did not release the request once"
-tail -n 2 "$AUDIT" | jq -e -s --arg l "$LABEL" '.[0].tool == "access_change" and .[0].decision == "denied" and .[0].client.label == $l
-    and .[1].tool == "request_credential" and .[1].decision == "granted" and .[1].method == "prompt"' >/dev/null \
-  || die "a refused Always allow was not recorded as one release and one refused change: $(tail -n 2 "$AUDIT")"
-
-raise_prompt always-allowed password "$RELEASE_ENTRY"
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$RELEASE_ENTRY field=password for=once or always always=Always allow makes ci:dev Automatic" \
-  || die "the prompt does not offer Always allow ci:dev"
-echo always >&7
-wait_for '^access-prompt agent=' "$HOLD_OUT" 2
-echo allow >&7
-reply_to 3
-withdrawn
-wait_for '^access-prompt withdrawn' "$HOLD_OUT" 2
-jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Always allow did not release the request"
-tail -n 2 "$AUDIT" | jq -e -s '.[0].tool == "access_change" and .[0].decision == "granted" and .[0].method == "prompt"
-    and .[1].tool == "request_credential" and .[1].decision == "granted" and .[1].method == "prompt"' >/dev/null \
-  || die "an allowed Always allow was not recorded as a confirmed change and a release: $(tail -n 2 "$AUDIT")"
-request 4 "$RELEASE_ENTRY" password
-reply_to 4
-exec 8>&-
-jq -e 'select(.id == 4) | .result.isError == false' <"$OUT" >/dev/null || die "the request after Always allow was not released"
-tail -n 1 "$AUDIT" | jq -e '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' >/dev/null \
-  || die "the request after Always allow was not recorded as released automatically"
-[ "$(grep -c '^prompt client' "$HOLD_OUT")" -eq "$PROMPTS" ] || die "a request under Automatic drew a prompt"
 
 # ------------------------------------------------- a terminal's edit is asked about in the window (D-0464)
 before="$(sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1)"

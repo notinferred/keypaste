@@ -23,8 +23,8 @@
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
 # output, if the approval dialog the shipped approver draws differs by one character from the block in
-# EITHER page, if the `[d] deny  [o] once  [a] always` choice line or the two
-# lines the approver draws to say what `[a]` does are missing from either, if either stops carrying the
+# EITHER page, if the `[d] deny  [o] once` choice line is missing from either or an `[a] always` one is
+# shown, if either stops carrying the
 # dialog at all, if a request allowed once does not return the
 # credential with the lifetime the person chose, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
@@ -237,17 +237,9 @@ done
 # ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
 # is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF "[d] deny  [o] once  [a] always" "$page" \
+  grep -qF "[d] deny  [o] once  " "$page" \
     || die "$page does not show the choices a person actually answers"
-done
-
-# What [a] does is drawn below the dialog, after the block compared above, so it is held line by line.
-always="$(tr -d '\r' <"$AGENT_ERR" | grep -a -A1 -m1 '^  \[a\] allows this once' || true)"
-[ "$(printf '%s\n' "$always" | grep -c .)" -eq 2 ] || die "the approver did not say what [a] does: |$always|"
-for page in $TRANSCRIPT_PAGES; do
-  while IFS= read -r line; do
-    in_doc "$line" "what [a] does" "$page"
-  done <<<"$always"
+  grep -qF "[a] always" "$page" && die "$page still shows an [a] always choice no prompt offers"
 done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
 

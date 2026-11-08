@@ -142,9 +142,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
-      released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [a] always  45s ›
+[d] deny  [o] once  45s ›
 ```
 
 Your run may use different arguments. Claude writes the reason. `agent` is the sanitized name the AI tool gave itself, which nothing checks; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `item` is the resolved vault item, and `field` is the requested allowed field.

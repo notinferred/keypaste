@@ -176,8 +176,8 @@ classify() {
   if judge agent-activity && judge request; then
     if [ "$(fact_of "$dir" mcp_error)" != false ]; then result=contradiction; why='keypaste mcp reported the approved request as an error'
     elif [ "$(fact_of "$dir" audit_decision)" != granted ]; then result=contradiction; why="the audit records $(fact_of "$dir" audit_decision), not granted"
-    elif [ "$(fact_of "$dir" audit_method)" != prompt ]; then result=contradiction; why="the audit records method $(fact_of "$dir" audit_method), not a person's prompt"
-    else result=pass; why="a person approved at the terminal agent; the app showed: $(fact_of "$dir" agent_activity)"
+    elif [ "$(fact_of "$dir" audit_method)" != allowed ]; then result=contradiction; why="the audit records method $(fact_of "$dir" audit_method), not a username agents see unasked"
+    else result=pass; why="the terminal agent released the username agents see unasked; the app showed: $(fact_of "$dir" agent_activity)"
     fi
   fi
   emit approval
@@ -465,8 +465,8 @@ env_run() {
 
 approval() {
   local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$HOME_DIR/audit.jsonl"
-  # y lets install-check see the group the app saved into, which is in no project; o then allows the request once.
-  printf '%s\ny\no\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  # Agents see an item's username unasked, so the request reads back the app's edit with nobody asked.
+  printf '%s\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -475,7 +475,6 @@ approval() {
     sleep 0.2
   done
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
-  act agent-settings "$KP" clients install-check --see "$ENTRY_GROUP/**" --vault "$VAULT_NATIVE" --approver "$pipe" || true
 
   launch second "$pipe" > /dev/null
   if act second-window drive window 120 && act second-unlock drive type "$MASTER" && act second-unlock-enter drive key Return \
@@ -618,7 +617,7 @@ selftest() {
       '{"fact":"mcp_error","value":"false"}' \
       '{"fact":"username_readback","value":"edited-in-app-1"}' \
       '{"fact":"audit_decision","value":"granted"}' \
-      '{"fact":"audit_method","value":"prompt"}' \
+      '{"fact":"audit_method","value":"allowed"}' \
       '{"fact":"terminal_expected","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe"}' \
       '{"fact":"path_entries","value":"1"}' \
       '{"fact":"terminal","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tthe MCP server your AI tools start"}' \

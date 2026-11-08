@@ -18,8 +18,9 @@
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
 # `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste approve` and `keypaste mcp` release
 # `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
-# its reference is asked about as the entry and the field. With the agent made Automatic, the field
-# is released unprompted and `Recovery codes` is still refused by name, before anyone is asked.
+# its reference is asked about as the entry and the field. With `protected = "allow"` written into
+# agents.toml by hand, the field is still asked about, since only the vault's owner can seal a rule, and
+# `Recovery codes` is still refused by name, before anyone is asked.
 # `keypaste run --env-file` gives a child the field a reference names and starts nothing for
 # `Recovery codes`. The app's own prompt window, held by tests/Keypaste.AppDriver on a copy keypaste
 # wrote only the agent's settings into, names the field; Allow once releases it alone, and the next
@@ -429,9 +430,8 @@ EOF
 printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/openai.xml")" "$(native "$openai")" \
   || die "keepassxc-cli could not import the OpenAI entry"
 [ "$(kx show "$openai" api/OpenAI -a OPENAI_API_KEY)" = fields-openai-api-key ] || die "KeePassXC does not read the OPENAI_API_KEY it wrote"
-# fields-probe sees api/** and may run commands, each still asked about, as a person confirmed at
-# keypaste approve's terminal; without them it would see only what is tagged into a project.
-agent_settings "$kp" "$(native "$openai")" "$pw" 'fields-probe --see api/** --run on' \
+# fields-probe may run commands, each still asked about, sealed by a keypaste approve of its own.
+agent_settings "$kp" "$(native "$openai")" "$pw" 'fields-probe --run on' \
   || die "could not save fields-probe's settings in the KeePassXC vault"
 # The app's half runs on this copy, which keypaste has written nothing into but those settings.
 app_openai="$dir/openai-app.kdbx"
@@ -516,26 +516,25 @@ for value in "${others[@]}"; do
 done
 grep -q "$api_key" "$dir/run-tool.out" "$audit" "$agent_err" && die "the released value reached the denied run, the audit log or the agent's terminal"
 
-step "with fields-probe Automatic, OPENAI_API_KEY is released with nobody asked, and Recovery codes is still refused by name"
+step "with protected = \"allow\" written into agents.toml by hand, OPENAI_API_KEY is still asked about, and Recovery codes is still refused by name"
 stop_agent
-agent_settings "$kp" "$(native "$openai")" "$pw" 'fields-probe --mode automatic' \
-  || die "could not make fields-probe Automatic in the KeePassXC vault"
+sed 's/^protected = "ask"$/protected = "allow"/' "$KEYPASTE_HOME/agents.toml" >"$dir/agents.edited" && mv "$dir/agents.edited" "$KEYPASTE_HOME/agents.toml"
+grep -q '^protected = "allow"$' "$KEYPASTE_HOME/agents.toml" || die "could not edit agents.toml"
 logged=$(lines_in "$audit")
 # Only the master password: a prompt the agent draws reads the end of its input, which denies.
 start_agent '' --approval-timeout 10
-ask_field 10 OPENAI_API_KEY | jq -e --arg v "$api_key" 'select(.id == 10) | .result.isError == false and .result.structuredContent.value == $v' >/dev/null \
-  || die "Automatic did not release exactly the OPENAI_API_KEY KeePassXC wrote: $(cat "$dir/field-10.out")"
-[ "$(asked)" = 0 ] || die "an Automatic release put a prompt in front of the person"
-tail -n 1 "$audit" | jq -e '.decision == "granted" and .method == "automatic" and .args.field == "OPENAI_API_KEY"' >/dev/null \
-  || die "the release was not audited as an Automatic release of that field: $(lines_after "$audit" "$logged")"
+ask_field 10 OPENAI_API_KEY | jq -e 'select(.id == 10) | .result.isError == true' >/dev/null \
+  || die "a hand-edited Allow released the OPENAI_API_KEY KeePassXC wrote: $(cat "$dir/field-10.out")"
+[ "$(asked)" = 1 ] || die "with a hand-edited Allow, the request for OPENAI_API_KEY did not reach the person"
+tail -n 1 "$audit" | jq -e '.decision == "denied" and .method == "prompt" and .args.field == "OPENAI_API_KEY"' >/dev/null \
+  || die "the request was not audited as a prompted denial of that field: $(lines_after "$audit" "$logged")"
 ask_field 11 'Recovery codes' | jq -e --arg t "$denial" 'select(.id == 11) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
-  || die "with fields-probe Automatic, a request for 'Recovery codes' was not refused with the fixed denial: $(cat "$dir/field-11.out")"
-[ "$(asked)" = 0 ] || die "a request for 'Recovery codes' reached a person"
+  || die "a request for 'Recovery codes' was not refused with the fixed denial: $(cat "$dir/field-11.out")"
+[ "$(asked)" = 1 ] || die "a request for 'Recovery codes' reached a person"
 stop_agent
-for value in "${others[@]}"; do
-  grep -q "$value" "$dir"/field-1?.out "$audit" "$dir"/agent-*.err && die "'$value' left the vault while fields-probe was Automatic"
+for value in "${others[@]}" "$api_key"; do
+  grep -q "$value" "$dir"/field-1?.out "$audit" "$dir"/agent-*.err && die "'$value' left the vault under a hand-edited Allow"
 done
-grep -q "$api_key" "$audit" "$dir"/agent-*.err && die "the value Automatic released reached the audit log or the agent's terminal"
 
 step "keypaste run --env-file gives the child the field a reference names, and a reference to Recovery codes starts nothing"
 child=${BASH:-/bin/bash}
@@ -588,7 +587,7 @@ withdrawn() { wait_for '^prompt withdrawn' "$hold_out" "$drawn"; }
 last_prompt() { grep '^prompt client' "$hold_out" | tail -1 | tr -d '\r'; }
 
 app_prompt once OPENAI_API_KEY
-grep -qF "label=fields-probe entry=api/OpenAI field=OPENAI_API_KEY for=once or always" <<<"$(last_prompt)" \
+grep -qF "label=fields-probe entry=api/OpenAI field=OPENAI_API_KEY for=once always=none" <<<"$(last_prompt)" \
   || die "the app's prompt does not name the field: $(last_prompt)"
 echo once >&7
 app_reply 3
