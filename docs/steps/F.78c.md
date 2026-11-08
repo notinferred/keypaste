@@ -1,6 +1,6 @@
 # F.78c — Give cards and identities categories of their own
 
-Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78b. Runs: RUNS.
+Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78b. Runs on Linux: ci fast tier 42532430898 at `5faea054` and dev desktop 42533103058 at `3d0740d5`, which changed only documents since, both green.
 
 ## Amendments
 
