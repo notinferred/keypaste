@@ -1294,13 +1294,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         {
             var target = new EntryName(group, row.Title);
 
-            // Judged before the move, since the path is what it changes (T-13).
-            var forAgents = _session.Unlocked is { } vault ? _session.AgentViewChangeOfMove(vault, row.Name, target).Describe(row.Title) : null;
-
-            if (Organize(row, target) && forAgents is not null)
-            {
-                Toast?.Invoke(forAgents, ToastTone.Information);
-            }
+            Organize(row, target);
         }
     }
 

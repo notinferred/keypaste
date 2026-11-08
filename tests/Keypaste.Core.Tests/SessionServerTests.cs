@@ -62,8 +62,7 @@ public sealed class SessionServerTests : IDisposable
         CurrentLifetime = () => lifetime,
         UnlockedFor = _ => null,
         Channel = new FakeChannel(),
-        Settings = IAgentSettings.Defaults,
-        Hourly = new HourlyLimit(TimeProvider.System),
+        Rules = IAgentRules.Defaults,
         Audit = () => null,
     };
 

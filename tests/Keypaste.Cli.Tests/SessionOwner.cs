@@ -78,8 +78,8 @@ internal sealed class SessionOwner : IAsyncDisposable
 
     internal string Pipe { get; }
 
-    /// <summary>The agents' settings this owner reads and writes.</summary>
-    internal FakeAgentSettings Settings { get; } = new();
+    /// <summary>The agents' rules this owner decides by.</summary>
+    internal FakeAgentRules Settings { get; } = new();
 
     /// <summary>Where a person would be asked: every credential is refused, and a change is answered as a test says.</summary>
     internal NobodyAsked Asked { get; } = new();
@@ -121,22 +121,11 @@ internal sealed class SessionOwner : IAsyncDisposable
 
     internal sealed class NobodyAsked : IApprovalChannel
     {
-        /// <summary>How a confirmation of a change that gives an agent more is answered; a no unless a test says otherwise.</summary>
-        internal ApprovalAnswer Change { get; set; } = ApprovalAnswer.Denied;
-
-        /// <summary>The last such confirmation asked.</summary>
-        internal AccessChangePrompt? LastChange { get; private set; }
-
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ApprovalAnswer.Denied);
 
         public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ApprovalAnswer.Denied);
 
-        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
-        {
-            LastChange = prompt;
-            return ValueTask.FromResult(Change);
-        }
     }
 }

@@ -19,12 +19,7 @@ internal sealed partial class AgentSettingsView : UserControl
 {
     private static readonly HashSet<string> _chipLists = new(StringComparer.Ordinal)
     {
-        nameof(AgentSettingsViewModel.ModeChoices),
-        nameof(AgentSettingsViewModel.ValueChoices),
         nameof(AgentSettingsViewModel.RunChoices),
-        nameof(AgentSettingsViewModel.SeeScopes),
-        nameof(AgentSettingsViewModel.SeeChoices),
-        nameof(AgentSettingsViewModel.Rows),
     };
 
     private AgentSettingsViewModel? _watched;
@@ -117,11 +112,10 @@ internal sealed partial class AgentSettingsView : UserControl
     }
 
     /// <summary>What a chip sets, which outlives the chip the panel rebuilds.</summary>
-    private readonly record struct ChipKey(string Setting, string Word, string? Project)
+    private readonly record struct ChipKey(string Setting, string Word)
     {
-        internal static ChipKey Of(SettingChoice choice) => new(choice.Setting, choice.Word, choice.Project?.Name);
+        internal static ChipKey Of(SettingChoice choice) => new(choice.Setting, choice.Word);
 
-        internal bool SameGroup(ChipKey other) =>
-            string.Equals(Setting, other.Setting, StringComparison.Ordinal) && string.Equals(Project, other.Project, StringComparison.Ordinal);
+        internal bool SameGroup(ChipKey other) => string.Equals(Setting, other.Setting, StringComparison.Ordinal);
     }
 }

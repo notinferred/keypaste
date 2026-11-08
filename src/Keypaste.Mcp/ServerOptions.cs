@@ -47,9 +47,6 @@ internal sealed record ServerOptions
         "where this bridge records a call it refuses itself or that nothing holding the vault answered, or set KEYPASTE_HOME; "
             + "the app or `keypaste approve` records the calls it answers in its own log");
 
-    private static readonly Option<string> _clients = Syntax.Value(
-        "--clients", "path", "this computer's limits, clients.toml, which an agent's change that gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME");
-
     private static readonly Option<string> _approver =
         Syntax.Value("--approver", "name", "which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER");
 
@@ -63,13 +60,12 @@ internal sealed record ServerOptions
             "the MCP server your AI tools start\n\n"
                 + "it lets an AI agent ask for one credential, with your approval and a full audit trail. an AI tool starts it; "
                 + "you do not run it yourself, and `keypaste setup` connects this computer's AI tools to your vault.\n\n"
-                + "nothing is released unless a person says yes to that specific request, or set this agent to Automatic for "
-                + "it. requests go to whichever keypaste process holds the vault unlocked, the desktop app or `keypaste approve` "
-                + "in the person's own terminal, so no agent can cause a master password prompt to appear. with nothing holding "
-                + "the vault, every request is denied but an agent's change that gives it less. `keypaste clients` shows or "
-                + "changes each agent's settings.")
+                + "nothing is released unless a person says yes to that specific request, or allowed that kind of value for "
+                + "agents on this computer. requests go to whichever keypaste process holds the vault unlocked, the desktop app or "
+                + "`keypaste approve` in the person's own terminal, so no agent can cause a master password prompt to appear. with "
+                + "nothing holding the vault, every request is denied. `keypaste clients` lists agents and turns run on or off.")
         {
-            _help, _vault, _expose, _clientLabel, _allowRun, _auditLog, _clients, _approver,
+            _help, _vault, _expose, _clientLabel, _allowRun, _auditLog, _approver,
         },
     };
 
@@ -83,18 +79,6 @@ internal sealed record ServerOptions
 
     /// <summary>Where the audit trail is appended.</summary>
     internal required string AuditPath { get; init; }
-
-    /// <summary>
-    /// This computer's ceilings, which an agent's own change that gives it nothing more lowers while
-    /// nothing holds the vault; null when the bridge cannot tell they are the ones the vault's owner reads.
-    /// </summary>
-    /// <remarks>
-    /// The file <c>--clients</c> names, which a registration for a home other than the default pins
-    /// beside its log; otherwise its home's, and only while its log is its home's too, since a client
-    /// that strips <c>KEYPASTE_HOME</c> from a bridge pinned to another home's log would leave it
-    /// lowering a file that home's owner never reads while the agent was told its change applied.
-    /// </remarks>
-    internal string? ClientsPath { get; init; }
 
     /// <summary>Which pipe the vault's owner is expected on, or null when no vault was named.</summary>
     /// <remarks>
@@ -171,7 +155,6 @@ internal sealed record ServerOptions
         var vault = line.GetValue(_vault);
         var label = line.GetValue(_clientLabel);
         var auditPath = line.GetValue(_auditLog);
-        var clientsPath = line.GetValue(_clients);
         var approver = line.GetValue(_approver);
         var allowRun = line.GetValue(_allowRun);
         var globs = line.GetValue(_expose) ?? [];
@@ -185,8 +168,8 @@ internal sealed record ServerOptions
             return false;
         }
 
-        // The rule an agent's settings are kept under, so a bridge starts only with a name settings
-        // can be kept for, and one the owner would reject on attach never reaches it.
+        // The rule an agent's name is kept under, so a bridge starts only with a name run can be turned
+        // on for, and one the owner would reject on attach never reaches it.
         if (label is not null && !AgentNames.IsNamed(label))
         {
             error = $"--client-label must be 1 to {AgentNames.MaximumLength} characters with no quote, backslash, slash or control character, and not \"*\"";
@@ -224,9 +207,6 @@ internal sealed record ServerOptions
             VaultKey = identity?.Key,
             LockedAppName = identity is null ? null : LockedAppEndpoint.NameFor(identity),
             AuditPath = log,
-            ClientsPath = clientsPath is { Length: > 0 } ? Path.GetFullPath(clientsPath)
-                : PathIdentity.SameFile(log, homeLog) ? KeypasteHome.ClientsPath(homeFromEnvironment)
-                : null,
         };
 
         return true;

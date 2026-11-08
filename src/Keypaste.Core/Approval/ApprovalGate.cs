@@ -12,36 +12,10 @@ public sealed record WaitingRequest(ApprovalPrompt Prompt, TimeSpan Remaining);
 /// <param name="Remaining">How long is left before the gate answers for them.</param>
 public sealed record WaitingRun(RunPrompt Prompt, TimeSpan Remaining);
 
-/// <summary>
-/// The gate's one slot, kept from a person's Always allow answer for the confirmation that follows it, so
-/// no other request can come in front of them between the two.
-/// </summary>
-/// <remarks>Disposing it gives the slot back, once; the confirmation asked in it leaves it kept.</remarks>
-public sealed class KeptSlot : IDisposable
-{
-    private ApprovalGate? _gate;
-
-    internal KeptSlot(ApprovalGate gate)
-    {
-        _gate = gate;
-    }
-
-    /// <summary>Whether this is the slot of that gate, still kept.</summary>
-    internal bool IsOf(ApprovalGate gate) => ReferenceEquals(Volatile.Read(ref _gate), gate);
-
-    /// <inheritdoc/>
-    public void Dispose() => Interlocked.Exchange(ref _gate, null)?.GiveBack();
-}
-
 /// <summary>A <c>keypaste run --session</c> request in front of a person, as a list shows it.</summary>
 /// <param name="Prompt">What the person is being shown.</param>
 /// <param name="Remaining">How long is left before the gate answers for them.</param>
 public sealed record WaitingEnv(EnvReleasePrompt Prompt, TimeSpan Remaining);
-
-/// <summary>A confirmation of a change that gives an agent more, in front of a person, as a list shows it.</summary>
-/// <param name="Prompt">What the person is being shown.</param>
-/// <param name="Remaining">How long is left before the gate answers for them.</param>
-public sealed record WaitingChange(AccessChangePrompt Prompt, TimeSpan Remaining);
 
 /// <summary>A terminal's edit in front of a person, as a list shows it.</summary>
 /// <param name="Prompt">What the person is being shown.</param>
@@ -56,7 +30,7 @@ public sealed record WaitingEdit(TerminalEditPrompt Prompt, TimeSpan Remaining);
 /// The gate exists so that no channel has to be trusted with the rules. A channel that forgets its
 /// own timeout, throws, answers twice, or answers late cannot turn any of those into a release: the
 /// deadline is measured here, and anything that is not a clean <see cref="ApprovalAnswer.ApprovedOnce"/>
-/// or an offered <see cref="ApprovalAnswer.Always"/> arriving inside the window is a denial
+/// arriving inside the window is a denial
 /// (docs/PRODUCT.md laws 3.2 and 3.7).
 /// </para>
 /// <para>
@@ -75,7 +49,7 @@ public sealed record WaitingEdit(TerminalEditPrompt Prompt, TimeSpan Remaining);
 /// </remarks>
 public sealed class ApprovalGate : IDisposable
 {
-    /// <summary>The one cooldown every request for more access, and every edit, from an agent or a terminal shares (THREATS.md T-11).</summary>
+    /// <summary>The one cooldown every edit from a terminal shares (THREATS.md T-11).</summary>
     internal const string AskedForMore = "access";
 
     private readonly IApprovalChannel _channel;
@@ -122,22 +96,18 @@ public sealed class ApprovalGate : IDisposable
     public WaitingEnv? WaitingEnv =>
         _asking is { Env: { } env } asking ? new WaitingEnv(env, asking.Window.Remaining(_clock)) : null;
 
-    /// <summary>The confirmation of a change that gives an agent more a person is being asked about now, or null.</summary>
-    public WaitingChange? WaitingChange =>
-        _asking is { Change: { } change } asking ? new WaitingChange(change, asking.Window.Remaining(_clock)) : null;
-
     /// <summary>The terminal's edit a person is being asked about now, or null.</summary>
     public WaitingEdit? WaitingEdit =>
         _asking is { Edit: { } edit } asking ? new WaitingEdit(edit, asking.Window.Remaining(_clock)) : null;
 
-    /// <summary>Why a request for more, or an edit, from an agent or a terminal was not put to the person, and when it can be asked again.</summary>
+    /// <summary>Why a terminal's edit was not put to the person, and when it can be asked again.</summary>
     /// <param name="otherwise">What the person can do instead, said after "or".</param>
     /// <returns>The sentence.</returns>
     internal string CoolingDown(string otherwise)
     {
         var seconds = (int)Math.Ceiling(CooldownLeft(AskedForMore).TotalSeconds);
 
-        return "a request from an agent or a terminal for more access, or to change the vault, was refused or went unanswered a moment ago, so this one was not put to the person; "
+        return "a request from a terminal to change the vault was refused or went unanswered a moment ago, so this one was not put to the person; "
             + $"try again in {ApprovalLimits.Describe(Math.Max(seconds, 1))}, or {otherwise}";
     }
 
@@ -158,53 +128,16 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
-    /// <summary>
-    /// Asks a human about a credential request, as <see cref="AskAsync(string, ApprovalPrompt, CancellationToken)"/>
-    /// does, and keeps the one slot when they answer Always allow on a prompt that offered it.
-    /// </summary>
-    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
-    /// <param name="prompt">What the human is shown.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>
-    /// The answer, and for Always allow the slot, which the caller asks the confirmation that follows in
-    /// and then disposes, whatever became of the request.
-    /// </returns>
-    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
-    public async ValueTask<(ApprovalAnswer Answer, KeptSlot? Kept)> AskKeepingAsync(
-        string cooldownKey,
-        ApprovalPrompt prompt,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(cooldownKey);
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        KeptSlot? kept = null;
-        var answer = await AskThroughAsync(
-            [cooldownKey],
-            new Asked(prompt, null, null, null, null),
-            token => _channel.AskAsync(prompt, token),
-            cancellationToken,
-            keep: answered => prompt.Always is not null && answered == ApprovalAnswer.Always ? kept = new KeptSlot(this) : null).ConfigureAwait(false);
-
-        return (answer, kept);
-    }
-
-    /// <summary>
-    /// Asks a human to pick one of the items a credential request names and answer it, under the same window, slot and
-    /// cooldown, keeping the slot when they answer Always allow on a candidate that offers it.
-    /// </summary>
+    /// <summary>Asks a human to pick one of the items a credential request names and answer it, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown, its candidates the items.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>
-    /// The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal;
-    /// and for Always allow the slot, which the caller asks the confirmation in and then disposes.
-    /// </returns>
+    /// <returns>The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
-    public async ValueTask<(ItemPick Pick, KeptSlot? Kept)> AskPickingAsync(
+    public async ValueTask<ItemPick> AskPickingAsync(
         string cooldownKey,
         ApprovalPrompt prompt,
         CancellationToken cancellationToken)
@@ -213,23 +146,19 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(prompt);
 
         int? picked = null;
-        KeptSlot? kept = null;
-
-        ItemCandidate? Picked() => picked is { } index && index >= 0 && index < prompt.Candidates.Count ? prompt.Candidates[index] : null;
 
         var answer = await AskThroughAsync(
             [cooldownKey],
-            new Asked(prompt, null, null, null, null),
+            new Asked(prompt, null, null, null),
             async token =>
             {
                 var said = await _channel.AskToPickAsync(prompt, token).ConfigureAwait(false);
-                picked = said.Picked;
-                return said.Answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always && Picked() is null ? ApprovalAnswer.Denied : said.Answer;
+                picked = said.Picked is { } index && index >= 0 && index < prompt.Candidates.Count ? index : null;
+                return said.Answer == ApprovalAnswer.ApprovedOnce && picked is null ? ApprovalAnswer.Denied : said.Answer;
             },
-            cancellationToken,
-            keep: answered => answered == ApprovalAnswer.Always && Picked() is { Always: not null } ? kept = new KeptSlot(this) : null).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
-        return (new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always ? picked : null), kept);
+        return new ItemPick(answer, answer == ApprovalAnswer.ApprovedOnce ? picked : null);
     }
 
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
@@ -250,7 +179,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync([cooldownKey], new Asked(null, null, prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(null, null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human about an agent's run, under the same window, slot and cooldown.</summary>
@@ -270,55 +199,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKeys);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
-    }
-
-
-    /// <summary>Asks a human to confirm a change that gives an agent more, under the same window, slot and cooldown.</summary>
-    /// <param name="cooldownKeys">Each identity under which a refusal holds the next change back: one cooling under any of them is refused unasked, and a refusal cools all of them.</param>
-    /// <param name="prompt">What the human is shown.</param>
-    /// <param name="coolUnanswered">Whether a confirmation nobody answered, because it expired or its asker withdrew it, cools down as a refusal does; one the owner withdrew never does.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, which confirms nothing unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
-    /// <remarks>
-    /// A request for more that reaches the owner from an agent or a terminal may come from a program that
-    /// gains by keeping a confirmation up until somebody presses yes, so its unanswered requests hold the
-    /// next one back too (THREATS.md T-11). One the owner withdrew, by a lock or a reload, holds nothing
-    /// back: no program chose it (<see cref="Withdrawals.ByOwner"/>).
-    /// </remarks>
-    public ValueTask<ApprovalAnswer> AskAsync(
-        IReadOnlyList<string> cooldownKeys,
-        AccessChangePrompt prompt,
-        bool coolUnanswered,
-        CancellationToken cancellationToken) =>
-        AskAsync(cooldownKeys, prompt, coolUnanswered, null, cancellationToken);
-
-    /// <summary>Asks a human to confirm a change that gives an agent more, in the slot Always allow kept when there is one.</summary>
-    /// <param name="cooldownKeys">Each identity under which a refusal holds the next change back.</param>
-    /// <param name="prompt">What the human is shown.</param>
-    /// <param name="coolUnanswered">Whether a confirmation nobody answered cools down as a refusal does.</param>
-    /// <param name="kept">The slot asking kept for Always allow, which stays kept, or null to take the slot as any request does.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, which confirms nothing unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="kept"/> is not this gate's slot, or was given back.</exception>
-    public ValueTask<ApprovalAnswer> AskAsync(
-        IReadOnlyList<string> cooldownKeys,
-        AccessChangePrompt prompt,
-        bool coolUnanswered,
-        KeptSlot? kept,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(cooldownKeys);
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        if (kept is not null && !kept.IsOf(this))
-        {
-            throw new ArgumentException("the slot is not this gate's, or was given back", nameof(kept));
-        }
-
-        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered, inKept: kept is not null);
+        return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human to allow a terminal's edit, under the same window and slot, cooling down unanswered requests too.</summary>
@@ -336,7 +217,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKeys);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered: true);
+        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered: true);
     }
 
     /// <summary>Asks a human, who armed pairing, to pair a browser, under the same window and slot as every other question.</summary>
@@ -355,7 +236,7 @@ public sealed class ApprovalGate : IDisposable
         string? name = null;
         var answer = await AskThroughAsync(
             [],
-            new Asked(null, null, null, null, null),
+            new Asked(null, null, null, null),
             async token =>
             {
                 var said = await _channel.AskAsync(prompt, token).ConfigureAwait(false);
@@ -374,9 +255,7 @@ public sealed class ApprovalGate : IDisposable
         Asked listed,
         Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
         CancellationToken cancellationToken,
-        bool coolUnanswered = false,
-        Func<ApprovalAnswer, KeptSlot?>? keep = null,
-        bool inKept = false)
+        bool coolUnanswered = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -392,16 +271,14 @@ public sealed class ApprovalGate : IDisposable
 
         // Wait(0), not WaitAsync: taking the slot must either succeed now or refuse now. Waiting
         // for it would queue the request behind a prompt a human has not answered yet.
-        if (!inKept && !_oneAtATime.Wait(0, CancellationToken.None))
+        if (!_oneAtATime.Wait(0, CancellationToken.None))
         {
             return ApprovalAnswer.Busy;
         }
 
-        var kept = false;
-
         try
         {
-            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, listed.Change, listed.Edit, Deadline.Starting(_clock, Limits.Window));
+            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, listed.Edit, Deadline.Starting(_clock, Limits.Window));
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
@@ -415,30 +292,12 @@ public sealed class ApprovalGate : IDisposable
                 }
             }
 
-            kept = !inKept && keep?.Invoke(answer) is not null;
             return answer;
         }
         finally
         {
             _asking = null;
-
-            if (!inKept && !kept)
-            {
-                _oneAtATime.Release();
-            }
-        }
-    }
-
-    /// <summary>Gives back the slot a <see cref="KeptSlot"/> kept.</summary>
-    internal void GiveBack()
-    {
-        try
-        {
             _oneAtATime.Release();
-        }
-        catch (ObjectDisposedException)
-        {
-            // A gate closed while the slot was kept has nothing left to give it back to.
         }
     }
 
@@ -520,9 +379,8 @@ public sealed class ApprovalGate : IDisposable
     /// <returns><see langword="true"/> if a refusal is still in force.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> is null.</exception>
     /// <remarks>
-    /// Public so the approver can consult it <em>before</em> an Automatic release, which is what
-    /// makes "a person's explicit no outranks a mode; a mode never resurrects it" a property of the
-    /// ordering rather than an accident of how the branches happen to fall today. <see cref="AskAsync(string, ApprovalPrompt, CancellationToken)"/> keeps its own check, so removing this one narrows nothing.
+    /// Public so the approver can consult it before releasing under a rule, so a person's explicit no
+    /// outranks an Allow and a rule never resurrects it. <see cref="AskAsync(string, ApprovalPrompt, CancellationToken)"/> keeps its own check, so removing this one narrows nothing.
     /// </remarks>
     public bool IsInCooldown(string cooldownKey)
     {
@@ -544,32 +402,6 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
 
         return _cooldowns.TryGetValue(cooldownKey, out var refusal) ? refusal.Standing(_clock) : TimeSpan.Zero;
-    }
-
-    /// <summary>Tells the person, through the channel, that the change Always allow asked for did not take effect.</summary>
-    /// <param name="notice">What to tell them.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="notice"/> is null.</exception>
-    /// <remarks>
-    /// It asks nothing, so it takes no slot and waits for nothing, and a channel that fails to show it,
-    /// or a gate already closed, cannot undo the release the person already allowed.
-    /// </remarks>
-    public void Tell(AlwaysNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        if (_disposed)
-        {
-            return;
-        }
-
-        try
-        {
-            _channel.Tell(notice);
-        }
-        catch (Exception)
-        {
-            // Saying it failed; the release and its line stand as they are.
-        }
     }
 
     /// <summary>Tells the person, through the channel, that a browser asked to pair while pairing was not armed.</summary>
@@ -633,7 +465,7 @@ public sealed class ApprovalGate : IDisposable
         _oneAtATime.Dispose();
     }
 
-    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, AccessChangePrompt? Change, TerminalEditPrompt? Edit, Deadline Window);
+    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, TerminalEditPrompt? Edit, Deadline Window);
 
-    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, AccessChangePrompt? Change, TerminalEditPrompt? Edit);
+    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, TerminalEditPrompt? Edit);
 }

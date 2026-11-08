@@ -4,11 +4,10 @@ namespace Keypaste.Core.Approval;
 /// What came back from asking a human. One value releases a credential.
 /// </summary>
 /// <remarks>
-/// Seven of the nine mean deny, and they are distinct only so the audit line and the refusal an
+/// Seven of the eight mean deny, and they are distinct only so the audit line and the refusal an
 /// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. docs/PRODUCT.md law
 /// 3.2 makes deny the default and law 3.7 makes every error path a denial, so the safe way to read
-/// this enum is: <see cref="ApprovedOnce"/> releases; anything else is a no, <see cref="Always"/>
-/// included unless the approver offered it.
+/// this enum is: <see cref="ApprovedOnce"/> releases; anything else is a no.
 /// <see cref="ApprovalAnswers.Releases"/> reads it that way.
 /// </remarks>
 public enum ApprovalAnswer
@@ -42,12 +41,4 @@ public enum ApprovalAnswer
 
     /// <summary>A human allowed this one request and nothing after it.</summary>
     ApprovedOnce = 8,
-
-    /// <summary>A human allowed this one request and chose Always allow on what the prompt offered.</summary>
-    /// <remarks>
-    /// Not a release by itself: the approver reads it as <see cref="ApprovedOnce"/> followed by the
-    /// confirmation any widening needs, and only when the prompt offered it
-    /// (<see cref="AlwaysOffer"/>); otherwise it is a denial.
-    /// </remarks>
-    Always = 9,
 }

@@ -10,7 +10,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
@@ -187,14 +186,6 @@ public sealed class OneHomeJourneyTests
     private static ToggleButton? Disclosure(Window window) =>
         window.GetVisualDescendants().OfType<ToggleButton>()
             .SingleOrDefault(toggle => toggle is { Name: "PART_ExpanderHeader", TemplatedParent: Expander { DataContext: AgentRow { Label: _label } }, IsEffectivelyVisible: true });
-
-    /// <summary>One of the open settings' mode choices for the agent's default.</summary>
-    private static Button Choice(Window window, string words) =>
-        window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.IsEffectivelyVisible && button.DataContext is SettingChoice { Setting: "mode", Project: null } choice && choice.Words == words);
-
-    private static AgentMode? Ceiling(string? home) =>
-        AccessCaps.TryLoad(KeypasteHome.ClientsPath(home), out var caps, out _) ? caps.For(_label).Rows.FirstOrDefault(row => row.Project is null)?.Mode : null;
 
     /// <summary>A record of this journey's own, so the log has a table to check.</summary>
     private static void Record(string vault)

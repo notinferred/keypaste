@@ -1363,7 +1363,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         if (status is AuthorityStatus.Serving)
         {
             var activity = Authority!.Activity;
-            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count + activity.WaitingEdits.Count;
+            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingEdits.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             AgentsRefusing = Authority.LastAuditFailure is not null;

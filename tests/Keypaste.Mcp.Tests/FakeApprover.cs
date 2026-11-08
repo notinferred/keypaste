@@ -93,12 +93,6 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>How many runs reached the approver.</summary>
     internal int Runs => Volatile.Read(ref _runs);
 
-    /// <summary>How the approver answers a change to an agent's settings; null answers as an owner that keeps none.</summary>
-    internal Func<AccessChangeRequest, AccessChangeReply>? AccessAnswer { get; set; }
-
-    /// <summary>Every change to an agent's settings that reached the approver, in the order it arrived.</summary>
-    internal ConcurrentQueue<AccessChangeRequest> AccessReceived { get; } = [];
-
     /// <summary>Whether each reply says this approver recorded the request, as an owner's does. True by default.</summary>
     internal bool Records { get; set; } = true;
 
@@ -142,8 +136,8 @@ internal sealed class FakeApprover : IAsyncDisposable
         Answer = new CredentialReply
         {
             Decision = AuditDecision.Granted,
-            Method = AuditMethod.Automatic,
-            Reason = "released without asking: billing-bot's mode for this item is Automatic (project billing:dev)",
+            Method = AuditMethod.Allowed,
+            Reason = "released without asking: the person allows passwords for every agent",
             Entry = "env/dev/STRIPE_KEY",
             Value = Sentinel,
         };
@@ -308,15 +302,6 @@ internal sealed class FakeApprover : IAsyncDisposable
             }
 
             var reply = approver.RunAnswer?.Invoke(request) ?? RunReplyOf(EnvOutcome.NoSession, AuditMethod.NoSession, []);
-            return ValueTask.FromResult(reply with { Recorded = approver.Records });
-        }
-
-        public ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken)
-        {
-            approver.AccessReceived.Enqueue(request);
-
-            var reply = approver.AccessAnswer?.Invoke(request)
-                ?? new AccessChangeReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process keeps no agent settings");
             return ValueTask.FromResult(reply with { Recorded = approver.Records });
         }
 

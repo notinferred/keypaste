@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
@@ -39,7 +38,7 @@ public sealed class AgentsFirstLevelTests
     private static readonly string[] _kinds =
     [
         "Button/AgentHistory", "Button/ShowPrompt", "Button/ConnectTool",
-        "Expander/AgentSettings", "Button/ResetClients",
+        "Expander/AgentSettings",
     ];
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -87,7 +86,7 @@ public sealed class AgentsFirstLevelTests
         var panels = Panels(agents.Window);
         Assert.Equal(2, panels.Count);
         var controls = PanelControls(agents.Window);
-        var focused = controls.Single(panel => panel.DataContext == claude.Settings).GetVisualDescendants().OfType<ToggleButton>().Single(button => button.Name == "PART_ExpanderHeader" && AutomationProperties.GetName(button)?.StartsWith("More settings", StringComparison.Ordinal) == true);
+        var focused = controls.Single(panel => panel.DataContext == claude.Settings).GetVisualDescendants().OfType<ToggleButton>().Single(button => AutomationProperties.GetName(button) == "On");
         focused.Focus();
         Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
 
@@ -121,7 +120,7 @@ public sealed class AgentsFirstLevelTests
     {
         await using var agents = await Agents.StartAsync();
         agents.Person.Hold = true;
-        var waiting = agents.RequestAsync("username");
+        var waiting = agents.RequestAsync("notes");
         await UntilAsync(() => agents.Authority.Activity.Waiting.Count == 1);
         agents.Settle();
         var show = Shown(agents.Window, "ShowPrompt");
@@ -141,38 +140,6 @@ public sealed class AgentsFirstLevelTests
     });
 
     /// <summary>
-    /// In the app's narrowest window, an open Settings disclosure with its limits and patterns shown keeps every
-    /// control inside the table that holds it, which clips whatever reaches past its edge.
-    /// </summary>
-    [Fact]
-    public Task An_open_Settings_panel_fits_the_narrowest_window() => HeadlessSession.On(async () =>
-    {
-        await using var agents = await Agents.StartAsync(_narrowest);
-        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
-        Assert.Equal(AuditDecision.Granted, (await agents.Authority.ChangeAccessAsync("claude-code", edit, Token)).Decision);
-        var claude = agents.Model.Rows.Single(row => row.Key == "claude-code");
-
-        Disclosure(agents.Window, claude).IsExpanded = true;
-        agents.Settle();
-        var settings = Assert.IsType<AgentSettingsViewModel>(claude.Settings);
-        settings.IsMoreOpen = true;
-        agents.Settle();
-
-        Assert.True(settings.OffersLimits, "no limits to show");
-        var disclosure = Disclosure(agents.Window, claude);
-        var table = disclosure.GetVisualAncestors().OfType<Border>().First(border => border.Classes.Contains("table"));
-        var outside = disclosure.GetVisualDescendants()
-            .OfType<Control>()
-            .Where(control => control is Button or TextBox or ComboBox or CalendarDatePicker && control.TemplatedParent is null && control.IsEffectivelyVisible)
-            .Where(control => control.TranslatePoint(new Point(control.Bounds.Width, 0), table) is not { } edge || edge.X > table.Bounds.Width)
-            .Select(control => $"{control.GetType().Name} '{Said(control)}'")
-            .ToList();
-
-        Assert.Contains(disclosure.GetVisualDescendants().OfType<ComboBox>(), box => AutomationProperties.GetName(box) == "Where the limit applies" && box.IsEffectivelyVisible);
-        Assert.True(outside.Count == 0, $"cut off at {_narrowest} px: {string.Join("; ", outside)}");
-    });
-
-    /// <summary>
     /// Drives Agents through every state it can be in, calling <paramref name="look"/> in each with every
     /// disclosure and pane closed: tools found in each state, an agent of no tool, one with no name and Every other
     /// agent; history; a request waiting; a change waiting; an unusable clients.toml; not serving.
@@ -189,7 +156,7 @@ public sealed class AgentsFirstLevelTests
         look(agents.Window);
 
         agents.Person.Hold = true;
-        var waiting = agents.RequestAsync("username");
+        var waiting = agents.RequestAsync("notes");
         await UntilAsync(() => agents.Authority.Activity.Waiting.Count == 1);
         agents.Settle();
         Assert.True(agents.Model.HasWaiting, "no request waiting");
@@ -197,19 +164,9 @@ public sealed class AgentsFirstLevelTests
         agents.Clock.Advance(TimeSpan.FromMinutes(1));
         await waiting.WaitAsync(_wait, Token);
 
-        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
-        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        var changing = agents.Authority.ChangeAccessAsync(TempVault.Agent, edit, givingUp.Token).AsTask();
-        await UntilAsync(() => agents.Authority.Activity.WaitingChanges.Count == 1);
+        File.WriteAllText(KeypasteHome.AgentsPath(agents.Fixture.Home), "[[rules]]\npassword = \"sometimes\"\n");
         agents.Settle();
-        Assert.True(agents.Model.HasWaiting, "no change waiting");
-        look(agents.Window);
-        await givingUp.CancelAsync();
-        await Task.WhenAny(changing, Task.Delay(_wait, Token));
-
-        File.WriteAllText(KeypasteHome.ClientsPath(agents.Fixture.Home), "[[client]]\nlabel = \"x\"\npolicy = \"ask\"\n");
-        agents.Settle();
-        Assert.True(agents.Model.HasClientsProblem, "clients.toml was read");
+        Assert.True(agents.Model.HasClientsProblem, "agents.toml was read");
         look(agents.Window);
 
         agents.Authority.Session.Lock(VaultLockReason.Manual);
@@ -381,8 +338,6 @@ public sealed class AgentsFirstLevelTests
         internal bool Hold { get; set; }
 
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => AnswerAsync(cancellationToken);
-
-        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken) => AnswerAsync(cancellationToken);
 
         private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
         {

@@ -7,11 +7,9 @@ using KeePassLib.Cryptography.KeyDerivation;
 using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Internal;
 using Xunit;
-using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
@@ -770,39 +768,6 @@ public sealed class VaultMergeTests : IDisposable
             }
         });
         Assert.Equal(fileNewer ? new MergeRenamedGroup(_work, "billing") : new MergeRenamedGroup("billing", _work), Assert.Single(report.RenamedGroups));
-    }
-
-    /// <summary>Agents' records merge by the ordinary rules, the newer whole and the older in its history, and the report names the agent (D-0545).</summary>
-    [Fact]
-    public void AnAgentsRecordChangedInBoth_IsTheNewerWhole_WithTheOlderInItsHistory()
-    {
-        const string agent = "claude-code";
-        var theirs = AgentAccess.Defaults with { Mode = AgentMode.Ask, Values = false };
-        Seed("stripe");
-        using (var vault = Vault.Open(VaultPath, _password))
-        {
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write(agent, Automatic));
-            vault.Save();
-        }
-
-        File.Copy(VaultPath, FilePath, overwrite: true);
-        using var open = Vault.Open(VaultPath, _password);
-        Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(open).Write(agent, Asks));
-        InFile(FilePath, database => Edit(database, agent, _later, entry => entry.Strings.Set(AgentAccessStore.Field, new ProtectedString(false, AcafRecord.Write(theirs)))));
-
-        var report = Merge(open);
-
-        Read(FilePath, database =>
-        {
-            var entry = Entry(database, agent);
-            Assert.Equal(AcafRecord.Write(theirs), entry.Strings.ReadSafe(AgentAccessStore.Field));
-            Assert.Contains(AcafRecord.Write(Asks), entry.History.Select(version => version.Strings.ReadSafe(AgentAccessStore.Field)));
-        });
-        Assert.Equal([agent], report.Agents);
-        Assert.Empty(report.Conflicts);
-
-        using var merged = Vault.Open(FilePath, _password);
-        Assert.Equal(theirs, Assert.Single(new AgentAccessStore(merged).Read(agent).Own).Access);
     }
 
     /// <summary>

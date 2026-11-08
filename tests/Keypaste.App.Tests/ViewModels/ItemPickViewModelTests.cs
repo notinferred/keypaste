@@ -1,6 +1,5 @@
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Xunit;
 
@@ -12,14 +11,10 @@ public sealed class ItemPickViewModelTests
     private static ApprovalPrompt Picker() =>
         ApprovalPrompt.For("claude-code", new EntryName("services", "Mail"), "password", "send the report", "mail-bot") with
         {
-            Candidates =
-            [
-                Candidate("alice", new AlwaysOffer(AccessEdit.AlwaysItem("0123456789ABCDEF0123456789ABCDEF"), "services/Mail"), OnceOnly.None),
-                Candidate("bob", null, OnceOnly.ProtectedProfile),
-            ],
+            Candidates = [Candidate("alice"), Candidate("bob")],
         };
 
-    private static ItemCandidate Candidate(string username, AlwaysOffer? always, OnceOnly onceOnly) => new()
+    private static ItemCandidate Candidate(string username) => new()
     {
         Name = new EntryName("services", "Mail"),
         Item = username == "alice" ? "0123456789ABCDEF0123456789ABCDEF" : "FEDCBA9876543210FEDCBA9876543210",
@@ -27,8 +22,6 @@ public sealed class ItemPickViewModelTests
         Group = "services",
         Username = username,
         Url = string.Empty,
-        Always = always,
-        OnceOnly = onceOnly,
     };
 
     [Fact]
@@ -40,22 +33,13 @@ public sealed class ItemPickViewModelTests
         Assert.Null(picker.Picked);
         Assert.Null(picker.PickedIndex);
         Assert.False(picker.AllowOnceCommand.CanExecute(null));
-        Assert.False(picker.AlwaysAllowCommand.CanExecute(null));
-        Assert.True(picker.OffersAlways);
-        Assert.Equal("Pick an item to allow it. Nothing is picked for you.", picker.AlwaysCaption);
+        Assert.Equal("Pick an item to allow it. Nothing is picked for you.", picker.PickCaption);
         Assert.Equal(["services · alice", "services · bob"], picker.Rows.Select(row => row.Details));
 
         picker.Picked = picker.Rows[0];
 
         Assert.True(picker.AllowOnceCommand.CanExecute(null));
-        Assert.True(picker.AlwaysAllowCommand.CanExecute(null));
-        Assert.Contains("covers the item you picked", picker.AlwaysCaption, StringComparison.Ordinal);
-
-        picker.Picked = picker.Rows[1];
-
-        Assert.True(picker.AllowOnceCommand.CanExecute(null));
-        Assert.False(picker.AlwaysAllowCommand.CanExecute(null));
-        Assert.Equal("once only: protected environment", picker.Lifetime);
+        Assert.Empty(picker.PickCaption);
     }
 
     [Fact]

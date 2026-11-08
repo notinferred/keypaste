@@ -6,7 +6,7 @@ namespace Keypaste.Core.Approval;
 /// <param name="Url">Its URL, verbatim; shown to the person, never sent to the agent.</param>
 public sealed record AnsweringItem(EntryName Name, string Username, string Url);
 
-/// <summary>One item on a picker prompt, already sanitized, with what Always allow would cover if the person picks it.</summary>
+/// <summary>One item on a picker prompt, already sanitized.</summary>
 public sealed record ItemCandidate
 {
     /// <summary>The item, carrying its UUID; not for display, since it is not sanitized.</summary>
@@ -26,12 +26,6 @@ public sealed record ItemCandidate
 
     /// <summary>Its URL, sanitized, or empty.</summary>
     public required string Url { get; init; }
-
-    /// <summary>Why picking it offers no Always allow, when it offers none.</summary>
-    public OnceOnly OnceOnly { get; init; }
-
-    /// <summary>What Always allow would ask the person to confirm for this item, or null when it is not offered.</summary>
-    public AlwaysOffer? Always { get; init; }
 }
 
 /// <summary>The person's answer to a picker prompt.</summary>

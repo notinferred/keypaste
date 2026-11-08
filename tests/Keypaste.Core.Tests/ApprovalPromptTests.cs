@@ -62,7 +62,6 @@ public sealed class ApprovalPromptTests
 
         Assert.Equal(
             [
-                "Always",
                 "Candidates",
                 "Client",
                 "Entry",
@@ -70,7 +69,6 @@ public sealed class ApprovalPromptTests
                 "Field",
                 "Item",
                 "Label",
-                "OnceOnly",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
@@ -212,111 +210,5 @@ public sealed class ApprovalPromptTests
         Assert.True(ApprovalLimits.DefaultWindowSeconds < 60);
         Assert.True(ApprovalLimits.MaximumWindowSeconds < 60);
         Assert.True(ApprovalLimits.MinimumWindowSeconds <= ApprovalLimits.DefaultWindowSeconds);
-    }
-
-    /// <summary>A change asked for with no reason, as Always allow and the app's own settings ask, shows none rather than a placeholder.</summary>
-    [Fact]
-    public void AChangeWithNoReason_ShowsNone_AndOneScrubbedAwayIsSaidToBe()
-    {
-        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Run = true });
-
-        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc);
-        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc);
-
-        Assert.Equal((string.Empty, false, false), (none.Reason, none.ReasonWasAltered, none.ReasonWasTruncated));
-        Assert.True(scrubbed.ReasonWasAltered);
-        Assert.NotEmpty(scrubbed.Reason);
-    }
-
-    /// <summary>
-    /// The selectors an agent asks to see are shown in the confirmation with each character that could
-    /// hide or reorder text as an escape, so a pattern cannot pass for another or push what follows out
-    /// of view.
-    /// </summary>
-    [Fact]
-    public void AChangesGains_ShowEveryCharacterOfWhatItWouldSee()
-    {
-        var hidden = "x" + new string('\u2028', 20) + "**";
-        Assert.True(EntryExposure.TryCreate(["tag:env:billing", hidden, "\u202Eprod/**"], out var see, out var error), error);
-        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { See = see });
-
-        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc).Gains);
-
-        Assert.Equal($"sees tag:env:billing, x{string.Concat(Enumerable.Repeat("\\u2028", 20))}**, \\u202Eprod/**", gain);
-        Assert.DoesNotContain('\u2028', gain);
-        Assert.DoesNotContain('\u202E', gain);
-    }
-
-    /// <summary>Choosing Automatic with commands, or letting such an agent run commands, says it runs them unasked and that nothing approves what they do; with Run off it says nothing of commands.</summary>
-    [Fact]
-    public void AutomaticWithCommands_IsConfirmedSayingItsCommandsRunUnasked()
-    {
-        var both = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true });
-        var runOff = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands });
-
-        var asked = AccessChangePrompt.For("claude-code", both, AccessOrigin.Agent, "to run the tests", TimeZoneInfo.Utc);
-
-        Assert.True(asked.AnswersCommand);
-        Assert.Equal("claude-code can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", asked.CommandCaution);
-        Assert.Contains(asked.Gains, gain => gain.Contains("Automatic with commands", StringComparison.Ordinal));
-        Assert.False(AccessChangePrompt.For("claude-code", runOff, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc).AnswersCommand);
-    }
-
-    /// <summary>Every change that lets an Automatic with commands agent start commands unasked again says so: run turned on under the mode alone, the mode on a project row, and a limit that allows more.</summary>
-    [Theory]
-    [InlineData("run")]
-    [InlineData("row")]
-    [InlineData("renewed")]
-    [InlineData("no end")]
-    [InlineData("per hour")]
-    public void EveryGainThatStartsCommandsUnasked_SaysSo(string kind)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var commands = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true };
-        var (current, proposed) = kind switch
-        {
-            "run" => (commands with { Run = false }, commands),
-            "row" => (commands with { Mode = Agents.AgentMode.Ask }, commands with { Mode = Agents.AgentMode.Ask, Projects = [AgentAccessBuilders.Row("acme-api", Agents.AgentMode.AutomaticCommands)] }),
-            "renewed" => (commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(-1) } }, commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(1) } }),
-            "no end" => (commands with { Limit = new Agents.AccessLimit { Until = now.AddDays(1) } }, commands),
-            _ => (commands with { Limit = new Agents.AccessLimit { PerHour = 5 } }, commands with { Limit = new Agents.AccessLimit { PerHour = 50 } }),
-        };
-        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Create("claude-code", AgentAccessBuilders.Own(current), Agents.AccessCaps.Empty), proposed);
-
-        var asked = AccessChangePrompt.For("claude-code", change, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc);
-
-        Assert.NotEmpty(change.Gains);
-        Assert.True(asked.AnswersCommand);
-        Assert.StartsWith("claude-code can now run commands", asked.CommandCaution, StringComparison.Ordinal);
-    }
-
-    /// <summary>A limit that allows more under plain Automatic starts no command, so it says nothing of commands.</summary>
-    [Fact]
-    public void ALimitGainUnderPlainAutomatic_SaysNothingOfCommands()
-    {
-        var automatic = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.Automatic, Run = true };
-        var change = Agents.AccessChange.Classify(
-            Agents.EffectiveAccess.Create("claude-code", AgentAccessBuilders.Own(automatic with { Limit = new Agents.AccessLimit { PerHour = 5 } }), Agents.AccessCaps.Empty),
-            automatic);
-
-        Assert.NotEmpty(change.Gains);
-        Assert.False(AccessChangePrompt.For("claude-code", change, AccessOrigin.Settings, string.Empty, TimeZoneInfo.Utc).AnswersCommand);
-    }
-
-    /// <summary>Resetting this computer's limits names each agent the vault's settings would let start commands unasked.</summary>
-    [Fact]
-    public void AReset_NamesEachAgentWhoseCommandsWouldStartUnasked()
-    {
-        var commands = Agents.AgentAccess.Defaults with { Mode = Agents.AgentMode.AutomaticCommands, Run = true };
-        var records = new Agents.AgentRecordList(SavedRead.Current, [
-            new Agents.AgentRecord("claude-code", AgentAccessBuilders.Understood(commands)),
-            new Agents.AgentRecord("codex", AgentAccessBuilders.Understood(commands with { Mode = Agents.AgentMode.Automatic })),
-        ]);
-
-        var reset = AccessChangePrompt.ForReset(records, TimeZoneInfo.Utc);
-
-        Assert.True(reset.AnswersCommand);
-        Assert.Equal("claude-code can now run commands with the values it can see, without asking. keypaste approves nothing about what those commands do.", reset.CommandCaution);
-        Assert.False(AccessChangePrompt.ForReset(new Agents.AgentRecordList(SavedRead.Current, [records.Records[1]]), TimeZoneInfo.Utc).AnswersCommand);
     }
 }

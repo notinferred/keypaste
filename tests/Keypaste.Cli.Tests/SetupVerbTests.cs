@@ -387,7 +387,7 @@ public sealed class SetupVerbTests
 
     /// <summary>A client may start the bridge without KEYPASTE_HOME, and Gemini CLI always does, so another home is written into it.</summary>
     [Fact]
-    public void Another_home_pins_its_chosen_vault_its_log_its_ceilings_and_its_owner()
+    public void Another_home_pins_its_chosen_vault_its_log_and_its_owner()
     {
         using var harness = Wired("claude");
         var home = Path.Combine(harness.Directory, "elsewhere");
@@ -395,16 +395,14 @@ public sealed class SetupVerbTests
         ChosenVault.Choose(home, harness.VaultPath, onlyIfNone: false);
         var owner = ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), harness.VaultPath));
         var audit = KeypasteHome.AuditPath(home);
-        var ceilings = KeypasteHome.ClientsPath(home);
 
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--yes", "--client", "claude-code"));
 
         Assert.Contains(
-            $"-- {ServerPath(harness)} mcp --vault {harness.VaultPath} --audit-log {audit} --clients {ceilings} --approver {owner} --client-label claude-code",
+            $"-- {ServerPath(harness)} mcp --vault {harness.VaultPath} --audit-log {audit} --approver {owner} --client-label claude-code",
             Assert.Single(Ran(harness), Adds),
             StringComparison.Ordinal);
         Assert.Contains($"audit log      {audit}", harness.Out, StringComparison.Ordinal);
-        Assert.Contains($"limits         {ceilings}", harness.Out, StringComparison.Ordinal);
         Assert.Contains($"approver       {owner}", harness.Out, StringComparison.Ordinal);
     }
 

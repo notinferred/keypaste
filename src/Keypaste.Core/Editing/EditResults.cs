@@ -148,6 +148,5 @@ public sealed record EditResult
 }
 
 /// <summary>What an edit is checked against besides the vault.</summary>
-/// <param name="ClientsPath">This computer's <c>clients.toml</c>, which says which agents a tag reaches unasked.</param>
-/// <param name="Now">The time a tag change is judged at.</param>
-public sealed record EditScene(string ClientsPath, DateTimeOffset Now);
+/// <param name="Now">The time the edit is judged at.</param>
+public sealed record EditScene(DateTimeOffset Now);

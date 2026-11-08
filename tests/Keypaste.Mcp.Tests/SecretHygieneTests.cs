@@ -89,17 +89,14 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     ];
 
     /// <summary>
-    /// What the agent may do through the first approver: see as far as the bridge exposes, and run
-    /// commands. Kept under the label the <em>operator</em> gave the bridge, never the name the client
-    /// asserts (THREATS.md T-3).
+    /// What the agent may do through the first approver: every value asked, and run on. Kept under the label the
+    /// <em>operator</em> gave the bridge, never the name the client asserts (THREATS.md T-3).
     /// </summary>
-    private static AgentAccess Sees { get; } = AgentAccess.Defaults with { See = Everything(), Run = true };
+    private static AgentRules Sees { get; } = AgentRules.Defaults.WithRun(McpHarness.ClientLabel, run: true);
 
-    /// <summary>
-    /// What the second approver holds for the same agent: Automatic for the billing project only, which
-    /// the stripe entry is tagged into, so the root token is inside the exposure and outside the row.
-    /// </summary>
-    private static AgentAccess AutomaticForBilling { get; } = Sees with { Projects = [new ProjectAccess(Billing(), AgentMode.Automatic)] };
+    /// <summary>What the second approver's rules hold for every agent: every category allowed, so nobody is asked.</summary>
+    private static AgentRules AllowsEverything { get; } =
+        FieldCategories.Ruled.Aggregate(Sees, (rules, category) => rules.Allowing(category, confirmed: true));
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -117,8 +114,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private CancellationTokenSource? _automaticStop;
     private Task? _automaticServing;
 
-    private readonly FakeAgentSettings _settings = new();
-    private readonly FakeAgentSettings _automaticSettings = new();
+    private readonly FakeAgentRules _settings = new();
+    private readonly FakeAgentRules _automaticSettings = new();
 
     private string PipeName { get; } =
         "keypaste-hygiene-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -169,8 +166,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved (D-0317).
         _vault.Save();
 
-        _settings.Records[McpHarness.ClientLabel] = Sees;
-        _automaticSettings.Records[McpHarness.ClientLabel] = AutomaticForBilling;
+        _settings.Rules = Sees;
+        _automaticSettings.Rules = AllowsEverything;
 
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
@@ -671,7 +668,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             // The owner's log records that it happened — which, with no human witness, is the only
             // record that it happened at all — and records it as Automatic, never as an approval.
-            Assert.Contains("\"method\":\"automatic\"", _log!.Text(), StringComparison.Ordinal);
+            Assert.Contains("\"method\":\"allowed\"", _log!.Text(), StringComparison.Ordinal);
             Assert.DoesNotContain(SentinelPassword, _log.Text(), StringComparison.Ordinal);
             Assert.Empty(harness.AuditLines());
         }
@@ -700,30 +697,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             {
                 AssertNowhere(harness, each, text, $"an Automatic release of {field}");
             }
-        }
-    }
-
-    /// <summary>
-    /// An entry inside the bridge's exposure and in no project the agent is Automatic for. This is the
-    /// sentinel that makes "Automatic cannot widen" a claim about the mode: the exposure permits this
-    /// entry, so nothing but the row's own project is standing between the agent and it.
-    /// </summary>
-    [Fact]
-    public async Task AnEntryInsideTheExposureAndOutsideTheRow_StillNeedsAPerson()
-    {
-        _human.Answer = ApprovalAnswer.Denied;
-
-        var (harness, client) = await StartAutomaticAsync();
-
-        await using (harness)
-        {
-            var result = await client.CallToolAsync(
-                ToolText.CredentialToolName, Ask(entry: "env/prod/ROOT_TOKEN"), cancellationToken: Token);
-
-            Assert.True(result.IsError);
-            Assert.Equal(1, _human.Asked);
-
-            AssertNowhere(harness, SentinelOutsideTheRow, TextOf(result), "outside the row");
         }
     }
 
@@ -868,12 +841,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     {
         Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out var error), error);
         return exposure;
-    }
-
-    private static ProjectScope Billing()
-    {
-        Assert.True(ProjectScope.TryCreate("billing", null, out var scope, out var error), error);
-        return scope;
     }
 
     private sealed class ScriptedHuman : IApprovalChannel

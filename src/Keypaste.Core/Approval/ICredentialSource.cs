@@ -22,7 +22,7 @@ namespace Keypaste.Core.Approval;
 /// </remarks>
 public interface ICredentialSource
 {
-    /// <summary>An entry's UUID as hex, which an Always allow row names it by.</summary>
+    /// <summary>An entry's UUID as hex, which a line names it by.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>The UUID, or null when it cannot be read, so no row covers it and none is offered.</returns>
     string? ItemId(EntryName name) => null;
@@ -90,11 +90,17 @@ public interface ICredentialSource
         out CredentialFailure failure,
         out string unfilled);
 
-    /// <summary>Whether a release of this entry is asked about live every time, with no Always allow and no rule (D-0348).</summary>
+    /// <summary>Whether the entry is in a protected environment, which no scoped token may release (D-0348).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
     /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>
     bool RequiresLiveApproval(EntryName name);
+
+    /// <summary>Whether a custom field of the entry is protected, which decides its category without reading its value.</summary>
+    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
+    /// <param name="field">The custom field's name.</param>
+    /// <returns>False only for a field the entry holds unprotected, so one that cannot be read counts as protected.</returns>
+    bool IsProtectedField(EntryName name, string field) => true;
 
     /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches (D-0422).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>

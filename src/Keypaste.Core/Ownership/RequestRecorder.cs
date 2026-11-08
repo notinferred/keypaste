@@ -82,14 +82,6 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
             ? reply
             : new EnvReply(EnvResolved.Refused(reply.Set.Project, EnvOutcome.Unreadable, profile: reply.Set.Profile), _unrecorded);
 
-    /// <summary>A change to an agent's settings once its line is written, saying whether it was.</summary>
-    /// <param name="reply">The reply as it will leave.</param>
-    /// <param name="record">Its line.</param>
-    /// <returns>The reply to send.</returns>
-    /// <remarks>A change releases nothing, and the owner asks whether the log <see cref="Opens"/> before it decides one.</remarks>
-    internal AccessChangeReply Recorded(AccessChangeReply reply, AuditRecord record) =>
-        reply with { Recorded = TryAppend(record) };
-
     /// <summary>A terminal's edit once its line is written, saying whether it was.</summary>
     /// <param name="reply">The reply as it will leave.</param>
     /// <param name="record">Its line.</param>

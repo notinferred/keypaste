@@ -50,7 +50,7 @@ internal static class ToolResults
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
     /// <param name="codeSeconds">How long a TOTP code stays current; zero for any other field.</param>
-    /// <param name="method">Whether a person answered this request or the agent's Automatic mode covered it.</param>
+    /// <param name="method">Whether a person answered this request or an Allow rule covered it.</param>
     /// <returns>A success result carrying exactly one field value and nothing else.</returns>
     /// <remarks>
     /// <para>
@@ -78,8 +78,7 @@ internal static class ToolResults
                 // claim keypaste asks to be trusted on.
                 Text = (method switch
                 {
-                    AuditMethod.Automatic or AuditMethod.AutomaticCommands => ToolText.ReleasedAutomatically(field),
-                    AuditMethod.AlwaysAllowed => ToolText.ReleasedByAlways(field),
+                    AuditMethod.Allowed => ToolText.ReleasedUnasked(field),
                     _ => ToolText.ReleasedOnce(field),
                 }) + (codeSeconds > 0 ? ToolText.CodeLasts(codeSeconds) : string.Empty) + value,
             },
@@ -89,7 +88,6 @@ internal static class ToolResults
 
     /// <summary>A run's result: how it ended and its scrubbed output. It carries no value.</summary>
     /// <param name="names">The variables injected.</param>
-    /// <param name="method">How the release was decided.</param>
     /// <param name="exitCode">The exit code, or null when it was stopped.</param>
     /// <param name="timeoutSeconds">The run's timeout.</param>
     /// <param name="stdout">Standard output, scrubbed.</param>
@@ -97,14 +95,13 @@ internal static class ToolResults
     /// <returns>A success result, even for a non-zero exit: the tool worked and the command did not.</returns>
     internal static CallToolResult Ran(
         IReadOnlyList<string> names,
-        AuditMethod method,
         int? exitCode,
         int timeoutSeconds,
         ScrubbedText stdout,
         ScrubbedText stderr)
     {
         var replacements = stdout.Replacements + stderr.Replacements;
-        var header = ToolText.Ran(names, method, exitCode, timeoutSeconds, replacements);
+        var header = ToolText.Ran(names, exitCode, timeoutSeconds, replacements);
 
         using var buffer = new MemoryStream(1024);
 

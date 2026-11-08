@@ -1,7 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Editing;
-using Keypaste.Core.Ipc;
 
 namespace Keypaste.App.Session;
 
@@ -169,41 +167,6 @@ internal sealed class AppAuthority : IDisposable
 
     /// <summary>Whether a prompt waits for the person's answer on screen; called on the UI thread.</summary>
     internal bool IsAsking => _host.IsAsking;
-
-    /// <summary>What an Always allow row's item is now, for an agent's settings to list.</summary>
-    /// <param name="item">The item's UUID as hex.</param>
-    /// <returns>Its name, and whether a protected tag keeps it asked about.</returns>
-    internal (string Shown, bool IsProtected) AlwaysItem(string item) => _host.AlwaysItem(item);
-
-    /// <summary>What applies to an agent's requests now, or null when nothing here answers or its settings cannot be read.</summary>
-    /// <param name="label">The bridge's raw label, or null.</param>
-    /// <returns>What applies, or null.</returns>
-    internal Core.Agents.EffectiveAccess? Access(string? label) => _host.Access(label);
-
-    /// <summary>One agent's settings as the person's own screen shows them: what the vault says and what this computer holds back.</summary>
-    /// <param name="agent">The agent's name, or <c>*</c>.</param>
-    /// <param name="settings">Its settings, when they could be read.</param>
-    /// <param name="problem">Why not, otherwise empty.</param>
-    /// <returns>Whether they were read; never while nothing here answers agents.</returns>
-    internal bool TrySettings(string agent, [NotNullWhen(true)] out Core.Agents.AgentSettingsState? settings, out string problem) =>
-        _host.TrySettings(agent, out settings, out problem);
-
-    /// <summary>
-    /// Changes an agent's settings for the person at this app: at once when it gives the agent nothing
-    /// more, otherwise once they confirm it in the prompt window, as any change that gives more is.
-    /// </summary>
-    /// <param name="agent">The agent's name, or <c>*</c>.</param>
-    /// <param name="edit">The change.</param>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
-    /// <returns>What became of it, recorded in the audit log before it returns.</returns>
-    internal ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, Core.Agents.AccessEdit edit, CancellationToken cancellationToken) =>
-        _host.ChangeAccessAsync(agent, edit, cancellationToken);
-
-    /// <summary>Resets this computer's ceilings, which keypaste cannot read, once the person confirms what each agent then gets; recorded as keypaste app.</summary>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws the confirmation.</param>
-    /// <returns>What became of it.</returns>
-    internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken) =>
-        _host.ResetCapsAsync(cancellationToken);
 
     /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>

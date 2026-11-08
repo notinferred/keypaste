@@ -1,6 +1,4 @@
-using Keypaste.Core.Agents;
 using Xunit;
-using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
@@ -565,110 +563,6 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.Equal(ExposureReach.None, exposure.Reach(moved!, []));
         Assert.Equal(new EntryName("keys", "TOKEN"), EntryName.Of(vault.Find("keys/TOKEN")!));
-    }
-
-    /// <summary>
-    /// The cost of renaming a group, asserted rather than described. What an agent sees by place is a
-    /// standing human authorization over a <em>path</em>, so carrying a group into a place it sees
-    /// carries its credentials into its reach with nobody prompted (THREATS.md T-13). keypaste does not
-    /// prevent this; it must not be able to happen without this test going red.
-    /// </summary>
-    [Fact]
-    public void APlaceAnAgentSees_FollowsTheGroupPath_SoARenameMovesEntriesIntoIt()
-    {
-        using var vault = Seeded(NewVaultPath());
-        var access = EffectiveAccess.Create("claude-code", Own(AgentAccess.Defaults with { See = See("env/dev/**") }), AccessCaps.Empty);
-        var bridge = See("**");
-
-        Assert.Equal(ExposureReach.None, access.Reach(bridge, _token, []));
-
-        Assert.Equal(GroupOutcome.Renamed, vault.RenameGroup("env/billing", "dev", out _));
-
-        var names = vault.ReadEntries()
-            .Where(entry => entry.GroupPath == "env/dev")
-            .Select(EntryName.Of)
-            .ToList();
-
-        Assert.Equal(2, names.Count);
-        Assert.All(names, name => Assert.Equal(ExposureReach.Entry, access.Reach(bridge, name, [])));
-    }
-
-    [Fact]
-    public void A_move_names_the_agents_whose_view_it_changes()
-    {
-        using var vault = Seeded(NewVaultPath());
-        var store = new AgentAccessStore(vault);
-        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-dev", AgentAccess.Defaults with { See = See("env/dev/**") }));
-        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-billing", AgentAccess.Defaults with { See = See("env/billing/**") }));
-        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-all", AgentAccess.Defaults with { See = See("**") }));
-        vault.Save();
-        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
-
-        var change = AgentViewChange.OfMove(vault, _token, new EntryName("env/dev", _token.Title), clients);
-
-        Assert.Equal(["sees-dev"], change.Gaining);
-        Assert.Equal(["sees-billing"], change.Losing);
-        Assert.Equal($"sees-dev can now see {_token.Title}; sees-billing can no longer see {_token.Title}.", change.Describe(_token.Title));
-    }
-
-    [Fact]
-    public void A_move_that_changes_how_much_of_a_tagged_item_an_agent_sees_names_it()
-    {
-        using var vault = Seeded(NewVaultPath());
-        Assert.True(vault.AddTag(_token, "env:billing"));
-        var store = new AgentAccessStore(vault);
-        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-both", AgentAccess.Defaults with { See = See("tag:env:billing", "env/dev/**", "env/billing/**") }));
-        Assert.Equal(AgentAccessWrite.Written, store.Write("sees-dev-too", AgentAccess.Defaults with { See = See("tag:env:billing", "env/dev/**") }));
-        vault.Save();
-        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
-
-        var intoDev = AgentViewChange.OfMove(vault, _token, new EntryName("env/dev", _token.Title), clients);
-        var toElsewhere = AgentViewChange.OfMove(vault, _token, new EntryName("elsewhere", _token.Title), clients);
-
-        Assert.Equal(["sees-dev-too"], intoDev.Widening);
-        Assert.Empty(intoDev.Narrowing);
-        Assert.Equal($"sees-dev-too can now see all of {_token.Title}.", intoDev.Describe(_token.Title));
-        Assert.Equal(["sees-both"], toElsewhere.Narrowing);
-        Assert.Empty(toElsewhere.Widening);
-        Assert.Empty(toElsewhere.Losing);
-        Assert.Equal($"sees-both can now see only the variables of {_token.Title}.", toElsewhere.Describe(_token.Title));
-    }
-
-    [Fact]
-    public void A_move_no_agents_view_depends_on_says_nothing()
-    {
-        using var vault = Seeded(NewVaultPath());
-        Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("sees-all", AgentAccess.Defaults with { See = See("**") }));
-        vault.Save();
-        var clients = Path.Combine(Path.GetDirectoryName(vault.Path)!, "absent-clients.toml");
-
-        var change = AgentViewChange.OfMove(vault, _token, new EntryName("elsewhere", _token.Title), clients);
-
-        Assert.False(change.Any);
-        Assert.Null(change.Describe(_token.Title));
-    }
-
-    /// <summary>
-    /// A project row follows the entry's tags and never its path, so moving or renaming where it lives
-    /// changes nothing, and a project renamed in its tags leaves the row with nothing to release: it
-    /// fails closed to the agent's default (D-0275).
-    /// </summary>
-    [Fact]
-    public void AProjectRow_FollowsTheEntrysTags_NotItsPath()
-    {
-        using var vault = Seeded(NewVaultPath());
-        Assert.True(vault.AddTag(_token, "env:billing"));
-        var access = EffectiveAccess.Create("claude-code", Own(AgentAccess.Defaults with { Projects = [Row("billing", AgentMode.Automatic)] }), AccessCaps.Empty);
-        var now = DateTimeOffset.UtcNow;
-
-        Assert.Equal(AgentMode.Automatic, access.Item(vault.Tags(_token)!, now).Mode);
-
-        Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(_token, "keys", out var moved));
-        Assert.Equal(AgentMode.Automatic, access.Item(vault.Tags(moved!)!, now).Mode);
-
-        Assert.True(vault.RemoveTags(moved!, ["env:billing"]));
-        Assert.True(vault.AddTag(moved!, "env:invoicing"));
-        Assert.Equal(AgentMode.Ask, access.Item(vault.Tags(moved!)!, now).Mode);
     }
 
     // ---------------------------------------------------------------- helpers

@@ -428,7 +428,7 @@ public sealed class RunToolTests : IDisposable
 
         var tools = await client.ListToolsAsync(cancellationToken: Token);
 
-        Assert.Equal([ToolText.ListToolName, ToolText.AccessToolName, ToolText.CredentialToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
+        Assert.Equal([ToolText.ListToolName, ToolText.CredentialToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -445,11 +445,11 @@ public sealed class RunToolTests : IDisposable
         Assert.False(run.ProtocolTool.Annotations.IdempotentHint);
     }
 
-    /// <summary>A command the agent's settings do not let it run is refused before anybody is asked, and the agent is told who can allow it.</summary>
+    /// <summary>A command from an agent whose run is off is refused before anybody is asked, and the agent is told who can turn it on.</summary>
     [Fact]
     public async Task ARunTheAgentMayNotMake_IsRefused_NamingWhoCanAllowIt()
     {
-        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, clients: "[[client]]\nlabel = \"test-label\"\nrun = \"off\"\n");
+        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, rules: AgentRules.Defaults);
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
 
@@ -459,25 +459,6 @@ public sealed class RunToolTests : IDisposable
         Assert.Equal(ToolText.RunOff, TextOf(result));
         Assert.Equal(0, owner.Asked);
         Assert.Equal("run-off", Assert.Single(owner.Log.Lines()).GetProperty("method").GetString());
-        Assert.Empty(harness.AuditLines());
-    }
-
-    [Fact]
-    public async Task NoValues_RefusesRequestCredential_WithTheRunHint()
-    {
-        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, clients: "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
-        await using var harness = new McpHarness(owner.PipeName, VaultPath);
-        var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
-
-        var result = await client.CallToolAsync(
-            ToolText.CredentialToolName,
-            new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy" },
-            cancellationToken: Token);
-
-        Assert.True(result.IsError);
-        Assert.Equal(ToolText.InjectOnly, TextOf(result));
-        Assert.Equal(0, owner.Asked);
-        Assert.Equal("inject-only", Assert.Single(owner.Log.Lines()).GetProperty("method").GetString());
         Assert.Empty(harness.AuditLines());
     }
 
@@ -528,7 +509,7 @@ public sealed class RunToolTests : IDisposable
         private int _asked;
         private int _runs;
 
-        private Owner(RunToolTests test, ApprovalAnswer answer, string? clients, IReadOnlyList<(string Key, string Value)> variables)
+        private Owner(RunToolTests test, ApprovalAnswer answer, AgentRules rules, IReadOnlyList<(string Key, string Value)> variables)
         {
             _answer = answer;
             Log = new OwnerLog(Path.Combine(test._directory, "home"));
@@ -545,24 +526,15 @@ public sealed class RunToolTests : IDisposable
             _vault.SetFields(token, [new FieldWrite("TOKEN", "tok-" + _core)]);
             _vault.AddTag(token, "env:acme-api");
             _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "bank", Password = "bank-" + _core });
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(_vault).Write(McpHarness.ClientLabel, TestSession.Sees));
             _vault.Save();
 
             _gate = new ApprovalGate(this, TimeProvider.System, ApprovalLimits.Default);
-
-            // The settings as an owner reads them: the record saved in the vault, beneath this computer's ceilings.
-            var path = Path.Combine(test._directory, "clients.toml");
-
-            if (clients is not null)
-            {
-                File.WriteAllText(path, clients);
-            }
 
             var handler = new ApproverHandler(
                 new VaultCredentialSource(() => _vault),
                 new VaultEntryNameLister(() => _vault),
                 _gate,
-                new VaultAgentSettings(() => _vault, _ => AgentSave.Unchanged, new AccessCapsSource(path)));
+                IAgentRules.Of(rules));
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(KeypasteHome.Resolve(null), test.VaultPath),
@@ -588,8 +560,8 @@ public sealed class RunToolTests : IDisposable
         internal int Runs => Volatile.Read(ref _runs);
 
         /// <summary>Starts an owner of the test's vault, whose <c>acme-api</c> also holds <paramref name="variables"/> as <c>env set</c> writes them.</summary>
-        internal static Owner Start(RunToolTests test, ApprovalAnswer answer, string? clients = null, IReadOnlyList<(string Key, string Value)>? variables = null) =>
-            new(test, answer, clients, variables ?? []);
+        internal static Owner Start(RunToolTests test, ApprovalAnswer answer, AgentRules? rules = null, IReadOnlyList<(string Key, string Value)>? variables = null) =>
+            new(test, answer, rules ?? TestSession.Sees, variables ?? []);
 
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {

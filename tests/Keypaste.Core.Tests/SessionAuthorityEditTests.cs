@@ -101,7 +101,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
         var prompt = _fixture.Channel.LastEditPrompt!;
         Assert.Equal("keypaste set", prompt.Command);
         Assert.Equal("work/github", prompt.Item);
-        Assert.Equal(AccessChangePrompt.FromTerminalText, prompt.OriginText);
+        Assert.Equal("asked from a terminal; any program you run could have typed it", prompt.OriginText);
         Assert.DoesNotContain(prompt.Changes, sentence => sentence.Contains(_sentinel, StringComparison.Ordinal));
 
         var line = Assert.Single(_log.Lines());
@@ -334,7 +334,6 @@ public sealed class SessionAuthorityEditTests : IDisposable
                     test._fixture.Gate,
                     lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
                     test.Write,
-                    Path.Combine(test._directory, "clients.toml"),
                     test._fixture.Clock,
                     narrate: null,
                     edited: test.Edited.Add)

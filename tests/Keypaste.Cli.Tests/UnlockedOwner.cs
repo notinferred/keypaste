@@ -41,13 +41,12 @@ internal sealed class UnlockedOwner : IAsyncDisposable
             new VaultCredentialSource(() => _vault),
             new VaultEntryNameLister(() => _vault),
             _gate,
-            IAgentSettings.Defaults);
+            IAgentRules.Defaults);
 
         var editor = new SessionEditor(
             _gate,
             asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
             Write,
-            KeypasteHome.ClientsPath(harness.Directory),
             TimeProvider.System,
             narrate: null,
             edited: null);

@@ -125,7 +125,6 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _variableMenu;
     private readonly IReadOnlyList<AppMenuEntry> _memberMenu;
     private readonly IReadOnlyList<AppMenuEntry> _tokenMenu;
-    private readonly IReadOnlyList<AppMenuEntry> _alwaysMenu;
     private readonly IReadOnlyList<AppMenuEntry> _linkMenu;
     private readonly IReadOnlyList<AppMenuEntry> _reportMenu;
     private readonly IReadOnlyList<AppMenuEntry> _tagMenu;
@@ -341,14 +340,7 @@ internal sealed class AppCommands
         var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
         var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
         var disconnect = Routed(Strings.DisconnectLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
-        var resetClients = Routed(Strings.ResetClientsToml, () => Agents() is { HasClientsProblem: true } agents ? agents : null, agents => agents.ResetClientsCommand);
         var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
-        var removeAlways = new AppCommand(
-            Strings.RemoveAlwaysAllowed,
-            [],
-            () => Agents() is not null && Target<AlwaysRow>() is { Remove.CanRemove: true },
-            () => Target<AlwaysRow>()?.Remove.Run());
-        _alwaysMenu = [removeAlways];
         var agentHistory = Routed(Strings.AgentHistory, Agents, agents => agents.OpenHistoryCommand);
         var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
         var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
@@ -414,8 +406,8 @@ internal sealed class AppCommands
 
         var agents = new AppMenuGroup(Strings.Agents,
         [
-            agentSettings, connect, connectAgain, disconnect, resetClients, _line,
-            showPrompt, removeAlways, _line,
+            agentSettings, connect, connectAgain, disconnect, _line,
+            showPrompt, _line,
             agentHistory, verifyChain, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,
             deleteReport,
@@ -618,7 +610,7 @@ internal sealed class AppCommands
     /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
     internal static bool HasContextMenu(object? row) =>
         row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
-            or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow or AlwaysRow
+            or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow
             or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or PairingItem;
 
     /// <summary>
@@ -675,8 +667,6 @@ internal sealed class AppCommands
                 return Bound(_linkMenu, row);
             case CrashReportRow:
                 return Bound(_reportMenu, row);
-            case AlwaysRow when Agents() is not null:
-                return Bound(_alwaysMenu, row);
             default:
                 return null;
         }

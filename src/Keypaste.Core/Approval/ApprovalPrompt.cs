@@ -31,9 +31,6 @@ public sealed record ApprovalPrompt
     /// <summary>The longest reason a human is shown, whatever the schema allows.</summary>
     public const int MaximumReasonLength = 400;
 
-    /// <summary>Why a prompt offers no Always allow to an agent with no name, and what gives it one.</summary>
-    public const string UnnamedText = "This agent has no name, so Always allow is not offered. Start its bridge with --client-label to name it.";
-
     /// <summary>The longest client name a human is shown.</summary>
     public const int MaximumClientLength = 64;
 
@@ -80,21 +77,8 @@ public sealed record ApprovalPrompt
     /// </remarks>
     public required bool ReasonWasAltered { get; init; }
 
-    /// <summary>Why no Always allow is offered, when none is.</summary>
-    public OnceOnly OnceOnly { get; init; }
-
-    /// <summary>What Always allow would ask the person to confirm, or null when it is not offered.</summary>
-    /// <remarks>
-    /// Choosing it allows this request once and then asks the person to confirm the change, as any
-    /// change that gives an agent more is confirmed.
-    /// </remarks>
-    public AlwaysOffer? Always { get; init; }
-
     /// <summary>The items the person picks one from, when more than one answers to the request; empty otherwise.</summary>
-    /// <remarks>
-    /// A picker's own <see cref="Always"/> is null and its <see cref="OnceOnly"/> none: what Always allow would cover belongs to each candidate.
-    /// <see cref="Entry"/> is the name they share.
-    /// </remarks>
+    /// <remarks><see cref="Entry"/> is the name they share.</remarks>
     public IReadOnlyList<ItemCandidate> Candidates { get; init; } = [];
 
     /// <summary>The UUID of the one item asked about, as hex, or null when the prompt is a picker or the UUID could not be read.</summary>

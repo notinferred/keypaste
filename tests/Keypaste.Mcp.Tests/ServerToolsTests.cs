@@ -119,19 +119,18 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlyThreeTools()
+    public async Task TheServerExposes_ExactlyTwoTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
 
         var tools = await ToolsAsync(client);
 
-        // The count matters as much as the names: a fourth tool appearing by accident on a
+        // The count matters as much as the names: a third tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(3, tools.Count);
+        Assert.Equal(2, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
-        Assert.Contains(tools, t => t.Name == ToolText.AccessToolName);
     }
 
     /// <summary>
@@ -392,12 +391,11 @@ public sealed class ServerToolsTests
     /// <remarks>
     /// keypaste asks a model to be told the truth about who decided and to act accordingly; saying
     /// "a person released this" about something no person saw is the one untruth a credentials tool
-    /// cannot afford. It also names neither the project nor the setting that covered it, because an
-    /// agent that learns which parts of a vault are released without asking has been handed a map of
-    /// where to aim.
+    /// cannot afford. It also names no rule that covered it, because an agent that learns which kinds
+    /// of value are released without asking has been handed a map of where to aim.
     /// </remarks>
     [Fact]
-    public async Task AnAutomaticRelease_DoesNotClaimAPersonApprovedIt()
+    public async Task AnAllowedRelease_DoesNotClaimAPersonApprovedIt()
     {
         await using var harness = new McpHarness();
         harness.Approver.StartAutomatic();
@@ -408,12 +406,11 @@ public sealed class ServerToolsTests
 
         Assert.False(result.IsError);
         Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Contains("APPROVED without asking, because the user set this agent to Automatic", text, StringComparison.Ordinal);
+        Assert.Contains("APPROVED without asking, because the user allows agents this kind of value", text, StringComparison.Ordinal);
         Assert.DoesNotContain("A person released", text, StringComparison.Ordinal);
 
-        // Neither the project nor the setting, even though the owner's reason names both.
-        Assert.DoesNotContain("billing:dev", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("billing-bot's mode", text, StringComparison.Ordinal);
+        // Not the rule, even though the owner's reason names it.
+        Assert.DoesNotContain("passwords", text, StringComparison.Ordinal);
 
         // And the terms still travel with it, exactly as on the prompted path.
         Assert.Contains("Do not print it", text, StringComparison.Ordinal);
@@ -437,29 +434,6 @@ public sealed class ServerToolsTests
         Assert.Equal(McpHarness.ClientName, forwarded.ClientName, StringComparer.Ordinal);
         Assert.Equal(McpHarness.ClientLabel, forwarded.ClientLabel, StringComparer.Ordinal);
         Assert.NotEqual(forwarded.ClientName, forwarded.ClientLabel);
-    }
-
-    /// <summary>
-    /// An agent whose settings give it no values is told so, and told the way that is left: a command
-    /// it runs, which only the person can allow, and not to retry.
-    /// </summary>
-    [Fact]
-    public async Task AnAgentGivenNoValues_IsRefusedWithAdviceThatIsActuallyTrue()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartRefusing(AuditMethod.InjectOnly, "this agent is given no values; they reach only commands it runs");
-        var client = await harness.StartAsync();
-
-        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-        var text = TextOf(result);
-
-        Assert.True(result.IsError);
-        Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Equal(ToolText.InjectOnly, text);
-        Assert.Contains("Do not retry request_credential", text, StringComparison.Ordinal);
-
-        // The owner recorded the refusal it answered; the bridge records nothing of its own.
-        Assert.Empty(harness.AuditLines());
     }
 
     /// <summary>

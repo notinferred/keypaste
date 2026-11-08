@@ -9,7 +9,6 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Settings;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -131,29 +130,15 @@ internal static class ApproveCommand
             }
 
             var retired = KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-            var caps = new AccessCapsSource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+            var rules = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
             return VaultSession.OpenHeld(
                 vaultPath,
                 line,
                 context,
                 OwnerKind.TerminalAgent,
-                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, caps, File.Exists(retired) ? retired : null, Reach(vaultPath, pipeName, home, context), pairing, context));
+                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, rules, File.Exists(retired) ? retired : null, pairing, context));
         }
-    }
-
-    /// <summary>
-    /// What <c>keypaste clients</c> must be told to reach this approver: its vault when that is not the
-    /// chosen one, and its pipe when that is not the one its vault's owner listens on unasked.
-    /// </summary>
-    private static (string? Vault, string? Approver) Reach(string vaultPath, string pipeName, string home, CliContext context)
-    {
-        var chosen = ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-        var unasked = ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(home, vaultPath));
-
-        return (
-            ChosenVault.Same(chosen, vaultPath) ? null : vaultPath,
-            string.Equals(pipeName, unasked, StringComparison.Ordinal) ? null : pipeName);
     }
 
     private static int Serve(
@@ -162,9 +147,8 @@ internal static class ApproveCommand
         AuditLog audit,
         string pipeName,
         ApprovalLimits limits,
-        AccessCapsSource caps,
+        AgentRulesFile rules,
         string? retiredPolicy,
-        (string? Vault, string? Approver) reach,
         string? pairing,
         CliContext context)
     {
@@ -174,8 +158,8 @@ internal static class ApproveCommand
         using var lifetime = new SessionLifetime();
         using var stop = new CancellationTokenSource();
 
-        // The approver saves only what a person confirmed, or a narrowing, under the claim it holds, so no
-        // save here can land under another owner (D-0317).
+        // The approver saves only what a person confirmed under the claim it holds, so no save here can
+        // land under another owner (D-0317).
         AgentSave Save(Func<Vault, bool> edit)
         {
             try
@@ -209,8 +193,6 @@ internal static class ApproveCommand
             }
         }
 
-        Vault? Unlocked() => lifetime.IsLive ? vault : null;
-
         SessionServer server;
 
         try
@@ -223,10 +205,9 @@ internal static class ApproveCommand
                 Lifetime = lifetime,
                 CurrentLifetime = () => lifetime,
                 UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
-                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System) { Vault = reach.Vault, Approver = reach.Approver },
+                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
                 Limits = limits,
-                Settings = new VaultAgentSettings(Unlocked, Save, caps),
-                Hourly = new HourlyLimit(TimeProvider.System),
+                Rules = rules,
                 Audit = () => audit,
 
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
@@ -235,7 +216,6 @@ internal static class ApproveCommand
 
                 // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
                 WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
-                ClientsPath = caps.Path,
 
                 // A browser pairs only while this terminal's person armed it with --pair-browser (D-0634).
                 BrowserUses = new PairingUses(),
@@ -257,13 +237,11 @@ internal static class ApproveCommand
 
             try
             {
-                var records = new AgentAccessStore(vault).List();
-                var automatic = AutomaticAgents.Named(
-                    records,
-                    caps.TryCurrent(out var ceilings, out _) ? ceilings : AccessCaps.Empty,
-                    TimeProvider.System.GetUtcNow());
+                List<string> allowed = rules.TryRead(out var read, out _)
+                    ? [.. FieldCategories.Ruled.Where(category => read.RuleFor(category) == CategoryRule.Allow).Select(FieldCategories.Shown)]
+                    : [];
 
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, AutomaticAgents.AlwaysAllowed(records), console);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, allowed, console);
 
                 if (pairing is not null)
                 {
@@ -328,14 +306,13 @@ internal static class ApproveCommand
 
     /// <summary>
     /// The lines a person reads before leaving this running, one of which changes meaning entirely
-    /// when the vault sets an agent to Automatic.
+    /// when this computer's rules allow a category.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The claim changes when an agent is Automatic, because with one it is no longer true. Saying
-    /// "nothing is released without you saying yes" while an agent's requests are released silently
-    /// is the kind of small untruth this product cannot afford to print, so each such agent is named,
-    /// with where.
+    /// The claim changes when a category is allowed, because with one it is no longer true. Saying
+    /// "every value waits for you" while some are released silently is the kind of small untruth this
+    /// product cannot afford to print, so each allowed category is named.
     /// </para>
     /// <para>
     /// A <c>policy.toml</c> left from before agents' settings moved into the vault is named once, so a
@@ -352,8 +329,7 @@ internal static class ApproveCommand
         string session,
         ApprovalLimits limits,
         string? retiredPolicy,
-        IReadOnlyList<string> automatic,
-        IReadOnlyList<string> alwaysAllowed,
+        IReadOnlyList<string> allowed,
         AgentConsole console)
     {
         console.WriteLine($"keypaste: watching {vaultPath}");
@@ -361,17 +337,12 @@ internal static class ApproveCommand
         if (retiredPolicy is not null)
         {
             console.WriteLine(
-                $"keypaste: {retiredPolicy} is no longer read: each agent's settings are kept in the vault. `keypaste clients` shows them.");
+                $"keypaste: {retiredPolicy} is no longer read: agents' rules are kept on this computer. `keypaste clients` shows them.");
         }
 
-        if (automatic.Count > 0)
+        if (allowed.Count > 0)
         {
-            console.WriteLine($"keypaste: set to Automatic in the vault: {string.Join("; ", automatic)}");
-        }
-
-        if (alwaysAllowed.Count > 0)
-        {
-            console.WriteLine($"keypaste: always allowed in the vault: {string.Join("; ", alwaysAllowed)}");
+            console.WriteLine($"keypaste: released to every agent without asking, by this computer's rules: {string.Join(", ", allowed)}");
         }
 
         console.WriteLine(
@@ -380,9 +351,9 @@ internal static class ApproveCommand
                 $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer."));
 
         console.WriteLine(
-            automatic.Count > 0 || alwaysAllowed.Count > 0
-                ? "keypaste: nothing is released without you saying yes, except what an agent above is Automatic for or always allowed. Press Ctrl+C to stop."
-                : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
+            allowed.Count > 0
+                ? "keypaste: every other value waits for you to say yes; agents see item details unless Settings hides them. Press Ctrl+C to stop."
+                : "keypaste: every value waits for you to say yes; agents see item details unless Settings hides them. Press Ctrl+C to stop.");
     }
 
     private static bool TryLimits(ParseResult line, CliContext context, out ApprovalLimits limits)

@@ -62,14 +62,11 @@ public sealed partial class PlainWordsTests
         foreach (var method in Enum.GetValues<AuditMethod>())
         {
             said.Add(($"Refusal({method})", ToolText.Refusal(method)));
-            said.Add(($"AccessRefusal({method})", ToolText.AccessRefusal(method)));
         }
 
         said.Add(("ReleasedOnce", ToolText.ReleasedOnce("password")));
-        said.Add(("ReleasedByAlways", ToolText.ReleasedByAlways("password")));
-        said.Add(("ReleasedAutomatically", ToolText.ReleasedAutomatically("password")));
-        said.Add(("Ran from a person", ToolText.Ran(["DEPLOY_KEY"], AuditMethod.Prompt, 0, 120, 1)));
-        said.Add(("Ran under Automatic with commands", ToolText.Ran(["DEPLOY_KEY"], AuditMethod.AutomaticCommands, null, 120, 0)));
+        said.Add(("ReleasedUnasked", ToolText.ReleasedUnasked("password")));
+        said.Add(("Ran from a person", ToolText.Ran(["DEPLOY_KEY"], 0, 120, 1)));
         said.Add(("RunNotStarted", ToolText.RunNotStarted("/usr/bin/npm", "no such file")));
         said.Add(("Invalid", ToolText.Invalid("reason", "must not be empty")));
 

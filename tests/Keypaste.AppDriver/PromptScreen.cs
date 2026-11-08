@@ -145,13 +145,6 @@ internal sealed class PromptScreen : IDisposable
     {
         window.CaptureRenderedFrame();
 
-        // A notice asks nothing, so it is printed and left on screen; the next answer is for a prompt.
-        if (window is NoticeWindow)
-        {
-            Console.Out.WriteLine($"notice text={Text(window, "NoticeText")}");
-            return;
-        }
-
         if (window is PairingNoticeWindow)
         {
             Console.Out.WriteLine($"pair-notice identity={Text(window, "IdentityText")} text={Text(window, "NoticeText")}");
@@ -170,9 +163,6 @@ internal sealed class PromptScreen : IDisposable
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")} " +
                 $"always={window.FindControl<Button>("AlwaysAllow")?.IsVisible == true}",
-            AccessChangeWindow =>
-                $"access-prompt agent={Text(window, "AgentText")} asked={Text(window, "OriginText")} " +
-                $"gains={string.Join("; ", Gains(window))} reason={Text(window, "ReasonText")}",
             TerminalEditWindow =>
                 $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
                 $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
@@ -180,13 +170,11 @@ internal sealed class PromptScreen : IDisposable
                 $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={(window.FindControl<Button>("AlwaysAllow")?.IsVisible == true ? "once or always" : Text(window, "LifetimeText"))} " +
-                $"always={(window.FindControl<Button>("AlwaysAllow")?.IsVisible == true ? Text(window, "AlwaysCaptionText") : "none")}",
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",
         });
 
         var withdrawn = window switch
         {
-            AccessChangeWindow => "access-prompt withdrawn",
             TerminalEditWindow => "edit-prompt withdrawn",
             PairingWindow => "pair-prompt withdrawn",
             _ => "prompt withdrawn",
@@ -204,10 +192,6 @@ internal sealed class PromptScreen : IDisposable
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
-
-    private static IEnumerable<string?> Gains(Window window) =>
-        window.FindControl<ItemsControl>("GainsList")?.GetVisualDescendants().OfType<TextBlock>()
-            .Where(block => block.Classes.Contains("gain")).Select(block => block.Text) ?? [];
 
     private static IEnumerable<string?> Changes(Window window) =>
         window.FindControl<ItemsControl>("ChangesList")?.GetVisualDescendants().OfType<TextBlock>()

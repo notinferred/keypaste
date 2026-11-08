@@ -291,17 +291,17 @@ public sealed class McpServerLocatorTests : IDisposable
     }
 
     [Fact]
-    public void Under_another_home_the_vault_the_log_the_ceilings_and_that_homes_owner_are_pinned()
+    public void Under_another_home_the_vault_the_log_and_that_homes_owner_are_pinned()
     {
         var home = Path.Combine(_directory, "custom");
         var named = Path.Combine(_directory, "named.kdbx");
         var chosen = Path.Combine(_directory, "chosen.kdbx");
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, null, namedVault: null, chosen, out var pins));
-        Assert.Equal(new McpServerPins(chosen, Path.Combine(home, "audit.jsonl"), Owner(home, chosen), Path.Combine(home, "clients.toml")), pins);
+        Assert.Equal(new McpServerPins(chosen, Path.Combine(home, "audit.jsonl"), Owner(home, chosen)), pins);
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, null, named, chosen, out pins));
-        Assert.Equal(new McpServerPins(named, Path.Combine(home, "audit.jsonl"), Owner(home, named), Path.Combine(home, "clients.toml")), pins);
+        Assert.Equal(new McpServerPins(named, Path.Combine(home, "audit.jsonl"), Owner(home, named)), pins);
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, "keypaste-test-pipe", named, chosen, out pins));
         Assert.Equal("keypaste-test-pipe", pins.ApproverName);

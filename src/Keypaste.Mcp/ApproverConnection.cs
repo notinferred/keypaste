@@ -127,11 +127,8 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// </summary>
     internal TimeSpan AnswerBound { get; init; } = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
-    /// <summary>
-    /// The longest a credential request or a run may take: two windows and the same margin, because
-    /// Always allow's confirmation is answered before its release leaves, in the one exchange.
-    /// </summary>
-    internal TimeSpan ReleaseBound { get; init; } = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
+    /// <summary>The longest a credential request or a run may take: one window and the same margin, as one prompt answers it.</summary>
+    internal TimeSpan ReleaseBound { get; init; } = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
@@ -146,18 +143,6 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         ExchangeAsync(
             (client, session, token) => client.ReleaseRunAsync(request with { Vault = vaultPath, Session = session }, token),
             ReleaseBound,
-            cancellationToken,
-            retry: false);
-
-    /// <summary>Asks the owner to change this bridge's agent's settings, which may wait for the person to confirm it.</summary>
-    /// <param name="request">The change. Its vault and session are filled in here.</param>
-    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
-    /// <returns>The owner's answer, and what became of the exchange.</returns>
-    /// <remarks>Never sent twice, as a run is not: a change whose reply was lost may already have been confirmed or applied.</remarks>
-    internal ValueTask<Exchange<AccessChangeReply>> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken) =>
-        ExchangeAsync(
-            (client, session, token) => client.ChangeAccessAsync(request with { Vault = vaultPath, Session = session }, token),
-            AnswerBound,
             cancellationToken,
             retry: false);
 

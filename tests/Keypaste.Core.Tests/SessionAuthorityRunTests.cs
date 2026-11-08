@@ -5,15 +5,14 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Xunit;
-using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An agent's run over a real pipe (D-0358): the owner releases the variables only to a connection of
-/// its current session, only when the agent's settings let it run commands, only within what the agent
-/// can see, after the person approves the exact program, command, directory and names, or under a timed
-/// grant that same connection holds for that same command line.
+/// its current session, only when this computer turns run on for the agent, only within what its bridge
+/// can see and with no field in a Blocked category, after the person approves the exact program, command,
+/// directory and names, every time.
 /// </summary>
 public sealed class SessionAuthorityRunTests : IDisposable
 {
@@ -58,23 +57,20 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 Assert.True(created.AddTag(wide, "env:wide"));
             }
 
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(created).Write(_label, Runs));
             created.Save();
         }
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
-        _fixture.Settings.Records[_label] = Runs;
+        _fixture.Rules.Rules = Runs;
     }
 
-    /// <summary>What the test's agent may do: see as far as its bridge exposes, and run commands.</summary>
-    private static AgentAccess Runs { get; } = ApproverFixture.SeesAll with { Run = true };
+    /// <summary>The rules the test's agent is held to: every category asked, and run on for it.</summary>
+    private static AgentRules Runs { get; } = AgentRules.Defaults.WithRun(_label, run: true);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private string VaultPath => Path.Combine(_directory, "vault.kdbx");
-
-    private string ClientsPath => Path.Combine(_directory, "clients.toml");
 
     private static string Program => OperatingSystem.IsWindows() ? @"C:\tools\npm.exe" : "/usr/bin/npm";
 
@@ -120,140 +116,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Empty(reply.Set.Variables);
     }
 
-    /// <summary>Automatic with commands starts a run unasked, recorded and narrated as its own kind, and a run is never offered Always allow.</summary>
-    [Fact]
-    public async Task AutomaticWithCommands_StartsARunUnasked_OnALineOfItsOwnKind()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands };
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal((EnvOutcome.Resolved, AuditMethod.AutomaticCommands), (reply!.Set.Outcome, reply.Method));
-        Assert.Equal(0, _fixture.Channel.Asked);
-        Assert.Equal("automatic-commands", _log.Lines().Last().GetProperty("method").GetString());
-        Assert.Contains(_narration, line => line.Contains("without asking (Automatic with commands)", StringComparison.Ordinal));
-    }
-
-    /// <summary>With Run off nothing starts, whatever the mode, and Automatic never answers a command.</summary>
-    [Fact]
-    public async Task RunOff_StopsEveryMode_AndAutomaticNeverAnswersACommand()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Run = false };
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        Assert.Equal(AuditMethod.RunOff, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic };
-
-        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-        Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Equal(OnceOnly.None, _fixture.Channel.LastRunPrompt!.OnceOnly);
-    }
-
-    /// <summary>A run touching a protected item is asked about in every mode, Allow once only.</summary>
-    [Fact]
-    public async Task AProtectedRun_IsAsked_UnderAutomaticWithCommands()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands };
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run() with { Profile = "prod" }, Token);
-
-        Assert.Equal((EnvOutcome.Resolved, AuditMethod.Prompt), (reply!.Set.Outcome, reply.Method));
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
-    }
-
-    /// <summary>A protected tag added to an item the mode already started a run with asks again, whatever the mode says.</summary>
-    [Fact]
-    public async Task AProtectedTagAddedLater_OutranksTheMode()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands };
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        Assert.Equal(AuditMethod.AutomaticCommands, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-
-        Assert.True(_vault.AddTag(new EntryName("env/acme-api", ".env"), "env:acme-api:prod"));
-        _vault.Save();
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal((EnvOutcome.Resolved, AuditMethod.Prompt), (reply!.Set.Outcome, reply.Method));
-        Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
-    }
-
-    /// <summary>A spent hourly limit asks, once only, and a refusal still cooling outranks the mode.</summary>
-    [Fact]
-    public async Task AReachedLimit_Asks_AndACooldown_OutranksTheMode()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Limit = new AccessLimit { PerHour = 1 } };
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        Assert.Equal(AuditMethod.AutomaticCommands, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-
-        _fixture.Channel.Answer = ApprovalAnswer.Denied;
-        var limited = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(limited);
-        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastRunPrompt!.OnceOnly);
-
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands };
-        var cooling = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(cooling);
-        Assert.Equal(1, _fixture.Channel.Asked);
-    }
-
-    /// <summary>A project row of Automatic with commands starts a run of that project's items unasked where the agent's own mode asks, and a set mixing in an item no such row covers asks.</summary>
-    [Fact]
-    public async Task AProjectRow_StartsItsOwnItemsUnasked_AndAMixedSetAsks()
-    {
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Ask, Projects = [Row("acme-api", AgentMode.AutomaticCommands)] };
-        _fixture.Source.Tagged[new EntryName("env/acme-api", ".env")] = ["env:acme-api"];
-        _fixture.Source.Tagged[new EntryName("personal", "github")] = ["env:billing"];
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        Assert.Equal(AuditMethod.AutomaticCommands, (await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL")), Token))!.Method);
-        Assert.Equal(0, _fixture.Channel.Asked);
-
-        var untagged = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Projects = [Row("billing", AgentMode.Automatic)] };
-        var automatic = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/dev/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
-
-        Assert.Equal((AuditMethod.Prompt, AuditMethod.Prompt), (untagged!.Method, automatic!.Method));
-        Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Equal(OnceOnly.None, _fixture.Channel.LastRunPrompt!.OnceOnly);
-    }
-
-    /// <summary>A passed end asks about a run Automatic with commands would have started, saying its limit was reached; under plain Automatic, which never starts a run, the prompt names no limit.</summary>
-    [Fact]
-    public async Task APassedEnd_AsksAboutTheRun_NamingTheLimitOnlyWhereItHeldARunBack()
-    {
-        var passed = new AccessLimit { Until = _fixture.Clock.GetUtcNow().AddMinutes(-1) };
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.AutomaticCommands, Limit = passed };
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-        Assert.Equal(OnceOnly.LimitReached, _fixture.Channel.LastRunPrompt!.OnceOnly);
-
-        _fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic, Limit = passed };
-        Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
-
-        Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Equal(OnceOnly.None, _fixture.Channel.LastRunPrompt!.OnceOnly);
-    }
-
     [Fact]
     public async Task AnApprovedRun_ReleasesTheSet_AndNamesItsEntries()
     {
@@ -272,7 +134,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
-    public async Task ATaggedField_IsNamedByItsEntryAndField_AndAProdTaggedMemberIsOnceOnly()
+    public async Task ATaggedField_IsNamedByItsEntryAndField()
     {
         var stripe = new EntryName("personal", "stripe");
         _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "stripe", Password = "stripe-login" });
@@ -294,7 +156,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         var prompt = Assert.IsType<RunPrompt>(_fixture.Channel.LastRunPrompt);
         Assert.Equal(new RunPromptVariable("STRIPE_WEBHOOK", "personal/stripe", "STRIPE_WEBHOOK"), prompt.Variables[2]);
-        Assert.Equal(OnceOnly.ProtectedProfile, prompt.OnceOnly);
     }
 
     [Fact]
@@ -335,7 +196,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
-    public async Task AProtectedProfile_IsOnceOnly_AndNeverServedFromAGrant()
+    public async Task AProtectedProfile_IsAskedEveryTime()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
@@ -347,11 +208,10 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(_prod, first!.Set.Variables.Single().Value);
         Assert.Equal(EnvOutcome.Resolved, second!.Set.Outcome);
         Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
     }
 
     [Fact]
-    public async Task AReferenceIntoAProtectedProfile_IsOnceOnly()
+    public async Task AReferenceIntoAProtectedProfile_IsAsked()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
@@ -360,12 +220,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
         var reply = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/prod/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
 
         Assert.Equal([new EnvVariable("DB", _prod), new EnvVariable("GH", _github)], reply!.Set.Variables);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
         Assert.Equal(["env/acme-api/.env.prod", "personal/github"], reply.Entries);
     }
 
     [Fact]
-    public async Task AReferenceToAnEntryTaggedIntoAProtectedEnvironment_IsOnceOnly()
+    public async Task AReferenceToAnEntryTaggedIntoAProtectedEnvironment_IsAsked()
     {
         Assert.True(_vault.AddTag(new EntryName("personal", "github"), "env:acme-api:prod"));
         _vault.Save();
@@ -376,7 +235,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
         var reply = await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token);
 
         Assert.Equal([new EnvVariable("GH", _github)], reply!.Set.Variables);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
     }
 
     [Fact]
@@ -551,24 +409,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
-    public async Task NoValues_StillRuns()
+    public async Task AnUnreadableRulesFile_RefusesUnasked()
     {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
+        _fixture.Rules.Unreadable = "agents.toml: line 1: [[client]] is not a section keypaste reads here";
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, clients: true);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(EnvOutcome.Resolved, reply!.Set.Outcome);
-    }
-
-    [Fact]
-    public async Task AnUnreadableClientsFile_RefusesUnasked()
-    {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\npolicy = \"ask\"\n");
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, clients: true);
+        await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.ReleaseRunAsync(Run(), Token);
@@ -760,27 +605,12 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
-    [Fact]
-    public async Task AutomaticNeverReleasesARun()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-        await using var owner = Owner.Start(this, fixture);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(reply);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    /// <summary>An agent whose settings do not let it run commands is refused before anything is resolved or anybody asked, an unnamed bridge's included.</summary>
+    /// <summary>An agent whose run is off is refused before anything is resolved or anybody asked, an unnamed bridge's included.</summary>
     [Fact]
     public async Task RunOff_IsRefusedUnasked_AndSoIsAnUnnamedBridge()
     {
         using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = ApproverFixture.SeesAll;
+        fixture.Rules.Rules = AgentRules.Defaults;
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, fixture);
         await using var client = await AttachedAsync(owner);
@@ -792,41 +622,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         AssertNothingReleased(unnamed);
         Assert.Equal((AuditMethod.RunOff, AuditMethod.RunOff), (off!.Method, unnamed!.Method));
         Assert.Equal(0, fixture.Channel.Asked);
-        Assert.Contains(_narration, said => said.Contains("its settings do not let it run commands", StringComparison.Ordinal));
-    }
-
-    /// <summary>A run is held to what the agent can see as a credential request is: a variable outside it is out of scope, unasked.</summary>
-    [Fact]
-    public async Task ARunOutsideWhatTheAgentSees_IsOutOfScopeUnasked()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = Runs with { See = See("env/billing/**") };
-        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, fixture);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(reply);
-        Assert.Equal(AuditMethod.OutOfScope, reply!.Method);
-        Assert.Equal(0, fixture.Channel.Asked);
-    }
-
-    /// <summary>The settings the vault holds, read by the owner itself, decide a run: run on asks, and a ceiling of run off on this computer refuses.</summary>
-    [Fact]
-    public async Task TheVaultsRecord_AndThisComputersCeiling_DecideARun()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, clients: true);
-        await using var client = await AttachedAsync(owner);
-
-        var allowed = await client.ReleaseRunAsync(Run(), Token);
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nrun = \"off\"\n");
-        var capped = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(EnvOutcome.Resolved, allowed!.Set.Outcome);
-        Assert.Equal(AuditMethod.RunOff, capped!.Method);
-        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Contains(_narration, said => said.Contains("run is off for it on this computer", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -897,19 +693,14 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         internal SessionAuthority Authority { get; }
 
-        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool clients = false, bool vaultSource = false)
+        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool vaultSource = false)
         {
             var used = fixture ?? test._fixture;
-            IAgentSettings settings = clients
-                ? new VaultAgentSettings(() => test._vault, _ => AgentSave.Unchanged, new AccessCapsSource(test.ClientsPath))
-                : used.Settings;
             var handler = new ApproverHandler(
                 vaultSource ? new VaultCredentialSource(() => test._vault) : used.Source,
                 vaultSource ? new VaultEntryNameLister(() => test._vault) : used.Source,
                 used.Gate,
-                settings,
-                hourly: used.Hourly,
-                clock: used.Clock);
+                used.Rules);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, test.VaultPath),

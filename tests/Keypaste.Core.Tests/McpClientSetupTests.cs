@@ -409,13 +409,12 @@ public sealed class McpClientSetupTests : IDisposable
     }
 
     [Fact]
-    public void The_vault_the_audit_log_and_the_ceilings_are_made_absolute()
+    public void The_vault_and_the_audit_log_are_made_absolute()
     {
         Assert.True(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins("vault.kdbx", "audit.jsonl", null, "clients.toml"), "codex", [], out var registration, out _));
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins("vault.kdbx", "audit.jsonl", null), "codex", [], out var registration, out _));
         Assert.Equal(Path.GetFullPath("vault.kdbx"), registration.VaultPath);
         Assert.Equal(Path.GetFullPath("audit.jsonl"), registration.AuditLogPath);
-        Assert.Equal(Path.GetFullPath("clients.toml"), registration.ClientsPath);
     }
 
     /// <summary>
@@ -428,7 +427,7 @@ public sealed class McpClientSetupTests : IDisposable
         var server = new McpServerCommand(Path.Combine(_directory, "keypaste"), [McpServerLocator.BridgeArgument]);
         Assert.True(McpServerRegistration.TryCreate(
             server,
-            new McpServerPins(Path.Combine(_directory, "v.kdbx"), Path.Combine(_directory, "a.jsonl"), "keypaste-vault-0123", Path.Combine(_directory, "c.toml")),
+            new McpServerPins(Path.Combine(_directory, "v.kdbx"), Path.Combine(_directory, "a.jsonl"), "keypaste-vault-0123"),
             "claude-code",
             ["env/**"],
             out var registration,
@@ -436,7 +435,7 @@ public sealed class McpClientSetupTests : IDisposable
 
         Assert.Equal(
             [server.Path, "mcp", "--vault", Path.Combine(_directory, "v.kdbx"), "--audit-log", Path.Combine(_directory, "a.jsonl"),
-             "--clients", Path.Combine(_directory, "c.toml"), "--approver", "keypaste-vault-0123", "--client-label", "claude-code", "--allow-run", "--expose", "env/**"],
+             "--approver", "keypaste-vault-0123", "--client-label", "claude-code", "--allow-run", "--expose", "env/**"],
             registration.CommandLine());
     }
 

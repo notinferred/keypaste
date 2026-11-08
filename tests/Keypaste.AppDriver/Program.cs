@@ -1658,14 +1658,10 @@ internal sealed class Driver(string home)
         internal async Task ShowSettingsAsync(string label)
         {
             var settings = await SettingsAsync(label).ConfigureAwait(true);
-            settings.Read();
-            string Chosen(IReadOnlyList<SettingChoice> choices) => choices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none";
+            settings.Refresh();
 
             Console.Out.WriteLine(
-                $"settings agent={settings.Agent} mode={Chosen(settings.ModeChoices)} values={Chosen(settings.ValueChoices)} " +
-                $"run={Chosen(settings.RunChoices)} see={settings.SeePattern} " +
-                $"rows={string.Join(',', settings.Rows.Select(row => $"{row.Name}:{Chosen(row.Modes)}"))} " +
-                $"held={(settings.IsHeldBack ? settings.HeldBack : "none")}" +
+                $"settings agent={settings.Agent} run={settings.RunChoices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none"}" +
                 (settings.HasProblem ? $" problem={settings.Problem}" : string.Empty));
         }
 
@@ -1673,31 +1669,15 @@ internal sealed class Driver(string home)
         internal async Task ChangeAsync(string label, string[] change)
         {
             var settings = await SettingsAsync(label).ConfigureAwait(true);
-            var changing = change switch
+
+            if (change is not ["run", var word])
             {
-                [("mode" or "values" or "run") and var setting, var word] => settings.ChooseAsync(Offered(settings, setting, word, null)),
-                ["see", var selectors] => See(settings, selectors),
-                ["row", var scope] => AddRow(settings, scope),
-                ["row-mode", var scope, var word] => settings.ChooseAsync(Offered(settings, "mode", word, scope)),
-                ["use-vault"] => settings.UseVaultAsync(),
-                _ => throw new DriverException($"setting does not understand '{string.Join(' ', change)}'"),
-            };
+                throw new DriverException($"setting does not understand '{string.Join(' ', change)}'");
+            }
 
-            _ = changing.ContinueWith(_ => Console.Out.WriteLine($"setting-done {settings.Message}"), TaskScheduler.Default);
-        }
-
-        private static Task See(AgentSettingsViewModel settings, string selectors)
-        {
-            settings.SeePattern = selectors;
-            return settings.ApplySeeAsync();
-        }
-
-        private static Task AddRow(AgentSettingsViewModel settings, string scope)
-        {
-            settings.NewRowScope = settings.NewRowScopes.Contains(scope, StringComparer.Ordinal)
-                ? scope
-                : throw new DriverException($"the settings offer no new row for {scope}");
-            return settings.AddRowAsync();
+            settings.ChooseCommand.Execute(settings.RunChoices.FirstOrDefault(choice => string.Equals(choice.Word, word, StringComparison.Ordinal))
+                ?? throw new DriverException($"the settings offer no run {word}"));
+            Console.Out.WriteLine($"setting-done {settings.Message}");
         }
 
         /// <summary>The settings open on a row, opened from its disclosure if they are not.</summary>
@@ -1722,22 +1702,6 @@ internal sealed class Driver(string home)
 
             row.IsOpen = true;
             return row.Settings ?? throw new DriverException($"{label}'s settings did not open");
-        }
-
-        private static SettingChoice Offered(AgentSettingsViewModel settings, string setting, string word, string? row)
-        {
-            var choices = row is null
-                ? setting switch
-                {
-                    "mode" => settings.ModeChoices,
-                    "values" => settings.ValueChoices,
-                    _ => settings.RunChoices,
-                }
-                : settings.Rows.FirstOrDefault(listed => string.Equals(listed.Name, row, StringComparison.Ordinal))?.Modes
-                    ?? throw new DriverException($"the settings have no row for {row}");
-
-            return choices.FirstOrDefault(choice => string.Equals(choice.Word, word, StringComparison.Ordinal))
-                ?? throw new DriverException($"the settings offer no {setting} {word}");
         }
 
         private static AgentRow Row(AgentActivityViewModel screen, string key) =>

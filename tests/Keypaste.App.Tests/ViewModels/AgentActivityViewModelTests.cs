@@ -52,35 +52,6 @@ public sealed class AgentActivityViewModelTests
         Assert.True(model.NothingWaiting);
     }
 
-    /// <summary>
-    /// The status names each agent the vault releases to without asking and where, beneath this
-    /// computer's ceilings, rather than a sentence that could be true of any agent.
-    /// </summary>
-    [Fact]
-    public async Task The_status_names_each_agent_on_Automatic_and_for_what()
-    {
-        await using var app = await App.StartAsync(vault =>
-        {
-            Assert.True(ProjectScope.TryCreate("billing", "dev", out var dev, out var error), error);
-            var store = new AgentAccessStore(vault);
-            Assert.Equal(AgentAccessWrite.Written, store.Write("claude-code", AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }));
-            Assert.Equal(AgentAccessWrite.Written, store.Write("held", AgentAccess.Defaults with { Mode = AgentMode.Automatic }));
-        });
-        File.WriteAllText(KeypasteHome.ClientsPath(app.Fixture.Home), "[[client]]\nlabel = \"held\"\nmode = \"ask\"\n");
-
-        using var model = app.Model();
-
-        Assert.EndsWith(
-            "nothing is released unless you allow it, except what these agents are Automatic for: claude-code (billing:dev).",
-            model.Status,
-            StringComparison.Ordinal);
-
-        File.Delete(KeypasteHome.ClientsPath(app.Fixture.Home));
-        model.Refresh();
-
-        Assert.EndsWith("except what these agents are Automatic for: claude-code (billing:dev); held (by default).", model.Status, StringComparison.Ordinal);
-    }
-
     [Fact]
     public void Without_an_authority_nothing_is_read_and_the_screen_says_so()
     {
@@ -119,58 +90,6 @@ public sealed class AgentActivityViewModelTests
         model.Refresh();
 
         Assert.False(model.ShowPromptCommand.CanExecute(null));
-    }
-
-    /// <summary>A confirmation of a change that gives an agent more waits like a request, named by where it says it came from, with no reason shown.</summary>
-    [Fact]
-    public async Task A_waiting_change_is_listed_by_where_it_came_from_with_Show_the_prompt()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Hold = true;
-        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
-        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        var changing = app.Authority.ChangeAccessAsync("claude-code", edit, givingUp.Token).AsTask();
-        await app.Person.Waiting.WaitAsync(_connect, Token);
-
-        using var model = app.Model();
-
-        var waiting = Assert.Single(model.Waiting);
-        Assert.Equal(("claude-code", "Your change to claude-code's settings"), (waiting.Client, waiting.Asked));
-        Assert.EndsWith("s left", waiting.LeftText, StringComparison.Ordinal);
-        Assert.True(model.ShowPromptCommand.CanExecute(null));
-
-        await givingUp.CancelAsync();
-
-        try
-        {
-            await changing.WaitAsync(_connect, Token);
-        }
-        catch (OperationCanceledException)
-        {
-            // Withdrawn, as a screen that stops waiting withdraws it.
-        }
-    }
-
-    /// <summary>
-    /// A row's summary follows a change made outside its panel, such as one an agent asked for and the person
-    /// confirmed in the prompt window, which rewrites the agent's record and leaves the number of records as it was.
-    /// </summary>
-    [Fact]
-    public async Task A_rows_summary_follows_a_change_made_outside_its_panel()
-    {
-        await using var app = await App.StartAsync(vault =>
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Mode = AgentMode.Ask })));
-        app.Person.Answer = ApprovalAnswer.ApprovedOnce;
-
-        using var model = app.Model();
-        var claude = model.Rows.Single(row => row.Key == "claude-code");
-        Assert.DoesNotContain("Automatic", claude.Summary, StringComparison.Ordinal);
-
-        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
-        Assert.Equal(AuditDecision.Granted, (await app.Authority.ChangeAccessAsync("claude-code", edit, Token)).Decision);
-        app.Clock.Advance(TimeSpan.FromSeconds(1));
-
-        Assert.StartsWith("Automatic · ", claude.Summary, StringComparison.Ordinal);
     }
 
     /// <summary>A row listed only while its settings are open goes on saying what is true of it: once its bridge leaves, it is no longer in use.</summary>
@@ -496,7 +415,6 @@ public sealed class AgentActivityViewModelTests
 
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
 
-        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
 
         private async ValueTask<ApprovalAnswer> HoldAsync(CancellationToken cancellationToken)
         {

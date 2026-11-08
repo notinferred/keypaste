@@ -21,7 +21,6 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -766,16 +765,6 @@ public sealed class ScreenRenderer
         var waiting = AskAsync(zed, serving, demo.Path, "zed", Allowing.HeldEntry, Allowing.HeldField);
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
-        Assert.True(Core.Agents.AccessCaps.TrySave(
-            Core.Audit.KeypasteHome.ClientsPath(demo.Home),
-            // The strict ceiling sits on every other client (T-36); the two holding grants keep timed grants, as they must to hold them.
-            Core.Agents.AccessCaps.Empty
-                .With(new Core.Agents.CapsRow { Label = Core.Agents.AgentNames.Any, Mode = Core.Agents.AgentMode.Ask })
-                .With(new Core.Agents.CapsRow { Label = "claude-code", Mode = Core.Agents.AgentMode.Automatic })
-                .With(new Core.Agents.CapsRow { Label = "zed", Mode = Core.Agents.AgentMode.Automatic })
-                .With(new Core.Agents.CapsRow { Label = "local-evals", Values = false }),
-            out var saveError), saveError);
-
         var tools = new FakeTools(Path.Combine(demo.Home, "computer")).ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable();
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock, post: action => Avalonia.Threading.Dispatcher.UIThread.Post(action))
         {
@@ -795,7 +784,7 @@ public sealed class ScreenRenderer
         Save(window, output, "20a-agents-looking");
         SetDrawnState(agents, nameof(agents.IsLooking), false);
 
-        SetDrawnState(agents, nameof(agents.ClientsProblem), $"{Core.Audit.KeypasteHome.ClientsPath(demo.Home)}: line 3 is not one this version reads. Every agent request is refused until it is fixed or reset; Reset shows what each agent then gets before anything changes.");
+        SetDrawnState(agents, nameof(agents.ClientsProblem), $"{Core.Audit.KeypasteHome.AgentsPath(demo.Home)}: line 3: [[client]] is not a section keypaste reads here. Every agent request is refused until it is fixed; deleting it asks about every value again.");
         Save(window, output, "20b-agents-clients-unreadable");
         SetDrawnState(agents, nameof(agents.ClientsProblem), string.Empty);
 
@@ -817,48 +806,6 @@ public sealed class ScreenRenderer
         var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
         claudeRow.IsOpen = true;
         Save(window, output, "27-agents-settings-open");
-        var alwaysItem = authority.Session.Unlocked!.EntryUuid(_apiHome)!;
-        var alwaysStore = new Core.Agents.AgentAccessStore(authority.Session.Unlocked!);
-        alwaysStore.Write("claude-code", AccessEdit.AlwaysItem(alwaysItem));
-        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var alwaysProject, out var alwaysError), alwaysError);
-        alwaysStore.Write("claude-code", AccessEdit.Automatic(alwaysProject));
-        authority.Session.Unlocked!.Save();
-        claudeRow.IsOpen = false;
-        agents.Refresh();
-        claudeRow.IsOpen = true;
-        agents.Refresh();
-        var tall = window.Height;
-        window.Height = 2400;
-        Save(window, output, "27b-agents-always-allowed");
-        window.Width = 720;
-        Save(window, output, "27b-agents-always-allowed-narrow");
-        window.Width = _width;
-        var alwaysSettings = window.GetVisualDescendants().OfType<AgentSettingsView>().First(view => view.IsEffectivelyVisible);
-        var alwaysModel = Assert.IsType<AgentSettingsViewModel>(alwaysSettings.DataContext);
-        await alwaysModel.RemoveAlwaysAsync(Core.Agents.AlwaysAllowed.ItemId(alwaysItem));
-        Save(window, output, "27c-agents-always-removed");
-
-        Assert.True(AccessEdit.TryCreate(null, "automatic-commands", null, null, "off", null, null, false, out var commandsMode, out var commandsError), commandsError);
-        alwaysStore.Write("claude-code", commandsMode);
-        authority.Session.Unlocked!.Save();
-        claudeRow.IsOpen = false;
-        agents.Refresh();
-        claudeRow.IsOpen = true;
-        agents.Refresh();
-        Save(window, output, "27d-agents-automatic-commands-run-off");
-        window.Width = 720;
-        Save(window, output, "27d-agents-automatic-commands-run-off-narrow");
-        window.Width = _width;
-        Assert.True(AccessEdit.TryCreate(null, null, null, null, "on", null, null, false, out var runOn, out var runError), runError);
-        alwaysStore.Write("claude-code", runOn);
-        authority.Session.Unlocked!.Save();
-        claudeRow.IsOpen = false;
-        agents.Refresh();
-        claudeRow.IsOpen = true;
-        agents.Refresh();
-        Save(window, output, "27e-agents-automatic-commands");
-        window.Height = tall;
-        await DrawMore(window, output);
         window.Width = 960;
         Save(window, output, "27-agents-settings-narrow");
         window.Width = _width;
@@ -1566,83 +1513,25 @@ public sealed class ScreenRenderer
             Profile = "dev",
             Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
         };
-        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91c-run-once-only");
-        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run with { OnceOnly = OnceOnly.LimitReached })), output, "91c2-run-limit-reached");
         DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
-        DrawWindow(
-            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
-                "work laptop",
-                AccessChange.Classify(
-                    EffectiveAccess.Create("work laptop", new AgentRecords(SavedRead.Current, [new AcafRead(AgentAccess.Defaults with { Run = true }, Understood: true, Rewritable: true)], []), AccessCaps.Empty),
-                    AgentAccess.Defaults with { Mode = AgentMode.AutomaticCommands, Run = true }),
-                AccessOrigin.Settings,
-                string.Empty,
-                TimeZoneInfo.Utc))),
-            output,
-            "91f3-access-change-automatic-commands");
-        DrawWindow(
-            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
-                "work laptop",
-                AccessChange.Classify(
-                    EffectiveAccess.Create("work laptop", new AgentRecords(SavedRead.Current, [new AcafRead(AgentAccess.Defaults with { Run = true }, Understood: true, Rewritable: true)], []), AccessCaps.Empty),
-                    AgentAccess.Defaults with { Run = true, Mode = AgentMode.AutomaticCommands, Limit = new AccessLimit { PerHour = 20 } }),
-                AccessOrigin.Agent,
-                "Run the test suite after each change without stopping to ask.",
-                TimeZoneInfo.Utc))),
-            output,
-            "91f5-access-change-automatic-commands-agent");
-        DrawWindow(
-            new AccessChangeWindow(new AccessChangeViewModel(AccessChangePrompt.For(
-                "work laptop",
-                AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Always = new AlwaysAllowed { Items = [new string('a', 32)] } }),
-                AccessOrigin.Prompt,
-                string.Empty,
-                TimeZoneInfo.Utc,
-                _ => "api/Stripe"))),
-            output,
-            "91f4-access-change-item");
-
         var protectedPrompt = ApprovalPrompt.For(
             "claude-code",
             new EntryName("env/acme-api", ".env.prod"),
             "DATABASE_URL",
             "I need the \u202eproduction database URL to check the schema.",
             null);
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.ProtectedProfile })), output, "91d-approval-once-only");
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt with { OnceOnly = OnceOnly.LimitReached })), output, "91d2-approval-limit-reached");
-        var item = new string('a', 32);
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt)), output, "91d-approval-protected");
         var ordinary = ApprovalPrompt.For("claude-code", new EntryName("api", "Stripe"), "password", "Run the webhook tests against the dev Stripe account.", "work laptop");
-        DrawWindow(
-            new ApprovalWindow(new ApprovalViewModel(ordinary with { Always = new AlwaysOffer(AccessEdit.AlwaysItem(item), ordinary.Entry) })),
-            output,
-            "91e2-approval-always-item");
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(ordinary with { Label = null, OnceOnly = OnceOnly.Unnamed })), output, "91e3-approval-unnamed");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(ordinary with { Label = null })), output, "91e3-approval-unnamed");
 
-        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
         var asked = ApprovalPrompt.For(
             "claude-code",
             new EntryName("env/acme-api", ".env"),
             "STRIPE_SECRET_KEY",
             "Run the webhook tests against the dev Stripe account.",
             "work laptop");
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) })), output, "91e-approval-always-for");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked)), output, "91e-approval");
 
-        var change = AccessChangePrompt.For(
-            "work laptop",
-            AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
-            AccessOrigin.Prompt,
-            string.Empty,
-            TimeZoneInfo.Utc);
-        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
-        var named = AgentAccess.Defaults with { Mode = AgentMode.Automatic };
-        var reset = AccessChangePrompt.ForReset(
-            new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named, Understood: true, Rewritable: true))]),
-            TimeZoneInfo.Utc);
-        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(reset)), output, "91f2-access-change-reset");
-        var resetCommands = AccessChangePrompt.ForReset(
-            new AgentRecordList(SavedRead.Current, [new AgentRecord("claude-code", new AcafRead(named with { Mode = AgentMode.AutomaticCommands, Run = true }, Understood: true, Rewritable: true))]),
-            TimeZoneInfo.Utc);
-        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(resetCommands)), output, "91f6-access-change-reset-commands");
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
             {
@@ -1653,14 +1542,9 @@ public sealed class ScreenRenderer
             output,
             "91h-terminal-edit");
 
-        var notice = new NoticeWindow(new AlwaysNotice("work laptop", TestOffers.Project("acme-api:dev"), "another prompt was already waiting for an answer"), _ => { });
-        notice.Show();
-        Save(notice, output, "91g-always-for-notice");
-        notice.Close();
-
         DrawPickers(output);
 
-        var arming = new ApprovalWindow(new ApprovalViewModel(asked with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) }));
+        var arming = new ApprovalWindow(new ApprovalViewModel(asked));
         arming.Show();
         Save(arming, output, "91j-approval-arming");
         arming.Close();
@@ -1683,8 +1567,6 @@ public sealed class ScreenRenderer
             Group = "work",
             Username = username,
             Url = url,
-            OnceOnly = protectedItem ? OnceOnly.ProtectedProfile : OnceOnly.None,
-            Always = protectedItem ? null : new AlwaysOffer(AccessEdit.AlwaysItem(new string((char)('a' + number), 32)), "work/GitHub"),
         };
 
         var pair = ApprovalPrompt.For("claude-code", new EntryName("work", "GitHub"), "password", "Push the release branch to the company repository.", "work laptop") with
@@ -2125,40 +2007,6 @@ public sealed class ScreenRenderer
         cell.EndReveal();
     }
 
-    /// <summary>An agent's settings with More open, as its first control is drawn in every palette and at the window's narrowest.</summary>
-    private static async Task DrawMore(Window window, string output)
-    {
-        var settings = window.GetVisualDescendants().OfType<AgentSettingsView>().First(view => view.IsEffectivelyVisible);
-        var model = Assert.IsType<AgentSettingsViewModel>(settings.DataContext);
-        var width = window.Width;
-
-        settings.BringIntoView();
-        Save(window, output, "27-agents-settings-closed");
-        model.IsMoreOpen = true;
-        Save(window, output, "27-agents-settings-more");
-        WindowInput.Drain();
-        var learnMore = settings.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LearnMoreSeeing");
-        learnMore.BringIntoView();
-        learnMore.Flyout!.ShowAt(learnMore);
-        WindowInput.Drain();
-        Save(window, output, "27-agents-settings-learn-more");
-        learnMore.Flyout.Hide();
-        await model.ChooseAsync(model.SeeScopes.Single(choice => choice.Words == "Only these"));
-        Save(window, output, "27-agents-settings-only-these");
-        window.Width = 720;
-        Save(window, output, "27-agents-settings-only-these-narrow");
-        window.Width = width;
-        await model.ChooseAsync(model.SeeScopes.Single(choice => choice.Words == "All projects"));
-        window.Width = 720;
-        Save(window, output, "27-agents-settings-more-narrow");
-        model.NewRowScope = model.NewRowScopes[0];
-        await model.AddRowAsync();
-        Save(window, output, "27-agents-settings-row-narrow");
-        await model.RemoveRowAsync(model.Rows[0]);
-        window.Width = width;
-        model.IsMoreOpen = false;
-    }
-
     /// <summary>
     /// Four links as the vault would remember them, one per status, and a share server that knows
     /// the two still open: one untouched, one opened once.
@@ -2255,8 +2103,7 @@ public sealed class ScreenRenderer
             "DATABASE_URL",
             "Run the database migration for the api service.",
             "work laptop");
-        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
-        var model = new ApprovalViewModel(prompt with { Always = new AlwaysOffer(AccessEdit.Automatic(dev), dev.Name) });
+        var model = new ApprovalViewModel(prompt);
         model.Tick(TimeSpan.FromSeconds(28));
         model.Arm();
         var window = new ApprovalWindow(model);

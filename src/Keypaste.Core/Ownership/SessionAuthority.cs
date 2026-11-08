@@ -40,11 +40,10 @@ namespace Keypaste.Core.Ownership;
 /// unasked (D-0451).
 /// </para>
 /// <para>
-/// An agent's <c>run</c> is refused unasked unless the agent's settings let it run commands, and is
-/// otherwise resolved the same way, against what the agent can see, and asked about once as the exact
-/// program, command line, directory and variable names, never Always allowed. Only Automatic with commands
-/// for every item of the set starts it unasked, and a protected item or a reached limit still asks (T-35).
-/// The owner runs nothing: the bridge starts the command.
+/// An agent's <c>run</c> is refused unasked unless this computer's rules turn run on for the agent, and is
+/// otherwise resolved the same way, against what the agent can see, refused when a field of its set is in a
+/// Blocked category, and asked about every time as the exact program, command line, directory and variable
+/// names, Allow once only, whatever any rule says (T-35). The owner runs nothing: the bridge starts the command.
 /// </para>
 /// <para>
 /// A browser's attachment, which names the KeePassXC-Browser build its relay was started for, makes only a pairing, a pairing
@@ -52,12 +51,12 @@ namespace Keypaste.Core.Ownership;
 /// other three are decided by the <see cref="IBrowserRequests"/> this owner was given, and refused without one.
 /// </para>
 /// <para>
-/// Every listing, credential, run, token and settings-change request it reads is recorded in this
+/// Every listing, credential, run and token request it reads is recorded in this
 /// owner's own log before it is answered, a request refused at admission, withdrawn or failed while
 /// deciding included, and a release whose line cannot be written is refused (THREATS.md T-6). While
 /// that log will not open, every request is refused before anybody is asked. Nothing the asker sends
 /// moves that log, so a bridge configured to log elsewhere, or a program speaking the pipe directly, is
-/// recorded all the same (T-14). Attaching, listing settings and locking release nothing and
+/// recorded all the same (T-14). Attaching and locking release nothing and
 /// are not recorded.
 /// </para>
 /// <para>
@@ -189,12 +188,6 @@ public sealed class SessionAuthority : IApproverHandler
             }
         }
     }
-
-    /// <summary>What an Always allow row's item is now, for an agent's settings to list.</summary>
-    /// <param name="item">The item's UUID as hex.</param>
-    /// <returns>Its name, and whether a protected tag keeps it asked about.</returns>
-    public (string Shown, bool IsProtected) AlwaysItem(string item) =>
-        Live() is null ? ("an item no longer in this vault", false) : (_inner.ShownItem(item), _inner.IsProtectedItem(item));
 
     /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it (D-0452).</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
@@ -387,27 +380,6 @@ public sealed class SessionAuthority : IApproverHandler
             waiting,
             withdrawn.Token).ConfigureAwait(false);
 
-        AlwaysNotice? unmade = null;
-
-        // Asked before the commit, so a lock while the person decides still withdraws the release, and
-        // in the slot the release's prompt kept, which is given back whatever became of it.
-        using (reply.Kept)
-        {
-            if (reply is { Decision: AuditDecision.Granted, Always: { } offer } && request.ClientLabel is { } agent)
-            {
-                unmade = await AlwaysAsync(
-                    AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
-                    agent,
-                    offer,
-                    reply.Kept,
-                    lifetime,
-                    request.Session,
-                    request.Vault,
-                    waiting,
-                    withdrawn.Token).ConfigureAwait(false);
-            }
-        }
-
         if (!lifetime.TryCommitAfter(waiting) && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
         {
             // The released string is dropped here, never sent: the lock or the reload came before the release.
@@ -422,12 +394,6 @@ public sealed class SessionAuthority : IApproverHandler
         if (answered is { Decision: AuditDecision.Granted, Entry: { } entry })
         {
             Record(lifetime, [entry], client, AuditLog.Wire(answered.Method), answered.Item);
-
-            // Only now, so "allowed once" is said of a release that left.
-            if (unmade is not null)
-            {
-                _inner.Tell(unmade);
-            }
         }
         else if (delivered.Decision == AuditDecision.Granted)
         {
@@ -435,113 +401,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         return answered;
-    }
-
-    /// <summary>
-    /// After a person chose Always allow on a release: asks them to confirm the widening, as any change
-    /// that gives an agent more is confirmed, and records the change on its own line.
-    /// </summary>
-    /// <returns>What to tell them once the release has left when the change did not take effect, otherwise null.</returns>
-    /// <remarks>Whatever they answer, the release they already allowed stands as allowed once, and nothing beyond it holds until they confirm.</remarks>
-    private async ValueTask<AlwaysNotice?> AlwaysAsync(
-        AuditClient client,
-        string agent,
-        AlwaysOffer offer,
-        KeptSlot? kept,
-        SessionLifetime lifetime,
-        string session,
-        string vault,
-        CancellationToken waiting,
-        CancellationToken cancellationToken)
-    {
-        var reply = await Decided(
-            token => _inner.ChangeAccessAsync(agent, offer.Change, AccessOrigin.Prompt, string.Empty, kept, token),
-            lifetime,
-            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason) { Unapplied = reason },
-            waiting,
-            cancellationToken).ConfigureAwait(false);
-
-        _recorder.Recorded(
-            reply,
-            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, session, VaultNamed(vault)));
-
-        return AlwaysNotice.For(agent, offer, reply);
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// Reading settings releases nothing, so it is not recorded. The listing
-    /// starts after the rows the request says it already has, so one too long for a frame is read in turns.
-    /// </remarks>
-    public ValueTask<AccessListReply> ListAccessAsync(AccessListRequest request, string connectionId, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
-        {
-            return ValueTask.FromResult(new AccessListReply(false, [], true, refusal.Reason));
-        }
-
-        var listed = _inner.ListAccess();
-
-        return ValueTask.FromResult(listed with { Agents = [.. listed.Agents.Skip(request.From)] });
-    }
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// <para>
-    /// Recorded under the surface that asked, with the agent the change is for as its label: a bridge's
-    /// client when one attached, otherwise <c>keypaste clients</c>, or no name for one that says an
-    /// agent asked. Beyond that, the origin the request claims only chooses where a narrowing is kept
-    /// and what the person is told it came from.
-    /// </para>
-    /// <para>
-    /// A request that says an agent asked through its own tool is admitted only for the agent its
-    /// connection attached as, so the person is never told an agent asked about another's settings.
-    /// That is a check of the claim, not of the agent: any program can attach under any label (THREATS.md T-3).
-    /// </para>
-    /// <para>
-    /// The log is asked for before anything is decided, so a change is never made that its line could
-    /// not follow; one whose line then fails to append still says so in its reply.
-    /// </para>
-    /// </remarks>
-    public async ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(connectionId);
-
-        var attached = _attached.TryGetValue(connectionId, out var attachment) ? attachment.Client : null;
-        var client = attached is not null ? AuditClient.Of(attached.Name, attached.Version, request.Agent)
-            : request.Origin == AccessOrigin.Agent ? AuditClient.Of(null, null, request.Agent)
-            : AuditClient.Of("keypaste clients", CoreInfo.Version, request.Agent);
-
-        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
-            reply,
-            RequestRecords.AccessChange(client, request.Reason, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
-
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
-        {
-            return Answer(new AccessChangeReply(AuditDecision.Denied, refusal.Method, refusal.Reason));
-        }
-
-        if (request.Origin == AccessOrigin.Agent && !string.Equals(attached?.Label, request.Agent, StringComparison.Ordinal))
-        {
-            return Answer(new AccessChangeReply(
-                AuditDecision.Denied,
-                AuditMethod.InvalidRequest,
-                "an agent may ask only about its own settings, and this connection did not attach as that agent"));
-        }
-
-        var waiting = lifetime.Waiting;
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.AddOwner(waiting);
-
-        return Answer(await Decided(
-            token => _inner.ChangeAccessAsync(request, token),
-            lifetime,
-            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
-            waiting,
-            withdrawn.Token).ConfigureAwait(false));
     }
 
     /// <inheritdoc/>
@@ -584,84 +443,6 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <summary>
-    /// Changes an agent's settings for the person at this owner's own screen: at once when the change
-    /// gives the agent nothing more, otherwise only once they confirm it, as a terminal's change is.
-    /// </summary>
-    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
-    /// <param name="edit">The change.</param>
-    /// <param name="surface">What the line records the screen as.</param>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
-    /// <returns>What became of it, recorded on its own line before it returns.</returns>
-    /// <remarks>
-    /// Kept to the live session as a request from a pipe is: a locked owner changes nothing, and a lock
-    /// or a reload while the person decides withdraws the confirmation, one not yet drawn included.
-    /// </remarks>
-    public async ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, string surface, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(agent);
-        ArgumentNullException.ThrowIfNull(edit);
-        ArgumentNullException.ThrowIfNull(surface);
-
-        var lifetime = Live();
-        var client = AuditClient.Of(surface, CoreInfo.Version, agent);
-
-        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
-            reply,
-            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, lifetime?.Id, _vault.Key));
-
-        if (lifetime is null)
-        {
-            return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
-        }
-
-        var waiting = lifetime.Waiting;
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.AddOwner(waiting);
-
-        return Answer(await Decided(
-            token => _inner.ChangeAccessAsync(agent, edit, AccessOrigin.Settings, string.Empty, token),
-            lifetime,
-            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
-            waiting,
-            withdrawn.Token).ConfigureAwait(false));
-    }
-
-    /// <summary>
-    /// Resets this computer's ceilings for the person at this owner's own screen, when <c>clients.toml</c>
-    /// holds what keypaste cannot parse: only once they confirm what each agent then gets.
-    /// </summary>
-    /// <param name="surface">What the line records the screen as.</param>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
-    /// <returns>What became of it, recorded on its own line, under <c>*</c> for every agent, before it returns.</returns>
-    public async ValueTask<AccessChangeReply> ResetCapsAsync(string surface, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(surface);
-
-        var lifetime = Live();
-        var client = AuditClient.Of(surface, CoreInfo.Version, AgentNames.Any);
-
-        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
-            reply,
-            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, lifetime?.Id, _vault.Key));
-
-        if (lifetime is null)
-        {
-            return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
-        }
-
-        var waiting = lifetime.Waiting;
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.AddOwner(waiting);
-
-        return Answer(await Decided(
-            token => _inner.ResetCapsAsync(token),
-            lifetime,
-            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
-            waiting,
-            withdrawn.Token).ConfigureAwait(false));
-    }
-
-    /// <summary>
     /// Merges another program's save with the open vault for this owner, as D-0542 and D-0543 say: withdraws every
     /// request waiting on a person, merges and saves, puts the merged copy in place in the same session, and records a merge it saved.
     /// </summary>
@@ -675,7 +456,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// Agents are refused from the detection to the merged copy's save, because the open copy no longer matches its file. The
     /// withdrawal at the start answers each request waiting on a person as
-    /// the vault having been merged; afterwards a request is answered from the merged copy and asked again unless Automatic. A merge
+    /// the vault having been merged; afterwards a request is answered from the merged copy and asked again unless its rule is Allow. A merge
     /// the owner saved is recorded on one line naming items and agents, never a value (D-0545); one that took nothing writes none.
     /// </remarks>
     public VaultMergeSave Merge(Vault open, Func<Vault, bool> swap, string surface) =>
@@ -721,28 +502,6 @@ public sealed class SessionAuthority : IApproverHandler
 
         return merged;
     }
-
-    /// <summary>One agent's settings as the person's own screen shows them.</summary>
-    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
-    /// <param name="settings">Its settings, when a session is live and they could be read.</param>
-    /// <param name="problem">Why not, otherwise empty.</param>
-    /// <returns>Whether they were read.</returns>
-    public bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
-    {
-        if (Live() is null)
-        {
-            settings = null;
-            problem = _lockedReason;
-            return false;
-        }
-
-        return _inner.TrySettings(agent, out settings, out problem);
-    }
-
-    /// <summary>What applies to an agent's requests now, or null when its settings cannot be read, which refuses them all.</summary>
-    /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
-    /// <returns>What applies, or null.</returns>
-    public EffectiveAccess? Access(string? label) => _inner.TryAccess(label, out var access, out _) ? access : null;
 
     /// <inheritdoc/>
     public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
@@ -917,18 +676,17 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// <para>
     /// The order is the security property. Admitted, then the request's rules, then the exposure and
-    /// the agent's settings, a run refused unresolved when they do not let it run commands, then
-    /// resolved under the admitted lifetime; the person is asked about the names the set holds once
-    /// what the agent can see, the name rule and the audit line's room are checked, unless every item in
-    /// the set is Automatic with commands for the agent, none protected, its limits unspent and a refusal
-    /// not cooling. The set is read again
+    /// this computer's rules, a run refused unresolved when run is off for the agent, then resolved under
+    /// the admitted lifetime; the person is asked about the names the set holds once what the agent can
+    /// see, the name rule, the audit line's room and that no field of the set is Blocked are checked,
+    /// every time, whatever the rules allow. The set is read again
     /// after the answer, so an edit saved meanwhile is what leaves. A release whose names are not the
     /// ones the request named, or that one frame cannot carry, is refused before it is recorded.
     /// </para>
     /// <para>
     /// A missing project, a missing profile, an unusable set and one outside the exposure all come back
     /// as <see cref="AuditMethod.OutOfScope"/>, so a run cannot map the vault (THREATS.md T-4); the
-    /// reason, which only the audit line keeps, says which. Only Automatic with commands starts a run unasked: Automatic asks.
+    /// reason, which only the audit line keeps, says which. No rule starts a run unasked.
     /// </para>
     /// </remarks>
     public async ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
@@ -981,12 +739,7 @@ public sealed class SessionAuthority : IApproverHandler
         {
             Record(admitted, answered.Entries, client, "run");
 
-            // Every run is narrated with its command, one its mode started too: the mode approved
-            // nothing about what the files it runs do (T-35).
-            var command = EnvReleasePrompt.CommandLine(request.Command);
-            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.AutomaticCommands
-                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` without asking (Automatic with commands)"
-                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` once");
+            _environments?.Narrate?.Invoke($"released {answered.Set.Variables.Count} variable(s) to {client} for `{EnvReleasePrompt.CommandLine(request.Command)}` once");
         }
         else if (delivered.Set.Outcome == EnvOutcome.Resolved)
         {
@@ -1021,17 +774,17 @@ public sealed class SessionAuthority : IApproverHandler
             return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"this bridge's --expose is not usable: {globError}");
         }
 
-        if (!_inner.TryAccess(request.ClientLabel, out var access, out var settingsProblem))
+        if (!_inner.TryRules(out var rules, out var rulesProblem))
         {
-            environments.Narrate?.Invoke($"refused a run: agent settings are not usable: {settingsProblem}");
-            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"agent settings are not usable: {settingsProblem}");
+            environments.Narrate?.Invoke($"refused a run: agent rules are not usable: {rulesProblem}");
+            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"agent rules are not usable: {rulesProblem}");
         }
 
         // Before anything is resolved, so an agent that may not run commands learns nothing of the vault from a run.
-        if (!access.Run)
+        if (!rules.Runs(request.ClientLabel))
         {
-            environments.Narrate?.Invoke($"refused a run for {ConnectedClient.Named(request.ClientLabel, request.ClientName)}: its settings do not let it run commands");
-            return Refuse(EnvOutcome.Unauthorized, AuditMethod.RunOff, "this agent's settings do not let it run commands");
+            environments.Narrate?.Invoke($"refused a run for {ConnectedClient.Named(request.ClientLabel, request.ClientName)}: run is off for it on this computer");
+            return Refuse(EnvOutcome.Unauthorized, AuditMethod.RunOff, "run is off for this agent; a person turns it on with keypaste clients or in the app");
         }
 
         EnvReferenceDocument? document = null;
@@ -1054,7 +807,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var answer = ApprovalAnswer.NoChannel;
-        var method = AuditMethod.Prompt;
         IReadOnlyList<string> shown = [];
         string? refused = null;
         var refusedMethod = AuditMethod.InvalidRequest;
@@ -1070,7 +822,7 @@ public sealed class SessionAuthority : IApproverHandler
             shown = recordable ? named : [];
 
             // What the agent can see first, so a set outside it is refused as out of scope whatever its size (T-4).
-            if (entries.Any(entry => !EntryExposure.Permits(access.Reach(exposure, entry.Name, _inner.Tags(entry.Name)), entry.Field)))
+            if (entries.Any(entry => !EntryExposure.Permits(exposure.Reach(entry.Name, _inner.Tags(entry.Name)), entry.Field)))
             {
                 (refused, refusedMethod) = ("a variable's item or field is outside what this agent can see through this bridge", AuditMethod.OutOfScope);
                 return false;
@@ -1088,7 +840,13 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            var isProtected = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name));
+            List<FieldCategory> blocked = [.. entries.Select(entry => _inner.Category(entry.Name, entry.Field)).Where(category => rules.RuleFor(category) == CategoryRule.Block)];
+
+            if (blocked.Count > 0)
+            {
+                (refused, refusedMethod) = ($"a variable of the set is in a blocked category: {ApproverHandler.Blocked(blocked[0])}", AuditMethod.Blocked);
+                return false;
+            }
 
             // A denial cools down every run of this connection and each field it asked for, whichever
             // connection asks next and whether a run or a credential request reaches it: another argument,
@@ -1099,30 +857,18 @@ public sealed class SessionAuthority : IApproverHandler
                 .. entries.Select(entry => ApprovalGate.FieldKey(EntryHandle.For(entry.Name), entry.Field)).Distinct(StringComparer.Ordinal),
             ];
 
-            // A protected item in the set asks in every mode, and a refusal still cooling outranks the mode.
-            var limitReached = false;
-
-            if (!isProtected
-                && !cooldownKeys.Any(environments.Gate.IsInCooldown)
-                && _inner.TryRunUnasked(access, [.. entries.Select(entry => entry.Name)], out limitReached))
-            {
-                method = AuditMethod.AutomaticCommands;
-                return true;
-            }
-
+            // Every run is asked, whatever any rule says of its values: a rule approves nothing about what a command does (T-35).
             var prompt = RunPrompt.For(
                 request,
                 preview.Project,
                 preview.Profile,
-                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))],
-                isProtected ? OnceOnly.ProtectedProfile : limitReached ? OnceOnly.LimitReached : OnceOnly.None);
+                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))]);
 
             answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();
 
-            method = AuditMethod.Prompt;
             return answer.Releases();
         }
 
@@ -1137,9 +883,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (resolved.Outcome == EnvOutcome.Resolved)
         {
-            return new RunReply(resolved, method, method == AuditMethod.AutomaticCommands
-                ? "started without asking: this agent's mode is Automatic with commands"
-                : "a person approved this one run")
+            return new RunReply(resolved, AuditMethod.Prompt, "a person approved this one run")
             {
                 Entries = shown,
             };

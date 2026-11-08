@@ -4,55 +4,34 @@ using System.Text.Json;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Ipc;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary><c>keypaste clients</c>: the one place to read and change agents' settings.</summary>
+/// <summary><c>keypaste clients</c>: lists this computer's agent rules and known agents, turns an agent's run on or off and removes one.</summary>
 /// <remarks>
-/// Those that give an agent more are kept in the vault, so it asks the process holding the vault: a change
-/// that gives nothing more applies at once, and any other waits for the person to confirm it there. With
-/// nothing holding the vault it can only lower this computer's ceilings in <c>clients.toml</c>, which can
-/// never give more. Any program the person runs can run this command, so the confirmation is the boundary,
-/// and it says the request came from a terminal without claiming the person typed it.
+/// The rules live in <c>agents.toml</c> under the keypaste home, never in a vault, so this verb reads and writes that file
+/// itself and needs nothing holding the vault. Turning run on releases nothing unasked, since every run is asked, so it is
+/// made at once and recorded.
 /// </remarks>
 internal static class ClientsCommand
 {
     private const string _verb = "keypaste clients";
-    private const string _noAnswer =
-        "the keypaste process holding the vault did not answer; it may be older than this keypaste";
 
-    private static readonly TimeSpan _listBound = TimeSpan.FromSeconds(10);
-
-    // Long enough for the person to answer the longest window the owner can have, and a little more.
-    private static readonly TimeSpan _changeBound = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
-
-    private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent whose settings to change; \"*\" is every other agent");
-    private static readonly Option<string> _project = Syntax.Value("--project", "project[:environment]", "the project row to change");
-    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|automatic|automatic-commands", "how it is asked");
-    private static readonly Option<string[]> _see = Syntax.Values("--see", "selector", "what it can see, as often as you like");
-    private static readonly Option<string> _values = Syntax.Value("--values", "yes|no", "whether it may read values");
-    private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may run commands");
-    private static readonly Option<string> _perHour = Syntax.Value("--per-hour", "n|none", "how many releases an hour");
-    private static readonly Option<string> _until = Syntax.Value(
-        "--until", "date|time|none", "when Automatic ends: a date at its close, a time on this computer's clock unless it ends in Z or an offset");
-    private static readonly Option<bool> _reset = Syntax.Flag("--reset", "go back to the defaults");
-    private static readonly Option<string> _forget = Syntax.Value("--forget", "id", "remove one always-allowed item, by the id this verb lists");
+    private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent to change, by its bridge's --client-label");
+    private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may ask to run commands, each run asked");
+    private static readonly Option<bool> _remove = Syntax.Flag("--remove", "forget the agent, which turns its run off");
 
     internal static CliVerb Command { get; } = new(
         "clients",
-        "show or change what each agent can see and do\n\n"
-            + "shows each agent's settings, from the vault through the app or `keypaste approve` holding it, and this "
-            + "computer's limits in clients.toml; with an agent's name, changes them. settings follow the name an "
-            + "agent's bridge was given with --client-label. a change that gives the agent nothing more applies at once; "
-            + "one that gives more waits for you to confirm it where the vault is unlocked, and with nothing holding it, "
-            + "only a change that lowers this computer's limits can be made.",
+        "list agents and turn their run on or off\n\n"
+            + "lists the rules every agent's request is decided by on this computer, kept in agents.toml, and each agent it "
+            + "knows by the name its bridge was given with --client-label. with an agent's name, turns its run on or off or "
+            + "removes it. each run is still asked; the app's Settings sets the rules.",
         Execute)
     {
-        _agent, _project, _mode, _see, _values, _run, _perHour, _until, _reset, _forget, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
+        _agent, _run, _remove, CliOptions.Json,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -60,11 +39,13 @@ internal static class ClientsCommand
         ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
 
-        var clients = KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var file = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+        var run = line.GetValue(_run);
+        var remove = line.GetValue(_remove);
 
         if (line.GetValue(_agent) is not { } agent)
         {
-            return HasChange(line) ? Usage(context, "name the agent to change") : List(line, clients, context);
+            return run is not null || remove ? Usage(context, "name the agent to change") : List(line, file, context);
         }
 
         if (line.GetValue(CliOptions.Json))
@@ -72,254 +53,84 @@ internal static class ClientsCommand
             return Usage(context, "give one agent's name and what to change, or nothing to list them");
         }
 
-        if (!AgentNames.IsValid(agent, out var nameError))
+        if (!AgentNames.IsNamed(agent))
         {
-            return Usage(context, nameError);
+            return Usage(context, $"an agent's name is its bridge's --client-label: 1 to {AgentNames.MaximumLength} characters with no quote, backslash, slash or control character");
         }
 
-        if (line.GetValue(_forget) is { } forget)
+        if ((run is null) == !remove)
         {
-            if (new[] { _project, _mode, _values, _run, _perHour, _until }.Any(option => line.GetValue(option) is not null)
-                || line.GetValue(_see) is { Length: > 0 }
-                || line.GetValue(_reset))
-            {
-                return Usage(context, "--forget removes one always-allowed row, so it takes nothing else to change");
-            }
-
-            return AccessEdit.TryForget(forget, out var forgetting, out var forgetError)
-                ? ChangeAsync(line, clients, agent, forgetting, new AccessChangeRequest(agent, string.Empty) { Origin = AccessOrigin.Terminal, Forget = forget }, context).GetAwaiter().GetResult()
-                : Usage(context, forgetError);
+            return Usage(context, "give --run on, --run off or --remove");
         }
 
-        var see = line.GetValue(_see) ?? [];
-
-        if (!UntilTime.TryRecord(line.GetValue(_until), context.Clock, out var until, out var untilError))
+        if (run is not (null or "on" or "off"))
         {
-            return Usage(context, untilError);
+            return Usage(context, "--run is on or off");
         }
 
-        if (!AccessEdit.TryCreate(
-                line.GetValue(_project),
-                line.GetValue(_mode),
-                see.Length == 0 ? null : see,
-                line.GetValue(_values),
-                line.GetValue(_run),
-                line.GetValue(_perHour),
-                until,
-                line.GetValue(_reset),
-                out var edit,
-                out var editError))
+        if (!file.TryRead(out var rules, out var problem))
         {
-            return Usage(context, editError);
+            return Malformed(context, problem);
         }
 
-        var request = new AccessChangeRequest(agent, string.Empty)
+        if (remove && !rules.Agents.Any(known => string.Equals(known.Name, agent, StringComparison.Ordinal)))
         {
-            Origin = AccessOrigin.Terminal,
-            Project = line.GetValue(_project),
-            Mode = line.GetValue(_mode),
-            See = see.Length == 0 ? null : see,
-            Values = line.GetValue(_values),
-            Run = line.GetValue(_run),
-            PerHour = line.GetValue(_perHour),
-            Until = until,
-            Reset = line.GetValue(_reset),
-        };
+            context.Stderr.WriteLine($"{_verb}: this computer knows no agent named {Shown(agent)}, so nothing was removed");
+            return CliApp.ExitUsageError;
+        }
 
-        return ChangeAsync(line, clients, agent, edit, request, context).GetAwaiter().GetResult();
+        AgentRules changed;
+
+        try
+        {
+            changed = remove ? rules.Without(agent) : rules.WithRun(agent, run == "on");
+        }
+        catch (ArgumentException tooMany)
+        {
+            context.Stderr.WriteLine($"{_verb}: {tooMany.Message}");
+            return CliApp.ExitUsageError;
+        }
+
+        var what = remove ? "removed; its run is off" : run == "on" ? "run on; each run is still asked" : "run off";
+
+        if (changed.Equals(rules))
+        {
+            Done(context, agent, $"already {what}");
+            return CliApp.ExitSuccess;
+        }
+
+        if (!file.TryWrite(changed, out problem))
+        {
+            context.Stderr.WriteLine($"{_verb}: nothing was changed: {problem}");
+            return CliApp.ExitInternalError;
+        }
+
+        Record(context, agent, what);
+        Done(context, agent, what);
+        return CliApp.ExitSuccess;
     }
 
-    private static bool HasChange(ParseResult line) =>
-        new[] { _project, _mode, _values, _run, _perHour, _until, _forget }.Any(option => line.GetValue(option) is not null)
-        || line.GetValue(_see) is { Length: > 0 }
-        || line.GetValue(_reset);
-
-    private static int List(ParseResult line, string clients, CliContext context)
+    private static int List(ParseResult line, AgentRulesFile file, CliContext context)
     {
-        if (!AccessCaps.TryLoad(clients, out var caps, out var problem))
+        if (!file.TryRead(out var rules, out var problem))
         {
-            return Malformed(context, clients, problem);
-        }
-
-        var (agents, note, exit) = ListAsync(line, context).GetAwaiter().GetResult();
-
-        if (exit != CliApp.ExitSuccess)
-        {
-            return exit;
+            return Malformed(context, problem);
         }
 
         if (line.GetValue(CliOptions.Json))
         {
-            WriteJson(context.Stdout, agents, caps);
+            WriteJson(context.Stdout, rules);
         }
         else
         {
-            WriteTable(agents, caps, context);
-        }
-
-        foreach (var agent in agents.Where(agent => agent.AlwaysNotShown > 0))
-        {
-            context.Stderr.WriteLine(
-                $"{_verb}: {EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text} has {agent.AlwaysNotShown} always-allowed rows not shown here, "
-                + "more than one reply carries, and they still release; the app's Agents screen shows them all and removes each");
-        }
-
-        foreach (var agent in agents.Where(agent => agent.ProjectsNotShown > 0))
-        {
-            context.Stderr.WriteLine(
-                $"{_verb}: {EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text} has {agent.ProjectsNotShown} project rows not shown here, "
-                + "more than one reply carries; the app's Agents screen shows them all");
-        }
-
-        if (note is not null)
-        {
-            context.Stderr.WriteLine($"{_verb}: {note}");
+            WriteTable(rules, context);
         }
 
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>
-    /// The vault's records through its owner, asked for in turns until the listing ends, or none with a
-    /// note saying why they are not shown.
-    /// </summary>
-    private static async Task<(IReadOnlyList<AccessRow> Agents, string? Note, int Exit)> ListAsync(ParseResult line, CliContext context)
-    {
-        if (!TryPipe(line, context, out var vault, out var pipe, out var why))
-        {
-            return ([], $"{why}, so only this computer's limits are shown", CliApp.ExitSuccess);
-        }
-
-        using var bound = new CancellationTokenSource(_listBound);
-        await using var attachment = await SessionPipe.AttachAsync(pipe, vault, bound.Token);
-
-        if (attachment is not { Client: { } client, Session: { } session })
-        {
-            if (attachment.Refusal is { } refusal)
-            {
-                context.Stderr.WriteLine($"{_verb}: {Shown(refusal)}");
-                return ([], null, CliApp.ExitInternalError);
-            }
-
-            return ([], $"nothing holds {vault} unlocked, so the vault's settings are not shown: unlock it in the app or run `keypaste approve` to see them", CliApp.ExitSuccess);
-        }
-
-        List<AccessRow> agents = [];
-        string? note = null;
-
-        while (true)
-        {
-            var reply = await client.ListAccessAsync(new AccessListRequest { Vault = vault, Session = session, From = agents.Count }, bound.Token);
-
-            if (reply is null)
-            {
-                context.Stderr.WriteLine($"{_verb}: {_noAnswer}");
-                return ([], null, CliApp.ExitInternalError);
-            }
-
-            if (!reply.Answered)
-            {
-                context.Stderr.WriteLine($"{_verb}: {Shown(reply.Reason)}");
-                return ([], null, CliApp.ExitInternalError);
-            }
-
-            note ??= reply.Reason.Length > 0 ? Shown(reply.Reason) : null;
-            agents.AddRange(reply.Agents);
-
-            if (reply.Complete)
-            {
-                return (agents, note, CliApp.ExitSuccess);
-            }
-
-            // A reply that carries nothing and says more follows would ask the same question forever.
-            if (reply.Agents.Count == 0)
-            {
-                return (agents, $"the keypaste process holding the vault stopped listing agents' settings after {agents.Count}; these are all it sent", CliApp.ExitSuccess);
-            }
-        }
-    }
-
-    private static async Task<int> ChangeAsync(
-        ParseResult line,
-        string clients,
-        string agent,
-        AccessEdit edit,
-        AccessChangeRequest request,
-        CliContext context)
-    {
-        if (TryPipe(line, context, out var vault, out var pipe, out _))
-        {
-            using var bound = new CancellationTokenSource(_changeBound);
-            await using var attachment = await SessionPipe.AttachAsync(pipe, vault, bound.Token);
-
-            if (attachment is { Client: { } client, Session: { } session })
-            {
-                var reply = await client.ChangeAccessAsync(request with { Vault = vault, Session = session }, bound.Token);
-
-                if (reply is null)
-                {
-                    context.Stderr.WriteLine($"{_verb}: {_noAnswer}");
-                    return CliApp.ExitInternalError;
-                }
-
-                var said = Shown(edit.OnThisClock(reply.Reason, context.Clock.LocalTimeZone));
-
-                if (reply.Decision != AuditDecision.Granted)
-                {
-                    context.Stderr.WriteLine($"{_verb}: not changed: {said}");
-                    return CliApp.ExitInternalError;
-                }
-
-                Done(context, agent, said);
-                return CliApp.ExitSuccess;
-            }
-
-            if (attachment.Refusal is { } refusal)
-            {
-                context.Stderr.WriteLine($"{_verb}: {Shown(refusal)}");
-                return CliApp.ExitInternalError;
-            }
-        }
-
-        return Lower(clients, agent, edit, context);
-    }
-
-    /// <summary>With nothing holding the vault: lowers this computer's ceilings, the only change that can be made without it.</summary>
-    private static int Lower(string clients, string agent, AccessEdit edit, CliContext context)
-    {
-        CapsChange changed;
-        string problem;
-
-        try
-        {
-            changed = AccessCaps.TryChange(clients, current => current.TryLower(agent, edit, out var lowered) ? lowered : null, out problem);
-        }
-        catch (ArgumentException tooMany)
-        {
-            context.Stderr.WriteLine($"{_verb}: {clients} could not hold it: {tooMany.Message}");
-            return CliApp.ExitInternalError;
-        }
-
-        switch (changed)
-        {
-            case CapsChange.Unreadable:
-                return Malformed(context, clients, problem);
-            case CapsChange.Declined:
-                context.Stderr.WriteLine(
-                    $"{_verb}: nothing holds the vault unlocked, and this could give {agent} more or removes what the vault's settings hold. Unlock the vault in the app or run `keypaste approve`, then run this again.");
-                return CliApp.ExitInternalError;
-            case CapsChange.Unwritten:
-                context.Stderr.WriteLine($"{_verb}: {clients} could not be written: {problem}");
-                return CliApp.ExitInternalError;
-        }
-
-        Record(context, agent, edit);
-        Done(context, agent, $"applied on this computer, since it gives the agent nothing more ({edit}); applies to its next request");
-        return CliApp.ExitSuccess;
-    }
-
-    /// <summary>Records a change made with nothing holding the vault, as the bridge records a call nothing answered.</summary>
-    private static void Record(CliContext context, string agent, AccessEdit edit)
+    /// <summary>Records a change to the rules, as the owner records each request it answers.</summary>
+    private static void Record(CliContext context, string agent, string what)
     {
         var path = KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
@@ -335,8 +146,8 @@ internal static class ClientsCommand
                 AuditClient.Of(_verb, CoreInfo.Version, agent),
                 string.Empty,
                 AuditDecision.Granted,
-                AuditMethod.Narrowing,
-                $"applied on this computer with nothing holding the vault, since it gives the agent nothing more ({agent}: {edit})",
+                AuditMethod.RulesChanged,
+                $"changed on this computer from a terminal: {what}",
                 session: null,
                 vault: null);
 
@@ -352,89 +163,27 @@ internal static class ClientsCommand
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         var dot = style.Glyph(context.Stderr, Mark.Dot);
-        context.Stderr.WriteLine($"  {done} {agent} {dot} {what}");
+        context.Stderr.WriteLine($"  {done} {Shown(agent)} {dot} {what}");
     }
 
-    private static void WriteTable(IReadOnlyList<AccessRow> agents, AccessCaps caps, CliContext context)
+    private static void WriteTable(AgentRules rules, CliContext context)
     {
         var writer = context.Stdout;
         var style = context.ConsoleStyle;
-        var zone = context.Clock.LocalTimeZone;
 
-        List<string[]> rows = [];
-
-        foreach (var agent in agents)
-        {
-            var read = AcafRecord.Read(agent.Record);
-            var access = read.Access;
-            var name = EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text + (agent.Understood ? string.Empty : " (not all understood)");
-
-            rows.Add([name, string.Empty, Mode(access.Mode, access.Limit, zone), access.Values ? "yes" : "no", access.Run ? "on" : "off", string.Join(' ', access.See.Globs)]);
-            rows.AddRange(access.Projects.Select(project => new[] { string.Empty, project.Scope.Name, Mode(project.Mode, project.Limit, zone), string.Empty, string.Empty, string.Empty }));
-        }
-
-        if (!agents.Any(agent => string.Equals(agent.Name, AgentNames.Any, StringComparison.Ordinal)))
-        {
-            var defaults = AgentAccess.Defaults;
-            rows.Add([AgentNames.Any + "   (default)", string.Empty, Mode(defaults.Mode, defaults.Limit, zone), "yes", "off", string.Join(' ', defaults.See.Globs)]);
-        }
-
-        Table(writer, style, ["AGENT", "PROJECT", "MODE", "VALUES", "RUN", "SEES"], rows);
-
-        List<string[]> always =
-        [
-            .. agents.SelectMany(agent =>
-            {
-                var said = AcafRecord.Read(agent.Record).Access.Always;
-                var name = EntryNameSanitizer.Sanitize(agent.Name, AgentNames.MaximumLength).Text;
-
-                return said.Items.Select(item => new[] { name, AlwaysAllowed.ItemId(item), $"item {item}" });
-            }),
-        ];
-
-        if (always.Count > 0)
-        {
-            writer.WriteLine();
-            writer.WriteLine(style.Paint(writer, Tone.Muted, "  always allowed: released without asking. keypaste clients <agent> --forget <id> removes one"));
-            Table(writer, style, ["AGENT", "ID", "WHAT"], always);
-        }
-
-        if (caps.Rows.Count == 0)
-        {
-            return;
-        }
-
-        writer.WriteLine();
-        writer.WriteLine(style.Paint(writer, Tone.Muted, "  this computer's limits, in clients.toml: nothing above gives more than these"));
         Table(
             writer,
             style,
-            ["AGENT", "PROJECT", "MODE", "VALUES", "RUN", "SEES"],
+            ["VALUE", "EVERY AGENT"],
             [
-                .. caps.Rows.Select(row => new[]
-                {
-                    row.Label,
-                    row.Project?.Name ?? string.Empty,
-                    Ceiling(row.Mode, row.Limit, zone),
-                    row.Values is { } values ? values ? "yes" : "no" : string.Empty,
-                    row.Run is { } run ? run ? "on" : "off" : string.Empty,
-                    row.See is { } see ? string.Join(' ', see.Globs) : string.Empty,
-                }),
+                [FieldCategories.Shown(FieldCategory.Detail), rules.ShowsDetails ? "shown" : "hidden"],
+                .. FieldCategories.Ruled.Select(category => new[] { FieldCategories.Shown(category), Word(rules.RuleFor(category)) }),
+                [FieldCategories.Shown(FieldCategory.Passkey), Word(CategoryRule.Block)],
             ]);
+
+        writer.WriteLine();
+        Table(writer, style, ["AGENT", "RUN"], [.. rules.Agents.Select(agent => new[] { Shown(agent.Name), agent.Run ? "on" : "off" })]);
     }
-
-    /// <summary>A ceiling's mode and limit as the table shows them, such as <c>automatic, until 2026-12-31 18:00 +02:00</c>.</summary>
-    private static string Ceiling(AgentMode? mode, AccessLimit? limit, TimeZoneInfo zone) => (mode, limit) switch
-    {
-        (null, null) => string.Empty,
-        (null, { } held) => AccessChangePrompt.Words(held, zone),
-        ({ } held, _) => Mode(held, limit ?? AccessLimit.None, zone),
-    };
-
-    private static string Mode(AgentMode mode, AccessLimit limit, TimeZoneInfo zone) =>
-        mode >= AgentMode.Automatic && !limit.IsNone
-            ? $"{AgentModes.Name(mode)}, {AccessChangePrompt.Words(limit, zone)}"
-            : AgentModes.Name(mode);
 
     private static void Table(TextWriter writer, IConsoleStyle style, string[] headings, List<string[]> rows)
     {
@@ -453,8 +202,8 @@ internal static class ClientsCommand
         }
     }
 
-    /// <summary>One array, one object per row, as every <c>--json</c> is: each agent's record as ACAF writes it, then each ceiling.</summary>
-    private static void WriteJson(TextWriter writer, IReadOnlyList<AccessRow> agents, AccessCaps caps)
+    /// <summary>One array, one object per row, as every <c>--json</c> is: each value's rule, then each agent.</summary>
+    private static void WriteJson(TextWriter writer, AgentRules rules)
     {
         using var buffer = new MemoryStream();
 
@@ -462,81 +211,26 @@ internal static class ClientsCommand
         {
             json.WriteStartArray();
 
-            foreach (var agent in agents)
+            json.WriteStartObject();
+            json.WriteString("kind", "details");
+            json.WriteString("rule", rules.ShowsDetails ? "shown" : "hidden");
+            json.WriteEndObject();
+
+            foreach (var category in FieldCategories.Ruled.Append(FieldCategory.Passkey))
+            {
+                json.WriteStartObject();
+                json.WriteString("kind", "category");
+                json.WriteString("category", FieldCategories.Shown(category));
+                json.WriteString("rule", Word(rules.RuleFor(category)));
+                json.WriteEndObject();
+            }
+
+            foreach (var agent in rules.Agents)
             {
                 json.WriteStartObject();
                 json.WriteString("kind", "agent");
                 json.WriteString("name", agent.Name);
-                json.WriteBoolean("understood", agent.Understood);
-
-                if (agent.ProjectsNotShown > 0)
-                {
-                    json.WriteNumber("projects_not_shown", agent.ProjectsNotShown);
-                }
-
-                if (agent.AlwaysNotShown > 0)
-                {
-                    json.WriteNumber("always_not_shown", agent.AlwaysNotShown);
-                }
-
-                json.WritePropertyName("record");
-
-                using (var record = JsonDocument.Parse(AcafRecord.Write(AcafRecord.Read(agent.Record).Access)))
-                {
-                    record.RootElement.WriteTo(json);
-                }
-
-                json.WriteEndObject();
-            }
-
-            foreach (var row in caps.Rows)
-            {
-                json.WriteStartObject();
-                json.WriteString("kind", "ceiling");
-                json.WriteString("label", row.Label);
-
-                if (row.Project is { } project)
-                {
-                    json.WriteString("project", project.Name);
-                }
-
-                if (row.Mode is { } mode)
-                {
-                    json.WriteString("mode", AgentModes.Name(mode));
-                }
-
-                if (row.Limit?.PerHour is { } perHour)
-                {
-                    json.WriteNumber("per_hour", perHour);
-                }
-
-                if (row.Limit?.Until is { } until)
-                {
-                    json.WriteString("until", UntilTime.Recorded(until));
-                }
-
-                if (row.Values is { } values)
-                {
-                    json.WriteString("values", values ? "yes" : "no");
-                }
-
-                if (row.Run is { } run)
-                {
-                    json.WriteString("run", run ? "on" : "off");
-                }
-
-                if (row.See is { } see)
-                {
-                    json.WriteStartArray("see");
-
-                    foreach (var glob in see.Globs)
-                    {
-                        json.WriteStringValue(glob);
-                    }
-
-                    json.WriteEndArray();
-                }
-
+                json.WriteString("run", agent.Run ? "on" : "off");
                 json.WriteEndObject();
             }
 
@@ -546,32 +240,19 @@ internal static class ClientsCommand
         writer.WriteLine(Encoding.UTF8.GetString(buffer.ToArray()));
     }
 
-    private static bool TryPipe(ParseResult line, CliContext context, out string vault, out string pipe, out string why)
+    private static string Word(CategoryRule rule) => rule switch
     {
-        pipe = string.Empty;
+        CategoryRule.Allow => "allow",
+        CategoryRule.Block => "block",
+        _ => "ask",
+    };
 
-        if (!VaultLocator.TryResolve(line, context.Environment, out vault, out var locateError))
-        {
-            why = locateError;
-            return false;
-        }
+    /// <summary>A name from a file any program can write, made safe for this terminal.</summary>
+    private static string Shown(string text) => EntryNameSanitizer.Sanitize(text, AgentNames.MaximumLength).Text;
 
-        if (!SessionPipe.TryResolve(line, vault, context, out pipe, out var pipeError))
-        {
-            why = pipeError;
-            return false;
-        }
-
-        why = string.Empty;
-        return true;
-    }
-
-    /// <summary>Another process's words, made safe for this terminal.</summary>
-    private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
-
-    private static int Malformed(CliContext context, string path, string problem)
+    private static int Malformed(CliContext context, string problem)
     {
-        context.Stderr.WriteLine($"{_verb}: {path}: {problem}; fix it or delete it");
+        context.Stderr.WriteLine($"{_verb}: {problem}; fix it or delete it, which asks about every value again");
         return CliApp.ExitInternalError;
     }
 

@@ -355,7 +355,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task AnAutomaticReleaseRacingTheLock_IsRefused()
     {
         using var policed = new ApproverFixture();
-        policed.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
+        policed.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         policed.Source.During = _lifetime!.End;
         await using var owner = Owner.Start(this, policed.Handler);
         await using var client = await ConnectAsync(owner.PipeName);
@@ -447,11 +447,11 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     [Fact]
-    public async Task AnAutomaticRelease_IsRefusedAfterAnExternalChange()
+    public async Task AnAllowedRelease_IsRefusedAfterAnExternalChange()
     {
         using var vault = SavedVault("v1");
         using var policed = new ApproverFixture();
-        policed.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
+        policed.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         await using var owner = Owner.Start(this, Over(vault, policed));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -459,7 +459,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
         var before = await client.RequestAsync(request, Token);
         Assert.NotNull(before);
-        Assert.Equal(AuditMethod.Automatic, before.Method);
+        Assert.Equal(AuditMethod.Allowed, before.Method);
 
         SaveElsewhere("external");
         var after = await client.RequestAsync(request, Token);
@@ -618,10 +618,8 @@ public sealed class SessionAuthorityTests : IDisposable
             new VaultCredentialSource(() => vault),
             new VaultEntryNameLister(() => vault),
             fixture.Gate,
-            fixture.Settings,
-            fixture.Narration.Add,
-            hourly: fixture.Hourly,
-            clock: fixture.Clock);
+            fixture.Rules,
+            fixture.Narration.Add);
     }
 
     /// <summary>Attaches over a raw pipe, sends one frame as written, and says whether the owner hung up unanswered.</summary>

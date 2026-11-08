@@ -22,7 +22,7 @@ public sealed class VaultCheckpointTests : IDisposable
         _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "old", Notes = "kept" });
         _vault.Save();
-        _scene = new EditScene(Path.Combine(_directory, "clients.toml"), DateTimeOffset.UnixEpoch);
+        _scene = new EditScene(DateTimeOffset.UnixEpoch);
     }
 
     public void Dispose()

@@ -42,12 +42,6 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
-        OnceOnlyText = prompt.OnceOnly switch
-        {
-            OnceOnly.ProtectedProfile => "This environment is protected: it is asked about every time.",
-            OnceOnly.LimitReached => "This agent's limit was reached, so this run is asked about.",
-            _ => string.Empty,
-        };
     }
 
     /// <summary>What keypaste does with the values, and what it cannot stop.</summary>
@@ -91,7 +85,4 @@ internal sealed class RunApprovalViewModel : PromptViewModel
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
-
-    /// <summary>Why this run is asked about although its mode could start it unasked, or why it always is; otherwise empty.</summary>
-    internal string OnceOnlyText { get; }
 }

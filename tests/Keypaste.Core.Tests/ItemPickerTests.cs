@@ -1,4 +1,3 @@
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -40,16 +39,14 @@ public sealed class ItemPickerTests : IDisposable
             new VaultCredentialSource(() => _lifetime.IsLive ? _vault : null),
             new VaultEntryNameLister(() => _vault),
             _fixture.Gate,
-            _fixture.Settings,
-            clock: _fixture.Clock);
+            _fixture.Rules);
 
         _authority = new SessionAuthority(
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             handler,
             () => _log.Log,
-            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null, _fixture.Clock),
-            clock: _fixture.Clock);
+            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null, _fixture.Clock));
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -77,7 +74,6 @@ public sealed class ItemPickerTests : IDisposable
         Assert.Equal(["https://mail.example.com", string.Empty], prompt.Candidates.Select(candidate => candidate.Url));
         Assert.All(prompt.Candidates, candidate => Assert.Equal(("Mail", "services"), (candidate.Title, candidate.Group)));
         Assert.Equal([Uuid("alice"), Uuid("bob")], prompt.Candidates.Select(candidate => candidate.Item));
-        Assert.Null(prompt.Always);
         Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt), (reply.Decision, reply.Method));
         Assert.Null(reply.Value);
         Assert.DoesNotContain("-password", prompt.ToString(), StringComparison.Ordinal);
@@ -148,49 +144,6 @@ public sealed class ItemPickerTests : IDisposable
         Assert.Equal("carol-password", reply.Value);
         Assert.Equal("a person approved this one request", line.GetProperty("reason").GetString());
         Assert.Equal(Uuid("carol"), line.GetProperty("args").GetProperty("item").GetString());
-    }
-
-    [Fact]
-    public async Task An_agent_that_is_Automatic_or_always_allowed_one_of_them_is_still_asked_to_have_one_picked()
-    {
-        _fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with
-        {
-            Mode = AgentMode.AutomaticCommands,
-            Always = new AlwaysAllowed { Items = [Uuid("alice")] },
-        };
-
-        var reply = await AskAsync("services/Mail");
-
-        Assert.Equal(1, _fixture.Channel.PickersAsked);
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-        Assert.All(_fixture.Channel.LastPrompt!.Candidates, candidate => Assert.Equal((OnceOnly.Automatic, null), (candidate.OnceOnly, candidate.Always)));
-    }
-
-    [Fact]
-    public async Task Always_allow_on_the_picker_covers_the_picked_item_and_a_protected_one_offers_none()
-    {
-        Assert.True(_vault.AddTag(Name("bob"), "env:billing:prod"));
-        _vault.Save();
-        _fixture.Channel.Answer = ApprovalAnswer.Always;
-        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
-        _fixture.Channel.Pick = prompt => prompt.Candidates.ToList().FindIndex(candidate => candidate.Username == "bob");
-
-        var protectedPick = await AskAsync("services/Mail");
-        var candidates = _fixture.Channel.LastPrompt!.Candidates;
-
-        Assert.Equal((OnceOnly.None, Uuid("alice")), (candidates[0].OnceOnly, candidates[0].Always?.Change.AddsItem));
-        Assert.Equal((OnceOnly.ProtectedProfile, null), (candidates[1].OnceOnly, candidates[1].Always));
-        Assert.Equal(AuditDecision.Denied, protectedPick.Decision);
-        Assert.Null(protectedPick.Value);
-        Assert.Equal(0, _fixture.Channel.AccessAsked);
-
-        _fixture.Clock.Advance(ApprovalLimits.Default.DenialCooldown);
-        _fixture.Channel.Pick = _ => 0;
-        var always = await AskAsync("services/Mail");
-
-        Assert.Equal("alice-password", always.Value);
-        Assert.Equal(1, _fixture.Channel.AccessAsked);
-        Assert.Contains(Uuid("alice"), _fixture.Settings.Records[ApproverFixture.Agent].Always.Items);
     }
 
     private async Task<CredentialReply> AskAsync(string entry)

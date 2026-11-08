@@ -33,19 +33,18 @@ public sealed class SessionAuthorityMergeTests : IDisposable
     private readonly OwnerLog _log;
     private readonly SessionLifetime _lifetime = new("session-one");
     private readonly FakeChannel _channel = new();
-    private readonly FakeAgentSettings _settings = new();
+    private readonly FakeAgentRules _settings = new();
     private Vault _vault;
 
     public SessionAuthorityMergeTests()
     {
         _log = new OwnerLog(_directory);
-        _settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll;
 
         using (var seed = Vault.Create(VaultPath, _master))
         {
             seed.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "github-0" });
             seed.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "stripe-0" });
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(seed).Write(ApproverFixture.Agent, AgentAccessBuilders.Automatic));
+            Assert.True(seed.WriteRecord(new EntryName(ReservedGroups.Agents, ApproverFixture.Agent), AcafIds.Agent, "acaf", """{"acaf":1,"mode":"automatic"}"""));
             seed.Save();
         }
 
@@ -144,7 +143,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
 
             var agent = database.RootGroup.GetEntries(true).Single(entry => entry.Strings.ReadSafe(PwDefs.TitleField) == ApproverFixture.Agent);
             agent.CreateBackup(database);
-            agent.Strings.Set(AgentAccessStore.Field, new ProtectedString(false, AcafRecord.Write(AgentAccessBuilders.Asks)));
+            agent.Strings.Set("acaf", new ProtectedString(false, """{"acaf":1,"mode":"ask"}"""));
             agent.LastModificationTime = later;
         });
 
@@ -277,8 +276,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
                     CurrentLifetime = () => test._lifetime,
                     UnlockedFor = lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? Volatile.Read(ref test._vault) : null,
                     Channel = test._channel,
-                    Settings = test._settings,
-                    Hourly = new HourlyLimit(TimeProvider.System),
+                    Rules = test._settings,
                     Audit = () => test._log.Log,
                 }),
                 test.VaultPath);

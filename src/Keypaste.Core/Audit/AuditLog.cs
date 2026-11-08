@@ -681,6 +681,9 @@ public sealed class AuditLog : IDisposable
         AuditMethod.NotPaired => "not-paired",
         AuditMethod.Removed => "removed",
         AuditMethod.AutomaticCommands => "automatic-commands",
+        AuditMethod.Allowed => "allowed",
+        AuditMethod.Blocked => "blocked",
+        AuditMethod.RulesChanged => "rules-changed",
         _ => "unknown",
     };
 

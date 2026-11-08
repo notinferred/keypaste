@@ -8,7 +8,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -449,30 +448,6 @@ public sealed class FilesByDragTests
         entries.UndoCommand.Press();
         WindowInput.Drain();
         Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName(string.Empty, "github")));
-    });
-
-    [Fact]
-    public Task An_item_dropped_on_a_group_says_what_changed_for_agents_and_only_then() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-drop-agents-", vault =>
-        {
-            vault.CreateGroup(string.Empty, "servers", out _);
-            vault.CreateGroup(string.Empty, "quiet", out _);
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { See = Patterns("servers/**") }));
-        });
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        var github = entries.Rows.Single(row => row.Title == "github");
-
-        entries.MoveToGroup(github, "quiet");
-        RenderedShell.Drain();
-        Assert.Empty(shell.Shell.Toasts.Shown);
-
-        entries.MoveToGroup(entries.Rows.Single(row => row.Title == "github"), "servers");
-        RenderedShell.Drain();
-
-        var toast = Assert.Single(shell.Shell.Toasts.Shown);
-        Assert.Equal("claude-code can now see github.", toast.Message);
-        Assert.All(RenderedShell.Secrets, secret => Assert.DoesNotContain(secret, toast.Message, StringComparison.Ordinal));
     });
 
     private static EntryExposure Patterns(string pattern) =>

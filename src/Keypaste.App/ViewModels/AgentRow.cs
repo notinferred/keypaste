@@ -171,7 +171,7 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
     }
 
     /// <summary>Re-reads the open settings, after a change made elsewhere on the screen.</summary>
-    internal void ReadSettings() => _settings?.Read();
+    internal void ReadSettings() => _settings?.Refresh();
 
     private IEnumerable<string> StatusParts(McpClientCard card, DateTimeOffset now, bool inUse)
     {

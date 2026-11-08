@@ -1075,8 +1075,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 CurrentLifetime = () => _lifetime,
                 UnlockedFor = lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
                 Channel = _fixture.Channel,
-                Settings = _fixture.Settings,
-                Hourly = _fixture.Hourly,
+                Rules = _fixture.Rules,
                 Audit = () => _audit,
                 Clock = _fixture.Clock,
             });
@@ -1134,7 +1133,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             new VaultCredentialSource(() => _vault),
             new VaultEntryNameLister(() => _vault),
             _fixture.Gate,
-            _fixture.Settings);
+            _fixture.Rules);
 
     private async Task<ApproverClient> AttachedAsync(Owner owner)
     {

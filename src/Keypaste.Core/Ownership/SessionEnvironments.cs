@@ -6,7 +6,7 @@ namespace Keypaste.Core.Ownership;
 /// <param name="Gate">Where the person is asked: the owner's own gate, so its prompts and an agent's never overlap.</param>
 /// <param name="VaultFor">The vault a lifetime may read, or null once it has ended.</param>
 /// <param name="Clock">What expiry is judged against.</param>
-/// <param name="Narrate">Optional: a line for the operator's terminal when an Always allow row starts a command unasked.</param>
+/// <param name="Narrate">Optional: a line for the operator's terminal for each run released.</param>
 /// <param name="Launches">The passes the app's Run confirmation issued, or null to refuse every request carrying one.</param>
 public sealed record SessionEnvironments(
     ApprovalGate Gate,

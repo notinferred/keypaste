@@ -48,8 +48,7 @@ public sealed class LaunchEndpointTests : IDisposable
             CurrentLifetime = () => _lifetime,
             UnlockedFor = lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
             Channel = _channel,
-            Settings = IAgentSettings.Defaults,
-            Hourly = new HourlyLimit(_clock),
+            Rules = IAgentRules.Defaults,
             Audit = () => _audit,
             Clock = _clock,
         });
@@ -131,8 +130,6 @@ public sealed class LaunchEndpointTests : IDisposable
     [InlineData("run")]
     [InlineData("token")]
     [InlineData("lock")]
-    [InlineData("access-list")]
-    [InlineData("access-change")]
     [InlineData("edit")]
     public async Task Every_other_request_ends_its_connection_unanswered(string kind)
     {
@@ -152,10 +149,6 @@ public sealed class LaunchEndpointTests : IDisposable
             "run" => await client.ReleaseRunAsync(Run(), Token),
             "token" => await client.ReleaseTokenEnvAsync(
                 new TokenEnvRequest("kpt_launch_endpoint", "dev", EnvProfileNames.Default, ["deploy"], WorkDirectory) { Vault = VaultPath, Session = "session-one" },
-                Token),
-            "access-list" => await client.ListAccessAsync(new AccessListRequest { Vault = VaultPath, Session = "session-one" }, Token),
-            "access-change" => await client.ChangeAccessAsync(
-                new AccessChangeRequest("claude-code", "so deploys stop asking") { Origin = AccessOrigin.Agent, Mode = "automatic", Vault = VaultPath, Session = "session-one" },
                 Token),
             "edit" => await client.EditAsync(
                 new EditRequest(new Editing.RemoveItem("env/dev/STRIPE_KEY")) { Vault = VaultPath, Session = "session-one" },

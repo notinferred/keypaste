@@ -56,7 +56,6 @@ public sealed class TotpReleaseTests : IDisposable
 
         var prompt = approver.Channel.LastPrompt!;
         Assert.Equal(CredentialFields.Totp, prompt.Field);
-        Assert.Equal(OnceOnly.None, prompt.OnceOnly);
     }
 
     [Fact]
@@ -96,13 +95,13 @@ public sealed class TotpReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task An_Automatic_mode_releases_the_code_unasked_for_its_seconds_and_not_the_agents_ttl()
+    public async Task An_allowed_TOTP_category_releases_the_code_unasked_for_its_seconds()
     {
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.Totp, confirmed: true));
 
         var reply = await approver.Handler.RequestAsync(Request(_github), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Automatic, reply.Method);
+        Assert.Equal(AuditMethod.Allowed, reply.Method);
         Assert.Equal(_codeAt09, reply.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }
@@ -245,20 +244,19 @@ public sealed class TotpReleaseTests : IDisposable
     /// <summary>A real handler and source over the real vault on one clock at 1111111109 s, with only the person faked.</summary>
     private sealed class Approver : IDisposable
     {
-        internal Approver(Vault vault, AgentAccess? access = null)
+        internal Approver(Vault vault, AgentRules? rules = null)
         {
-            Settings.Records["claude-code"] = access ?? ApproverFixture.SeesAll;
+            Rules.Rules = rules ?? AgentRules.Defaults;
             Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
             Handler = new ApproverHandler(
                 new VaultCredentialSource(() => vault, Clock),
                 new VaultEntryNameLister(() => vault),
                 Gate,
-                Settings,
-                Narration.Add,
-                clock: Clock);
+                Rules,
+                Narration.Add);
         }
 
-        internal FakeAgentSettings Settings { get; } = new();
+        internal FakeAgentRules Rules { get; } = new();
 
         internal FakeChannel Channel { get; } = new();
 

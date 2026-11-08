@@ -105,28 +105,6 @@ internal sealed partial class ActivityRow : ObservableObject
             LeftText = Humanized(waiting.Remaining),
         };
 
-    /// <summary>
-    /// A confirmation of a change that gives an agent more, named by where the request says it came from,
-    /// as a claim: a terminal or the agent's own tool may have sent it, and only the person's own change is theirs.
-    /// </summary>
-    internal static ActivityRow WaitingChange(int number, WaitingChange waiting)
-    {
-        var prompt = waiting.Prompt;
-        var what = prompt switch
-        {
-            { ResetsCeilings: true } => "Your reset of this computer's limits",
-            { Origin: AccessOrigin.Terminal } => $"A change to {prompt.Agent}'s settings, asked from a terminal",
-            { Origin: AccessOrigin.Agent } => $"A change to {prompt.Agent}'s settings, asked by {prompt.Agent} through its keypaste tool",
-            _ => $"Your change to {prompt.Agent}'s settings",
-        };
-
-        return new(number, prompt.Agent, "none configured", what, "settings", "answered for you in " + Seconds(waiting.Remaining))
-        {
-            Detail = what,
-            LeftText = Humanized(waiting.Remaining),
-        };
-    }
-
     /// <summary>A terminal's edit a person is being asked about, named by its command as a claim: any program can type one.</summary>
     internal static ActivityRow WaitingEdit(int number, WaitingEdit waiting)
     {

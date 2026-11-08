@@ -405,7 +405,7 @@ public sealed class DoctorVerbTests : IDisposable
         var old = Another("old", CoreInfo.Version);
         string[] tools = [Plant(Bin, "claude"), Plant(Bin, "codex")];
 
-        File.WriteAllText(KeypasteHome.ClientsPath(Home), "this is not toml\n");
+        File.WriteAllText(KeypasteHome.AgentsPath(Home), "this is not toml\n");
         File.WriteAllText(KeypasteHome.RecentPath(Home), "[[vault]]\n");
         File.WriteAllText(KeypasteHome.ProjectsPath(Home), "{}");
         File.WriteAllText(KeypasteHome.RecommendationsPath(Home), "[]");

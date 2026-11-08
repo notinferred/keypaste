@@ -17,9 +17,7 @@ internal sealed record PickRow(string Title, string Details, string Field)
 /// agent gets, then answer as any request is answered, once.
 /// </summary>
 /// <remarks>
-/// Nothing is picked for them, and neither allow can be pressed until they pick, as well as until the prompt has armed.
-/// Always allow is drawn wherever any candidate offers it, so the buttons never move, and can be pressed only for a
-/// candidate that offers it.
+/// Nothing is picked for them, and Allow once cannot be pressed until they pick, as well as until the prompt has armed.
 /// </remarks>
 internal sealed partial class ItemPickViewModel : PromptViewModel
 {
@@ -32,8 +30,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
         _candidates = prompt.Candidates;
         Rows = [.. _candidates.Select(candidate => new PickRow(candidate.Title, Details(candidate), prompt.Field))];
-        OffersAlways = _candidates.Any(candidate => candidate.Always is not null);
-        AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.Always), () => IsArmed && Candidate?.Always is not null && !IsAnswered);
 
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
@@ -44,15 +40,12 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
         Truncation = ApprovalViewModel.TruncationText(prompt);
     }
 
-    /// <summary>Allows the picked item's field once, then asks the person to confirm what Always allow covers for that item.</summary>
-    internal RelayCommand AlwaysAllowCommand { get; }
-
     /// <summary>The items, in the vault's order.</summary>
     internal IReadOnlyList<PickRow> Rows { get; }
 
     /// <summary>The row the person picked, or null until they pick one.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AlwaysCaption), nameof(Lifetime), nameof(IsOnceOnly))]
+    [NotifyPropertyChangedFor(nameof(PickCaption))]
     internal partial PickRow? Picked { get; set; }
 
     partial void OnPickedChanged(PickRow? value)
@@ -64,13 +57,10 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
         }
 
         AllowOnceCommand.NotifyCanExecuteChanged();
-        AlwaysAllowCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Where the row picked as the person answered is among the candidates, or null; safe from any thread.</summary>
     internal int? PickedIndex => Volatile.Read(ref _picked) is >= 0 and var index ? index : null;
-
-    private ItemCandidate? Candidate => PickedIndex is { } index ? _candidates[index] : null;
 
     private int IndexOf(PickRow row)
     {
@@ -87,26 +77,8 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     protected override bool CanAllow => Picked is not null;
 
-    protected override void OnAllowsChanged() => AlwaysAllowCommand.NotifyCanExecuteChanged();
-
-    /// <summary>Whether any candidate offers Always allow, which keeps its button in place for every pick.</summary>
-    internal bool OffersAlways { get; }
-
-    /// <summary>What Always allow covers for the picked item, said above the buttons in a place kept whatever is picked.</summary>
-    internal string AlwaysCaption => Candidate switch
-    {
-        null => "Pick an item to allow it. Nothing is picked for you.",
-        { Always: { IsProject: true } offer } => $"Always allow makes {offer.Covers} Automatic for this agent. It allows this once, then asks you to confirm.",
-        { Always: not null } => "Always allow covers the item you picked for this agent. It allows this once, then asks you to confirm.",
-        { OnceOnly: OnceOnly.Unnamed } => ApprovalPrompt.UnnamedText,
-        _ => string.Empty,
-    };
-
-    /// <summary>Why the picked item can be allowed only once; empty where the buttons already say what can be chosen.</summary>
-    internal string Lifetime => Candidate?.OnceOnly is { } once ? ApprovalViewModel.LifetimeText(once) : string.Empty;
-
-    /// <summary>Whether <see cref="Lifetime"/> has anything to say.</summary>
-    internal bool IsOnceOnly => Lifetime.Length > 0;
+    /// <summary>What is said above the buttons until the person picks an item.</summary>
+    internal string PickCaption => Picked is null ? "Pick an item to allow it. Nothing is picked for you." : string.Empty;
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }

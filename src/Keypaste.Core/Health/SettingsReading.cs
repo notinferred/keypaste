@@ -24,7 +24,7 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
         (string Name, string Path, Func<string, string, HealthFinding?> Check)[] files =
         [
             (KeypasteHome.SettingsFileName, KeypasteHome.SettingsPath(home), AppToml),
-            (KeypasteHome.ClientsFileName, KeypasteHome.ClientsPath(home), ClientsToml),
+            (KeypasteHome.AgentsFileName, KeypasteHome.AgentsPath(home), AgentsToml),
             (KeypasteHome.RecentFileName, KeypasteHome.RecentPath(home), RecentToml),
             (KeypasteHome.ProjectsFileName, KeypasteHome.ProjectsPath(home), ProjectsJson),
             (KeypasteHome.RecommendationsFileName, KeypasteHome.RecommendationsPath(home), RecommendationsJson),
@@ -72,16 +72,16 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
         return Unparsed(name, problem, path, fix);
     }
 
-    // Deleting the file would lift this computer's limits on every agent, so the fix never offers it.
-    private static HealthFinding? ClientsToml(string name, string path)
+    private static HealthFinding? AgentsToml(string name, string path)
     {
-        if (AccessCaps.Probe(path, out var problem) == CapsFile.Usable)
+        if (new AgentRulesFile(path).TryRead(out _, out var problem))
         {
             return null;
         }
 
-        var place = LineOf(problem) is { } line ? $"{line} of {path}" : path;
-        return Unparsed(name, $"{problem}; agents are refused until it is fixed", path, $"fix {place}, and keep the file: it holds this computer's limits on every agent");
+        var said = problem.StartsWith(path + ": ", StringComparison.Ordinal) ? problem[(path.Length + 2)..] : problem;
+        var place = LineOf(said) is { } line ? $"{line} of {path}" : path;
+        return Unparsed(name, $"{said}; agents are refused until it is fixed", path, $"fix {place}, or delete it to ask about every value again");
     }
 
     private static HealthFinding? RecentToml(string name, string path) =>
@@ -100,7 +100,7 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
             : Unparsed(name, "could not be read", path, "delete it; recommendations you dismissed show again");
 
     private static HealthFinding? RetiredPolicy(string name, string path) =>
-        new(HealthArea.Settings, name, HealthStatus.Note, "keypaste no longer reads it; agents' settings are kept in the vault") { Where = path };
+        new(HealthArea.Settings, name, HealthStatus.Note, "keypaste no longer reads it; agents' rules are kept in agents.toml") { Where = path };
 
     private static HealthFinding Unparsed(string name, string says, string path, string fix) =>
         new(HealthArea.Settings, name, HealthStatus.Fix, says) { Where = path, Fix = fix };

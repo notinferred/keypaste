@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.Core.Tests;
@@ -20,12 +19,6 @@ internal sealed class ApproverFixture : IDisposable
     /// <summary>The agent a test's requests come from unless it says otherwise.</summary>
     internal const string Agent = "claude-code";
 
-    /// <summary>
-    /// Settings that see as far as any bridge exposes and are otherwise the defaults, so the bridge's
-    /// own exposure decides what <see cref="Agent"/> reaches, as it did before agents had settings.
-    /// </summary>
-    internal static AgentAccess SeesAll { get; } = AgentAccess.Defaults with { See = AgentAccessBuilders.See("**") };
-
     internal FakeSource Source { get; } = new();
 
     internal FakeChannel Channel { get; } = new();
@@ -36,11 +29,8 @@ internal sealed class ApproverFixture : IDisposable
 
     internal ApproverHandler Handler { get; }
 
-    /// <summary>Each agent's settings and this computer's ceilings; every agent gets the defaults until a test sets more.</summary>
-    internal FakeAgentSettings Settings { get; } = new();
-
-    /// <summary>The owner's hourly limits on Automatic, on the same clock as everything else.</summary>
-    internal HourlyLimit Hourly { get; }
+    /// <summary>This computer's agent rules; every category is asked until a test sets it.</summary>
+    internal FakeAgentRules Rules { get; } = new();
 
     /// <summary>Every line the handler printed to the operator's terminal, in order.</summary>
     /// <remarks>
@@ -51,18 +41,11 @@ internal sealed class ApproverFixture : IDisposable
     internal List<string> Narration { get; } = [];
 
     /// <summary>Builds a fixture.</summary>
-    /// <param name="limits">The operator's own ceilings, when a test needs them narrower.</param>
-    /// <remarks>
-    /// The hourly limits and the handler share <see cref="Clock"/>. A limit measured on a second clock
-    /// would silently ignore <c>ManualClock.Advance</c>, and a test asserting that a limit comes back
-    /// would pass for the wrong reason.
-    /// </remarks>
+    /// <param name="limits">The operator's own window and cooldown, when a test needs them narrower.</param>
     internal ApproverFixture(ApprovalLimits? limits = null)
     {
         Gate = new ApprovalGate(Channel, Clock, limits ?? ApprovalLimits.Default);
-        Hourly = new HourlyLimit(Clock);
-        Settings.Records[Agent] = SeesAll;
-        Handler = new ApproverHandler(Source, Source, Gate, Settings, Narration.Add, hourly: Hourly, clock: Clock);
+        Handler = new ApproverHandler(Source, Source, Gate, Rules, Narration.Add);
     }
 
     public void Dispose()
@@ -107,7 +90,12 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     /// <summary>Each entry's own tags, which a <c>tag:</c> exposure reads.</summary>
     internal Dictionary<EntryName, string[]> Tagged { get; } = [];
 
+    /// <summary>The custom fields held unprotected; every other custom field is protected.</summary>
+    internal HashSet<(EntryName Entry, string Field)> Unprotected { get; } = [];
+
     public bool RequiresLiveApproval(EntryName name) => Protected.Contains(name);
+
+    public bool IsProtectedField(EntryName name, string field) => !Unprotected.Contains((name, field));
 
     public IReadOnlyList<string> Tags(EntryName name) => Tagged.TryGetValue(name, out var tags) ? tags : [];
 
@@ -210,17 +198,6 @@ internal sealed class FakeChannel : IApprovalChannel
 
     internal RunPrompt? LastRunPrompt { get; private set; }
 
-    internal AccessChangePrompt? LastAccessPrompt { get; private set; }
-
-    /// <summary>What a confirmation of a change that gives an agent more is answered with; a no unless a test says otherwise.</summary>
-    internal ApprovalAnswer AccessAnswer { get; set; } = ApprovalAnswer.Denied;
-
-    /// <summary>How many confirmations of a change were asked.</summary>
-    internal int AccessAsked { get; private set; }
-
-    /// <summary>Runs while a confirmation of a change is on screen, before it is answered.</summary>
-    internal Action? WhileConfirming { get; set; }
-
     /// <summary>What a terminal's edit is answered with; a no unless a test says otherwise.</summary>
     internal ApprovalAnswer EditAnswer { get; set; } = ApprovalAnswer.Denied;
 
@@ -232,9 +209,6 @@ internal sealed class FakeChannel : IApprovalChannel
 
     /// <summary>Runs while a terminal's edit is on screen, before it is answered.</summary>
     internal Action? WhileEditing { get; set; }
-
-    /// <summary>Every notice that the change Always allow asked for did not take effect, in order.</summary>
-    internal List<AlwaysNotice> Told { get; } = [];
 
     /// <summary>Completes once a held prompt is up.</summary>
     internal Task Waiting => _waiting.Task;
@@ -274,14 +248,6 @@ internal sealed class FakeChannel : IApprovalChannel
         return AnswerAsync(cancellationToken);
     }
 
-    public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
-    {
-        LastAccessPrompt = prompt;
-        AccessAsked++;
-        WhileConfirming?.Invoke();
-        return ValueTask.FromResult(AccessAnswer);
-    }
-
     public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
     {
         LastEditPrompt = prompt;
@@ -289,8 +255,6 @@ internal sealed class FakeChannel : IApprovalChannel
         WhileEditing?.Invoke();
         return ValueTask.FromResult(EditAnswer);
     }
-
-    public void Tell(AlwaysNotice notice) => Told.Add(notice);
 
     /// <summary>How a pairing's confirmation is answered; a no unless a test says otherwise.</summary>
     internal Func<PairingPrompt, PairingAnswer> AnswerPairing { get; set; } = _ => new PairingAnswer(ApprovalAnswer.Denied, null);

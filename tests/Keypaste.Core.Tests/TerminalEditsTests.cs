@@ -25,7 +25,7 @@ public sealed class TerminalEditsTests : IDisposable
         _vault = Vault.Create(_path, _master);
         _vault.AddEntry(new VaultEntry { Title = _stripe.Title, GroupPath = _stripe.GroupPath, Password = "login-password" });
         _vault.Save();
-        _scene = new EditScene(Path.Combine(_directory, "clients.toml"), DateTimeOffset.UnixEpoch);
+        _scene = new EditScene(DateTimeOffset.UnixEpoch);
     }
 
     public void Dispose()

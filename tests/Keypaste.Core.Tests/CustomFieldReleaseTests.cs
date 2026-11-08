@@ -102,23 +102,23 @@ public sealed class CustomFieldReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task AnAutomaticMode_ReleasesTheField_WithNobodyAsked()
+    public async Task AnAllowedCategory_ReleasesTheField_WithNobodyAsked()
     {
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
         approver.Channel.Answer = ApprovalAnswer.Denied;
 
         var released = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(AuditMethod.Allowed, released.Method);
         Assert.Equal(_apiKey, released.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }
 
-    /// <summary>No mode reaches a field that never leaves: the field's name is refused before Automatic is considered.</summary>
+    /// <summary>No rule reaches a field that never leaves: the field's name is refused before its category is considered.</summary>
     [Fact]
-    public async Task AnAutomaticMode_NeverReleasesAFieldThatNeverLeaves()
+    public async Task AnAllowedCategory_NeverReleasesAFieldThatNeverLeaves()
     {
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
 
         var refused = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
 
@@ -206,14 +206,14 @@ public sealed class CustomFieldReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task AnAutomaticRelease_IsFilledIn()
+    public async Task AnAllowedRelease_IsFilledIn()
     {
         Plant("DATABASE_URL", _databaseUrl);
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
 
         var released = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(AuditMethod.Allowed, released.Method);
         Assert.Equal(_databaseUrlFilled, released.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }
@@ -386,19 +386,18 @@ public sealed class CustomFieldReleaseTests : IDisposable
     /// <summary>A real handler over the real vault, with only the person faked.</summary>
     private sealed class Approver : IDisposable
     {
-        internal Approver(Vault vault, AgentAccess? access = null)
+        internal Approver(Vault vault, AgentRules? rules = null)
         {
-            Settings.Records["claude-code"] = access ?? ApproverFixture.SeesAll;
+            Rules.Rules = rules ?? AgentRules.Defaults;
             Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
             Handler = new ApproverHandler(
                 new VaultCredentialSource(() => vault),
                 new VaultEntryNameLister(() => vault),
                 Gate,
-                Settings,
-                clock: Clock);
+                Rules);
         }
 
-        internal FakeAgentSettings Settings { get; } = new();
+        internal FakeAgentRules Rules { get; } = new();
 
         internal FakeChannel Channel { get; } = new();
 

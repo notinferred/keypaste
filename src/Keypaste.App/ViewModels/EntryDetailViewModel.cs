@@ -1431,7 +1431,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         try
         {
-            PendingTagChange = _session.PreviewTagChange(vault, Name, [tag], adding);
+            PendingTagChange = ProjectTagChange.Preview(vault, Name, [tag], adding);
         }
         catch (VaultException e)
         {

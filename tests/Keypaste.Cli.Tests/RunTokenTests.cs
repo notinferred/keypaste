@@ -338,7 +338,7 @@ public sealed class RunTokenTests : IDisposable
                 new VaultCredentialSource(() => _vault),
                 new VaultEntryNameLister(() => _vault),
                 _gate,
-                IAgentSettings.Defaults);
+                IAgentRules.Defaults);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),

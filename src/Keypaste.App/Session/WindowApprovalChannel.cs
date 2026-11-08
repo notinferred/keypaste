@@ -28,14 +28,12 @@ namespace Keypaste.App.Session;
 /// </remarks>
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
-/// <param name="openSettings">What the Always allow notice's Open settings does with the agent's name, or null to offer Close alone.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 /// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
-    Action<string>? openSettings = null,
     Action<Exception, string>? unexpected = null,
     Action? openBrowserFill = null,
     RequestNotices? notices = null) : IApprovalChannel
@@ -71,7 +69,7 @@ internal sealed class WindowApprovalChannel(
         var request = new ItemPickViewModel(prompt);
         var answer = await ShowAsync(request, () => new ItemPickWindow(request), cancellationToken).ConfigureAwait(false);
 
-        return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.Always ? request.PickedIndex : null);
+        return new ItemPick(answer, answer == ApprovalAnswer.ApprovedOnce ? request.PickedIndex : null);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
@@ -88,14 +86,6 @@ internal sealed class WindowApprovalChannel(
 
         var request = new RunApprovalViewModel(prompt);
         return ShowAsync(request, () => new RunApprovalWindow(request), cancellationToken);
-    }
-
-    public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        var request = new AccessChangeViewModel(prompt);
-        return ShowAsync(request, () => new AccessChangeWindow(request), cancellationToken);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
@@ -169,26 +159,6 @@ internal sealed class WindowApprovalChannel(
         showing.Window.BringForward();
         _ = ArmAsync(showing.Request, showing.Window, showing.Withdrawn);
         return true;
-    }
-
-    public void Tell(AlwaysNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        UiThread.Post(() =>
-        {
-            try
-            {
-                var window = new NoticeWindow(notice, openSettings);
-                window.Show();
-                Shown?.Invoke(this, window);
-            }
-            catch (Exception ex)
-            {
-                // A notice that cannot be shown changes nothing: the release stands, and the change's line says why it did not.
-                unexpected?.Invoke(ex, CrashReporting.AlwaysNoticeSite);
-            }
-        });
     }
 
     private async ValueTask<ApprovalAnswer> ShowAsync(

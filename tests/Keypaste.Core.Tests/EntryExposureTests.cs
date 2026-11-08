@@ -304,7 +304,7 @@ public sealed class EntryExposureTests
                 new VaultCredentialSource(() => vault),
                 new VaultEntryNameLister(() => vault),
                 fixture.Gate,
-                fixture.Settings);
+                fixture.Rules);
 
             var reply = await handler.RequestAsync(
                 new CredentialRequest

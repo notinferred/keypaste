@@ -27,11 +27,8 @@ public sealed record SessionServerOptions
     /// <summary>How many requests wait for a person, and for how long.</summary>
     public ApprovalLimits Limits { get; init; } = ApprovalLimits.Default;
 
-    /// <summary>Each agent's settings in the vault, and this computer's ceilings in <c>clients.toml</c>.</summary>
-    public required IAgentSettings Settings { get; init; }
-
-    /// <summary>The owner's hourly limits on Automatic, which outlive one unlock and end with the owner's process.</summary>
-    public required HourlyLimit Hourly { get; init; }
+    /// <summary>The rules every agent's request is decided by, this computer's <c>agents.toml</c>.</summary>
+    public required IAgentRules Rules { get; init; }
 
     /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
     public required Func<AuditLog?> Audit { get; init; }
@@ -56,9 +53,6 @@ public sealed record SessionServerOptions
     /// pairing also needs <see cref="WriteEdit"/> (D-0634).
     /// </summary>
     public PairingUses? BrowserUses { get; init; }
-
-    /// <summary>This computer's <c>clients.toml</c>, which says which agents a tag change would reach unasked.</summary>
-    public string ClientsPath { get; init; } = string.Empty;
 
     /// <summary>Told of each terminal's edit once it is saved, or null.</summary>
     public Action<EditDone>? Edited { get; init; }
@@ -117,13 +111,11 @@ public sealed class SessionServer : IDisposable
                 new VaultCredentialSource(() => options.UnlockedFor(lifetime), options.Clock),
                 new VaultEntryNameLister(() => options.UnlockedFor(lifetime)),
                 gate,
-                options.Settings,
-                options.Narrate,
-                hourly: options.Hourly,
-                clock: options.Clock);
+                options.Rules,
+                options.Narrate);
 
             var editor = options.WriteEdit is { } write
-                ? new SessionEditor(gate, options.UnlockedFor, write, options.ClientsPath, options.Clock, options.Narrate, options.Edited)
+                ? new SessionEditor(gate, options.UnlockedFor, write, options.Clock, options.Narrate, options.Edited)
                 : null;
 
             var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair

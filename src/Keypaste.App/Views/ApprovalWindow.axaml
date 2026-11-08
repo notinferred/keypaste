@@ -64,11 +64,6 @@
             <TextBlock Grid.Column="1" Classes="tag size-13" Text="value goes to the agent" VerticalAlignment="Center" />
           </Grid>
         </Border>
-        <StackPanel Orientation="Horizontal" Height="20">
-          <TextBlock Classes="prompt-note size-13" TextWrapping="NoWrap" Text="You can allow it " IsVisible="{Binding IsOnceOnly}" />
-          <TextBlock Name="LifetimeText" Classes="prompt-note size-13" TextWrapping="NoWrap" Text="{Binding Lifetime}"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-        </StackPanel>
       </StackPanel>
 
       <StackPanel Spacing="6">
@@ -91,18 +86,13 @@
       <TextBlock Classes="prompt-note size-13"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
-      <!-- Always allow's caption has a place of its own, kept whether the prompt offers it or not, so
-           the buttons never move (D-0326, T-2). No button is the default. -->
-      <TextBlock Name="AlwaysCaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
-                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+      <!-- No button is the default (D-0326, T-2). -->
 
-      <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                 IsCancel="True" Command="{Binding DenyCommand}" />
         <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
                 Command="{Binding AllowOnceCommand}" />
-        <Button Grid.Column="2" Name="AlwaysAllow" Classes="prompt" Content="Always allow"
-                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysAllowCommand}" />
       </Grid>
 
     </StackPanel>

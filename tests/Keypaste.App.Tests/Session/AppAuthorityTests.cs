@@ -252,8 +252,7 @@ public sealed class AppAuthorityTests
         Assert.Equal(OwnerKind.DesktopApp, serving.Owner.Kind);
         Assert.Equal(Environment.ProcessId, serving.Owner.ProcessId);
         Assert.Contains(serving.Session, AgentActivityViewModel.Describe(serving), StringComparison.Ordinal);
-        Assert.Contains("except what you always allowed for these agents: claude-code (2).", AgentActivityViewModel.Describe(serving, [], ["claude-code (2)"]), StringComparison.Ordinal);
-        Assert.Contains("Automatic for: cursor (billing:dev), and what you always allowed for these agents: claude-code (2).", AgentActivityViewModel.Describe(serving, ["cursor (billing:dev)"], ["claude-code (2)"]), StringComparison.Ordinal);
+        Assert.Contains("except what Settings allows for every agent: passwords, notes.", AgentActivityViewModel.Describe(serving, ["passwords", "notes"]), StringComparison.Ordinal);
 
         await using var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
         Assert.NotNull(client);

@@ -462,11 +462,6 @@ internal static class SetupCommand
             context.Stdout.WriteLine($"audit log      {auditLog}");
         }
 
-        if (registration.ClientsPath is { } ceilings)
-        {
-            context.Stdout.WriteLine($"limits         {ceilings}");
-        }
-
         if (registration.ApproverName is { } approver)
         {
             context.Stdout.WriteLine($"approver       {approver}");

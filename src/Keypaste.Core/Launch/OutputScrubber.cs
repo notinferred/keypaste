@@ -28,7 +28,7 @@ public sealed record ScrubbedText(string Text, int Replacements, bool Truncated)
 /// or <c>+</c>, a URI's userinfo password, and each line of 8 or more characters of a multi-line value,
 /// all again with line breaks as <c>\n</c>, <c>\r\n</c> and <c>\r\r\n</c>. Anything else — base64, a reversed or split value, a
 /// substring, a file, the network — is not caught; the person's approval of the exact command is the
-/// control, and under Automatic with commands there is none (THREATS.md T-35).
+/// control (THREATS.md T-35).
 /// </para>
 /// <para>
 /// <b>Every occurrence of every form is covered</b>, overlaps included, and each covered run of bytes

@@ -107,9 +107,6 @@
 
       <StackPanel Spacing="4">
         <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
-        <TextBlock Name="OnceOnlyText" Classes="prompt-note size-13" Text="{Binding OnceOnlyText}"
-                   Foreground="{DynamicResource KpTextSecondary}"
-                   IsVisible="{Binding OnceOnlyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
 
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">

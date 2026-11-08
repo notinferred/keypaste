@@ -1,4 +1,3 @@
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Xunit;
 
@@ -31,47 +30,6 @@ public sealed class ApprovalGateTests
         using var owned = gate;
 
         Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken));
-    }
-
-    /// <summary>
-    /// Always allow keeps the one slot for the confirmation that follows it: nothing else is put in front of
-    /// the person between them, the confirmation is asked in it, and only giving it back frees it. A
-    /// prompt that offered no Always allow keeps nothing.
-    /// </summary>
-    [Fact]
-    public async Task AlwaysFor_KeepsTheSlotForItsConfirmation_UntilItIsGivenBack()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var channel = new FakeChannel { Answer = ApprovalAnswer.Always, AccessAnswer = ApprovalAnswer.ApprovedOnce };
-        var (gate, _) = Build(channel);
-        using var owned = gate;
-        var change = new AccessChangePrompt
-        {
-            Agent = "claude-code",
-            Gains = ["billing:dev: Automatic"],
-            Origin = AccessOrigin.Prompt,
-            Reason = string.Empty,
-            ReasonWasTruncated = false,
-            ReasonWasAltered = false,
-        };
-
-        var (answer, kept) = await owned.AskKeepingAsync("k", Prompt() with { Always = new AlwaysOffer(AccessEdit.Automatic(AgentAccessBuilders.Scope("billing:dev")), "billing:dev") }, token);
-
-        Assert.Equal(ApprovalAnswer.Always, answer);
-        Assert.NotNull(kept);
-        Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("other", Prompt(), token));
-        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync([], change, coolUnanswered: false, kept, token));
-        Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("other", Prompt(), token));
-
-        kept.Dispose();
-        kept.Dispose();
-
-        var (offeredNone, keptNone) = await owned.AskKeepingAsync("other", Prompt(), token);
-
-        Assert.Equal(ApprovalAnswer.Always, offeredNone);
-        Assert.Null(keptNone);
-        Assert.Equal(2, channel.Asked);
-        Assert.Equal(ApprovalAnswer.Always, await owned.AskAsync("again", Prompt(), token));
     }
 
     [Fact]

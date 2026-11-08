@@ -167,7 +167,7 @@ public sealed class ApproverHandlerTests
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         await fixture.Handler.RequestAsync(Request(field: "password"), "conn-1", Token);
-        var other = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-1", Token);
+        var other = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-1", Token);
 
         Assert.Equal(AuditMethod.Prompt, other.Method);
         Assert.Equal(2, fixture.Channel.Asked);
@@ -433,55 +433,16 @@ public sealed class ApproverHandlerTests
     }
 
     [Fact]
-    public async Task ALiveOnlyEntry_IsNeverServedFromAGrant()
+    public async Task AProtectedEnvironment_IsDecidedByItsFieldsRule_LikeAnyOther()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-
-        // A grant under exactly the same connection, entry and field, given while it was not live-only.
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditDecision.Denied, reply.Decision);
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-        Assert.Equal(2, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task ALiveOnlyEntry_IsNeverReleasedAutomatically()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-
-        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(1, fixture.Channel.Asked);
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-
-        // The same mode does release without asking once the entry is not live-only.
-        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        Assert.Equal(AuditMethod.Automatic, released.Method);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task WithoutAPredicate_AnEntryTheSourceProtectsIsStillLiveOnly()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
-        var request = Request();
 
-        var first = await fixture.Handler.RequestAsync(request, "conn-1", Token);
-        var second = await fixture.Handler.RequestAsync(request, "conn-1", Token);
+        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Prompt, first.Method);
-        Assert.Equal(AuditMethod.Prompt, second.Method);
-        Assert.Equal(2, fixture.Channel.Asked);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed), (released.Decision, released.Method));
+        Assert.Equal(0, fixture.Channel.Asked);
     }
 
     [Fact]
@@ -513,7 +474,7 @@ public sealed class ApproverHandlerTests
 
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var reconnected = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
-        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-2", Token);
 
         Assert.Equal(AuditMethod.Cooldown, reconnected.Method);
         Assert.Equal(AuditDecision.Granted, otherField.Decision);
@@ -544,7 +505,7 @@ public sealed class ApproverHandlerTests
             fixture.Narration[0]);
 
         fixture.Source.Unfilled = null;
-        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-2", Token);
 
         Assert.Equal(AuditDecision.Granted, otherField.Decision);
         Assert.Equal(2, fixture.Channel.Asked);
@@ -555,7 +516,7 @@ public sealed class ApproverHandlerTests
     public async Task AnAutomaticValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
     {
         using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
+        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         fixture.Source.Unfilled = _unfilled;
 
         var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -569,7 +530,4 @@ public sealed class ApproverHandlerTests
             $"refused env/dev/STRIPE_KEY for claude-code: the item's password {_unfilled}; edit the item so keypaste can fill it in",
             fixture.Narration[0]);
     }
-
-    private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
-        new(fixture.Source, fixture.Source, fixture.Gate, fixture.Settings, fixture.Narration.Add, _ => true, fixture.Hourly, fixture.Clock);
 }

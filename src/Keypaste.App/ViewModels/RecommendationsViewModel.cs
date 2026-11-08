@@ -254,7 +254,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
         try
         {
-            row.Confirmation = _session.PreviewTagChange(vault, row.Finding.Entry, [row.Finding.Tag], adding: true)?.Describe() ?? [];
+            row.Confirmation = ProjectTagChange.Preview(vault, row.Finding.Entry, [row.Finding.Tag], adding: true)?.Describe() ?? [];
             Message = string.Empty;
         }
         catch (VaultException e)

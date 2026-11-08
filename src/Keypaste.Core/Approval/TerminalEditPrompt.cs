@@ -23,7 +23,7 @@ public sealed record TerminalEditPrompt
     public required IReadOnlyList<string> Changes { get; init; }
 
     /// <summary>Where the request came from, as the prompt says it: a terminal, which never proves the person asked.</summary>
-    public string OriginText { get; init; } = AccessChangePrompt.FromTerminalText;
+    public string OriginText { get; init; } = "asked from a terminal; any program you run could have typed it";
 
     /// <summary>Whether allowing erases an item for good, because the vault has no recycle bin.</summary>
     public bool DeletesForGood { get; init; }

@@ -362,7 +362,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
 
             if (confirmed is null || !confirmed.Held.SequenceEqual(held, StringComparer.Ordinal))
             {
-                var changes = _session.PreviewRestore(vault, _owner.Name, fresh[row.Index]);
+                var changes = ProjectTagChange.Restoring(vault, _owner.Name, fresh[row.Index]);
 
                 if (changes.Count > 0)
                 {

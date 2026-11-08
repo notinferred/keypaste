@@ -103,6 +103,22 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     }
 
     /// <inheritdoc/>
+    public bool IsProtectedField(EntryName name, string field)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        try
+        {
+            return _unlockedVault()?.Fields(name)?.FirstOrDefault(held => string.Equals(held.Name, field, StringComparison.Ordinal)) is not { IsProtected: false };
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return true;
+        }
+    }
+
+    /// <inheritdoc/>
     public bool TryResolve(
         string entryArgument,
         [NotNullWhen(true)] out EntryName? name,

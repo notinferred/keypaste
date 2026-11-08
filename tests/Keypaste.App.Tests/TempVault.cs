@@ -38,39 +38,26 @@ internal sealed class TempVault : IDisposable
     /// <summary>The vault file.</summary>
     internal string Path_ { get; }
 
-    /// <summary>
-    /// What an agent the tests give settings to may do: see as far as its bridge exposes and run
-    /// commands, so its bridge's own exposure decides what it reaches, as before agents had settings.
-    /// </summary>
-    internal static AgentAccess SeesAll { get; } = AgentAccess.Defaults with
-    {
-        See = EntryExposure.TryCreate(["**"], out var all, out var error) ? all : throw new InvalidOperationException(error),
-        Run = true,
-    };
-
-    /// <summary>Gives agents <see cref="SeesAll"/> in an open vault, as a person confirms it in the app; the caller saves.</summary>
-    /// <param name="vault">The vault.</param>
+    /// <summary>Turns run on for agents in <c>agents.toml</c> beside a vault, the home the tests' sessions read, so each is listed and may ask to run.</summary>
+    /// <param name="vault">The vault, whose directory is the home.</param>
     /// <param name="agents">The agents' names.</param>
     internal static void Sees(Vault vault, params string[] agents)
     {
-        var store = new AgentAccessStore(vault);
+        var file = new AgentRulesFile(Core.Audit.KeypasteHome.AgentsPath(System.IO.Path.GetDirectoryName(vault.Path)));
 
-        foreach (var agent in agents)
+        if (!file.TryRead(out var rules, out var problem)
+            || !file.TryWrite(agents.Aggregate(rules, (known, agent) => known.WithRun(agent, run: true)), out problem))
         {
-            if (store.Write(agent, SeesAll) is not (AgentAccessWrite.Written or AgentAccessWrite.Unchanged) and var refused)
-            {
-                throw new InvalidOperationException($"{agent}'s settings were refused: {refused}");
-            }
+            throw new InvalidOperationException(problem);
         }
     }
 
-    /// <summary>Gives agents <see cref="SeesAll"/> in this fixture's vault, before anything unlocks it.</summary>
+    /// <summary>Turns run on for agents beside this fixture's vault, before anything unlocks it.</summary>
     /// <param name="agents">The agents' names; none gives <see cref="Agent"/>.</param>
     internal void Sees(params string[] agents)
     {
         using var vault = Vault.Open(Path_, Password);
         Sees(vault, agents.Length == 0 ? [Agent] : agents);
-        vault.Save();
     }
 
     /// <summary>

@@ -52,7 +52,7 @@ public sealed class TagProtectionTests : IDisposable
         using var vault = Seeded();
         using var fixture = new ApproverFixture();
         var source = new VaultCredentialSource(() => vault);
-        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Settings);
+        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Rules);
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var first = await handler.RequestAsync(Request("services/Database"), "conn-1", _token);
