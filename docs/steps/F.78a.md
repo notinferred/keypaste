@@ -19,6 +19,12 @@ Phase 2b, the founder's decisions of 2026-11-08, applied as written:
 
 The seal's counter, added to phase 2b: the vault's `agent-rules` record also holds `count`, which the owner increments and saves in the vault before writing the file on each sealed write, and the MAC covers it with the home identity and the rules. A file whose count is not the vault's current value reads as the defaults with the same reason, so an older sealed file put back is ignored, and a write whose file never lands leaves the defaults.
 
+The founder's fixes of 2026-11-08, after phase 2b:
+
+- **A count per home.** Each home's count is a record of its own in `.keypaste/keys`, titled `agent-rules-<home identity>` with a UUID derived from that title, holding `count`; the key stays alone in `agent-rules`. The seal covers this home's count, so a put-back older file is still refused and another home's change leaves this home's rules as they are. The founder asked for the counts in the same record, or a field per home if one field could not merge safely; neither can, because a merge, keypaste's as KeePass's and KeePassXC's, takes an entry changed in both copies as the newer whole with the older in its history, so two homes' fields in one entry would lose one of them. A record per home is only ever changed by its own home, so a merge keeps each.
+- **Any custom field can be requested.** `request_credential` takes any custom field of an item the agent can name, up to 128 characters with no control character, decided by its category (`CredentialFields.IsAgentCustom`); the listing names them and a tag's reach covers them. A standard name in another case and a field a TOTP seed is read from stay refused unasked, passkey fields stay Blocked, and reserved groups stay unreachable. A field's name is scrubbed like a title in the prompt and the audit line. `kp://` references and `keypaste share --field` keep the env-named rule, which projects need.
+- **DESIGN.md**: the voice's "Always allow" now reads as what ships, Deny and Allow once; the `clients.toml` vocabulary row is gone, and the "what it can see" row names `--expose`'s patterns, since agents' Can see settings went too.
+
 ## Judgment calls
 
 - **`request_attachment` is a second instance of the credential tool**, taking `entry`, `name` and `reason` and returning the bytes as base64 in the text and in structured content (`attachment`, `base64`). Its lines are `request_credential` lines with field `attachment` and the attachment's scrubbed name at the end of the reason, so the log's schema is unchanged.
@@ -27,7 +33,6 @@ The seal's counter, added to phase 2b: the vault's `agent-rules` record also hol
 - **A picked item's attachment is read by its UUID**, so two items sharing the name never make the read guess.
 - **The cooldown key of an attachment** is the item and `attachment:<name>`, so refusing one attachment holds back only that one.
 - **The Allow confirmation says "Every agent will receive every <category> value without asking."**, since the rules are the same for every agent, with "Each release is recorded in the log. Set Ask here to be asked again." under it; its button says what it does, such as Allow passwords. It is a secondary button, so Settings keeps no amber of its own.
-- **A single counter, as directed**, is shared by every computer that syncs the vault (Limits).
 - **The `custom` key** replaces `protected` in `agents.toml`, and `username = "shown"|"hidden"` replaces `details`.
 
 ## Evidence
@@ -40,9 +45,8 @@ In CI, phase 2b took three fast-tier attempts and two of each Linux profile, eac
 
 ## Limits and follow-ups
 
-- **Which custom fields may be requested at all still depends on their names**: `CredentialFields.IsCustom` accepts only a name shaped like an environment variable, so a field such as `Recovery codes` never leaves whatever its category says. BACKLOG holds it with F.78c's card names.
 - **A protected environment no longer holds back an Allow** on an agent's requests: its values are decided by their category like any other, as the row says ("Production is decided by these rules like any other field"); it still holds back a scoped token's run.
-- **A vault synced to two computers shares its key and count**, so a sealed change on one makes the other's rules read as the defaults until they are set there again.
+- **A home's first seal against two copies at once**: two copies that each create the shared key before either is merged settle to one key, so the other home's rules read as the defaults until set again. The key is made once per vault, so this needs two first seals racing.
 - **Whatever holds the unlocked vault can seal any rules**; the seal authenticates the owner process, not the person (THREATS T-15).
 - **An attachment is held whole** in the owner, the pipe reply, the bridge and the MCP result; BACKLOG asks whether chunking is worth it.
 - **DESIGN's voice still cites "Always allow"** and its vocabulary row for `clients.toml`; DESIGN changes only on founder direction.

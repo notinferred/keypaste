@@ -35,9 +35,9 @@ An agent may ask to run a command with values in its environment only once you t
 
 ## Where they are kept
 
-The rules are kept on this computer in `~/.keypaste/agents.toml`, never in the vault, so a synced or edited vault gives an agent nothing more. Any program you run can write that file, so the app or `keypaste approve` holding the vault seals each change with a key the vault holds, bound to this computer's keypaste home and to the vault's count of changes; a file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is, every category is asked and no agent may run commands, and Settings says the rules were changed outside keypaste and are ignored until you set them again. With nothing holding the vault, `keypaste clients` can only turn run off or forget an agent, which it writes unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier version kept in the vault's `.keypaste/agents` group are ignored and left in place.
+The rules are kept on this computer in `~/.keypaste/agents.toml`, never in the vault, so a synced or edited vault gives an agent nothing more. Any program you run can write that file, so the app or `keypaste approve` holding the vault seals each change with a key the vault holds, bound to this computer's keypaste home and to the vault's count of this home's changes; a file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is, every category is asked and no agent may run commands, and Settings says the rules were changed outside keypaste and are ignored until you set them again. With nothing holding the vault, `keypaste clients` can only turn run off or forget an agent, which it writes unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier version kept in the vault's `.keypaste/agents` group are ignored and left in place.
 
-A vault synced to two computers shares its key and its count, so a change sealed on one makes the other's rules read as the defaults until you set them there again.
+A vault synced to two computers keeps a count for each, so each computer keeps its own rules.
 
 ## What is written down
 

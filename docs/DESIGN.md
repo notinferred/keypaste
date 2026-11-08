@@ -95,7 +95,7 @@ The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, command
 
 ## Voice
 
-Plain and calm; precise where it protects you. Name the actor and the object: "claude-code wants DATABASE_URL". Say how long plainly: "Allow once" or "Always allow", never "Trust" or "for a while", and an always names what it covers and where to remove it. Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
+Plain and calm; precise where it protects you. Name the actor and the object: "claude-code wants DATABASE_URL". Say how long plainly: a prompt answers "Deny" or "Allow once", never "Trust" or "for a while", and a rule that releases without asking says what it covers and where to change it. Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
 
 The words keypaste uses, on every screen and in the CLI's own sentences:
 
@@ -108,8 +108,7 @@ The words keypaste uses, on every screen and in the CLI's own sentences:
 | URL | What an item opens, in its field, its column and its menus | web address |
 | top level | The place outside every group | the root |
 | Disconnect | Taking keypaste out of an AI tool | Remove |
-| this computer's limits | What `clients.toml` holds | ceilings |
-| what it can see | The patterns an agent's settings take | selectors |
+| what it can see | The patterns a bridge's `--expose` takes | selectors |
 | keypaste.com | What serves share links | the relay |
 
 A word a person types or a machine reads keeps its spelling: flags such as `--keyfile`, `--client-label` and `--expose`, the group KDBX files call Recycle Bin, `--json` names and file names. Help names the flag and says what it is for in these words.
