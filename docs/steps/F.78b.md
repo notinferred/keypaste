@@ -1,6 +1,6 @@
 # F.78b — Let an agent's page and a prompt's answer override a category
 
-Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78a. Runs: RUNS.
+Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78a. Runs on Linux: ci fast tier 42495720558 and dev desktop 42496395328 at `40307c75`, dev desktop-gates 42494368704 at `138521c7`, all green.
 
 ## Amendments
 
@@ -23,6 +23,8 @@ The founder selected the row on 2026-11-08 and settled three of its open points 
 ## Evidence
 
 Run locally, each class once: Keypaste.Core.Tests `RememberedAnswerRequestTests` (13, new), `AgentRulesFileTests`, `SealedAgentRulesTests`, `FieldCategoryRequestTests`, `ItemPickerTests`, `ApprovalGateTests` and `ApproverHandlerTests`, 150 passed; Keypaste.App.Tests `AlwaysPromptWindowTests` (3, new), `DesktopApprovalTests`, `ItemPickViewModelTests`, `AgentActivityViewTests`, `AgentsFirstLevelTests`, `AssistiveTechnologyTests`, `InterfaceZoomTests`, `PlainWordsTests`, `OneHomeJourneyTests` and `ScreenRenderer`, passed; Keypaste.Cli.Tests `TerminalApprovalChannelTests`, with the always keys' cases, passed. `bash scripts/verify.sh compile` passed.
+
+In CI, two first attempts failed on rules the change had to meet, each fixed at its cause: ci 42493827471's predecessor at `6d60d44e` failed `ApprovalPromptTests.ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline`, which now names `OffersAlways`, set from the label and the room left, never the request's text; dev desktop 42494338092 at `138521c7` failed `LanguageAndRegionTests.Every_word_a_view_shows_comes_from_the_resources` on the agent page's four new labels, now in `Strings.resx`. The desktop-gates run at `138521c7` also ran F.78a's edits to `verify-desktop-approval.sh`; compat, which runs `verify-keepassxc-fields.sh`, has not run since `b0d150bf`.
 
 New request-path tests: an item's answer, then the agent's rule, then Settings deciding the same request in turn; another label and an unlabelled bridge decided apart from them; Always allow and Always block confirmed on the prompt releasing and refusing then and unasked after; an always from a prompt that offered none, and each change without confirmation, keeping nothing; Remove asking again; a passkey Blocked under a kept Allow; the picker's kept pick answering that agent alone, and passed over for an item it always blocks; a lock withdrawing an always mid-prompt and releasing nothing under a kept one; a run refused a variable its agent blocks; a sealed always holding and a hand-written one ignored.
 
