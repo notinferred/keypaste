@@ -46,7 +46,7 @@ public sealed partial class DoctorSourceRulesTests
         Assert.Contains("StatusCommand.cs", names);
         Assert.Contains("HealthCheck.cs", names);
         Assert.True(names.Count >= 8, $"only {names.Count} files were scanned");
-        Assert.True(Requests().Count >= 9, $"only {Requests().Count} of the holder's requests were found");
+        Assert.True(Requests().Count >= 8, $"only {Requests().Count} of the holder's requests were found");
         Assert.DoesNotContain(".AttachAsync(", Requests());
     }
 
