@@ -43,11 +43,9 @@ public sealed class ApprovalPromptTests
     /// put either. They are set from the sanitizer's own result rather than from anything the agent
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
-    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the agent's settings,
-    /// never from the request's text: it says why no timed grant is offered, and nothing else.
-    /// <c>AlwaysFor</c> is the project environment the approver reads from the entry's own tag for a
-    /// named agent, never from the request's text: it adds one choice that still asks for its own
-    /// confirmation, and leaves the default a denial and the deadline where it was.
+    /// <c>OffersAlways</c> is set by the approver from the bridge's label and the room left in this computer's rules,
+    /// never from the request's text: it adds Always allow and Always block, each still confirmed in a step of its own,
+    /// and leaves the default a denial and the deadline where it was.
     /// <c>Candidates</c> are the items the approver read from the vault for the name the request resolved to, each with its
     /// own names and its own offer, never the request's text: a list in the vault's order with none picked, so it adds no
     /// default, no duration and no position a reason could choose. <c>Item</c> is the one item's UUID, read from the vault.
@@ -69,6 +67,7 @@ public sealed class ApprovalPromptTests
                 "Field",
                 "Item",
                 "Label",
+                "OffersAlways",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
