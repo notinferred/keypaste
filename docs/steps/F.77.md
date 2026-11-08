@@ -87,6 +87,8 @@ A read-only review of Automatic with commands found these, each checked against 
 
 Tests added: `SessionAuthorityRunTests.AProjectRow_StartsItsOwnItemsUnasked_AndAMixedSetAsks` and `APassedEnd_AsksAboutTheRun_NamingTheLimitOnlyWhereItHeldARunBack`, `SessionAuthorityAccessTests.AnAgentsRequestForAutomaticWithCommands_ReachesThePersonWithTheCommandsSentence`, `ApprovalPromptTests.EveryGainThatStartsCommandsUnasked_SaysSo`, `ALimitGainUnderPlainAutomatic_SaysNothingOfCommands` and `AReset_NamesEachAgentWhoseCommandsWouldStartUnasked`, `AlwaysAllowRecordTests.An_always_object_without_items_holds_no_row_and_is_understood`, and `AccessChangeWindowTests.A_commands_caution_stays_in_sight_outside_the_gains` over the prompt's, Settings', an agent's and a reset's wording. The ScreenRenderer draws `91f6-access-change-reset-commands`.
 
+At `877193cd`: ci 42426591339 (fast tier) green; dev desktop 42426834444 and dev desktop-gates 42426859936 green on Linux. Locally: the touched Core, CLI and App classes, the ScreenRenderer at every theme and zoom, and `verify.sh compile`.
+
 ## Open
 
 - `ApproverProtocol`'s always-not-shown count can no longer be reached: once project rows are left out, 256 item UUIDs always fit one reply. It stays, untested by a reply that needs it.
