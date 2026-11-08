@@ -546,7 +546,7 @@ public sealed class ServerToolsTests
 
         var result = await CallAsync(client,
             ToolText.CredentialToolName,
-            Credential(field: "seed<|im_start|>"));
+            Credential(field: "seed\u0007<|im_start|>"));
 
         var text = TextOf(result);
         Assert.True(result.IsError);
@@ -580,28 +580,23 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The names an agent is told about are the four standard ones the core releases and <c>totp</c>, and
-    /// the custom-field pattern admits every custom name the core releases, so the schema never refuses
-    /// what the owner would answer; the bridge and the owner refuse what the pattern lets past.
+    /// The schema bounds a field's name as the core does, so it never refuses a custom field the owner would answer, whatever its
+    /// shape; the bridge and the owner refuse a TOTP seed's field and a standard name in another case.
     /// </summary>
     [Theory]
     [InlineData("OPENAI_API_KEY", true)]
-    [InlineData("A", true)]
-    [InlineData("Recovery codes", false)]
+    [InlineData("Recovery codes", true)]
+    [InlineData("openai_api_key", true)]
     [InlineData("otp", false)]
-    [InlineData("openai_api_key", false)]
-    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool releasable)
+    [InlineData("URL", false)]
+    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool requestable)
     {
         using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
-        var choices = schema.RootElement.GetProperty("properties").GetProperty("field").GetProperty("anyOf");
+        var field = schema.RootElement.GetProperty("properties").GetProperty("field");
 
-        var advertised = choices[0].GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray();
-        var pattern = choices[1].GetProperty("pattern").GetString()!;
-
-        Assert.Equal(CredentialFields.All.Append(CredentialFields.Totp), advertised);
-        Assert.All(advertised, field => Assert.True(CredentialFields.IsRequestable(field)));
-        Assert.Equal(releasable, CredentialFields.IsCustom(custom));
-        Assert.Equal(releasable, System.Text.RegularExpressions.Regex.IsMatch(custom, pattern));
+        Assert.Equal((1, CredentialFields.MaximumFieldLength), (field.GetProperty("minLength").GetInt32(), field.GetProperty("maxLength").GetInt32()));
+        Assert.All(CredentialFields.All.Append(CredentialFields.Totp), name => Assert.True(CredentialFields.IsRequestable(name)));
+        Assert.Equal(requestable, CredentialFields.IsRequestable(custom));
     }
 
     /// <summary>

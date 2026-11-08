@@ -17,12 +17,12 @@ readonly MASTER='ci-approval-master-pw'
 readonly SECRET='SENTINEL-E2E-PASSWORD-7c31f9'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
-# One entry with an env-named custom field, which may leave by name, and one that never does (C.5a).
+# One entry with two custom fields, each asked about by name, and the TOTP seeds and capitalized standard names refused (C.5a).
 readonly API_ENTRY='api/OpenAI'
 readonly API_PASSWORD='SENTINEL-E2E-OPENAI-PASSWORD-2b8d41'
 readonly API_KEY='SENTINEL-E2E-OPENAI-API-KEY-9e0c57'
 readonly RECOVERY='SENTINEL-E2E-RECOVERY-CODES-4f6a13'
-readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.'
+readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AGENT_ERR OUT ERR'
@@ -183,7 +183,7 @@ for other in "$API_PASSWORD" "$RECOVERY" "$SECRET"; do
 done
 
 id=5
-for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+for field in otp TimeOtp-Secret TimeOtp-Secret-Base32 URL; do
   OUT="$WORK/refused-$id-stdout.txt"
   ERR="$WORK/refused-$id-stderr.txt"
   ask_field "$id" "$field" "$OUT" "$ERR" 3

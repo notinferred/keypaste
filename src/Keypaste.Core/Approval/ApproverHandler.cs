@@ -483,7 +483,7 @@ public sealed class ApproverHandler
 
     /// <summary>What a prompt says is asked for: the field, or the attachment by its name, scrubbed for display.</summary>
     private static string Shown(CredentialRequest request) =>
-        request.Attachment is { } attachment ? $"attachment {EntryNameSanitizer.Sanitize(attachment).Text}" : request.Field;
+        request.Attachment is { } attachment ? $"attachment {EntryNameSanitizer.Sanitize(attachment).Text}" : EntryNameSanitizer.Sanitize(request.Field).Text;
 
     private const string _attachmentKey = CredentialFields.Attachment + ":";
 

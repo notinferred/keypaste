@@ -84,11 +84,9 @@ public sealed class CustomFieldReleaseTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Recovery codes")]
     [InlineData("otp")]
-    [InlineData("KP2A_URL_1")]
     [InlineData("URL")]
-    public async Task AnyOtherName_IsRefusedBeforeAnyoneIsAskedOrAnythingRead(string field)
+    public async Task A_TOTP_seed_or_a_standard_name_in_another_case_IsRefusedBeforeAnyoneIsAskedOrAnythingRead(string field)
     {
         using var approver = new Approver(_vault);
         approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
@@ -114,16 +112,15 @@ public sealed class CustomFieldReleaseTests : IDisposable
         Assert.Equal(0, approver.Channel.Asked);
     }
 
-    /// <summary>No rule reaches a field that never leaves: the field's name is refused before its category is considered.</summary>
+    /// <summary>A custom field is decided by its category whatever its name: one named with a space is released under the custom field rule's Allow.</summary>
     [Fact]
-    public async Task AnAllowedCategory_NeverReleasesAFieldThatNeverLeaves()
+    public async Task AnAllowedCategory_ReleasesACustomFieldOfAnyName()
     {
         using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
 
-        var refused = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
+        var released = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.InvalidRequest, refused.Method);
-        Assert.Null(refused.Value);
+        Assert.Equal((AuditMethod.Allowed, _recovery), (released.Method, released.Value));
         Assert.Equal(0, approver.Channel.Asked);
     }
 
@@ -151,8 +148,11 @@ public sealed class CustomFieldReleaseTests : IDisposable
             Assert.Equal(_apiKey, released.Value.ToString());
         }
 
-        Assert.False(source.TryRead(_openAi, "Recovery codes", out _, out failure, out _));
-        Assert.Equal(CredentialFailure.NoSuchField, failure);
+        Assert.True(source.TryRead(_openAi, "Recovery codes", out released, out failure, out _), failure.ToString());
+        using (released)
+        {
+            Assert.Equal(_recovery, released.Value.ToString());
+        }
 
         Assert.False(source.TryRead(_openAi, "MISSING_KEY", out _, out failure, out _));
         Assert.Equal(CredentialFailure.Empty, failure);

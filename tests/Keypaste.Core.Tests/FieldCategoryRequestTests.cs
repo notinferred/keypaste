@@ -20,6 +20,7 @@ public sealed class FieldCategoryRequestTests : IDisposable
     private const string _region = "eu-west-1";
     private const string _notes = "SENTINEL-CATEGORY-NOTES";
     private const string _database = "postgres://SENTINEL-CATEGORY-DB@db/app";
+    private const string _codes = "SENTINEL-CATEGORY-RECOVERY-CODES";
     private const string _key = "deploy.pem";
     private static readonly byte[] _keyBytes = [.. "SENTINEL-CATEGORY-ATTACHMENT"u8];
     private static readonly EntryName _github = new("work", "github");
@@ -44,6 +45,8 @@ public sealed class FieldCategoryRequestTests : IDisposable
                 new FieldWrite("API_TOKEN", _token),
                 new FieldWrite("REGION_NAME", _region, Protect: false),
                 new FieldWrite("TimeOtp-Secret", "12345678901234567890"),
+                new FieldWrite("Recovery codes", _codes),
+                new FieldWrite("api key", _token, Protect: false),
             ]));
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _database);
             Assert.True(created.AddAttachment(_github, _key, new MemoryStream(_keyBytes), out _));
@@ -155,6 +158,38 @@ public sealed class FieldCategoryRequestTests : IDisposable
         Assert.Null(unconfirmed.Value);
         Assert.Equal((AuditMethod.Allowed, _password), (confirmed.Method, confirmed.Value));
         Assert.Equal(1, _channel.Asked);
+    }
+
+    /// <summary>A custom field of any name, spaces or lower case included, is asked about as a custom field and released under its Allow.</summary>
+    [Theory]
+    [InlineData("Recovery codes", _codes)]
+    [InlineData("api key", _token)]
+    public async Task A_custom_field_of_any_name_is_asked_and_released_on_Allow(string field, string value)
+    {
+        Assert.Equal(FieldCategory.CustomField, Category("work/github", field));
+        _channel.Answer = ApprovalAnswer.Denied;
+
+        var asked = await RequestAsync("work/github", field);
+        _rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true);
+        _clock.Advance(TimeSpan.FromMinutes(2));
+        var allowed = await RequestAsync("work/github", field);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt, null), (asked.Decision, asked.Method, asked.Value));
+        Assert.Equal(field, _channel.LastPrompt!.Field);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed, value), (allowed.Decision, allowed.Method, allowed.Value));
+        Assert.Equal(1, _channel.Asked);
+    }
+
+    /// <summary>A field a TOTP seed is read from stays unreachable whatever the rules say: its code is released as <c>totp</c>, never its seed.</summary>
+    [Fact]
+    public async Task A_TOTP_seed_field_is_refused_unasked_under_every_rule()
+    {
+        _rules.Rules = FieldCategories.Ruled.Aggregate(AgentRules.Defaults, (rules, category) => rules.Allowing(category, confirmed: true));
+
+        var reply = await RequestAsync("work/github", "TimeOtp-Secret");
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.InvalidRequest, null), (reply.Decision, reply.Method, reply.Value));
+        Assert.Equal(0, _channel.Asked);
     }
 
     /// <summary>An item's username reaches agents unasked until Settings hides it, and the switch hides nothing else.</summary>

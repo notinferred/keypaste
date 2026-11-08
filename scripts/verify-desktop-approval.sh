@@ -28,7 +28,7 @@ readonly SECRET='SENTINEL-DESKTOP-APPROVAL-8b41e6'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 readonly LABEL='ci-probe'
 
-# An entry with an env-named custom field, which may leave by name, and one that never does (C.5a).
+# An entry with two custom fields, each asked about by name, and the TOTP seeds and capitalized standard names refused (C.5a).
 readonly API_ENTRY='api/OpenAI'
 readonly API_PASSWORD='SENTINEL-DESKTOP-OPENAI-PASSWORD-51c7'
 readonly API_KEY='SENTINEL-DESKTOP-OPENAI-API-KEY-6d08'
@@ -40,7 +40,7 @@ readonly RELEASE_ENTRY='env/ci/RELEASE_KEY'
 # A value a terminal sends the app to write, which no prompt and no log line may show.
 readonly EDITED='SENTINEL-DESKTOP-TERMINAL-EDIT-2a90'
 
-readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.'
+readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='HOLD_OUT OUT ERR'
@@ -217,7 +217,7 @@ echo deny >&7
 reply_to 4
 withdrawn
 id=5
-for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+for field in otp TimeOtp-Secret TimeOtp-Secret-Base32 URL; do
   request "$id" "$API_ENTRY" "$field"
   reply_to "$id"
   jq -e --arg t "$DENIAL" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' <"$OUT" >/dev/null \

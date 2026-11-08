@@ -50,11 +50,9 @@ internal static class ToolSchemas
             },
             "field": {
               "type": "string",
-              "anyOf": [
-                { "enum": ["password", "username", "url", "notes", "totp"] },
-                { "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
-              ],
-              "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or one custom field of the item named like an environment variable, such as OPENAI_API_KEY. Never more than one."
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or the exact name of one of the item's custom fields, as list_entry_names gives it, such as OPENAI_API_KEY. Never more than one."
             },
             "reason": {
               "type": "string",

@@ -17,10 +17,10 @@
 # value and the entry's history holds both values keypaste saved (D-0387).
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
 # `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste approve` and `keypaste mcp` release
-# `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
-# its reference is asked about as the entry and the field. With `custom = "allow"` written into
-# agents.toml by hand, the field is still asked about, since only the vault's owner can seal a rule, and
-# `Recovery codes` is still refused by name, before anyone is asked.
+# `OPENAI_API_KEY` as asked and refuse a TOTP seed's field and a standard name in capitals without asking
+# anyone, and the `run` tool naming its reference is asked about as the entry and the field. With
+# `custom = "allow"` written into agents.toml by hand, the field is still asked about, since only the
+# vault's owner can seal a rule, and `otp` is still refused by name, before anyone is asked.
 # `keypaste run --env-file` gives a child the field a reference names and starts nothing for
 # `Recovery codes`. The app's own prompt window, held by tests/Keypaste.AppDriver on a copy keypaste
 # wrote only the agent's settings into, names the field; Allow once releases it alone, and the next
@@ -438,7 +438,7 @@ app_openai="$dir/openai-app.kdbx"
 cp "$openai" "$app_openai"
 api_key=fields-openai-api-key
 others=(fields-openai-password fields-openai-recovery KRSXG5CTMVRXEZLU fields-openai-kp2a)
-denial='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.'
+denial='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.'
 
 agents=0
 # Starts keypaste approve on the OpenAI vault: $1 is what it reads after the master password, the rest its options.
@@ -484,7 +484,7 @@ ask_field() {
 ask_field 2 OPENAI_API_KEY | jq -e --arg v "$api_key" 'select(.id == 2) | .result.isError == false and .result.structuredContent.value == $v' >/dev/null \
   || die "Allow once did not return exactly the OPENAI_API_KEY KeePassXC wrote: $(cat "$dir/field-2.out")"
 id=3
-for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+for field in otp TimeOtp-Secret TimeOtp-Secret-Base32 URL; do
   ask_field "$id" "$field" | jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
     || die "a request for '$field' was not refused with the fixed denial: $(cat "$dir/field-$id.out")"
   id=$((id + 1))
@@ -516,7 +516,7 @@ for value in "${others[@]}"; do
 done
 grep -q "$api_key" "$dir/run-tool.out" "$audit" "$agent_err" && die "the released value reached the denied run, the audit log or the agent's terminal"
 
-step "with custom = \"allow\" written into agents.toml by hand, OPENAI_API_KEY is still asked about, and Recovery codes is still refused by name"
+step "with custom = \"allow\" written into agents.toml by hand, OPENAI_API_KEY is still asked about, and otp is still refused by name"
 stop_agent
 sed 's/^custom = "ask"$/custom = "allow"/' "$KEYPASTE_HOME/agents.toml" >"$dir/agents.edited" && mv "$dir/agents.edited" "$KEYPASTE_HOME/agents.toml"
 grep -q '^custom = "allow"$' "$KEYPASTE_HOME/agents.toml" || die "could not edit agents.toml"
@@ -528,9 +528,9 @@ ask_field 10 OPENAI_API_KEY | jq -e 'select(.id == 10) | .result.isError == true
 [ "$(asked)" = 1 ] || die "with a hand-edited Allow, the request for OPENAI_API_KEY did not reach the person"
 tail -n 1 "$audit" | jq -e '.decision == "denied" and .method == "prompt" and .args.field == "OPENAI_API_KEY"' >/dev/null \
   || die "the request was not audited as a prompted denial of that field: $(lines_after "$audit" "$logged")"
-ask_field 11 'Recovery codes' | jq -e --arg t "$denial" 'select(.id == 11) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
-  || die "a request for 'Recovery codes' was not refused with the fixed denial: $(cat "$dir/field-11.out")"
-[ "$(asked)" = 1 ] || die "a request for 'Recovery codes' reached a person"
+ask_field 11 otp | jq -e --arg t "$denial" 'select(.id == 11) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
+  || die "a request for otp was not refused with the fixed denial: $(cat "$dir/field-11.out")"
+[ "$(asked)" = 1 ] || die "a request for otp reached a person"
 stop_agent
 for value in "${others[@]}" "$api_key"; do
   grep -q "$value" "$dir"/field-1?.out "$audit" "$dir"/agent-*.err && die "'$value' left the vault under a hand-edited Allow"
@@ -613,7 +613,7 @@ app_reply 4
 withdrawn
 jq -e 'select(.id == 4) | .result.isError == true' <"$bridge_out" >/dev/null || die "the denied password was released"
 id=5
-for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+for field in otp TimeOtp-Secret TimeOtp-Secret-Base32 URL; do
   app_request "$id" "$field"
   app_reply "$id"
   jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' <"$bridge_out" >/dev/null \

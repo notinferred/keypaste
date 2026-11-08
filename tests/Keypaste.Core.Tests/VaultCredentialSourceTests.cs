@@ -245,7 +245,6 @@ public sealed class VaultCredentialSourceTests : IDisposable
 
     [Theory]
     [InlineData("Password")]
-    [InlineData("secret")]
     [InlineData("")]
     [InlineData("otp")]
     public void AFieldKeypasteDoesNotRelease_IsRefused(string field)

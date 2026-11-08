@@ -513,16 +513,13 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A custom field that is not env-named, KeePassXC's own attributes and a standard name in capitals
-    /// are refused by the bridge before the owner is asked, in the words the plan fixes, and audited as
-    /// an invalid field with no value anywhere.
+    /// A field a TOTP seed is read from and a standard name in capitals are refused by the bridge before the owner is asked,
+    /// in the words the plan fixes, and audited as an invalid field with no value anywhere.
     /// </summary>
     [Theory]
-    [InlineData("Recovery codes")]
     [InlineData("otp")]
     [InlineData("TimeOtp-Secret")]
     [InlineData("TimeOtp-Secret-Base32")]
-    [InlineData("KP2A_URL_1")]
     [InlineData("URL")]
     public async Task AFieldThatNeverLeaves_IsRefusedUnasked_AndAuditedAsInvalid(string field)
     {
@@ -536,7 +533,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             Assert.True(result.IsError);
             Assert.Equal(
-                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.",
+                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.",
                 TextOf(result));
             Assert.Equal(0, _human.Asked);
 

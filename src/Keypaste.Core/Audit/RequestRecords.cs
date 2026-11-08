@@ -151,7 +151,7 @@ public static class RequestRecords
         ArgumentNullException.ThrowIfNull(reason);
         ArgumentNullException.ThrowIfNull(exposure);
 
-        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? field : null, statedReason);
+        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? EntryNameSanitizer.Sanitize(field, CredentialFields.MaximumFieldLength).Text : null, statedReason);
 
         // The agent is told to prefer a handle, so the argument is usually an opaque k1_… that
         // answers nothing a reader of the log asks; the name it resolved to does.

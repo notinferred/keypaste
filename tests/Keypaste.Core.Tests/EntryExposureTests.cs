@@ -280,8 +280,8 @@ public sealed class EntryExposureTests
             Assert.True(lister.TryList(Exposure("services/**"), out var whole, out _));
             Assert.True(lister.TryList(EntryExposure.Default, out var tagged, out _));
 
-            Assert.Equal(new ListedEntry(stripe, ["password", "url", "STRIPE_SECRET_KEY"], ["env:billing"]), Assert.Single(whole));
-            Assert.Equal(new ListedEntry(stripe, ["STRIPE_SECRET_KEY"], ["env:billing"]), Assert.Single(tagged));
+            Assert.Equal(new ListedEntry(stripe, ["password", "url", "Region", "STRIPE_SECRET_KEY"], ["env:billing"]), Assert.Single(whole));
+            Assert.Equal(new ListedEntry(stripe, ["Region", "STRIPE_SECRET_KEY"], ["env:billing"]), Assert.Single(tagged));
         }
         finally
         {
@@ -369,7 +369,7 @@ public sealed class EntryExposureTests
             ExposureReach.Entry,
             Exposure("tag:env:*", "services/**").Reach(Name("services", "Stripe"), ["env:billing"]));
 
-    /// <summary>A tag never exposes a password: the reach through one covers only fields named like variables.</summary>
+    /// <summary>A tag never exposes a password: the reach through one covers only the item's custom fields, its project variables.</summary>
     [Fact]
     public void ATagReachesOnlyTheEntrysProjectVariables()
     {
@@ -384,7 +384,9 @@ public sealed class EntryExposureTests
             Assert.False(exposure.Permits(entry, tags, standard));
         }
 
-        Assert.False(exposure.Permits(entry, tags, "KP2A_URL_1"));
+        Assert.True(exposure.Permits(entry, tags, "Region"));
+        Assert.False(exposure.Permits(entry, tags, "otp"));
+        Assert.False(exposure.Permits(entry, tags, CredentialFields.Attachment));
         Assert.True(Exposure("services/**").Permits(entry, [], "password"));
         Assert.False(exposure.Permits(Name(ReservedGroups.Tokens, "7d2e91c0"), tags, "STRIPE_SECRET_KEY"));
     }

@@ -246,7 +246,7 @@ public sealed class EntryExposure
         return reach switch
         {
             ExposureReach.Entry => true,
-            ExposureReach.ProjectFields => CredentialFields.IsCustom(field),
+            ExposureReach.ProjectFields => CredentialFields.IsAgentCustom(field),
             _ => false,
         };
     }
@@ -261,7 +261,7 @@ public sealed class EntryExposure
         ArgumentNullException.ThrowIfNull(field);
 
         return Reach(name, []) == ExposureReach.Entry
-            || (_selectors.Length > 0 && !ReservedGroups.IsReserved(name.GroupPath) && CredentialFields.IsCustom(field));
+            || (_selectors.Length > 0 && !ReservedGroups.IsReserved(name.GroupPath) && CredentialFields.IsAgentCustom(field));
     }
 
     /// <summary>Whether this exposure provably reaches at least as far as another, entry by entry.</summary>
