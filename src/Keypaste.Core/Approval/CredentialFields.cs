@@ -26,7 +26,7 @@ public static class CredentialFields
     public const string Rule = "password, username, url, notes or a custom field named like an environment variable";
 
     /// <summary>What a credential request may name, completing a sentence such as "the field must be …".</summary>
-    public const string RequestRule = "password, username, url, notes, totp, attachment or a custom field named like an environment variable";
+    public const string RequestRule = "password, username, url, notes, totp or a custom field named like an environment variable";
 
     /// <summary>Whether a field name is one keypaste releases.</summary>
     /// <param name="field">The field name exactly as it arrived.</param>
