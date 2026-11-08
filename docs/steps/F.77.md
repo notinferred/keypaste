@@ -105,3 +105,11 @@ This branch and F.76's are held unmerged until these are built; the founder chos
 - The picker's Always allow remembers the pick: it answers this agent's requests for that name with the picked item after the person confirms, kept in the app configuration.
 - PRODUCT §3's "MCP remains bounded credential access … not arbitrary shell execution" is reworded in the v1.23 draft for Automatic with commands.
 - Still to ask: telling a same-named pair apart in Trash (username or URL, deletion time to the second, or leave it); Agents listing a project set to Automatic twice, under Always allowed and Project rows.
+
+Later the same evening the founder simplified the agent model, superseding the split above where they differ:
+
+- An agent's page holds only what the person always allowed, each with Remove, and whether it may run commands. Modes, Can see patterns, project rows, limits, Give values and this computer's ceilings go. Every agent sees item names, never values.
+- A value request offers Deny, Allow once and Always allow, the last for this item or for everything this agent asks; two items answering opens the picker, whose Always allow remembers the pick. A command offers Deny, Allow once or always allowing this agent to run commands. Production stays asked, Allow once only.
+- Nothing about agents is kept in the vault: what is always allowed lives in this computer's app configuration. ACAF v1 and v1.1 stay published as written, marked as no longer used by keypaste; v1.2 is not published. PRODUCT v1.12's storage sentence is amended.
+- Before 1.0.0, an agent may ask to save a value: it names the place and variable, and the person types or pastes the value in the app, which the agent never sees. This needs a dated PRODUCT amendment.
+- A request arriving while a prompt is open waits its turn instead of being refused as busy. How a looping agent is kept from piling prompts up is still to settle.
