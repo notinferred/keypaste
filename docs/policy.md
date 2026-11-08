@@ -21,13 +21,15 @@ Every value an agent asks for falls in one category, and each category is Ask, A
 | Category | What it holds |
 |---|---|
 | Passwords | An item's password |
-| Custom fields | Any custom field of an item that is not in a project, protected or not |
+| Custom fields | Any custom field of an item that is not in a project and not a card's or an identity's protected field, protected or not |
 | Project variables | Any custom field of an item tagged into a project, `env:<project>` or `env:<project>:<environment>` |
+| Card values | A protected custom field of an item tagged `Credit Card`, such as its number or security code |
+| Identity values | A protected custom field of an item tagged `Identity`, such as a Social Security or passport number |
 | TOTP codes | An item's current code, never its seed |
 | Notes | An item's notes |
 | Attachments | One attachment of an item, asked for by name, at most 5 MiB |
 
-Ask puts each request to you, and the prompt offers Deny and Allow once, and Always allow and Always block for an agent whose bridge has a label ([approvals](approvals.md)). Allow releases without asking you and records each release; it takes effect only once you confirm, in Settings, that every agent will receive every value of that kind without asking. Block refuses without asking you. A passkey's fields are always blocked, since its private key signs in wherever it is registered. Whether a custom field is a project variable depends only on its item's project tag, never on the field's name.
+Ask puts each request to you, and the prompt offers Deny and Allow once, and Always allow and Always block for an agent whose bridge has a label ([approvals](approvals.md)). Allow releases without asking you and records each release; it takes effect only once you confirm, in Settings, that every agent will receive every value of that kind without asking. Block refuses without asking you. A passkey's fields are always blocked, since its private key signs in wherever it is registered. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and whether the field is protected, never on the field's name. keypaste's Bitwarden import and 1Password's 1PUX import tag cards `Credit Card` and identities `Identity`; tag a card or identity you made yourself the same way.
 
 After you refuse a request, the same field is refused for a minute without asking you again; changing that field's category in Settings ends the wait at once.
 

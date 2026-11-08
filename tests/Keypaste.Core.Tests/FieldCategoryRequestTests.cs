@@ -51,6 +51,15 @@ public sealed class FieldCategoryRequestTests : IDisposable
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _database);
             Assert.True(created.AddAttachment(_github, _key, new MemoryStream(_keyBytes), out _));
 
+            created.AddEntry(new VaultEntry { GroupPath = "cards", Title = "Visa" });
+            Assert.True(created.AddTag(new EntryName("cards", "Visa"), FieldCategories.CardTag));
+            Assert.True(created.SetFields(new EntryName("cards", "Visa"), [new FieldWrite("Number", "SENTINEL-CARD-NUMBER"), new FieldWrite("Brand", "Visa", Protect: false)]));
+            created.AddEntry(new VaultEntry { GroupPath = "ids", Title = "Me" });
+            Assert.True(created.AddTag(new EntryName("ids", "Me"), "identity"));
+            Assert.True(created.SetFields(new EntryName("ids", "Me"), [new FieldWrite("Social Security number", "SENTINEL-SSN")]));
+            created.AddEntry(new VaultEntry { GroupPath = "cards", Title = "Hand made" });
+            Assert.True(created.SetFields(new EntryName("cards", "Hand made"), [new FieldWrite("Number", "SENTINEL-HAND-NUMBER")]));
+
             foreach (var account in new[] { "first", "second" })
             {
                 created.AddEntry(new VaultEntry { GroupPath = "shared", Title = "certificate", Username = account });
@@ -90,6 +99,8 @@ public sealed class FieldCategoryRequestTests : IDisposable
         { FieldCategory.CustomField, "work/github", "API_TOKEN" },
         { FieldCategory.CustomField, "work/github", "REGION_NAME" },
         { FieldCategory.ProjectVariable, "env/acme-api/.env", "DATABASE_URL" },
+        { FieldCategory.Card, "cards/Visa", "Number" },
+        { FieldCategory.Identity, "ids/Me", "Social Security number" },
         { FieldCategory.Totp, "work/github", "totp" },
         { FieldCategory.Notes, "work/github", "notes" },
     };
@@ -438,6 +449,27 @@ public sealed class FieldCategoryRequestTests : IDisposable
         Assert.Equal(AuditMethod.Blocked, reply.Method);
         Assert.Empty(reply.Set.Variables);
         Assert.Equal(0, _channel.Asked);
+    }
+
+    /// <summary>
+    /// A card's or an identity's tag makes only its item's protected fields theirs (F.78c): its plain fields, and a hand-made
+    /// card nobody tagged, stay custom fields, so an unrecognised card releases nothing more.
+    /// </summary>
+    [Fact]
+    public async Task Only_a_tagged_items_protected_fields_are_card_or_identity_values()
+    {
+        Assert.Equal(FieldCategory.CustomField, Category("cards/Visa", "Brand"));
+        Assert.Equal(FieldCategory.CustomField, Category("cards/Hand made", "Number"));
+        Assert.Equal(FieldCategory.ProjectVariable, FieldCategories.Of("Number", ["env:acme-api", FieldCategories.CardTag], isProtected: true));
+        _rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Card, confirmed: true);
+        _channel.Answer = ApprovalAnswer.Denied;
+
+        var tagged = await RequestAsync("cards/Visa", "Number");
+        var handMade = await RequestAsync("cards/Hand made", "Number");
+
+        Assert.Equal(("SENTINEL-CARD-NUMBER", AuditMethod.Allowed), (tagged.Value, tagged.Method));
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt, null), (handMade.Decision, handMade.Method, handMade.Value));
+        Assert.Equal(1, _channel.Asked);
     }
 
     /// <summary>Rules that cannot be read refuse every agent request before anybody is asked.</summary>

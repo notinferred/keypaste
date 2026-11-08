@@ -151,7 +151,7 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(field);
 
-        return FieldCategories.Of(field, _source.Tags(name));
+        return FieldCategories.Of(field, _source.Tags(name), _source.IsProtected(name, field));
     }
 
     /// <summary>Which entry names may be shown to an agent: those its bridge's exposure reaches.</summary>

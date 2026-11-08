@@ -293,6 +293,9 @@ public sealed class BitwardenJsonReaderTests : IDisposable
             reopened.Fields(new EntryName("imported", "Server key")));
         Assert.Equal("bw-ssh-private", reopened.ReadField(new EntryName("imported", "Server key"), "Private key"));
         Assert.Equal([Masked("Account number"), Plain("Bank name")], reopened.Fields(new EntryName("imported", "Checking")));
+        Assert.Equal(["Credit Card"], reopened.Tags(new EntryName("imported", "Visa")));
+        Assert.Equal(["Identity"], reopened.Tags(new EntryName("imported", "Me")));
+        Assert.Empty(reopened.Tags(new EntryName("imported", "Checking"))!);
         Assert.Null(reopened.Find(new EntryName("imported", "Old")));
         Assert.Null(reopened.Find(new EntryName("imported", "Mystery")));
     }

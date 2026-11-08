@@ -46,7 +46,7 @@ flowchart TD
   ask -->|allow| released
 ```
 
-Each kind of value, passwords, custom fields, project variables, TOTP codes, notes and attachments, is asked about by default; allowing one for every agent is a setting you confirm, and a passkey is always refused. An item's URL, and its username unless you hide it, are released without asking. A command is asked about every time. Every error on this path refuses. If the audit record cannot be written, the value is not released.
+Each kind of value, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is asked about by default; allowing one for every agent is a setting you confirm, and a passkey is always refused. An item's URL, and its username unless you hide it, are released without asking. A command is asked about every time. Every error on this path refuses. If the audit record cannot be written, the value is not released.
 
 ## What locking does
 

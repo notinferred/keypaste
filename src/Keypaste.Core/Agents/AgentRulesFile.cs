@@ -81,6 +81,7 @@ public sealed class AgentRulesFile(string path)
     private static readonly TomlLimits _limits = TomlLimits.Policy with
     {
         Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + 2,
+        Pairs = FieldCategories.Ruled.Count + 2,
         Lines = 2048,
         Bytes = 256 * 1024,
         LineLength = 1024,

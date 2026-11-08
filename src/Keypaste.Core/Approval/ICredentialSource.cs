@@ -27,6 +27,12 @@ public interface ICredentialSource
     /// <returns>The UUID, or null when it cannot be read, so no row covers it and none is offered.</returns>
     string? ItemId(EntryName name) => null;
 
+    /// <summary>Whether one custom field of an entry is protected, read without its value, which decides whether a card's or an identity's tag makes it theirs.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name.</param>
+    /// <returns>False when it is not, or cannot be read, so the field stays a custom field.</returns>
+    bool IsProtected(EntryName name, string field) => false;
+
     /// <summary>The name of the entry with a UUID, for a row or a confirmation to show.</summary>
     /// <param name="item">The UUID as hex.</param>
     /// <returns>Its name, or null when no live entry has it.</returns>

@@ -79,7 +79,6 @@ These observations are not completed fixes or established causes. Only the found
 
 | Observation | What must be established |
 |---|---|
-| F.78c recognises a card or an identity by the field names keypaste's importers write, which F.78a's principle of deciding nothing by a field's name questions (F.78a, 2026-11-08). | Whether F.78c should recognise cards some other way or be dropped. |
 | An attachment crosses the owner's pipe in one reply of at most 8 MiB, base64 of the 5 MiB cap, held whole in both processes' memory and in the MCP result (F.78a, 2026-11-08). | Whether a streamed or chunked reply is worth its protocol cost for attachments near the cap. |
 | A sync or a merge from another file can bring back an always-allowed row the person removed here, since a row lives only in the agent's record, which a merge settles by time, and this computer's ceilings keep no row ([F.77](steps/F.77.md), T-12). | Whether a removal should also hold on this computer, as a narrowing does, and what the person is told when a merge brings a row back. |
 | A share's audit line and its Share links row name the path two items sharing a name have ([F.75](steps/F.75.md), T-53). Credential lines name the item's UUID since [F.76](steps/F.76.md), and a pair's row and card read by it. | Whether a share's line should name the item too, and whether lines written before F.76, which name the path alone, should count anywhere for such an item. |

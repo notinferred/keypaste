@@ -29,6 +29,12 @@ public enum FieldCategory
 
     /// <summary>A passkey's <c>KPEX_PASSKEY_*</c> field, whose private key signs in wherever it is registered: always Blocked.</summary>
     Passkey = 7,
+
+    /// <summary>A protected custom field of an item tagged <see cref="FieldCategories.CardTag"/>, such as a card's number or security code.</summary>
+    Card = 9,
+
+    /// <summary>A protected custom field of an item tagged <see cref="FieldCategories.IdentityTag"/>, such as a Social Security or passport number.</summary>
+    Identity = 10,
 }
 
 /// <summary>How every agent's requests for one category are answered.</summary>
@@ -50,12 +56,20 @@ public static class FieldCategories
     /// <summary>The prefix of KeePassXC's passkey fields.</summary>
     public const string PasskeyPrefix = "KPEX_PASSKEY_";
 
+    /// <summary>The tag that makes an item a card, as 1Password's import and keypaste's Bitwarden import write it; matched in any case.</summary>
+    public const string CardTag = "Credit Card";
+
+    /// <summary>The tag that makes an item an identity, as 1Password's import and keypaste's Bitwarden import write it; matched in any case.</summary>
+    public const string IdentityTag = "Identity";
+
     /// <summary>The categories Settings sets a rule for, in the order it lists them.</summary>
     public static IReadOnlyList<FieldCategory> Ruled { get; } =
     [
         FieldCategory.Password,
         FieldCategory.CustomField,
         FieldCategory.ProjectVariable,
+        FieldCategory.Card,
+        FieldCategory.Identity,
         FieldCategory.Totp,
         FieldCategory.Notes,
         FieldCategory.Attachment,
@@ -64,8 +78,12 @@ public static class FieldCategories
     /// <summary>The category of a field an agent named.</summary>
     /// <param name="field">The field as the request names it: <c>password</c>, <c>username</c>, <c>url</c>, <c>notes</c>, <c>totp</c> or a custom field.</param>
     /// <param name="tags">The item's own tags.</param>
-    /// <returns>Its category: the KeePass standard fields by their place, a passkey by KeePassXC's format, any other custom field by its item's project tags alone.</returns>
-    public static FieldCategory Of(string field, IReadOnlyList<string> tags)
+    /// <param name="isProtected">Whether the field is a protected custom field, which a card's or an identity's tag makes one of theirs.</param>
+    /// <returns>
+    /// Its category: the KeePass standard fields by their place, a passkey by KeePassXC's format, and any other custom field
+    /// by its item's tags alone: a project tag's variable, then a card's or an identity's protected field, otherwise a custom field.
+    /// </returns>
+    public static FieldCategory Of(string field, IReadOnlyList<string> tags, bool isProtected = false)
     {
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(tags);
@@ -80,9 +98,13 @@ public static class FieldCategories
             Approval.CredentialFields.Totp => FieldCategory.Totp,
             Approval.CredentialFields.Attachment => FieldCategory.Attachment,
             _ when tags.Any(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member) => FieldCategory.ProjectVariable,
+            _ when isProtected && Tagged(tags, CardTag) => FieldCategory.Card,
+            _ when isProtected && Tagged(tags, IdentityTag) => FieldCategory.Identity,
             _ => FieldCategory.CustomField,
         };
     }
+
+    private static bool Tagged(IReadOnlyList<string> tags, string tag) => tags.Any(held => string.Equals(held, tag, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Whether a field is one of a passkey's.</summary>
     /// <param name="field">The field's name.</param>
@@ -104,6 +126,8 @@ public static class FieldCategories
         FieldCategory.Password => "passwords",
         FieldCategory.CustomField => "custom fields",
         FieldCategory.ProjectVariable => "project variables",
+        FieldCategory.Card => "card values",
+        FieldCategory.Identity => "identity values",
         FieldCategory.Totp => "TOTP codes",
         FieldCategory.Notes => "notes",
         FieldCategory.Attachment => "attachments",
@@ -120,6 +144,8 @@ public static class FieldCategories
         FieldCategory.Password => "password",
         FieldCategory.CustomField => "custom field",
         FieldCategory.ProjectVariable => "project variable",
+        FieldCategory.Card => "card value",
+        FieldCategory.Identity => "identity value",
         FieldCategory.Totp => "TOTP code",
         FieldCategory.Notes => "notes",
         FieldCategory.Attachment => "attachment",
@@ -146,6 +172,8 @@ public static class FieldCategories
         FieldCategory.Password => "password",
         FieldCategory.CustomField => "custom",
         FieldCategory.ProjectVariable => "variable",
+        FieldCategory.Card => "card",
+        FieldCategory.Identity => "identity",
         FieldCategory.Totp => "totp",
         FieldCategory.Notes => "notes",
         FieldCategory.Attachment => "attachment",

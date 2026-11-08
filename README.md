@@ -306,7 +306,7 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Settings and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Settings hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
+In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Settings and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Settings hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
 
 ```sh
 keypaste clients
