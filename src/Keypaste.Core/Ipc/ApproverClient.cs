@@ -190,7 +190,11 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+        var frame = await ExchangeAsync(
+            ApproverProtocol.Encode(request),
+            cancellationToken,
+            withdrawable: true,
+            replyFrameBytes: request.Attachment is null ? MessageFramer.MaximumFrameBytes : ApproverProtocol.MaximumAttachmentReplyFrameBytes).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out CredentialReply? reply) ? reply : null;
     }

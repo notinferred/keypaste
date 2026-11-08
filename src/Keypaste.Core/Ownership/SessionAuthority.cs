@@ -357,7 +357,7 @@ public sealed class SessionAuthority : IApproverHandler
                 request.Reason,
                 reply.Decision,
                 reply.Method,
-                reply.Reason,
+                RequestRecords.Naming(request.Attachment, reply.Reason),
                 reply.Entry,
                 request.Exposure,
                 reply.Session,

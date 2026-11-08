@@ -237,7 +237,8 @@ internal static class ClientsCommand
             style,
             ["VALUE", "EVERY AGENT"],
             [
-                [FieldCategories.Shown(FieldCategory.Detail), rules.ShowsDetails ? "shown" : "hidden"],
+                [FieldCategories.Shown(FieldCategory.Url), "shown"],
+                [FieldCategories.Shown(FieldCategory.Username), rules.ShowsUsername ? "shown" : "hidden"],
                 .. FieldCategories.Ruled.Select(category => new[] { FieldCategories.Shown(category), Word(rules.RuleFor(category)) }),
                 [FieldCategories.Shown(FieldCategory.Passkey), Word(CategoryRule.Block)],
             ]);
@@ -273,8 +274,8 @@ internal static class ClientsCommand
             json.WriteStartArray();
 
             json.WriteStartObject();
-            json.WriteString("kind", "details");
-            json.WriteString("rule", rules.ShowsDetails ? "shown" : "hidden");
+            json.WriteString("kind", "username");
+            json.WriteString("rule", rules.ShowsUsername ? "shown" : "hidden");
             json.WriteEndObject();
 
             foreach (var category in FieldCategories.Ruled.Append(FieldCategory.Passkey))

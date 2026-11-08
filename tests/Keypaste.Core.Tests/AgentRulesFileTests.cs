@@ -13,11 +13,11 @@ public sealed class AgentRulesFileTests : IDisposable
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public void An_absent_file_asks_about_every_value_shows_details_and_runs_nothing()
+    public void An_absent_file_asks_about_every_value_shows_usernames_and_runs_nothing()
     {
         Assert.True(File.TryRead(out var rules, out var problem), problem);
 
-        Assert.True(rules.ShowsDetails);
+        Assert.True(rules.ShowsUsername);
         Assert.All(FieldCategories.Ruled, category => Assert.Equal(CategoryRule.Ask, rules.RuleFor(category)));
         Assert.Equal(CategoryRule.Block, rules.RuleFor(FieldCategory.Passkey));
         Assert.False(rules.Runs("claude-code"));
@@ -26,7 +26,7 @@ public sealed class AgentRulesFileTests : IDisposable
     [Fact]
     public void What_is_written_reads_back_as_itself()
     {
-        var written = (AgentRules.Defaults with { ShowsDetails = false })
+        var written = (AgentRules.Defaults with { ShowsUsername = false })
             .Allowing(FieldCategory.ProjectVariable, confirmed: true)
             .With(FieldCategory.Notes, CategoryRule.Block)
             .WithRun("claude-code", run: true)

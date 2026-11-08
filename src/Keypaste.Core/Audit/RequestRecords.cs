@@ -109,6 +109,15 @@ public static class RequestRecords
         string? vault) =>
         Listing(client, AuditDecision.Granted, AuditMethod.Exposure, Invariant($"listed {count} item names"), exposure, session, vault);
 
+    /// <summary>A credential line's reason, naming the attachment a request asked for, since the line's field says only <c>attachment</c>.</summary>
+    /// <param name="attachment">The attachment's name, or null for a field.</param>
+    /// <param name="reason">keypaste's own reason.</param>
+    /// <returns>The reason, with the attachment's scrubbed name when there is one.</returns>
+    public static string Naming(string? attachment, string reason) =>
+        attachment is null ? reason : $"{reason}; attachment {EntryNameSanitizer.Sanitize(attachment, _attachmentLength).Text}";
+
+    private const int _attachmentLength = 128;
+
     /// <summary>The line for a request for one field of one entry.</summary>
     /// <param name="client">Who asked.</param>
     /// <param name="entry">The <c>entry</c> argument as the agent wrote it.</param>

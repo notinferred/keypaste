@@ -184,6 +184,9 @@ public sealed record CredentialRequest
     /// <summary>Which field, or <c>totp</c> for the item's current TOTP code, already checked against <see cref="Approval.CredentialFields.IsRequestable"/>.</summary>
     public required string Field { get; init; }
 
+    /// <summary>The attachment's name when <see cref="Field"/> is <see cref="Approval.CredentialFields.Attachment"/>, otherwise null.</summary>
+    public string? Attachment { get; init; }
+
     /// <summary>The agent's stated reason, verbatim and untrusted (THREATS.md T-2).</summary>
     public required string Reason { get; init; }
 
@@ -267,6 +270,9 @@ public sealed record CredentialReply
     /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
     /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
     public bool Recorded { get; init; }
+
+    /// <summary>Whether this answers a request for an attachment, whose reply may fill <see cref="ApproverProtocol.MaximumAttachmentReplyFrameBytes"/>; never sent.</summary>
+    internal bool ForAttachment { get; init; }
 
     /// <summary>A description with the credential left out.</summary>
     /// <returns>The decision and method, and never the value.</returns>

@@ -119,18 +119,19 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlyTwoTools()
+    public async Task TheServerExposes_ExactlyThreeTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
 
         var tools = await ToolsAsync(client);
 
-        // The count matters as much as the names: a third tool appearing by accident on a
+        // The count matters as much as the names: another tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(2, tools.Count);
+        Assert.Equal(3, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.AttachmentToolName);
     }
 
     /// <summary>

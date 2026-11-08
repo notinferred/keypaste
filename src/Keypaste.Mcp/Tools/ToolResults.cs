@@ -86,6 +86,28 @@ internal static class ToolResults
         StructuredContent = Structured(field, value, codeSeconds),
     };
 
+    /// <summary>The result carrying one attachment, as base64, under the same terms as <see cref="Release"/>.</summary>
+    /// <param name="name">The attachment's name as the agent asked for it.</param>
+    /// <param name="base64">Its bytes as base64.</param>
+    /// <param name="method">Whether a person answered this request or an Allow rule covered it.</param>
+    /// <returns>A success result carrying exactly one attachment and nothing else.</returns>
+    internal static CallToolResult ReleaseAttachment(string name, string base64, AuditMethod method) => new()
+    {
+        IsError = false,
+        Content =
+        [
+            new TextContentBlock
+            {
+                Text = (method switch
+                {
+                    AuditMethod.Allowed => ToolText.ReleasedUnasked(ToolText.AttachmentShown(name)),
+                    _ => ToolText.ReleasedOnce(ToolText.AttachmentShown(name)),
+                }) + ToolText.Base64Follows + base64,
+            },
+        ],
+        StructuredContent = StructuredAttachment(name, base64),
+    };
+
     /// <summary>A run's result: how it ended and its scrubbed output. It carries no value.</summary>
     /// <param name="names">The variables injected.</param>
     /// <param name="exitCode">The exit code, or null when it was stopped.</param>
@@ -148,6 +170,22 @@ internal static class ToolResults
             ],
             StructuredContent = parsed.RootElement.Clone(),
         };
+    }
+
+    private static JsonElement StructuredAttachment(string name, string base64)
+    {
+        using var buffer = new MemoryStream(base64.Length + 128);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("attachment", name);
+            writer.WriteString("base64", base64);
+            writer.WriteEndObject();
+        }
+
+        using var parsed = JsonDocument.Parse(buffer.ToArray());
+        return parsed.RootElement.Clone();
     }
 
     private static JsonElement Structured(string field, string value, int codeSeconds)

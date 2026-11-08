@@ -105,6 +105,7 @@ public static class BridgeEntry
         serverOptions.ToolCollection.Add(
             new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit, attachments: true));
 
         if (options.AllowRun)
         {

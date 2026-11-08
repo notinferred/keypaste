@@ -52,7 +52,7 @@ public interface IAgentRules
 public sealed record RulesFileRead(AgentRules Rules, string? Seal, bool Present);
 
 /// <summary>
-/// <c>agents.toml</c> under the keypaste home: whether item details are shown, each category's rule and each known
+/// <c>agents.toml</c> under the keypaste home: whether usernames are shown, each category's rule and each known
 /// agent's run switch, and the seal its owner wrote, which <see cref="SealedAgentRules"/> checks; beside it,
 /// <c>agents.id</c>, this home's random identity, which the seal covers so a file copied from another home is not valid here.
 /// </summary>
@@ -67,7 +67,7 @@ public sealed class AgentRulesFile(string path)
     private const string _macKey = "mac";
     private const string _rulesTable = "rules";
     private const string _agentTable = "agent";
-    private const string _detailsKey = "details";
+    private const string _usernameKey = "username";
     private const string _nameKey = "name";
     private const string _runKey = "run";
 
@@ -232,7 +232,7 @@ public sealed class AgentRulesFile(string path)
 
     private static TomlWriter Render(TomlWriter writer, AgentRules rules)
     {
-        writer.Table(_rulesTable).Text(_detailsKey, rules.ShowsDetails ? "shown" : "hidden");
+        writer.Table(_rulesTable).Text(_usernameKey, rules.ShowsUsername ? "shown" : "hidden");
 
         foreach (var category in FieldCategories.Ruled)
         {
@@ -320,26 +320,26 @@ public sealed class AgentRulesFile(string path)
                 return false;
             }
 
-            if (string.Equals(pair.Key, _detailsKey, StringComparison.Ordinal))
+            if (string.Equals(pair.Key, _usernameKey, StringComparison.Ordinal))
             {
                 switch (pair.Value.Text)
                 {
                     case "shown":
-                        rules = rules with { ShowsDetails = true };
+                        rules = rules with { ShowsUsername = true };
                         continue;
                     case "hidden":
-                        rules = rules with { ShowsDetails = false };
+                        rules = rules with { ShowsUsername = false };
                         continue;
                     default:
-                        error = $"{At(pair.Line)}: {_detailsKey} is \"shown\" or \"hidden\"";
+                        error = $"{At(pair.Line)}: {_usernameKey} is \"shown\" or \"hidden\"";
                         return false;
                 }
             }
 
             var category = FieldCategories.Ruled.FirstOrDefault(ruled => string.Equals(FieldCategories.Key(ruled), pair.Key, StringComparison.Ordinal));
 
-            // Detail is no ruled category, so it is what no key found.
-            if (category == FieldCategory.Detail || !TryWord(pair.Value.Text, out var rule))
+            // The username is no ruled category, so it is what no key found.
+            if (category == FieldCategory.Username || !TryWord(pair.Value.Text, out var rule))
             {
                 error = $"{At(pair.Line)}: {pair.Key} = \"{pair.Value.Text}\" is not a rule keypaste reads; each is ask, allow or block";
                 return false;

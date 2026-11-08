@@ -393,6 +393,16 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cooldownKey">What counts as "the same request".</param>
     internal void CoolDown(string cooldownKey) => _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
 
+    /// <summary>Ends every refusal whose key a rule change answers, so its request is decided again by the new rule.</summary>
+    /// <param name="answered">Which keys the change answers.</param>
+    internal void ClearCooldowns(Func<string, bool> answered)
+    {
+        foreach (var key in _cooldowns.Keys.Where(answered))
+        {
+            _cooldowns.TryRemove(key, out _);
+        }
+    }
+
     /// <summary>How long a refusal under this key still holds the same request back, or nothing when none does.</summary>
     /// <param name="cooldownKey">What counts as "the same request".</param>
     /// <returns>The time left, measured as <see cref="IsInCooldown"/> measures it.</returns>

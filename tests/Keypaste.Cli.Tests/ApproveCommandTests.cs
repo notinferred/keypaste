@@ -51,7 +51,7 @@ public sealed class ApproveCommandTests : IDisposable
     {
         var text = Announced(null);
 
-        Assert.Contains("keypaste: every value waits for you to say yes; agents see item details unless Settings hides them. Press Ctrl+C to stop.", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("without asking", text, StringComparison.Ordinal);
         Assert.DoesNotContain("policy.toml", text, StringComparison.Ordinal);
     }

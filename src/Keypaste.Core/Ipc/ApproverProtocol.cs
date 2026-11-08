@@ -248,7 +248,7 @@ public static partial class ApproverProtocol
 
         var frame = WriteCredential(reply);
 
-        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        if (frame.Length <= PayloadBound(reply))
         {
             return frame;
         }
@@ -277,8 +277,19 @@ public static partial class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return WriteCredential(reply).Length <= MessageFramer.MaximumPayloadBytes;
+        return WriteCredential(reply).Length <= PayloadBound(reply);
     }
+
+    /// <summary>The largest frame carrying an attachment to the bridge that asked for it, the one credential reply over <see cref="MessageFramer.MaximumFrameBytes"/>.</summary>
+    /// <remarks>
+    /// Only that bridge reads one, and every frame the owner reads stays at <see cref="MessageFramer.MaximumFrameBytes"/>. It carries
+    /// <see cref="EntryAttachment.MaximumSize"/> bytes as base64, which adds a third, with room for the rest of the reply.
+    /// </remarks>
+    public const int MaximumAttachmentReplyFrameBytes = 8 * 1024 * 1024;
+
+    /// <summary>The bound a credential reply is written under: an attachment's, or one frame.</summary>
+    private static int PayloadBound(CredentialReply reply) =>
+        reply.ForAttachment ? MaximumAttachmentReplyFrameBytes - 1 : MessageFramer.MaximumPayloadBytes;
 
     /// <summary>Whether <see cref="Encode(EnvReply)"/> would send this reply as it is.</summary>
     /// <param name="reply">The reply the owner is about to record and return.</param>
@@ -493,6 +504,7 @@ public static partial class ApproverProtocol
             {
                 Entry = entry,
                 Field = field,
+                Attachment = Optional(root, "attachment"),
                 Reason = reason,
                 Exposure = exposure,
                 ClientName = Optional(root, "client"),

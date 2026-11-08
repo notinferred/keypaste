@@ -1109,6 +1109,17 @@ public sealed class Vault : IDisposable
         return removed;
     }
 
+    /// <summary>One attachment's bytes as this vault holds it, for a release a person or a rule allowed; null when the item holds none of that name.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal byte[]? ReadAttachment(EntryName name, string attachment)
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _interop.ReadAttachment(name, attachment);
+        }
+    }
+
     /// <summary>Writes one attachment's bytes once to a new file where the person chose, readable by its owner alone outside Windows (D-0534).</summary>
     /// <param name="name">The entry.</param>
     /// <param name="attachment">The attachment's name, matched exactly.</param>

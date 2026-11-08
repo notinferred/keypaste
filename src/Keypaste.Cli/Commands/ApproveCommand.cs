@@ -353,8 +353,8 @@ internal static class ApproveCommand
 
         console.WriteLine(
             allowed.Count > 0
-                ? "keypaste: every other value waits for you to say yes; agents see item details unless Settings hides them. Press Ctrl+C to stop."
-                : "keypaste: every value waits for you to say yes; agents see item details unless Settings hides them. Press Ctrl+C to stop.");
+                ? "keypaste: every other value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop."
+                : "keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.");
     }
 
     private static bool TryLimits(ParseResult line, CliContext context, out ApprovalLimits limits)

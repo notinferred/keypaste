@@ -90,12 +90,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     /// <summary>Each entry's own tags, which a <c>tag:</c> exposure reads.</summary>
     internal Dictionary<EntryName, string[]> Tagged { get; } = [];
 
-    /// <summary>The custom fields held unprotected; every other custom field is protected.</summary>
-    internal HashSet<(EntryName Entry, string Field)> Unprotected { get; } = [];
-
     public bool RequiresLiveApproval(EntryName name) => Protected.Contains(name);
-
-    public bool IsProtectedField(EntryName name, string field) => !Unprotected.Contains((name, field));
 
     public IReadOnlyList<string> Tags(EntryName name) => Tagged.TryGetValue(name, out var tags) ? tags : [];
 

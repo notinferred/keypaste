@@ -87,6 +87,22 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Equal(edited, File.ReadAllText(_file.Path));
     }
 
+    /// <summary>A file this owner sealed, put back after a later sealed change, is ignored: the seal covers the vault's count of changes.</summary>
+    [Fact]
+    public async Task An_older_sealed_file_put_back_is_ignored_and_asked()
+    {
+        Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
+        var older = File.ReadAllText(_file.Path);
+        Assert.True(_rules.TryChange(rules => rules.With(FieldCategory.Password, CategoryRule.Ask), out problem), problem);
+        File.WriteAllText(_file.Path, older);
+
+        var reply = await RequestAsync();
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt, null), (reply.Decision, reply.Method, reply.Value));
+        Assert.Equal(1, _channel.Asked);
+        Assert.Equal(SealedAgentRules.IgnoredText, _rules.Ignored);
+    }
+
     /// <summary>
     /// A file sealed in another home, its identity and the vault's key with it, is not this home's: this home's identity is
     /// its own, so the seal does not hold here.

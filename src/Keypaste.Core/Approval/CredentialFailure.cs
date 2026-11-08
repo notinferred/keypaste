@@ -56,4 +56,7 @@ public enum CredentialFailure
 
     /// <summary>The item has no TOTP keypaste can compute, so there is no code to release (D-0480).</summary>
     NoCode = 10,
+
+    /// <summary>The attachment is larger than <see cref="EntryAttachment.MaximumSize"/>, the most keypaste releases.</summary>
+    TooLarge = 11,
 }

@@ -96,11 +96,19 @@ public interface ICredentialSource
     /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>
     bool RequiresLiveApproval(EntryName name);
 
-    /// <summary>Whether a custom field of the entry is protected, which decides its category without reading its value.</summary>
-    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
-    /// <param name="field">The custom field's name.</param>
-    /// <returns>False only for a field the entry holds unprotected, so one that cannot be read counts as protected.</returns>
-    bool IsProtectedField(EntryName name, string field) => true;
+    /// <summary>Reads one attachment of one entry as base64, for a release a person or a rule allowed.</summary>
+    /// <param name="name">The entry, as <see cref="TryRead"/> takes it.</param>
+    /// <param name="attachment">The attachment's name, exactly as the item holds it.</param>
+    /// <param name="value">The attachment's bytes as base64 under <see cref="CredentialFields.Attachment"/>, when it could be read.</param>
+    /// <param name="failure">Why not: <see cref="CredentialFailure.NoSuchField"/> when the item holds no attachment of that name.</param>
+    /// <returns><see langword="true"/> when the attachment was read and is not empty.</returns>
+    /// <remarks>Call this only where <see cref="TryRead"/> may be called.</remarks>
+    bool TryReadAttachment(EntryName name, string attachment, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+    {
+        value = null;
+        failure = CredentialFailure.NoSuchField;
+        return false;
+    }
 
     /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches (D-0422).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>

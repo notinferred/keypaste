@@ -103,22 +103,6 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     }
 
     /// <inheritdoc/>
-    public bool IsProtectedField(EntryName name, string field)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(field);
-
-        try
-        {
-            return _unlockedVault()?.Fields(name)?.FirstOrDefault(held => string.Equals(held.Name, field, StringComparison.Ordinal)) is not { IsProtected: false };
-        }
-        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
-        {
-            return true;
-        }
-    }
-
-    /// <inheritdoc/>
     public bool TryResolve(
         string entryArgument,
         [NotNullWhen(true)] out EntryName? name,
@@ -259,6 +243,76 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         }
 
         value = new ReleasedField(field, text);
+        failure = CredentialFailure.None;
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public bool TryReadAttachment(EntryName name, string attachment, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(attachment);
+
+        value = null;
+
+        if (!TryReadEntries(out var entries, out failure))
+        {
+            return false;
+        }
+
+        var entry = Single(
+            entries,
+            candidate => string.Equals(candidate.GroupPath, name.GroupPath, StringComparison.Ordinal)
+                && string.Equals(candidate.Title, name.Title, StringComparison.Ordinal)
+                && (name.Uuid is null || string.Equals(candidate.Uuid, name.Uuid, StringComparison.Ordinal)),
+            out failure);
+
+        if (entry is null)
+        {
+            return false;
+        }
+
+        if (_unlockedVault() is not { } vault)
+        {
+            failure = CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        byte[]? bytes;
+
+        try
+        {
+            // By the one entry found, so two items sharing its name never make the read guess.
+            bytes = vault.ReadAttachment(name with { Uuid = entry.Uuid }, attachment);
+        }
+        catch (Exception)
+        {
+            failure = CredentialFailure.Failed;
+            return false;
+        }
+
+        if (bytes is null)
+        {
+            failure = CredentialFailure.NoSuchField;
+            return false;
+        }
+
+        if (bytes.Length == 0 || bytes.Length > EntryAttachment.MaximumSize)
+        {
+            failure = bytes.Length == 0 ? CredentialFailure.Empty : CredentialFailure.TooLarge;
+            Array.Clear(bytes);
+            return false;
+        }
+
+        try
+        {
+            value = new ReleasedField(CredentialFields.Attachment, Convert.ToBase64String(bytes));
+        }
+        finally
+        {
+            Array.Clear(bytes);
+        }
+
         failure = CredentialFailure.None;
         return true;
     }

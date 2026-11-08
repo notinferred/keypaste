@@ -104,7 +104,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     [Fact]
     public async Task AnAllowedCategory_ReleasesTheField_WithNobodyAsked()
     {
-        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
         approver.Channel.Answer = ApprovalAnswer.Denied;
 
         var released = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
@@ -118,7 +118,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     [Fact]
     public async Task AnAllowedCategory_NeverReleasesAFieldThatNeverLeaves()
     {
-        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
 
         var refused = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
 
@@ -209,7 +209,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     public async Task AnAllowedRelease_IsFilledIn()
     {
         Plant("DATABASE_URL", _databaseUrl);
-        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.ProtectedField, confirmed: true));
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
 
         var released = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
 

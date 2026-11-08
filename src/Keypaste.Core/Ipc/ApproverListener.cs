@@ -239,10 +239,14 @@ public sealed class ApproverListener : IDisposable
     }
 
     /// <summary>The bound a reply to this kind of request is written under: an env set's, which only its runner reads, or one frame.</summary>
-    private static int MaximumReplyFrameBytes(ApproverMessageKind request) =>
-        request is ApproverMessageKind.EnvProfile or ApproverMessageKind.TokenEnv
-            ? ApproverProtocol.MaximumEnvReplyFrameBytes
-            : MessageFramer.MaximumFrameBytes;
+    private static int MaximumReplyFrameBytes(ApproverMessageKind request) => request switch
+    {
+        ApproverMessageKind.EnvProfile or ApproverMessageKind.TokenEnv => ApproverProtocol.MaximumEnvReplyFrameBytes,
+
+        // The encoder holds every reply but an attachment's to one frame.
+        ApproverMessageKind.Credential => ApproverProtocol.MaximumAttachmentReplyFrameBytes,
+        _ => MessageFramer.MaximumFrameBytes,
+    };
 
     /// <summary>Answers one request, withdrawing it if its peer stops waiting first.</summary>
     /// <param name="frame">The request.</param>

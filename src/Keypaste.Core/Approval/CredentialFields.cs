@@ -15,6 +15,10 @@ public static class CredentialFields
     /// <remarks>Lower-case, so no custom field that leaves by name can be called this.</remarks>
     public const string Totp = "totp";
 
+    /// <summary>What a credential request names to be given one of the item's attachments, by the attachment's own name.</summary>
+    /// <remarks>Lower-case, so no custom field that leaves by name can be called this.</remarks>
+    public const string Attachment = "attachment";
+
     /// <summary>The standard releasable field names, lower-case, in the order the schema lists them.</summary>
     public static IReadOnlyList<string> All { get; } = ["password", "username", "url", "notes"];
 
@@ -22,7 +26,7 @@ public static class CredentialFields
     public const string Rule = "password, username, url, notes or a custom field named like an environment variable";
 
     /// <summary>What a credential request may name, completing a sentence such as "the field must be …".</summary>
-    public const string RequestRule = "password, username, url, notes, totp or a custom field named like an environment variable";
+    public const string RequestRule = "password, username, url, notes, totp, attachment or a custom field named like an environment variable";
 
     /// <summary>Whether a field name is one keypaste releases.</summary>
     /// <param name="field">The field name exactly as it arrived.</param>
@@ -44,7 +48,7 @@ public static class CredentialFields
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        return IsReleasable(field) || string.Equals(field, Totp, StringComparison.Ordinal);
+        return IsReleasable(field) || string.Equals(field, Totp, StringComparison.Ordinal) || string.Equals(field, Attachment, StringComparison.Ordinal);
     }
 
     /// <summary>Whether a field name is one of <see cref="All"/>, spelled exactly.</summary>

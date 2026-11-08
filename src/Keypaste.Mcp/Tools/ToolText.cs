@@ -16,6 +16,27 @@ internal static class ToolText
 
     internal const string RunToolName = AuditTools.Run;
 
+    /// <summary>The tool that asks for one attachment; its lines are <see cref="CredentialToolName"/>'s, with the field <c>attachment</c>.</summary>
+    internal const string AttachmentToolName = "request_attachment";
+
+    /// <summary>The description a client shows for <c>request_attachment</c>.</summary>
+    internal const string AttachmentDescription = """
+        Asks the user to release one attachment of one vault item, by its name, as base64. A human sees the item, the
+        attachment's name and your stated reason, and decides, unless they allowed or blocked attachments for agents in
+        advance. Default is deny. An attachment over 5 MiB is never released.
+
+        Pass the `handle` from list_entry_names as `entry` where you have one, and the attachment's exact `name`. Write
+        `reason` for the person reading it, not for the model: it is shown to them verbatim.
+        """;
+
+    /// <summary>What precedes an attachment's bytes in its result.</summary>
+    internal const string Base64Follows = "Its bytes follow as base64.\n\n";
+
+    /// <summary>How a result names an attachment.</summary>
+    /// <param name="name">The name the agent asked for.</param>
+    /// <returns>The words, such as <c>attachment report.pdf</c>.</returns>
+    internal static string AttachmentShown(string name) => $"attachment {name}";
+
     /// <summary>What the instructions add when this bridge offers <c>run</c>.</summary>
     internal const string RunInstructions = """
 

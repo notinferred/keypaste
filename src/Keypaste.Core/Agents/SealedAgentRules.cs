@@ -1,10 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace Keypaste.Core.Agents;
 
 /// <summary>
 /// The rules a vault's owner decides by: <c>agents.toml</c> only while its seal holds, an HMAC-SHA256 under a key the
-/// vault keeps in <see cref="ReservedGroups.Keys"/>, over this home's identity and the rules; otherwise the defaults.
+/// vault keeps in <see cref="ReservedGroups.Keys"/>, over this home's identity, the vault's count of sealed writes and the rules;
+/// otherwise the defaults.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -14,7 +16,8 @@ namespace Keypaste.Core.Agents;
 /// vault's key synced or copied from another computer do not make that computer's rules valid here.
 /// </para>
 /// <para>
-/// An older file this home's owner sealed stays valid if it is put back: the seal says who wrote the rules, not when.
+/// Each sealed write counts up the vault's count first and writes the file after, so a file sealed before the latest
+/// write, put back, is ignored too, and a write whose file never lands leaves the defaults.
 /// </para>
 /// </remarks>
 /// <param name="file">This home's <c>agents.toml</c>.</param>
@@ -30,6 +33,9 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
 
     /// <summary>The record's field that holds the key, as base64.</summary>
     internal const string KeyField = "key";
+
+    /// <summary>The record's field that counts the sealed writes, as a decimal number.</summary>
+    internal const string CountField = "count";
 
     private readonly AgentRulesFile _file = file ?? throw new ArgumentNullException(nameof(file));
     private readonly Func<Vault?> _vault = vault ?? throw new ArgumentNullException(nameof(vault));
@@ -48,7 +54,10 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        var holds = !read.Present || (read.Seal is { } seal && Key(_vault()) is { } key && _file.HomeId() is { } home && Matches(Seal(key, home, read.Rules), seal));
+        var open = _vault();
+        var holds = !read.Present
+            || (read.Seal is { } seal && Key(open) is { } key && Count(open) is { } count && _file.HomeId() is { } home
+                && Matches(Seal(key, home, count, read.Rules), seal));
         _ignored = holds ? null : IgnoredText;
         rules = holds ? read.Rules : AgentRules.Defaults;
         return true;
@@ -73,7 +82,22 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
 
         var next = change(current);
 
-        if (!_file.TryWrite(next, Seal(key, home, next), out problem))
+        if (Count(_vault()) is not { } count || count == ulong.MaxValue)
+        {
+            problem = "the vault's count of agent rule changes cannot be read";
+            return false;
+        }
+
+        var counted = (count + 1).ToString(CultureInfo.InvariantCulture);
+        var saved = _save(vault => vault.WriteRecord(new EntryName(ReservedGroups.Keys, KeyTitle), AcafIds.Agent, CountField, counted));
+
+        if (!saved.Holds)
+        {
+            problem = $"the change could not be saved in the vault: {saved.Reason}";
+            return false;
+        }
+
+        if (!_file.TryWrite(next, Seal(key, home, count + 1, next), out problem))
         {
             return false;
         }
@@ -85,10 +109,13 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
     /// <summary>The seal of rules for a home under a key.</summary>
     /// <param name="key">The vault's key.</param>
     /// <param name="home">This home's identity.</param>
+    /// <param name="count">The vault's count of sealed writes, this one's included.</param>
     /// <param name="rules">The rules.</param>
     /// <returns>The HMAC-SHA256, as lower-case hex.</returns>
-    internal static string Seal(byte[] key, string home, AgentRules rules) =>
-        Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"keypaste agents.toml 1\n{home}\n{AgentRulesFile.Canonical(rules)}")));
+    internal static string Seal(byte[] key, string home, ulong count, AgentRules rules) =>
+        Convert.ToHexStringLower(HMACSHA256.HashData(
+            key,
+            Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"keypaste agents.toml 2\n{home}\n{count}\n{AgentRulesFile.Canonical(rules)}"))));
 
     private static bool Matches(string expected, string seal) =>
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(seal));
@@ -101,6 +128,28 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
                 && Convert.TryFromBase64String(text, new byte[32], out var length) && length == 32
                 ? Convert.FromBase64String(text)
                 : null;
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The vault's count of sealed writes: none before the first, or null when the vault is locked or the count unreadable.</summary>
+    private static ulong? Count(Vault? vault)
+    {
+        try
+        {
+            if (vault?.ReadRecords(ReservedGroups.Keys, CountField) is not { } records)
+            {
+                return null;
+            }
+
+            var text = records.FirstOrDefault(record => string.Equals(record.Title, KeyTitle, StringComparison.Ordinal))?.Value;
+
+            return text is not { Length: > 0 }
+                ? 0
+                : ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var count) ? count : null;
         }
         catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
         {

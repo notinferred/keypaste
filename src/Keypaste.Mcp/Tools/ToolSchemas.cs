@@ -68,6 +68,36 @@ internal static class ToolSchemas
         }
         """;
 
+    /// <summary>The arguments of <c>request_attachment</c>: which item, which attachment by name, and why.</summary>
+    /// <remarks>The bounds are <c>CredentialRequestRules</c>'s, which the owner applies again.</remarks>
+    internal const string AttachmentInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The handle from list_entry_names (preferred), or the item's full path."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The attachment's exact name, as the item holds it."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human who approves or denies. Be specific and honest."
+            }
+          },
+          "required": ["entry", "name", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
     /// <summary>The arguments of <c>run</c>: the command, where, which variables and why.</summary>
     /// <remarks>The bounds are <c>RunRequestRules</c>'s, which the bridge and the owner apply again.</remarks>
     internal const string RunInputJson = """
@@ -139,6 +169,9 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
+
+    /// <summary><see cref="AttachmentInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement AttachmentInput = Parse(AttachmentInputJson);
 
     /// <summary>
     /// Detaches the element from its document, so the parsed schema outlives the parse without

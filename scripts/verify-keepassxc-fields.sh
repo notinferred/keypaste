@@ -18,7 +18,7 @@
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
 # `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste approve` and `keypaste mcp` release
 # `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
-# its reference is asked about as the entry and the field. With `protected = "allow"` written into
+# its reference is asked about as the entry and the field. With `custom = "allow"` written into
 # agents.toml by hand, the field is still asked about, since only the vault's owner can seal a rule, and
 # `Recovery codes` is still refused by name, before anyone is asked.
 # `keypaste run --env-file` gives a child the field a reference names and starts nothing for
@@ -516,10 +516,10 @@ for value in "${others[@]}"; do
 done
 grep -q "$api_key" "$dir/run-tool.out" "$audit" "$agent_err" && die "the released value reached the denied run, the audit log or the agent's terminal"
 
-step "with protected = \"allow\" written into agents.toml by hand, OPENAI_API_KEY is still asked about, and Recovery codes is still refused by name"
+step "with custom = \"allow\" written into agents.toml by hand, OPENAI_API_KEY is still asked about, and Recovery codes is still refused by name"
 stop_agent
-sed 's/^protected = "ask"$/protected = "allow"/' "$KEYPASTE_HOME/agents.toml" >"$dir/agents.edited" && mv "$dir/agents.edited" "$KEYPASTE_HOME/agents.toml"
-grep -q '^protected = "allow"$' "$KEYPASTE_HOME/agents.toml" || die "could not edit agents.toml"
+sed 's/^custom = "ask"$/custom = "allow"/' "$KEYPASTE_HOME/agents.toml" >"$dir/agents.edited" && mv "$dir/agents.edited" "$KEYPASTE_HOME/agents.toml"
+grep -q '^custom = "allow"$' "$KEYPASTE_HOME/agents.toml" || die "could not edit agents.toml"
 logged=$(lines_in "$audit")
 # Only the master password: a prompt the agent draws reads the end of its input, which denies.
 start_agent '' --approval-timeout 10

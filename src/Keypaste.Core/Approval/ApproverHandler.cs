@@ -97,7 +97,46 @@ public sealed class ApproverHandler
     /// <param name="change">The new rules from those that hold now.</param>
     /// <param name="problem">Why nothing changed, otherwise empty.</param>
     /// <returns>Whether the rules now hold the change.</returns>
-    public bool TryChangeRules(Func<AgentRules, AgentRules> change, out string problem) => _rules.TryChange(change, out problem);
+    /// <remarks>A refusal a person gave for a field whose rule the change moves ends with it, so the field is decided by the new rule.</remarks>
+    public bool TryChangeRules(Func<AgentRules, AgentRules> change, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        var before = _rules.TryRead(out var held, out _) ? held : null;
+
+        if (!_rules.TryChange(change, out problem))
+        {
+            return false;
+        }
+
+        if (_rules.TryRead(out var after, out _))
+        {
+            HashSet<FieldCategory> moved = [.. Enum.GetValues<FieldCategory>().Where(category => before?.RuleFor(category) != after.RuleFor(category))];
+            _gate.ClearCooldowns(key => CategoryOf(key) is { } category && moved.Contains(category));
+        }
+
+        return true;
+    }
+
+    /// <summary>The category a cooldown key's field falls in, as <see cref="Category"/> reads it, or null for a key naming no field, such as a run's.</summary>
+    private FieldCategory? CategoryOf(string cooldownKey)
+    {
+        var bar = cooldownKey.IndexOf('|', StringComparison.Ordinal);
+
+        if (bar < 0)
+        {
+            return null;
+        }
+
+        var field = cooldownKey[(bar + 1)..];
+
+        if (field.StartsWith(_attachmentKey, StringComparison.Ordinal))
+        {
+            return FieldCategory.Attachment;
+        }
+
+        return _source.TryResolve(cooldownKey[..bar], out var name, out _) ? Category(name, field) : FieldCategories.Of(field, []);
+    }
 
     /// <summary>Which category one field of an entry falls in.</summary>
     /// <param name="name">The entry.</param>
@@ -108,10 +147,10 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(field);
 
-        return FieldCategories.Of(field, !CredentialFields.IsStandard(field) && _source.IsProtectedField(name, field), _source.Tags(name));
+        return FieldCategories.Of(field, _source.Tags(name));
     }
 
-    /// <summary>Which entry names may be shown to an agent: those its bridge's exposure reaches, while Settings shows item details.</summary>
+    /// <summary>Which entry names may be shown to an agent: those its bridge's exposure reaches.</summary>
     /// <param name="request">The exposure the bridge is configured with, and its label.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
@@ -129,16 +168,10 @@ public sealed class ApproverHandler
                 new NamesReply(false, [], "this bridge's --expose is not usable", true) { Refusal = AuditMethod.Failed });
         }
 
-        if (!_rules.TryRead(out var rules, out var problem))
+        if (!_rules.TryRead(out _, out var problem))
         {
             _narrate?.Invoke($"refused a listing: {Unusable(problem)}");
             return ValueTask.FromResult(new NamesReply(false, [], Unusable(problem), true) { Refusal = AuditMethod.Failed });
-        }
-
-        if (!rules.ShowsDetails)
-        {
-            return ValueTask.FromResult(
-                new NamesReply(false, [], "the person hides item details from agents; ask for an item by its name", true) { Refusal = AuditMethod.Blocked });
         }
 
         if (!_lister.TryList(exposure, out var names, out var failure))
@@ -173,7 +206,7 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Reason) is { } problem)
+        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Attachment, request.Reason) is { } problem)
         {
             return Refused(AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}");
         }
@@ -253,10 +286,10 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Blocked, Blocked(category), display) with { Item = itemId };
         }
 
-        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), request.Field);
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), Subject(request));
 
-        // Before Allow, not after. A person who refused this exact request a moment ago has said
-        // something more specific and more recent than any rule, and a rule must never resurrect it.
+        // Before Allow, not after. A person who refused this exact request a moment ago has said something more
+        // specific and more recent than the rule that held then; only changing that rule ends the refusal.
         if (_gate.IsInCooldown(cooldownKey))
         {
             _narrate?.Invoke($"refused {display}: {Explain(ApprovalAnswer.Cooldown)}");
@@ -268,7 +301,7 @@ public sealed class ApproverHandler
             return Unasked(request, name, itemId, display, cooldownKey, category, cancellationToken);
         }
 
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, request.ClientLabel) with { Item = itemId };
+        var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with { Item = itemId };
         var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
 
         return Answered(request, name, itemId, display, cooldownKey, prompt.Client, answer, "a person approved this one request", cancellationToken);
@@ -307,7 +340,7 @@ public sealed class ApproverHandler
 
         var shared = offered[0].Name;
         var display = ApprovalPrompt.Shown(shared);
-        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), request.Field);
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), Subject(request));
 
         if (_gate.IsInCooldown(cooldownKey))
         {
@@ -316,7 +349,7 @@ public sealed class ApproverHandler
         }
 
         List<ItemCandidate> candidates = [.. offered.Select(Candidate)];
-        var prompt = ApprovalPrompt.For(request.ClientName, shared, request.Field, request.Reason, request.ClientLabel) with { Candidates = candidates };
+        var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with { Candidates = candidates };
         var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
         var picked = pick.Picked is { } index ? candidates[index] : null;
 
@@ -367,31 +400,31 @@ public sealed class ApproverHandler
         }
 
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
+        using var released = Release(name, request, out var readFailure, out var unfilled);
+
+        if (released is null)
         {
             return Unread(readFailure, cooldownKey, request.Field, unfilled, display, client) with { Item = itemId };
         }
 
-        using (released)
-        {
-            return Deliver(
-                new CredentialReply
-                {
-                    Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Prompt,
-                    Reason = approved,
-                    Entry = display,
-                    Item = itemId,
-                    CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
-                    Value = released.Value.ToString(),
-                },
-                display,
-                $"released {display} to {client} once",
-                cooldownKey);
-        }
+        return Deliver(
+            new CredentialReply
+            {
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.Prompt,
+                Reason = approved,
+                Entry = display,
+                Item = itemId,
+                CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
+                Value = released.Value.ToString(),
+                ForAttachment = request.Attachment is not null,
+            },
+            display,
+            $"released {display} to {client} once",
+            cooldownKey);
     }
 
-    /// <summary>Releases a field nobody is asked about, because its category is Allow: item details shown, or a rule the person confirmed.</summary>
+    /// <summary>Releases a field nobody is asked about, because its category is Allow: a URL, a username shown, or a rule the person confirmed.</summary>
     /// <remarks>
     /// Its line names the category, and never a person, since nobody saw this request. The read is still
     /// last of all, exactly as on the prompted path.
@@ -412,33 +445,59 @@ public sealed class ApproverHandler
             return withdrawn with { Item = itemId };
         }
 
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
+        using var released = Release(name, request, out var readFailure, out var unfilled);
+
+        if (released is null)
         {
             return Unread(readFailure, cooldownKey, request.Field, unfilled, display, client) with { Item = itemId };
         }
 
-        var why = category == FieldCategory.Detail
-            ? "released without asking: agents see item details"
-            : $"released without asking: the person allows {FieldCategories.Shown(category)} for every agent";
-
-        using (released)
+        var why = category switch
         {
-            // One line on the operator's terminal either way, and the only live signal that this
-            // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
-            return Deliver(
-                new CredentialReply
-                {
-                    Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Allowed,
-                    Reason = why,
-                    Entry = display,
-                    Item = itemId,
-                    CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
-                    Value = released.Value.ToString(),
-                },
-                display,
-                $"released {display} to {client} without asking ({FieldCategories.Shown(category)} allowed)");
-        }
+            FieldCategory.Url => "released without asking: agents see an item's URL",
+            FieldCategory.Username => "released without asking: agents see an item's username",
+            _ => $"released without asking: the person allows {FieldCategories.Shown(category)} for every agent",
+        };
+
+        // One line on the operator's terminal either way, and the only live signal that this
+        // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
+        return Deliver(
+            new CredentialReply
+            {
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.Allowed,
+                Reason = why,
+                Entry = display,
+                Item = itemId,
+                CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
+                Value = released.Value.ToString(),
+                ForAttachment = request.Attachment is not null,
+            },
+            display,
+            $"released {display} to {client} without asking ({FieldCategories.Shown(category)} allowed)");
+    }
+
+    /// <summary>What a request's cooldown key names within its item: the field, or the attachment by its name.</summary>
+    private static string Subject(CredentialRequest request) =>
+        request.Attachment is { } attachment ? _attachmentKey + attachment : request.Field;
+
+    /// <summary>What a prompt says is asked for: the field, or the attachment by its name, scrubbed for display.</summary>
+    private static string Shown(CredentialRequest request) =>
+        request.Attachment is { } attachment ? $"attachment {EntryNameSanitizer.Sanitize(attachment).Text}" : request.Field;
+
+    private const string _attachmentKey = CredentialFields.Attachment + ":";
+
+    /// <summary>Reads what a request asks for, a field or an attachment, once it is authorized; null with the reason when it cannot.</summary>
+    private ReleasedField? Release(EntryName name, CredentialRequest request, out CredentialFailure failure, out string unfilled)
+    {
+        unfilled = string.Empty;
+        ReleasedField? released;
+
+        return (request.Attachment is { } attachment
+            ? _source.TryReadAttachment(name, attachment, out released, out failure)
+            : _source.TryRead(name, request.Field, out released, out failure, out unfilled))
+            ? released
+            : null;
     }
 
     /// <summary>Why a request for a Blocked category was refused.</summary>
@@ -517,7 +576,10 @@ public sealed class ApproverHandler
 
         if (failure != CredentialFailure.Unfilled)
         {
-            return Refused(AuditMethod.Failed, Explain(failure), display);
+            return Refused(
+                AuditMethod.Failed,
+                failure == CredentialFailure.NoSuchField && string.Equals(field, CredentialFields.Attachment, StringComparison.Ordinal) ? "the item holds no attachment of that name" : Explain(failure),
+                display);
         }
 
         var reason = unfilled.Length > 0 ? $"the item's {field} {unfilled}" : Explain(failure);
@@ -588,6 +650,7 @@ public sealed class ApproverHandler
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
         CredentialFailure.Unfilled => "the item's field holds a KeePass placeholder keypaste does not fill in",
         CredentialFailure.NoCode => "the item has no TOTP keypaste can compute",
+        CredentialFailure.TooLarge => $"the attachment is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste releases",
         _ => "the vault could not be read",
     };
 }

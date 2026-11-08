@@ -6,7 +6,7 @@ namespace Keypaste.Core.Agents;
 public sealed record KnownAgent(string Name, bool Run);
 
 /// <summary>
-/// What every agent gets on this computer: whether item details are shown and each category's rule, kept in
+/// What every agent gets on this computer: whether usernames are shown and each category's rule, kept in
 /// <c>agents.toml</c> under the keypaste home and never in a vault, so a synced or edited vault releases nothing more.
 /// </summary>
 /// <remarks>
@@ -21,11 +21,11 @@ public sealed record AgentRules
     private Dictionary<FieldCategory, CategoryRule> Rules { get; init; } = [];
     private readonly IReadOnlyList<KnownAgent> _agents = [];
 
-    /// <summary>Details shown, every category asked, no agent running commands.</summary>
+    /// <summary>The username shown, every category asked, no agent running commands.</summary>
     public static AgentRules Defaults { get; } = new();
 
-    /// <summary>Whether agents see each item's username, URL, tags and unprotected custom fields without asking.</summary>
-    public bool ShowsDetails { get; init; } = true;
+    /// <summary>Whether agents see each item's username without asking; its title, group, tags and URL they always see.</summary>
+    public bool ShowsUsername { get; init; } = true;
 
     /// <summary>The agents this computer knows, by name.</summary>
     /// <exception cref="ArgumentException">Two share a name, or there are more than <see cref="MaximumAgents"/>.</exception>
@@ -47,11 +47,12 @@ public sealed record AgentRules
 
     /// <summary>The rule each request for a category is answered by.</summary>
     /// <param name="category">The category.</param>
-    /// <returns>Block for a passkey, details by <see cref="ShowsDetails"/>, otherwise what is set, Ask by default.</returns>
+    /// <returns>Block for a passkey, Allow for a URL, the username by <see cref="ShowsUsername"/>, otherwise what is set, Ask by default.</returns>
     public CategoryRule RuleFor(FieldCategory category) => category switch
     {
         FieldCategory.Passkey => CategoryRule.Block,
-        FieldCategory.Detail => ShowsDetails ? CategoryRule.Allow : CategoryRule.Ask,
+        FieldCategory.Url => CategoryRule.Allow,
+        FieldCategory.Username => ShowsUsername ? CategoryRule.Allow : CategoryRule.Ask,
         _ => Rules.TryGetValue(category, out var rule) ? rule : CategoryRule.Ask,
     };
 
@@ -80,7 +81,7 @@ public sealed record AgentRules
     /// <param name="category">The category.</param>
     /// <returns>The sentence.</returns>
     public static string AllowConfirmation(FieldCategory category) =>
-        $"Every agent will get {FieldCategories.Shown(category)} without asking, each release recorded in the log.";
+        $"Every agent will receive every {FieldCategories.One(category)} value without asking.";
 
     /// <summary>Whether an agent may ask to run commands.</summary>
     /// <param name="label">The bridge's raw label, or null.</param>
@@ -117,12 +118,12 @@ public sealed record AgentRules
     /// <inheritdoc/>
     public bool Equals(AgentRules? other) =>
         other is not null
-        && ShowsDetails == other.ShowsDetails
+        && ShowsUsername == other.ShowsUsername
         && FieldCategories.Ruled.All(category => RuleFor(category) == other.RuleFor(category))
         && _agents.SequenceEqual(other._agents);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(ShowsDetails, _agents.Count);
+    public override int GetHashCode() => HashCode.Combine(ShowsUsername, _agents.Count);
 
     private AgentRules Set(FieldCategory category, CategoryRule rule)
     {

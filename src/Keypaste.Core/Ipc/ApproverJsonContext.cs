@@ -105,6 +105,7 @@ internal sealed class CredentialRequestFrame(CredentialRequest request)
     public string Session => request.Session;
     public string Entry => request.Entry;
     public string Field => request.Field;
+    public string? Attachment => request.Attachment;
     public string Reason => request.Reason;
     public IReadOnlyList<string> Exposure => request.Exposure;
     public string? Client => request.ClientName;
