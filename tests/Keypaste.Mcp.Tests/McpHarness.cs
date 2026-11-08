@@ -181,6 +181,7 @@ internal sealed class McpHarness : IAsyncDisposable
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit, attachments: true));
+        serverOptions.ToolCollection.Add(new SaveValueTool(options, _approver, _audit));
 
         if (options.AllowRun)
         {

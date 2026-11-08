@@ -231,6 +231,19 @@ internal sealed class FakeChannel : IApprovalChannel
         return new ItemPick(answer, Pick(prompt));
     }
 
+    /// <summary>The value a save prompt is answered with; the answer is <see cref="Answer"/>.</summary>
+    internal string? SaveValue { get; set; }
+
+    /// <summary>The last save prompt shown.</summary>
+    internal SavePrompt? LastSavePrompt { get; private set; }
+
+    public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken)
+    {
+        LastSavePrompt = prompt;
+        var answer = await AnswerAsync(cancellationToken).ConfigureAwait(false);
+        return new SaveAnswer(answer, SaveValue);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         LastEnvPrompt = prompt;

@@ -188,7 +188,7 @@ public sealed class SessionEditor
             : Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
 
     /// <summary>Takes an edit back out of the vault it was made in, unless the vault was locked meanwhile and took the edit with it.</summary>
-    private static void TakeBack(Vault? vault, VaultCheckpoint? checkpoint)
+    internal static void TakeBack(Vault? vault, VaultCheckpoint? checkpoint)
     {
         if (vault is null || checkpoint is null)
         {
@@ -205,10 +205,10 @@ public sealed class SessionEditor
         }
     }
 
-    private static string Said(EditRefusal refusal) =>
+    internal static string Said(EditRefusal refusal) =>
         refusal.Then.Count == 0 ? refusal.Reason : $"{refusal.Reason}. {string.Join(" ", refusal.Then)}";
 
-    private static AuditMethod MethodOf(AgentSave saved) => saved.Outcome switch
+    internal static AuditMethod MethodOf(AgentSave saved) => saved.Outcome switch
     {
         AgentSaveOutcome.Locked => AuditMethod.VaultLocked,
         AgentSaveOutcome.ChangedOnDisk => AuditMethod.VaultChanged,

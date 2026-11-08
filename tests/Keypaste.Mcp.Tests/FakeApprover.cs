@@ -54,6 +54,12 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>The session every attachment is given.</summary>
     internal string Session { get; set; } = "fake-session";
 
+    /// <summary>What a save request is answered with.</summary>
+    internal SaveReply SaveAnswer { get; set; } = new(AuditDecision.Denied, AuditMethod.Prompt, "a person did not save a value there");
+
+    /// <summary>Every save request that arrived.</summary>
+    internal ConcurrentQueue<SaveRequest> SavesReceived { get; } = [];
+
     /// <summary>Set to refuse every attachment with this reply instead.</summary>
     internal AttachReply? AttachRefusal { get; set; }
 
@@ -285,6 +291,12 @@ internal sealed class FakeApprover : IAsyncDisposable
             }
 
             return approver.Answer with { Session = approver.Session, Recorded = approver.Records };
+        }
+
+        public ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.SavesReceived.Enqueue(request);
+            return ValueTask.FromResult(approver.SaveAnswer with { Recorded = approver.Records, Session = approver.Session });
         }
 
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>

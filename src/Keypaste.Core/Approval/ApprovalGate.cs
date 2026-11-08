@@ -170,6 +170,32 @@ public sealed class ApprovalGate : IDisposable
         return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed ? picked : null);
     }
 
+    /// <summary>Asks a human to save a value an agent named the place of, under the same window, slot and cooldown.</summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer, and the value only with an allow that carries one; an allow with none is a refusal.</returns>
+    public async ValueTask<SaveAnswer> AskSavingAsync(string cooldownKey, SavePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        string? value = null;
+
+        var answer = await AskThroughAsync(
+            [cooldownKey],
+            new Asked(null, null, null, null),
+            async token =>
+            {
+                var said = await _channel.AskToSaveAsync(prompt, token).ConfigureAwait(false);
+                value = said.Value;
+                return said.Answer == ApprovalAnswer.ApprovedOnce && value is not { Length: > 0 } ? ApprovalAnswer.Denied : said.Answer;
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        return new SaveAnswer(answer, answer == ApprovalAnswer.ApprovedOnce ? value : null);
+    }
+
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown.</param>

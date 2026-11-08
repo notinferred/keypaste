@@ -118,6 +118,10 @@ public sealed class SessionServer : IDisposable
                 ? new SessionEditor(gate, options.UnlockedFor, write, options.Clock, options.Narrate, options.Edited)
                 : null;
 
+            var saver = options.WriteEdit is { } save
+                ? new SessionSaver(gate, options.UnlockedFor, save, options.Clock, options.Narrate)
+                : null;
+
             var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
                 ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Audit, uses, options.Clock, options.Narrate)
                 : null;
@@ -131,7 +135,8 @@ public sealed class SessionServer : IDisposable
                 options.LockNow,
                 options.Clock,
                 editor,
-                browsers)
+                browsers,
+                saver)
             {
                 Unexpected = options.Unexpected,
             };

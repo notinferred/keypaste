@@ -292,7 +292,7 @@ Export uses single quotes where possible for consistent reading by `motdotla/dot
 
 ## Agent access
 
-In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_attachment`, asks for one attachment of an entry by its name, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
+In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_attachment`, asks for one attachment of an entry by its name, a fourth, `request_save`, asks you to save a value the agent never sees, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
 
 A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a kind of value you allowed for every agent and confirmed. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
 

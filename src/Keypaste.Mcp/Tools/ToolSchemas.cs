@@ -66,6 +66,54 @@ internal static class ToolSchemas
         }
         """;
 
+    /// <summary>The arguments of <c>request_save</c>: an item and a field, or a project, an environment and a key, and why.</summary>
+    /// <remarks>The bounds are the owner's, which it applies again; which of the two places is named it checks itself.</remarks>
+    internal const string SaveInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The item's full path, such as work/github; it is created when no item has that path. Give it with field."
+            },
+            "field": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With item: password, or the name of a custom field, such as OPENAI_API_KEY."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "A project, for a variable of one of its environments. Give it with environment and key instead of item and field."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With project: the environment, such as dev or prod."
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With project: the variable's name, such as DATABASE_URL."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human, who enters the value. Say what the value is and where they will find it."
+            }
+          },
+          "required": ["reason"],
+          "additionalProperties": false
+        }
+        """;
+
     /// <summary>The arguments of <c>request_attachment</c>: which item, which attachment by name, and why.</summary>
     /// <remarks>The bounds are <c>CredentialRequestRules</c>'s, which the owner applies again.</remarks>
     internal const string AttachmentInputJson = """
@@ -167,6 +215,9 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
+
+    /// <summary><see cref="SaveInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement SaveInput = Parse(SaveInputJson);
 
     /// <summary><see cref="AttachmentInputJson"/>, parsed once.</summary>
     internal static readonly JsonElement AttachmentInput = Parse(AttachmentInputJson);

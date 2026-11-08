@@ -39,6 +39,17 @@ public interface IApprovalChannel
     ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ItemPick.NoChannel);
 
+    /// <summary>Shows an agent's request to save a value and waits for the person to enter one and save it, or not.</summary>
+    /// <param name="prompt">Where the value would go and why. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the person said, with the value only when they saved one.</returns>
+    /// <remarks>
+    /// No value is entered for them and nothing is saved until they press Save, which works a moment after the prompt is up and,
+    /// where it replaces a value, only once they confirm that. A channel that cannot show this has asked nobody, which is a no.
+    /// </remarks>
+    ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(SaveAnswer.NoChannel);
+
     /// <summary>Shows a request for a project's env set to a human and waits for their answer.</summary>
     /// <param name="prompt">What to show. Already sanitized; render it as inert text.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>

@@ -31,12 +31,14 @@ namespace Keypaste.App.Session;
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 /// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>
+/// <param name="clipboard">Where a save prompt's value is pasted from, or null for none.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
     Action<Exception, string>? unexpected = null,
     Action? openBrowserFill = null,
-    RequestNotices? notices = null) : IApprovalChannel
+    RequestNotices? notices = null,
+    Func<Clipboard.IAppClipboard>? clipboard = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -70,6 +72,27 @@ internal sealed class WindowApprovalChannel(
         var answer = await ShowAsync(request, () => new ItemPickWindow(request), cancellationToken).ConfigureAwait(false);
 
         return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed ? request.PickedIndex : null);
+    }
+
+    /// <summary>Asks the person to enter and save a value an agent named the place of, in a prompt window of its own.</summary>
+    public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        // Disposed in the finally below, on the UI thread, where the window it is bound to lives; CA2000 cannot see that handoff.
+#pragma warning disable CA2000
+        var request = new SaveValueViewModel(prompt, clipboard?.Invoke() ?? Clipboard.NoClipboard.Instance, _clock);
+#pragma warning restore CA2000
+
+        try
+        {
+            var answer = await ShowAsync(request, () => new SaveValueWindow(request), cancellationToken).ConfigureAwait(false);
+            return new SaveAnswer(answer, answer == ApprovalAnswer.ApprovedOnce ? request.Composed() : null);
+        }
+        finally
+        {
+            DisposeOnUiThread(request);
+        }
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
@@ -277,6 +300,9 @@ internal sealed class WindowApprovalChannel(
             }
         });
     }
+
+    /// <summary>Disposes a prompt's model on the UI thread, after its window comes down, since disposing it tells the window.</summary>
+    private static void DisposeOnUiThread(IDisposable model) => OnUiThread(model.Dispose);
 
     private static void OnUiThread(Action action)
     {

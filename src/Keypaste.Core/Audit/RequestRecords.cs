@@ -29,6 +29,9 @@ public static class AuditTools
 
     /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused (D-0637).</summary>
     public const string Browser = "browser";
+
+    /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
+    public const string Save = "request_save";
 }
 
 /// <summary>What a browser's line is about, written as its field.</summary>
@@ -177,6 +180,23 @@ public static class RequestRecords
             Session = session,
             Vault = vault,
         };
+    }
+
+    /// <summary>The line for an agent's request to save a value, which names the place and never the value.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="request">Where the value goes and why.</param>
+    /// <param name="decision">Granted once it was saved.</param>
+    /// <param name="method">How it was decided.</param>
+    /// <param name="reason">keypaste's own sentence.</param>
+    /// <param name="session">The unlocked session that answered.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord Save(AuditClient client, Ipc.SaveRequest request, AuditDecision decision, AuditMethod method, string reason, string? session, string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var record = Credential(client, request.Where, request.Named, request.Reason, decision, method, reason, request.Where, request.Exposure, session, vault);
+        return record with { Tool = AuditTools.Save };
     }
 
     /// <summary>The line for an agent's request to run a command.</summary>

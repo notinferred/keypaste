@@ -81,6 +81,7 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly RequestRecorder _recorder;
     private readonly SessionEnvironments? _environments;
     private readonly SessionEditor? _editor;
+    private readonly SessionSaver? _saver;
     private readonly IBrowserRequests? _browsers;
     private readonly Action? _lockNow;
     private readonly TimeProvider _clock;
@@ -102,6 +103,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="clock">What attachments and releases are timed on; null is the system clock.</param>
     /// <param name="editor">What a terminal's edit is put to the person and made with, or null to refuse every one.</param>
     /// <param name="browsers">What decides a browser's pairing, pairing check and fill, or null to refuse every one.</param>
+    /// <param name="saver">Saves a value an agent asks the person to save; null where this owner saves none.</param>
     public SessionAuthority(
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
@@ -111,7 +113,8 @@ public sealed class SessionAuthority : IApproverHandler
         Action? lockNow = null,
         TimeProvider? clock = null,
         SessionEditor? editor = null,
-        IBrowserRequests? browsers = null)
+        IBrowserRequests? browsers = null,
+        SessionSaver? saver = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -124,6 +127,7 @@ public sealed class SessionAuthority : IApproverHandler
         _recorder = new RequestRecorder(audit);
         _environments = environments;
         _editor = editor;
+        _saver = saver;
         _browsers = browsers;
         _lockNow = lockNow;
         _clock = clock ?? TimeProvider.System;
@@ -532,6 +536,42 @@ public sealed class SessionAuthority : IApproverHandler
             (method, reason) => new EditReply(AuditDecision.Denied, method, reason),
             waiting,
             withdrawn.Token).ConfigureAwait(false));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Recorded under the client that asked, naming the place and never the value, as every agent request is.</remarks>
+    public async ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
+
+        SaveReply Answer(SaveReply reply) =>
+            _recorder.Recorded(reply, RequestRecords.Save(client, request, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(new SaveReply(AuditDecision.Denied, refusal.Method, refusal.Reason));
+        }
+
+        if (_saver is null)
+        {
+            return Answer(new SaveReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not save values agents ask for"));
+        }
+
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
+
+        var decided = await Decided(
+            token => _saver.DecideAsync(request, lifetime, waiting, token),
+            lifetime,
+            (method, reason) => new SaveReply(AuditDecision.Denied, method, reason),
+            waiting,
+            withdrawn.Token).ConfigureAwait(false);
+
+        return Answer(decided with { Session = lifetime.Id });
     }
 
     /// <summary>

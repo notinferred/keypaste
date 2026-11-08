@@ -424,6 +424,30 @@ public sealed class TerminalApprovalChannelTests
         Assert.DoesNotContain("[b]", rig.Prompt.PromptsSeen[1], StringComparison.Ordinal);
     }
 
+    private static SavePrompt SavePromptFor(bool replaces = false) =>
+        SavePrompt.For("Claude Code", "claude-code", "work/stripe", "STRIPE_KEY", "the new key") with { Replaces = replaces };
+
+    /// <summary>A value typed masked, or generated, is saved only with y; the value is never printed (F.79).</summary>
+    [Fact]
+    public async Task A_save_takes_a_typed_or_generated_value_and_y_and_never_prints_it()
+    {
+        var typed = Build("t", "sk_typed_value", "y");
+        var generated = Build("g", "y");
+        var cancelled = Build("t", "sk_typed_value", "n");
+
+        var typedAnswer = await typed.Channel.AskToSaveAsync(SavePromptFor(replaces: true), Token);
+        var generatedAnswer = await generated.Channel.AskToSaveAsync(SavePromptFor(), Token);
+        var cancelledAnswer = await cancelled.Channel.AskToSaveAsync(SavePromptFor(), Token);
+
+        Assert.Equal(new SaveAnswer(ApprovalAnswer.ApprovedOnce, "sk_typed_value"), typedAnswer);
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, generatedAnswer.Answer);
+        Assert.Equal(20, generatedAnswer.Value!.Length);
+        Assert.Equal(new SaveAnswer(ApprovalAnswer.Denied, null), cancelledAnswer);
+        Assert.Contains("This replaces STRIPE_KEY at work/stripe.", typed.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("sk_typed_value", typed.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(generatedAnswer.Value, generated.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AnEnvRun_OffersOnceOnly()
     {

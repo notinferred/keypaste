@@ -119,7 +119,7 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlyThreeTools()
+    public async Task TheServerExposes_ExactlyFourTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
@@ -128,10 +128,11 @@ public sealed class ServerToolsTests
 
         // The count matters as much as the names: another tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(3, tools.Count);
+        Assert.Equal(4, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
         Assert.Contains(tools, t => t.Name == ToolText.AttachmentToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.SaveToolName);
     }
 
     /// <summary>
@@ -366,6 +367,29 @@ public sealed class ServerToolsTests
     /// The path that did not exist before this stage: a person says yes, and exactly one field
     /// value reaches the agent.
     /// </summary>
+    /// <summary>request_save says only whether the person saved a value: the agent is told where, and never given it (F.79).</summary>
+    [Fact]
+    public async Task A_save_says_where_it_was_saved_and_a_refusal_that_it_was_not()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Start();
+        var client = await harness.StartAsync();
+        harness.Approver.SaveAnswer = new SaveReply(AuditDecision.Granted, AuditMethod.Prompt, "saved") { Where = "env/dev/stripe" };
+
+        var saved = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["reason"] = "the new key" });
+        harness.Approver.SaveAnswer = new SaveReply(AuditDecision.Denied, AuditMethod.Prompt, "a person did not save a value there");
+        var refused = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["reason"] = "the new key" });
+        var both = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["project"] = "acme", ["reason"] = "x" });
+
+        Assert.False(saved.IsError, TextOf(saved));
+        Assert.Contains("SAVED", TextOf(saved), StringComparison.Ordinal);
+        Assert.Contains("env/dev/stripe", TextOf(saved), StringComparison.Ordinal);
+        Assert.True(refused.IsError);
+        Assert.Contains("NOT SAVED", TextOf(refused), StringComparison.Ordinal);
+        Assert.True(both.IsError);
+        Assert.Equal(2, harness.Approver.SavesReceived.Count);
+    }
+
     [Fact]
     public async Task WhenAPersonSaysYes_TheFieldValueReachesTheAgent()
     {

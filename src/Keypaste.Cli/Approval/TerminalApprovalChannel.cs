@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Approval;
@@ -103,6 +104,107 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var always = Always.Of(request, $"the {request.Field} of {Described(request.Candidates[picked])} when it asks for {request.Entry},", blocks: false);
 
         return new ItemPick(await AnswerAsync(started, always, cancellationToken).ConfigureAwait(false), picked);
+    }
+
+    /// <summary>
+    /// Shows an agent's request to save a value, reads the value masked or generates one, then asks for <c>y</c> to save it.
+    /// The value is never printed.
+    /// </summary>
+    public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(RenderSave(request, RuleLine));
+
+        try
+        {
+            var how = await ChooseAsync("tg", () => SaveChoice(Remaining(started)), cancellationToken).ConfigureAwait(false);
+            string? value = null;
+
+            if (how == 't')
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var typed = await Task.Run(() => _prompt.ReadSecret("  value: "), CancellationToken.None).WaitAsync(cancellationToken).ConfigureAwait(false);
+                value = typed is { Length: > 0 } ? new string(typed.Value) : null;
+            }
+            else if (how == 'g')
+            {
+                using var generated = new SecretBuffer();
+                PasswordGenerator.Append(SecretRecipe.Default, generated);
+                value = new string(generated.Value);
+                _console.WriteLine($"  generated a {SecretRecipe.Default.Describe("password")}; it is not shown");
+            }
+
+            if (value is null)
+            {
+                return new SaveAnswer(SaidSave(saved: false), null);
+            }
+
+            if (request.Replaces)
+            {
+                _console.WriteLine($"  This replaces {request.Field} at {request.Where}. The old value stays in the item's history.");
+            }
+
+            var confirmed = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "save"), cancellationToken).ConfigureAwait(false) == 'y';
+
+            return confirmed ? new SaveAnswer(SaidSave(saved: true), value) : new SaveAnswer(SaidSave(saved: false), null);
+        }
+        catch (OperationCanceledException)
+        {
+            return new SaveAnswer(Withdrawn("Nothing was saved."), null);
+        }
+    }
+
+    private ApprovalAnswer SaidSave(bool saved)
+    {
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            saved ? _console.Paint(Tone.Ok, "keypaste: saving it. The agent is not given it.") : _console.Paint(Tone.Danger, "keypaste: not saved."),
+            RuleLine));
+
+        return saved ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
+    }
+
+    /// <summary>The save prompt's choice line: cancel first, then typing or generating the value.</summary>
+    private string SaveChoice(int secondsLeft) =>
+        _console.Paint(Tone.Accent, "[d] cancel  [t] type it  [g] generate  ")
+        + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
+        + " ";
+
+    private static string RenderSave(SavePrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            "keypaste: an agent asks you to save a value. You enter it; the agent is not given it.",
+            string.Empty,
+            $"  agent    {Named(request.Client, request.Label)}",
+            $"  {(request.ForProject ? "project" : "item   ")}  {request.Where}",
+            $"  {(request.ForProject ? "key    " : "field  ")}  {request.Field}",
+            $"  saving   {(request.Replaces ? "replaces the value it holds" : request.Creates ? "creates it" : "adds it")}",
+            string.Empty,
+            "  the agent says it needs this because:",
+            $"    {request.Reason}",
+        ];
+
+        if (request.ReasonWasTruncated)
+        {
+            lines.Add("    (cut short — the full text is hashed in the audit log)");
+        }
+
+        if (request.WasAltered)
+        {
+            lines.Add(string.Empty);
+            lines.Add("  The place or the reason above is not what the agent sent: it was scrubbed.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+        lines.Add(string.Empty);
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     public async ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt request, CancellationToken cancellationToken)

@@ -1,3 +1,5 @@
+using Keypaste.Core.Audit;
+
 namespace Keypaste.Core.Ipc;
 
 /// <summary>
@@ -102,6 +104,14 @@ public interface IApproverHandler
     /// <returns>What became of it. A handler that takes no edits refuses.</returns>
     ValueTask<EditReply> EditAsync(EditRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new EditReply(Audit.AuditDecision.Denied, Audit.AuditMethod.NoSession, "this keypaste process does not take changes from a terminal"));
+
+    /// <summary>Asks the person to save a value an agent named the place of, which the agent never receives.</summary>
+    /// <param name="request">Where the value goes and why.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether it was saved; a handler that saves nothing refuses.</returns>
+    ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new SaveReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not save values agents ask for"));
 
     /// <summary>Pairs the browser attached on this connection (D-0627).</summary>
     /// <param name="request">The extension's identification key, and the attachment it is made under.</param>

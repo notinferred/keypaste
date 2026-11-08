@@ -170,6 +170,8 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 In source, `request_attachment` takes `entry`, `name` and `reason`, and returns one attachment of the entry, by its exact name, as base64, decided the same way under the rule for attachments; one over 5 MiB is refused.
 
+In source, `request_save` takes `item` and `field`, or `project`, `environment` and `key`, with `reason`, and asks the person to save a value there, which they type, paste or generate; the item is created when there is none, a replace needs their confirmation, and the agent learns only whether it was saved and where ([THREATS](../THREATS.md) T-54).
+
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
 ## Running a command with secrets (`--allow-run`)
@@ -328,7 +330,7 @@ printf '%s\n' \
   | keypaste mcp --vault ~/vault.kdbx --audit-log /tmp/probe.jsonl
 ```
 
-You should get two JSON lines back, the second listing `list_entry_names`, `request_credential` and `request_attachment`. CI runs a stricter version of exactly this on all three operating systems (`scripts/verify-mcp-stdio.sh`).
+You should get two JSON lines back, the second listing `list_entry_names`, `request_credential`, `request_attachment` and `request_save`. CI runs a stricter version of exactly this on all three operating systems (`scripts/verify-mcp-stdio.sh`).
 
 ## Troubleshooting
 

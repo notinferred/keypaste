@@ -8,11 +8,7 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.79 — Let an agent ask the person to save a value.** Needs: none ([F.78b](steps/F.78b.md)). Founder, 2026-11-07, for 1.0.0.
-  - An agent names where a value belongs (project or item, field or variable name) and why; the app asks the person to type, paste or generate the value with keypaste's password or passphrase generator, shows where it will go, and saves it only on their action. The agent never receives the value, only whether it was saved, and the request is logged. It keeps the prompts' rules: no default, focus on Cancel, the save disarmed for a second, a fixed layout.
-  - PRODUCT is amended, dated, since agents organizing the vault (T7) otherwise follows 1.0.0.
-  - Accepted when tests show a saved value reaching the named place and never the agent, a cancel or lock saving nothing, and an existing value replaced only after the person confirms it.
-- [ ] **F.80 — Let a request wait its turn.** Needs: none ([F.78b](steps/F.78b.md)). Founder, 2026-11-07.
+- [ ] **F.80 — Let a request wait its turn.** Needs: none ([F.78b](steps/F.78b.md), [F.79](steps/F.79.md)). Founder, 2026-11-07.
   - A request arriving while a prompt is open waits its turn instead of being refused as busy, so two tabs of one agent are each answered. A looping agent cannot pile prompts up: the founder settles the bound before it is built, with a few waiting per agent and the refusal cooldown as the starting proposal.
   - Accepted when tests show two concurrent requests each prompted in order, a cancelled or timed-out request leaving the queue, a lock emptying it, and the bound holding.
 

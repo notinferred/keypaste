@@ -135,7 +135,13 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, Unexpected, OpenBrowserFill, requestNotices),
+            () => new WindowApprovalChannel(
+                TimeProvider.System,
+                ApprovalLimits.Default.Window,
+                Unexpected,
+                OpenBrowserFill,
+                requestNotices,
+                () => _window is { } window ? Clipboards(window) : NoClipboard.Instance),
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
             Unexpected);
 

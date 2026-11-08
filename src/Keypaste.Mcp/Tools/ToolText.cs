@@ -19,6 +19,9 @@ internal static class ToolText
     /// <summary>The tool that asks for one attachment; its lines are <see cref="CredentialToolName"/>'s, with the field <c>attachment</c>.</summary>
     internal const string AttachmentToolName = "request_attachment";
 
+    /// <summary>The tool that asks the person to save a value the agent never receives.</summary>
+    internal const string SaveToolName = AuditTools.Save;
+
     /// <summary>The description a client shows for <c>request_attachment</c>.</summary>
     internal const string AttachmentDescription = """
         Asks the user to release one attachment of one vault item, by its name, as base64. A human sees the item, the
@@ -166,6 +169,30 @@ internal static class ToolText
 
         Where an item lists `totp`, that field is its current TOTP code, never the seed behind it. A code
         is released once, for the seconds it has left; ask again for the next one.
+        """;
+
+    /// <summary>The description a client shows for <c>request_save</c>.</summary>
+    internal const string SaveDescription = """
+        Asks the user to save a value in their vault: a credential you need them to store, such as a new
+        API key, which you never see. Name where it belongs, an item's path and field, or a project, an
+        environment and a variable's name, and why. The user types, pastes or generates the value and
+        saves it, or does not; you learn only whether it was saved. Default is not saved.
+
+        An item that does not exist is created. Replacing a value the place already holds needs the
+        user's confirmation. Ask only for a value the user has to provide; never ask them to paste a
+        value you already have.
+        """;
+
+    /// <summary>What the agent is told once the person saved the value.</summary>
+    /// <param name="where">Where it was saved.</param>
+    /// <returns>The sentence, holding no value.</returns>
+    internal static string Saved(string where) =>
+        $"keypaste: SAVED. The user entered a value and it is saved at {where}. You were not given it; ask for it with request_credential if you need it.";
+
+    /// <summary>What the agent is told when the person did not save a value.</summary>
+    internal const string NotSaved = """
+        keypaste: NOT SAVED. The user did not save a value there. Do not ask again for the same place
+        unless they tell you to. This call was recorded in the audit log.
         """;
 
     /// <summary>Why a call was refused when no approver is running.</summary>

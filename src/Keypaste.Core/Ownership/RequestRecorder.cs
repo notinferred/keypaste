@@ -90,6 +90,10 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     internal EditReply Recorded(EditReply reply, AuditRecord record) =>
         reply with { Recorded = TryAppend(record) };
 
+    /// <summary>A save request's reply, saying whether its line was appended.</summary>
+    internal SaveReply Recorded(SaveReply reply, AuditRecord record) =>
+        reply with { Recorded = TryAppend(record) };
+
     /// <summary>Writes the line of something the owner did that released nothing and answers nobody, such as a merge it saved.</summary>
     /// <param name="record">Its line.</param>
     /// <returns>Whether it was written.</returns>

@@ -46,6 +46,16 @@ internal static class ToolResults
         Content = [new TextContentBlock { Text = explanation }],
     };
 
+    /// <summary>A value the person saved, which the result says and never carries.</summary>
+    /// <param name="where">Where it was saved.</param>
+    /// <returns>A success result saying so, with <c>saved</c> in its structured content.</returns>
+    internal static CallToolResult Saved(string where) => new()
+    {
+        IsError = false,
+        Content = [new TextContentBlock { Text = ToolText.Saved(where) }],
+        StructuredContent = StructuredSaved(where),
+    };
+
     /// <summary>The one result in keypaste that carries a credential.</summary>
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
@@ -198,6 +208,22 @@ internal static class ToolResults
             writer.WriteString("field", field);
             writer.WriteString("value", value);
             writer.WriteNumber("expires_in_seconds", codeSeconds);
+            writer.WriteEndObject();
+        }
+
+        using var parsed = JsonDocument.Parse(buffer.ToArray());
+        return parsed.RootElement.Clone();
+    }
+
+    private static JsonElement StructuredSaved(string where)
+    {
+        using var buffer = new MemoryStream(128);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteBoolean("saved", true);
+            writer.WriteString("where", where);
             writer.WriteEndObject();
         }
 

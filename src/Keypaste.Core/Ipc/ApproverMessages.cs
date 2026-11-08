@@ -45,6 +45,9 @@ public enum ApproverMessageKind
 
     /// <summary>A change to this computer's agent rules from <c>keypaste clients</c>, which the owner makes and seals.</summary>
     RulesChange = 19,
+
+    /// <summary>An agent's request that the person save a value it never sees (F.79).</summary>
+    Save = 20,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>

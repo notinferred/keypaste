@@ -26,6 +26,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(LockReplyFrame))]
 [JsonSerializable(typeof(RulesChangeRequestFrame))]
 [JsonSerializable(typeof(RulesChangeReplyFrame))]
+[JsonSerializable(typeof(SaveRequestFrame))]
+[JsonSerializable(typeof(SaveReplyFrame))]
 [JsonSerializable(typeof(TokenEnvRequestFrame))]
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
@@ -476,4 +478,34 @@ internal sealed class BrowserLoginRow(BrowserLogin login)
     public string Password => login.Password;
     public string Name => login.Name;
     public string Uuid => login.Uuid;
+}
+
+internal sealed class SaveRequestFrame(SaveRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SaveKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Item => request.Item;
+    public string Field => request.Field;
+    public string Project => request.Project;
+    public string Environment => request.Environment;
+    public string Key => request.Key;
+    public string Reason => request.Reason;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? Client => request.ClientName;
+    public string? ClientVersion => request.ClientVersion;
+    public string? ClientLabel => request.ClientLabel;
+}
+
+internal sealed class SaveReplyFrame(SaveReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SaveKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
+    public string? Where => reply.Where;
+    public string? Session => reply.Session;
 }
