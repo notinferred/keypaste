@@ -5,7 +5,7 @@ namespace Keypaste.Core.Agents;
 
 /// <summary>
 /// The rules a vault's owner decides by: <c>agents.toml</c> only while its seal holds, an HMAC-SHA256 under a key the
-/// vault keeps in <see cref="ReservedGroups.Keys"/>, over this home's identity, the vault's count of sealed writes and the rules;
+/// vault keeps in <see cref="ReservedGroups.Keys"/>, over this home's identity, the vault's count of this home's sealed writes and the rules;
 /// otherwise the defaults.
 /// </summary>
 /// <remarks>
@@ -16,8 +16,9 @@ namespace Keypaste.Core.Agents;
 /// vault's key synced or copied from another computer do not make that computer's rules valid here.
 /// </para>
 /// <para>
-/// Each sealed write counts up the vault's count first and writes the file after, so a file sealed before the latest
-/// write, put back, is ignored too, and a write whose file never lands leaves the defaults.
+/// Each sealed write counts up this home's count in the vault first, in a record of the home's own, and writes the file
+/// after, so a file sealed before the home's latest write, put back, is ignored too, a write whose file never lands leaves
+/// the defaults, and another home sharing the vault changes nothing here.
 /// </para>
 /// </remarks>
 /// <param name="file">This home's <c>agents.toml</c>.</param>
@@ -34,7 +35,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
     /// <summary>The record's field that holds the key, as base64.</summary>
     internal const string KeyField = "key";
 
-    /// <summary>The record's field that counts the sealed writes, as a decimal number.</summary>
+    /// <summary>The field of each home's own record that counts that home's sealed writes, as a decimal number.</summary>
     internal const string CountField = "count";
 
     private readonly AgentRulesFile _file = file ?? throw new ArgumentNullException(nameof(file));
@@ -56,7 +57,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
 
         var open = _vault();
         var holds = !read.Present
-            || (read.Seal is { } seal && Key(open) is { } key && Count(open) is { } count && _file.HomeId() is { } home
+            || (read.Seal is { } seal && Key(open) is { } key && _file.HomeId() is { } home && Count(open, home) is { } count
                 && Matches(Seal(key, home, count, read.Rules), seal));
         _ignored = holds ? null : IgnoredText;
         rules = holds ? read.Rules : AgentRules.Defaults;
@@ -82,14 +83,14 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
 
         var next = change(current);
 
-        if (Count(_vault()) is not { } count || count == ulong.MaxValue)
+        if (Count(_vault(), home) is not { } count || count == ulong.MaxValue)
         {
             problem = "the vault's count of agent rule changes cannot be read";
             return false;
         }
 
         var counted = (count + 1).ToString(CultureInfo.InvariantCulture);
-        var saved = _save(vault => vault.WriteRecord(new EntryName(ReservedGroups.Keys, KeyTitle), AcafIds.Agent, CountField, counted));
+        var saved = _save(vault => vault.WriteRecord(new EntryName(ReservedGroups.Keys, CountTitle(home)), AcafIds.Agent, CountField, counted));
 
         if (!saved.Holds)
         {
@@ -135,8 +136,12 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
         }
     }
 
-    /// <summary>The vault's count of sealed writes: none before the first, or null when the vault is locked or the count unreadable.</summary>
-    private static ulong? Count(Vault? vault)
+    /// <summary>The title of a home's own record of its count.</summary>
+    /// <remarks>A record of its own, with a UUID derived from its title, because a merge takes an entry changed in both copies as the newer whole: two homes' counts in one entry would lose one.</remarks>
+    internal static string CountTitle(string home) => $"{KeyTitle}-{home}";
+
+    /// <summary>The vault's count of this home's sealed writes: none before the first, or null when the vault is locked or the count unreadable.</summary>
+    private static ulong? Count(Vault? vault, string home)
     {
         try
         {
@@ -145,7 +150,8 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
                 return null;
             }
 
-            var text = records.FirstOrDefault(record => string.Equals(record.Title, KeyTitle, StringComparison.Ordinal))?.Value;
+            var title = CountTitle(home);
+            var text = records.FirstOrDefault(record => string.Equals(record.Title, title, StringComparison.Ordinal))?.Value;
 
             return text is not { Length: > 0 }
                 ? 0

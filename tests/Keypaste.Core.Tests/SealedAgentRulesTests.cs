@@ -103,6 +103,58 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Equal(SealedAgentRules.IgnoredText, _rules.Ignored);
     }
 
+    /// <summary>Two homes sharing one vault each keep their own rules across the other's sealed changes.</summary>
+    [Fact]
+    public void Two_homes_sharing_a_vault_each_keep_their_rules_across_the_others_change()
+    {
+        var other = Sealer(new AgentRulesFile(KeypasteHome.AgentsPath(Path.Combine(_directory, "other-home"))), _vault);
+        Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
+        Assert.True(other.TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
+        Assert.True(other.TryChange(rules => rules.With(FieldCategory.Notes, CategoryRule.Block), out problem), problem);
+
+        Assert.True(_rules.TryRead(out var here, out _));
+        Assert.True(other.TryRead(out var there, out _));
+        Assert.Equal((CategoryRule.Allow, CategoryRule.Ask), (here.RuleFor(FieldCategory.Password), here.RuleFor(FieldCategory.Notes)));
+        Assert.Equal((CategoryRule.Ask, CategoryRule.Block), (there.RuleFor(FieldCategory.Password), there.RuleFor(FieldCategory.Notes)));
+        Assert.Null(_rules.Ignored);
+        Assert.Null(other.Ignored);
+    }
+
+    /// <summary>
+    /// Two copies of the vault that each sealed a change for their own home merge to a vault both seals hold under, since each
+    /// home's count is a record of its own and a merge settles a record changed in both copies as one whole.
+    /// </summary>
+    [Fact]
+    public void A_merge_of_two_copies_each_sealing_its_own_home_keeps_both_counts()
+    {
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        var otherFile = new AgentRulesFile(KeypasteHome.AgentsPath(Path.Combine(_directory, "other-home")));
+        using var theirs = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        Assert.True(Sealer(otherFile, theirs).TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
+
+        Vault? merged = null;
+        var mine = new SealedAgentRules(_file, () => _vault, edit =>
+        {
+            edit(_vault);
+            var save = _vault.MergeAnotherSave();
+            merged = save.Copy;
+            return save.Outcome == VaultMergeSaveOutcome.Saved ? AgentSave.Saved : new AgentSave(AgentSaveOutcome.Failed, save.Reason);
+        });
+        Assert.True(mine.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out problem), problem);
+
+        using (merged)
+        {
+            Assert.NotNull(merged);
+            var here = new SealedAgentRules(_file, () => merged, _ => AgentSave.Saved);
+            var there = new SealedAgentRules(otherFile, () => merged, _ => AgentSave.Saved);
+            Assert.True(here.TryRead(out var heldHere, out _));
+            Assert.True(there.TryRead(out var heldThere, out _));
+            Assert.Equal((null, null), (here.Ignored, there.Ignored));
+            Assert.Equal(CategoryRule.Allow, heldHere.RuleFor(FieldCategory.Password));
+            Assert.Equal(CategoryRule.Allow, heldThere.RuleFor(FieldCategory.Notes));
+        }
+    }
+
     /// <summary>
     /// A file sealed in another home, its identity and the vault's key with it, is not this home's: this home's identity is
     /// its own, so the seal does not hold here.
@@ -143,10 +195,12 @@ public sealed class SealedAgentRulesTests : IDisposable
     {
         Assert.Empty(_vault.ReadRecords(ReservedGroups.Keys, "key"));
         Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
-        var key = Assert.Single(_vault.ReadRecords(ReservedGroups.Keys, "key")).Value;
+        var key = Keys().Single();
         Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: false), out problem), problem);
 
-        Assert.Equal(key, Assert.Single(_vault.ReadRecords(ReservedGroups.Keys, "key")).Value);
+        Assert.Equal(key, Keys().Single());
+
+        IEnumerable<string?> Keys() => _vault.ReadRecords(ReservedGroups.Keys, "key").Where(record => record.Value is { Length: > 0 }).Select(record => record.Value);
     }
 
     [Fact]
