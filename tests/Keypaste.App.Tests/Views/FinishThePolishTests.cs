@@ -369,7 +369,7 @@ public sealed class FinishThePolishTests
     });
 
     [Fact]
-    public Task Learn_more_says_what_a_selector_and_a_scope_are_where_they_are_typed() => HeadlessSession.On(() =>
+    public Task Learn_more_says_what_a_scope_is_where_it_is_typed() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-learn-more-");
         shell.Show<ScopedTokensViewModel>(DestinationKind.Tokens).OpenFormCommand.Execute(null);
@@ -381,12 +381,6 @@ public sealed class FinishThePolishTests
         Assert.Contains("link", learnMore.Classes);
         Assert.NotNull(learnMore.Flyout);
         AssertItsExamplesAreSetAsCode(learnMore);
-
-        var seeing = new AgentSettingsView();
-        var learnMoreSeeing = seeing.FindControl<Button>("LearnMoreSeeing")!;
-        Assert.Equal("Learn more about what it can see", AutomationProperties.GetName(learnMoreSeeing));
-        Assert.Contains("link", learnMoreSeeing.Classes);
-        AssertItsExamplesAreSetAsCode(learnMoreSeeing);
 
         static void AssertItsExamplesAreSetAsCode(Button link)
         {

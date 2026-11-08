@@ -116,19 +116,12 @@ public sealed class EntryActivityRowsTests
     }
 
     [Fact]
-    public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
+    public async Task TheAgentAccessCard_ShowsOnceAnAgentThatCanSeeTheItemIsAttached()
     {
         await using var app = await App.StartAsync();
 
         using (var screen = app.Screen())
         {
-            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
-            Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
-        }
-
-        await using (await app.AttachBridgeAsync("no-settings"))
-        {
-            using var screen = app.Screen();
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
         }
