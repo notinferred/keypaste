@@ -95,3 +95,13 @@ At `877193cd`: ci 42426591339 (fast tier) green; dev desktop 42426834444 and dev
 - The bridge's bound on a run stays two windows, which T-10 states; a run no longer has a confirmation after its prompt, so one window would do.
 
 `THREATS.md` names three tests that do not exist, on `main` too: `EnvTagVerbTests.Tag_names_an_agent_set_to_Automatic_there_before_asking`, `RunSessionTests.A_command_the_prompt_cannot_show_whole_is_refused_and_recorded_by_the_owner` and `VerbTests.Get_ClipboardChangedSinceTheCopy_IsLeftAlone`. `DesktopApprovalTests.A_custom_field_is_named_on_the_prompt_and_allowing_it_answers_no_other_field` failed once locally, at the prompt that never came, with its class beside others and passed alone; it asked again before the previous release's reply had come back, so it now waits for that reply.
+
+### Founder decisions of 2026-11-07, evening, not yet built
+
+This branch and F.76's are held unmerged until these are built; the founder chose to stop and plan them in a new session with its own budget.
+
+- Agent settings are split by risk. The vault keeps what an agent can see. Anything that releases without asking (Automatic, Automatic with commands, Always allow rows and a picker's remembered pick) lives only in this computer's app configuration, so a synced or edited vault cannot turn it on. PRODUCT (v1.12's storage sentence and the v1.23 draft) and ACAF v1.2 change with it.
+- Automatic's hourly cap and end time are both removed; Automatic lasts until the person changes it.
+- The picker's Always allow remembers the pick: it answers this agent's requests for that name with the picked item after the person confirms, kept in the app configuration.
+- PRODUCT §3's "MCP remains bounded credential access … not arbitrary shell execution" is reworded in the v1.23 draft for Automatic with commands.
+- Still to ask: telling a same-named pair apart in Trash (username or URL, deletion time to the second, or leave it); Agents listing a project set to Automatic twice, under Always allowed and Project rows.
