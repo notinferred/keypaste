@@ -1,6 +1,6 @@
 # F.78a — Decide an agent's access by field category
 
-Completed 2026-11-08 on `f76-picker`, source only and not merged: the founder reviews PRODUCT's v1.23 draft, THREATS and every site change first. Runs: ci 42478773405 at `45b600aa` (phases 1 and 2a); phase 2b's below.
+Completed 2026-11-08 on `f76-picker`, source only and not merged: the founder reviews PRODUCT's v1.23 draft, THREATS and every site change first. Runs: ci 42478773405 at `45b600aa` (phases 1 and 2a); at `81f9a014`, ci's fast tier 42484932459, dev desktop 42484941647 and dev desktop-gates 42484987806 on Linux, all green.
 
 ## Amendments
 
@@ -35,6 +35,8 @@ The seal's counter, added to phase 2b: the vault's `agent-rules` record also hol
 Run locally, each class once: Keypaste.Core.Tests `FieldCategoryRequestTests`, `SealedAgentRulesTests`, `AgentRulesFileTests` and `CustomFieldReleaseTests`, 86 passed; `ApproverHandlerTests`, `ApproverProtocolTests`, `ItemPickerTests`, `ApprovalGateTests`, `ApproverListenerTests`, `ApproverClientTests`, `VaultCredentialSourceTests`, `FieldCategoryRequestTests` and `SealedAgentRulesTests`, 252 passed; Keypaste.Mcp.Tests `AttachmentToolTests`, `ServerToolsTests`, `PlainWordsTests` and `LargeCredentialTests`, passed; Keypaste.App.Tests `AgentRulesViewModelTests`, 4 passed; `ScreenRenderer` with the new frames `04-settings-agent-rules`, `-allow` and `-ignored` at every palette and at 150% and 200%, passed once the ignored notice wrapped. `bash scripts/verify.sh compile` passed.
 
 New request-path tests: each category's Ask, Allow and Block with a protected and an unprotected custom field; the username switch and the URL under every rule; listing with usernames hidden; a rule change clearing only the cooldown it covers; attachments asked, allowed and blocked, a missing name, over and at 5 MiB, a lock, and the picker when two items answer to the name; the older sealed file put back; and over a real pipe and MCP client, a 1 MiB attachment released as base64 and logged once.
+
+In CI, phase 2b took three fast-tier attempts and two of each Linux profile, each failure an assertion of the old behaviour, fixed at its cause: `verify-mcp-stdio.sh` counted two tools (42482332165); the field rule's wording had gained `attachment`, which `request_credential` does not take, so it was put back, and `RunToolTests` listed the tools without `request_attachment` (42482571324); `verify-connect-client.sh` expected the defaults' tagged-only listing that the removed Can see gave (42483550437); and three App tests covered removed settings: a limit's end time in the log, the Can see Learn more, and the agent card hidden from an agent with no settings (42483522379).
 
 ## Limits and follow-ups
 
