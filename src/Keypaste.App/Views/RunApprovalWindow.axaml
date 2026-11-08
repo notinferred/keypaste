@@ -105,9 +105,7 @@
         <TextBlock Name="AttributionText" Classes="caption" Text="{Binding Attribution}" />
       </StackPanel>
 
-      <StackPanel Spacing="4">
-        <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
-      </StackPanel>
+      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
 
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"

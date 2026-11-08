@@ -866,6 +866,21 @@ public sealed class ScreenRenderer
         Save(window, output, "04-settings-browser-fill-remove");
         browserFill.StopCommand.Press();
 
+        // Settings › Agents: the username switch and each category's rule, an Allow waiting on its confirmation, and the
+        // notice that the rules on file are ignored.
+        var rules = Assert.IsType<SettingsViewModel>(shell.Content).AgentRules!;
+        var card = window.GetVisualDescendants().OfType<Border>().First(border => border.Name == "AgentRulesCard");
+        scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);
+        WindowInput.Drain();
+        Save(window, output, "04-settings-agent-rules");
+        rules.ChooseCommand.Press(rules.Rows.Single(row => row.Category == Core.Agents.FieldCategory.Password).Choices.Single(choice => choice.Rule == Core.Agents.CategoryRule.Allow));
+        WindowInput.Drain();
+        Save(window, output, "04-settings-agent-rules-allow");
+        rules.CancelAllowCommand.Press();
+        SetDrawnState(rules, nameof(rules.Ignored), "Agent rules were changed outside keypaste and are ignored until you set them again. Until then every value is asked about and no agent may run commands.");
+        WindowInput.Drain();
+        Save(window, output, "04-settings-agent-rules-ignored");
+
         window.Close();
     }
 

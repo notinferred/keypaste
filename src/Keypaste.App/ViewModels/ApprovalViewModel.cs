@@ -37,6 +37,11 @@ internal sealed class ApprovalViewModel : PromptViewModel
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
 
+    /// <summary>The tool the request came through, an attachment's or a field's.</summary>
+    internal string Tool => Field.StartsWith(CredentialFields.Attachment + " ", StringComparison.Ordinal)
+        ? "tool: keypaste.request_attachment"
+        : "tool: keypaste.request_credential";
+
     /// <inheritdoc/>
     protected override string Asks => $"{Client} wants 1 secret, {Entry}";
 

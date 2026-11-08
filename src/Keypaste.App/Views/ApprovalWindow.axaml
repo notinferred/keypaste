@@ -52,19 +52,17 @@
 
       <Border Classes="prompt-call size-12" Padding="12,8">
         <StackPanel>
-          <TextBlock Text="tool: keypaste.request_credential" />
+          <TextBlock Name="ToolText" Text="{Binding Tool}" />
           <TextBlock Name="EntryText" Classes="value" Text="{Binding Entry}" TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </Border>
 
-      <StackPanel Spacing="8">
-        <Border Classes="prompt-list size-12-5">
-          <Grid ColumnDefinitions="*,Auto" Height="36" Margin="12,0">
-            <TextBlock Grid.Column="0" Name="FieldText" Text="{Binding Field}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="tag size-13" Text="value goes to the agent" VerticalAlignment="Center" />
-          </Grid>
-        </Border>
-      </StackPanel>
+      <Border Classes="prompt-list size-12-5">
+        <Grid ColumnDefinitions="*,Auto" Height="36" Margin="12,0">
+          <TextBlock Grid.Column="0" Name="FieldText" Text="{Binding Field}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Classes="tag size-13" Text="value goes to the agent" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
 
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="The agent says it needs this because" />

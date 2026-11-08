@@ -47,7 +47,9 @@ public static class Strings
     public static string AgentHistory => Manager.GetString("AgentHistory", CultureInfo.CurrentUICulture)!;
     public static string AgentSettingsLabel => Manager.GetString("AgentSettingsLabel", CultureInfo.CurrentUICulture)!;
     public static string Agents => Manager.GetString("Agents", CultureInfo.CurrentUICulture)!;
+    public static string AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL => Manager.GetString("AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL", CultureInfo.CurrentUICulture)!;
     public static string AgentsAndTheCLI => Manager.GetString("AgentsAndTheCLI", CultureInfo.CurrentUICulture)!;
+    public static string AgentsSeeUsernames => Manager.GetString("AgentsSeeUsernames", CultureInfo.CurrentUICulture)!;
     public static string AgentsWithoutALabel => Manager.GetString("AgentsWithoutALabel", CultureInfo.CurrentUICulture)!;
     public static string All => Manager.GetString("All", CultureInfo.CurrentUICulture)!;
     public static string AllItems => Manager.GetString("AllItems", CultureInfo.CurrentUICulture)!;
@@ -171,6 +173,8 @@ public static class Strings
     public static string Duplicate => Manager.GetString("Duplicate", CultureInfo.CurrentUICulture)!;
     public static string ENVIRONMENT => Manager.GetString("ENVIRONMENT", CultureInfo.CurrentUICulture)!;
     public static string EXPIRESCapitals => Manager.GetString("EXPIRESCapitals", CultureInfo.CurrentUICulture)!;
+    public static string EachKindOfValueIsAskedAllowedOrBlocked => Manager.GetString("EachKindOfValueIsAskedAllowedOrBlocked", CultureInfo.CurrentUICulture)!;
+    public static string EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere => Manager.GetString("EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere", CultureInfo.CurrentUICulture)!;
     public static string EachValueBecomesAProtectedFieldNamedX966a34 => Manager.GetString("EachValueBecomesAProtectedFieldNamedX966a34", CultureInfo.CurrentUICulture)!;
     public static string EarlierVersions => Manager.GetString("EarlierVersions", CultureInfo.CurrentUICulture)!;
     public static string EditFields => Manager.GetString("EditFields", CultureInfo.CurrentUICulture)!;
@@ -589,6 +593,7 @@ public static class Strings
     public static string Views => Manager.GetString("Views", CultureInfo.CurrentUICulture)!;
     public static string WaitingForYou => Manager.GetString("WaitingForYou", CultureInfo.CurrentUICulture)!;
     public static string What => Manager.GetString("What", CultureInfo.CurrentUICulture)!;
+    public static string WhatAgentsGet => Manager.GetString("WhatAgentsGet", CultureInfo.CurrentUICulture)!;
     public static string WhatFailedAndWhereInKeypastesCodeX12c043 => Manager.GetString("WhatFailedAndWhereInKeypastesCodeX12c043", CultureInfo.CurrentUICulture)!;
     public static string WhatTheEverydayScreensLeaveOutEachX739fe5 => Manager.GetString("WhatTheEverydayScreensLeaveOutEachX739fe5", CultureInfo.CurrentUICulture)!;
     public static string WhatYouTypedHasNotBeenSaved => Manager.GetString("WhatYouTypedHasNotBeenSaved", CultureInfo.CurrentUICulture)!;

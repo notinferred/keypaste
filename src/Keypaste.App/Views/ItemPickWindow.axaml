@@ -106,8 +106,9 @@
       <TextBlock Classes="prompt-note size-13"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
+      <!-- Its line is kept once an item is picked and the caption empties, so the buttons never move (T-2). -->
       <TextBlock Name="PickCaptionText" Classes="prompt-note size-13" Text="{Binding PickCaption}"
-                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                 Height="20" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
 
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"

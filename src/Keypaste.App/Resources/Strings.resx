@@ -597,4 +597,9 @@
   <data name="SomeLinuxDesktopsShowNoTrayIcon" xml:space="preserve"><value>Some Linux desktops show no tray icon.</value></data>
   <data name="HidingTheAppIsNotMinimizing" xml:space="preserve"><value>Hiding the app with ⌘H is not minimizing either.</value></data>
   <data name="OpenAgents" xml:space="preserve"><value>Open Agents</value></data>
+  <data name="AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL" xml:space="preserve"><value>Agents always see an item's title, group, tags and URL. Turning this off hides only the username, which they then ask for.</value></data>
+  <data name="AgentsSeeUsernames" xml:space="preserve"><value>Agents see usernames</value></data>
+  <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
+  <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
+  <data name="WhatAgentsGet" xml:space="preserve"><value>What agents get</value></data>
 </root>

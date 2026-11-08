@@ -233,6 +233,11 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// <summary>Browser fill: pairing a browser and the pairings the vault holds; null where nothing answers browsers.</summary>
     internal BrowserFillViewModel? BrowserFill { get; init; }
 
+    /// <summary>Settings › Agents: what every agent gets, present only where this app answers agents.</summary>
+    internal AgentRulesViewModel? AgentRules { get; init; }
+
+    internal bool HasAgentRules => AgentRules is not null;
+
     internal bool HasBrowserFill => BrowserFill is not null;
 
     internal bool HasCrashReports => Crashes is not null;
@@ -530,6 +535,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     {
         Access.Dispose();
         BrowserFill?.Dispose();
+        AgentRules?.Dispose();
     }
 
     private static string When(VaultBackup backup) =>
