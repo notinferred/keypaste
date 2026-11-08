@@ -77,7 +77,7 @@ public sealed class CliAppTests
 
     [Theory]
     [InlineData("approve", "approve agents' requests in this terminal")]
-    [InlineData("clients", "list agents and turn their run on or off")]
+    [InlineData("clients", "list agents, their rules and kept answers, and change them")]
     public void ApproveAndClients_AreVerbsOfTheirOwn(string verb, string usage)
     {
         using var harness = new CliHarness();
@@ -209,7 +209,7 @@ public sealed class CliAppTests
             "  setup       connect this computer's AI tools to your vault",
             "  mcp         the MCP server your AI tools start",
             "  approve     approve agents' requests in this terminal",
-            "  clients     list agents and turn their run on or off",
+            "  clients     list agents, their rules and kept answers, and change them",
             "  doctor      check the vault, the AI tools and the app, and say what to fix",
             "  token       create scoped, inject-only tokens",
             "  log         show the hash-chained activity log",

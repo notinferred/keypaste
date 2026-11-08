@@ -37,7 +37,7 @@ internal static class ClientsCommand
 
     internal static CliVerb Command { get; } = new(
         "clients",
-        "list agents, their rules and kept answers, and change them for less\n\n"
+        "list agents, their rules and kept answers, and change them\n\n"
             + "lists the rules every agent's request is decided by on this computer, kept in agents.toml, each agent it "
             + "knows by the name its bridge was given with --client-label, its own rules and the answers kept for it. with an "
             + "agent's name, turns its run on or off, sets its rule for a kind of value to ask, block or what Settings sets, "
