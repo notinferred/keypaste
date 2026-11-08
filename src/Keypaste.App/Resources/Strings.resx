@@ -602,4 +602,7 @@
   <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
   <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
   <data name="WhatAgentsGet" xml:space="preserve"><value>What agents get</value></data>
+  <data name="WhatItGets" xml:space="preserve"><value>What it gets</value></data>
+  <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
+  <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
 </root>

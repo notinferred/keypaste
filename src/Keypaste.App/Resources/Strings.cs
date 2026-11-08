@@ -594,6 +594,9 @@ public static class Strings
     public static string WaitingForYou => Manager.GetString("WaitingForYou", CultureInfo.CurrentUICulture)!;
     public static string What => Manager.GetString("What", CultureInfo.CurrentUICulture)!;
     public static string WhatAgentsGet => Manager.GetString("WhatAgentsGet", CultureInfo.CurrentUICulture)!;
+    public static string WhatItGets => Manager.GetString("WhatItGets", CultureInfo.CurrentUICulture)!;
+    public static string AlwaysAnswers => Manager.GetString("AlwaysAnswers", CultureInfo.CurrentUICulture)!;
+    public static string NoAlwaysAnswersYet => Manager.GetString("NoAlwaysAnswersYet", CultureInfo.CurrentUICulture)!;
     public static string WhatFailedAndWhereInKeypastesCodeX12c043 => Manager.GetString("WhatFailedAndWhereInKeypastesCodeX12c043", CultureInfo.CurrentUICulture)!;
     public static string WhatTheEverydayScreensLeaveOutEachX739fe5 => Manager.GetString("WhatTheEverydayScreensLeaveOutEachX739fe5", CultureInfo.CurrentUICulture)!;
     public static string WhatYouTypedHasNotBeenSaved => Manager.GetString("WhatYouTypedHasNotBeenSaved", CultureInfo.CurrentUICulture)!;

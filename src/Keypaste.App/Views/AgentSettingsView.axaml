@@ -58,7 +58,7 @@
     </Grid>
 
     <StackPanel Spacing="8">
-      <TextBlock Classes="label" Text="What it gets" />
+      <TextBlock Classes="label" Text="{x:Static res:Strings.WhatItGets}" />
       <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AgentCategoryRow">
@@ -100,15 +100,15 @@
     </StackPanel>
 
     <StackPanel Spacing="8">
-      <TextBlock Classes="label" Text="Always answers" />
+      <TextBlock Classes="label" Text="{x:Static res:Strings.AlwaysAnswers}" />
       <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !HasRemembered}"
-                 Text="None yet. Always allow and Always block on a prompt keep an answer for one item here." />
+                 Text="{x:Static res:Strings.NoAlwaysAnswersYet}" />
       <ItemsControl Name="RememberedAnswers" ItemsSource="{Binding Remembered}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:RememberedRow">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,6">
               <TextBlock Classes="body" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
-              <Button Grid.Column="1" Classes="ghost sm" Content="Remove"
+              <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}"
                       Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).RemoveCommand}"
                       CommandParameter="{Binding}"
                       AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}" />
