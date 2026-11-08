@@ -474,7 +474,7 @@ public sealed class SessionAuthorityTests : IDisposable
     {
         { "entry", string.Empty, "password", "deploy" },
         { "entry", new string('a', CredentialRequestRules.MaximumEntryLength + 1), "password", "deploy" },
-        { "field", "env/dev/STRIPE_KEY", "password,username", "deploy" },
+        { "field", "env/dev/STRIPE_KEY", new string('F', CredentialFields.MaximumFieldLength + 1), "deploy" },
         { "field", "env/dev/STRIPE_KEY", "otp", "deploy" },
         { "reason", "env/dev/STRIPE_KEY", "password", string.Empty },
         { "reason", "env/dev/STRIPE_KEY", "password", new string('r', CredentialRequestRules.MaximumReasonLength + 1) },

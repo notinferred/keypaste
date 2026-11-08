@@ -40,7 +40,7 @@ readonly RELEASE_ENTRY='env/ci/RELEASE_KEY'
 # A value a terminal sends the app to write, which no prompt and no log line may show.
 readonly EDITED='SENTINEL-DESKTOP-TERMINAL-EDIT-2a90'
 
-readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.'
+readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item'\''s custom fields. This call was recorded in the audit log.'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='HOLD_OUT OUT ERR'

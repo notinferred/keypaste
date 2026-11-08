@@ -161,7 +161,7 @@ public sealed class RequestRecordsTests : IDisposable
     public void ACredentialDenial_KeepsNoGrantLength_AndAFieldKeypasteDoesNotReleaseIsInvalid()
     {
         var line = RequestRecords.Credential(
-            _client, "env/dev/STRIPE_KEY", "Recovery codes", "why",
+            _client, "env/dev/STRIPE_KEY", "otp", "why",
             AuditDecision.Denied, AuditMethod.InvalidRequest, "the request did not satisfy the tool's schema", null, _exposure, null, _vault);
 
         Assert.Equal("invalid", line.Args.Field);
