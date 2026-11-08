@@ -50,5 +50,5 @@ In CI, phase 2b took three fast-tier attempts and two of each Linux profile, eac
 - **A home's first seal against two copies at once**: two copies that each create the shared key before either is merged settle to one key, so the other home's rules read as the defaults until set again. The key is made once per vault, so this needs two first seals racing.
 - **Whatever holds the unlocked vault can seal any rules**; the seal authenticates the owner process, not the person (THREATS T-15).
 - **An attachment is held whole** in the owner, the pipe reply, the bridge and the MCP result; BACKLOG asks whether chunking is worth it.
-- **DESIGN's voice still cites "Always allow"** and its vocabulary row for `clients.toml`; DESIGN changes only on founder direction.
+- **The fixes' edits to `verify-desktop-approval.sh` and `verify-keepassxc-fields.sh`** have not run in CI: desktop-gates and compat were not run after `b0d150bf`.
 - **The ACAF v1 and v1.1 pages** still describe keypaste's former ceilings inside the format's text, kept as written under their new status.
