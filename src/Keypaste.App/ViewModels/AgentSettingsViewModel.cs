@@ -198,7 +198,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
                 $"{(answer.Rule == CategoryRule.Allow ? "Always allowed" : "Always blocked")}: {Item(answer.Item)}, {Field(answer.Field)}",
                 held => held.Forgetting(answer))),
             .. rules.Picks.Where(pick => pick.Agent == Agent).Select(pick => new RememberedRow(
-                $"Always picked: {Item(pick.Item)}, {Field(pick.Field)}, when it asks for {EntryNameSanitizer.Sanitize(pick.Name).Text}",
+                $"Always picked: {Item(pick.Item)}, {Field(pick.Field)}, when it asks for {DisplayTextSanitizer.Sanitize(pick.Name).Text}",
                 held => held.Forgetting(pick))),
         ];
 

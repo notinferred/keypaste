@@ -985,7 +985,8 @@ public static partial class ApproverProtocol
             && Agents.AgentNames.IsNamed(agent)
             && TryString(root, "change", out var word)
             && TryChange(word, out var change)
-                ? new RulesChangeRequest(agent, change) { Vault = vault, Session = session }
+            && TryTarget(root, change, out var target)
+                ? new RulesChangeRequest(agent, change) { Vault = vault, Session = session, Target = target }
                 : null;
 
         return request is not null;
@@ -1025,8 +1026,32 @@ public static partial class ApproverProtocol
     {
         RulesChangeKind.RunOn => "run-on",
         RulesChangeKind.RunOff => "run-off",
+        RulesChangeKind.Set => "set",
+        RulesChangeKind.Forget => "forget",
         _ => "remove",
     };
+
+    /// <summary>The most a rules change's target may hold: a category and a rule, or an answer's key.</summary>
+    private const int _maximumTargetLength = 64;
+
+    /// <summary>A change's target: present and short for a set or a forget, ignored by every other change.</summary>
+    private static bool TryTarget(JsonElement root, RulesChangeKind change, out string target)
+    {
+        target = string.Empty;
+
+        if (change is not (RulesChangeKind.Set or RulesChangeKind.Forget))
+        {
+            return true;
+        }
+
+        if (!TryString(root, "target", out var named) || named.Length is 0 or > _maximumTargetLength)
+        {
+            return false;
+        }
+
+        target = named;
+        return true;
+    }
 
     private static bool TryChange(string word, out RulesChangeKind change)
     {
@@ -1035,6 +1060,8 @@ public static partial class ApproverProtocol
             "run-on" => (true, RulesChangeKind.RunOn),
             "run-off" => (true, RulesChangeKind.RunOff),
             "remove" => (true, RulesChangeKind.Remove),
+            "set" => (true, RulesChangeKind.Set),
+            "forget" => (true, RulesChangeKind.Forget),
             _ => (false, RulesChangeKind.RunOff),
         };
 

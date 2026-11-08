@@ -274,6 +274,36 @@ public sealed class RememberedAnswerRequestTests : IDisposable
         Assert.Null(_channel.LastRunPrompt);
     }
 
+    /// <summary>A terminal proves no person agreed, so it may change an agent's rules only to what releases nothing more unasked.</summary>
+    [Fact]
+    public void A_terminal_narrows_an_agents_rules_and_never_widens_them()
+    {
+        var allowing = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true).With(_agent, FieldCategory.Password, CategoryRule.Block);
+
+        Assert.Equal(CategoryRule.Ask, AgentRuleTarget.Apply(allowing, _agent, "password=ask").RuleFor(_agent, FieldCategory.Password));
+        Assert.Throws<ArgumentException>(() => AgentRuleTarget.Apply(allowing, _agent, "password=settings"));
+        Assert.Throws<ArgumentException>(() => AgentRuleTarget.Apply(allowing, _agent, "password=allow"));
+        Assert.Throws<ArgumentException>(() => AgentRuleTarget.Apply(allowing, _agent, "passkey=block"));
+        Assert.Null(AgentRuleTarget.Apply(AgentRules.Defaults.With(_agent, FieldCategory.Notes, CategoryRule.Block), _agent, "notes=settings").RuleFor(_agent, FieldCategory.Notes));
+    }
+
+    [Fact]
+    public void A_terminal_forgets_an_Always_allow_or_a_pick_by_its_key_and_never_an_Always_block()
+    {
+        var allow = new RememberedAnswer(_agent, GithubId, "password", CategoryRule.Allow);
+        var block = new RememberedAnswer(_agent, GithubId, "notes", CategoryRule.Block);
+        var pick = new RememberedPick(_agent, "services/Mail", "password", Uuid("bob"));
+        var rules = AgentRules.Defaults.Remembering(allow, confirmed: true).Remembering(block, confirmed: true).Remembering(pick, confirmed: true);
+
+        var forgotten = rules.ForgettingKey(_agent, AgentRules.KeyOf(allow)).ForgettingKey(_agent, AgentRules.KeyOf(pick));
+
+        Assert.Equal(CategoryRule.Block, Assert.Single(forgotten.Answers).Rule);
+        Assert.Empty(forgotten.Picks);
+        Assert.Throws<ArgumentException>(() => rules.ForgettingKey(_agent, AgentRules.KeyOf(block)));
+        Assert.Throws<ArgumentException>(() => rules.ForgettingKey(_other, AgentRules.KeyOf(allow)));
+        Assert.Equal(AgentRules.KeyOf(allow), AgentRules.KeyOf(allow with { Item = GithubId.ToUpperInvariant() }));
+    }
+
     /// <summary>Rules with no room left to remember another answer.</summary>
     private static AgentRules Full()
     {

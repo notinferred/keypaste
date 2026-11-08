@@ -10,12 +10,17 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary><c>keypaste clients</c>: lists this computer's agent rules and known agents, turns an agent's run on or off and removes one.</summary>
+/// <summary>
+/// <c>keypaste clients</c>: lists this computer's agent rules, each known agent's own rules and the answers kept for it; turns
+/// an agent's run on or off, sets its own rule for a kind of value, forgets a kept Always allow or pick, and removes an agent.
+/// </summary>
 /// <remarks>
 /// The rules live in <c>agents.toml</c> under the keypaste home, sealed with a key the vault holds, so a change goes to the
 /// process holding the vault, which makes and seals it; turning run on releases nothing unasked, since every run is asked,
-/// so it is made without a confirmation. With nothing holding the vault only a change that gives less can be made, and it
-/// is written unsealed, which leaves every agent at the defaults until the owner sets the rules again.
+/// so it is made without a confirmation. A terminal proves no person agreed, so a set or a forget releases nothing more
+/// unasked (<see cref="AgentRules.Narrowing"/>, <see cref="AgentRules.ForgettingKey"/>). With nothing holding the vault only
+/// a change that gives less can be made, and it is written unsealed, which leaves every agent at the defaults until the
+/// owner sets the rules again.
 /// </remarks>
 internal static class ClientsCommand
 {
@@ -27,16 +32,20 @@ internal static class ClientsCommand
     private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent to change, by its bridge's --client-label");
     private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may ask to run commands, each run asked");
     private static readonly Option<bool> _remove = Syntax.Flag("--remove", "forget the agent, which turns its run off");
+    private static readonly Option<string> _set = Syntax.Value("--set", $"<value>={AgentRuleTarget.Rules}", "set its own rule for one kind of value: password, custom, variable, totp, notes or attachment");
+    private static readonly Option<string> _forget = Syntax.Value("--forget", "<key>", "forget one Always allow or pick kept for it, by the key the list shows");
 
     internal static CliVerb Command { get; } = new(
         "clients",
-        "list agents and turn their run on or off\n\n"
-            + "lists the rules every agent's request is decided by on this computer, kept in agents.toml, and each agent it "
-            + "knows by the name its bridge was given with --client-label. with an agent's name, turns its run on or off or "
-            + "removes it. each run is still asked; the app's Settings sets the rules.",
+        "list agents, their rules and kept answers, and change them for less\n\n"
+            + "lists the rules every agent's request is decided by on this computer, kept in agents.toml, each agent it "
+            + "knows by the name its bridge was given with --client-label, its own rules and the answers kept for it. with an "
+            + "agent's name, turns its run on or off, sets its rule for a kind of value to ask, block or what Settings sets, "
+            + "forgets an Always allow or pick, or removes it. each run is still asked; an Allow, and removing an Always block, "
+            + "are made in the app.",
         Execute)
     {
-        _agent, _run, _remove, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
+        _agent, _run, _remove, _set, _forget, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -47,10 +56,13 @@ internal static class ClientsCommand
         var file = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
         var run = line.GetValue(_run);
         var remove = line.GetValue(_remove);
+        var set = line.GetValue(_set);
+        var forget = line.GetValue(_forget);
+        var changes = (run is null ? 0 : 1) + (remove ? 1 : 0) + (set is null ? 0 : 1) + (forget is null ? 0 : 1);
 
         if (line.GetValue(_agent) is not { } agent)
         {
-            return run is not null || remove ? Usage(context, "name the agent to change") : List(line, file, context);
+            return changes > 0 ? Usage(context, "name the agent to change") : List(line, file, context);
         }
 
         if (line.GetValue(CliOptions.Json))
@@ -63,9 +75,14 @@ internal static class ClientsCommand
             return Usage(context, $"an agent's name is its bridge's --client-label: 1 to {AgentNames.MaximumLength} characters with no quote, backslash, slash or control character");
         }
 
-        if ((run is null) == !remove)
+        if (changes != 1)
         {
-            return Usage(context, "give --run on, --run off or --remove");
+            return Usage(context, "give one of --run on, --run off, --set, --forget or --remove");
+        }
+
+        if (set is not null && !AgentRuleTarget.TryParse(set, out _, out _))
+        {
+            return Usage(context, $"--set is a kind of value and {AgentRuleTarget.Rules}, such as password=block");
         }
 
         if (run is not (null or "on" or "off"))
@@ -84,24 +101,34 @@ internal static class ClientsCommand
             return CliApp.ExitUsageError;
         }
 
+        var (kind, target, what) = (remove, set, forget) switch
+        {
+            (true, _, _) => (RulesChangeKind.Remove, string.Empty, "removed; its run is off"),
+            (_, { } rule, _) => (RulesChangeKind.Set, rule, $"{rule} set"),
+            (_, _, { } key) => (RulesChangeKind.Forget, key, $"{key} forgotten"),
+            _ when run == "on" => (RulesChangeKind.RunOn, string.Empty, "run on; each run is still asked"),
+            _ => (RulesChangeKind.RunOff, string.Empty, "run off"),
+        };
+
+        if (OwnerAsync(line, agent, kind, target, what, context).GetAwaiter().GetResult() is { } answered)
+        {
+            return answered;
+        }
+
+        // Applied here only when nothing holds the vault: the owner's sealed rules, not this unverified copy, decide otherwise.
         AgentRules changed;
 
         try
         {
-            changed = remove ? rules.Without(agent) : rules.WithRun(agent, run == "on");
+            changed = remove ? rules.Without(agent)
+                : set is not null ? AgentRuleTarget.Apply(rules, agent, set)
+                : forget is not null ? rules.ForgettingKey(agent, forget)
+                : rules.WithRun(agent, run == "on");
         }
-        catch (ArgumentException tooMany)
+        catch (ArgumentException refused)
         {
-            context.Stderr.WriteLine($"{_verb}: {tooMany.Message}");
+            context.Stderr.WriteLine($"{_verb}: {refused.Message}");
             return CliApp.ExitUsageError;
-        }
-
-        var what = remove ? "removed; its run is off" : run == "on" ? "run on; each run is still asked" : "run off";
-        var kind = remove ? RulesChangeKind.Remove : run == "on" ? RulesChangeKind.RunOn : RulesChangeKind.RunOff;
-
-        if (OwnerAsync(line, agent, kind, what, context).GetAwaiter().GetResult() is { } answered)
-        {
-            return answered;
         }
 
         if (kind == RulesChangeKind.RunOn)
@@ -125,7 +152,7 @@ internal static class ClientsCommand
     }
 
     /// <summary>Asks the process holding the vault to make and seal the change; null when nothing holds it.</summary>
-    private static async Task<int?> OwnerAsync(ParseResult line, string agent, RulesChangeKind change, string what, CliContext context)
+    private static async Task<int?> OwnerAsync(ParseResult line, string agent, RulesChangeKind change, string target, string what, CliContext context)
     {
         if (!VaultLocator.TryResolve(line, context.Environment, out var vault, out _) || !SessionPipe.TryResolve(line, vault, context, out var pipe, out _))
         {
@@ -146,7 +173,7 @@ internal static class ClientsCommand
             return null;
         }
 
-        var reply = await client.ChangeRulesAsync(new RulesChangeRequest(agent, change) { Vault = vault, Session = session }, bound.Token);
+        var reply = await client.ChangeRulesAsync(new RulesChangeRequest(agent, change) { Vault = vault, Session = session, Target = target }, bound.Token);
 
         if (reply is null)
         {
@@ -245,7 +272,41 @@ internal static class ClientsCommand
 
         writer.WriteLine();
         Table(writer, style, ["AGENT", "RUN"], [.. rules.Agents.Select(agent => new[] { Shown(agent.Name), agent.Run ? "on" : "off" })]);
+
+        if (rules.AgentCategories.Count > 0)
+        {
+            writer.WriteLine();
+            Table(
+                writer,
+                style,
+                ["AGENT", "VALUE", "ITS OWN RULE"],
+                [.. rules.AgentCategories.Select(own => new[] { Shown(own.Agent), FieldCategories.Key(own.Category), Word(own.Rule) })]);
+        }
+
+        if (rules.Answers.Count + rules.Picks.Count > 0)
+        {
+            writer.WriteLine();
+            Table(
+                writer,
+                style,
+                ["AGENT", "KEY", "KEPT ANSWER"],
+                [
+                    .. rules.Answers.Select(answer => new[]
+                    {
+                        Shown(answer.Agent), AgentRules.KeyOf(answer),
+                        $"{(answer.Rule == CategoryRule.Allow ? "always allows" : "always blocks")} {Field(answer.Field)} of item {answer.Item}",
+                    }),
+                    .. rules.Picks.Select(pick => new[]
+                    {
+                        Shown(pick.Agent), AgentRules.KeyOf(pick),
+                        $"always picks item {pick.Item} for {Field(pick.Field)} of {DisplayTextSanitizer.Sanitize(pick.Name).Text}",
+                    }),
+                ]);
+        }
     }
+
+    /// <summary>A kept answer's field, scrubbed, since an agent's request named it.</summary>
+    private static string Field(string field) => EntryNameSanitizer.Sanitize(field).Text;
 
     private static void Table(TextWriter writer, IConsoleStyle style, string[] headings, List<string[]> rows)
     {
@@ -293,6 +354,40 @@ internal static class ClientsCommand
                 json.WriteString("kind", "agent");
                 json.WriteString("name", agent.Name);
                 json.WriteString("run", agent.Run ? "on" : "off");
+                json.WriteEndObject();
+            }
+
+            foreach (var own in rules.AgentCategories)
+            {
+                json.WriteStartObject();
+                json.WriteString("kind", "agent-rule");
+                json.WriteString("agent", own.Agent);
+                json.WriteString("value", FieldCategories.Key(own.Category));
+                json.WriteString("rule", Word(own.Rule));
+                json.WriteEndObject();
+            }
+
+            foreach (var answer in rules.Answers)
+            {
+                json.WriteStartObject();
+                json.WriteString("kind", "answer");
+                json.WriteString("agent", answer.Agent);
+                json.WriteString("key", AgentRules.KeyOf(answer));
+                json.WriteString("item", answer.Item);
+                json.WriteString("field", answer.Field);
+                json.WriteString("rule", Word(answer.Rule));
+                json.WriteEndObject();
+            }
+
+            foreach (var pick in rules.Picks)
+            {
+                json.WriteStartObject();
+                json.WriteString("kind", "pick");
+                json.WriteString("agent", pick.Agent);
+                json.WriteString("key", AgentRules.KeyOf(pick));
+                json.WriteString("name", pick.Name);
+                json.WriteString("field", pick.Field);
+                json.WriteString("item", pick.Item);
                 json.WriteEndObject();
             }
 

@@ -301,6 +301,71 @@ public sealed record AgentRules
         return this with { Picks = [.. Picks.Where(held => !(Same(held.Agent, pick.Agent) && Same(held.Name, pick.Name) && Same(held.Field, pick.Field)))] };
     }
 
+    /// <summary>The short key a terminal names a remembered answer by, the same however the answers are ordered.</summary>
+    /// <param name="answer">The answer.</param>
+    /// <returns>Twelve lower-case hex characters.</returns>
+    public static string KeyOf(RememberedAnswer answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        return Key($"answer\n{answer.Agent}\n{answer.Item.ToLowerInvariant()}\n{answer.Field}");
+    }
+
+    /// <summary>The short key a terminal names a remembered pick by, the same however the picks are ordered.</summary>
+    /// <param name="pick">The pick.</param>
+    /// <returns>Twelve lower-case hex characters.</returns>
+    public static string KeyOf(RememberedPick pick)
+    {
+        ArgumentNullException.ThrowIfNull(pick);
+        return Key($"pick\n{pick.Agent}\n{pick.Name}\n{pick.Field}");
+    }
+
+    /// <summary>
+    /// These rules with an agent's own rule for a category changed from a terminal, which proves no person agreed, so only to
+    /// what releases nothing more unasked: Ask, Block, or what Settings sets unless that is an Allow the agent did not have.
+    /// </summary>
+    /// <param name="agent">A named agent's label, added if it is new.</param>
+    /// <param name="category">One of <see cref="FieldCategories.Ruled"/>.</param>
+    /// <param name="rule">Ask, Block, or null for what Settings sets.</param>
+    /// <returns>The new rules.</returns>
+    /// <exception cref="ArgumentException">The change would release more without asking, or the name is not one agent's.</exception>
+    public AgentRules Narrowing(string agent, FieldCategory category, CategoryRule? rule)
+    {
+        if (rule == CategoryRule.Allow || (rule is null && RuleFor(category) == CategoryRule.Allow && RuleFor(agent, category) != CategoryRule.Allow))
+        {
+            throw new ArgumentException(
+                $"that would give {agent} {FieldCategories.Shown(category)} without asking, which only the app's agent page sets, once you confirm it");
+        }
+
+        return With(agent, category, rule);
+    }
+
+    /// <summary>
+    /// These rules without the Always allow or the pick a terminal names by its key; an Always block is removed only on the
+    /// agent's page, since a terminal proves no person agreed to what removing it may release.
+    /// </summary>
+    /// <param name="agent">The agent's name.</param>
+    /// <param name="key">From <see cref="KeyOf(RememberedAnswer)"/> or <see cref="KeyOf(RememberedPick)"/>.</param>
+    /// <returns>The new rules.</returns>
+    /// <exception cref="ArgumentException">No Always allow or pick of that agent has the key, or it names an Always block.</exception>
+    public AgentRules ForgettingKey(string agent, string key)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (Answers.FirstOrDefault(answer => Same(answer.Agent, agent) && Same(KeyOf(answer), key)) is { } answer)
+        {
+            return answer.Rule == CategoryRule.Block
+                ? throw new ArgumentException($"{key} is an Always block, which is removed on {agent}'s page in the app, since removing it may release more")
+                : Forgetting(answer);
+        }
+
+        return Picks.FirstOrDefault(pick => Same(pick.Agent, agent) && Same(KeyOf(pick), key)) is { } pick
+            ? Forgetting(pick)
+            : throw new ArgumentException($"no answer kept for {agent} has the key {key}");
+    }
+
+    private static string Key(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..12];
+
     /// <summary>Whether an agent may ask to run commands.</summary>
     /// <param name="label">The bridge's raw label, or null.</param>
     /// <returns>Whether a named agent this computer knows has run turned on.</returns>

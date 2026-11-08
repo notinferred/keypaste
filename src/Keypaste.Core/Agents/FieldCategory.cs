@@ -126,10 +126,22 @@ public static class FieldCategories
         _ => "passkey",
     };
 
+    /// <summary>The ruled category a key names, as <c>agents.toml</c> and <c>keypaste clients --set</c> spell it.</summary>
+    /// <param name="key">The key: <c>password</c>, <c>custom</c>, <c>variable</c>, <c>totp</c>, <c>notes</c> or <c>attachment</c>.</param>
+    /// <param name="category">The category, when the key names one.</param>
+    /// <returns>Whether it does.</returns>
+    public static bool TryParseKey(string key, out FieldCategory category)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        category = Ruled.FirstOrDefault(ruled => string.Equals(Key(ruled), key, StringComparison.Ordinal), FieldCategory.Username);
+        return category != FieldCategory.Username;
+    }
+
     /// <summary>The key a category's rule is kept under in <c>agents.toml</c>.</summary>
     /// <param name="category">One of <see cref="Ruled"/>.</param>
     /// <returns>Its key.</returns>
-    internal static string Key(FieldCategory category) => category switch
+    public static string Key(FieldCategory category) => category switch
     {
         FieldCategory.Password => "password",
         FieldCategory.CustomField => "custom",

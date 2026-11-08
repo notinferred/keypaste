@@ -5,6 +5,8 @@ In source, for the next release, what every agent gets is decided by the kind of
 ```sh
 keypaste clients                      # the rules and the agents this computer knows
 keypaste clients claude-code --run on # let claude-code ask to run commands, each run asked
+keypaste clients claude-code --set notes=block     # its own rule for notes; ask, block or settings
+keypaste clients claude-code --forget 54380d03ad11 # forget an Always allow or pick, by the key the list shows
 keypaste clients claude-code --remove # forget it, which turns its run off
 ```
 
@@ -35,7 +37,7 @@ An agent may ask to run a command with values in its environment only once you t
 
 ## Where they are kept
 
-The rules are kept on this computer in `~/.keypaste/agents.toml`, never in the vault, so a synced or edited vault gives an agent nothing more. Any program you run can write that file, so the app or `keypaste approve` holding the vault seals each change with a key the vault holds, bound to this computer's keypaste home and to the vault's count of this home's changes; a file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is, every category is asked and no agent may run commands, and Settings says the rules were changed outside keypaste and are ignored until you set them again. With nothing holding the vault, `keypaste clients` can only turn run off or forget an agent, which it writes unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier version kept in the vault's `.keypaste/agents` group are ignored and left in place.
+The rules are kept on this computer in `~/.keypaste/agents.toml`, never in the vault, so a synced or edited vault gives an agent nothing more. Any program you run can write that file, so the app or `keypaste approve` holding the vault seals each change with a key the vault holds, bound to this computer's keypaste home and to the vault's count of this home's changes; a file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is, every category is asked and no agent may run commands, and Settings says the rules were changed outside keypaste and are ignored until you set them again. From a terminal, which proves no person agreed, `keypaste clients` makes only changes that release nothing more without asking: an Allow, setting a kind of value back to Settings' Allow, and removing an Always block are made on the agent's page in the app. With nothing holding the vault it can only turn run off, set Ask or Block, forget an Always allow or a pick, or forget an agent, which it writes unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier version kept in the vault's `.keypaste/agents` group are ignored and left in place.
 
 A vault synced to two computers keeps a count for each, so each computer keeps its own rules.
 

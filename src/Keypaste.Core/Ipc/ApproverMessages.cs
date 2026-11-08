@@ -353,6 +353,12 @@ public enum RulesChangeKind
 
     /// <summary>Forgets it, which turns its run off.</summary>
     Remove = 2,
+
+    /// <summary>Sets its own rule for one category to Ask, Block or what Settings sets, never to more without asking; the target is <c>category=rule</c>.</summary>
+    Set = 3,
+
+    /// <summary>Forgets one of its Always allow answers or picks; the target is the answer's key.</summary>
+    Forget = 4,
 }
 
 /// <summary>Asks the owner to change one agent in this computer's rules, which only the owner can seal.</summary>
@@ -360,6 +366,9 @@ public enum RulesChangeKind
 /// <param name="Change">What changes.</param>
 public sealed record RulesChangeRequest(string Agent, RulesChangeKind Change)
 {
+    /// <summary>What a <see cref="RulesChangeKind.Set"/> or <see cref="RulesChangeKind.Forget"/> names, otherwise empty.</summary>
+    public string Target { get; init; } = string.Empty;
+
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
 

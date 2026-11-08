@@ -127,6 +127,25 @@ public sealed class ApproverProtocolTests
         Assert.Equal(AuditMethod.Failed, future.Refusal);
     }
 
+    /// <summary>A set or a forget carries its target; one without a target, or with one too long to name a rule or a key, is not read.</summary>
+    [Theory]
+    [InlineData(RulesChangeKind.Set, "password=block")]
+    [InlineData(RulesChangeKind.Forget, "0123456789ab")]
+    [InlineData(RulesChangeKind.RunOn, "")]
+    public void ARulesChangeSurvivesTheRoundTripWithItsTarget(RulesChangeKind change, string target)
+    {
+        var request = new RulesChangeRequest("claude-code", change) { Vault = "/v.kdbx", Session = "s", Target = target };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out RulesChangeRequest? decoded));
+        Assert.Equal(request, decoded);
+
+        foreach (var missing in new[] { string.Empty, new string('x', 65) })
+        {
+            var bad = request with { Target = missing };
+            Assert.Equal(change is RulesChangeKind.RunOn, ApproverProtocol.TryDecode(ApproverProtocol.Encode(bad), out RulesChangeRequest? _));
+        }
+    }
+
     [Fact]
     public void ANamesRequestSurvivesTheRoundTrip()
     {

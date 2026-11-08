@@ -406,7 +406,8 @@ public sealed class SessionAuthority : IApproverHandler
     /// <inheritdoc/>
     /// <remarks>
     /// Recorded under <c>keypaste clients</c>, naming the agent. Turning run on releases nothing unasked, since every run
-    /// is asked, so the owner makes it without a confirmation; what it writes is sealed with the vault's key.
+    /// is asked, so the owner makes it without a confirmation; a set or a forget is refused unless it releases nothing more
+    /// unasked, since a terminal proves no person agreed. What it writes is sealed with the vault's key.
     /// </remarks>
     public ValueTask<RulesChangeReply> ChangeRulesAsync(RulesChangeRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -424,6 +425,8 @@ public sealed class SessionAuthority : IApproverHandler
             {
                 RulesChangeKind.RunOn => rules => rules.WithRun(request.Agent, run: true),
                 RulesChangeKind.RunOff => rules => rules.WithRun(request.Agent, run: false),
+                RulesChangeKind.Set => rules => AgentRuleTarget.Apply(rules, request.Agent, request.Target),
+                RulesChangeKind.Forget => rules => rules.ForgettingKey(request.Agent, request.Target),
                 _ => rules => rules.Without(request.Agent),
             },
             RequestRecords.RulesClient,

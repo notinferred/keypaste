@@ -198,6 +198,7 @@ internal sealed class RulesChangeRequestFrame(RulesChangeRequest request)
     public string Session => request.Session;
     public string Agent => request.Agent;
     public string Change => ApproverProtocol.ChangeWord(request.Change);
+    public string Target => request.Target;
 }
 
 internal sealed class RulesChangeReplyFrame(RulesChangeReply reply)

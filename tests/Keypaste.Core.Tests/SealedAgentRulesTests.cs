@@ -266,6 +266,32 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Contains("\"method\":\"rules-changed\"", _log.Text(), StringComparison.Ordinal);
     }
 
+    /// <summary>A set and a forget over the pipe are made and sealed by the owner when they give less, and refused when they would give more.</summary>
+    [Fact]
+    public async Task A_set_or_a_forget_from_keypaste_clients_gives_less_or_is_refused()
+    {
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+        var allow = new RememberedAnswer(_agent, item, "password", CategoryRule.Allow);
+        Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true).Remembering(allow, confirmed: true), out var problem), problem);
+        var connection = await AttachAsync();
+
+        async Task<RulesChangeReply> Change(RulesChangeKind kind, string target) =>
+            await _authority.ChangeRulesAsync(new RulesChangeRequest(_agent, kind) { Vault = VaultPath, Session = "session-one", Target = target }, connection, Token);
+
+        var blocked = await Change(RulesChangeKind.Set, "notes=block");
+        var widened = await Change(RulesChangeKind.Set, "notes=settings");
+        var forgot = await Change(RulesChangeKind.Forget, AgentRules.KeyOf(allow));
+
+        Assert.True(blocked.Changed, blocked.Reason);
+        Assert.False(widened.Changed);
+        Assert.Contains("only the app's agent page sets", widened.Reason, StringComparison.Ordinal);
+        Assert.True(forgot.Changed, forgot.Reason);
+        Assert.True(_rules.TryRead(out var held, out _));
+        Assert.Equal(CategoryRule.Block, held.RuleFor(_agent, FieldCategory.Notes));
+        Assert.Empty(held.Answers);
+        Assert.Null(_rules.Ignored);
+    }
+
     private static SealedAgentRules Sealer(AgentRulesFile file, Vault vault) => new(file, () => vault, edit =>
     {
         edit(vault);

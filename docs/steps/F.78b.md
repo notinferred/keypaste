@@ -6,6 +6,8 @@ Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F
 
 The founder selected the row on 2026-11-08 and settled three of its open points before the build: an always is confirmed in the prompt itself, as a second step of the same window; `keypaste approve` offers the same choices, `[a]` and `[b]` each confirmed with `y`; and the picker's Always allow keeps the pick and releases that item's field without asking, as an item's Always allow would.
 
+The founder's direction of 2026-11-08, after the build: `keypaste clients` lists each agent's own rules and kept answers and sets and forgets them, Allow staying in the app, since a `y` typed in the asking terminal proves no person agreed. It sets an agent's rule with `--set <value>=ask|block|settings` and forgets an Always allow or a pick with `--forget <key>`, the key twelve hex characters of a hash of the answer, shown by the list. Both go to the owner as two new rules changes, `set` and `forget`, with a target of at most 64 characters; the owner makes only what releases nothing more unasked, refusing `settings` where Settings allows what the agent's own rule did not, and the removal of an Always block, which the app's agent page makes. With nothing holding the vault the change is applied to the file and written unsealed, as `--run off` is.
+
 ## Judgment calls
 
 - **Only a labelled agent has answers of its own.** A bridge with no `--client-label` cannot be told from another, so it is decided by Settings alone and its prompt offers Deny and Allow once.
@@ -26,6 +28,8 @@ Run locally, each class once: Keypaste.Core.Tests `RememberedAnswerRequestTests`
 
 In CI, two first attempts failed on rules the change had to meet, each fixed at its cause: ci 42493543438 at `6d60d44e`, cancelled once its test job failed, failed `ApprovalPromptTests.ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline`, which now names `OffersAlways`, set from the label and the room left, never the request's text; dev desktop 42494338092 at `138521c7` failed `LanguageAndRegionTests.Every_word_a_view_shows_comes_from_the_resources` on the agent page's four new labels, now in `Strings.resx`. The desktop-gates run at `138521c7` also ran F.78a's edits to `verify-desktop-approval.sh`; compat, which runs `verify-keepassxc-fields.sh`, has not run since `b0d150bf`.
 
+For `keypaste clients`, run locally: `RememberedAnswerRequestTests`, `SealedAgentRulesTests`, `ApproverProtocolTests`, `ClientsVerbTests` and `TerminalApprovalChannelTests`, 192 passed, with new cases for a terminal narrowing and never widening an agent's rules, forgetting by key and never an Always block, the owner making a set and a forget and refusing a widening, the change's target round-tripping and refused when missing or too long, and the list naming each kept answer by its key.
+
 New request-path tests: an item's answer, then the agent's rule, then Settings deciding the same request in turn; another label and an unlabelled bridge decided apart from them; Always allow and Always block confirmed on the prompt releasing and refusing then and unasked after; an always from a prompt that offered none, and each change without confirmation, keeping nothing; Remove asking again; a passkey Blocked under a kept Allow; the picker's kept pick answering that agent alone, and passed over for an item it always blocks; a lock withdrawing an always mid-prompt and releasing nothing under a kept one; a run refused a variable its agent blocks; a sealed always holding and a hand-written one ignored.
 
 ## Limits and follow-ups
@@ -33,5 +37,4 @@ New request-path tests: an item's answer, then the agent's rule, then Settings d
 - **A label is the operator's word**: whatever starts a bridge under an agent's label gets that agent's Allows and always answers (THREATS T-14, T-36, updated).
 - **PRODUCT's v1.23 draft** is amended, by the founder's direction of 2026-11-08, to name the always answers, an agent's own rules and their order; it stays a draft until the founder's review.
 - **`docs/demo/keypaste-demo.gif`** shows the older choice line, and README's prompt screenshot is older still (its alt text names Allow for 1 hour); BACKLOG's smaller possibilities hold regenerating them.
-- **`keypaste clients`** lists Settings' rules and each agent's run, not an agent's own rules or kept answers, and cannot remove one; the app's agent page is the one place they are shown and removed.
 - **The agent's page names a kept item** by its current name in the open vault, or as "an item no longer in this vault" when none has that UUID.
