@@ -31,7 +31,7 @@ New request-path tests: an item's answer, then the agent's rule, then Settings d
 ## Limits and follow-ups
 
 - **A label is the operator's word**: whatever starts a bridge under an agent's label gets that agent's Allows and always answers (THREATS T-14, T-36, updated).
-- **PRODUCT's v1.23 draft** still says a prompt offers Deny or Allow once; its amendment is the founder's, with the draft's review.
-- **`docs/demo/keypaste-demo.gif`** shows the older choice line, and README's prompt screenshot is older still (its alt text names Allow for 1 hour); neither is regenerated here.
+- **PRODUCT's v1.23 draft** is amended, by the founder's direction of 2026-11-08, to name the always answers, an agent's own rules and their order; it stays a draft until the founder's review.
+- **`docs/demo/keypaste-demo.gif`** shows the older choice line, and README's prompt screenshot is older still (its alt text names Allow for 1 hour); BACKLOG's smaller possibilities hold regenerating them.
 - **`keypaste clients`** lists Settings' rules and each agent's run, not an agent's own rules or kept answers, and cannot remove one; the app's agent page is the one place they are shown and removed.
 - **The agent's page names a kept item** by its current name in the open vault, or as "an item no longer in this vault" when none has that UUID.
