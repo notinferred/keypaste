@@ -38,9 +38,9 @@ Giving an agent a plaintext `.env` exposes all credentials in that file without 
 
 An agent cannot even name an entry you did not expose. In `v0.3.0` the default is the `env/` subtree and nothing else, and widening it takes a glob you typed into your own client config. In source, an agent sees every project's variables, the env-named fields of entries tagged into a project, until you change its settings, and widening them takes your confirmation where the vault is unlocked; a glob in the client config can only narrow them.
 
-The approver resolves the entry, rechecks what the agent can see, considers a recent refusal, then releases without asking if you set that agent to Automatic for the entry or always allowed it, or prompts. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
+The approver resolves the entry, rechecks what the agent can see, considers a recent refusal, then releases or refuses without asking if you allowed or blocked that kind of value for every agent, or prompts. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
 
-In source, Allow once releases one field and keeps nothing; Always allow releases it once and, once you confirm, answers that agent without a prompt until you remove it in Agents. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
+In source, Allow once releases one field and keeps nothing. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
 
 ## What it looks like
 
@@ -72,7 +72,7 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`exposure` records a listing of what the agent can see; `prompt` records a request a person reviewed, and `automatic` one released without asking because you set that agent to Automatic. [The demo](demo.md) shows the flow in about sixty seconds.
+`exposure` records a listing of what the agent can see; `prompt` records a request a person reviewed, and `allowed` one released without asking because you allowed that kind of value. [The demo](demo.md) shows the flow in about sixty seconds.
 
 ## Moving from another KeePass file
 
@@ -95,7 +95,7 @@ Each top-level group lands under `--into`, which defaults to the file's name. In
 
 `request_credential` returns the credential as text and structured data. A client may send those results to a remote model, retain them in its session file and put the value on a command line. keypaste cannot erase those copies or revoke the credential at its provider. The local audit records the release, not every later use.
 
-keypaste removes control characters from the reason, caps its length and labels its author, but cannot verify the claim. An agent set to Automatic gets what it can see there without human review, and in `v0.3.0` so do the fields a policy rule matches. Anyone who can write the audit file can recompute its hash chain. A hostile process running as your user is outside these protections.
+keypaste removes control characters from the reason, caps its length and labels its author, but cannot verify the claim. A kind of value you allowed reaches every agent without human review, and in `v0.3.0` so do the fields a policy rule matches. Anyone who can write the audit file can recompute its hash chain. A hostile process running as your user is outside these protections.
 
 <a id="the-stance"></a>
 

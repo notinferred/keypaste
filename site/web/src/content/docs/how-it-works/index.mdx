@@ -38,14 +38,15 @@ flowchart LR
 flowchart TD
   request["A request for one field of one entry"] --> exposed{"Is the entry exposed to this agent?"}
   exposed -->|no| refused["Refused and logged"]
-  exposed -->|yes| standing{"Automatic for this agent, or always allowed?"}
-  standing -->|yes| released["One field released and logged"]
-  standing -->|no| ask["You are asked"]
+  exposed -->|yes| standing{"Is that kind of value allowed or blocked?"}
+  standing -->|allowed| released["One field released and logged"]
+  standing -->|blocked| refused
+  standing -->|asked| ask["You are asked"]
   ask -->|deny, or no answer| refused
   ask -->|allow| released
 ```
 
-Automatic is a setting you confirm for one agent, for a project or environment it can see; Always allow, which you confirm too, covers one item. A command is asked about each time unless you set the agent to Automatic with commands, which runs its commands without asking and approves nothing about what they do. Production environments are always asked. Every error on this path refuses. If the audit record cannot be written, the value is not released.
+Each kind of value, passwords, custom fields, project variables, TOTP codes, notes and attachments, is asked about by default; allowing one for every agent is a setting you confirm, and a passkey is always refused. An item's URL, and its username unless you hide it, are released without asking. A command is asked about every time. Every error on this path refuses. If the audit record cannot be written, the value is not released.
 
 ## What locking does
 

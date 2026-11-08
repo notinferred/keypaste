@@ -14,7 +14,7 @@ keypaste stores passwords and project environment variables in a local KDBX file
 
 The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
 
-For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Always allow, which releases it once and, once you confirm, answers that agent without asking from then on; silence for 45 seconds denies access. An agent you set to Automatic for a project, a change that waits for your confirmation, gets what it can see there without a prompt, a command is asked about each time unless you set the agent to Automatic with commands, and protected environments are always asked. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
+For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny or Allow once, which releases one field and keeps nothing; silence for 45 seconds denies access. A kind of value you allow for every agent in Settings, a change that waits for your confirmation, is released without a prompt, and a command is asked about each time. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
 
 The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste approve` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Projects screen launches a project's command or a terminal from that session; none of this is published yet.
 
@@ -52,7 +52,7 @@ keypaste: an agent is asking for a credential.
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. Removing an Always allow row stops later releases, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
+`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. Setting a kind of value back to Ask stops later releases without asking, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
 
 ## Before using this material
 
