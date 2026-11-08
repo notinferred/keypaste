@@ -22,4 +22,4 @@ Run locally, each class once: Keypaste.Core.Tests `FieldCategoryRequestTests`, w
 ## Limits and follow-ups
 
 - **A card or identity imported from Bitwarden before this change** carries no tag, so its fields stay protected custom fields until the person tags it.
-- **Only the Bitwarden and 1Password 1PUX imports** tag cards and identities; the CSV imports carry no item type to read.
+- **The other imports** tag an item with the type their export names: LastPass's CSV tags a typed note with its `NoteType`, so its cards arrive tagged `Credit Card` with their fields protected, and are card values; LastPass has no type named Identity, so its Social Security, passport and address notes are not recognised. 1Password's CSV tags each item with its type but carries only the common fields, so it brings no card or identity value.

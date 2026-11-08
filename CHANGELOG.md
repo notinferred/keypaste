@@ -8,7 +8,7 @@ Every agent's request is now decided by the kind of value it asks for: passwords
 
 A prompt now offers Always allow and Always block for an agent whose bridge has a label: each asks you to confirm in the same window, or with `y` at `keypaste approve`, then keeps that answer for that agent and that item's field, and the picker's Always allow keeps the item you picked for that name. An agent's page in Agents can set any kind of value differently for that agent, and lists each kept answer with Remove. The most specific answer decides: an item's field, then the agent's rule, then Settings; passkeys stay blocked. `keypaste clients` lists each agent's own rules and kept answers, and `--set <value>=ask|block|settings` and `--forget <key>` change them for less ([F.78b](docs/steps/F.78b.md)).
 
-Cards and identities have rules of their own: the protected fields of an item tagged `Credit Card` or `Identity`, as keypaste's Bitwarden import and 1Password's 1PUX import tag them, are card values or identity values, each Ask, Allow or Block; an untagged card's fields stay protected custom fields ([F.78c](docs/steps/F.78c.md)).
+Cards and identities have rules of their own: the protected fields of an item tagged `Credit Card` or `Identity`, as keypaste's Bitwarden and 1Password 1PUX imports tag them, and its LastPass import tags a card, are card values or identity values, each Ask, Allow or Block; an untagged card's fields stay protected custom fields ([F.78c](docs/steps/F.78c.md)).
 
 Timed allowing is gone: no Allow for 1 hour, Allowances list, `keypaste grants`, `--max-ttl` or `ttl_seconds`. Restoring one of two same-named items from Trash brings it back under its own title ([F.77](docs/steps/F.77.md)).
 
