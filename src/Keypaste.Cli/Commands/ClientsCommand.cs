@@ -5,19 +5,24 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
 /// <summary><c>keypaste clients</c>: lists this computer's agent rules and known agents, turns an agent's run on or off and removes one.</summary>
 /// <remarks>
-/// The rules live in <c>agents.toml</c> under the keypaste home, never in a vault, so this verb reads and writes that file
-/// itself and needs nothing holding the vault. Turning run on releases nothing unasked, since every run is asked, so it is
-/// made at once and recorded.
+/// The rules live in <c>agents.toml</c> under the keypaste home, sealed with a key the vault holds, so a change goes to the
+/// process holding the vault, which makes and seals it; turning run on releases nothing unasked, since every run is asked,
+/// so it is made without a confirmation. With nothing holding the vault only a change that gives less can be made, and it
+/// is written unsealed, which leaves every agent at the defaults until the owner sets the rules again.
 /// </remarks>
 internal static class ClientsCommand
 {
     private const string _verb = "keypaste clients";
+    private const string _noAnswer = "the keypaste process holding the vault did not answer; it may be older than this keypaste";
+
+    private static readonly TimeSpan _changeBound = TimeSpan.FromSeconds(10);
 
     private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent to change, by its bridge's --client-label");
     private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may ask to run commands, each run asked");
@@ -31,7 +36,7 @@ internal static class ClientsCommand
             + "removes it. each run is still asked; the app's Settings sets the rules.",
         Execute)
     {
-        _agent, _run, _remove, CliOptions.Json,
+        _agent, _run, _remove, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -92,29 +97,85 @@ internal static class ClientsCommand
         }
 
         var what = remove ? "removed; its run is off" : run == "on" ? "run on; each run is still asked" : "run off";
+        var kind = remove ? RulesChangeKind.Remove : run == "on" ? RulesChangeKind.RunOn : RulesChangeKind.RunOff;
 
-        if (changed.Equals(rules))
+        if (OwnerAsync(line, agent, kind, what, context).GetAwaiter().GetResult() is { } answered)
         {
-            Done(context, agent, $"already {what}");
-            return CliApp.ExitSuccess;
+            return answered;
         }
 
-        if (!file.TryWrite(changed, out problem))
+        if (kind == RulesChangeKind.RunOn)
+        {
+            context.Stderr.WriteLine(
+                $"{_verb}: nothing holds the vault unlocked, and only the process holding it can seal a change that lets an agent run commands. "
+                + "Unlock the vault in the keypaste app or run `keypaste approve`, then run this again.");
+            return CliApp.ExitInternalError;
+        }
+
+        if (!file.TryWrite(changed, seal: null, out problem))
         {
             context.Stderr.WriteLine($"{_verb}: nothing was changed: {problem}");
             return CliApp.ExitInternalError;
         }
 
-        Record(context, agent, what);
-        Done(context, agent, what);
+        const string unsealed = "written unsealed, since nothing holds the vault, so every agent gets the defaults, every value asked and no runs, until the rules are set again where the vault is unlocked";
+        Record(context, agent, $"{what}; {unsealed}");
+        Done(context, agent, $"{what}; {unsealed}");
+        return CliApp.ExitSuccess;
+    }
+
+    /// <summary>Asks the process holding the vault to make and seal the change; null when nothing holds it.</summary>
+    private static async Task<int?> OwnerAsync(ParseResult line, string agent, RulesChangeKind change, string what, CliContext context)
+    {
+        if (!VaultLocator.TryResolve(line, context.Environment, out var vault, out _) || !SessionPipe.TryResolve(line, vault, context, out var pipe, out _))
+        {
+            return null;
+        }
+
+        using var bound = new CancellationTokenSource(_changeBound);
+        await using var attachment = await SessionPipe.AttachAsync(pipe, vault, bound.Token);
+
+        if (attachment is not { Client: { } client, Session: { } session })
+        {
+            if (attachment.Refusal is { } refusal)
+            {
+                context.Stderr.WriteLine($"{_verb}: {EntryNameSanitizer.SanitizeProse(refusal, 512).Text}");
+                return CliApp.ExitInternalError;
+            }
+
+            return null;
+        }
+
+        var reply = await client.ChangeRulesAsync(new RulesChangeRequest(agent, change) { Vault = vault, Session = session }, bound.Token);
+
+        if (reply is null)
+        {
+            context.Stderr.WriteLine($"{_verb}: {_noAnswer}");
+            return CliApp.ExitInternalError;
+        }
+
+        if (!reply.Changed)
+        {
+            context.Stderr.WriteLine($"{_verb}: {EntryNameSanitizer.SanitizeProse(reply.Reason, 512).Text}");
+            return CliApp.ExitInternalError;
+        }
+
+        Done(context, agent, $"{what}; sealed by the process holding the vault");
         return CliApp.ExitSuccess;
     }
 
     private static int List(ParseResult line, AgentRulesFile file, CliContext context)
     {
-        if (!file.TryRead(out var rules, out var problem))
+        if (!file.TryReadFile(out var read, out var problem))
         {
             return Malformed(context, problem);
+        }
+
+        var rules = read.Rules;
+
+        if (read is { Present: true, Seal: null })
+        {
+            context.Stderr.WriteLine($"{_verb}: {file.Path} is not sealed, so keypaste ignores it and every agent gets the defaults until the rules are set again where the vault is unlocked");
         }
 
         if (line.GetValue(CliOptions.Json))

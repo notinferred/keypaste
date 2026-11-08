@@ -49,6 +49,7 @@ public static partial class ApproverProtocol
     internal const string AttachKind = "attach";
     internal const string EnvKind = "env";
     internal const string LockKind = "lock";
+    internal const string RulesKind = "rules-change";
     internal const string EnvProfileKind = "env-profile";
     internal const string TokenEnvKind = "token-env";
     internal const string RunKind = "run";
@@ -415,6 +416,7 @@ public static partial class ApproverProtocol
                 AttachKind => ApproverMessageKind.Attach,
                 EnvKind => ApproverMessageKind.Env,
                 LockKind => ApproverMessageKind.Lock,
+                RulesKind => ApproverMessageKind.RulesChange,
                 EnvProfileKind => ApproverMessageKind.EnvProfile,
                 TokenEnvKind => ApproverMessageKind.TokenEnv,
                 RunKind => ApproverMessageKind.Run,
@@ -934,6 +936,97 @@ public static partial class ApproverProtocol
             reply = new LockReply(locked, reason);
             return true;
         }
+    }
+
+    /// <summary>Encodes a change to this computer's agent rules.</summary>
+    /// <param name="request">The change, and the attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    public static byte[] Encode(RulesChangeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new RulesChangeRequestFrame(request), Wire.RulesChangeRequestFrame);
+    }
+
+    /// <summary>Encodes what became of a change to the agent rules.</summary>
+    /// <param name="reply">The answer.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    public static byte[] Encode(RulesChangeReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var frame = JsonSerializer.SerializeToUtf8Bytes(new RulesChangeReplyFrame(reply), Wire.RulesChangeReplyFrame);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : JsonSerializer.SerializeToUtf8Bytes(new RulesChangeReplyFrame(reply with { Reason = Oversized }), Wire.RulesChangeReplyFrame);
+    }
+
+    /// <summary>Decodes a change to the agent rules.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed change naming a valid agent.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RulesChangeRequest? request)
+    {
+        request = TryAttached(frame, RulesKind, out var vault, out var session, out var root)
+            && TryString(root, "agent", out var agent)
+            && Agents.AgentNames.IsNamed(agent)
+            && TryString(root, "change", out var word)
+            && TryChange(word, out var change)
+                ? new RulesChangeRequest(agent, change) { Vault = vault, Session = session }
+                : null;
+
+        return request is not null;
+    }
+
+    /// <summary>Decodes what became of a change to the agent rules.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed reply.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RulesChangeReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, RulesKind)
+                || !TryBoolean(root, "changed", out var changed)
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            reply = new RulesChangeReply(changed, reason) { Recorded = TrueOnly(root, "recorded") };
+            return true;
+        }
+    }
+
+    /// <summary>The word a rules change is sent as.</summary>
+    internal static string ChangeWord(RulesChangeKind change) => change switch
+    {
+        RulesChangeKind.RunOn => "run-on",
+        RulesChangeKind.RunOff => "run-off",
+        _ => "remove",
+    };
+
+    private static bool TryChange(string word, out RulesChangeKind change)
+    {
+        (var known, change) = word switch
+        {
+            "run-on" => (true, RulesChangeKind.RunOn),
+            "run-off" => (true, RulesChangeKind.RunOff),
+            "remove" => (true, RulesChangeKind.Remove),
+            _ => (false, RulesChangeKind.RunOff),
+        };
+
+        return known;
     }
 
     /// <summary>Encodes a terminal's edit.</summary>

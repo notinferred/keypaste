@@ -30,34 +30,41 @@ public sealed class ClientsVerbTests : IDisposable
         Assert.False(File.Exists(Rules.Path));
     }
 
+    /// <summary>With the vault held, the owner makes and seals the change, and records it.</summary>
     [Fact]
-    public void Run_on_and_off_is_kept_on_this_computer_and_recorded()
+    public async Task Run_on_and_off_go_to_the_process_holding_the_vault()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "on"));
-        Assert.True(Rules.TryRead(out var on, out var problem), problem);
-        Assert.True(on.Runs("claude-code"));
-        Assert.Contains("run on; each run is still asked", _harness.Err, StringComparison.Ordinal);
+        await using var owner = SessionOwner.Start(_harness, records: true);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "on", "--vault", _harness.VaultPath));
+        Assert.True(owner.Settings.Rules.Runs("claude-code"));
+        Assert.Contains("run on; each run is still asked; sealed by the process holding the vault", _harness.Err, StringComparison.Ordinal);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "off", "--vault", _harness.VaultPath));
+        Assert.False(owner.Settings.Rules.Runs("claude-code"));
+    }
+
+    /// <summary>With nothing holding the vault, nothing can be sealed: turning run on is refused, and a change for less is written unsealed, which no owner follows.</summary>
+    [Fact]
+    public void With_nothing_holding_the_vault_only_less_is_written_and_unsealed()
+    {
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--run", "on"));
+        Assert.Contains("only the process holding it can seal", _harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(Rules.Path));
 
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "off"));
-        Assert.True(Rules.TryRead(out var off, out problem), problem);
-        Assert.False(off.Runs("claude-code"));
+        Assert.True(Rules.TryReadFile(out var read, out var problem), problem);
+        Assert.Null(read.Seal);
+        Assert.Contains("written unsealed", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("\"method\":\"rules-changed\"", File.ReadAllText(KeypasteHome.AuditPath(Home)), StringComparison.Ordinal);
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json"));
-        Assert.Contains("\"name\":\"claude-code\",\"run\":\"off\"", _harness.Out, StringComparison.Ordinal);
-
-        var log = File.ReadAllText(KeypasteHome.AuditPath(Home));
-        Assert.Equal(2, log.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
-        Assert.Contains("\"method\":\"rules-changed\"", log, StringComparison.Ordinal);
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
+        Assert.Contains("is not sealed, so keypaste ignores it", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Remove_forgets_a_known_agent_and_refuses_an_unknown_one()
+    public void Remove_refuses_an_agent_this_computer_does_not_know()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "on"));
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--remove"));
-        Assert.True(Rules.TryRead(out var rules, out var problem), problem);
-        Assert.Empty(rules.Agents);
-
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--remove"));
         Assert.Contains("knows no agent named claude-code", _harness.Err, StringComparison.Ordinal);
     }

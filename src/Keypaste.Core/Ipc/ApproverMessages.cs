@@ -42,6 +42,9 @@ public enum ApproverMessageKind
     BrowserFill = 17,
     /// <summary>A browser's request to lock now, made only on a browser's attachment.</summary>
     BrowserLock = 18,
+
+    /// <summary>A change to this computer's agent rules from <c>keypaste clients</c>, which the owner makes and seals.</summary>
+    RulesChange = 19,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -332,6 +335,40 @@ public sealed record LockRequest
 /// <param name="Locked">Whether the session the request was made under has ended.</param>
 /// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
 public sealed record LockReply(bool Locked, string Reason);
+
+/// <summary>What a change to this computer's agent rules does to one agent.</summary>
+public enum RulesChangeKind
+{
+    /// <summary>Lets it ask to run commands, each run still asked.</summary>
+    RunOn = 0,
+
+    /// <summary>Stops it running commands.</summary>
+    RunOff = 1,
+
+    /// <summary>Forgets it, which turns its run off.</summary>
+    Remove = 2,
+}
+
+/// <summary>Asks the owner to change one agent in this computer's rules, which only the owner can seal.</summary>
+/// <param name="Agent">The agent's name, its bridge's <c>--client-label</c>.</param>
+/// <param name="Change">What changes.</param>
+public sealed record RulesChangeRequest(string Agent, RulesChangeKind Change)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>What became of a change to this computer's agent rules.</summary>
+/// <param name="Changed">Whether the rules now hold it, sealed.</param>
+/// <param name="Reason">keypaste's own words.</param>
+public sealed record RulesChangeReply(bool Changed, string Reason)
+{
+    /// <summary>Whether the owner recorded the change in its log.</summary>
+    public bool Recorded { get; init; }
+}
 
 /// <summary>
 /// Asks the owner to make a terminal's edit to its vault's items, which it checks again itself, puts

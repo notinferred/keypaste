@@ -339,6 +339,10 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseRunAsync(run, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.RulesChange when ApproverProtocol.TryDecode(frame, out RulesChangeRequest? rulesChange):
+                return ApproverProtocol.Encode(
+                    await _handler.ChangeRulesAsync(rulesChange, connectionId, cancellationToken).ConfigureAwait(false));
+
             case ApproverMessageKind.Edit when ApproverProtocol.TryDecode(frame, out EditRequest? editRequest):
                 return ApproverProtocol.Encode(
                     await _handler.EditAsync(editRequest, connectionId, cancellationToken).ConfigureAwait(false));

@@ -147,7 +147,7 @@ internal static class ApproveCommand
         AuditLog audit,
         string pipeName,
         ApprovalLimits limits,
-        AgentRulesFile rules,
+        AgentRulesFile rulesFile,
         string? retiredPolicy,
         string? pairing,
         CliContext context)
@@ -193,6 +193,7 @@ internal static class ApproveCommand
             }
         }
 
+        var rules = new SealedAgentRules(rulesFile, () => lifetime.IsLive ? vault : null, Save);
         SessionServer server;
 
         try

@@ -87,6 +87,14 @@ public interface IApproverHandler
             "this keypaste process does not run commands for agents"));
     }
 
+    /// <summary>Changes one agent in this computer's rules and seals them.</summary>
+    /// <param name="request">The change, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>What became of it. A handler that keeps no rules refuses.</returns>
+    ValueTask<RulesChangeReply> ChangeRulesAsync(RulesChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new RulesChangeReply(false, "this keypaste process keeps no agent rules"));
+
     /// <summary>Makes a terminal's edit to the vault's items, once the person allows it (D-0464).</summary>
     /// <param name="request">The edit, and the attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>

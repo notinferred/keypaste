@@ -291,7 +291,13 @@ internal sealed class AppVaultSession : IDisposable
     /// <returns>The environments, empty for an entry in no project, or null when no entry answers to the name.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<EntryEnvironment>? ReadEnvironments(Vault vault, EntryName entry) =>
-        EntryEnvironment.Read(vault, entry, new Core.Agents.AgentRulesFile(KeypasteHome.AgentsPath(_home)));
+        EntryEnvironment.Read(
+            vault,
+            entry,
+            new Core.Agents.SealedAgentRules(
+                new Core.Agents.AgentRulesFile(KeypasteHome.AgentsPath(_home)),
+                () => vault,
+                _ => new Core.Agents.AgentSave(Core.Agents.AgentSaveOutcome.Refused, "reading only")));
 
     /// <summary>
     /// The items the open vault changed since it was opened or last saved, which a reload discards: names

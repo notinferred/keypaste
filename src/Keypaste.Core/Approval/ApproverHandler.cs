@@ -90,6 +90,15 @@ public sealed class ApproverHandler
     /// <returns>False only when the rules file cannot be read, which refuses every agent request.</returns>
     public bool TryRules([NotNullWhen(true)] out AgentRules? rules, out string problem) => _rules.TryRead(out rules, out problem);
 
+    /// <summary>Why the rules on file are ignored and the defaults hold, or null.</summary>
+    public string? RulesIgnored => _rules.Ignored;
+
+    /// <summary>Changes the rules as this owner does, sealing what it writes.</summary>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <param name="problem">Why nothing changed, otherwise empty.</param>
+    /// <returns>Whether the rules now hold the change.</returns>
+    public bool TryChangeRules(Func<AgentRules, AgentRules> change, out string problem) => _rules.TryChange(change, out problem);
+
     /// <summary>Which category one field of an entry falls in.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="field">The field as a request or a run's set names it.</param>

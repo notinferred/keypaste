@@ -56,6 +56,9 @@ public static class RequestRecords
     /// <summary>The client a <c>keypaste run --session</c> request is recorded under.</summary>
     public const string SessionRunner = "keypaste run --session";
 
+    /// <summary>Who a change to this computer's agent rules from a terminal is recorded as made by.</summary>
+    public const string RulesClient = "keypaste clients";
+
     /// <summary>The line for a listing of entry names.</summary>
     /// <param name="client">Who asked.</param>
     /// <param name="decision">Whether anything was listed.</param>

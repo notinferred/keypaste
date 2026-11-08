@@ -24,6 +24,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(EnvReplyFrame))]
 [JsonSerializable(typeof(AttachedFrame))]
 [JsonSerializable(typeof(LockReplyFrame))]
+[JsonSerializable(typeof(RulesChangeRequestFrame))]
+[JsonSerializable(typeof(RulesChangeReplyFrame))]
 [JsonSerializable(typeof(TokenEnvRequestFrame))]
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
@@ -185,6 +187,25 @@ internal sealed class WithdrawFrame
 {
     public int V { get; } = ApproverProtocol.Version;
     public string Kind { get; } = ApproverProtocol.WithdrawKind;
+}
+
+internal sealed class RulesChangeRequestFrame(RulesChangeRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.RulesKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Agent => request.Agent;
+    public string Change => ApproverProtocol.ChangeWord(request.Change);
+}
+
+internal sealed class RulesChangeReplyFrame(RulesChangeReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.RulesKind;
+    public bool Changed => reply.Changed;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
 }
 
 internal sealed class LockReplyFrame(LockReply reply)

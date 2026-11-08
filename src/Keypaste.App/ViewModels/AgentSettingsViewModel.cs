@@ -12,26 +12,27 @@ internal sealed record SettingChoice(string Setting, string Word, string Words, 
 
 /// <summary>One agent's settings, on the panel the Agents screen opens from its card: whether it may ask to run commands.</summary>
 /// <remarks>
-/// Kept in this computer's <c>agents.toml</c>, as <c>keypaste clients</c> keeps it. Turning run on releases nothing unasked,
-/// since every run is asked, so the change is made at once. What each kind of value gets is set for every agent in Settings.
+/// Kept in this computer's <c>agents.toml</c>, sealed with the vault's key by the authority that answers agents. Turning run
+/// on releases nothing unasked, since every run is asked, so the change is made at once. What each kind of value gets is set
+/// for every agent in Settings.
 /// </remarks>
 internal sealed partial class AgentSettingsViewModel : ObservableObject, IDisposable
 {
     private const string _run = "run";
 
-    private readonly AgentRulesFile _rules;
+    private readonly Session.AppAuthority _authority;
     private readonly Action? _changed;
     private IReadOnlyList<SettingChoice> _runChoices = [];
 
-    /// <param name="rules">This computer's agent rules.</param>
+    /// <param name="authority">The authority that answers agents, which reads and seals the rules.</param>
     /// <param name="agent">The agent's name.</param>
     /// <param name="changed">Called after each change, so the screen around the panel reads again.</param>
-    internal AgentSettingsViewModel(AgentRulesFile rules, string agent, Action? changed = null)
+    internal AgentSettingsViewModel(Session.AppAuthority authority, string agent, Action? changed = null)
     {
-        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(authority);
         ArgumentNullException.ThrowIfNull(agent);
 
-        _rules = rules;
+        _authority = authority;
         _changed = changed;
         Agent = agent;
         ChooseCommand = new RelayCommand<SettingChoice>(choice => Choose(choice!), choice => choice is not null && HasRules);
@@ -80,9 +81,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     private void Read()
     {
-        if (!_rules.TryRead(out var rules, out var problem))
+        if (!_authority.TryRules(out var rules, out _))
         {
-            Problem = $"These settings can't be read: {problem}. Correct that, then open them again.";
+            Problem = "These settings can't be read while the vault is locked or agents.toml can't be read. Correct that, then open them again.";
             RunChoices = [];
             return;
         }
@@ -101,21 +102,12 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     private void Choose(SettingChoice choice)
     {
-        if (choice.IsChosen || !_rules.TryRead(out var rules, out var problem))
+        if (!choice.IsChosen)
         {
-            Read();
-            return;
-        }
-
-        try
-        {
-            Message = _rules.TryWrite(rules.WithRun(Agent, choice.Word == "on"), out problem)
+            var reply = _authority.ChangeRules(Agent, rules => rules.WithRun(Agent, choice.Word == "on"));
+            Message = reply.Changed
                 ? choice.Word == "on" ? "Run is on. Each run is still asked." : "Run is off."
-                : $"Not changed: {problem}";
-        }
-        catch (ArgumentException tooMany)
-        {
-            Message = $"Not changed: {tooMany.Message}";
+                : $"Not changed: {reply.Reason}";
         }
 
         Read();

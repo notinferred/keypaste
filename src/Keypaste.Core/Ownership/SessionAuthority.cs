@@ -405,6 +405,90 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Recorded under <c>keypaste clients</c>, naming the agent. Turning run on releases nothing unasked, since every run
+    /// is asked, so the owner makes it without a confirmation; what it writes is sealed with the vault's key.
+    /// </remarks>
+    public ValueTask<RulesChangeReply> ChangeRulesAsync(RulesChangeRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        {
+            return ValueTask.FromResult(new RulesChangeReply(false, refusal.Reason));
+        }
+
+        var made = ChangeRules(
+            request.Agent,
+            request.Change switch
+            {
+                RulesChangeKind.RunOn => rules => rules.WithRun(request.Agent, run: true),
+                RulesChangeKind.RunOff => rules => rules.WithRun(request.Agent, run: false),
+                _ => rules => rules.Without(request.Agent),
+            },
+            RequestRecords.RulesClient,
+            out _);
+
+        return ValueTask.FromResult(made);
+    }
+
+    /// <summary>Changes this computer's agent rules for the person at this owner, sealing them, and records it on its own line.</summary>
+    /// <param name="agent">The agent the change is about, for its line.</param>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <param name="surface">What the line records the change as made by.</param>
+    /// <param name="said">What became of it, in keypaste's words.</param>
+    /// <returns>The reply, saying whether it was recorded.</returns>
+    public RulesChangeReply ChangeRules(string agent, Func<AgentRules, AgentRules> change, string surface, out string said)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(surface);
+
+        var lifetime = Live();
+        var changed = false;
+
+        if (lifetime is null)
+        {
+            said = _lockedReason;
+        }
+        else
+        {
+            try
+            {
+                changed = _inner.TryChangeRules(change, out said);
+            }
+            catch (ArgumentException refused)
+            {
+                said = refused.Message;
+            }
+        }
+
+        said = changed ? "changed and sealed on this computer" : $"not changed: {said}";
+        var recorded = _recorder.Recorded(RequestRecords.AccessChange(
+            AuditClient.Of(surface, CoreInfo.Version, agent),
+            string.Empty,
+            changed ? AuditDecision.Granted : AuditDecision.Denied,
+            changed ? AuditMethod.RulesChanged : lifetime is null ? AuditMethod.VaultLocked : AuditMethod.Failed,
+            said,
+            lifetime?.Id,
+            _vault.Key));
+
+        return new RulesChangeReply(changed, said) { Recorded = recorded };
+    }
+
+    /// <summary>The rules this owner decides by now, and why the file's are ignored when they are.</summary>
+    /// <param name="rules">The rules, when they could be read.</param>
+    /// <param name="ignored">Why the file's rules are ignored and the defaults hold, or null.</param>
+    /// <returns>False when the file holds what keypaste cannot read.</returns>
+    public bool TryRules([NotNullWhen(true)] out AgentRules? rules, out string? ignored)
+    {
+        var read = _inner.TryRules(out rules, out _);
+        ignored = _inner.RulesIgnored;
+        return read;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Recorded under the command that asked, <c>keypaste &lt;verb&gt;</c>, naming only what the terminal
     /// typed (D-0464). The log is asked for before anything is decided, so an edit is never made that its
     /// line could not follow, and the question is withdrawn by a lock as a credential request's is.

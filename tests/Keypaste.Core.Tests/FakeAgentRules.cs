@@ -11,6 +11,13 @@ internal sealed class FakeAgentRules : IAgentRules
     /// <summary>When set, the rules cannot be read, for this reason.</summary>
     internal string? Unreadable { get; set; }
 
+    public bool TryChange(Func<AgentRules, AgentRules> change, out string problem)
+    {
+        Rules = change(Rules);
+        problem = string.Empty;
+        return true;
+    }
+
     public bool TryRead([NotNullWhen(true)] out AgentRules? rules, out string problem)
     {
         rules = Unreadable is null ? Rules : null;

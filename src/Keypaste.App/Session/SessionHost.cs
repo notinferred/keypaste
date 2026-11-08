@@ -168,6 +168,42 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>The rules the authority answering agents decides by, and why the file's are ignored when they are.</summary>
+    /// <param name="rules">The rules, when something here answers agents and the file could be read.</param>
+    /// <param name="ignored">Why the file's rules are ignored, or null.</param>
+    /// <returns>Whether they were read.</returns>
+    internal bool TryRules([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Core.Agents.AgentRules? rules, out string? ignored)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        rules = null;
+        ignored = null;
+
+        // Outside the lock, which a lock of the session takes: checking the seal reads the session's vault.
+        return hosted is not null && hosted.TryRules(out rules, out ignored);
+    }
+
+    /// <summary>Changes this computer's agent rules for the person at this app, sealed and recorded as keypaste app.</summary>
+    /// <param name="agent">The agent the change is about.</param>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <returns>Whether it was made, and keypaste's words.</returns>
+    internal RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        return hosted?.ChangeRules(agent, change) ?? new RulesChangeReply(false, _notAnswering);
+    }
+
     /// <summary>What the authority answering agents has waiting for a person and has granted.</summary>
     /// <remarks>Nothing once the accept loop has ended or the lifetime it answers for has.</remarks>
     internal ApproverActivity Activity
@@ -452,6 +488,16 @@ internal sealed class SessionHost : IDisposable
 
         internal ApproverActivity Activity => AnswersAgents ? _server.Authority.Activity : ApproverActivity.None;
 
+        internal bool TryRules([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Core.Agents.AgentRules? rules, out string? ignored)
+        {
+            rules = null;
+            ignored = null;
+            return AnswersAgents && _server.Authority.TryRules(out rules, out ignored);
+        }
+
+        internal RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change) =>
+            AnswersAgents ? _server.Authority.ChangeRules(agent, change, Surface, out _) : new RulesChangeReply(false, _notAnswering);
+
         internal IReadOnlyList<ConnectedClient> Clients => AnswersAgents ? _server.Authority.Clients : [];
 
         internal IReadOnlyList<ReleaseSeen> Released => _server.Authority.Released;
@@ -502,7 +548,10 @@ internal sealed class SessionHost : IDisposable
                     CurrentLifetime = () => session.Lifetime,
                     UnlockedFor = session.UnlockedFor,
                     Channel = channel,
-                    Rules = new AgentRulesFile(KeypasteHome.AgentsPath(session.Home)),
+                    Rules = new SealedAgentRules(
+                        new AgentRulesFile(KeypasteHome.AgentsPath(session.Home)),
+                        () => session.UnlockedFor(lifetime),
+                        edit => Saved(session.WriteFor(lifetime, edit, changed => changed))),
                     Audit = audit.Open,
                     LockNow = requestLock,
                     Clock = session.Clock,

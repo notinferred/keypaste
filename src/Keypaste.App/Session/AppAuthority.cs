@@ -133,6 +133,19 @@ internal sealed class AppAuthority : IDisposable
 
     internal ApproverActivity Activity => _host.Activity;
 
+    /// <summary>The rules agents are decided by here, and why the file's are ignored when they are.</summary>
+    /// <param name="rules">The rules, when this app answers agents and the file could be read.</param>
+    /// <param name="ignored">Why the file's rules are ignored and the defaults hold, or null.</param>
+    /// <returns>Whether they were read.</returns>
+    internal bool TryRules([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Core.Agents.AgentRules? rules, out string? ignored) =>
+        _host.TryRules(out rules, out ignored);
+
+    /// <summary>Changes this computer's agent rules, sealed with the vault's key and recorded.</summary>
+    /// <param name="agent">The agent the change is about.</param>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <returns>Whether it was made, and keypaste's words.</returns>
+    internal Core.Ipc.RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change) => _host.ChangeRules(agent, change);
+
     /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
     internal DateTimeOffset? PairingArmedUntil => _host.PairingArmedUntil;
 

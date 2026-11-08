@@ -32,10 +32,12 @@ public sealed class AgentRulesFileTests : IDisposable
             .WithRun("claude-code", run: true)
             .WithRun("cursor", run: false);
 
-        Assert.True(File.TryWrite(written, out var problem), problem);
-        Assert.True(File.TryRead(out var read, out problem), problem);
+        Assert.True(File.TryWrite(written, "0123abcd", out var problem), problem);
+        Assert.True(File.TryReadFile(out var file, out problem), problem);
+        var read = file.Rules;
 
         Assert.Equal(written, read);
+        Assert.Equal(("0123abcd", true), (file.Seal, file.Present));
         Assert.True(read.Runs("claude-code"));
         Assert.False(read.Runs("cursor"));
         Assert.Equal(CategoryRule.Allow, read.RuleFor(FieldCategory.ProjectVariable));
@@ -56,8 +58,20 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.Null(rules);
         Assert.Contains(said, problem, StringComparison.Ordinal);
 
-        Assert.False(File.TryWrite(AgentRules.Defaults, out _));
+        Assert.False(File.TryWrite(AgentRules.Defaults, seal: null, out _));
         Assert.Equal(text, System.IO.File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void A_home_has_one_random_identity_made_once()
+    {
+        Assert.Null(File.HomeId());
+        Assert.True(File.TryEnsureHomeId(out var made, out var problem), problem);
+        Assert.True(File.TryEnsureHomeId(out var again, out problem), problem);
+
+        Assert.Equal(32, made.Length);
+        Assert.Equal(made, again);
+        Assert.Equal(made, File.HomeId());
     }
 
     [Fact]

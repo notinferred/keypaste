@@ -38,15 +38,20 @@ internal sealed class TempVault : IDisposable
     /// <summary>The vault file.</summary>
     internal string Path_ { get; }
 
-    /// <summary>Turns run on for agents in <c>agents.toml</c> beside a vault, the home the tests' sessions read, so each is listed and may ask to run.</summary>
+    /// <summary>Turns run on for agents in <c>agents.toml</c> beside a vault, the home the tests' sessions read, sealed with the vault's key as its owner seals it, so each is listed and may ask to run.</summary>
     /// <param name="vault">The vault, whose directory is the home.</param>
     /// <param name="agents">The agents' names.</param>
     internal static void Sees(Vault vault, params string[] agents)
     {
         var file = new AgentRulesFile(Core.Audit.KeypasteHome.AgentsPath(System.IO.Path.GetDirectoryName(vault.Path)));
+        var sealer = new SealedAgentRules(file, () => vault, edit =>
+        {
+            edit(vault);
+            vault.Save();
+            return AgentSave.Saved;
+        });
 
-        if (!file.TryRead(out var rules, out var problem)
-            || !file.TryWrite(agents.Aggregate(rules, (known, agent) => known.WithRun(agent, run: true)), out problem))
+        if (!sealer.TryChange(rules => agents.Aggregate(rules, (known, agent) => known.WithRun(agent, run: true)), out var problem))
         {
             throw new InvalidOperationException(problem);
         }

@@ -317,17 +317,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             _auditEntries = stamp is not null && AuditReader.TryRead(_auditPath, out var entries, out _, out _) ? entries : [];
         }
 
-        AgentRules? read = null;
-
-        if (_rules.TryRead(out var rules, out var problem))
-        {
-            read = rules;
-            ClientsProblem = string.Empty;
-        }
-        else
-        {
-            ClientsProblem = $"{problem}. Every agent request is refused until it is fixed; deleting it asks about every value again.";
-        }
+        var read = CurrentRules(out var problem);
+        ClientsProblem = problem;
 
         var now = _clock.GetUtcNow();
 
@@ -463,10 +454,32 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             ? string.Create(CultureInfo.InvariantCulture, $"{file.Length}@{file.LastWriteTimeUtc.Ticks}")
             : "-";
 
+    /// <summary>
+    /// The rules agents are decided by, as the authority checks their seal, or as the file says while nothing here
+    /// answers agents; null when the file cannot be read, which refuses every agent request.
+    /// </summary>
+    private AgentRules? CurrentRules(out string problem)
+    {
+        if (_authority is not null && _authority.TryRules(out var held, out var ignored))
+        {
+            problem = ignored is null ? string.Empty : $"{char.ToUpperInvariant(ignored[0])}{ignored[1..]}: every value is asked about and no agent runs commands.";
+            return held;
+        }
+
+        if (!_rules.TryRead(out var said, out var unreadable))
+        {
+            problem = $"{unreadable}. Every agent request is refused until it is fixed; deleting it asks about every value again.";
+            return null;
+        }
+
+        problem = string.Empty;
+        return said;
+    }
+
     /// <summary>Says on each named row whether it may ask to run commands.</summary>
     private void Summarize()
     {
-        var rules = _rules.TryRead(out var read, out _) ? read : null;
+        var rules = CurrentRules(out _);
 
         foreach (var row in _rows)
         {
@@ -476,7 +489,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     /// <summary>The panel a row's Settings opens, which re-reads the screen after each change.</summary>
     private AgentSettingsViewModel? OpenAgentSettings(string agent) =>
-        _authority is null ? null : new AgentSettingsViewModel(_rules, agent, () =>
+        _authority is null ? null : new AgentSettingsViewModel(_authority, agent, () =>
         {
             Read(force: false);
             Summarize();
