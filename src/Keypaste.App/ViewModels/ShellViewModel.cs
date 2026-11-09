@@ -981,7 +981,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast };
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke() };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
@@ -1654,12 +1654,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
             switch (Content)
             {
-                case IHoldsDraft { UnsavedDraft: not null }:
-                case EntriesViewModel { Detail.IsEditing: true }:
+                case EntriesViewModel entries:
+                    entries.ShowChangeFromElsewhere();
                     break;
 
-                case EntriesViewModel entries:
-                    entries.ReloadMerged();
+                case IHoldsDraft { UnsavedDraft: not null }:
                     break;
 
                 case EnvSetsViewModel env:
@@ -1777,11 +1776,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         switch (Content)
         {
-            case IHoldsDraft { UnsavedDraft: not null }:
+            case EntriesViewModel entries:
+                entries.ShowChangeFromElsewhere();
                 break;
 
-            case EntriesViewModel entries when entries.Detail is not { IsEditing: true }:
-                entries.Reload();
+            case IHoldsDraft { UnsavedDraft: not null }:
                 break;
 
             case EnvSetsViewModel env:

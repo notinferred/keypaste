@@ -188,6 +188,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Clears the search box, which the shell owns.</summary>
     internal Action? ClearSearchBox { get; set; }
 
+    /// <summary>Hides any value on screen before the open item is read again; the shell's.</summary>
+    internal Action? EndReveals { get; init; }
+
     /// <summary>Widens the search to every item through the shell, which keeps a draft from being lost.</summary>
     internal Action? WidenSearch { get; set; }
 
@@ -298,6 +301,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     }
 
     private string? _renamedGroupName;
+    private bool _changeHeldOff;
 
     private void MoveSelection(EntryName name)
     {
@@ -307,6 +311,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Select(name);
+        ShowHeldChange();
     }
 
     /// <summary>How this screen asks "Discard …?" before choosing a row loses a draft; the shell's, or none to lose it unasked.</summary>
@@ -809,16 +814,33 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         ApplyActivity();
     }
 
-    /// <summary>Reads the vault again after a merge, and the open item too, which <see cref="Reload"/> leaves to the pane that made the change.</summary>
-    /// <remarks>The caller has established that no draft is open. A moved or renamed item already has a new pane, and a removed one none.</remarks>
-    internal void ReloadMerged()
+    /// <summary>Reads the vault again after a merge or a terminal's edit, and the open item too, which <see cref="Reload"/> leaves to the pane that made the change; a draft or an edit holds this off until its form closes.</summary>
+    /// <remarks>A moved or renamed item already has a new pane, and a removed one none.</remarks>
+    internal void ShowChangeFromElsewhere()
     {
+        if (UnsavedDraft is not null || Detail is { IsEditing: true })
+        {
+            _changeHeldOff = true;
+            return;
+        }
+
+        _changeHeldOff = false;
+        EndReveals?.Invoke();
+
         var open = Detail;
         Reload();
 
         if (open is not null && ReferenceEquals(open, Detail))
         {
             open.ReadAgain();
+        }
+    }
+
+    private void ShowHeldChange()
+    {
+        if (_changeHeldOff)
+        {
+            ShowChangeFromElsewhere();
         }
     }
 
@@ -925,7 +947,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard };
+        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange };
         TellPaneAboutItsName(detail);
         return detail;
     }
@@ -947,6 +969,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         Reload();
         SelectIfListed(name);
+        ShowHeldChange();
     }
 
     /// <summary>Selects what the vault still holds, and holds it in the list until the next query or group, because an edit or another program's save is not the person hiding it.</summary>
@@ -1114,6 +1137,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         NewItem = null;
         Error = null;
+        ShowHeldChange();
     }
 
     private bool CanCreate => _newItem is { HasTitle: true };
@@ -1130,6 +1154,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Error = null;
         Reload();
         Selected = Rows.FirstOrDefault(row => row.Name == name);
+        ShowHeldChange();
     }
 
     private void DeleteOrAsk()
@@ -1252,6 +1277,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         DraftTitle = string.Empty;
         MoveTarget = null;
         Error = null;
+        ShowHeldChange();
     }
 
     /// <summary>
@@ -1284,7 +1310,28 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        Organize(row, new EntryName(MoveTarget?.Path ?? string.Empty, DraftTitle.Trim()));
+        Organize(row, TargetOf(row));
+    }
+
+    /// <summary>Where the form sends the item: what the person left as it opened stays as a merge since has made it.</summary>
+    private EntryName TargetOf(EntryRow row)
+    {
+        var title = DraftTitle.Trim();
+        var group = MoveTarget?.Path ?? string.Empty;
+        VaultEntry? now;
+
+        try
+        {
+            now = _session.Unlocked?.Find(row.Name);
+        }
+        catch (VaultException)
+        {
+            now = null;
+        }
+
+        return new EntryName(
+            now is not null && string.Equals(group, row.GroupPath, StringComparison.Ordinal) ? now.GroupPath : group,
+            now is not null && string.Equals(title, row.Title, StringComparison.Ordinal) ? now.Title : title);
     }
 
     /// <summary>Whether no form or draft on this screen would be left behind by a drag taking an item or a file to its item.</summary>
@@ -1431,6 +1478,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         DraftGroupName = string.Empty;
         GroupMoveTarget = null;
         RefuseGroup(null);
+        ShowHeldChange();
     }
 
     /// <summary>Closes whatever else is open, so one form is on screen at a time.</summary>

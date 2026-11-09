@@ -45,6 +45,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     private string _entryPath;
     private string _title;
     private string _groupPath;
+    private (string Username, string Url, string Notes) _editOpenedWith = (string.Empty, string.Empty, string.Empty);
 
     private string? _uuid;
     private EntryFieldRow? _replacingField;
@@ -88,7 +89,13 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ConfirmAddFieldCommand = new RelayCommand(ConfirmAddField, () => IsAddingField && DraftFieldName.Trim().Length > 0);
         CancelAddFieldCommand = new RelayCommand(CancelAddField, () => IsAddingField);
         ConfirmReplaceFieldCommand = new RelayCommand(ConfirmReplaceField, () => ReplacingField is not null);
-        CancelReplaceFieldCommand = new RelayCommand(() => ReplacingField = null, () => ReplacingField is not null);
+        CancelReplaceFieldCommand = new RelayCommand(
+            () =>
+            {
+                ReplacingField = null;
+                FormClosed?.Invoke();
+            },
+            () => ReplacingField is not null);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
         GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => HasPassword && !IsEditing);
         Generator.PropertyChanged += (_, _) =>
@@ -101,7 +108,13 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ConfirmRemoveFieldCommand = new RelayCommand(ConfirmRemoveField, () => RemovingField is not null);
         CancelRemoveFieldCommand = new RelayCommand(() => RemovingField = null, () => RemovingField is not null);
         ConfirmRenameFieldCommand = new RelayCommand(ConfirmRenameField, () => RenamingField is not null && DraftFieldRename.Trim().Length > 0);
-        CancelRenameFieldCommand = new RelayCommand(() => RenamingField = null, () => RenamingField is not null);
+        CancelRenameFieldCommand = new RelayCommand(
+            () =>
+            {
+                RenamingField = null;
+                FormClosed?.Invoke();
+            },
+            () => RenamingField is not null);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
@@ -353,6 +366,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTagCommand))]
     internal partial string DraftTag { get; set; } = string.Empty;
+
+    partial void OnDraftTagChanged(string value)
+    {
+        if (value.Trim().Length == 0)
+        {
+            FormClosed?.Invoke();
+        }
+    }
 
     /// <summary>The vault's project tags this item does not carry, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
     [ObservableProperty]
@@ -625,6 +646,9 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>How leaving a form holding what was typed is asked about, or null to leave without asking.</summary>
     internal Action<string, Action, Action?>? AskDiscard { get; init; }
+
+    /// <summary>Called last when a form here closes, which may replace this pane.</summary>
+    internal Action? FormClosed { get; set; }
 
     /// <summary>Removes one of the entry's tags, first asking about a project tag.</summary>
     internal void RemoveTag(EntryTagChip chip)
@@ -1037,6 +1061,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     public void Dispose()
     {
+        FormClosed = null;
+        _editOpenedWith = (string.Empty, string.Empty, string.Empty);
         _entryPath = string.Empty;
         _title = string.Empty;
         _groupPath = string.Empty;
@@ -1291,6 +1317,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         IsAddingField = false;
         NewFieldValue.Clear();
         Report(null);
+        FormClosed?.Invoke();
     }
 
     private void ConfirmAddField()
@@ -1307,6 +1334,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             IsAddingField = false;
             NewFieldValue.Clear();
             DraftFieldName = string.Empty;
+            FormClosed?.Invoke();
         }
     }
 
@@ -1320,6 +1348,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         if (Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, ReplacementFieldValue.Compose())]), null))
         {
             ReplacingField = null;
+            FormClosed?.Invoke();
         }
     }
 
@@ -1351,6 +1380,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         if (Write(vault => vault.RenameField(Name, row.Name, name), $"{row.DisplayName} is no longer on this item."))
         {
             RenamingField = null;
+            FormClosed?.Invoke();
         }
     }
 
@@ -1479,6 +1509,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private void BeginEdit()
     {
+        _editOpenedWith = (Username, Url, Notes);
         DraftUsername = Username;
         DraftUrl = Url;
         DraftNotes = Notes;
@@ -1492,7 +1523,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         IsEditing = false;
         NewPassword.Clear();
         Report(null);
+        FormClosed?.Invoke();
     }
+
+    /// <summary>What Save writes to a field: the person's value only where they changed it, so a merge since the form opened keeps the rest.</summary>
+    private static string Edited(string draft, string openedWith, string current) =>
+        string.Equals(draft, openedWith, StringComparison.Ordinal) ? current : draft;
 
     private void SaveEdit()
     {
@@ -1510,9 +1546,9 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
                 // than two.
                 var updated = existing with
                 {
-                    Username = DraftUsername,
-                    Url = DraftUrl,
-                    Notes = DraftNotes,
+                    Username = Edited(DraftUsername, _editOpenedWith.Username, existing.Username),
+                    Url = Edited(DraftUrl, _editOpenedWith.Url, existing.Url),
+                    Notes = Edited(DraftNotes, _editOpenedWith.Notes, existing.Notes),
                 };
 
                 if (NewPassword.HasValue)

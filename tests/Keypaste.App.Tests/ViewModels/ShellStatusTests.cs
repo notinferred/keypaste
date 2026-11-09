@@ -6,6 +6,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -776,6 +777,226 @@ public sealed class ShellStatusTests
         Assert.Null(entries.Detail);
     }
 
+    /// <summary>An edit opened before a merge writes only what the person changed, so the field another device changed stays as it made it.</summary>
+    [Fact]
+    public async Task AnEditSavedAcrossAMerge_KeepsTheFieldItDidNotTouch()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+        detail.EditCommand.Press();
+        detail.DraftNotes = "mine";
+
+        Elsewhere(fixture, other => Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "theirs" })));
+        await MergedByThePoll(shell, clock);
+        detail.SaveCommand.Press();
+
+        Assert.False(detail.IsEditing);
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.Equal("theirs", file.Find("example")!.Username);
+        Assert.Equal("mine", file.Find("example")!.Notes);
+    }
+
+    /// <summary>A field both sides changed takes the person's Save, and the item's history keeps the other device's value.</summary>
+    [Fact]
+    public async Task AnEditSavedAcrossAMerge_WinsTheFieldBothChanged_AndHistoryKeepsTheOther()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+        detail.EditCommand.Press();
+        detail.DraftNotes = "mine";
+
+        Elsewhere(fixture, other => Assert.True(other.UpdateEntry(other.Find("example")! with { Notes = "theirs" })));
+        await MergedByThePoll(shell, clock);
+        detail.SaveCommand.Press();
+
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.Equal("mine", file.Find("example")!.Notes);
+        Assert.Contains(file.ReadHistory(new EntryName(string.Empty, "example"))!, revision => revision.Fields.Notes == "theirs");
+    }
+
+    /// <summary>Rename or move opened before a merge sends only what the person changed, so a group another device moved the item to stays.</summary>
+    [Fact]
+    public async Task ARenameSavedAcrossAMerge_KeepsTheGroupItDidNotTouch()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        OpenExample(shell);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.OrganizeCommand.Press();
+        entries.DraftTitle = "renamed";
+
+        Elsewhere(fixture, other =>
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "y" });
+            Assert.Equal(OrganizeOutcome.Moved, other.MoveEntry(new EntryName(string.Empty, "example"), "env/app", out _));
+        });
+        await MergedByThePoll(shell, clock);
+        entries.ConfirmOrganizeCommand.Press();
+
+        Assert.Null(entries.Error);
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.NotNull(file.Find("env/app/renamed"));
+    }
+
+    public static TheoryData<string> Forms => ["edit", "add field"];
+
+    /// <summary>A merge a form held off is shown once that form is cancelled, on the same pane.</summary>
+    [Theory]
+    [MemberData(nameof(Forms))]
+    public async Task AMergeAFormHeldOff_IsShownOnceTheFormIsCancelled(string form)
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+
+        if (form == "edit")
+        {
+            detail.EditCommand.Press();
+            detail.DraftNotes = "typed";
+        }
+        else
+        {
+            detail.BeginAddFieldCommand.Press();
+            detail.DraftFieldName = "HALF_TYPED";
+        }
+
+        Elsewhere(fixture, other => Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "theirs" })));
+        await MergedByThePoll(shell, clock);
+        Assert.NotEqual("theirs", detail.Username);
+
+        (form == "edit" ? detail.CancelCommand : detail.CancelAddFieldCommand).Press();
+
+        Assert.Same(detail, Assert.IsType<EntriesViewModel>(shell.Content).Detail);
+        Assert.Equal("theirs", detail.Username);
+    }
+
+    /// <summary>A cancel with no merge behind it leaves the pane as it was.</summary>
+    [Fact]
+    public void ACancelWithNoMergeBehindIt_DoesNotReadThePaneAgain()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+        var fields = detail.Fields;
+
+        detail.EditCommand.Press();
+        detail.DraftNotes = "typed";
+        detail.CancelCommand.Press();
+
+        Assert.Same(fields, detail.Fields);
+    }
+
+    /// <summary>A merge an edit held off is shown once the edit is saved, what the pane's own reload does not read, such as an expiry, included.</summary>
+    [Fact]
+    public async Task AMergeAnEditHeldOff_IsShownOnceTheEditIsSaved()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+        detail.EditCommand.Press();
+        detail.DraftNotes = "typed";
+
+        Elsewhere(fixture, other =>
+        {
+            Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "theirs" }));
+            other.SetExpiryUnchecked(new EntryName(string.Empty, "example"), new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        });
+        await MergedByThePoll(shell, clock);
+        detail.SaveCommand.Press();
+
+        Assert.False(detail.IsEditing);
+        Assert.Equal("typed", detail.Notes);
+        Assert.Equal("theirs", detail.Username);
+        Assert.True(detail.HasExpiry);
+    }
+
+    /// <summary>A terminal's edit reaches the item open in the pane.</summary>
+    [Fact]
+    public async Task ATerminalEdit_ReachesTheOpenItem()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock, new AllowsEdits());
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+
+        await EditFromATerminal(authority, fixture, "seventeen-letters");
+
+        Assert.Equal("seventeen-letters".Length, detail.PasswordLength);
+    }
+
+    /// <summary>A terminal's edit a form held off is shown once that form is cancelled.</summary>
+    [Fact]
+    public async Task ATerminalEditAFormHeldOff_IsShownOnceTheFormIsCancelled()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Opened(fixture, clock, new AllowsEdits());
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var detail = OpenExample(shell);
+        detail.BeginAddFieldCommand.Press();
+        detail.DraftFieldName = "HALF_TYPED";
+
+        await EditFromATerminal(authority, fixture, "seventeen-letters");
+        Assert.NotEqual("seventeen-letters".Length, detail.PasswordLength);
+        Assert.Equal("HALF_TYPED", detail.DraftFieldName);
+
+        detail.CancelAddFieldCommand.Press();
+
+        Assert.Equal("seventeen-letters".Length, detail.PasswordLength);
+    }
+
+    private static AppAuthority Opened(TempVault fixture, ManualClock clock, IApprovalChannel? channel = null)
+    {
+#pragma warning disable CA2000
+        var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => channel ?? new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        return authority;
+    }
+
+    private static EntryDetailViewModel OpenExample(ShellViewModel shell)
+    {
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+        return entries.Detail!;
+    }
+
+    private static void Elsewhere(TempVault fixture, Action<Vault> change)
+    {
+        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        change(other);
+        other.Save();
+    }
+
+    private static async Task EditFromATerminal(AppAuthority authority, TempVault fixture, string password)
+    {
+        var edited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        authority.TerminalEdited += (_, _) => edited.TrySetResult();
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+        await using var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+        Assert.NotNull(client);
+        var attached = await client.AttachAsync(new AttachRequest(fixture.Path_), Token);
+        var edit = new EditRequest(new SetPassword(new EntryName(string.Empty, "example"), NewSecret.Of(password))) { Vault = fixture.Path_, Session = attached!.Session! };
+
+        Assert.NotNull(await client.EditAsync(edit, Token));
+        await edited.Task.WaitAsync(_connect, Token);
+    }
+
     /// <summary>Advances the clock a second at a time until the poll or the folder watch has started a merge, then waits for it.</summary>
     [Fact]
     public async Task AMerge_LeavesAScreenHoldingADraftAsTyped()
@@ -830,6 +1051,13 @@ public sealed class ShellStatusTests
             return ApprovalAnswer.Denied;
         }
 
+    }
+
+    private sealed class AllowsEdits : IApprovalChannel
+    {
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => ValueTask.FromResult(ApprovalAnswer.Denied);
+
+        public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken) => ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
     }
 
     private sealed class NobodyAnswers : IApprovalChannel
