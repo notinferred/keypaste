@@ -987,6 +987,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Attachments.Read();
     }
 
+    /// <summary>Reads again what a change this pane did not make can reach: its values, its times and an open history.</summary>
+    internal void ReadAgain()
+    {
+        Reload();
+        ReadTimes();
+        History.Refresh();
+    }
+
     /// <inheritdoc/>
     public event EventHandler? Changed;
 

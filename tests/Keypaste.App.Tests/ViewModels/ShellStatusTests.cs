@@ -649,6 +649,133 @@ public sealed class ShellStatusTests
         Assert.NotNull(file.Find("env/app/ELSEWHERE"));
     }
 
+    /// <summary>The item open in the pane shows what another program's save merged into it, in the same pane, its open history included.</summary>
+    [Fact]
+    public async Task AMerge_ReadsTheOpenItemAgain_InTheSamePane()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+        var detail = entries.Detail!;
+        detail.History.ToggleCommand.Press();
+        var revisions = detail.History.Rows.Count;
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            var name = new EntryName(string.Empty, "example");
+            Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "merged-user", Url = "https://merged.example", Notes = "merged notes", Password = "twelve-chars" }));
+            Assert.True(other.AddField(name, new FieldWrite("MERGED_FIELD", "plain", Protect: false)));
+            Assert.True(other.AddTag(name, "merged-tag"));
+            other.Save();
+        }
+
+        await MergedByThePoll(shell, clock);
+
+        Assert.Same(detail, entries.Detail);
+        Assert.Equal("merged-user", detail.Username);
+        Assert.Equal("https://merged.example", detail.Url);
+        Assert.Equal("merged notes", detail.Notes);
+        Assert.Equal("twelve-chars".Length, detail.PasswordLength);
+        Assert.Contains(detail.Fields, field => field.Name == "MERGED_FIELD");
+        Assert.Contains(detail.Tags, chip => chip.Tag == "merged-tag");
+        Assert.True(detail.History.Rows.Count > revisions);
+    }
+
+    /// <summary>A form holding what was typed keeps it through a merge, and the pane it is on is not read again.</summary>
+    [Fact]
+    public async Task AMerge_LeavesTheOpenItemAlone_WhileAFormOnItHoldsADraft()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+        var detail = entries.Detail!;
+        var username = detail.Username;
+        detail.BeginAddFieldCommand.Press();
+        detail.DraftFieldName = "HALF_TYPED";
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "merged-user" }));
+            other.Save();
+        }
+
+        await MergedByThePoll(shell, clock);
+
+        Assert.Same(detail, entries.Detail);
+        Assert.True(detail.IsAddingField);
+        Assert.Equal("HALF_TYPED", detail.DraftFieldName);
+        Assert.Equal(username, detail.Username);
+    }
+
+    /// <summary>A merge that moved the open item leaves the pane on it, where it now is.</summary>
+    [Fact]
+    public async Task AMerge_ThatMovedTheOpenItem_ShowsItWhereItIsNow()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "y" });
+            Assert.Equal(OrganizeOutcome.Moved, other.MoveEntry(new EntryName(string.Empty, "example"), "env/app", out _));
+            other.Save();
+        }
+
+        await MergedByThePoll(shell, clock);
+
+        Assert.Null(entries.Error);
+        Assert.Equal("env/app", entries.Detail!.GroupPath);
+        Assert.Equal("example", entries.Detail.Title);
+        Assert.Equal("env/app", entries.Selected!.GroupPath);
+    }
+
+    /// <summary>A merge that took the open item away closes its pane, and does not say the item could not be read.</summary>
+    [Fact]
+    public async Task AMerge_ThatRemovedTheOpenItem_ClosesThePaneWithoutAnError()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            Assert.Equal(DeletionOutcome.Recycled, other.RemoveEntry(new EntryName(string.Empty, "example"), out var recycled));
+            Assert.True(other.PurgeRecycled(recycled));
+            other.Save();
+        }
+
+        await MergedByThePoll(shell, clock);
+
+        Assert.Null(entries.Error);
+        Assert.Null(entries.Selected);
+        Assert.Null(entries.Detail);
+    }
+
     /// <summary>Advances the clock a second at a time until the poll or the folder watch has started a merge, then waits for it.</summary>
     [Fact]
     public async Task AMerge_LeavesAScreenHoldingADraftAsTyped()

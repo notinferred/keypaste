@@ -1659,7 +1659,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     break;
 
                 case EntriesViewModel entries:
-                    entries.Reload();
+                    entries.ReloadMerged();
                     break;
 
                 case EnvSetsViewModel env:

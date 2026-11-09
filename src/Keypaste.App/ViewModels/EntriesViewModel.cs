@@ -809,6 +809,19 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         ApplyActivity();
     }
 
+    /// <summary>Reads the vault again after a merge, and the open item too, which <see cref="Reload"/> leaves to the pane that made the change.</summary>
+    /// <remarks>The caller has established that no draft is open. A moved or renamed item already has a new pane, and a removed one none.</remarks>
+    internal void ReloadMerged()
+    {
+        var open = Detail;
+        Reload();
+
+        if (open is not null && ReferenceEquals(open, Detail))
+        {
+            open.ReadAgain();
+        }
+    }
+
     private void OnActivity(object? sender, EventArgs e) => ApplyActivity();
 
     /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
