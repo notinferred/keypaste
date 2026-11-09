@@ -23,6 +23,8 @@ namespace Keypaste.App.Tests.Views;
 /// </summary>
 public sealed class FirstLaunchTermsTests
 {
+    private const string _agreement = "Continuing agrees to the terms of use for keypaste's online services and to sending crash reports. You can turn crash reports off in Settings. The software itself is under AGPL-3.0, and nothing here limits the rights it gives you.";
+
     private static string Toml(string home) => KeypasteHome.SettingsPath(home);
 
     private static IEnumerable<string> Texts(Window window) =>
@@ -61,7 +63,7 @@ public sealed class FirstLaunchTermsTests
         var agreed = 0;
         var window = ShowScreen(() => agreed++);
 
-        Assert.Contains("Continuing agrees to the terms of use, which include sending crash reports. You can turn crash reports off in Settings.", Texts(window));
+        Assert.Contains(_agreement, Texts(window));
         Assert.True(Named<Button>(window, "OpenTerms").IsEffectivelyVisible);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<CheckBox>(), _ => true);
         var action = Assert.Single(window.GetVisualDescendants().OfType<Button>(), button => button.Name != "OpenTerms" && button.IsEffectivelyVisible && button.GetVisualAncestors().OfType<FirstLaunchView>().Any());
@@ -81,7 +83,7 @@ public sealed class FirstLaunchTermsTests
         var window = ShowScreen(() => { });
 
         var live = window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("live"));
-        Assert.Contains("Continuing agrees to the terms of use", live.Text, StringComparison.Ordinal);
+        Assert.Contains(_agreement, live.Text, StringComparison.Ordinal);
         Assert.Contains("A report holds", live.Text, StringComparison.Ordinal);
         window.Close();
     });
@@ -106,7 +108,7 @@ public sealed class FirstLaunchTermsTests
         RenderedShell.Drain();
 
         var asking = Assert.IsType<TermsAgreementWindow>(Assert.Single(window.OwnedWindows));
-        Assert.Contains("Continuing agrees to the terms of use, which include sending crash reports. You can turn crash reports off in Settings.", Texts(asking));
+        Assert.Contains(_agreement, Texts(asking));
         Assert.True(Named<Button>(asking, "Deny").IsFocused);
 
         asking.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);

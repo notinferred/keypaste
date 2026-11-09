@@ -3,7 +3,7 @@ using Keypaste.App.Terms;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>The one first-launch screen: continuing agrees to the terms of use, which include sending crash reports.</summary>
+/// <summary>The one first-launch screen: continuing agrees to the terms of use for keypaste's online services and to sending crash reports.</summary>
 internal sealed class FirstLaunchViewModel
 {
     /// <param name="terms">The terms the link opens.</param>

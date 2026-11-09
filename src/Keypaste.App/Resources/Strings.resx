@@ -109,7 +109,7 @@
   <data name="CopyUsername" xml:space="preserve"><value>Copy username</value></data>
   <data name="CopyValue" xml:space="preserve"><value>Copy {0}</value></data>
   <data name="CorrectTheTagOnTheItemInXafafd7" xml:space="preserve"><value>Correct the tag on the item in Items, or remove it.</value></data>
-  <data name="ContinuingAgreesToTheTermsOfUse" xml:space="preserve"><value>Continuing agrees to the terms of use, which include sending crash reports. You can turn crash reports off in Settings.</value></data>
+  <data name="ContinuingAgreesToTheTermsOfUse" xml:space="preserve"><value>Continuing agrees to the terms of use for keypaste's online services and to sending crash reports. You can turn crash reports off in Settings. The software itself is under AGPL-3.0, and nothing here limits the rights it gives you.</value></data>
   <data name="DeleteThisReportItWontBeSent" xml:space="preserve"><value>Delete this report? It won't be sent.</value></data>
   <data name="CrashReports" xml:space="preserve"><value>Crash reports</value></data>
   <data name="Create" xml:space="preserve"><value>Create</value></data>
