@@ -1131,6 +1131,7 @@ public sealed class ScreenRenderer
 
         shell.OpenGeneratorCommand.Press();
         Save(window, output, "13b-secrets-generate");
+        DrawRevealed(window, output, "GeneratedValue", "13b-secrets-generate-revealed");
         shell.GeneratorDialog!.Generator.UseWords = true;
         Save(window, output, "13c-secrets-generate-words");
         shell.CloseGeneratorCommand.Press();

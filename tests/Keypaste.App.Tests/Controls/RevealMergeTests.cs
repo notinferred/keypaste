@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
+using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.Tests.Rendering;
@@ -77,6 +78,71 @@ public sealed class RevealMergeTests
         window.Content = null;
         window.Close();
     });
+
+    /// <summary>A merge ends a reveal wherever it stands, which reaches a code, a generated value and a minted token alike.</summary>
+    [Theory]
+    [InlineData("totp")]
+    [InlineData("generated")]
+    [InlineData("token")]
+    public Task A_merge_takes_a_code_a_generated_value_and_a_minted_token_off_the_frame(string surface) => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+
+        using (var seeded = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            Assert.True(seeded.SetFields(new EntryName(string.Empty, "example"), [new FieldWrite("TimeOtp-Secret", "12345678901234567890"), new FieldWrite("TimeOtp-Length", "8")]));
+            seeded.Save();
+        }
+
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        using var shell = Shell(authority, fixture, clock);
+        var (window, entries) = Showing(shell);
+        var (cellName, value) = Prepare(shell, entries, surface);
+        WindowInput.Drain();
+        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(candidate => candidate.Name == cellName);
+        var style = TextStyle.Of(cell);
+
+        cell.BeginReveal();
+        WindowInput.Drain();
+        var shown = DrawnFrame.Capture(window);
+        Assert.True(shown.Shows(value, style, shown.Everywhere), "the value is not drawn before the merge");
+
+        Elsewhere(fixture, "kept the item");
+        await Merged(shell, clock);
+
+        var after = DrawnFrame.Capture(window);
+        Assert.False(after.Shows(value, style, after.Everywhere), "the value is still in the frame");
+        Assert.False(cell.IsRevealed);
+        Assert.Null(RevealedValue.Shown);
+
+        window.Content = null;
+        window.Close();
+    });
+
+    private static (string CellName, string Value) Prepare(ShellViewModel shell, EntriesViewModel entries, string surface)
+    {
+        switch (surface)
+        {
+            case "totp":
+                return ("CurrentTotp", entries.Detail!.Totp!.Reveal()!);
+
+            case "generated":
+                shell.OpenGeneratorCommand.Press();
+                return ("GeneratedValue", shell.GeneratorDialog!.Reveal()!);
+
+            default:
+                shell.Current = Destinations.Of(DestinationKind.Tokens);
+                var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
+                tokens.OpenFormCommand.Press();
+                tokens.Name = "ci-staging";
+                tokens.Scope = "read:billing/dev/*";
+                tokens.CreateCommand.Press();
+                return ("MintedToken", tokens.Minted!.Reveal()!);
+        }
+    }
 
     [Fact]
     public Task A_value_shown_behind_a_form_that_held_off_a_merge_goes_when_the_form_closes() => HeadlessSession.On(async () =>
