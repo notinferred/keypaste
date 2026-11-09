@@ -3,31 +3,28 @@ using System.ComponentModel;
 using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.Core;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Agents: the request waiting for the person, the allowances in force, the AI tools on this computer
+/// Agents: the request waiting for the person, the AI tools on this computer
 /// and the agents that asked, each with its settings, and what was recorded since the app was unlocked.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Waiting requests and allowances are read from the session authority</b> that answers agents
+/// <b>Waiting requests are read from the session authority</b> that answers agents
 /// (D-0330), never from the prompt window's events, so the list says what the next request would
-/// meet. Nothing here answers a request: Show the prompt brings its window forward (D-0456), and End
-/// ends an allowance there.
+/// meet. Nothing here answers a request: Show the prompt brings its window forward (D-0456).
 /// </para>
 /// <para>
 /// <b>The AI tools are looked for in the background</b> each time the screen opens, as
 /// <c>keypaste setup</c> finds them, and again once a Connect or Disconnect has run (D-0455). Each
 /// row is kept by its key, updated in place and left where it is listed, so an open Settings disclosure,
 /// its unsaved edits, an open pane and the focus or open drop-down in them survive the refresh; so do a
-/// waiting request's and an allowance's buttons. One Connect pane is open at a time, and while its plan
+/// waiting request's buttons. One Connect pane is open at a time, and while its plan
 /// or check runs no other Connect, Connect again or Disconnect can start.
 /// </para>
 /// <para>
@@ -44,7 +41,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private readonly ClipboardCountdown? _clipboard;
     private readonly IWebLauncher? _web;
     private readonly string _auditPath;
-    private readonly string _clientsPath;
+    private readonly AgentRulesFile _rules;
     private readonly TimeProvider _clock;
     private readonly Dictionary<string, AgentRow> _byKey = new(StringComparer.Ordinal);
     private readonly HashSet<string> _opened = new(StringComparer.Ordinal);
@@ -62,11 +59,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private AgentRow? _connecting;
 
     private readonly ObservableCollection<ActivityRow> _waiting = [];
-    private readonly ObservableCollection<ActivityRow> _grants = [];
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
-    /// <param name="home">The keypaste home whose audit log and <c>clients.toml</c> are read.</param>
+    /// <param name="home">The keypaste home whose audit log and <c>agents.toml</c> are read.</param>
     /// <param name="clock">What lifetimes count down on.</param>
     /// <param name="post">Runs a tick or a finished look on the UI thread.</param>
     /// <param name="connector">What finding and connecting AI tools reaches, or null to look for none.</param>
@@ -93,17 +89,14 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         _toast = toast ?? ((_, _) => { });
         OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
-        _clientsPath = KeypasteHome.ClientsPath(home);
+        _rules = new AgentRulesFile(KeypasteHome.AgentsPath(home));
         _clock = clock ?? TimeProvider.System;
         _post = post ?? (run => run());
-        ResetClientsCommand = new RelayCommand(() => Resetting = ResetClientsAsync(), () => ClientsProblem.Length > 0 && _authority is not null && !IsResetting);
         ConnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: false), row => row is { OffersConnect: true } && CanConnect);
         ConnectAgainCommand = new RelayCommand<AgentRow>(row => Open(row, removes: false), row => row is { OffersConnectAgain: true } && CanConnect);
         DisconnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: true), row => row is { OffersDisconnect: true } && CanConnect);
         CloseConnectionCommand = new RelayCommand(CloseConnection, () => Connection is { IsBusy: false });
 
-        EndCommand = new RelayCommand<ActivityRow>(End, row => row?.Id is not null);
-        EndAllCommand = new RelayCommand(EndAll, () => _grants.Count > 0);
 
         Refresh();
         Look();
@@ -155,24 +148,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>The open pane composing its plan, or a completed task.</summary>
     internal Task Opening { get; private set; } = Task.CompletedTask;
 
-    /// <summary>
-    /// Sets a clients file keypaste cannot parse aside and starts an empty one, once the person confirms, in
-    /// the window that confirms any change giving agents more, what each agent then gets.
-    /// </summary>
-    internal RelayCommand ResetClientsCommand { get; }
-
-    /// <summary>The reset in progress, or a completed task.</summary>
-    internal Task Resetting { get; private set; } = Task.CompletedTask;
-
-    /// <summary>Whether a reset is waiting for the person's answer.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ResetClientsCommand))]
-    internal partial bool IsResetting { get; private set; }
-
-    /// <summary>Why <c>clients.toml</c> cannot be used, or empty. While it is set, every agent request is refused.</summary>
+    /// <summary>Why <c>agents.toml</c> cannot be used, or empty. While it is set, every agent request is refused.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasClientsProblem))]
-    [NotifyCanExecuteChangedFor(nameof(ResetClientsCommand))]
     internal partial string ClientsProblem { get; private set; } = string.Empty;
 
     internal bool HasClientsProblem => ClientsProblem.Length > 0;
@@ -189,9 +167,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     [ObservableProperty]
     internal partial string Status { get; private set; } = string.Empty;
 
-    /// <summary>Why waiting requests and allowances cannot be read, or empty when they were.</summary>
+    /// <summary>Why waiting requests cannot be read, or empty when they were.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting), nameof(NoGrants))]
+    [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting))]
     internal partial string Unavailable { get; private set; } = string.Empty;
 
     internal bool IsAvailable => Unavailable.Length == 0;
@@ -205,34 +183,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     internal bool HasWaiting => _waiting.Count > 0;
 
-    /// <summary>The allowances in force, soonest to end first.</summary>
-    internal IReadOnlyList<ActivityRow> Grants => _grants;
-
-    internal bool NoGrants => IsAvailable && _grants.Count == 0;
-
-    internal bool HasGrants => _grants.Count > 0;
-
     /// <summary>The audit log history is read from.</summary>
     internal string AuditPath => _auditPath;
-
-    /// <summary>Ends the allowance a row lists, so the next matching request asks again.</summary>
-    internal RelayCommand<ActivityRow> EndCommand { get; }
-
-    /// <summary>Ends every allowance given since this unlock.</summary>
-    internal RelayCommand EndAllCommand { get; }
-
-    /// <summary>Whether End all waits on its confirmation: every allowance goes, and none comes back.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OffersEndAll))]
-    internal partial bool IsConfirmingEndAll { get; private set; }
-
-    internal bool OffersEndAll => HasGrants && !IsConfirmingEndAll;
-
-    [RelayCommand]
-    private void AskEndAll() => IsConfirmingEndAll = true;
-
-    [RelayCommand]
-    private void CancelEndAll() => IsConfirmingEndAll = false;
 
     private bool CanConnect => _connector is not null && _authority is not null && Connection is not { IsBusy: true };
 
@@ -240,13 +192,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     [RelayCommand]
     internal void Refresh() => Read(force: true);
 
-    /// <summary>The status as the screen says it, with no agent Automatic.</summary>
+    /// <summary>The status as the screen says it, with nothing allowed without asking.</summary>
     internal static string Describe(AuthorityStatus status) => Describe(status, []);
 
     /// <summary>The status as the screen says it.</summary>
     /// <param name="status">Who answers agents.</param>
-    /// <param name="automatic">Each agent released to without asking now, with where, as <see cref="AutomaticAgents.Named"/> names it.</param>
-    internal static string Describe(AuthorityStatus status, IReadOnlyList<string> automatic) => status switch
+    /// <param name="allowed">Each kind of value this computer's rules release to every agent without asking.</param>
+    internal static string Describe(AuthorityStatus status, IReadOnlyList<string> allowed) => status switch
     {
         AuthorityStatus.Serving serving =>
             string.Create(
@@ -254,16 +206,16 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
                 $"This app (process {serving.Owner.ProcessId}, unlock {serving.Session}) holds this vault for agents while it is unlocked. ")
             + "AI tools connected to this vault reach it here and can list the item names they are allowed to see. "
             + "Each credential request is asked about in a prompt window, and nothing is released unless you allow it, "
-            + (automatic.Count == 0
-                ? "or you set that agent to Automatic for it in its settings."
-                : $"except what these agents are Automatic for: {string.Join("; ", automatic)}."),
+            + (allowed.Count == 0
+                ? "or Settings allows that kind of value for every agent."
+                : $"except what Settings allows for every agent: {string.Join(", ", allowed)}."),
         AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason.TrimEnd('.')}. Lock and unlock the vault to try again.",
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now. Lock and unlock the vault to try again.",
     };
 
     /// <inheritdoc/>
-    public string? UnsavedDraft => _rows.Select(row => row.Settings?.UnsavedDraft).FirstOrDefault(draft => draft is not null);
+    public string? UnsavedDraft => null;
 
     /// <summary>Opens the named agent's settings on its row, listing it first when no row shows it yet.</summary>
     /// <param name="agent">The agent's name, or <c>*</c>.</param>
@@ -299,7 +251,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
         List<ActivityRow> waiting = [];
-        List<ActivityRow> grants = [];
 
         if (status is AuthorityStatus.Serving serving)
         {
@@ -308,45 +259,36 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             var asked = activity.Waiting.Count;
             var run = asked + activity.WaitingRuns.Count;
             var env = run + activity.WaitingEnvs.Count;
-            var change = env + activity.WaitingChanges.Count;
             waiting =
             [
                 .. activity.Waiting.Select((request, i) => ActivityRow.Waiting(i + 1, request)),
                 .. activity.WaitingRuns.Select((request, i) => ActivityRow.WaitingRun(asked + i + 1, request)),
                 .. activity.WaitingEnvs.Select((request, i) => ActivityRow.WaitingEnv(run + i + 1, request)),
-                .. activity.WaitingChanges.Select((request, i) => ActivityRow.WaitingChange(env + i + 1, request)),
-                .. activity.WaitingEdits.Select((request, i) => ActivityRow.WaitingEdit(change + i + 1, request)),
-            ];
-            grants =
-            [
-                .. activity.Grants.Select((grant, i) => ActivityRow.Granted(i + 1, grant)),
-                .. activity.EnvGrants.Select((grant, i) => ActivityRow.EnvGranted(activity.Grants.Count + i + 1, grant)),
+                .. activity.WaitingEdits.Select((request, i) => ActivityRow.WaitingEdit(env + i + 1, request)),
             ];
         }
         else
         {
-            Unavailable = "Waiting requests and allowances can't be read, because this app is not answering agents for this vault. Lock and unlock the vault to try again.";
+            Unavailable = "Waiting requests can't be read, because this app is not answering agents for this vault. Lock and unlock the vault to try again.";
         }
 
         Relist(_waiting, waiting);
-        Relist(_grants, grants);
         OnPropertyChanged(nameof(HasWaiting));
-        OnPropertyChanged(nameof(HasGrants));
-        OnPropertyChanged(nameof(OffersEndAll));
-        IsConfirmingEndAll = IsConfirmingEndAll && _grants.Count > 0;
         OnPropertyChanged(nameof(FormsArePrimary));
         OnPropertyChanged(nameof(NothingWaiting));
         ShowPromptCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(NoGrants));
-        EndAllCommand.NotifyCanExecuteChanged();
 
-        var (caps, records) = ReadClients(force);
+        var rules = ReadClients(force);
 
         OnPropertyChanged(nameof(UnnamedAgentsNote));
         OnPropertyChanged(nameof(HasUnnamedAgentsNote));
 
-        // With clients.toml unreadable every agent request is refused, so nobody is answered without asking.
-        var said = Describe(status, status is AuthorityStatus.Serving && caps is not null ? AutomaticAgents.Named(records, caps, _clock.GetUtcNow()) : []);
+        // With agents.toml unreadable every agent request is refused, so nobody is answered without asking.
+        var said = Describe(
+            status,
+            status is AuthorityStatus.Serving && rules is not null
+                ? [.. FieldCategories.Ruled.Where(category => rules.RuleFor(category) == CategoryRule.Allow).Select(FieldCategories.Shown)]
+                : []);
         Status = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
             ? $"{said} {Unrecorded(unopened)}"
             : said;
@@ -359,25 +301,12 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     internal static string Unrecorded(string failure) =>
         $"keypaste refuses every agent request while its audit log won't open: {failure.TrimEnd('.')}. Fix the log file, and the next request opens it again.";
 
-    /// <summary>The records of the vault the app holds, read from the open vault, so a change not yet saved is named as it will apply.</summary>
-    private IReadOnlyList<AgentRecord> Records()
-    {
-        try
-        {
-            return _authority?.Session.Unlocked is { } vault ? new AgentAccessStore(vault).List() : [];
-        }
-        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
-        {
-            return [];
-        }
-    }
-
     /// <summary>
-    /// Builds the rows from the tools found, who is attached, this vault's audit lines, its records and
-    /// <c>clients.toml</c>, keeping each row that was already listed.
+    /// Builds the rows from the tools found, who is attached, this vault's audit lines and <c>agents.toml</c>,
+    /// keeping each row that was already listed.
     /// </summary>
-    /// <returns>This computer's ceilings, or null when <c>clients.toml</c> cannot be read; and the vault's records.</returns>
-    private (AccessCaps? Caps, IReadOnlyList<AgentRecord> Records) ReadClients(bool force)
+    /// <returns>This computer's rules, or null when <c>agents.toml</c> cannot be read.</returns>
+    private AgentRules? ReadClients(bool force)
     {
         var file = new FileInfo(_auditPath);
         (long, DateTime)? stamp = file.Exists ? (file.Length, file.LastWriteTimeUtc) : null;
@@ -388,32 +317,30 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             _auditEntries = stamp is not null && AuditReader.TryRead(_auditPath, out var entries, out _, out _) ? entries : [];
         }
 
-        AccessCaps caps;
+        var read = CurrentRules(out var problem);
+        ClientsProblem = problem;
 
-        if (AccessCaps.TryLoad(_clientsPath, out var loaded, out var problem))
-        {
-            caps = loaded;
-            ClientsProblem = string.Empty;
-        }
-        else
-        {
-            caps = AccessCaps.Empty;
-            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed or reset; Reset shows what each agent then gets before anything changes.";
-        }
-
-        var records = Records();
         var now = _clock.GetUtcNow();
 
         // A row whose settings or pane are open is built from its name, so it stays listed, and current, until they close.
         var open = _byKey.Values.Where(row => row.IsOpen || row.HasConnection).Select(row => row.Label).OfType<string>();
+        var known = read ?? AgentRules.Defaults;
+
+        foreach (var name in _opened.Concat(open).Where(AgentNames.IsNamed).Distinct(StringComparer.Ordinal).ToList())
+        {
+            if (known.Agents.Count < AgentRules.MaximumAgents && !known.Agents.Any(agent => string.Equals(agent.Name, name, StringComparison.Ordinal)))
+            {
+                known = known with { Agents = [.. known.Agents, new KnownAgent(name, false)] };
+            }
+        }
+
         var cards = McpClientCards.Build(
             _authority?.Clients ?? [],
             _auditEntries,
             _authority?.Session.Identity?.Key ?? string.Empty,
-            caps,
+            known,
             _findings,
-            now,
-            [.. records.Select(record => record.Name), .. _opened, .. open]);
+            now);
         List<AgentRow> listed = [];
 
         foreach (var card in cards)
@@ -439,12 +366,11 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             row.Dispose();
         }
 
-        // What each summary is read from: the records' content, not only their number, and the two files beneath them.
+        // What each summary is read from: each card and the file beneath them.
         var signature = string.Join(
             '\n',
-            cards.Select(card => $"{card.Key}|{card.Presence}")
-                .Concat(records.Select(record => $"{record.Name}|{record.Record.Understood}|{AcafRecord.Write(record.Record.Access)}"))
-                .Append($"*|{ClientsProblem}|{Stamp(_clientsPath)}|{Stamp(_authority?.Session.Unlocked?.Path)}"));
+            cards.Select(card => $"{card.Key}|{card.Presence}|{card.Run}")
+                .Append($"*|{ClientsProblem}|{Stamp(_rules.Path)}"));
 
         if (force || !string.Equals(signature, _clientsSignature, StringComparison.Ordinal))
         {
@@ -460,7 +386,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             }
         }
 
-        return (ClientsProblem.Length == 0 ? loaded : null, records);
+        return read;
     }
 
     /// <summary>
@@ -528,63 +454,38 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             ? string.Create(CultureInfo.InvariantCulture, $"{file.Length}@{file.LastWriteTimeUtc.Ticks}")
             : "-";
 
-    /// <summary>Says on each row with settings what they give it, as its panel reads them: Every other agent's in full, and another's where they differ or this computer holds it back.</summary>
+    /// <summary>
+    /// The rules agents are decided by, as the authority checks their seal, or as the file says while nothing here
+    /// answers agents; null when the file cannot be read, which refuses every agent request.
+    /// </summary>
+    private AgentRules? CurrentRules(out string problem)
+    {
+        if (_authority is not null && _authority.TryRules(out var held, out var ignored))
+        {
+            problem = ignored is null ? string.Empty : $"{char.ToUpperInvariant(ignored[0])}{ignored[1..]}: every value is asked about and no agent runs commands.";
+            return held;
+        }
+
+        if (!_rules.TryRead(out var said, out var unreadable))
+        {
+            problem = $"{unreadable}. Every agent request is refused until it is fixed; deleting it asks about every value again.";
+            return null;
+        }
+
+        problem = string.Empty;
+        return said;
+    }
+
+    /// <summary>Says on each named row whether it may ask to run commands.</summary>
     private void Summarize()
     {
-        var everyOther = _authority is not null && _authority.TrySettings(AgentNames.Any, out var others, out _) ? Given(others) : null;
+        var rules = CurrentRules(out _);
 
         foreach (var row in _rows)
         {
-            row.Summary = row.Label is { } label && _authority is not null && _authority.TrySettings(label, out var state, out _)
-                ? Summary(state, followsEveryOther: !row.IsEveryOther && Given(state) == everyOther)
-                : string.Empty;
+            row.Summary = row.Label is { } label && !row.IsEveryOther && rules is not null && rules.Runs(label) ? "may ask to run commands" : string.Empty;
         }
     }
-
-    private static string Summary(AgentSettingsState state, bool followsEveryOther) => (followsEveryOther, HeldBack(state)) switch
-    {
-        (false, null) => Given(state),
-        (false, var held) => $"{Given(state)} · {held}",
-        (true, null) => string.Empty,
-        (true, var held) => string.Concat(held[..1].ToUpperInvariant(), held[1..]),
-    };
-
-    /// <summary>What an agent's settings give it, in a line: its mode, each project row, what it sees, values and commands.</summary>
-    private static string Given(AgentSettingsState state)
-    {
-        var access = state.Vault;
-        List<string> parts = [Words(access.Mode), .. access.Projects.Select(row => $"{Words(row.Mode)} for {row.Scope.Name}")];
-        parts.Add(access.See.Globs switch
-        {
-            var globs when globs.Contains(McpServerRegistration.WideExposure, StringComparer.Ordinal) => "sees every item",
-            var globs when globs.Contains(EntryExposure.DefaultGlob, StringComparer.Ordinal) => "sees all projects",
-            _ => "sees only what you picked",
-        });
-
-        if (!access.Values)
-        {
-            parts.Add("values only into commands it runs");
-        }
-
-        if (access.Run)
-        {
-            parts.Add("may run commands");
-        }
-
-        return string.Join(" · ", parts);
-    }
-
-    private static string? HeldBack(AgentSettingsState state) =>
-        state.BeneathDefaults ? "the defaults apply until its saved settings can be read"
-        : state.HeldBack.Count > 0 ? "less on this computer"
-        : null;
-
-    private static string Words(AgentMode mode) => mode switch
-    {
-        AgentMode.Ask => "Ask every time",
-        AgentMode.Automatic => "Automatic",
-        _ => AccessChangePrompt.AllowForDefaultWords,
-    };
 
     /// <summary>The panel a row's Settings opens, which re-reads the screen after each change.</summary>
     private AgentSettingsViewModel? OpenAgentSettings(string agent) =>
@@ -698,42 +599,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         CloseConnectionCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Asks the authority to reset the clients file, which the person confirms, then reads it again.</summary>
-    private async Task ResetClientsAsync()
-    {
-        if (_authority is null || _disposed)
-        {
-            return;
-        }
-
-        IsResetting = true;
-        string said;
-        var tone = ToastTone.Warning;
-
-        try
-        {
-            var reply = await _authority.ResetCapsAsync(_closing.Token).ConfigureAwait(true);
-            tone = reply.Decision == AuditDecision.Granted ? ToastTone.Success : ToastTone.Warning;
-            said = reply.Decision == AuditDecision.Granted
-                ? $"Reset: {_clientsPath} was set aside as {Path.GetFileName(reply.Kept ?? _clientsPath + AccessCaps.KeptSuffix)}, and every agent gets what the vault's settings say."
-                : $"Not reset: {reply.Reason}. Try Reset again.";
-        }
-        catch (OperationCanceledException)
-        {
-            said = "Not reset: the screen closed before the reset had an answer. Open Agents and reset again.";
-        }
-        finally
-        {
-            IsResetting = false;
-        }
-
-        if (!_disposed)
-        {
-            ReadClients(force: true);
-            _toast(said, tone);
-        }
-    }
-
     /// <summary>Brings the waiting prompt's window forward with Deny focused and its allows disarmed for a second; only the person's press reaches it, never a message on the pipe (D-0456).</summary>
     [RelayCommand(CanExecute = nameof(HasWaiting))]
     private void ShowPrompt()
@@ -744,28 +609,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         Read(force: false);
-    }
-
-    private void End(ActivityRow? row)
-    {
-        if (row?.Id is { } id)
-        {
-            var ended = _authority?.Revoke(id) == true;
-            Read(force: false);
-
-            if (ended)
-            {
-                _toast($"Ended {row.Client}'s allowance.", ToastTone.Success);
-            }
-        }
-    }
-
-    private void EndAll()
-    {
-        IsConfirmingEndAll = false;
-        _authority?.RevokeAll();
-        Read(force: false);
-        _toast("Ended every allowance.", ToastTone.Success);
     }
 
     public void Dispose()

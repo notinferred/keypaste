@@ -21,7 +21,7 @@ internal enum ApproverOutcome
     Failed = 2,
 
     /// <summary>
-    /// This connection was already carrying an exchange, so this one was refused rather than queued.
+    /// Every lane this bridge may open was already carrying an exchange, so this one was refused rather than queued.
     /// </summary>
     Busy = 3,
 
@@ -106,8 +106,11 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// </remarks>
     internal static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(500);
 
-    private readonly SemaphoreSlim _oneAtATime = new(1, 1);
-    private ApproverClient? _client;
+    /// <summary>How many exchanges this bridge carries at once: one on screen and the agent's waiting behind it (F.80).</summary>
+    internal const int Lanes = ApprovalLimits.MaximumWaiting + 1;
+
+    private readonly object _lanesLock = new();
+    private readonly List<Lane> _lanes = [];
     private bool _disposed;
 
     /// <summary>Who this bridge's client says it is, sent on every attach so the owner can count it; null sends nothing.</summary>
@@ -128,10 +131,10 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal TimeSpan AnswerBound { get; init; } = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
     /// <summary>
-    /// The longest a credential request may take: two windows and the same margin, because Always for's
-    /// confirmation can follow its release in the one exchange.
+    /// The longest a credential request or a run may take: the windows of the prompts its agent can have ahead of it and its
+    /// own, as each waits its turn, and the same margin.
     /// </summary>
-    internal TimeSpan CredentialBound { get; init; } = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
+    internal TimeSpan ReleaseBound { get; init; } = TimeSpan.FromSeconds((ApprovalLimits.MaximumWindowSeconds * Lanes) + 15);
 
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
@@ -145,19 +148,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal ValueTask<Exchange<RunReply>> RunAsync(RunRequest request, CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.ReleaseRunAsync(request with { Vault = vaultPath, Session = session }, token),
-            AnswerBound,
-            cancellationToken,
-            retry: false);
-
-    /// <summary>Asks the owner to change this bridge's agent's settings, which may wait for the person to confirm it.</summary>
-    /// <param name="request">The change. Its vault and session are filled in here.</param>
-    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
-    /// <returns>The owner's answer, and what became of the exchange.</returns>
-    /// <remarks>Never sent twice, as a run is not: a change whose reply was lost may already have been confirmed or applied.</remarks>
-    internal ValueTask<Exchange<AccessChangeReply>> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken) =>
-        ExchangeAsync(
-            (client, session, token) => client.ChangeAccessAsync(request with { Vault = vaultPath, Session = session }, token),
-            AnswerBound,
+            ReleaseBound,
             cancellationToken,
             retry: false);
 
@@ -171,7 +162,19 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.RequestAsync(request with { Vault = vaultPath, Session = session }, token),
-            CredentialBound,
+            ReleaseBound,
+            cancellationToken,
+            retry: false);
+
+    /// <summary>Asks the owner to put an agent's request to save a value to the person.</summary>
+    /// <param name="request">Where the value goes and why. Its vault and session are filled in here.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent.</param>
+    /// <returns>The owner's answer, and what became of the exchange.</returns>
+    /// <remarks>Never sent twice: a request whose reply was lost may already have been answered by a person.</remarks>
+    internal ValueTask<Exchange<SaveReply>> SaveAsync(SaveRequest request, CancellationToken cancellationToken) =>
+        ExchangeAsync(
+            (client, session, token) => client.SaveAsync(request with { Vault = vaultPath, Session = session }, token),
+            ReleaseBound,
             cancellationToken,
             retry: false);
 
@@ -199,25 +202,10 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             return new(null, ApproverOutcome.NoVault);
         }
 
-        bool taken;
-
-        try
-        {
-            // Wait(0), not WaitAsync: taking the slot must succeed now or refuse now. The pipe carries
-            // one exchange at a time and nothing correlates two replies, so waiting here queues a request
-            // behind an unanswered prompt and delivers it as a second prompt. ApprovalGate refuses this
-            // one layer in, and a queue in front of that check makes it unreachable (THREATS.md T-11).
-            taken = _oneAtATime.Wait(0, CancellationToken.None);
-        }
-        catch (ObjectDisposedException)
-        {
-            return new(null, ApproverOutcome.Unreachable);
-        }
-
-        // Deliberately above the try below, whose finally releases the slot. A refusal never took
-        // one, and releasing a slot it never held would admit two exchanges onto the stream from
-        // then on - the precise failure this method exists to prevent.
-        if (!taken)
+        // A lane carries one exchange at a time, since nothing correlates two replies on one pipe. A call made while every
+        // lane is busy is refused rather than queued here: the owner's queue is where requests wait, bounded per agent
+        // (THREATS.md T-11), and a queue in front of it would hide that bound.
+        if (Take() is not { } lane)
         {
             return new(null, ApproverOutcome.Busy);
         }
@@ -230,7 +218,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             withdrawing.CancelAfter(bound);
             var withdrawn = withdrawing.Token;
 
-            var (client, attached, outcome) = await AttachedAsync(withdrawn).ConfigureAwait(false);
+            var (client, attached, outcome) = await AttachedAsync(lane, withdrawn).ConfigureAwait(false);
 
             if (client is null || attached is not { Attached: true, Session: { } session })
             {
@@ -247,19 +235,19 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             // A request that was withdrawn is not an owner that died, and the difference decides whether to
             // send it again. The connection is finished either way, but re-sending would put a request
             // nobody is waiting for in front of a person, on a fresh connection whose id scopes a different
-            // grant and cooldown; and one that can ask a person may already have been answered.
+            // cooldown; and one that can ask a person may already have been answered.
             if (withdrawn.IsCancellationRequested || !retry)
             {
-                await DropAsync().ConfigureAwait(false);
+                await lane.DropAsync().ConfigureAwait(false);
 
                 return new(null, ApproverOutcome.Failed);
             }
 
             // One reconnect, and one retry under the session the request was first sent in. If the
             // owner has locked or restarted since, it refuses rather than answering from a later unlock.
-            await DropAsync().ConfigureAwait(false);
+            await lane.DropAsync().ConfigureAwait(false);
 
-            var (reconnected, _, _) = await AttachedAsync(withdrawn).ConfigureAwait(false);
+            var (reconnected, _, _) = await AttachedAsync(lane, withdrawn).ConfigureAwait(false);
 
             if (reconnected is null)
             {
@@ -272,17 +260,48 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         }
         finally
         {
-            _oneAtATime.Release();
+            lock (_lanesLock)
+            {
+                lane.Busy = false;
+            }
         }
     }
 
-    /// <summary>Connects if need be and attaches, reconnecting once if an idle connection has died.</summary>
+    /// <summary>A lane free now, opened when every one open is busy and fewer than <see cref="Lanes"/> are; null otherwise.</summary>
+    private Lane? Take()
+    {
+        lock (_lanesLock)
+        {
+            if (_disposed)
+            {
+                return null;
+            }
+
+            if (_lanes.FirstOrDefault(lane => !lane.Busy) is { } free)
+            {
+                free.Busy = true;
+                return free;
+            }
+
+            if (_lanes.Count >= Lanes)
+            {
+                return null;
+            }
+
+            var opened = new Lane { Busy = true };
+            _lanes.Add(opened);
+            return opened;
+        }
+    }
+
+    /// <summary>Connects the lane if need be and attaches, reconnecting once if an idle connection has died.</summary>
     private async ValueTask<(ApproverClient? Client, AttachReply? Attached, ApproverOutcome Outcome)> AttachedAsync(
+        Lane lane,
         CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var client = await ConnectedAsync(cancellationToken).ConfigureAwait(false);
+            var client = await ConnectedAsync(lane, cancellationToken).ConfigureAwait(false);
 
             if (client is null)
             {
@@ -296,7 +315,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
                 return (client, attached, attached.Attached ? ApproverOutcome.Answered : ApproverOutcome.Refused);
             }
 
-            await DropAsync().ConfigureAwait(false);
+            await lane.DropAsync().ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested)
             {
@@ -307,47 +326,64 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         return (null, null, ApproverOutcome.Failed);
     }
 
-    private async ValueTask<ApproverClient?> ConnectedAsync(CancellationToken cancellationToken)
+    private async ValueTask<ApproverClient?> ConnectedAsync(Lane lane, CancellationToken cancellationToken)
     {
         if (_disposed || pipeName is null)
         {
             return null;
         }
 
-        if (_client is { IsConnected: true })
+        if (lane.Client is { IsConnected: true })
         {
-            return _client;
+            return lane.Client;
         }
 
-        await DropAsync().ConfigureAwait(false);
+        await lane.DropAsync().ConfigureAwait(false);
 
-        _client = await ApproverClient.TryConnectAsync(pipeName, ConnectTimeout, cancellationToken).ConfigureAwait(false);
+        lane.Client = await ApproverClient.TryConnectAsync(pipeName, ConnectTimeout, cancellationToken).ConfigureAwait(false);
 
-        return _client;
-    }
-
-    private async ValueTask DropAsync()
-    {
-        var going = _client;
-        _client = null;
-
-        if (going is not null)
-        {
-            await going.DisposeAsync().ConfigureAwait(false);
-        }
+        return lane.Client;
     }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        List<Lane> lanes;
+
+        lock (_lanesLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            lanes = [.. _lanes];
         }
 
-        _disposed = true;
+        foreach (var lane in lanes)
+        {
+            await lane.DropAsync().ConfigureAwait(false);
+        }
+    }
 
-        await DropAsync().ConfigureAwait(false);
-        _oneAtATime.Dispose();
+    /// <summary>One connection to the owner, carrying one exchange at a time; it stays open for the next once its exchange ends.</summary>
+    private sealed class Lane
+    {
+        /// <summary>Whether an exchange holds it. Read and written under the connection's lock.</summary>
+        internal bool Busy { get; set; }
+
+        internal ApproverClient? Client { get; set; }
+
+        internal async ValueTask DropAsync()
+        {
+            var going = Client;
+            Client = null;
+
+            if (going is not null)
+            {
+                await going.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 }

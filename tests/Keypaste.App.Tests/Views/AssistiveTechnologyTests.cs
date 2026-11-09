@@ -176,7 +176,7 @@ public sealed class AssistiveTechnologyTests
     [Fact]
     public Task A_prompt_says_what_it_asks_and_its_time_limit_once_while_its_countdown_ticks() => HeadlessSession.On(() =>
     {
-        var model = new ApprovalViewModel(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 3600, "label"));
+        var model = new ApprovalViewModel(ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", "label"));
         model.Tick(TimeSpan.FromMinutes(2));
         var window = new ApprovalWindow(model);
         window.Show();

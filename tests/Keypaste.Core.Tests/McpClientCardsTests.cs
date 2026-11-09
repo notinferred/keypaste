@@ -2,12 +2,11 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Xunit;
-using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The Agents screen's rows: agents attached now, seen in this vault's log or named by a row of <c>clients.toml</c>, the AI
+/// The Agents screen's rows: agents attached now, seen in this vault's log or known to <c>agents.toml</c>, the AI
 /// tools found on this computer, each sharing the row of the agent of its id, and every other agent last.
 /// </summary>
 public sealed class McpClientCardsTests
@@ -27,10 +26,10 @@ public sealed class McpClientCardsTests
     private static IReadOnlyList<McpClientCard> Cards(
         IReadOnlyList<ConnectedClient> connected,
         IReadOnlyList<AuditEntry> audit,
-        AccessCaps? caps = null,
+        AgentRules? rules = null,
         IReadOnlyList<McpToolFinding>? findings = null)
     {
-        var cards = McpClientCards.Build(connected, audit, _vault, caps ?? AccessCaps.Empty, findings ?? [], _now);
+        var cards = McpClientCards.Build(connected, audit, _vault, rules ?? AgentRules.Defaults, findings ?? [], _now);
 
         Assert.Equal((AgentNames.Any, McpClientCards.EveryOtherAgent), (cards[^1].Key, cards[^1].Name));
         Assert.Equal(AgentNames.Any, cards[^1].Label);
@@ -41,9 +40,9 @@ public sealed class McpClientCardsTests
     private static IReadOnlyList<McpClientCard> Agents(
         IReadOnlyList<ConnectedClient> connected,
         IReadOnlyList<AuditEntry> audit,
-        AccessCaps? caps = null,
+        AgentRules? rules = null,
         IReadOnlyList<McpToolFinding>? findings = null) =>
-        [.. Cards(connected, audit, caps, findings).SkipLast(1)];
+        [.. Cards(connected, audit, rules, findings).SkipLast(1)];
 
     private static AuditEntry Line(string label, string name, int hoursAgo, string vault = _vault, string tool = "request_credential") => new()
     {
@@ -62,7 +61,7 @@ public sealed class McpClientCardsTests
     {
         var card = Assert.Single(Agents([Connected("c1", "Claude Code", "claude-code")], []));
         Assert.Equal(("claude-code", ClientStatus.Connected, 1, "MCP stdio"), (card.Key, card.Status, card.Connections, card.Kind));
-        Assert.Empty(card.Ceiling.Rows);
+        Assert.False(card.Run);
     }
 
     [Fact]
@@ -104,34 +103,6 @@ public sealed class McpClientCardsTests
     }
 
     [Fact]
-    public void ACeilingRowWithoutActivity_IsListed()
-    {
-        var caps = Caps(
-            new CapsRow { Label = "cursor", Mode = AgentMode.Ask },
-            new CapsRow { Label = "cursor", Project = Scope("billing"), Mode = AgentMode.Ask },
-            new CapsRow { Label = AgentNames.Any, Values = false });
-
-        var card = Assert.Single(Agents([], [], caps));
-
-        Assert.Equal(("cursor", ClientStatus.Idle), (card.Key, card.Status));
-        Assert.Equal(2, card.Ceiling.Rows.Count);
-        Assert.True(card.Ceiling.Values);
-        Assert.Null(card.LastSeen);
-    }
-
-    [Fact]
-    public void UnlabeledClients_AreKeyedByName_AndHeldToTheStarRow()
-    {
-        var caps = Caps(new CapsRow { Label = AgentNames.Any, Values = false });
-
-        var card = Assert.Single(Agents([Connected("c1", "Zed", null)], [], caps));
-
-        Assert.Equal("name:Zed", card.Key);
-        Assert.Null(card.Label);
-        Assert.False(card.Ceiling.Values);
-    }
-
-    [Fact]
     public void Count_IsDistinctClients()
     {
         Assert.Equal(2, McpClientCards.Count([Connected("c1", "Claude", "cc"), Connected("c2", "Claude", "cc"), Connected("c3", "Zed", null)]));
@@ -140,7 +111,7 @@ public sealed class McpClientCardsTests
 
     /// <summary>
     /// Agents in use now, then the most recently asked, then found tools not yet used, connected first and in catalogue
-    /// order, then agents with settings alone, then every other agent.
+    /// order, then agents agents.toml alone knows, then every other agent.
     /// </summary>
     [Fact]
     public void Ordering_InUseFirst_ThenMostRecentlyAsked_ThenFoundTools_ThenSettingsAlone_ThenEveryOtherAgent()
@@ -148,26 +119,10 @@ public sealed class McpClientCardsTests
         var cards = Cards(
             [Connected("c1", "Zed", "zed")],
             [Line("older", "Older", 10), Line("newer", "Newer", 1)],
-            Caps(new CapsRow { Label = "quiet", Mode = AgentMode.Ask }),
+            AgentRules.Defaults.WithRun("quiet", run: false),
             [Found("cursor", McpEntryPresence.Absent), Found("codex", McpEntryPresence.Absent), Found("vscode", McpEntryPresence.Present)]);
 
         Assert.Equal(["zed", "newer", "older", "vscode", "codex", "cursor", "quiet", AgentNames.Any], cards.Select(card => card.Key));
-    }
-
-    [Fact]
-    public void EveryOtherAgent_IsAlwaysLast_HeldToTheStarRows()
-    {
-        var caps = Caps(new CapsRow { Label = AgentNames.Any, Values = false }, new CapsRow { Label = "cursor", Mode = AgentMode.Ask });
-
-        var alone = Assert.Single(Cards([], [], caps: AccessCaps.Empty));
-        var everyOther = Cards([Connected("c1", "Zed", "zed")], [], caps)[^1];
-
-        Assert.Null(alone.LastSeen);
-        Assert.Equal((ClientStatus.Idle, 0), (everyOther.Status, everyOther.Connections));
-        Assert.False(everyOther.Ceiling.Values);
-        Assert.Equal(AgentNames.Any, Assert.Single(everyOther.Ceiling.Rows).Label);
-        Assert.Null(everyOther.Tool);
-        Assert.Null(everyOther.Presence);
     }
 
     [Fact]
@@ -215,15 +170,5 @@ public sealed class McpClientCardsTests
         Assert.Null(cards["cursor"].Presence);
         Assert.Null(cards["Cursor"].Tool);
         Assert.Null(cards["my-script"].Tool);
-    }
-
-    /// <summary>An agent whose settings the vault holds has its row though it has not asked, and <c>*</c> and an unnamed label add none.</summary>
-    [Fact]
-    public void AnAgentWithSettingsInTheVault_HasARow()
-    {
-        var cards = McpClientCards.Build([], [Line("seen", "Zed", hoursAgo: 1)], _vault, AccessCaps.Empty, [], _now, ["vault-only", "seen", AgentNames.Any, ""]);
-
-        Assert.Equal(["seen", "vault-only", AgentNames.Any], cards.Select(card => card.Key));
-        Assert.Equal(("vault-only", ClientStatus.Idle, (DateTimeOffset?)null), (cards[1].Label, cards[1].Status, cards[1].LastSeen));
     }
 }

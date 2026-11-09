@@ -9,7 +9,6 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Settings;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -47,7 +46,7 @@ namespace Keypaste.Cli.Commands;
 /// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
 /// to discover. Ctrl+C, SIGTERM, closing the terminal and <c>keypaste lock</c> end the unlock's
 /// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
-/// take, so a request waiting at the prompt is withdrawn and denied and every grant is zeroed
+/// take, so a request waiting at the prompt is withdrawn and denied
 /// (D-0313).
 /// </para>
 /// </remarks>
@@ -57,9 +56,6 @@ internal static class ApproveCommand
         "--approval-timeout",
         "seconds",
         $"how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, {ApprovalLimits.DefaultWindowSeconds} by default");
-
-    private static readonly Option<string> _maxTtl =
-        Syntax.Value("--max-ttl", "seconds", $"how long an [h] allowance lasts, {ApprovalLimits.DefaultMaximumTtlSeconds} by default");
 
     private static readonly Option<string> _pairBrowser =
         Syntax.Value("--pair-browser", "name", "pair KeePassXC-Browser under this name in the first 2 minutes");
@@ -73,7 +69,7 @@ internal static class ApproveCommand
             + "shows and changes them. your master password is typed here, never in a window an agent caused to appear.",
         Execute)
     {
-        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _maxTtl, _pairBrowser,
+        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _pairBrowser,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -134,29 +130,15 @@ internal static class ApproveCommand
             }
 
             var retired = KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-            var caps = new AccessCapsSource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+            var rules = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
             return VaultSession.OpenHeld(
                 vaultPath,
                 line,
                 context,
                 OwnerKind.TerminalAgent,
-                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, caps, File.Exists(retired) ? retired : null, Reach(vaultPath, pipeName, home, context), pairing, context));
+                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, rules, File.Exists(retired) ? retired : null, pairing, context));
         }
-    }
-
-    /// <summary>
-    /// What <c>keypaste clients</c> must be told to reach this approver: its vault when that is not the
-    /// chosen one, and its pipe when that is not the one its vault's owner listens on unasked.
-    /// </summary>
-    private static (string? Vault, string? Approver) Reach(string vaultPath, string pipeName, string home, CliContext context)
-    {
-        var chosen = ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-        var unasked = ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(home, vaultPath));
-
-        return (
-            ChosenVault.Same(chosen, vaultPath) ? null : vaultPath,
-            string.Equals(pipeName, unasked, StringComparison.Ordinal) ? null : pipeName);
     }
 
     private static int Serve(
@@ -165,9 +147,8 @@ internal static class ApproveCommand
         AuditLog audit,
         string pipeName,
         ApprovalLimits limits,
-        AccessCapsSource caps,
+        AgentRulesFile rulesFile,
         string? retiredPolicy,
-        (string? Vault, string? Approver) reach,
         string? pairing,
         CliContext context)
     {
@@ -177,8 +158,8 @@ internal static class ApproveCommand
         using var lifetime = new SessionLifetime();
         using var stop = new CancellationTokenSource();
 
-        // The approver saves only what a person confirmed, or a narrowing, under the claim it holds, so no
-        // save here can land under another owner (D-0317).
+        // The approver saves only what a person confirmed under the claim it holds, so no save here can
+        // land under another owner (D-0317).
         AgentSave Save(Func<Vault, bool> edit)
         {
             try
@@ -212,8 +193,7 @@ internal static class ApproveCommand
             }
         }
 
-        Vault? Unlocked() => lifetime.IsLive ? vault : null;
-
+        var rules = new SealedAgentRules(rulesFile, () => lifetime.IsLive ? vault : null, Save);
         SessionServer server;
 
         try
@@ -226,13 +206,10 @@ internal static class ApproveCommand
                 Lifetime = lifetime,
                 CurrentLifetime = () => lifetime,
                 UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
-                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System) { Vault = reach.Vault, Approver = reach.Approver },
+                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
                 Limits = limits,
-                Settings = new VaultAgentSettings(Unlocked, Save, caps),
-                Hourly = new HourlyLimit(TimeProvider.System),
+                Rules = rules,
                 Audit = () => audit,
-                WatchEdits = edited => vault.Edited += edited,
-                UnwatchEdits = edited => vault.Edited -= edited,
 
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
                 LockNow = () => Stop(lifetime, stop),
@@ -240,7 +217,6 @@ internal static class ApproveCommand
 
                 // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
                 WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
-                ClientsPath = caps.Path,
 
                 // A browser pairs only while this terminal's person armed it with --pair-browser (D-0634).
                 BrowserUses = new PairingUses(),
@@ -257,17 +233,16 @@ internal static class ApproveCommand
         {
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
-            // grants are zeroed on the way out instead of being abandoned mid-flight.
+            // nothing is abandoned mid-flight.
             var signals = LockOnSignals(lifetime, stop);
 
             try
             {
-                var automatic = AutomaticAgents.Named(
-                    new AgentAccessStore(vault).List(),
-                    caps.TryCurrent(out var ceilings, out _) ? ceilings : AccessCaps.Empty,
-                    TimeProvider.System.GetUtcNow());
+                List<string> allowed = rules.TryRead(out var read, out _)
+                    ? [.. FieldCategories.Ruled.Where(category => read.RuleFor(category) == CategoryRule.Allow).Select(FieldCategories.Shown)]
+                    : [];
 
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, console);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, allowed, console);
 
                 if (pairing is not null)
                 {
@@ -288,7 +263,7 @@ internal static class ApproveCommand
             }
         }
 
-        console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked and every allowance has ended.");
+        console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked.");
         return CliApp.ExitSuccess;
     }
 
@@ -332,14 +307,13 @@ internal static class ApproveCommand
 
     /// <summary>
     /// The lines a person reads before leaving this running, one of which changes meaning entirely
-    /// when the vault sets an agent to Automatic.
+    /// when this computer's rules allow a category.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The claim changes when an agent is Automatic, because with one it is no longer true. Saying
-    /// "nothing is released without you saying yes" while an agent's requests are released silently
-    /// is the kind of small untruth this product cannot afford to print, so each such agent is named,
-    /// with where.
+    /// The claim changes when a category is allowed, because with one it is no longer true. Saying
+    /// "every value waits for you" while some are released silently is the kind of small untruth this
+    /// product cannot afford to print, so each allowed category is named.
     /// </para>
     /// <para>
     /// A <c>policy.toml</c> left from before agents' settings moved into the vault is named once, so a
@@ -356,7 +330,7 @@ internal static class ApproveCommand
         string session,
         ApprovalLimits limits,
         string? retiredPolicy,
-        IReadOnlyList<string> automatic,
+        IReadOnlyList<string> allowed,
         AgentConsole console)
     {
         console.WriteLine($"keypaste: watching {vaultPath}");
@@ -364,23 +338,23 @@ internal static class ApproveCommand
         if (retiredPolicy is not null)
         {
             console.WriteLine(
-                $"keypaste: {retiredPolicy} is no longer read: each agent's settings are kept in the vault. `keypaste clients` shows them.");
+                $"keypaste: {retiredPolicy} is no longer read: agents' rules are kept on this computer. `keypaste clients` shows them.");
         }
 
-        if (automatic.Count > 0)
+        if (allowed.Count > 0)
         {
-            console.WriteLine($"keypaste: set to Automatic in the vault: {string.Join("; ", automatic)}");
+            console.WriteLine($"keypaste: released to every agent without asking, by this computer's rules: {string.Join(", ", allowed)}");
         }
 
         console.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer, an allowance lasts at most {ApprovalLimits.Describe(limits.MaximumTtlSeconds)}"));
+                $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer."));
 
         console.WriteLine(
-            automatic.Count > 0
-                ? "keypaste: nothing is released without you saying yes, except what an agent above is Automatic for. Press Ctrl+C to stop."
-                : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
+            allowed.Count > 0
+                ? "keypaste: every other value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop."
+                : "keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.");
     }
 
     private static bool TryLimits(ParseResult line, CliContext context, out ApprovalLimits limits)
@@ -398,25 +372,13 @@ internal static class ApproveCommand
             return false;
         }
 
-        if (!TrySeconds(line.GetValue(_maxTtl), _maxTtl.Name, 1, ToolTtlCeiling, context, out var maxTtl))
-        {
-            return false;
-        }
-
         limits = ApprovalLimits.Default with
         {
             Window = window is null ? ApprovalLimits.Default.Window : TimeSpan.FromSeconds(window.Value),
-            MaximumTtlSeconds = maxTtl ?? ApprovalLimits.Default.MaximumTtlSeconds,
         };
 
         return true;
     }
-
-    /// <summary>
-    /// The ceiling the tool schema advertises. Kept in step by
-    /// <c>ToolSchemasMatchTheCoreTests</c> rather than by hoping.
-    /// </summary>
-    internal const int ToolTtlCeiling = ApprovalLimits.MaximumRequestableTtlSeconds;
 
     private static bool TrySeconds(
         string? raw,

@@ -316,7 +316,6 @@ public sealed class RunTokenTests : IDisposable
     private sealed class Owner : IAsyncDisposable
     {
         private readonly Vault _vault;
-        private readonly GrantCache _grants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
         private readonly AuditLog? _audit;
         private readonly ApproverListener _listener;
@@ -339,8 +338,7 @@ public sealed class RunTokenTests : IDisposable
                 new VaultCredentialSource(() => _vault),
                 new VaultEntryNameLister(() => _vault),
                 _gate,
-                _grants,
-                IAgentSettings.Defaults);
+                IAgentRules.Defaults);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),
@@ -390,7 +388,6 @@ public sealed class RunTokenTests : IDisposable
             _listener.Dispose();
             Lifetime.Dispose();
             _gate.Dispose();
-            _grants.Dispose();
             _audit?.Dispose();
             _vault.Dispose();
             _stop.Dispose();

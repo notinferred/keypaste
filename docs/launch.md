@@ -14,7 +14,7 @@ keypaste stores passwords and project environment variables in a local KDBX file
 
 The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
 
-For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Allow for 1 hour, which lets that connection reuse the approval for the hour; silence for 45 seconds denies access. An agent you set to Automatic for a project, a change that waits for your confirmation, gets what it can see there without a prompt, and commands and protected environments are always asked. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
+For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny or Allow once, which releases one field and keeps nothing, or, for an agent whose bridge has a label, Always allow or Always block, each confirmed with `y` and kept for that agent and item; silence for 45 seconds denies access. A kind of value you allow for every agent in Settings, a change that waits for your confirmation, is released without a prompt, and a command is asked about each time. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
 
 The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste approve` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Projects screen launches a project's command or a terminal from that session; none of this is published yet.
 
@@ -41,9 +41,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
-      released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
 ```
@@ -54,7 +52,7 @@ keypaste: an agent is asking for a credential.
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. TTL controls approval reuse, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
+`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. Setting a kind of value back to Ask stops later releases without asking, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
 
 ## Before using this material
 

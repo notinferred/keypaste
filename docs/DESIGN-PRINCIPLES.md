@@ -11,7 +11,7 @@ Be what keypaste claims to be.
 Test: every claim on a screen, in the CLI, on keypaste.com or in a guide matches what the code does and what recorded evidence shows (D-0036).
 
 - No fake urgency, no hidden cost and no exit harder than the way in: the vault stays a KeePass file the person can open in another app, and leaving keypaste loses nothing.
-- When keypaste refuses something it says why, in plain words, and every grant names its duration.
+- When keypaste refuses something it says why, in plain words, and every allow says how long it lasts.
 - A screen shows the state as it is: saved, unsaved or changed on disk, locked or unlocked, never a reassurance the code has not checked.
 
 ## 2. Responsibility

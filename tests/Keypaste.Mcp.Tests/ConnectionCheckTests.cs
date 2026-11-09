@@ -41,7 +41,6 @@ public sealed class ConnectionCheckTests
         Assert.Equal(McpConnectionCheck.Reason, request.Reason);
         Assert.Equal(McpConnectionCheck.ClientName, request.ClientName);
         Assert.Equal(McpHarness.ClientLabel, request.ClientLabel);
-        Assert.Equal(McpConnectionCheck.TtlSeconds, request.TtlSeconds);
     }
 
     [Fact]

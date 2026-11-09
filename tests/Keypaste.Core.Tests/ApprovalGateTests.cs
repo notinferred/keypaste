@@ -15,7 +15,7 @@ namespace Keypaste.Core.Tests;
 public sealed class ApprovalGateTests
 {
     private static ApprovalPrompt Prompt() =>
-        ApprovalPrompt.For("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy billing", 300);
+        ApprovalPrompt.For("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy billing");
 
     private static (ApprovalGate Gate, ManualClock Clock) Build(IApprovalChannel channel, ApprovalLimits? limits = null)
     {
@@ -26,51 +26,10 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task AYesInsideTheWindow_IsTheOnlyThingThatApproves()
     {
-        var (gate, _) = Build(new ScriptedChannel(ApprovalAnswer.Approved));
+        var (gate, _) = Build(new ScriptedChannel(ApprovalAnswer.ApprovedOnce));
         using var owned = gate;
 
-        Assert.Equal(ApprovalAnswer.Approved, await owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken));
-    }
-
-    /// <summary>
-    /// Always for keeps the one slot for the confirmation that follows it: nothing else is put in front of
-    /// the person between them, the confirmation is asked in it, and only giving it back frees it. A
-    /// prompt that offered no Always for keeps nothing.
-    /// </summary>
-    [Fact]
-    public async Task AlwaysFor_KeepsTheSlotForItsConfirmation_UntilItIsGivenBack()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var channel = new FakeChannel { Answer = ApprovalAnswer.AlwaysForProject, AccessAnswer = ApprovalAnswer.ApprovedOnce };
-        var (gate, _) = Build(channel);
-        using var owned = gate;
-        var change = new AccessChangePrompt
-        {
-            Agent = "claude-code",
-            Gains = ["billing:dev: Automatic"],
-            Origin = AccessOrigin.Prompt,
-            Reason = string.Empty,
-            ReasonWasTruncated = false,
-            ReasonWasAltered = false,
-        };
-
-        var (answer, kept) = await owned.AskKeepingAsync("k", Prompt() with { AlwaysFor = AgentAccessBuilders.Scope("billing:dev") }, token);
-
-        Assert.Equal(ApprovalAnswer.AlwaysForProject, answer);
-        Assert.NotNull(kept);
-        Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("other", Prompt(), token));
-        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync([], change, coolUnanswered: false, kept, token));
-        Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("other", Prompt(), token));
-
-        kept.Dispose();
-        kept.Dispose();
-
-        var (offeredNone, keptNone) = await owned.AskKeepingAsync("other", Prompt(), token);
-
-        Assert.Equal(ApprovalAnswer.AlwaysForProject, offeredNone);
-        Assert.Null(keptNone);
-        Assert.Equal(2, channel.Asked);
-        Assert.Equal(ApprovalAnswer.AlwaysForProject, await owned.AskAsync("again", Prompt(), token));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -89,7 +48,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task NoAnswerBeforeTheWindowCloses_IsADenial()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, clock) = Build(channel);
         using var owned = gate;
 
@@ -134,7 +93,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task ADeadlinePassed_IsADenialEvenIfTheChannelSaysYes()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true, IgnoreWithdrawal = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true, IgnoreWithdrawal = true };
         var (gate, clock) = Build(channel);
         using var owned = gate;
 
@@ -150,7 +109,7 @@ public sealed class ApprovalGateTests
         var answer = await asking;
 
         Assert.Equal(ApprovalAnswer.TimedOut, answer);
-        Assert.NotEqual(ApprovalAnswer.Approved, answer);
+        Assert.NotEqual(ApprovalAnswer.ApprovedOnce, answer);
     }
 
     /// <summary>
@@ -170,7 +129,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task ACallerThatGivesUp_IsCancelledRatherThanDenied()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, _) = Build(channel);
         using var owned = gate;
 
@@ -189,7 +148,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task ARequestArrivingCancelled_IsNeverShownToAnybody()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved);
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
         var (gate, _) = Build(channel);
         using var owned = gate;
 
@@ -208,7 +167,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, _) = Build(channel);
         using var owned = gate;
 
@@ -229,12 +188,12 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task OnceTheFirstIsAnswered_TheNextRequestIsAskedNormally()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved);
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
         var (gate, _) = Build(channel);
         using var owned = gate;
 
-        Assert.Equal(ApprovalAnswer.Approved, await owned.AskAsync("a", Prompt(), TestContext.Current.CancellationToken));
-        Assert.Equal(ApprovalAnswer.Approved, await owned.AskAsync("b", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("a", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("b", Prompt(), TestContext.Current.CancellationToken));
         Assert.Equal(2, channel.Asked);
     }
 
@@ -310,13 +269,13 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task AnApprovalStartsNoCooldown()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved);
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
         var (gate, _) = Build(channel);
         using var owned = gate;
 
         await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(ApprovalAnswer.Approved, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -331,7 +290,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task TheRequestBeingAsked_IsWaiting_WithItsWindowCountingDown_UntilItIsAnswered()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, clock) = Build(channel);
         using var owned = gate;
 
@@ -349,14 +308,14 @@ public sealed class ApprovalGateTests
 
         channel.Release();
 
-        Assert.Equal(ApprovalAnswer.Approved, await asking);
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await asking);
         Assert.Null(owned.Waiting);
     }
 
     [Fact]
     public async Task ARequestTheWindowClosedOn_IsNoLongerWaiting()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, clock) = Build(channel);
         using var owned = gate;
 
@@ -372,7 +331,7 @@ public sealed class ApprovalGateTests
     [Fact]
     public async Task AWithdrawnRequest_IsNoLongerWaiting_AndOneRefusedAsBusyWasNeverListed()
     {
-        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
         var (gate, _) = Build(channel);
         using var owned = gate;
         using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -380,7 +339,7 @@ public sealed class ApprovalGateTests
         var asking = owned.AskAsync("k", Prompt(), withdraw.Token).AsTask();
         await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
 
-        var other = ApprovalPrompt.For("other", new EntryName("env/dev", "OTHER"), "password", "x", 300);
+        var other = ApprovalPrompt.For("other", new EntryName("env/dev", "OTHER"), "password", "x");
         Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("k2", other, TestContext.Current.CancellationToken));
         Assert.Equal(Prompt(), owned.Waiting!.Prompt);
 
@@ -457,10 +416,9 @@ public sealed class ApprovalGateTests
     [InlineData(ApprovalAnswer.Busy)]
     [InlineData(ApprovalAnswer.Cooldown)]
     [InlineData(ApprovalAnswer.Failed)]
-    public void OnlyTheTwoAllowAnswers_Release(ApprovalAnswer answer)
+    public void OnlyAllowOnce_Releases(ApprovalAnswer answer)
     {
         Assert.False(answer.Releases());
-        Assert.True(ApprovalAnswer.Approved.Releases());
         Assert.True(ApprovalAnswer.ApprovedOnce.Releases());
     }
 

@@ -3,8 +3,6 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
-using Keypaste.Core.Audit;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -215,44 +213,6 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.NotNull(detail.RenamedFieldProblem);
         Assert.True(detail.IsRenamingField);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
-    }
-
-    /// <summary>
-    /// The Environments card lists each environment the item's own tags put it in, saying "approval
-    /// required" where no agent gets the item without a person's answer, which a protected environment
-    /// always is (D-0441, D-0371); an item in no project has no card.
-    /// </summary>
-    [Fact]
-    public void The_environments_card_says_where_approval_is_required()
-    {
-        using (var vault = Vault.Open(_vaultPath, _master))
-        {
-            Assert.True(ProjectScope.TryCreate("billing", "staging", out var staging, out var error), error);
-            Assert.Equal(
-                AgentAccessWrite.Written,
-                new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Projects = [new ProjectAccess(staging, AgentMode.Automatic)] }));
-            vault.Save();
-        }
-
-        using var context = new Context(_vaultPath, _directory);
-        var detail = context.Open(_checking);
-
-        Assert.False(detail.ShowsEnvironments);
-
-        detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Press();
-        detail.ConfirmTagChangeCommand.Press();
-
-        var staged = Assert.Single(detail.Environments);
-        Assert.True(detail.ShowsEnvironments);
-        Assert.Equal(("billing · staging", "set", false), (staged.Label, staged.Status, staged.RequiresApproval));
-
-        detail.DraftTag = "env:billing:prod";
-        detail.AddTagCommand.Press();
-        detail.ConfirmTagChangeCommand.Press();
-
-        Assert.Equal(["billing · prod", "billing · staging"], detail.Environments.Select(row => row.Label).Order(StringComparer.Ordinal));
-        Assert.All(detail.Environments, row => Assert.Equal("approval required", row.Status));
     }
 
     [Fact]
@@ -481,46 +441,6 @@ public sealed class EntryFieldsTests : IDisposable
     {
         using var vault = Vault.Open(_vaultPath, _master);
         return vault.Tags(_checking)!;
-    }
-
-    /// <summary>
-    /// A tag change that would let an agent set to Automatic there get the entry without asking says so
-    /// on the change, among what it reaches; it is confirmed like any other. With this computer's
-    /// <c>clients.toml</c> unreadable it names the agent the vault's settings would release it to once
-    /// the file reads again.
-    /// </summary>
-    [Theory]
-    [InlineData(null, "Automatic: claude-code would get Banking/Checking without asking, each release recorded in history.")]
-    [InlineData("this is not a clients file\n", "Automatic: by the vault's settings, claude-code would get Banking/Checking without asking, each release recorded in history, once this computer's clients.toml can be read again; until then every agent request is refused.")]
-    public void A_project_tag_change_names_an_agent_it_would_let_get_the_entry_without_asking(string? clients, string said)
-    {
-        if (clients is not null)
-        {
-            File.WriteAllText(KeypasteHome.ClientsPath(_directory), clients);
-        }
-
-        using (var vault = Vault.Open(_vaultPath, _master))
-        {
-            Assert.True(ProjectScope.TryCreate("billing", "staging", out var staging, out var error), error);
-            Assert.Equal(
-                AgentAccessWrite.Written,
-                new AgentAccessStore(vault).Write(
-                    "claude-code",
-                    AgentAccess.Defaults with { Projects = [new ProjectAccess(staging, AgentMode.Automatic)] }));
-            vault.Save();
-        }
-
-        using var context = new Context(_vaultPath, _directory);
-        var detail = context.Open(_checking);
-
-        detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Press();
-
-        Assert.True(detail.IsConfirmingTagChange);
-        Assert.Equal(said, detail.TagChangeLines[^1]);
-
-        detail.ConfirmTagChangeCommand.Press();
-        Assert.Contains("env:billing:staging", Tags());
     }
 
     private sealed class Context : IDisposable

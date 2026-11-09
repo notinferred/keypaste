@@ -198,7 +198,7 @@ public sealed class ContextMenuTests
         var row = Container(shell.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.ItemsSource == trash.Rows), trash.Rows.Single());
 
         var menu = RightClick(shell.Window, row);
-        Assert.Equal(["Restore", "Restore as another name", "-", "Delete for good", "Empty Trash"], Headers(menu));
+        Assert.Equal(["Restore", "-", "Delete for good", "Empty Trash"], Headers(menu));
         menu.Hide();
 
         Choose(FromTheKeyboard(shell.Window, row, PhysicalKey.ContextMenu, RawInputModifiers.None), "Restore");
@@ -292,7 +292,9 @@ public sealed class ContextMenuTests
         agents.Model.DisconnectCommand.Press(claude);
         await agents.Model.Opening;
         WindowInput.Drain();
-        var whilePaneIsOpen = RightClick(agents.Window, card);
+
+        // On its name, since the middle of an open card is one of the pane's own controls.
+        var whilePaneIsOpen = RightClick(agents.Window, card.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == claude.Title));
         Assert.False(Item(whilePaneIsOpen, "Disconnect…").IsEffectivelyEnabled);
         whilePaneIsOpen.Hide();
     });

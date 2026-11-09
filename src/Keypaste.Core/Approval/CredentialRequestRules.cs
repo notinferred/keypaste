@@ -20,9 +20,16 @@ public static class CredentialRequestRules
     /// <param name="entry">The entry, handle or path.</param>
     /// <param name="field">The field asked for.</param>
     /// <param name="reason">The agent's reason.</param>
-    /// <param name="ttlSeconds">The lifetime asked for.</param>
     /// <returns>The argument and its rule, or null when the request is well formed.</returns>
-    public static CredentialRequestProblem? Check(string entry, string field, string reason, int ttlSeconds)
+    public static CredentialRequestProblem? Check(string entry, string field, string reason) => Check(entry, field, null, reason);
+
+    /// <summary>Checks a request's arguments, an attachment's name among them.</summary>
+    /// <param name="entry">The <c>entry</c> argument.</param>
+    /// <param name="field">The <c>field</c> argument.</param>
+    /// <param name="attachment">The attachment's name, which a request for <see cref="CredentialFields.Attachment"/> needs and no other may give.</param>
+    /// <param name="reason">The <c>reason</c> argument.</param>
+    /// <returns>The first problem, or null.</returns>
+    public static CredentialRequestProblem? Check(string entry, string field, string? attachment, string reason)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(field);
@@ -38,16 +45,16 @@ public static class CredentialRequestRules
             return new("field", $"must be {CredentialFields.RequestRule}");
         }
 
+        if (string.Equals(field, CredentialFields.Attachment, StringComparison.Ordinal)
+            ? attachment is not { Length: > 0 and <= MaximumEntryLength }
+            : attachment is not null)
+        {
+            return new("name", string.Equals(field, CredentialFields.Attachment, StringComparison.Ordinal) ? Length(MaximumEntryLength) : "is given only for an attachment");
+        }
+
         if (reason.Length is 0 or > MaximumReasonLength)
         {
             return new("reason", Length(MaximumReasonLength));
-        }
-
-        if (ttlSeconds is < 1 or > ApprovalLimits.MaximumRequestableTtlSeconds)
-        {
-            return new(
-                "ttl_seconds",
-                string.Create(CultureInfo.InvariantCulture, $"must be between 1 and {ApprovalLimits.MaximumRequestableTtlSeconds}"));
         }
 
         return null;

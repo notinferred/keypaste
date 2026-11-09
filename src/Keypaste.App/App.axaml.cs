@@ -135,7 +135,13 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected, OpenBrowserFill, requestNotices),
+            () => new WindowApprovalChannel(
+                TimeProvider.System,
+                ApprovalLimits.Default.Window,
+                Unexpected,
+                OpenBrowserFill,
+                requestNotices,
+                () => _window is { } window ? Clipboards(window) : NoClipboard.Instance),
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
             Unexpected);
 
@@ -311,7 +317,7 @@ internal sealed partial class App : Application, IDisposable
         _window.Activate();
     }
 
-    /// <summary>Shows the window on Agents with one agent's settings open, as the Always for notice asks.</summary>
+    /// <summary>Shows the window on Agents with one agent's settings open, as the Always allow notice asks.</summary>
     /// <param name="agent">The agent's name.</param>
     internal void OpenAgentSettings(string agent)
     {

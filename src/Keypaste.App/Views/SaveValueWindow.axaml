@@ -1,0 +1,112 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    xmlns:res="using:Keypaste.App.Resources"
+                    x:Class="Keypaste.App.Views.SaveValueWindow"
+                    x:DataType="vm:SaveValueViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: an agent asks you to save a value"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Every block has a fixed height, so nothing the agent writes can move the place, the value or the
+       buttons (THREATS.md T-2). The reason is one plain TextBlock in a box that scrolls, and no button is
+       the default: Enter saves nothing, and Escape cancels. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title size-16" Text="{Binding Client}"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="prompt-title size-16" Text=" asks you to save a value" />
+          </Grid>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="prompt-sub size-13" Text="via MCP · label " />
+            <TextBlock Name="LabelText" Classes="prompt-sub size-13" Text="{Binding Label}"
+                       MaxWidth="200" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call size-12" Padding="12,8">
+        <StackPanel>
+          <TextBlock Text="tool: keypaste.request_save" />
+          <TextBlock Name="WhereText" Classes="value" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Name="FieldText" Classes="caption" Text="{Binding Field}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Classes="caption" Text="you enter it; the agent is not given it" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <ctl:MaskedInput x:Name="ValueInput" Grid.Column="0" AllowsPaste="True"
+                           Sink="{Binding Value}" MaskedLength="{Binding Value.MaskedLength}"
+                           AutomationProperties.Name="{x:Static res:Strings.TheValueToSave}" />
+          <Button Grid.Column="1" Name="Generate" Classes="prompt" Content="Password" Command="{Binding GenerateCommand}"
+                  ToolTip.Tip="Generate a password" />
+          <Button Grid.Column="2" Name="GeneratePassphrase" Classes="prompt" Content="Passphrase" Command="{Binding GeneratePassphraseCommand}"
+                  ToolTip.Tip="Generate a passphrase" />
+        </Grid>
+        <TextBlock Name="ValueNote" Height="18" Classes="size-13" Text="{Binding Value.Note}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="The agent says it needs this because" />
+        <Border Classes="prompt-reason" Height="77">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,8" Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
+                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
+                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding Attribution}" />
+      </StackPanel>
+
+      <!-- The placement and the replace confirmation keep their place whether the prompt replaces a value or not. -->
+      <StackPanel Spacing="6" Height="52">
+        <TextBlock Name="PlacementText" Classes="prompt-note size-13" Text="{Binding Placement}" TextTrimming="CharacterEllipsis" />
+        <CheckBox Name="ConfirmReplace" IsVisible="{Binding Replaces}" IsChecked="{Binding ConfirmsReplace}"
+                  Content="Replace the value it holds" />
+      </StackPanel>
+
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Cancel"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Save"
+                Command="{Binding AllowOnceCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

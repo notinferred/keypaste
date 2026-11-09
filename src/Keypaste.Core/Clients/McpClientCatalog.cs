@@ -161,11 +161,7 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// </param>
 /// <param name="AuditLogPath">The log for <c>--audit-log</c>, or null for the one under the bridge's own home.</param>
 /// <param name="ApproverName">The pipe for <c>--approver</c>, or null for the one the bridge derives.</param>
-/// <param name="ClientsPath">
-/// This computer's ceilings for <c>--clients</c>, which the bridge lowers for an agent's own narrowing while nothing
-/// holds the vault, or null for the ones under the bridge's own home.
-/// </param>
-public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, string? ApproverName, string? ClientsPath = null)
+public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, string? ApproverName)
 {
     /// <summary>Nothing pinned: the bridge follows the chosen vault, under the home it resolves.</summary>
     public static McpServerPins None { get; } = new(VaultPath: null, AuditLogPath: null, ApproverName: null);
@@ -176,14 +172,12 @@ public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, stri
 /// </summary>
 /// <remarks>
 /// The bridge is registered with <c>--allow-run</c> and, unless the person narrowed it, <see cref="WideExposure"/>,
-/// because what an agent sees, receives and runs is decided by its settings, which the owner applies to every
-/// request: an agent with none sees every project's variables, is given a value only when the person allows it and
-/// runs nothing.
+/// because what an agent receives and runs is decided by this computer's rules, which the owner applies to every
+/// request: by default each value is asked about and nothing runs.
 /// </remarks>
 /// <param name="Server">How to start <c>keypaste mcp</c>.</param>
 /// <param name="VaultPath">The absolute vault the bridge is pinned to with <c>--vault</c>, or null for none.</param>
 /// <param name="AuditLogPath">The absolute log the bridge is pinned to with <c>--audit-log</c>, or null for none.</param>
-/// <param name="ClientsPath">The absolute ceilings file the bridge is pinned to with <c>--clients</c>, or null for none.</param>
 /// <param name="ApproverName">The pipe the bridge is pinned to with <c>--approver</c>, or null for none.</param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">The globs the bridge may name through: <see cref="WideExposure"/>, or the narrower ones the person gave.</param>
@@ -191,7 +185,6 @@ public sealed record McpServerRegistration(
     McpServerCommand Server,
     string? VaultPath,
     string? AuditLogPath,
-    string? ClientsPath,
     string? ApproverName,
     string ClientLabel,
     IReadOnlyList<string> Expose)
@@ -249,7 +242,6 @@ public sealed record McpServerRegistration(
             server,
             Absolute(pins.VaultPath),
             Absolute(pins.AuditLogPath),
-            Absolute(pins.ClientsPath),
             pins.ApproverName,
             clientLabel,
             expose.Count == 0 ? [WideExposure] : [.. expose]);
@@ -272,12 +264,6 @@ public sealed record McpServerRegistration(
         {
             line.Add("--audit-log");
             line.Add(AuditLogPath);
-        }
-
-        if (ClientsPath is not null)
-        {
-            line.Add("--clients");
-            line.Add(ClientsPath);
         }
 
         if (ApproverName is not null)

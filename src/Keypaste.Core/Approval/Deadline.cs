@@ -3,10 +3,10 @@ namespace Keypaste.Core.Approval;
 /// <summary>A moment in the future, held on both clocks so that moving either one cannot move it.</summary>
 /// <remarks>
 /// Neither clock is enough alone: the wall clock can be moved backwards by an NTP correction, which
-/// makes an expired approval usable again, and the monotonic clock does not advance across suspend on
-/// every platform, so a machine asleep for an hour wakes with a five-minute grant still live.
+/// makes an expired window usable again, and the monotonic clock does not advance across suspend on
+/// every platform, so a machine asleep for an hour wakes with a five-minute window still open.
 /// The direction is not the same for a permission and a refusal. <see cref="HasExpired"/> takes
-/// whichever clock says <em>more</em> time has passed, so both kinds of clock error end a grant early
+/// whichever clock says <em>more</em> time has passed, so both kinds of clock error end a window early
 /// and the worst that costs is one more prompt. <see cref="StillInForce"/> takes whichever says
 /// <em>less</em>, because a cooldown is a person's "no" and ending it early is the fail-open
 /// direction there. One "elapsed" would have to be wrong for one of them.

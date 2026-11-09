@@ -290,7 +290,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         Tool = "request_credential",
         Client = new AuditClient("claude-code", "1.2.3", null),
-        Args = AuditArgs.ForCredentialRequest(entry, "password", ttlSeconds: 60, "run the migration"),
+        Args = AuditArgs.ForCredentialRequest(entry, "password", "run the migration"),
         Decision = decision,
         Method = method,
         Reason = TempAuditHome.Reason,

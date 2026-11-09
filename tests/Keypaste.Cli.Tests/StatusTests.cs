@@ -201,7 +201,7 @@ public sealed class StatusTests : IDisposable
         _harness.ProcessRunner.Says[old] = "0.0.1\n";
         Register(McpConfigLocation.Cursor, old, "mcp");
         Register(McpConfigLocation.ClaudeCode, This, "mcp", "--client-label", "claude-code");
-        File.WriteAllText(KeypasteHome.ClientsPath(Home), "this is not toml\n");
+        File.WriteAllText(KeypasteHome.AgentsPath(Home), "this is not toml\n");
 
         _harness.Prompt.Interactive = true;
         var before = Snapshot(_harness.Directory);

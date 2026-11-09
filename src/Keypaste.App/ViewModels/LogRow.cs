@@ -1,7 +1,6 @@
 using System.Globalization;
 using Keypaste.App.Globalization;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
 using Keypaste.Core.Tokens;
@@ -246,6 +245,8 @@ internal sealed record LogRow
                 var seconds => $"Approved {Span(seconds.Value)}",
             }, LogTone.Ok),
             "automatic" => ("Automatic", LogTone.Ok),
+            "automatic-commands" => ("Automatic with commands", LogTone.Ok),
+            "always-allowed" => ("Always", LogTone.Ok),
             // Released by a policy.toml rule, in a line written before agents had modes.
             "policy" => ("By rule", LogTone.Ok),
             "narrowing" => ("Narrowed", LogTone.Muted),
@@ -267,10 +268,9 @@ internal sealed record LogRow
             lines.Add(UnverifiedWords);
         }
 
-        // A settings change's reason is keypaste's own words, whose end the log keeps in UTC, shown here as every other place shows it.
         if (entry.Reason.Length > 0)
         {
-            lines.Add(Is(entry.Tool, "access_change") ? UntilTime.OnThisClock(entry.Reason, zone) : entry.Reason);
+            lines.Add(entry.Reason);
         }
 
         if (entry.Command.Length > 0)

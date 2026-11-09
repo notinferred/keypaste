@@ -76,51 +76,6 @@
           </Border>
         </StackPanel>
 
-        <StackPanel Spacing="8" IsVisible="{Binding IsAvailable}">
-          <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="hourglass" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.Allowances}" VerticalAlignment="Center" />
-            <Button Grid.Column="2" Name="EndAllAllowances" Classes="sm size-12" Content="{x:Static res:Strings.EndAll}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                    IsVisible="{Binding OffersEndAll}" Command="{Binding AskEndAllCommand}"
-                    AutomationProperties.Name="{x:Static res:Strings.EndAllAllowances}" />
-          </Grid>
-          <Border Name="EndAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingEndAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelEndAllCommand}">
-            <StackPanel Spacing="8">
-              <TextBlock Text="{x:Static res:Strings.EndEveryAllowanceTheNextRequestAsksAgain}" TextWrapping="Wrap" Classes="primary size-13" />
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Name="CancelEndAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelEndAllCommand}" />
-                <Button Name="ConfirmEndAll" Classes="danger sm" Content="{x:Static res:Strings.EndAllAllowances}" Command="{Binding EndAllCommand}" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-          <TextBlock Classes="caption" IsVisible="{Binding NoGrants}"
-                     Text="{x:Static res:Strings.NoAllowanceIsInForceSoTheX69bc1f}" />
-          <Border Classes="table" IsVisible="{Binding HasGrants}">
-            <ItemsControl ItemsSource="{Binding Grants}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ActivityRow">
-                  <Border Padding="16,12" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="*,150,Auto" ColumnSpacing="16">
-                      <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono secondary size-12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
-                      </StackPanel>
-                      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Classes="label secondary" Text="{Binding LeftText}" />
-                        <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
-                      </StackPanel>
-                      <Button Grid.Column="2" Name="EndAllowance" Classes="sm size-12" Content="{x:Static res:Strings.End}" VerticalAlignment="Center"
-                              Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).EndCommand}"
-                              CommandParameter="{Binding}"
-                              AutomationProperties.Name="{Binding EndName}" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </Border>
-        </StackPanel>
-
         <!-- The AI tools found on this computer and the agents of this vault, each with its settings.
              Names are what agents say about themselves and the names their connections were given: display
              only (T-3, T-36). -->
@@ -140,10 +95,9 @@
           </StackPanel>
           <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
           <Border IsVisible="{Binding HasClientsProblem}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
               <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
               <TextBlock Grid.Column="1" Name="ClientsProblemText" Classes="body secondary" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
-              <Button Grid.Column="2" Name="ResetClients" Content="{x:Static res:Strings.ResetClientsToml}" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
             </Grid>
           </Border>
           <Border Classes="table">

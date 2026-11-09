@@ -114,7 +114,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
     await_replies "${WAIT_SECONDS:-30}" "$OUT" 2 || true
     if [ "${3:-}" != "--list-only" ]; then
-      printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}"
+      printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\"}}}"
       await_replies "${WAIT_SECONDS:-30}" "$OUT" 3 || true
     fi
   } | "$CLI" mcp --vault "${ASK_VAULT:-$VAULT}" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
@@ -158,7 +158,7 @@ start_request() {
   exec 8> >(exec 7>&- 9>&-; exec "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}" >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\"}}}" >&8
 }
 
 # Waits for the waiting request's reply, which must be a denial with no value, then lets the bridge go.

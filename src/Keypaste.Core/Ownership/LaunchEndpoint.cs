@@ -19,7 +19,7 @@ namespace Keypaste.Core.Ownership;
 /// unlock, which refuses its pass and records it.
 /// </para>
 /// <para>
-/// Any other kind of request ends its connection unanswered, so nothing here lists, releases, grants or
+/// Any other kind of request ends its connection unanswered, so nothing here lists, releases or
 /// locks for an agent, and an env request without a pass is refused unasked and recorded. An attachment
 /// here names no client, so a bridge that reaches it is not shown as connected.
 /// </para>

@@ -38,9 +38,9 @@ Giving an agent a plaintext `.env` exposes all credentials in that file without 
 
 An agent cannot even name an entry you did not expose. In `v0.3.0` the default is the `env/` subtree and nothing else, and widening it takes a glob you typed into your own client config. In source, an agent sees every project's variables, the env-named fields of entries tagged into a project, until you change its settings, and widening them takes your confirmation where the vault is unlocked; a glob in the client config can only narrow them.
 
-The approver resolves the entry, rechecks what the agent can see, considers a live grant and recent refusal, then releases without asking if you set that agent to Automatic for the entry, or prompts. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
+The approver resolves the entry, rechecks what the agent can see, considers a recent refusal, then releases or refuses without asking if you allowed or blocked that kind of value for every agent, or prompts. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
 
-In source, Allow once releases one field and keeps nothing; Allow for 1 hour also lets the same connection receive that field again without a prompt until the grant ends or the connection closes. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
+In source, Allow once releases one field and keeps nothing. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
 
 ## What it looks like
 
@@ -59,9 +59,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
-      released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
 One keystroke later the deploy runs, and the exchange is two lines you can read back:
@@ -74,7 +72,7 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`exposure` records a listing of what the agent can see; `prompt` records a request a person reviewed, and `automatic` one released without asking because you set that agent to Automatic. [The demo](demo.md) shows the flow in about sixty seconds.
+`exposure` records a listing of what the agent can see; `prompt` records a request a person reviewed, and `allowed` one released without asking because you allowed that kind of value. [The demo](demo.md) shows the flow in about sixty seconds.
 
 ## Moving from another KeePass file
 
@@ -95,9 +93,9 @@ Each top-level group lands under `--into`, which defaults to the file's name. In
 
 ## Limits
 
-`request_credential` returns the credential as text and structured data. A client may send those results to a remote model, retain them in its session file and put the value on a command line. TTL bounds cached approval reuse; it cannot erase those copies or revoke the credential at its provider. The local audit records the release, not every later use.
+`request_credential` returns the credential as text and structured data. A client may send those results to a remote model, retain them in its session file and put the value on a command line. keypaste cannot erase those copies or revoke the credential at its provider. The local audit records the release, not every later use.
 
-keypaste removes control characters from the reason, caps its length and labels its author, but cannot verify the claim. An agent set to Automatic gets what it can see there without human review, and in `v0.3.0` so do the fields a policy rule matches. Anyone who can write the audit file can recompute its hash chain. A hostile process running as your user is outside these protections.
+keypaste removes control characters from the reason, caps its length and labels its author, but cannot verify the claim. A kind of value you allowed reaches every agent without human review, and in `v0.3.0` so do the fields a policy rule matches. Anyone who can write the audit file can recompute its hash chain. A hostile process running as your user is outside these protections.
 
 <a id="the-stance"></a>
 
@@ -105,4 +103,4 @@ keypaste removes control characters from the reason, caps its length and labels 
 
 The local vault works without an account or network and opens in KeePassXC. A permanent CI gate checks compatibility in both directions against a real `keepassxc-cli` on all three operating systems. The source is licensed under AGPL-3.0.
 
-It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals with bounded reuse or settings you confirmed, and a local audit. In source, the desktop app and `keypaste approve` share one owner per vault: the app asks about each agent request in its own window, launches projects through the same session, and one lock ends it; the published `v0.3.0` predates this. [ROADMAP](../ROADMAP.md) has what comes next and [BACKLOG](BACKLOG.md) the optional ideas.
+It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals or settings you confirmed, and a local audit. In source, the desktop app and `keypaste approve` share one owner per vault: the app asks about each agent request in its own window, launches projects through the same session, and one lock ends it; the published `v0.3.0` predates this. [ROADMAP](../ROADMAP.md) has what comes next and [BACKLOG](BACKLOG.md) the optional ideas.

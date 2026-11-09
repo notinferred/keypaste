@@ -1,7 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Editing;
-using Keypaste.Core.Ipc;
 
 namespace Keypaste.App.Session;
 
@@ -135,6 +133,24 @@ internal sealed class AppAuthority : IDisposable
 
     internal ApproverActivity Activity => _host.Activity;
 
+    /// <summary>The rules agents are decided by here, and why the file's are ignored when they are.</summary>
+    /// <param name="rules">The rules, when this app answers agents and the file could be read.</param>
+    /// <param name="ignored">Why the file's rules are ignored and the defaults hold, or null.</param>
+    /// <returns>Whether they were read.</returns>
+    internal bool TryRules([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Core.Agents.AgentRules? rules, out string? ignored) =>
+        _host.TryRules(out rules, out ignored);
+
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    internal string? ItemShown(string item) => _host.ItemShown(item);
+
+    /// <summary>Changes this computer's agent rules, sealed with the vault's key and recorded.</summary>
+    /// <param name="agent">The agent the change is about.</param>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <returns>Whether it was made, and keypaste's words.</returns>
+    internal Core.Ipc.RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change) => _host.ChangeRules(agent, change);
+
     /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
     internal DateTimeOffset? PairingArmedUntil => _host.PairingArmedUntil;
 
@@ -153,10 +169,6 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was removed, and why not.</returns>
     internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
 
-    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    internal void Revoke(GrantKey key) => _host.Revoke(key);
-
     /// <summary>The MCP clients attached to the live session, as they describe themselves (display only).</summary>
     internal IReadOnlyList<Core.Clients.ConnectedClient> Clients => _host.Clients;
 
@@ -173,51 +185,6 @@ internal sealed class AppAuthority : IDisposable
 
     /// <summary>Whether a prompt waits for the person's answer on screen; called on the UI thread.</summary>
     internal bool IsAsking => _host.IsAsking;
-
-    /// <summary>Ends every grant given to a bridge started with this label, as a stricter ceiling for it does.</summary>
-    /// <param name="label">The raw label.</param>
-    internal void RevokeClient(string label) => _host.RevokeClient(label);
-
-    /// <summary>What applies to an agent's requests now, or null when nothing here answers or its settings cannot be read.</summary>
-    /// <param name="label">The bridge's raw label, or null.</param>
-    /// <returns>What applies, or null.</returns>
-    internal Core.Agents.EffectiveAccess? Access(string? label) => _host.Access(label);
-
-    /// <summary>One agent's settings as the person's own screen shows them: what the vault says and what this computer holds back.</summary>
-    /// <param name="agent">The agent's name, or <c>*</c>.</param>
-    /// <param name="settings">Its settings, when they could be read.</param>
-    /// <param name="problem">Why not, otherwise empty.</param>
-    /// <returns>Whether they were read; never while nothing here answers agents.</returns>
-    internal bool TrySettings(string agent, [NotNullWhen(true)] out Core.Agents.AgentSettingsState? settings, out string problem) =>
-        _host.TrySettings(agent, out settings, out problem);
-
-    /// <summary>
-    /// Changes an agent's settings for the person at this app: at once when it gives the agent nothing
-    /// more, otherwise once they confirm it in the prompt window, as any change that gives more is.
-    /// </summary>
-    /// <param name="agent">The agent's name, or <c>*</c>.</param>
-    /// <param name="edit">The change.</param>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
-    /// <returns>What became of it, recorded in the audit log before it returns.</returns>
-    internal ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, Core.Agents.AccessEdit edit, CancellationToken cancellationToken) =>
-        _host.ChangeAccessAsync(agent, edit, cancellationToken);
-
-    /// <summary>Resets this computer's ceilings, which keypaste cannot read, once the person confirms what each agent then gets; recorded as keypaste app.</summary>
-    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws the confirmation.</param>
-    /// <returns>What became of it.</returns>
-    internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken) =>
-        _host.ResetCapsAsync(cancellationToken);
-
-    /// <summary>Ends every grant this session has given.</summary>
-    internal void RevokeAll() => _host.RevokeAll();
-
-    /// <summary>The grants in force with the ids <c>keypaste grants</c> shows, never a value.</summary>
-    internal IReadOnlyList<GrantSummary> Grants() => _host.Grants();
-
-    /// <summary>Ends the grant with this id.</summary>
-    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
-    /// <returns>Whether a grant with that id was in force.</returns>
-    internal bool Revoke(string id) => _host.Revoke(id);
 
     /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>

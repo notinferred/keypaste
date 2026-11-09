@@ -13,6 +13,7 @@ namespace Keypaste.Core.Import;
 internal sealed class BitwardenJsonReader : IExportReader
 {
     private const int _login = 1;
+    private const int _card = 3;
     private const int _identity = 4;
     private const int _textField = 0;
     private const int _booleanField = 2;
@@ -55,7 +56,7 @@ internal sealed class BitwardenJsonReader : IExportReader
     [
         new(_login, "login", [], ["uris", "username", "password", "totp", "fido2Credentials"]),
         new(2, "secureNote", [], ["type"]),
-        new(3, "card",
+        new(_card, "card",
         [
             new("cardholderName", "Cardholder name"), new("brand", "Brand"), new("number", "Number", Protect: true),
             new("expMonth", "Expiration month"), new("expYear", "Expiration year"), new("code", "Security code", Protect: true),
@@ -275,6 +276,12 @@ internal sealed class BitwardenJsonReader : IExportReader
         if (Present(element, "archivedDate"))
         {
             tags.Add(_archivedTag);
+        }
+
+        // The tag 1Password's import writes too, which makes the item's protected fields card or identity values for agents.
+        if (type.Number is _card or _identity)
+        {
+            tags.Add(type.Number == _card ? Agents.FieldCategories.CardTag : Agents.FieldCategories.IdentityTag);
         }
 
         return new ExportItem

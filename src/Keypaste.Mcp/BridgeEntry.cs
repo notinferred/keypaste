@@ -99,13 +99,16 @@ public static class BridgeEntry
             ToolCollection = [],
         };
 
-        // Registered explicitly rather than by scanning the assembly: three tools is the whole
-        // surface, and run a fourth only when the person started this bridge with --allow-run, so
+        // Registered explicitly rather than by scanning the assembly: these are the whole
+        // surface, and run another only when the person started this bridge with --allow-run, so
         // no existing configuration gains command execution on upgrade (D-0358).
         serverOptions.ToolCollection.Add(
             new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
-        serverOptions.ToolCollection.Add(new RequestAccessChangeTool(options, approver, audit, TimeProvider.System));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit, attachments: true));
+
+        // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one (F.79).
+        serverOptions.ToolCollection.Add(new SaveValueTool(options, approver, audit));
 
         if (options.AllowRun)
         {

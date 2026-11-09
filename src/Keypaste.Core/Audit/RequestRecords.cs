@@ -29,6 +29,9 @@ public static class AuditTools
 
     /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused (D-0637).</summary>
     public const string Browser = "browser";
+
+    /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
+    public const string Save = "request_save";
 }
 
 /// <summary>What a browser's line is about, written as its field.</summary>
@@ -55,6 +58,9 @@ public static class RequestRecords
 {
     /// <summary>The client a <c>keypaste run --session</c> request is recorded under.</summary>
     public const string SessionRunner = "keypaste run --session";
+
+    /// <summary>Who a change to this computer's agent rules from a terminal is recorded as made by.</summary>
+    public const string RulesClient = "keypaste clients";
 
     /// <summary>The line for a listing of entry names.</summary>
     /// <param name="client">Who asked.</param>
@@ -106,42 +112,49 @@ public static class RequestRecords
         string? vault) =>
         Listing(client, AuditDecision.Granted, AuditMethod.Exposure, Invariant($"listed {count} item names"), exposure, session, vault);
 
+    /// <summary>A credential line's reason, naming the attachment a request asked for, since the line's field says only <c>attachment</c>.</summary>
+    /// <param name="attachment">The attachment's name, or null for a field.</param>
+    /// <param name="reason">keypaste's own reason.</param>
+    /// <returns>The reason, with the attachment's scrubbed name when there is one.</returns>
+    public static string Naming(string? attachment, string reason) =>
+        attachment is null ? reason : $"{reason}; attachment {EntryNameSanitizer.Sanitize(attachment, _attachmentLength).Text}";
+
+    private const int _attachmentLength = 128;
+
     /// <summary>The line for a request for one field of one entry.</summary>
     /// <param name="client">Who asked.</param>
     /// <param name="entry">The <c>entry</c> argument as the agent wrote it.</param>
     /// <param name="field">The <c>field</c> argument as the agent wrote it, <c>totp</c> for a TOTP code; one a request may not name is recorded as <c>invalid</c>.</param>
-    /// <param name="ttlSeconds">The lifetime the agent asked for, or <c>-1</c> when it was missing or unusable.</param>
     /// <param name="statedReason">The agent's stated reason, verbatim.</param>
     /// <param name="decision">Whether the field was released.</param>
     /// <param name="method">How that was decided.</param>
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
     /// <param name="resolvedEntry">The entry the owner resolved the argument to, or null when it got no further.</param>
-    /// <param name="grantedSeconds">How long the release stays granted; kept only on a grant.</param>
     /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
     /// <param name="session">The unlocked session that answered, or null.</param>
     /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <param name="item">The UUID, as hex, of the one item the owner decided about, which tells it from another of its name; null when it reached none.</param>
     /// <returns>The record to append.</returns>
     public static AuditRecord Credential(
         AuditClient client,
         string entry,
         string field,
-        int ttlSeconds,
         string statedReason,
         AuditDecision decision,
         AuditMethod method,
         string reason,
         string? resolvedEntry,
-        int? grantedSeconds,
         IReadOnlyList<string> exposure,
         string? session,
-        string? vault)
+        string? vault,
+        string? item = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(reason);
         ArgumentNullException.ThrowIfNull(exposure);
 
-        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? field : null, ttlSeconds, statedReason);
+        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? EntryNameSanitizer.Sanitize(field, CredentialFields.MaximumFieldLength).Text : null, statedReason);
 
         // The agent is told to prefer a handle, so the argument is usually an opaque k1_… that
         // answers nothing a reader of the log asks; the name it resolved to does.
@@ -151,6 +164,7 @@ public static class RequestRecords
             {
                 Entry = EntryNameSanitizer.SanitizePath(resolvedEntry, maximumLength: AuditArgs.EntryLength).Text,
                 EntryKind = EntryAddressKind.Path,
+                Item = item,
             };
         }
 
@@ -164,9 +178,25 @@ public static class RequestRecords
             Reason = reason,
             Exposure = exposure,
             Session = session,
-            GrantedSeconds = decision == AuditDecision.Granted ? grantedSeconds : null,
             Vault = vault,
         };
+    }
+
+    /// <summary>The line for an agent's request to save a value, which names the place and never the value.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="request">Where the value goes and why.</param>
+    /// <param name="decision">Granted once it was saved.</param>
+    /// <param name="method">How it was decided.</param>
+    /// <param name="reason">keypaste's own sentence.</param>
+    /// <param name="session">The unlocked session that answered.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord Save(AuditClient client, Ipc.SaveRequest request, AuditDecision decision, AuditMethod method, string reason, string? session, string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var record = Credential(client, request.Where, request.Named, request.Reason, decision, method, reason, request.Where, request.Exposure, session, vault);
+        return record with { Tool = AuditTools.Save };
     }
 
     /// <summary>The line for an agent's request to run a command.</summary>
@@ -176,7 +206,6 @@ public static class RequestRecords
     /// <param name="decision">Whether the values were released.</param>
     /// <param name="method">How that was decided.</param>
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
-    /// <param name="grantedSeconds">How long the release stays granted; kept only on a grant.</param>
     /// <param name="entries">Each entry the run released or asked about, as <see cref="ApprovalPrompt.Shown"/> writes it, or null.</param>
     /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
     /// <param name="session">The unlocked session that answered, or null.</param>
@@ -189,7 +218,6 @@ public static class RequestRecords
         AuditDecision decision,
         AuditMethod method,
         string reason,
-        int? grantedSeconds,
         IReadOnlyList<string>? entries,
         IReadOnlyList<string> exposure,
         string? session,
@@ -215,7 +243,6 @@ public static class RequestRecords
             Reason = reason,
             Exposure = exposure,
             Session = session,
-            GrantedSeconds = decision == AuditDecision.Granted ? grantedSeconds : null,
             Vault = vault,
             Entries = entries,
             Command = shown.Length > AuditRecord.CommandLength ? shown[..(AuditRecord.CommandLength - 1)] + "…" : shown,

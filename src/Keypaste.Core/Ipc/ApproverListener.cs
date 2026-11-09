@@ -18,7 +18,7 @@ namespace Keypaste.Core.Ipc;
 /// <b>Two clients at once is the case that matters</b>, not an edge case: Claude Desktop and Claude
 /// Code each spawn their own bridge, and both may be connected to one approver. That is why
 /// connections are handled concurrently rather than one at a time, and why each gets its own
-/// connection id and its own grants.
+/// connection id.
 /// </para>
 /// <para>
 /// A connection that misbehaves — a frame that will not parse, a frame over the size limit, a peer
@@ -33,7 +33,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>At most <see cref="MaxConnections"/> are served at once</b>, and one more is closed as soon as
 /// it connects, so a process opening connections it never uses cannot exhaust the approver. Nothing
-/// closes an idle connection: a bridge waits between an agent's requests, and its grants end with it.
+/// closes an idle connection: a bridge waits between an agent's requests.
 /// </para>
 /// <para>
 /// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
@@ -239,10 +239,14 @@ public sealed class ApproverListener : IDisposable
     }
 
     /// <summary>The bound a reply to this kind of request is written under: an env set's, which only its runner reads, or one frame.</summary>
-    private static int MaximumReplyFrameBytes(ApproverMessageKind request) =>
-        request is ApproverMessageKind.EnvProfile or ApproverMessageKind.TokenEnv
-            ? ApproverProtocol.MaximumEnvReplyFrameBytes
-            : MessageFramer.MaximumFrameBytes;
+    private static int MaximumReplyFrameBytes(ApproverMessageKind request) => request switch
+    {
+        ApproverMessageKind.EnvProfile or ApproverMessageKind.TokenEnv => ApproverProtocol.MaximumEnvReplyFrameBytes,
+
+        // The encoder holds every reply but an attachment's to one frame.
+        ApproverMessageKind.Credential => ApproverProtocol.MaximumAttachmentReplyFrameBytes,
+        _ => MessageFramer.MaximumFrameBytes,
+    };
 
     /// <summary>Answers one request, withdrawing it if its peer stops waiting first.</summary>
     /// <param name="frame">The request.</param>
@@ -327,14 +331,6 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseEnvAsync(envProfile, connectionId, cancellationToken).ConfigureAwait(false));
 
-            case ApproverMessageKind.Grants when ApproverProtocol.TryDecode(frame, out GrantsRequest? grants):
-                return ApproverProtocol.Encode(
-                    await _handler.GrantsAsync(grants, connectionId, cancellationToken).ConfigureAwait(false));
-
-            case ApproverMessageKind.RevokeGrants when ApproverProtocol.TryDecode(frame, out RevokeGrantsRequest? revoke):
-                return ApproverProtocol.Encode(
-                    await _handler.RevokeGrantsAsync(revoke, connectionId, cancellationToken).ConfigureAwait(false));
-
             case ApproverMessageKind.Lock when ApproverProtocol.TryDecode(frame, out LockRequest? lockNow):
                 return ApproverProtocol.Encode(
                     await _handler.LockAsync(lockNow, connectionId, cancellationToken).ConfigureAwait(false));
@@ -347,13 +343,13 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseRunAsync(run, connectionId, cancellationToken).ConfigureAwait(false));
 
-            case ApproverMessageKind.AccessList when ApproverProtocol.TryDecode(frame, out AccessListRequest? accessList):
+            case ApproverMessageKind.RulesChange when ApproverProtocol.TryDecode(frame, out RulesChangeRequest? rulesChange):
                 return ApproverProtocol.Encode(
-                    await _handler.ListAccessAsync(accessList, connectionId, cancellationToken).ConfigureAwait(false));
+                    await _handler.ChangeRulesAsync(rulesChange, connectionId, cancellationToken).ConfigureAwait(false));
 
-            case ApproverMessageKind.AccessChange when ApproverProtocol.TryDecode(frame, out AccessChangeRequest? accessChange):
+            case ApproverMessageKind.Save when ApproverProtocol.TryDecode(frame, out SaveRequest? save):
                 return ApproverProtocol.Encode(
-                    await _handler.ChangeAccessAsync(accessChange, connectionId, cancellationToken).ConfigureAwait(false));
+                    await _handler.SaveAsync(save, connectionId, cancellationToken).ConfigureAwait(false));
 
             case ApproverMessageKind.Edit when ApproverProtocol.TryDecode(frame, out EditRequest? editRequest):
                 return ApproverProtocol.Encode(

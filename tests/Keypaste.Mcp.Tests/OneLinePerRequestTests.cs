@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
@@ -54,11 +53,8 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
             CurrentLifetime = () => _lifetime,
             UnlockedFor = asked => ReferenceEquals(asked, _lifetime) && asked.IsLive ? _vault : null,
             Channel = _person,
-            Settings = TestSession.Settings(),
-            Hourly = new HourlyLimit(TimeProvider.System),
+            Rules = TestSession.Settings(),
             Audit = () => _unwritable ? null : _log?.Log,
-            WatchEdits = _ => { },
-            UnwatchEdits = _ => { },
         });
         _serving = _server.RunAsync(_stop.Token);
 
@@ -92,7 +88,6 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
 
     /// <summary>

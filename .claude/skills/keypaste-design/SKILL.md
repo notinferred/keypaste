@@ -31,7 +31,7 @@ Brand never overrides security behaviour: a secret stays masked until revealed, 
 - Anything machine-readable (keys, values, `kp://` references, paths, commands, tokens, timestamps) is Fragment Mono; everything else is Instrument Sans.
 - Depth is lightness; shadows only on dialogs, toasts and popovers.
 - Icons are Lucide at 1.5px, muted unless their object is live. No emoji, no filled icons.
-- Copy names the actor and the object, gives every grant a duration, uses sentence case and "you", has no exclamation marks and says what to do next after an error. "keypaste" is always lowercase.
+- Copy names the actor and the object, says how long every allow lasts, uses sentence case and "you", has no exclamation marks and says what to do next after an error. "keypaste" is always lowercase.
 - Each fact appears once in a view, and the main job gets the room (DESIGN § Information).
 - DESIGN § Interaction holds: the command is in `AppCommands.cs` and so in the menus, with the platform's chord and an ellipsis when it opens more; a confirmation puts Cancel first, answers Return and Escape, and asks only when the action cannot be undone; a draft survives a change of place; every field has a visible label and its error under it; a wait shows a moving indicator; every control has an accessible name that holds no secret, contrast is 4.5:1 for text and 3:1 for focus, edges and status, and targets are at least 20 by 20.
 

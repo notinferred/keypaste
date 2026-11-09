@@ -10,7 +10,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
@@ -152,8 +151,6 @@ public sealed class OneHomeJourneyTests
                 () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),
                 () => "the settings did not open");
             AmberElements.AssertOne(main, null, "Agents, an agent's settings open");
-            Press(main, Choice(main, "Ask every time"));
-            await Until(() => Ceiling(home) == AgentMode.Ask, () => $"clients.toml holds {Ceiling(home)}");
             AmberElements.AssertOne(main, null, "Agents, the mode changed");
 
             // History shows the records and leaves the check to the activity log.
@@ -189,14 +186,6 @@ public sealed class OneHomeJourneyTests
     private static ToggleButton? Disclosure(Window window) =>
         window.GetVisualDescendants().OfType<ToggleButton>()
             .SingleOrDefault(toggle => toggle is { Name: "PART_ExpanderHeader", TemplatedParent: Expander { DataContext: AgentRow { Label: _label } }, IsEffectivelyVisible: true });
-
-    /// <summary>One of the open settings' mode choices for the agent's default.</summary>
-    private static Button Choice(Window window, string words) =>
-        window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.IsEffectivelyVisible && button.DataContext is SettingChoice { Setting: "mode", Project: null } choice && choice.Words == words);
-
-    private static AgentMode? Ceiling(string? home) =>
-        AccessCaps.TryLoad(KeypasteHome.ClientsPath(home), out var caps, out _) ? caps.For(_label).Rows.FirstOrDefault(row => row.Project is null)?.Mode : null;
 
     /// <summary>A record of this journey's own, so the log has a table to check.</summary>
     private static void Record(string vault)

@@ -37,7 +37,7 @@
               <StackPanel Grid.Column="0" Spacing="4">
                 <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ActivityLog}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.EveryAgentRequestAllowanceTokenRunAndX73000f}" />
+                           Text="{x:Static res:Strings.EveryAgentRequestTokenRunAndShareOnThisMachine}" />
               </StackPanel>
               <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
                       AutomationProperties.Name="{x:Static res:Strings.OpenTheActivityLog}"

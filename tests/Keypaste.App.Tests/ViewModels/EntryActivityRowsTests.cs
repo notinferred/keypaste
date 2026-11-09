@@ -21,25 +21,6 @@ public sealed class EntryActivityRowsTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    [Fact]
-    public async Task ARowWithAGrant_IsInUse_AndTheCardSaysWhose()
-    {
-        await using var app = await App.StartAsync();
-        app.Person.Answer = ApprovalAnswer.Approved;
-        Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-
-        using var screen = app.Screen();
-        var row = screen.Entries.Rows.Single(entry => entry.Path == "example");
-
-        Assert.True(row.IsInUse);
-        Assert.Equal("in use", row.LastUsedText);
-
-        screen.Entries.Selected = row;
-        Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail!.AgentAccessSummary);
-        Assert.Equal("in use", screen.Entries.Detail.LastUsedText);
-        Assert.Single(screen.Entries.Detail.AgentAccess!.Grants);
-    }
-
     [Theory]
     [InlineData(30, "30m ago", true)]
     [InlineData(180, "3h ago", false)]
@@ -72,7 +53,7 @@ public sealed class EntryActivityRowsTests
             _ => true).Problem("add them") is null);
         app.Audit("days", key, ago: TimeSpan.FromDays(3));
         app.Audit("minutes", key, ago: TimeSpan.FromMinutes(30));
-        app.Person.Answer = ApprovalAnswer.Approved;
+        app.Person.Answer = ApprovalAnswer.ApprovedOnce;
         Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
 
         using var screen = app.Screen();
@@ -92,8 +73,12 @@ public sealed class EntryActivityRowsTests
     /// absent, a bridge whose agent's settings do not reach the item leaves it absent, and one whose
     /// settings do brings it, saying which agent can see the item (N.5).
     /// </summary>
+    /// <summary>
+    /// Of two items sharing a name, each row and card shows only what names its own UUID: a line naming the path alone,
+    /// as every line did before the picker, is neither's, and one naming an item is that item's (F.76).
+    /// </summary>
     [Fact]
-    public async Task TwoItemsOfOneName_ClaimNoUseOnTheirRows_AndTheirPanesSayItMayBeTheOthers()
+    public async Task TwoItemsOfOneName_ShowOnlyWhatIsRecordedForEachItem()
     {
         await using var app = await App.StartAsync();
         var key = app.Authority.Session.Identity!.Key;
@@ -104,37 +89,39 @@ public sealed class EntryActivityRowsTests
                 return true;
             },
             _ => true).Problem("add the second") is null);
-        app.Audit("example", key, ago: TimeSpan.FromMinutes(30));
+
+        string second;
+        using (var first = app.Screen())
+        {
+            second = first.Entries.Rows.Single(entry => entry.Path == "example" && entry.Username == "second").Uuid;
+        }
+
+        app.Audit("example", key, ago: TimeSpan.FromDays(3));
+        app.Audit("example", key, ago: TimeSpan.FromMinutes(30), item: second);
 
         using var screen = app.Screen();
         var rows = screen.Entries.Rows.Where(entry => entry.Path == "example").ToList();
+        var named = rows.Single(row => row.Uuid == second);
+        var other = rows.Single(row => row.Uuid != second);
 
-        Assert.Equal(2, rows.Count);
-        Assert.All(rows, row =>
-        {
-            Assert.Equal("—", row.LastUsedText);
-            Assert.True(row.IsIdle);
-            Assert.NotNull(row.LastUsedTip);
-        });
+        Assert.Equal(("30m ago", true), (named.LastUsedText, named.IsRecent));
+        Assert.Equal(("never", true), (other.LastUsedText, other.IsIdle));
 
-        screen.Entries.Selected = rows[0];
+        screen.Entries.Selected = named;
         Assert.True(screen.Entries.Detail!.SharesItsName);
+        Assert.Single(screen.Entries.Detail.AgentAccess!.Clients);
+
+        screen.Entries.Selected = other;
+        Assert.Empty(screen.Entries.Detail!.AgentAccess!.Clients);
     }
 
     [Fact]
-    public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
+    public async Task TheAgentAccessCard_ShowsOnceAnAgentThatCanSeeTheItemIsAttached()
     {
         await using var app = await App.StartAsync();
 
         using (var screen = app.Screen())
         {
-            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
-            Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
-        }
-
-        await using (await app.AttachBridgeAsync("no-settings"))
-        {
-            using var screen = app.Screen();
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
         }
@@ -145,25 +132,6 @@ public sealed class EntryActivityRowsTests
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
             Assert.Equal("ci-probe can see it · nothing released", screen.Entries.Detail.AgentAccessSummary);
-        }
-    }
-
-    /// <summary>A grant in force is what the card says first, while an attached agent can also see the item.</summary>
-    [Fact]
-    public async Task TheAgentAccessCard_PutsAGrantBeforeTheAgentsThatCanSeeTheItem()
-    {
-        await using var app = await App.StartAsync();
-
-        await using (await app.AttachBridgeAsync(TempVault.Agent))
-        {
-            app.Person.Answer = ApprovalAnswer.Approved;
-            Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-
-            using var screen = app.Screen();
-            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
-
-            Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
-            Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail.AgentAccessSummary);
         }
     }
 
@@ -277,7 +245,6 @@ public sealed class EntryActivityRowsTests
                     Entry = "example",
                     Field = "password",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["**"],
                     ClientName = "claude-code",
                     ClientLabel = "ci-probe",
@@ -287,7 +254,7 @@ public sealed class EntryActivityRowsTests
                 Token).AsTask();
 
         /// <summary>Appends a granted line written <paramref name="ago"/> before now, as a bridge wrote it then.</summary>
-        internal void Audit(string entry, string vaultKey, string label = "ci-probe", TimeSpan ago = default)
+        internal void Audit(string entry, string vaultKey, string label = "ci-probe", TimeSpan ago = default, string? item = null)
         {
             var then = new ManualClock(Clock.GetUtcNow() - ago);
             Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(Fixture.Home), then, out var log, out var error), error);
@@ -299,7 +266,7 @@ public sealed class EntryActivityRowsTests
                     {
                         Tool = "request_credential",
                         Client = new AuditClient("some-client", null, label),
-                        Args = AuditArgs.ForCredentialRequest(entry, "password", 60, "deploy"),
+                        Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy") with { Item = item },
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.Prompt,
                         Reason = "a person approved this request",

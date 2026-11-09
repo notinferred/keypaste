@@ -63,9 +63,6 @@ public sealed class McpConnectionCheck : IAsyncDisposable
     /// <summary>The reason the prompt shows the person for the check's request.</summary>
     public const string Reason = "Connection check from the keypaste app. The value is discarded unread.";
 
-    /// <summary>The lifetime the check asks for. Its grant ends with the check's bridge anyway.</summary>
-    public const int TtlSeconds = 60;
-
     /// <summary>How long the handshake and the listing may take.</summary>
     public static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(10);
 
@@ -220,7 +217,6 @@ public sealed class McpConnectionCheck : IAsyncDisposable
                     writer.WriteString("entry", entry.Handle);
                     writer.WriteString("field", entry.Field);
                     writer.WriteString("reason", Reason);
-                    writer.WriteNumber("ttl_seconds", TtlSeconds);
                 },
                 deadline.Token).ConfigureAwait(false);
 

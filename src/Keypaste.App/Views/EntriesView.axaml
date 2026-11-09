@@ -521,8 +521,6 @@
                               Orientation="Horizontal"
                               HorizontalAlignment="Right"
                               Spacing="6"
-                              Background="Transparent"
-                              ToolTip.Tip="{Binding LastUsedTip}"
                               IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Classes="size-13 muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
                     <Border Classes="dot info" IsVisible="{Binding IsInUse}" />
@@ -1680,7 +1678,7 @@
                     </Border>
                   </StackPanel>
 
-                  <!-- Agent access: who received this entry and what grant covers it now, never a value, shown
+                  <!-- Agent access: who received this entry and when, never a value, shown
                        only when agents can see the entry (N.5). -->
                   <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
                     <Border x:Name="AgentAccessCard" Classes="card" IsVisible="{Binding ShowsAgentAccess}">

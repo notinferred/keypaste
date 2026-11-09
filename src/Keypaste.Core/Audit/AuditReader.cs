@@ -37,6 +37,9 @@ public sealed record AuditEntry
     /// <summary>The entry the agent named, or empty for a call that names none.</summary>
     public string Entry { get; init; } = string.Empty;
 
+    /// <summary>The UUID, as hex, of the item the line is about, or empty where the line names none, as every line before items were named.</summary>
+    public string Item { get; init; } = string.Empty;
+
     /// <summary>The field the agent asked for, or empty.</summary>
     public string Field { get; init; } = string.Empty;
 
@@ -60,8 +63,8 @@ public sealed record AuditEntry
 
     /// <summary>Whether this release was served under a reason no person ever read.</summary>
     /// <remarks>
-    /// True when a grant was reused from the cache under a reason that differs from the one shown to
-    /// the person who approved it. This is THREATS.md T-12, and it is the whole reason the record
+    /// True when it was released without asking under a reason that differs from the one shown to
+    /// the person who last approved it. This is THREATS.md T-12, and it is the whole reason the record
     /// carries a hash of the reason as well as an excerpt of it.
     /// </remarks>
     public bool ReasonUnread { get; init; }
@@ -262,11 +265,10 @@ public static class AuditReader
     }
 
     /// <summary>
-    /// Flags every grant that was served from the cache under a reason nobody was shown.
+    /// Flags every release under an Always allow row, or an older log's cached grant, under a reason nobody was shown.
     /// </summary>
     /// <remarks>
-    /// A grant is scoped to one client, entry and field, so that triple is what identifies the
-    /// approval a cached release is drawing on. The comparison is between hashes rather than
+    /// One client, entry and field identify the approval such a release follows. The comparison is between hashes rather than
     /// excerpts, because an excerpt is truncated and two reasons that differ past 200 characters
     /// differ. An <c>automatic</c> release is not flagged: there is no earlier approval it could be
     /// diverging from, which THREATS.md T-12 says is the worse case rather than the better one.
@@ -292,7 +294,9 @@ public static class AuditReader
                 continue;
             }
 
-            if (!string.Equals(entry.Method, "grant-cache", StringComparison.Ordinal))
+            // always-allowed is what this writes; grant-cache stands in a log an older keypaste wrote.
+            if (!string.Equals(entry.Method, "always-allowed", StringComparison.Ordinal)
+                && !string.Equals(entry.Method, "grant-cache", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -336,6 +340,7 @@ public static class AuditReader
                 Name = name,
                 Tool = Text(root, "tool"),
                 Entry = EntryPath(args, "entry"),
+                Item = Text(args, "item"),
                 Field = Text(args, "field"),
                 Decision = Text(root, "decision"),
                 Method = Text(root, "method"),

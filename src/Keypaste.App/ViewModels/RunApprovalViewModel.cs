@@ -14,8 +14,7 @@ internal sealed record RunVariableRow(string Name, string Source, string Tag);
 /// </summary>
 /// <remarks>
 /// The command and directory are shown whole: the request was refused before anybody was asked if
-/// either held anything a prompt would have to scrub (D-0358). The timed allow covers this command
-/// line on this connection, and the caption says it can change the files that line runs.
+/// either held anything a prompt would have to scrub (D-0358). A run is allowed once, never always.
 /// </remarks>
 internal sealed class RunApprovalViewModel : PromptViewModel
 {
@@ -43,16 +42,6 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
-        OnceOnlyText = prompt.OnceOnly switch
-        {
-            _ when prompt.GrantSeconds > 0 => string.Empty,
-            OnceOnly.AskEveryTime => "This agent is set to Ask every time: no timed allowance is offered.",
-            _ => "This environment is protected: it is asked about every time.",
-        };
-        TimedSeconds = prompt.GrantSeconds;
-        TimedCaption = prompt.GrantSeconds > 0
-            ? "This agent can run this command line here again without asking until then, and can change the files it runs (scripts, package.json) in that time."
-            : string.Empty;
     }
 
     /// <summary>What keypaste does with the values, and what it cannot stop.</summary>
@@ -96,11 +85,4 @@ internal sealed class RunApprovalViewModel : PromptViewModel
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
-
-    /// <summary>Why no timed grant is offered, or empty.</summary>
-    internal string OnceOnlyText { get; }
-
-    internal string TimedCaption { get; }
-
-    protected override int TimedSeconds { get; }
 }

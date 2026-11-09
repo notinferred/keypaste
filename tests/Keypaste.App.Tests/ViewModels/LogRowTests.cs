@@ -1,7 +1,6 @@
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -47,6 +46,7 @@ public sealed class LogRowTests
     /// <summary>A release nobody was asked about says which kind it was: an agent's Automatic mode, or a rule in a line written before agents had modes.</summary>
     [Theory]
     [InlineData("automatic", "Automatic")]
+    [InlineData("always-allowed", "Always")]
     [InlineData("policy", "By rule")]
     public void A_release_nobody_was_asked_about_says_so(string method, string result)
     {
@@ -157,24 +157,6 @@ public sealed class LogRowTests
         var row = Row(Entry("access_change", decision, method) with { Reason = "a person confirmed it (claude-code: mode automatic)" });
 
         Assert.Equal(action, row.Action);
-    }
-
-    /// <summary>
-    /// A settings change's end reads on this computer's clock with its offset, as every other place shows
-    /// it, while the log keeps UTC; another tool's reason is shown as it was recorded.
-    /// </summary>
-    [Fact]
-    public void A_settings_changes_end_reads_on_this_computers_clock()
-    {
-        var zoned = new ZonedClock(_now, TestZones.PlusTwo);
-        var change = LogRow.From(
-            Entry("access_change", "granted", "prompt") with { Reason = "a person confirmed it (claude-code: mode automatic, until 2026-12-31T21:59:59Z, per-hour none)" },
-            verified: true,
-            zoned);
-        var credential = LogRow.From(Entry("request_credential", "granted", "prompt") with { Reason = "until 2026-12-31T21:59:59Z" }, verified: true, zoned);
-
-        Assert.StartsWith("a person confirmed it (claude-code: mode automatic, until 2026-12-31 23:59 +02:00, per-hour none)", change.Detail, StringComparison.Ordinal);
-        Assert.StartsWith("until 2026-12-31T21:59:59Z", credential.Detail, StringComparison.Ordinal);
     }
 
     [Fact]

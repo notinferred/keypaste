@@ -15,13 +15,29 @@ namespace Keypaste.Core.Approval;
 /// <para>
 /// <b>Resolving and reading are two calls, and the order matters.</b> Resolution yields an
 /// <see cref="EntryName"/>, which structurally cannot carry a secret, so the caller can re-check
-/// its exposure globs and look in the grant cache <em>before</em> anything decrypts a field. A
+/// its exposure globs and check its settings <em>before</em> anything decrypts a field. A
 /// single <c>TryRead(entryArgument, field)</c> would have to read the value before the human had
 /// approved anything, which puts a secret in memory for requests that are about to be denied.
 /// </para>
 /// </remarks>
 public interface ICredentialSource
 {
+    /// <summary>An entry's UUID as hex, which a line names it by.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>The UUID, or null when it cannot be read, so no row covers it and none is offered.</returns>
+    string? ItemId(EntryName name) => null;
+
+    /// <summary>Whether one custom field of an entry is protected, read without its value, which decides whether a card's or an identity's tag makes it theirs.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name.</param>
+    /// <returns>False when it is not, or cannot be read, so the field stays a custom field.</returns>
+    bool IsProtected(EntryName name, string field) => false;
+
+    /// <summary>The name of the entry with a UUID, for a row or a confirmation to show.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>Its name, or null when no live entry has it.</returns>
+    EntryName? ItemNamed(string item) => null;
+
     /// <summary>Finds which entry an agent's <c>entry</c> argument names.</summary>
     /// <param name="entryArgument">The argument exactly as it arrived, handle or path.</param>
     /// <param name="name">The entry it names, when exactly one entry does.</param>
@@ -38,8 +54,24 @@ public interface ICredentialSource
         [NotNullWhen(true)] out EntryName? name,
         out CredentialFailure failure);
 
+    /// <summary>Every item an agent's <c>entry</c> argument names, by the rule <see cref="TryResolve"/> applies, for the person to pick one.</summary>
+    /// <param name="entryArgument">The argument exactly as it arrived, handle or path.</param>
+    /// <param name="items">The items, each carrying its UUID, in the vault's order.</param>
+    /// <param name="failure">Why none could be read.</param>
+    /// <returns><see langword="true"/> when the vault could be read.</returns>
+    /// <remarks>
+    /// Each item's username and URL are for the person picking, who sees them on Items too, and never for the agent.
+    /// Nothing here reads a field the agent asked for.
+    /// </remarks>
+    bool TryChoose(string entryArgument, out IReadOnlyList<AnsweringItem> items, out CredentialFailure failure)
+    {
+        items = [];
+        failure = CredentialFailure.Ambiguous;
+        return false;
+    }
+
     /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465), or computes its current TOTP code.</summary>
-    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
+    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>, or one of <see cref="TryChoose"/>'s, which is read only while its UUID and its name still agree.</param>
     /// <param name="field">
     /// Which field, exactly as the tool schema spells it, or <see cref="CredentialFields.Totp"/> for the code, which is
     /// released with how long it stays current and never with its seed (D-0480).
@@ -54,7 +86,7 @@ public interface ICredentialSource
     /// <returns><see langword="true"/> when the field was read and filled in, and is not empty.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
     /// <remarks>
-    /// Call this only after a human has approved the request, or after a live grant has been found.
+    /// Call this only after a human has approved the request, or after a setting they confirmed answers it.
     /// It is the only method in keypaste that turns an entry into a secret on the agent path.
     /// </remarks>
     bool TryRead(
@@ -64,11 +96,25 @@ public interface ICredentialSource
         out CredentialFailure failure,
         out string unfilled);
 
-    /// <summary>Whether a release of this entry is asked about live every time, with no grant and no rule (D-0348).</summary>
+    /// <summary>Whether the entry is in a protected environment, which no scoped token may release (D-0348).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
     /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>
     bool RequiresLiveApproval(EntryName name);
+
+    /// <summary>Reads one attachment of one entry as base64, for a release a person or a rule allowed.</summary>
+    /// <param name="name">The entry, as <see cref="TryRead"/> takes it.</param>
+    /// <param name="attachment">The attachment's name, exactly as the item holds it.</param>
+    /// <param name="value">The attachment's bytes as base64 under <see cref="CredentialFields.Attachment"/>, when it could be read.</param>
+    /// <param name="failure">Why not: <see cref="CredentialFailure.NoSuchField"/> when the item holds no attachment of that name.</param>
+    /// <returns><see langword="true"/> when the attachment was read and is not empty.</returns>
+    /// <remarks>Call this only where <see cref="TryRead"/> may be called.</remarks>
+    bool TryReadAttachment(EntryName name, string attachment, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+    {
+        value = null;
+        failure = CredentialFailure.NoSuchField;
+        return false;
+    }
 
     /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches (D-0422).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>

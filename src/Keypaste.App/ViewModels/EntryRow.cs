@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Keypaste.App.Resources;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
 
@@ -33,7 +32,6 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
 {
     private EntryUseState _use;
     private string _lastUsedText = string.Empty;
-    private string? _lastUsedTip;
 
     /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -75,20 +73,6 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         }
     }
 
-    /// <summary>Why the time is not shown, on an item another shares a name with; null otherwise.</summary>
-    internal string? LastUsedTip
-    {
-        get => _lastUsedTip;
-        private set
-        {
-            if (!string.Equals(_lastUsedTip, value, StringComparison.Ordinal))
-            {
-                _lastUsedTip = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastUsedTip)));
-            }
-        }
-    }
-
     /// <summary>When it was last used, for sorting: in use is the latest there is, and never answered has no time.</summary>
     internal long? LastUsedTicks { get; private set; }
 
@@ -99,14 +83,11 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     {
         ArgumentNullException.ThrowIfNull(activity);
 
-        var use = activity.Use(Name);
-
-        // A line names a path, so of two items with one path it cannot say which an agent received.
-        var eitherItems = SharesItsName && (use.State == EntryUseState.InUse || use.LastUsed is not null);
-        Use = eitherItems ? EntryUseState.Idle : use.State;
-        LastUsedText = eitherItems ? "—" : UseText.LastUsed(use, now);
-        LastUsedTip = eitherItems ? Strings.SharedNameLastUsedTip : null;
-        LastUsedTicks = eitherItems ? null : use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
+        // A path names both items of a pair, so of one of them only what names its UUID is its own.
+        var use = activity.Use(Name, byItem: SharesItsName);
+        Use = use.State;
+        LastUsedText = UseText.LastUsed(use, now);
+        LastUsedTicks = use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
     }
 
     /// <summary>Rows are the same row when they are the same item, show the same fields and are found for the same reason; their use is not identity.</summary>

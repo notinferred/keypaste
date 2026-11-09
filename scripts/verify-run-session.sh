@@ -159,10 +159,10 @@ start_run ci case-approve
 next_prompt
 PROMPT_LINE="$(grep '^env-prompt project=' "$HOLD_OUT" | tail -1)"
 case "$PROMPT_LINE" in
-  "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/ci/.env,env/ci/.env timed=True") ;;
+  "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/ci/.env,env/ci/.env") ;;
   *) die "the prompt does not name the project, the command, the directory, the variable names and their entries: $PROMPT_LINE" ;;
 esac
-echo approve >&7
+echo once >&7
 withdrawn
 released "Approve in the app"
 grep -qE "$DEPLOY|$DATABASE" "$HOLD_OUT" && die "a value reached the app's output"
@@ -172,7 +172,7 @@ start_run tagged case-tagged
 next_prompt
 PROMPT_LINE="$(grep '^env-prompt project=' "$HOLD_OUT" | tail -1)"
 case "$PROMPT_LINE" in
-  "env-prompt project=tagged command="*" case-tagged directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/tagged/.env,services/Deploy timed=False") ;;
+  "env-prompt project=tagged command="*" case-tagged directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/tagged/.env,services/Deploy") ;;
   *) die "the tagged set's prompt does not name each source entry once only: $PROMPT_LINE" ;;
 esac
 echo once >&7

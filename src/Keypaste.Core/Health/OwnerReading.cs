@@ -35,7 +35,7 @@ public enum OwnerAnswer
 /// <param name="Version">The version the owner gave, or null when it gave none or nothing answered.</param>
 /// <param name="Finding">What doctor says of it.</param>
 /// <remarks>
-/// The owner is attached to as <c>grants</c> and <c>lock</c> do, with no AI tool's name, so it counts no agent; nothing
+/// The owner is attached to as <c>lock</c> does, with no AI tool's name, so it counts no agent; nothing
 /// else is asked. The pipe a locked app listens on for agents is never reached.
 /// </remarks>
 public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? Version, HealthFinding Finding)

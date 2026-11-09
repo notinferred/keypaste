@@ -128,7 +128,7 @@ public sealed class LockBoundaryTests
         using var fixture = new TempVault();
         fixture.Sees();
         var clock = new ManualClock(AppClock.Start);
-        var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
+        var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.ApprovedOnce };
         using var session = new AppVaultSession(clock, home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
         Unlock(session, fixture.Path_);
@@ -177,39 +177,6 @@ public sealed class LockBoundaryTests
     }
 
     [Fact]
-    public async Task The_next_unlock_starts_with_no_grant_from_before_the_lock()
-    {
-        using var fixture = new TempVault();
-        fixture.Sees();
-        var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
-        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
-        using var host = new SessionHost(session, approverOverride: null, () => prompt);
-        Unlock(session, fixture.Path_);
-
-        await using (var client = await ConnectAsync(host))
-        {
-            var attached = await client.AttachAsync(new AttachRequest(fixture.Path_), Token);
-            var first = await client.RequestAsync(Request(fixture.Path_, attached!.Session!), Token);
-            var reused = await client.RequestAsync(Request(fixture.Path_, attached.Session!), Token);
-
-            Assert.Equal(AuditMethod.Prompt, first!.Method);
-            Assert.Equal(AuditMethod.GrantCache, reused!.Method);
-        }
-
-        session.Lock(VaultLockReason.Manual);
-        Unlock(session, fixture.Path_);
-        prompt.Answer = ApprovalAnswer.Denied;
-
-        await using var after = await ConnectAsync(host);
-        var reattached = await after.AttachAsync(new AttachRequest(fixture.Path_), Token);
-        var again = await after.RequestAsync(Request(fixture.Path_, reattached!.Session!), Token);
-
-        Assert.Equal(AuditDecision.Denied, again!.Decision);
-        Assert.Equal(AuditMethod.Prompt, again.Method);
-        Assert.Equal(2, prompt.Asked);
-    }
-
-    [Fact]
     public void A_lifetime_that_ended_cannot_reach_the_vault_a_later_unlock_opened()
     {
         using var fixture = new TempVault();
@@ -231,7 +198,6 @@ public sealed class LockBoundaryTests
         Entry = "example",
         Field = "password",
         Reason = "deploy",
-        TtlSeconds = 60,
         Exposure = ["**"],
         ClientLabel = TempVault.Agent,
         Vault = vault,

@@ -67,7 +67,7 @@ internal sealed class PromptScreen : IDisposable
     }
 
     /// <summary>
-    /// Answers the prompt on screen: <c>approve</c> (the timed allow), <c>once</c>, <c>always</c> (Always for),
+    /// Answers the prompt on screen: <c>once</c>, <c>always</c> (Always allow),
     /// <c>allow</c> (a change's confirmation), <c>deny</c> or <c>close</c>.
     /// </summary>
     internal Task AnswerAsync(string answer) =>
@@ -78,13 +78,12 @@ internal sealed class PromptScreen : IDisposable
 
                 switch (answer)
                 {
-                    case "approve" or "once" or "always" or "allow":
+                    case "once" or "always" or "allow":
                         var allow = Button(window, answer switch
                         {
                             "once" => "AllowOnce",
-                            "always" => "AlwaysFor",
-                            "allow" => "Allow",
-                            _ => "Approve",
+                            "always" => "AlwaysAllow",
+                            _ => "Allow",
                         });
                         var armedBy = DateTime.UtcNow + _armingWait;
 
@@ -122,7 +121,7 @@ internal sealed class PromptScreen : IDisposable
             async () =>
             {
                 var window = _open ?? throw new DriverException("no prompt is on screen");
-                var allow = new[] { "Approve", "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
+                var allow = new[] { "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
                     ?? throw new DriverException("the prompt has no allow button");
                 var armedBy = DateTime.UtcNow + _armingWait;
 
@@ -138,20 +137,13 @@ internal sealed class PromptScreen : IDisposable
 
                 press();
                 Dispatcher.UIThread.RunJobs();
-                var focus = new[] { "Deny", "AllowOnce", "Approve", "AlwaysFor", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
+                var focus = new[] { "Deny", "AllowOnce", "AlwaysAllow", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
                 return $"prompt raised armed={(allow.IsEffectivelyEnabled ? "true" : "false")} focus={focus}";
             });
 
     private void OnShown(object? sender, Window window)
     {
         window.CaptureRenderedFrame();
-
-        // A notice asks nothing, so it is printed and left on screen; the next answer is for a prompt.
-        if (window is NoticeWindow)
-        {
-            Console.Out.WriteLine($"notice text={Text(window, "NoticeText")}");
-            return;
-        }
 
         if (window is PairingNoticeWindow)
         {
@@ -166,13 +158,11 @@ internal sealed class PromptScreen : IDisposable
             EnvApprovalWindow =>
                 $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
                 $"directory={Text(window, "DirectoryText")} keys={string.Join(',', Classed(window, "key"))} " +
-                $"entries={string.Join(',', Classed(window, "entry"))} timed={window.FindControl<Button>("Approve")?.IsVisible == true}",
+                $"entries={string.Join(',', Classed(window, "entry"))}",
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
-                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
-            AccessChangeWindow =>
-                $"access-prompt agent={Text(window, "AgentText")} asked={Text(window, "OriginText")} " +
-                $"gains={string.Join("; ", Gains(window))} reason={Text(window, "ReasonText")}",
+                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")} " +
+                $"always={window.FindControl<Button>("AlwaysAllow")?.IsVisible == true}",
             TerminalEditWindow =>
                 $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
                 $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
@@ -180,13 +170,11 @@ internal sealed class PromptScreen : IDisposable
                 $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
-                $"always={(window.FindControl<Button>("AlwaysFor")?.IsVisible == true ? Text(window, "AlwaysText") : "none")}",
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",
         });
 
         var withdrawn = window switch
         {
-            AccessChangeWindow => "access-prompt withdrawn",
             TerminalEditWindow => "edit-prompt withdrawn",
             PairingWindow => "pair-prompt withdrawn",
             _ => "prompt withdrawn",
@@ -204,10 +192,6 @@ internal sealed class PromptScreen : IDisposable
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
-
-    private static IEnumerable<string?> Gains(Window window) =>
-        window.FindControl<ItemsControl>("GainsList")?.GetVisualDescendants().OfType<TextBlock>()
-            .Where(block => block.Classes.Contains("gain")).Select(block => block.Text) ?? [];
 
     private static IEnumerable<string?> Changes(Window window) =>
         window.FindControl<ItemsControl>("ChangesList")?.GetVisualDescendants().OfType<TextBlock>()

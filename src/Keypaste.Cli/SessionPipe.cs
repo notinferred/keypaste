@@ -5,7 +5,7 @@ using Keypaste.Core.Ownership;
 
 namespace Keypaste.Cli;
 
-/// <summary>Reaches the process holding a vault unlocked, for the verbs that act on its session: <c>grants</c> and <c>lock</c>.</summary>
+/// <summary>Reaches the process holding a vault unlocked, for the verb that acts on its session: <c>lock</c>.</summary>
 /// <remarks>
 /// The endpoint is found exactly as <c>keypaste run --session</c> finds it, over the per-user pipe the
 /// operating system authenticates (THREATS.md T-10). Nothing here opens the vault or reads a password.

@@ -1,6 +1,5 @@
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tokens;
 
@@ -15,7 +14,7 @@ public enum EntryUseState
     /// <summary>Released within <see cref="EntryActivity.RecentWindow"/>.</summary>
     Recent = 1,
 
-    /// <summary>A grant in force covers it, or a waiting request names it.</summary>
+    /// <summary>A waiting request names it.</summary>
     InUse = 2,
 }
 
@@ -34,9 +33,8 @@ public sealed record ClientAccess(string Client, DateTimeOffset LastAt, int Rele
 /// <summary>Everything the Agent access card says about one entry: names and times, never a value.</summary>
 /// <param name="Use">Its state and last use.</param>
 /// <param name="Clients">Who received it, newest first.</param>
-/// <param name="Grants">The grants in force that cover it.</param>
 /// <param name="Waiting">Whether a waiting request names it.</param>
-public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> Clients, IReadOnlyList<GrantSummary> Grants, bool Waiting);
+public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> Clients, bool Waiting);
 
 /// <summary>What one attached agent can name without having asked yet.</summary>
 /// <param name="Agent">How a screen names it: its label, else its name.</param>
@@ -45,7 +43,7 @@ public sealed record AgentReach(string Agent, Func<EntryName, IReadOnlyList<stri
 
 /// <summary>
 /// Which entries agents use, from what is already recorded: this vault's granted audit lines, the
-/// owner's release ledger for this session and its live grants and waiting prompts (D-0361).
+/// owner's release ledger for this session and its waiting prompts (D-0361).
 /// </summary>
 /// <remarks>
 /// A line written before lines named their vault counts for whichever vault is open, a stated limit.
@@ -58,8 +56,9 @@ public sealed class EntryActivity
 
     private readonly DateTimeOffset _now;
     private readonly Dictionary<string, Dictionary<string, ClientAccess>> _released = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, ClientAccess>> _releasedItems = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, List<GrantSummary>> _envGrants = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _waitingItems = new(StringComparer.Ordinal);
     private readonly ApproverActivity _live;
     private readonly IReadOnlyList<AgentReach> _reach;
 
@@ -112,35 +111,30 @@ public sealed class EntryActivity
 
             foreach (var named in entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [])
             {
-                activity.Released(Key(named), client, how, at, counted: true);
+                Released(activity._released, Key(named), client, how, at, counted: true);
+            }
+
+            if (entry.Item.Length > 0)
+            {
+                Released(activity._releasedItems, entry.Item, client, how, at, counted: true);
             }
         }
 
         // Every other release the ledger holds is also an audit line: it moves the time, not the count.
         foreach (var seen in session)
         {
-            activity.Released(Key(seen.Entry), seen.Client, seen.How, seen.At, counted: seen.How == "run --session");
-        }
+            Released(activity._released, Key(seen.Entry), seen.Client, seen.How, seen.At, counted: seen.How == "run --session");
 
-        foreach (var grant in live.EnvGrants)
-        {
-            foreach (var named in grant.Entries)
+            if (seen.Item is { } item)
             {
-                var key = Key(named);
-
-                if (!activity._envGrants.TryGetValue(key, out var rows))
-                {
-                    rows = [];
-                    activity._envGrants[key] = rows;
-                }
-
-                rows.Add(GrantSummary.From(grant));
+                Released(activity._releasedItems, item, seen.Client, seen.How, seen.At, counted: false);
             }
         }
 
         foreach (var waiting in live.Waiting)
         {
             activity._waiting.Add(Key(waiting.Prompt.Entry));
+            activity._waitingItems.UnionWith(waiting.Prompt.Item is { } item ? [item] : waiting.Prompt.Candidates.Select(candidate => candidate.Item));
         }
 
         foreach (var run in live.WaitingRuns)
@@ -156,7 +150,7 @@ public sealed class EntryActivity
         return activity;
     }
 
-    /// <summary>An entry as every prompt, grant and audit line names it.</summary>
+    /// <summary>An entry as every prompt and audit line names it.</summary>
     /// <param name="entry">The entry.</param>
     /// <returns>Its display path, capped as an audit line caps it.</returns>
     public static string KeyOf(EntryName entry)
@@ -168,15 +162,19 @@ public sealed class EntryActivity
 
     /// <summary>An entry's state and last use.</summary>
     /// <param name="entry">The entry.</param>
+    /// <param name="byItem">
+    /// Whether to read only what names the entry's own UUID, for an item another shares its name with, whose name alone
+    /// cannot say which of them an agent received.
+    /// </param>
     /// <returns>In use, recent or idle.</returns>
-    public EntryUse Use(EntryName entry)
+    public EntryUse Use(EntryName entry, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var key = KeyOf(entry);
-        DateTimeOffset? last = _released.TryGetValue(key, out var clients) ? clients.Values.Max(access => access.LastAt) : null;
+        var (released, waiting) = Recorded(entry, byItem);
+        DateTimeOffset? last = released is { } clients ? clients.Values.Max(access => access.LastAt) : null;
 
-        var state = InUse(entry, key)
+        var state = waiting
             ? EntryUseState.InUse
             : last is { } at && _now - at <= RecentWindow ? EntryUseState.Recent : EntryUseState.Idle;
 
@@ -185,12 +183,13 @@ public sealed class EntryActivity
 
     /// <summary>
     /// Whether agents can see an entry: an attached agent's reach covers it,
-    /// or it has been released, is covered by a grant or is waiting on a person (N.5).
+    /// or it has been released or is waiting on a person (N.5).
     /// </summary>
     /// <param name="entry">The entry.</param>
     /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern reads.</param>
+    /// <param name="byItem">Whether to read only what names the entry's own UUID, as <see cref="Use"/> does.</param>
     /// <returns>Whether the Agent access card belongs on its pane.</returns>
-    public bool AgentsCanSee(EntryName entry, IReadOnlyList<string> tags)
+    public bool AgentsCanSee(EntryName entry, IReadOnlyList<string> tags, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tags);
@@ -200,8 +199,8 @@ public sealed class EntryActivity
             return true;
         }
 
-        var access = Access(entry);
-        return access.Clients.Count > 0 || access.Grants.Count > 0 || access.Waiting;
+        var access = Access(entry, byItem);
+        return access.Clients.Count > 0 || access.Waiting;
     }
 
     /// <summary>The attached agents that can name an entry without having asked yet.</summary>
@@ -222,42 +221,41 @@ public sealed class EntryActivity
 
     /// <summary>What the Agent access card shows for an entry.</summary>
     /// <param name="entry">The entry.</param>
-    /// <returns>Its use, its clients newest first, its grants and whether a request waits on it.</returns>
-    public EntryAgentAccess Access(EntryName entry)
+    /// <param name="byItem">Whether to read only what names the entry's own UUID, as <see cref="Use"/> does.</param>
+    /// <returns>Its use, its clients newest first and whether a request waits on it.</returns>
+    public EntryAgentAccess Access(EntryName entry, bool byItem = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var key = KeyOf(entry);
-        var handle = EntryHandle.For(entry);
+        var (released, waiting) = Recorded(entry, byItem);
 
-        IReadOnlyList<ClientAccess> clients = _released.TryGetValue(key, out var byClient)
+        IReadOnlyList<ClientAccess> clients = released is { } byClient
             ? [.. byClient.Values.OrderByDescending(access => access.LastAt).ThenBy(access => access.Client, StringComparer.Ordinal)]
             : [];
 
-        IReadOnlyList<GrantSummary> grants =
-        [
-            .. _live.Grants.Where(grant => string.Equals(grant.Key.Handle, handle, StringComparison.Ordinal)).Select(GrantSummary.From),
-            .. _envGrants.GetValueOrDefault(key) ?? [],
-        ];
-
-        return new EntryAgentAccess(Use(entry), clients, grants, _waiting.Contains(key));
+        return new EntryAgentAccess(Use(entry, byItem), clients, waiting);
     }
 
-    private bool InUse(EntryName entry, string key)
+    /// <summary>What is recorded of an entry, by its name or by its UUID, and whether a waiting request names it.</summary>
+    private (Dictionary<string, ClientAccess>? Released, bool Waiting) Recorded(EntryName entry, bool byItem)
     {
-        var handle = EntryHandle.For(entry);
+        if (byItem)
+        {
+            return entry.Uuid is { } item
+                ? (_releasedItems.GetValueOrDefault(item), _waitingItems.Contains(item))
+                : (null, false);
+        }
 
-        return _waiting.Contains(key)
-            || _envGrants.ContainsKey(key)
-            || _live.Grants.Any(grant => string.Equals(grant.Key.Handle, handle, StringComparison.Ordinal));
+        var key = KeyOf(entry);
+        return (_released.GetValueOrDefault(key), _waiting.Contains(key));
     }
 
-    private void Released(string key, string client, string how, DateTimeOffset at, bool counted)
+    private static void Released(Dictionary<string, Dictionary<string, ClientAccess>> released, string key, string client, string how, DateTimeOffset at, bool counted)
     {
-        if (!_released.TryGetValue(key, out var byClient))
+        if (!released.TryGetValue(key, out var byClient))
         {
             byClient = new Dictionary<string, ClientAccess>(StringComparer.Ordinal);
-            _released[key] = byClient;
+            released[key] = byClient;
         }
 
         byClient[client] = byClient.TryGetValue(client, out var known)

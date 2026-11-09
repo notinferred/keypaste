@@ -72,12 +72,12 @@ public sealed class CliAppTests
 
         Assert.Equal(GroupedHelp, redirected.ToString());
         Assert.DoesNotContain(ConsoleStyleTests.Escape, redirected.ToString(), StringComparison.Ordinal);
-        Assert.Contains("  \u001b[38;5;214mgrants" + Styling.SystemConsoleStyle.Reset + "      list or revoke", terminal.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  \u001b[38;5;214mtoken" + Styling.SystemConsoleStyle.Reset + "       create scoped", terminal.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData("approve", "approve agents' requests in this terminal")]
-    [InlineData("clients", "show or change what each agent can see and do")]
+    [InlineData("clients", "list agents, their rules and kept answers, and change them")]
     public void ApproveAndClients_AreVerbsOfTheirOwn(string verb, string usage)
     {
         using var harness = new CliHarness();
@@ -117,7 +117,7 @@ public sealed class CliAppTests
         Assert.Equal(0, harness.Clipboard.SetCount);
         Assert.Empty(harness.ProcessRunner.Calls);
         Assert.Empty(harness.ProcessLauncher.Started);
-        Assert.False(File.Exists(KeypasteHome.ClientsPath(harness.Environment[KeypasteHome.EnvironmentVariable])));
+        Assert.False(File.Exists(KeypasteHome.AgentsPath(harness.Environment[KeypasteHome.EnvironmentVariable])));
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(27, verbs.Count);
+        Assert.Equal(26, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -209,9 +209,8 @@ public sealed class CliAppTests
             "  setup       connect this computer's AI tools to your vault",
             "  mcp         the MCP server your AI tools start",
             "  approve     approve agents' requests in this terminal",
-            "  clients     show or change what each agent can see and do",
+            "  clients     list agents, their rules and kept answers, and change them",
             "  doctor      check the vault, the AI tools and the app, and say what to fix",
-            "  grants      list or revoke time-boxed access",
             "  token       create scoped, inject-only tokens",
             "  log         show the hash-chained activity log",
             "",
@@ -232,7 +231,7 @@ public sealed class CliAppTests
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
-            "                    attachment ls, env ls, log, grants, doctor, token ls,",
+            "                    attachment ls, env ls, log, doctor, token ls,",
             "                    share ls, clients",
             "  -h, --help        help for any command",
             "",

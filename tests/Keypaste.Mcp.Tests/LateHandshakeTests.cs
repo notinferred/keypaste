@@ -33,7 +33,6 @@ public sealed class LateHandshakeTests
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy",
-        ["ttl_seconds"] = 60,
     };
 
     [Fact]
@@ -89,22 +88,6 @@ public sealed class LateHandshakeTests
 
         var run = Assert.Single(asked);
         Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion), (run.ClientName, run.ClientVersion));
-        Assert.Empty(harness.AuditLines());
-    }
-
-    [Fact]
-    public async Task AnAccessChange_ThatOvertookTheHandshake_AttachesToTheOwnerUnderTheNameItGave()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.AccessAnswer = _ => new AccessChangeReply(AuditDecision.Granted, AuditMethod.Narrowing, "applied at once on this computer");
-        harness.Approver.Start();
-        harness.Serve();
-
-        await CallAsync(harness, ToolText.AccessToolName, new() { ["mode"] = "ask", ["reason"] = "keep asking me" });
-
-        Assert.Single(harness.Approver.AccessReceived);
-        var attached = Assert.Single(harness.Approver.Attached).Client;
-        Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), (attached?.Name, attached?.Version, attached?.Label));
         Assert.Empty(harness.AuditLines());
     }
 

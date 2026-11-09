@@ -29,7 +29,6 @@ public sealed class SessionEditor
     private readonly ApprovalGate _gate;
     private readonly Func<SessionLifetime, Vault?> _unlockedFor;
     private readonly Func<SessionLifetime, Func<Vault, bool>, AgentSave> _write;
-    private readonly string _clientsPath;
     private readonly TimeProvider _clock;
     private readonly Action<string>? _narrate;
     private readonly Action<EditDone>? _edited;
@@ -38,7 +37,6 @@ public sealed class SessionEditor
     /// <param name="gate">Where the person is asked, under the same slot and cooldown as agents.</param>
     /// <param name="unlockedFor">The vault while a lifetime is live, otherwise null.</param>
     /// <param name="write">Runs an edit on the lifetime's vault and saves it under the owner's claim.</param>
-    /// <param name="clientsPath">This computer's <c>clients.toml</c>, which a tag change is judged by.</param>
     /// <param name="clock">What time it is.</param>
     /// <param name="narrate">Where the owner says what it decided, or null.</param>
     /// <param name="edited">Told of each edit once it is saved, or null.</param>
@@ -46,7 +44,6 @@ public sealed class SessionEditor
         ApprovalGate gate,
         Func<SessionLifetime, Vault?> unlockedFor,
         Func<SessionLifetime, Func<Vault, bool>, AgentSave> write,
-        string clientsPath,
         TimeProvider clock,
         Action<string>? narrate,
         Action<EditDone>? edited)
@@ -54,7 +51,6 @@ public sealed class SessionEditor
         _gate = gate;
         _unlockedFor = unlockedFor;
         _write = write;
-        _clientsPath = clientsPath;
         _clock = clock;
         _narrate = narrate;
         _edited = edited;
@@ -94,7 +90,7 @@ public sealed class SessionEditor
                 return Refused(AuditMethod.Failed, "the vault's file could not be read to compare");
         }
 
-        var scene = new EditScene(_clientsPath, _clock.GetUtcNow());
+        var scene = new EditScene(_clock.GetUtcNow());
         TerminalEdit made;
         EditCheck check;
 
@@ -192,7 +188,7 @@ public sealed class SessionEditor
             : Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
 
     /// <summary>Takes an edit back out of the vault it was made in, unless the vault was locked meanwhile and took the edit with it.</summary>
-    private static void TakeBack(Vault? vault, VaultCheckpoint? checkpoint)
+    internal static void TakeBack(Vault? vault, VaultCheckpoint? checkpoint)
     {
         if (vault is null || checkpoint is null)
         {
@@ -209,10 +205,10 @@ public sealed class SessionEditor
         }
     }
 
-    private static string Said(EditRefusal refusal) =>
+    internal static string Said(EditRefusal refusal) =>
         refusal.Then.Count == 0 ? refusal.Reason : $"{refusal.Reason}. {string.Join(" ", refusal.Then)}";
 
-    private static AuditMethod MethodOf(AgentSave saved) => saved.Outcome switch
+    internal static AuditMethod MethodOf(AgentSave saved) => saved.Outcome switch
     {
         AgentSaveOutcome.Locked => AuditMethod.VaultLocked,
         AgentSaveOutcome.ChangedOnDisk => AuditMethod.VaultChanged,

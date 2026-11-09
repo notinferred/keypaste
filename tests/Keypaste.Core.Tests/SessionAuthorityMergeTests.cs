@@ -33,19 +33,18 @@ public sealed class SessionAuthorityMergeTests : IDisposable
     private readonly OwnerLog _log;
     private readonly SessionLifetime _lifetime = new("session-one");
     private readonly FakeChannel _channel = new();
-    private readonly FakeAgentSettings _settings = new();
+    private readonly FakeAgentRules _settings = new();
     private Vault _vault;
 
     public SessionAuthorityMergeTests()
     {
         _log = new OwnerLog(_directory);
-        _settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll;
 
         using (var seed = Vault.Create(VaultPath, _master))
         {
             seed.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "github-0" });
             seed.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "stripe-0" });
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(seed).Write(ApproverFixture.Agent, AgentAccessBuilders.Automatic));
+            Assert.True(seed.WriteRecord(new EntryName(ReservedGroups.Agents, ApproverFixture.Agent), AcafIds.Agent, "acaf", """{"acaf":1,"mode":"automatic"}"""));
             seed.Save();
         }
 
@@ -99,31 +98,6 @@ public sealed class SessionAuthorityMergeTests : IDisposable
         Assert.Equal(_mine, _vault.Find(_stripe)!.Password);
     }
 
-    /// <summary>The merge's withdrawal ends a timed allowance with no refusal before it, so the next request is asked again (D-0542, D-0516).</summary>
-    [Fact]
-    public async Task TheMerge_EndsEveryGrant_SoTheNextRequestIsAskedAgain()
-    {
-        _channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await owner.AttachAsync();
-
-        Assert.Equal(AuditMethod.Prompt, (await client.RequestAsync(Request(_github), Token))!.Method);
-        Assert.Equal(AuditMethod.GrantCache, (await client.RequestAsync(Request(_github), Token))!.Method);
-        Assert.Single(owner.Authority.Activity.Grants);
-
-        InFile(database => Edit(database, _stripe, _theirs));
-        var merged = owner.Authority.Merge(_vault, Swap, _surface);
-
-        Assert.Equal(VaultMergeSaveOutcome.Updated, merged.Outcome);
-        Assert.Empty(owner.Authority.Activity.Grants);
-
-        var again = await client.RequestAsync(Request(_github), Token);
-
-        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (again!.Decision, again.Method));
-        Assert.Equal(2, _channel.Asked);
-        Assert.Equal(_theirs, _vault.Find(_stripe)!.Password);
-    }
-
     [Fact]
     public async Task ARequestWaitingOnAPerson_IsWithdrawn_AndRecordedAsMerged()
     {
@@ -169,7 +143,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
 
             var agent = database.RootGroup.GetEntries(true).Single(entry => entry.Strings.ReadSafe(PwDefs.TitleField) == ApproverFixture.Agent);
             agent.CreateBackup(database);
-            agent.Strings.Set(AgentAccessStore.Field, new ProtectedString(false, AcafRecord.Write(AgentAccessBuilders.Asks)));
+            agent.Strings.Set("acaf", new ProtectedString(false, """{"acaf":1,"mode":"ask"}"""));
             agent.LastModificationTime = later;
         });
 
@@ -213,7 +187,6 @@ public sealed class SessionAuthorityMergeTests : IDisposable
         Entry = $"{entry.GroupPath}/{entry.Title}",
         Field = "password",
         Reason = "deploy billing",
-        TtlSeconds = 60,
         Exposure = ["work/**"],
         ClientLabel = ApproverFixture.Agent,
         Vault = VaultPath,
@@ -303,11 +276,8 @@ public sealed class SessionAuthorityMergeTests : IDisposable
                     CurrentLifetime = () => test._lifetime,
                     UnlockedFor = lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? Volatile.Read(ref test._vault) : null,
                     Channel = test._channel,
-                    Settings = test._settings,
-                    Hourly = new HourlyLimit(TimeProvider.System),
+                    Rules = test._settings,
                     Audit = () => test._log.Log,
-                    WatchEdits = _ => { },
-                    UnwatchEdits = _ => { },
                 }),
                 test.VaultPath);
         }

@@ -47,28 +47,21 @@ public sealed class TagProtectionTests : IDisposable
     }
 
     [Fact]
-    public async Task A_handler_asks_every_time_for_a_protected_entry_and_grants_the_hour_otherwise()
+    public async Task A_handler_asks_every_time_for_a_protected_entry()
     {
         using var vault = Seeded();
         using var fixture = new ApproverFixture();
         var source = new VaultCredentialSource(() => vault);
-        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Grants, fixture.Settings);
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Rules);
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var first = await handler.RequestAsync(Request("services/Database"), "conn-1", _token);
         var second = await handler.RequestAsync(Request("services/Database"), "conn-1", _token);
 
-        Assert.Equal((AuditMethod.Prompt, 0), (first.Method, first.TtlSeconds));
         Assert.Equal(AuditMethod.Prompt, second.Method);
-        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
         Assert.True(handler.RequiresLiveApproval(new EntryName("services", "Odd")));
 
-        var plain = await handler.RequestAsync(Request("services/Plain"), "conn-1", _token);
-        var cached = await handler.RequestAsync(Request("services/Plain"), "conn-1", _token);
-
-        Assert.Equal(AuditMethod.Prompt, plain.Method);
-        Assert.Equal(AuditMethod.GrantCache, cached.Method);
-        Assert.Equal(3, fixture.Channel.Asked);
+        Assert.Equal(2, fixture.Channel.Asked);
     }
 
     private Vault Seeded()
@@ -99,7 +92,6 @@ public sealed class TagProtectionTests : IDisposable
         Entry = entry,
         Field = "password",
         Reason = "deploy billing",
-        TtlSeconds = 900,
         Exposure = ["services/**"],
         ClientName = "claude-code",
         ClientLabel = ApproverFixture.Agent,

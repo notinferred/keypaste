@@ -6,12 +6,12 @@ keypaste asks you before an agent gets a value and records what it gives, but th
 
 | Path | Why |
 |---|---|
-| `~/.keypaste`, or `%USERPROFILE%\.keypaste` on Windows, or the folder `KEYPASTE_HOME` names: `clients.toml`, `app.toml`, `audit.jsonl`, `sessions/` | `clients.toml` holds this computer's ceilings on each agent, `app.toml` the vault every bridge without `--vault` asks for (D-0389), `audit.jsonl` the log `keypaste log` reads, and `sessions/` the claims that say which process holds a vault. |
+| `~/.keypaste`, or `%USERPROFILE%\.keypaste` on Windows, or the folder `KEYPASTE_HOME` names: `agents.toml`, `app.toml`, `audit.jsonl`, `sessions/` | `agents.toml` holds this computer's rules for agents, sealed with a key the vault holds, `app.toml` the vault every bridge without `--vault` asks for (D-0389), `audit.jsonl` the log `keypaste log` reads, and `sessions/` the claims that say which process holds a vault. |
 | Every tool's MCP configuration: `~/.claude.json` and a project's `.mcp.json` for Claude Code, `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) and a project's `.codex/config.toml` for Codex, `~/.cursor/mcp.json` and a project's `.cursor/mcp.json` for Cursor | It names the program the tool starts as keypaste, with its label, vault and reach (T-36). A project's `.codex/config.toml` can also set Codex's `sandbox_mode`. |
 | The vault and the `<vault>.backups` folder beside it | Replacing or deleting the vault loses your items, and the backups are how you get them back. |
 | The `keypaste` the tools start: the path on the `keypaste mcp` line `keypaste setup` prints, the app it belongs to (`/Applications/keypaste.app` on macOS, the AppImage on Linux, `%LOCALAPPDATA%\Programs\keypaste` on Windows) and `~/.local/bin/keypaste` on Linux | Whatever is at that path is the bridge every tool starts, with your approvals behind it. |
 
-The bridge itself needs some of these. `keypaste mcp` writes `audit.jsonl` and will not start without it (T-6), lowers `clients.toml` when an agent asks for less while nothing holds the vault (T-41), reads `app.toml`, and reaches the app or `keypaste approve` over a pipe that is a socket in the temporary folder on macOS and Linux and a named pipe on Windows (T-10). Claude Code's documentation says it starts MCP servers outside the sandbox it gives the agent's commands, and Codex's that its sandbox settings do not govern them, so the settings below leave the bridge that access; Cursor's documentation does not say where it starts them. For the same reason, do not run a whole tool inside a sandbox that keeps these paths from it, such as Claude Code started under the standalone `srt` with its default settings: its bridge would not start.
+The bridge itself needs some of these. `keypaste mcp` writes `audit.jsonl` and will not start without it (T-6), reads `app.toml`, and reaches the app or `keypaste approve` over a pipe that is a socket in the temporary folder on macOS and Linux and a named pipe on Windows (T-10). Claude Code's documentation says it starts MCP servers outside the sandbox it gives the agent's commands, and Codex's that its sandbox settings do not govern them, so the settings below leave the bridge that access; Cursor's documentation does not say where it starts them. For the same reason, do not run a whole tool inside a sandbox that keeps these paths from it, such as Claude Code started under the standalone `srt` with its default settings: its bridge would not start.
 
 ## For every tool
 
@@ -106,7 +106,7 @@ Cursor's documentation does not say whether a sandboxed command can read other p
 
 A sandbox confines the agent's own commands. Everything outside it still runs as you, and keypaste's limits there stand:
 
-- Anything that can reach the vault's holder and name an agent set to Automatic gets what that agent gets without a prompt (T-14).
+- Anything that can reach the vault's holder through a bridge gets every kind of value you allowed for every agent without a prompt, and under an agent's label what you allowed or always allowed for that agent (T-14).
 - A command an agent runs through keypaste's `run` tool receives the values, and the agent often wrote what that command does (T-35).
 - An agent's settings bind only the bridge that names them (T-36).
 - A process running as you outside the sandbox can read memory, files and keystrokes and talk to keypaste's pipe (T-10, T-18).
@@ -114,7 +114,7 @@ A sandbox confines the agent's own commands. Everything outside it still runs as
 
 ## How keypaste checks this
 
-ci's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, appends to `~/.keypaste/clients.toml` and to Codex's `config.toml` are refused and leave both unchanged. It does not try a project's `.mcp.json` or `.cursor/mcp.json`, which Codex's sandbox does not protect. That the bridge keeps its access rests on each tool's documentation. Nothing else in this guide is checked by keypaste: Claude Code has no command that runs a shell command in its sandbox without a model, Cursor's Agent CLI lists one only as hidden, and Codex's Windows sandbox is not driven ([L.3](steps/L.3.md)).
+ci's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. It does not try a project's `.mcp.json` or `.cursor/mcp.json`, which Codex's sandbox does not protect. That the bridge keeps its access rests on each tool's documentation. Nothing else in this guide is checked by keypaste: Claude Code has no command that runs a shell command in its sandbox without a model, Cursor's Agent CLI lists one only as hidden, and Codex's Windows sandbox is not driven ([L.3](steps/L.3.md)).
 
 ## Sources
 

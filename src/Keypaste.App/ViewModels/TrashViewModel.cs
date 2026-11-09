@@ -50,7 +50,6 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         Table.OrderChanged += OnOrderChanged;
 
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null && !IsConfirming);
-        RestoreAsCommand = new RelayCommand(RestoreAs, () => _selected is not null && RestoreAsTitle is not null && !IsConfirming);
         SelectedRows.CollectionChanged += (_, _) => PurgeCommand?.NotifyCanExecuteChanged();
         PurgeCommand = new RelayCommand(
             () => IsConfirmingPurge = true,
@@ -84,23 +83,14 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            // A confirmation is armed for one row, and so is an offer of another title. Moving the
-            // selection while either is showing would leave its button pointing at another entry.
+            // A confirmation is armed for one row; moving the selection while it shows would leave its button pointing at another entry.
             if (SetProperty(ref _selected, value))
             {
                 OnPropertyChanged(nameof(HasSelection));
                 OnPropertyChanged(nameof(PurgePrompt));
                 RestoreCommand.NotifyCanExecuteChanged();
-                RestoreAsCommand.NotifyCanExecuteChanged();
                 PurgeCommand.NotifyCanExecuteChanged();
                 IsConfirmingPurge = false;
-
-                // The refusal beside an offer names its button, so it goes with it.
-                if (RestoreAsTitle is not null)
-                {
-                    RestoreAsTitle = null;
-                    Error = null;
-                }
             }
         }
     }
@@ -128,7 +118,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     /// <c>KpDanger</c> appears on this screen: a restore is ordinary, and erasing a value is not.
     /// </remarks>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(RestoreAsCommand), nameof(PurgeCommand), nameof(ConfirmPurgeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(PurgeCommand), nameof(ConfirmPurgeCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelPurgeCommand), nameof(EmptyCommand))]
     internal partial bool IsConfirmingPurge { get; private set; }
 
@@ -140,7 +130,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     /// <summary>Whether emptying the whole bin is waiting to be confirmed.</summary>
     /// <remarks>The same second act as <see cref="IsConfirmingPurge"/>, for every row at once.</remarks>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(RestoreAsCommand), nameof(PurgeCommand), nameof(EmptyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(PurgeCommand), nameof(EmptyCommand))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmEmptyCommand), nameof(CancelEmptyCommand))]
     internal partial bool IsConfirmingEmpty { get; private set; }
 
@@ -151,17 +141,6 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         1 => "Delete the one item in the Trash and its history for good? This cannot be undone.",
         var count => Invariant($"Delete all {count} items in the Trash and their history for good? This cannot be undone."),
     };
-
-    /// <summary>The title a restore refused for a taken name can put the selected entry back under, or null.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OffersRestoreAs), nameof(RestoreAsLabel))]
-    [NotifyCanExecuteChangedFor(nameof(RestoreAsCommand))]
-    internal partial string? RestoreAsTitle { get; private set; }
-
-    internal bool OffersRestoreAs => RestoreAsTitle is not null;
-
-    /// <summary>The offer's button: <c>Restore as production (restored)</c>.</summary>
-    internal string RestoreAsLabel => RestoreAsTitle is { } title ? $"Restore as {title}" : string.Empty;
 
     /// <summary>What the last action did, or null.</summary>
     [ObservableProperty]
@@ -180,7 +159,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     /// <summary>Puts the selected entry back where it was deleted from.</summary>
     internal RelayCommand RestoreCommand { get; }
 
-    /// <summary>Puts every selected entry back in one save; one whose name is taken stays in the bin and is named.</summary>
+    /// <summary>Puts every selected entry back in one save; one that cannot go back stays in the bin and is named.</summary>
     private void RestoreSeveral(IReadOnlyList<TrashRow> rows)
     {
         var write = _session.Write(
@@ -198,13 +177,10 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         Report(
             back == 0 ? null : back == 1 ? "1 item is back." : Invariant($"{back} items are back."),
-            left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Something else has the name, or it left the Trash. Restore each one alone to see why.");
+            left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Restore each one alone to see why.");
         SelectedRows.Clear();
         Load();
     }
-
-    /// <summary>Puts the selected entry back under the first free <c>(restored)</c> title, its own being taken.</summary>
-    internal RelayCommand RestoreAsCommand { get; }
 
     /// <summary>Asks for confirmation. It deletes nothing.</summary>
     internal RelayCommand PurgeCommand { get; }
@@ -283,7 +259,6 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         Selected = null;
         IsConfirmingPurge = false;
         IsConfirmingEmpty = false;
-        RestoreAsTitle = null;
         Notice = null;
         Error = null;
     }
@@ -311,8 +286,6 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
             return;
         }
 
-        string? offer = null;
-
         switch (write.Value)
         {
             case RestoreOutcome.Restored:
@@ -324,64 +297,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             case RestoreOutcome.DestinationOccupied:
-                // Core refused the restore whole; another title is offered when the entry can
-                // take one, and taken only on a second press.
-                offer = _session.Unlocked?.RenamedRestoreName(row.Id) is { } free
-                    ? EntryNameSanitizer.Sanitize(free.Title).Text
-                    : null;
-                Report(
-                    null,
-                    offer is null
-                        ? $"Something else is called {row.DisplayTitle} in {row.Where} now, so this cannot go back under its own name. Rename or delete that one first."
-                        : $"Something else is called {row.DisplayTitle} in {row.Where} now, so this cannot go back under its own name. Restore it as {offer}, or rename or delete that one first.");
-                break;
-
-            default:
-                Report(null, $"{row.DisplayTitle} is not in the Trash any more. Check the list.");
-                break;
-        }
-
-        Load();
-
-        // Load's fresh rows reset the selection, which drops any offer, so it is made once they are in place.
-        if (offer is not null && _selected?.Id == row.Id)
-        {
-            RestoreAsTitle = offer;
-        }
-    }
-
-    /// <summary>Puts the selected entry back under the first free <c>(restored)</c> title, its own being taken.</summary>
-    private void RestoreAs()
-    {
-        if (_selected is not { } row || RestoreAsTitle is null)
-        {
-            return;
-        }
-
-        var write = _session.Write(
-            vault => (Outcome: vault.RestoreRecycledRenamed(row.Id, out var name), Name: name),
-            result => result.Outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot);
-
-        if (write.Problem("restore this again") is { } problem)
-        {
-            Report(null, problem);
-            return;
-        }
-
-        var title = write.Value.Name is { } restored ? EntryNameSanitizer.Sanitize(restored.Title).Text : string.Empty;
-
-        switch (write.Value.Outcome)
-        {
-            case RestoreOutcome.Restored:
-                Report($"{row.DisplayTitle} is back in {row.Where} as {title}.", null);
-                break;
-
-            case RestoreOutcome.RestoredToRoot:
-                Report($"{row.DisplayTitle} is back at the top level as {title}, because the group it came from is gone.", null);
-                break;
-
-            case RestoreOutcome.DestinationOccupied:
-                Report(null, $"Something else is called {row.DisplayTitle} in {row.Where} now, and this cannot take another name. Rename or delete that one first.");
+                Report(null, $"Something else is called {row.DisplayTitle} in {row.Where} now, so this cannot go back under its own name. Rename or delete that one first.");
                 break;
 
             default:
@@ -461,6 +377,5 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     {
         Notice = notice;
         Error = error;
-        RestoreAsTitle = null;
     }
 }

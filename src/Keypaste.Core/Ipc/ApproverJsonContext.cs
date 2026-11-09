@@ -23,19 +23,15 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(EnvRequestFrame))]
 [JsonSerializable(typeof(EnvReplyFrame))]
 [JsonSerializable(typeof(AttachedFrame))]
-[JsonSerializable(typeof(GrantsReplyFrame))]
-[JsonSerializable(typeof(RevokeGrantsRequestFrame))]
-[JsonSerializable(typeof(RevokeGrantsReplyFrame))]
 [JsonSerializable(typeof(LockReplyFrame))]
+[JsonSerializable(typeof(RulesChangeRequestFrame))]
+[JsonSerializable(typeof(RulesChangeReplyFrame))]
+[JsonSerializable(typeof(SaveRequestFrame))]
+[JsonSerializable(typeof(SaveReplyFrame))]
 [JsonSerializable(typeof(TokenEnvRequestFrame))]
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
 [JsonSerializable(typeof(WithdrawFrame))]
-[JsonSerializable(typeof(AccessListRequestFrame))]
-[JsonSerializable(typeof(AccessListReplyFrame))]
-[JsonSerializable(typeof(AccessRowFrame))]
-[JsonSerializable(typeof(AccessChangeRequestFrame))]
-[JsonSerializable(typeof(AccessChangeReplyFrame))]
 [JsonSerializable(typeof(EditRequestFrame))]
 [JsonSerializable(typeof(EditReplyFrame))]
 [JsonSerializable(typeof(BrowserPairRequestFrame))]
@@ -111,8 +107,8 @@ internal sealed class CredentialRequestFrame(CredentialRequest request)
     public string Session => request.Session;
     public string Entry => request.Entry;
     public string Field => request.Field;
+    public string? Attachment => request.Attachment;
     public string Reason => request.Reason;
-    public int TtlSeconds => request.TtlSeconds;
     public IReadOnlyList<string> Exposure => request.Exposure;
     public string? Client => request.ClientName;
     public string? ClientVersion => request.ClientVersion;
@@ -126,7 +122,7 @@ internal sealed class CredentialReplyFrame(CredentialReply reply)
     public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
     public int Method => (int)reply.Method;
     public string Reason => reply.Reason;
-    public int TtlSeconds => reply.TtlSeconds;
+    public int CodeSeconds => reply.CodeSeconds;
     public string? Entry => reply.Entry;
     public string? Session => reply.Session;
     public bool Recorded => reply.Recorded;
@@ -196,44 +192,24 @@ internal sealed class WithdrawFrame
     public string Kind { get; } = ApproverProtocol.WithdrawKind;
 }
 
-internal sealed class GrantsReplyFrame(GrantsReply reply, IEnumerable<GrantRow> grants, bool complete)
+internal sealed class RulesChangeRequestFrame(RulesChangeRequest request)
 {
     public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.GrantsKind;
-    public bool Answered => reply.Answered;
-    public bool Complete => complete;
-    public string Reason => reply.Reason;
-    public IEnumerable<GrantRow> Grants => grants;
-}
-
-internal sealed class GrantRow(GrantSummary grant)
-{
-    public string Id => grant.Id;
-    public string Kind => grant.Kind;
-    public string Client => grant.Client;
-    public string Scope => grant.Scope;
-    public string Field => grant.Field;
-    public int SecondsLeft => grant.SecondsLeft;
-}
-
-internal sealed class RevokeGrantsRequestFrame(RevokeGrantsRequest request)
-{
-    public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.RevokeGrantsKind;
+    public string Kind { get; } = ApproverProtocol.RulesKind;
     public string Vault => request.Vault;
     public string Session => request.Session;
-    public IReadOnlyList<string> Ids => request.Ids;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    public string? Client => request.Client;
-    public bool All => request.All;
+    public string Agent => request.Agent;
+    public string Change => ApproverProtocol.ChangeWord(request.Change);
+    public string Target => request.Target;
 }
 
-internal sealed class RevokeGrantsReplyFrame(RevokeGrantsReply reply)
+internal sealed class RulesChangeReplyFrame(RulesChangeReply reply)
 {
     public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.RevokeGrantsKind;
-    public int Revoked => reply.Revoked;
+    public string Kind { get; } = ApproverProtocol.RulesKind;
+    public bool Changed => reply.Changed;
     public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
 }
 
 internal sealed class LockReplyFrame(LockReply reply)
@@ -292,69 +268,12 @@ internal sealed class RunReplyFrame(RunReply reply)
     public int Outcome => (int)reply.Set.Outcome;
     public string Reason => reply.Reason;
     public int Method => (int)reply.Method;
-    public int GrantedSeconds => reply.GrantedSeconds;
     public IReadOnlyList<string> Entries => reply.Entries;
     public string? Session => reply.Session;
     public bool Recorded => reply.Recorded;
     public IEnumerable<ProblemRow> Problems => ProblemRow.Of(reply.Set);
     public IEnumerable<VariableRow>? Variables => VariableRow.Of(reply.Set);
     public IEnumerable<VariableRow>? Fills => VariableRow.FillsOf(reply.Set);
-}
-
-internal sealed class AccessListRequestFrame(AccessListRequest request)
-{
-    public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.AccessListKind;
-    public string Vault => request.Vault;
-    public string Session => request.Session;
-    public int From => request.From;
-}
-
-internal sealed class AccessListReplyFrame(AccessListReply reply, IEnumerable<AccessRowFrame> agents, bool complete)
-{
-    public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.AccessListKind;
-    public bool Answered => reply.Answered;
-    public bool Complete => complete;
-    public string Reason => reply.Reason;
-    public IEnumerable<AccessRowFrame> Agents => agents;
-}
-
-internal sealed class AccessRowFrame(AccessRow row)
-{
-    public string Name => row.Name;
-    public string Record => row.Record;
-    public bool Understood => row.Understood;
-    public int? ProjectsNotShown => row.ProjectsNotShown > 0 ? row.ProjectsNotShown : null;
-}
-
-internal sealed class AccessChangeRequestFrame(AccessChangeRequest request)
-{
-    public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.AccessChangeKind;
-    public string Vault => request.Vault;
-    public string Session => request.Session;
-    public string Agent => request.Agent;
-    public string Reason => request.Reason;
-    public string Origin => ApproverProtocol.OriginWord(request.Origin);
-    public string? Project => request.Project;
-    public string? Mode => request.Mode;
-    public IReadOnlyList<string>? See => request.See;
-    public string? Values => request.Values;
-    public string? Run => request.Run;
-    public string? PerHour => request.PerHour;
-    public string? Until => request.Until;
-    public bool Reset => request.Reset;
-}
-
-internal sealed class AccessChangeReplyFrame(AccessChangeReply reply)
-{
-    public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.AccessChangeKind;
-    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
-    public int Method => (int)reply.Method;
-    public string Reason => reply.Reason;
-    public bool Recorded => reply.Recorded;
 }
 
 internal sealed class EditRequestFrame(EditRequest request)
@@ -559,4 +478,34 @@ internal sealed class BrowserLoginRow(BrowserLogin login)
     public string Password => login.Password;
     public string Name => login.Name;
     public string Uuid => login.Uuid;
+}
+
+internal sealed class SaveRequestFrame(SaveRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SaveKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Item => request.Item;
+    public string Field => request.Field;
+    public string Project => request.Project;
+    public string Environment => request.Environment;
+    public string Key => request.Key;
+    public string Reason => request.Reason;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? Client => request.ClientName;
+    public string? ClientVersion => request.ClientVersion;
+    public string? ClientLabel => request.ClientLabel;
+}
+
+internal sealed class SaveReplyFrame(SaveReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SaveKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
+    public string? Where => reply.Where;
+    public string? Session => reply.Session;
 }

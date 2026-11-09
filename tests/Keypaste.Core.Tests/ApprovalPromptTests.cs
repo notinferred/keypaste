@@ -14,7 +14,7 @@ namespace Keypaste.Core.Tests;
 public sealed class ApprovalPromptTests
 {
     private static ApprovalPrompt For(string reason = "deploy billing to staging", string? client = "claude-code") =>
-        ApprovalPrompt.For(client, new EntryName("env/dev", "STRIPE_KEY"), "password", reason, 300);
+        ApprovalPrompt.For(client, new EntryName("env/dev", "STRIPE_KEY"), "password", reason);
 
     [Fact]
     public void ItShowsTheFourThingsAHumanNeedsToDecide()
@@ -25,7 +25,6 @@ public sealed class ApprovalPromptTests
         Assert.Equal("env/dev/STRIPE_KEY", prompt.Entry, StringComparer.Ordinal);
         Assert.Equal("password", prompt.Field, StringComparer.Ordinal);
         Assert.Equal("deploy billing to staging", prompt.Reason, StringComparer.Ordinal);
-        Assert.Equal(300, prompt.TtlSeconds);
         Assert.False(prompt.ReasonWasTruncated);
     }
 
@@ -44,11 +43,12 @@ public sealed class ApprovalPromptTests
     /// put either. They are set from the sanitizer's own result rather than from anything the agent
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
-    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the agent's settings,
-    /// never from the request's text: it says why no timed grant is offered, and nothing else.
-    /// <c>AlwaysFor</c> is the project environment the approver reads from the entry's own tag for a
-    /// named agent, never from the request's text: it adds one choice that still asks for its own
-    /// confirmation, and leaves the default a denial and the deadline where it was.
+    /// <c>OffersAlways</c> is set by the approver from the bridge's label and the room left in this computer's rules,
+    /// never from the request's text: it adds Always allow and Always block, each still confirmed in a step of its own,
+    /// and leaves the default a denial and the deadline where it was.
+    /// <c>Candidates</c> are the items the approver read from the vault for the name the request resolved to, each with its
+    /// own names and its own offer, never the request's text: a list in the vault's order with none picked, so it adds no
+    /// default, no duration and no position a reason could choose. <c>Item</c> is the one item's UUID, read from the vault.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -60,17 +60,17 @@ public sealed class ApprovalPromptTests
 
         Assert.Equal(
             [
-                "AlwaysFor",
+                "Candidates",
                 "Client",
                 "Entry",
                 "EntryWasAltered",
                 "Field",
+                "Item",
                 "Label",
-                "OnceOnly",
+                "OffersAlways",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
-                "TtlSeconds",
             ],
             members.Order(StringComparer.Ordinal));
     }
@@ -159,11 +159,11 @@ public sealed class ApprovalPromptTests
     public void TheClientLabel_IsSanitizedAndCapped_AndAbsentWhenNoneWasGiven()
     {
         var label = ApprovalPrompt.For(
-            "claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy", 300, new string('l', 300) + "‮");
+            "claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy", new string('l', 300) + "‮");
 
         Assert.Equal(ApprovalPrompt.MaximumClientLength, label.Label!.Length);
         Assert.Null(For().Label);
-        Assert.Null(ApprovalPrompt.For("c", new EntryName("", "t"), "password", "r", 1, "").Label);
+        Assert.Null(ApprovalPrompt.For("c", new EntryName("", "t"), "password", "r", "").Label);
     }
 
     [Fact]
@@ -186,8 +186,7 @@ public sealed class ApprovalPromptTests
             "claude-code",
             new EntryName("env/dev", "../../prod/ROOT_TOKEN"),
             "password",
-            "routine",
-            300);
+            "routine");
 
         Assert.Equal("env/dev/.. .. prod ROOT_TOKEN", prompt.Entry, StringComparer.Ordinal);
         Assert.StartsWith("env/dev/", prompt.Entry, StringComparison.Ordinal);
@@ -196,24 +195,9 @@ public sealed class ApprovalPromptTests
     [Fact]
     public void AnEntryInTheRootGroup_IsJustItsTitle()
     {
-        var prompt = ApprovalPrompt.For("c", new EntryName("", "LOOSE"), "password", "routine", 60);
+        var prompt = ApprovalPrompt.For("c", new EntryName("", "LOOSE"), "password", "routine");
 
         Assert.Equal("LOOSE", prompt.Entry, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// An Automatic release lasts what the agent asked for, never past the operator's ceiling.
-    /// A person's timed grant is not bounded this way: they chose its length on screen.
-    /// </summary>
-    [Fact]
-    public void AnAutomaticReleaseIsBoundedByTheRequestAndTheCeiling()
-    {
-        var limits = ApprovalLimits.Default with { MaximumTtlSeconds = 300 };
-
-        Assert.Equal(300, limits.EffectiveTtlSeconds(3600));
-        Assert.Equal(60, limits.EffectiveTtlSeconds(60));
-        Assert.Equal(1, limits.EffectiveTtlSeconds(0));
-        Assert.Equal(1, limits.EffectiveTtlSeconds(-99));
     }
 
     [Fact]
@@ -225,38 +209,5 @@ public sealed class ApprovalPromptTests
         Assert.True(ApprovalLimits.DefaultWindowSeconds < 60);
         Assert.True(ApprovalLimits.MaximumWindowSeconds < 60);
         Assert.True(ApprovalLimits.MinimumWindowSeconds <= ApprovalLimits.DefaultWindowSeconds);
-    }
-
-    /// <summary>A change asked for with no reason, as Always for and the app's own settings ask, shows none rather than a placeholder.</summary>
-    [Fact]
-    public void AChangeWithNoReason_ShowsNone_AndOneScrubbedAwayIsSaidToBe()
-    {
-        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Run = true });
-
-        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
-        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds);
-
-        Assert.Equal((string.Empty, false, false), (none.Reason, none.ReasonWasAltered, none.ReasonWasTruncated));
-        Assert.True(scrubbed.ReasonWasAltered);
-        Assert.NotEmpty(scrubbed.Reason);
-    }
-
-    /// <summary>
-    /// The selectors an agent asks to see are shown in the confirmation with each character that could
-    /// hide or reorder text as an escape, so a pattern cannot pass for another or push what follows out
-    /// of view.
-    /// </summary>
-    [Fact]
-    public void AChangesGains_ShowEveryCharacterOfWhatItWouldSee()
-    {
-        var hidden = "x" + new string('\u2028', 20) + "**";
-        Assert.True(EntryExposure.TryCreate(["tag:env:billing", hidden, "\u202Eprod/**"], out var see, out var error), error);
-        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { See = see });
-
-        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc, ApprovalLimits.DefaultMaximumTtlSeconds).Gains);
-
-        Assert.Equal($"sees tag:env:billing, x{string.Concat(Enumerable.Repeat("\\u2028", 20))}**, \\u202Eprod/**", gain);
-        Assert.DoesNotContain('\u2028', gain);
-        Assert.DoesNotContain('\u202E', gain);
     }
 }

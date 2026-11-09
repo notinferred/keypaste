@@ -173,7 +173,7 @@ public sealed partial class LanguageAndRegionTests
         {
             "keypaste", "API_KEY", "Work/github", "~/code/acme-api", "db.example.com:5432", "env:project:prod", "https://", "OPENAI_API_KEY", "STRIPE_SECRET_KEY", "billing-api", "npm start", "staging", "STRIPE_KEY", "FIELD_NAME", "ci-staging", "read:acme-api/staging/*",
         };
-        var prompts = new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "AccessChangeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow" };
+        var prompts = new[] { "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow" };
         var app = Path.Combine(RepoRoot(), "src", "Keypaste.App");
 
         var literals = Directory.EnumerateFiles(app, "*.axaml", SearchOption.AllDirectories)
@@ -212,7 +212,7 @@ public sealed partial class LanguageAndRegionTests
     {
         var views = Path.Combine(RepoRoot(), "src", "Keypaste.App", "Views");
 
-        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "AccessChangeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow" })
+        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow" })
         {
             Assert.DoesNotContain("res:Strings", File.ReadAllText(Path.Combine(views, prompt + ".axaml")), StringComparison.Ordinal);
         }
@@ -258,17 +258,6 @@ public sealed partial class LanguageAndRegionTests
 
         Assert.All(shell.Window.GetVisualDescendants().OfType<RevealedValue>(), value => Assert.Equal(FlowDirection.LeftToRight, value.FlowDirection));
         Assert.All(shell.Window.GetVisualDescendants().OfType<MaskedInput>(), input => Assert.Equal(FlowDirection.LeftToRight, input.FlowDirection));
-    });
-
-    [Fact]
-    public Task A_prompt_window_keeps_left_to_right_under_a_right_to_left_culture() => HeadlessSession.On(() =>
-    {
-        using var pseudo = PseudoLocale.RightToLeft();
-        var notice = new NoticeWindow();
-        notice.Show();
-        Assert.Equal(FlowDirection.LeftToRight, notice.FlowDirection);
-        Assert.All(notice.GetVisualDescendants().OfType<TextBlock>(), text => Assert.NotEqual(TextAlignment.Right, text.TextAlignment));
-        notice.Close();
     });
 
     [Fact]

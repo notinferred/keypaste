@@ -260,7 +260,6 @@ public sealed class ListingSizeTests
                 ["entry"] = "env/dev/STRIPE_KEY",
                 ["field"] = "password",
                 ["reason"] = "deploy the billing service to staging",
-                ["ttl_seconds"] = 300,
             },
             cancellationToken: Token);
 

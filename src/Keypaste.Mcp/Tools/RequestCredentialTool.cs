@@ -9,7 +9,8 @@ using ModelContextProtocol.Server;
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
-/// The tool an agent uses to ask for one field of one entry. A person decides every time.
+/// The tool an agent uses to ask for one field of one entry, or, as <c>request_attachment</c>, one of its attachments
+/// by name. Its category's rule decides, and a person when that rule is Ask.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,10 +33,15 @@ namespace Keypaste.Mcp.Tools;
 /// (law 3.3, THREATS.md T-6). If the log refuses, so does the call.
 /// </para>
 /// </remarks>
+/// <param name="options">What this bridge was started with.</param>
+/// <param name="approver">The connection to the vault's owner.</param>
+/// <param name="audit">The bridge's audit log.</param>
+/// <param name="attachments">Whether this is <c>request_attachment</c>, which takes an attachment's <c>name</c> where the other takes a <c>field</c>.</param>
 internal sealed class RequestCredentialTool(
     ServerOptions options,
     ApproverConnection approver,
-    AuditLog audit) : McpServerTool
+    AuditLog audit,
+    bool attachments = false) : McpServerTool
 {
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
@@ -43,10 +49,10 @@ internal sealed class RequestCredentialTool(
     /// <inheritdoc/>
     public override Tool ProtocolTool { get; } = new()
     {
-        Name = ToolText.CredentialToolName,
-        Title = "Request one credential",
-        Description = ToolText.CredentialDescription,
-        InputSchema = ToolSchemas.CredentialInput,
+        Name = attachments ? ToolText.AttachmentToolName : ToolText.CredentialToolName,
+        Title = attachments ? "Request one attachment" : "Request one credential",
+        Description = attachments ? ToolText.AttachmentDescription : ToolText.CredentialDescription,
+        InputSchema = attachments ? ToolSchemas.AttachmentInput : ToolSchemas.CredentialInput,
         Annotations = new ToolAnnotations
         {
             // ReadOnlyHint is false although the tool only reads: clients treat it as "safe to run
@@ -69,9 +75,9 @@ internal sealed class RequestCredentialTool(
         var arguments = request.Params?.Arguments;
 
         var entry = ReadString(arguments, "entry");
-        var field = ReadString(arguments, "field");
+        var field = attachments ? CredentialFields.Attachment : ReadString(arguments, "field");
+        var attachment = attachments ? ReadString(arguments, "name") : null;
         var reason = ReadString(arguments, "reason");
-        var ttl = ReadInteger(arguments, "ttl_seconds");
 
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
@@ -92,7 +98,7 @@ internal sealed class RequestCredentialTool(
         {
             try
             {
-                verdict = await DecideAsync(client, entry, field, reason, ttl, cancellationToken).ConfigureAwait(false);
+                verdict = await DecideAsync(client, entry, field, attachment, reason, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -115,13 +121,11 @@ internal sealed class RequestCredentialTool(
             client,
             entry,
             field,
-            ttl,
             reason,
             verdict.Decision,
             verdict.Method,
-            verdict.Reason,
+            RequestRecords.Naming(attachment, verdict.Reason),
             verdict.ResolvedEntry,
-            verdict.Released?.TtlSeconds,
             options.Exposure.Globs,
             verdict.Session,
             options.VaultKey);
@@ -134,9 +138,11 @@ internal sealed class RequestCredentialTool(
             return ToolResults.Refuse(ToolText.AuditUnavailable);
         }
 
-        return verdict.Released is { } released
-            ? ToolResults.Release(released.Field, released.Value, released.TtlSeconds, verdict.Method)
-            : ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method));
+        return verdict.Released is not { } released
+            ? ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method))
+            : attachment is not null
+                ? ToolResults.ReleaseAttachment(attachment, released.Value, verdict.Method)
+                : ToolResults.Release(released.Field, released.Value, released.CodeSeconds, verdict.Method);
     }
 
     /// <summary>
@@ -151,11 +157,11 @@ internal sealed class RequestCredentialTool(
         AuditClient client,
         string entry,
         string field,
+        string? attachment,
         string reason,
-        int ttl,
         CancellationToken cancellationToken)
     {
-        if (CredentialRequestRules.Check(entry, field, reason, ttl) is { } problem)
+        if (CredentialRequestRules.Check(entry, field, attachment, reason) is { } problem)
         {
             return Invalid(problem.Argument, problem.Rule);
         }
@@ -176,8 +182,8 @@ internal sealed class RequestCredentialTool(
             {
                 Entry = entry,
                 Field = field,
+                Attachment = attachment,
                 Reason = reason,
-                TtlSeconds = ttl,
                 Exposure = options.Exposure.Globs,
                 ClientName = client.Name,
                 ClientVersion = client.Version,
@@ -263,7 +269,7 @@ internal sealed class RequestCredentialTool(
             AuditDecision.Granted,
             reply.Method,
             reply.Reason,
-            new Released(field, reply.Value, reply.TtlSeconds),
+            new Released(field, reply.Value, reply.CodeSeconds),
             ResolvedEntry: reply.Entry,
             Session: reply.Session)
         {
@@ -289,21 +295,8 @@ internal sealed class RequestCredentialTool(
             ? element.GetString() ?? string.Empty
             : string.Empty;
 
-    /// <summary>Reads an integer argument, or <c>-1</c> when it is missing or unusable.</summary>
-    /// <remarks>
-    /// A sentinel rather than a nullable, because the audit line records what was asked for and
-    /// "nothing usable" is a thing worth recording rather than omitting.
-    /// </remarks>
-    private static int ReadInteger(IDictionary<string, JsonElement>? arguments, string name) =>
-        arguments is not null
-        && arguments.TryGetValue(name, out var element)
-        && element.ValueKind == JsonValueKind.Number
-        && element.TryGetInt32(out var value)
-            ? value
-            : -1;
-
     /// <summary>One field, released. The only shape in this file that can hold a credential.</summary>
-    private readonly record struct Released(string Field, string Value, int TtlSeconds);
+    private readonly record struct Released(string Field, string Value, int CodeSeconds);
 
     /// <summary>
     /// What was decided, in the two forms it is needed: the words for the log and the answer for

@@ -1023,7 +1023,7 @@ mcp_start() {
 mcp_say() { printf '%s\n' "$1" >&8; }
 
 mcp_request() {
-  mcp_say "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_FIELD\",\"field\":\"$FIELD\",\"reason\":\"$2\",\"ttl_seconds\":60}}}"
+  mcp_say "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_FIELD\",\"field\":\"$FIELD\",\"reason\":\"$2\"}}}"
 }
 
 replied() {
@@ -1393,7 +1393,7 @@ selftest() {
         '{"act":"connect","fact":"command","value":"/home/runner/.local/bin/keypaste mcp"}' \
         '{"act":"connect","fact":"has_vault","value":"false"}' \
         '{"act":"connect","fact":"server","value":"{\"name\":\"keypaste\"}"}' \
-        '{"act":"connect","fact":"tools","value":"list_entries request_credential request_access_change"}' \
+        '{"act":"connect","fact":"tools","value":"list_entries request_credential"}' \
         '{"act":"approve-deny","fact":"expected_sha256","value":"b2"}' \
         '{"act":"approve-deny","fact":"allow_unfocused","value":"not enabled"}' \
         '{"act":"approve-deny","fact":"allow_activated","value":"enabled"}' \

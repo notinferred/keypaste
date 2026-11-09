@@ -48,7 +48,7 @@ public static class KeypasteHome
         Path.Combine(Resolve(fromEnvironment), AuditFileName);
 
     /// <summary>Resolves where the retired policy file was kept, so <c>keypaste approve</c> can say it no longer reads one there.</summary>
-    /// <remarks>Agents' settings are kept in the vault now, and this computer's ceilings in <see cref="ClientsPath"/>.</remarks>
+    /// <remarks>Agents' rules are kept in <see cref="AgentsPath"/> now.</remarks>
     public static string PolicyPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), PolicyFileName);
 
@@ -92,15 +92,11 @@ public static class KeypasteHome
     public static string CrashReportsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), CrashReportsDirectoryName);
 
-    /// <summary>This computer's ceilings on each agent, keyed by each bridge's <c>--client-label</c>.</summary>
-    public const string ClientsFileName = "clients.toml";
+    /// <summary>The rules every agent's request is decided by on this computer, and each known agent's run switch.</summary>
+    public const string AgentsFileName = "agents.toml";
 
-    /// <summary>Resolves this computer's ceilings on agents. The file is not created.</summary>
-    /// <remarks>
-    /// Every setting in it only takes away from what the vault's settings give, so a hand or a script
-    /// that edits it can only narrow, and a narrowing kept here outlives a restore or a merge of the
-    /// vault. Not <c>app.toml</c>, which holds preferences: <c>keypaste approve</c> enforces the same file.
-    /// </remarks>
-    public static string ClientsPath(string? fromEnvironment) =>
-        Path.Combine(Resolve(fromEnvironment), ClientsFileName);
+    /// <summary>Resolves the agents' rules. The file is not created.</summary>
+    /// <remarks>Not <c>app.toml</c>, which holds the desktop's preferences: <c>keypaste approve</c> decides by the same file.</remarks>
+    public static string AgentsPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), AgentsFileName);
 }

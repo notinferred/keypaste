@@ -54,6 +54,12 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>The session every attachment is given.</summary>
     internal string Session { get; set; } = "fake-session";
 
+    /// <summary>What a save request is answered with.</summary>
+    internal SaveReply SaveAnswer { get; set; } = new(AuditDecision.Denied, AuditMethod.Prompt, "a person did not save a value there");
+
+    /// <summary>Every save request that arrived.</summary>
+    internal ConcurrentQueue<SaveRequest> SavesReceived { get; } = [];
+
     /// <summary>Set to refuse every attachment with this reply instead.</summary>
     internal AttachReply? AttachRefusal { get; set; }
 
@@ -93,12 +99,6 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>How many runs reached the approver.</summary>
     internal int Runs => Volatile.Read(ref _runs);
 
-    /// <summary>How the approver answers a change to an agent's settings; null answers as an owner that keeps none.</summary>
-    internal Func<AccessChangeRequest, AccessChangeReply>? AccessAnswer { get; set; }
-
-    /// <summary>Every change to an agent's settings that reached the approver, in the order it arrived.</summary>
-    internal ConcurrentQueue<AccessChangeRequest> AccessReceived { get; } = [];
-
     /// <summary>Whether each reply says this approver recorded the request, as an owner's does. True by default.</summary>
     internal bool Records { get; set; } = true;
 
@@ -121,15 +121,15 @@ internal sealed class FakeApprover : IAsyncDisposable
     }
 
     /// <summary>Starts listening and says yes to everything, releasing <see cref="Sentinel"/>.</summary>
-    internal FakeApprover StartApproving(int ttlSeconds = 300)
+    internal FakeApprover StartApproving(int codeSeconds = 0)
     {
         Answer = new CredentialReply
         {
             Decision = AuditDecision.Granted,
             Method = AuditMethod.Prompt,
-            Reason = $"a person approved this request for {ttlSeconds} seconds",
+            Reason = "a person approved this one request",
             Entry = "env/dev/STRIPE_KEY",
-            TtlSeconds = ttlSeconds,
+            CodeSeconds = codeSeconds,
             Value = Sentinel,
         };
 
@@ -137,15 +137,14 @@ internal sealed class FakeApprover : IAsyncDisposable
     }
 
     /// <summary>Starts listening and releases everything under the agent's Automatic mode, asking nobody.</summary>
-    internal FakeApprover StartAutomatic(int ttlSeconds = 300)
+    internal FakeApprover StartAutomatic()
     {
         Answer = new CredentialReply
         {
             Decision = AuditDecision.Granted,
-            Method = AuditMethod.Automatic,
-            Reason = "released without asking: billing-bot's mode for this item is Automatic (project billing:dev)",
+            Method = AuditMethod.Allowed,
+            Reason = "released without asking: the person allows passwords for every agent",
             Entry = "env/dev/STRIPE_KEY",
-            TtlSeconds = ttlSeconds,
             Value = Sentinel,
         };
 
@@ -174,7 +173,6 @@ internal sealed class FakeApprover : IAsyncDisposable
             writer.WriteNumber("outcome", (int)outcome);
             writer.WriteString("reason", "the fake approver answered");
             writer.WriteNumber("method", (int)method);
-            writer.WriteNumber("granted_seconds", 0);
             writer.WriteStartArray("entries");
             writer.WriteEndArray();
             writer.WriteString("session", "fake-session");
@@ -208,7 +206,6 @@ internal sealed class FakeApprover : IAsyncDisposable
         Decision = AuditDecision.Denied,
         Method = method,
         Reason = reason,
-        TtlSeconds = 0,
     };
 
     public async ValueTask DisposeAsync()
@@ -296,6 +293,12 @@ internal sealed class FakeApprover : IAsyncDisposable
             return approver.Answer with { Session = approver.Session, Recorded = approver.Records };
         }
 
+        public ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.SavesReceived.Enqueue(request);
+            return ValueTask.FromResult(approver.SaveAnswer with { Recorded = approver.Records, Session = approver.Session });
+        }
+
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
@@ -311,15 +314,6 @@ internal sealed class FakeApprover : IAsyncDisposable
             }
 
             var reply = approver.RunAnswer?.Invoke(request) ?? RunReplyOf(EnvOutcome.NoSession, AuditMethod.NoSession, []);
-            return ValueTask.FromResult(reply with { Recorded = approver.Records });
-        }
-
-        public ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken)
-        {
-            approver.AccessReceived.Enqueue(request);
-
-            var reply = approver.AccessAnswer?.Invoke(request)
-                ?? new AccessChangeReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process keeps no agent settings");
             return ValueTask.FromResult(reply with { Recorded = approver.Records });
         }
 

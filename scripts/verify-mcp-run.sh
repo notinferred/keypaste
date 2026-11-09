@@ -2,16 +2,17 @@
 # Proves the shipped run tool end to end, across two real processes: a real `keypaste approve` holds a
 # real vault and asks a person, and a real `keypaste mcp --allow-run` starts the command with the
 # approved value in its environment and returns its output scrubbed (D-0358, D-0359). An agent's
-# commands are off until the person turns them on, which they confirm in the agent's terminal. The
-# text a placeholder fills into a value from another field of its entry is scrubbed too (D-0465).
+# commands are off until `keypaste clients` turns them on through the owner, which seals the change, and
+# every run is then asked, the same run again included. The text a placeholder fills into a value from
+# another field of its entry is scrubbed too (D-0465).
 #
-# NEGATIVE CONTROL: this script fails if a run is asked about or started while the agent's settings
-# keep its commands off, if `--run on` applies without the person, if the approved run does not return
-# the command's exit code, if either stream is anything but the value's marker, if the sentinel
-# appears anywhere in the transcript or the audit log, if the same run on the same connection is asked
-# about again instead of served from the grant, if the text {S:DEPLOY_KEY} filled into DATABASE_URL
+# NEGATIVE CONTROL: this script fails if a run is asked about or started while the agent's run is off,
+# if `--run on` is not made and sealed by the owner, if the approved run does not return the command's
+# exit code, if either stream is anything but the value's marker, if the sentinel appears anywhere in the
+# transcript or the audit log, if the same run on the same connection starts without being asked about
+# again, if the text {S:DEPLOY_KEY} filled into DATABASE_URL
 # comes back as anything but DATABASE_URL's marker when the command prints it alone, if a denied run
-# starts anything, or if the audit lines do not name the entry, the grant, the session and the vault.
+# starts anything, or if the audit lines do not name the entry, the session and the vault.
 # These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -68,10 +69,9 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci 'DATABASE_URL=pre-{S:DEPLOY_KEY}-pos
   || die "could not store the value holding {S:DEPLOY_KEY}"
 
 # ------------------------------------------------------------------------------- start the owner
-# The master password, then one answer per prompt: y to turning ci-probe's commands on, h for the
-# first run, o for the third and d for the fourth. The second is served from the grant the h gave, so
-# nothing reads an answer for it.
-printf '%s\ny\nh\no\nd\n' "$MASTER" \
+# The master password, then one answer per run: o for the first three and d for the fourth. Turning
+# ci-probe's run on is made by the owner without a question, since every run is still asked.
+printf '%s\no\no\no\nd\n' "$MASTER" \
   | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -127,8 +127,8 @@ jq -se 'any(.[]; .id == 2 and .result.isError == true)' <"$OUT" >/dev/null || di
 [ "$(prompts_drawn)" -eq 0 ] || die "a run was asked about while the agent's commands are off"
 
 "$CLI" clients ci-probe --run on --vault "$VAULT" --approver "$PIPE" 2>"$ERR" \
-  || die "turning ci-probe's commands on, confirmed in the agent's terminal, was not applied"
-grep -q 'a change would give an agent more' "$AGENT_ERR" || die "turning commands on did not wait for the person"
+  || die "turning ci-probe's run on through the owner was not applied: $(cat "$ERR")"
+grep -q 'sealed by the process holding the vault' "$ERR" || die "turning run on did not say the owner sealed it"
 
 # -------------------------------------------------------------------------- one bridge, four runs
 # The denial comes last: it cools down every field it asked for, DATABASE_URL among them.
@@ -159,9 +159,10 @@ jq -se 'any(.[]; .id == 2 and .result.isError == false
   and .result.structuredContent.stderr == "[keypaste:DEPLOY_KEY]")' <"$OUT" >/dev/null \
   || die "the approved run did not come back as exit 3 with both streams scrubbed"
 
-# 2. The same run on the same connection is served from the grant the person gave, unasked.
+# 2. The same run is asked about again, and allowed once again.
 jq -se 'any(.[]; .id == 3 and .result.isError == false and .result.structuredContent.exit_code == 3)' <"$OUT" >/dev/null \
-  || die "the same run was not served from the grant"
+  || die "the same run, allowed once again, did not run"
+[ "$(prompts_drawn)" -eq 4 ] || die "expected each of the four runs to be asked about, got $(prompts_drawn) prompts"
 
 # 3. The text {S:DEPLOY_KEY} filled into DATABASE_URL, printed alone, comes back as DATABASE_URL's marker.
 jq -se 'any(.[]; .id == 4 and .result.isError == false
@@ -180,25 +181,22 @@ grep -q "$CORE" "$ERR" && die "the bridge's stderr carries the injected value"
 [ -f "$AUDIT" ] || die "no audit log was written"
 grep -q "$CORE" "$AUDIT" && die "the audit log carries the injected value"
 
-# 6. One line per run, naming the entry, the grant, the session and the vault, and one for the change between them.
+# 6. One line per run, naming the entry, how it was decided, the session and the vault, and one for the change.
 jq -e -s --arg s "$SESSION" '
   length == 6
   and .[0].tool == "run" and .[0].decision == "denied" and .[0].method == "run-off"
-  and .[1].tool == "access_change" and .[1].decision == "granted" and .[1].client.label == "ci-probe"
-  and (.[2:] | all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16)))
+  and .[1].tool == "access_change" and .[1].decision == "granted" and .[1].method == "rules-changed" and .[1].client.label == "ci-probe"
+  and ([.[2], .[3], .[4], .[5]] | all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16)))
   and .[0].session == $s
-  and .[2].decision == "granted" and .[2].method == "prompt" and .[2].granted_seconds == 900
-  and .[2].entries == ["env/ci/.env"] and (.[2].command | startswith("sh -c"))
-  and .[3].decision == "granted" and .[3].method == "grant-cache" and .[3].entries == ["env/ci/.env"]
-  and .[4].decision == "granted" and .[4].method == "prompt" and .[4].entries == ["env/ci/.env"]
+  and ([.[2], .[3], .[4]] | all(.[]; .decision == "granted" and .method == "prompt" and .entries == ["env/ci/.env"]))
+  and (.[2].command | startswith("sh -c"))
   and .[5].decision == "denied" and .[5].method == "prompt"' <"$AUDIT" >/dev/null \
-  || die "the audit lines do not show a run refused while off, the change, a prompted grant, a grant-served run, a run allowed once and a denial in session $SESSION"
+  || die "the audit lines do not show a run refused while off, the sealed change, three runs each allowed once and a denial in session $SESSION"
 
-# 7. The person was shown the exact command and the claim, and the owner narrated the grant's use.
+# 7. The person was shown the exact command and the claim, was told what the mode lets the agent do, and the owner narrated its use.
 grep -q 'tool         keypaste.run' "$AGENT_ERR" || die "the run dialog was not shown"
 grep -q 'ci run probe' "$AGENT_ERR" || die "the agent's stated reason was not shown to the person"
-grep -q 'under an allowance' "$AGENT_ERR" || die "the run an allowance served was not narrated"
 
 echo "ok: a person approved a run and denied another across two real processes; the value reached the"
-echo "    command and never the result, the transcript or the log, the grant served the same run once more,"
+echo "    command and never the result, the transcript or the log, the same run was asked about again,"
 echo "    and the text a placeholder filled into another value came back as that value's marker"

@@ -27,12 +27,10 @@ public sealed class LockVerbTests : IDisposable
         await using var owner = SessionOwner.Start(
             _harness,
             stopsListening ? SessionOwner.LockKind.StopsListening : SessionOwner.LockKind.KeepsListening);
-        owner.Grant("claude-code", "env/acme-api", "STRIPE_KEY");
 
         _harness.AssertExit(CliApp.ExitSuccess, Lock());
 
         Assert.False(owner.Lifetime.IsLive);
-        Assert.Empty(owner.Authority.Activity.Grants);
         Assert.Equal($"  ✓ locked {_harness.VaultPath} · agents paused" + Environment.NewLine, _harness.Err);
         Assert.Empty(_harness.Out);
         Assert.Empty(_harness.Prompt.PromptsSeen);

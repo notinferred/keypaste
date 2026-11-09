@@ -18,7 +18,7 @@ internal static class LockCommand
     internal static CliVerb Command { get; } = new(
         "lock",
         "lock now and pause all agents\n\n"
-            + "asks the keypaste app or `keypaste approve` holding the vault unlocked to lock it now. every allowance ends "
+            + "asks the keypaste app or `keypaste approve` holding the vault unlocked to lock it now. what waits is refused "
             + "and every agent is refused until somebody unlocks it again.",
         Execute)
     {

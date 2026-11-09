@@ -13,8 +13,7 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// <see cref="Withdraw(SessionWithdrawal)"/> withdraws what is waiting without ending it, as a reload does (D-0412) and a
 /// merge with another program's save (D-0542): a request that read <see cref="Waiting"/> before it then never commits,
-/// and one that begins after it waits anew. It first runs what <see cref="OnWithdraw"/> was given, so the owner's grants
-/// keep no allowance from a request asked before it.
+/// and one that begins after it waits anew.
 /// </para>
 /// <para>
 /// A lock waits for at most one commit check, never for a peer or a person.
@@ -25,7 +24,6 @@ public sealed class SessionLifetime : IDisposable
     private readonly Lock _gate = new();
     private readonly CancellationTokenSource _ended = new();
     private readonly List<IDisposable> _owned = [];
-    private readonly List<Action> _onWithdraw = [];
     private CancellationTokenSource _waiting = new();
     private CancellationToken _waitingToken;
     private SessionWithdrawal _withdrawal;
@@ -119,22 +117,6 @@ public sealed class SessionLifetime : IDisposable
         return owned;
     }
 
-    /// <summary>Runs <paramref name="withdrawing"/> each time <see cref="Withdraw(SessionWithdrawal)"/> withdraws what is waiting, before it does, until the lifetime ends.</summary>
-    /// <param name="withdrawing">What a withdrawal also does, such as ending every grant.</param>
-    /// <remarks>Given to a lifetime that has already ended, it is never run.</remarks>
-    public void OnWithdraw(Action withdrawing)
-    {
-        ArgumentNullException.ThrowIfNull(withdrawing);
-
-        lock (_gate)
-        {
-            if (_live)
-            {
-                _onWithdraw.Add(withdrawing);
-            }
-        }
-    }
-
     /// <summary>Commits a release to this lifetime, if it is still live.</summary>
     /// <returns>False once the lifetime has ended, and then nothing may be released under it.</returns>
     public bool TryCommit()
@@ -168,23 +150,6 @@ public sealed class SessionLifetime : IDisposable
     public void Withdraw(SessionWithdrawal cause)
     {
         CancellationTokenSource withdrawn;
-        List<Action> withdrawing;
-
-        lock (_gate)
-        {
-            if (!_live)
-            {
-                return;
-            }
-
-            withdrawing = [.. _onWithdraw];
-        }
-
-        // Before the wait is replaced, so an answer that lands meanwhile finds its grant already refused.
-        foreach (var action in withdrawing)
-        {
-            action();
-        }
 
         lock (_gate)
         {
@@ -222,7 +187,6 @@ public sealed class SessionLifetime : IDisposable
             _live = false;
             owned = [.. _owned];
             _owned.Clear();
-            _onWithdraw.Clear();
             waiting = _waiting;
         }
 

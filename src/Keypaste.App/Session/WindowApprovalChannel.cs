@@ -10,13 +10,13 @@ namespace Keypaste.App.Session;
 /// Asks the person at this desktop, in a prompt window of its own, whether an agent may have one
 /// field or a <c>keypaste run --session</c> may have a project's variables, and
 /// whether a change that gives an agent more may take effect; and tells them, in a window of its own,
-/// when the change Always for asked for did not.
+/// when the change Always allow asked for did not.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
 /// screen, counts down the gate's window on it and reports the answer. Anything but a press of an
-/// allow, or of Always for where the prompt offers it, is a denial: Deny, Escape, closing the window,
+/// allow, or a confirmed Always allow where the prompt offers it, is a denial: Deny, Escape, closing the window,
 /// and every withdrawal, whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
@@ -28,17 +28,17 @@ namespace Keypaste.App.Session;
 /// </remarks>
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
-/// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 /// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>
+/// <param name="clipboard">Where a save prompt's value is pasted from, or null for none.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
-    Action<string>? openSettings = null,
     Action<Exception, string>? unexpected = null,
     Action? openBrowserFill = null,
-    RequestNotices? notices = null) : IApprovalChannel
+    RequestNotices? notices = null,
+    Func<Clipboard.IAppClipboard>? clipboard = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -63,6 +63,38 @@ internal sealed class WindowApprovalChannel(
         return ShowAsync(request, () => new ApprovalWindow(request), cancellationToken);
     }
 
+    /// <summary>Asks the person to pick which of the items a request names the agent gets, in a prompt window of its own.</summary>
+    public async ValueTask<ItemPick> AskToPickAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new ItemPickViewModel(prompt);
+        var answer = await ShowAsync(request, () => new ItemPickWindow(request), cancellationToken).ConfigureAwait(false);
+
+        return new ItemPick(answer, answer is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed ? request.PickedIndex : null);
+    }
+
+    /// <summary>Asks the person to enter and save a value an agent named the place of, in a prompt window of its own.</summary>
+    public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        // Disposed in the finally below, on the UI thread, where the window it is bound to lives; CA2000 cannot see that handoff.
+#pragma warning disable CA2000
+        var request = new SaveValueViewModel(prompt, clipboard?.Invoke() ?? Clipboard.NoClipboard.Instance, _clock);
+#pragma warning restore CA2000
+
+        try
+        {
+            var answer = await ShowAsync(request, () => new SaveValueWindow(request), cancellationToken).ConfigureAwait(false);
+            return new SaveAnswer(answer, answer == ApprovalAnswer.ApprovedOnce ? request.Composed() : null);
+        }
+        finally
+        {
+            DisposeOnUiThread(request);
+        }
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);
@@ -77,14 +109,6 @@ internal sealed class WindowApprovalChannel(
 
         var request = new RunApprovalViewModel(prompt);
         return ShowAsync(request, () => new RunApprovalWindow(request), cancellationToken);
-    }
-
-    public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        var request = new AccessChangeViewModel(prompt);
-        return ShowAsync(request, () => new AccessChangeWindow(request), cancellationToken);
     }
 
     public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
@@ -131,7 +155,7 @@ internal sealed class WindowApprovalChannel(
             {
                 // A notice that cannot be shown changes nothing: the request stays refused, and its line says why.
                 _pairingNotice = null;
-                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
+                unexpected?.Invoke(ex, CrashReporting.AlwaysNoticeSite);
             }
         });
     }
@@ -158,26 +182,6 @@ internal sealed class WindowApprovalChannel(
         showing.Window.BringForward();
         _ = ArmAsync(showing.Request, showing.Window, showing.Withdrawn);
         return true;
-    }
-
-    public void Tell(AlwaysForNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        UiThread.Post(() =>
-        {
-            try
-            {
-                var window = new NoticeWindow(notice, openSettings);
-                window.Show();
-                Shown?.Invoke(this, window);
-            }
-            catch (Exception ex)
-            {
-                // A notice that cannot be shown changes nothing: the release stands, and the change's line says why it did not.
-                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
-            }
-        });
     }
 
     private async ValueTask<ApprovalAnswer> ShowAsync(
@@ -245,6 +249,7 @@ internal sealed class WindowApprovalChannel(
                     _ = ArmAsync(request, shown, cancellationToken);
                 };
                 shown.Deactivated += (_, _) => request.Disarm();
+                request.Disarmed += (_, _) => _ = ArmAsync(request, shown, cancellationToken);
                 _showing = new Showing(request, shown, cancellationToken);
                 Shown?.Invoke(this, shown);
                 _ = ArmAsync(request, shown, cancellationToken);
@@ -295,6 +300,9 @@ internal sealed class WindowApprovalChannel(
             }
         });
     }
+
+    /// <summary>Disposes a prompt's model on the UI thread, after its window comes down, since disposing it tells the window.</summary>
+    private static void DisposeOnUiThread(IDisposable model) => OnUiThread(model.Dispose);
 
     private static void OnUiThread(Action action)
     {

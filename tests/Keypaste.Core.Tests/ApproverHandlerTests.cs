@@ -31,7 +31,6 @@ public sealed class ApproverHandlerTests
             Entry = entry,
             Field = field,
             Reason = "deploy billing to staging",
-            TtlSeconds = ttl,
             Exposure = exposure.Length == 0 ? ["env/**"] : exposure,
             ClientName = "claude-code",
             ClientLabel = ApproverFixture.Agent,
@@ -43,7 +42,7 @@ public sealed class ApproverHandlerTests
     public async Task AnApprovedRequest_ReleasesTheFieldAndRecordsWhy()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
@@ -73,7 +72,7 @@ public sealed class ApproverHandlerTests
         // ...and the same source does read when the answer changes once the refusal's cooldown is
         // over, so this is not passing because reading is broken.
         fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultCooldownSeconds + 1));
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
         Assert.Equal(1, fixture.Source.Reads);
@@ -88,7 +87,7 @@ public sealed class ApproverHandlerTests
     public async Task AnEntryOutsideTheExposure_IsRefusedWithoutAskingAnybody()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await fixture.Handler.RequestAsync(Request("personal/bank"), "conn-1", Token);
 
@@ -107,7 +106,7 @@ public sealed class ApproverHandlerTests
     public async Task AHandleOutsideTheExposure_IsRefusedNotPrompted()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var handle = EntryHandle.For(new EntryName("personal", "bank"));
 
@@ -139,7 +138,6 @@ public sealed class ApproverHandlerTests
         Assert.Equal(AuditMethod.OutOfScope, missing.Method);
         Assert.Equal(missing.Decision, forbidden.Decision);
         Assert.Equal(missing.Entry, forbidden.Entry);
-        Assert.Equal(missing.TtlSeconds, forbidden.TtlSeconds);
     }
 
     [Theory]
@@ -162,55 +160,14 @@ public sealed class ApproverHandlerTests
         Assert.NotEmpty(reply.Reason);
     }
 
-    /// <summary>The point of the grant cache: a person is not asked the same question twice.</summary>
-    [Fact]
-    public async Task ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        var first = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        var second = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditMethod.Prompt, first.Method);
-        Assert.Equal(AuditMethod.GrantCache, second.Method);
-        Assert.Equal(Sentinel, second.Value, StringComparer.Ordinal);
-
-        // One prompt, and one read of the vault. A cache that re-read would be keeping a
-        // capability alive rather than the datum a person actually approved.
-        Assert.Equal(1, fixture.Channel.Asked);
-        Assert.Equal(1, fixture.Source.Reads);
-    }
-
-    /// <summary>
-    /// The number an agent and the audit log are told. Remaining lifetime is asked of the clock
-    /// rather than counted down, so a wall clock moved backwards used to report more time left
-    /// than the person had approved — a lifetime longer than the ceiling SECURITY.md names.
-    /// </summary>
-    [Fact]
-    public async Task AReusedGrant_NeverReportsMoreTimeThanWasApproved()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        var approved = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        fixture.Clock.RewindWallOnly(TimeSpan.FromHours(1));
-
-        var reused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditMethod.GrantCache, reused.Method);
-        Assert.InRange(reused.TtlSeconds, 0, approved.TtlSeconds);
-    }
-
     [Fact]
     public async Task ARepeatRequestForADifferentField_AsksAgain()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         await fixture.Handler.RequestAsync(Request(field: "password"), "conn-1", Token);
-        var other = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-1", Token);
+        var other = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-1", Token);
 
         Assert.Equal(AuditMethod.Prompt, other.Method);
         Assert.Equal(2, fixture.Channel.Asked);
@@ -220,7 +177,7 @@ public sealed class ApproverHandlerTests
     public async Task AnotherConnection_GetsNothingFromSomebodyElsesGrant()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
@@ -228,78 +185,6 @@ public sealed class ApproverHandlerTests
         var other = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
 
         Assert.Equal(AuditDecision.Denied, other.Decision);
-    }
-
-    [Fact]
-    public async Task WhenAConnectionGoesAway_ItsGrantsGoWithIt()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        fixture.Handler.Disconnected("conn-1");
-
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-
-        Assert.Equal(AuditDecision.Denied, (await fixture.Handler.RequestAsync(Request(), "conn-1", Token)).Decision);
-    }
-
-    /// <summary>
-    /// A path and the handle for the same entry share one grant, so an agent cannot force a second
-    /// prompt for something it has already been given by spelling the entry differently.
-    /// </summary>
-    [Fact]
-    public async Task AHandleAndItsPath_ShareOneGrant()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY"), "conn-1", Token);
-
-        var handle = EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY"));
-        var again = await fixture.Handler.RequestAsync(Request(handle), "conn-1", Token);
-
-        Assert.Equal(AuditMethod.GrantCache, again.Method);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    /// <summary>
-    /// The person chooses the duration on screen, so the prompt offers the approver's ceiling however
-    /// short or long a lifetime the agent asked for.
-    /// </summary>
-    [Theory]
-    [InlineData(1)]
-    [InlineData(60)]
-    [InlineData(3600)]
-    public async Task ThePromptOffersTheCeiling_WhateverTheAgentAsked(int requested)
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        var reply = await fixture.Handler.RequestAsync(Request(ttl: requested), "conn-1", Token);
-
-        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, fixture.Channel.LastPrompt!.TtlSeconds);
-        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, reply.TtlSeconds);
-    }
-
-    /// <summary>The person is shown which configured connection is asking, as the bridge was labelled.</summary>
-    [Fact]
-    public async Task AnApprovedGrant_IsListedWithWhatThePersonApproved_AndNoValue()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        var activity = fixture.Handler.Activity();
-        var grant = Assert.Single(activity.Grants);
-
-        Assert.Empty(activity.Waiting);
-        Assert.Equal(new GrantKey("conn-1", EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY")), "password"), grant.Key);
-        Assert.Equal(fixture.Channel.LastPrompt, grant.Approved);
-        Assert.Equal(ApproverFixture.Agent, grant.Approved.Label, StringComparer.Ordinal);
-        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.Default.MaximumTtlSeconds), grant.Remaining);
-        Assert.DoesNotContain(Sentinel, grant.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -320,81 +205,6 @@ public sealed class ApproverHandlerTests
         Assert.Empty(fixture.Handler.Activity().Waiting);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task AfterARevoke_TheSameRequestIsAskedAgain_RatherThanRefused(bool all)
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        var grant = Assert.Single(fixture.Handler.Activity().Grants);
-
-        if (all)
-        {
-            fixture.Handler.RevokeAll();
-        }
-        else
-        {
-            fixture.Handler.Revoke(grant.Key);
-        }
-
-        Assert.Empty(fixture.Handler.Activity().Grants);
-
-        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditMethod.Prompt, again.Method);
-        Assert.Equal(AuditDecision.Granted, again.Decision);
-        Assert.Equal(2, fixture.Channel.Asked);
-    }
-
-    /// <summary>
-    /// Revoke all while the person is still deciding: their timed allow releases this one request and
-    /// keeps nothing, and says it was once, so the next request is asked again (F03).
-    /// </summary>
-    [Fact]
-    public async Task AnAllowanceAnsweredAfterRevokeAll_IsReleasedOnceAndNotKept()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-        fixture.Channel.WhileAsking = () =>
-        {
-            fixture.Channel.WhileAsking = null;
-            fixture.Handler.RevokeAll();
-        };
-
-        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (released.Decision, released.Method));
-        Assert.Equal(Sentinel, released.Value, StringComparer.Ordinal);
-        Assert.Equal("a person approved this one request", released.Reason);
-        Assert.Equal(0, released.TtlSeconds);
-        Assert.Empty(fixture.Handler.Activity().Grants);
-        Assert.Contains("released env/dev/STRIPE_KEY to claude-code once", fixture.Narration);
-
-        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditMethod.Prompt, again.Method);
-        Assert.Equal(2, fixture.Channel.Asked);
-        Assert.Single(fixture.Handler.Activity().Grants);
-    }
-
-    /// <summary>The same when the grants end after the vault was read and before the grant would be kept, as an edit's or a reload's can.</summary>
-    [Fact]
-    public async Task AnAllowanceWhoseGrantsEndAsItIsRead_IsReleasedOnceAndNotKept()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-        fixture.Source.During = () => fixture.Grants.RevokeEntries(VaultEdit.Of(new EntryName("env/dev", "STRIPE_KEY")));
-
-        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditDecision.Granted, released.Decision);
-        Assert.Equal(0, released.TtlSeconds);
-        Assert.Equal(0, fixture.Grants.Count);
-    }
-
     [Fact]
     public async Task ThePromptCarriesTheBridgesLabel()
     {
@@ -409,7 +219,7 @@ public sealed class ApproverHandlerTests
     public async Task AFieldKeypasteDoesNotRelease_NeverReachesAPerson()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await fixture.Handler.RequestAsync(Request(field: "otp"), "conn-1", Token);
 
@@ -437,7 +247,7 @@ public sealed class ApproverHandlerTests
     public async Task AVaultThatFailsAfterTheApproval_StillDenies()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         fixture.Source.FailReads = true;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -479,7 +289,7 @@ public sealed class ApproverHandlerTests
     {
         using var fixture = new ApproverFixture();
         fixture.Source.Tagged[new EntryName("personal", "bank")] = ["env:billing"];
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var password = await fixture.Handler.RequestAsync(Request("personal/bank", "password", 900, EntryExposure.DefaultGlob), "conn-1", Token);
 
@@ -499,7 +309,7 @@ public sealed class ApproverHandlerTests
     public async Task AnUntaggedEntryUnderEnv_IsOutsideTheDefault()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY", "STRIPE_SECRET_KEY", 900, EntryExposure.DefaultGlob), "conn-1", Token);
 
@@ -535,7 +345,7 @@ public sealed class ApproverHandlerTests
     public async Task AReleaseTooBigToDeliver_IsRefusedAndSaysAPersonApprovedIt()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         fixture.Source.Value = new string('n', 100_000);
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -544,7 +354,6 @@ public sealed class ApproverHandlerTests
         Assert.Equal(AuditMethod.Undeliverable, reply.Method);
         Assert.Equal(ApproverProtocol.UndeliverableReason(AuditMethod.Prompt), reply.Reason, StringComparer.Ordinal);
         Assert.Null(reply.Value);
-        Assert.Equal(0, reply.TtlSeconds);
         Assert.Equal("env/dev/STRIPE_KEY", reply.Entry, StringComparer.Ordinal);
 
         // A person did answer, and the field was read. The record says denied because nothing
@@ -566,16 +375,14 @@ public sealed class ApproverHandlerTests
     public async Task AReleaseTooBigToDeliver_AsksAPersonOnce()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         fixture.Source.Value = new string('n', 100_000);
 
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
         var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
         Assert.Equal(1, fixture.Channel.Asked);
-        Assert.Equal(AuditMethod.Undeliverable, again.Method);
-        Assert.Equal(
-            ApproverProtocol.UndeliverableReason(AuditMethod.GrantCache), again.Reason, StringComparer.Ordinal);
+        Assert.Equal(AuditMethod.Cooldown, again.Method);
         Assert.Null(again.Value);
     }
 
@@ -589,7 +396,7 @@ public sealed class ApproverHandlerTests
     public async Task AnUndeliverableRelease_NeverTellsTheOperatorItWasReleased()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         fixture.Source.Value = new string('n', 100_000);
 
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -600,7 +407,7 @@ public sealed class ApproverHandlerTests
         // ...and it does say "released" when the reply actually leaves, so this is not passing
         // because the narration stopped working.
         fixture.Source.Value = ApproverFixture.Sentinel;
-        await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY"), "conn-2", Token);
+        await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
 
         Assert.Contains(fixture.Narration, line => line.StartsWith("released ", StringComparison.Ordinal));
     }
@@ -617,138 +424,25 @@ public sealed class ApproverHandlerTests
         Assert.Equal(AuditDecision.Granted, first.Decision);
         Assert.Equal(AuditMethod.Prompt, first.Method);
         Assert.Equal(Sentinel, first.Value, StringComparer.Ordinal);
-        Assert.Equal(0, first.TtlSeconds);
         Assert.Equal("a person approved this one request", first.Reason);
 
         // Nothing was kept, so the identical request is a fresh question rather than a cache hit.
         Assert.Equal(AuditMethod.Prompt, second.Method);
         Assert.Equal(2, fixture.Channel.Asked);
-        Assert.Empty(fixture.Handler.Activity().Grants);
         Assert.Contains(fixture.Narration, line => line.EndsWith(" once", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task AllowForTheHour_StoresAGrantForTheCeiling_NotTheAgentsTtl()
+    public async Task AProtectedEnvironment_IsDecidedByItsFieldsRule_LikeAnyOther()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        var first = await fixture.Handler.RequestAsync(Request(ttl: 60), "conn-1", Token);
-
-        fixture.Clock.Advance(TimeSpan.FromSeconds(61));
-        var second = await fixture.Handler.RequestAsync(Request(ttl: 60), "conn-1", Token);
-
-        Assert.Equal(3600, first.TtlSeconds);
-        Assert.Equal("a person approved this request for 1 hour", first.Reason);
-        Assert.Contains(fixture.Narration, line => line.EndsWith(" for 3600s", StringComparison.Ordinal));
-        Assert.Equal(AuditMethod.GrantCache, second.Method);
-        Assert.Equal(3600 - 61, second.TtlSeconds);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task TheTimedGrant_CoversOnlyThatConnectionEntryAndField()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-        var otherConnection = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
-        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-1", Token);
-        var same = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditDecision.Denied, otherConnection.Decision);
-        Assert.Equal(AuditDecision.Denied, otherField.Decision);
-        Assert.Equal(AuditMethod.GrantCache, same.Method);
-        Assert.Equal(3, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task MaxTtl_BoundsTheTimedGrant()
-    {
-        using var fixture = new ApproverFixture(limits: ApprovalLimits.Default with { MaximumTtlSeconds = 300 });
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        var reply = await fixture.Handler.RequestAsync(Request(ttl: 3600), "conn-1", Token);
-
-        Assert.Equal(300, fixture.Channel.LastPrompt!.TtlSeconds);
-        Assert.Equal(300, reply.TtlSeconds);
-        Assert.Equal("a person approved this request for 5 minutes", reply.Reason);
-    }
-
-    /// <summary>A channel that says "timed" to a prompt that offered none releases once and keeps nothing.</summary>
-    [Fact]
-    public async Task AnHourAnswer_ToAPromptOfferingNone_ReleasesOnceOnly()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-        var handler = LiveOnly(fixture);
-
-        var reply = await handler.RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
-        Assert.Equal(AuditDecision.Granted, reply.Decision);
-        Assert.Equal(0, reply.TtlSeconds);
-        Assert.Equal(0, fixture.Grants.Count);
-    }
-
-    [Fact]
-    public async Task ALiveOnlyEntry_IsNeverServedFromAGrant()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-
-        // A grant under exactly the same connection, entry and field, given while it was not live-only.
-        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        Assert.Equal(1, fixture.Grants.Count);
-
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(AuditDecision.Denied, reply.Decision);
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-        Assert.Equal(2, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task ALiveOnlyEntry_IsNeverReleasedAutomatically()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-
-        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
-
-        Assert.Equal(1, fixture.Channel.Asked);
-        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-
-        // The same mode does release without asking once the entry is not live-only.
-        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
-        Assert.Equal(AuditMethod.Automatic, released.Method);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task WithoutAPredicate_AnEntryTheSourceProtectsIsStillLiveOnly()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
-        var request = Request();
 
-        var first = await fixture.Handler.RequestAsync(request, "conn-1", Token);
-        var second = await fixture.Handler.RequestAsync(request, "conn-1", Token);
+        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Prompt, first.Method);
-        Assert.Equal(AuditMethod.Prompt, second.Method);
-        Assert.Equal(0, first.TtlSeconds);
-        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
-        Assert.Equal(2, fixture.Channel.Asked);
-        Assert.Equal(0, fixture.Grants.Count);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed), (released.Decision, released.Method));
+        Assert.Equal(0, fixture.Channel.Asked);
     }
 
     [Fact]
@@ -780,7 +474,7 @@ public sealed class ApproverHandlerTests
 
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var reconnected = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
-        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-2", Token);
 
         Assert.Equal(AuditMethod.Cooldown, reconnected.Method);
         Assert.Equal(AuditDecision.Granted, otherField.Decision);
@@ -792,13 +486,11 @@ public sealed class ApproverHandlerTests
     /// own, told to the operator's terminal, and cools its field down as a refusal does, so a retry from any
     /// connection troubles nobody while another field is still asked about (D-0465).
     /// </summary>
-    [Theory]
-    [InlineData(ApprovalAnswer.Approved)]
-    [InlineData(ApprovalAnswer.ApprovedOnce)]
-    public async Task AnAllowedValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown(ApprovalAnswer answer)
+    [Fact]
+    public async Task AnAllowedValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
     {
         using var fixture = new ApproverFixture();
-        fixture.Channel.Answer = answer;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         fixture.Source.Unfilled = _unfilled;
 
         var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -807,14 +499,13 @@ public sealed class ApproverHandlerTests
         Assert.Equal((AuditDecision.Denied, AuditMethod.Unfillable), (refused.Decision, refused.Method));
         Assert.Equal($"the item's password {_unfilled}", refused.Reason);
         Assert.Null(refused.Value);
-        Assert.Equal(0, fixture.Grants.Count);
         Assert.Equal(AuditMethod.Cooldown, again.Method);
         Assert.Equal(
             $"refused env/dev/STRIPE_KEY for claude-code: the item's password {_unfilled}; edit the item so keypaste can fill it in",
             fixture.Narration[0]);
 
         fixture.Source.Unfilled = null;
-        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "notes"), "conn-2", Token);
 
         Assert.Equal(AuditDecision.Granted, otherField.Decision);
         Assert.Equal(2, fixture.Channel.Asked);
@@ -825,7 +516,7 @@ public sealed class ApproverHandlerTests
     public async Task AnAutomaticValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
     {
         using var fixture = new ApproverFixture();
-        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
+        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         fixture.Source.Unfilled = _unfilled;
 
         var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -839,7 +530,4 @@ public sealed class ApproverHandlerTests
             $"refused env/dev/STRIPE_KEY for claude-code: the item's password {_unfilled}; edit the item so keypaste can fill it in",
             fixture.Narration[0]);
     }
-
-    private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
-        new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Settings, fixture.Narration.Add, _ => true, fixture.Hourly, fixture.Clock);
 }

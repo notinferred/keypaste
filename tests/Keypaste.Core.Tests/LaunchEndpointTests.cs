@@ -48,11 +48,8 @@ public sealed class LaunchEndpointTests : IDisposable
             CurrentLifetime = () => _lifetime,
             UnlockedFor = lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
             Channel = _channel,
-            Settings = IAgentSettings.Defaults,
-            Hourly = new HourlyLimit(_clock),
+            Rules = IAgentRules.Defaults,
             Audit = () => _audit,
-            WatchEdits = _ => { },
-            UnwatchEdits = _ => { },
             Clock = _clock,
         });
     }
@@ -103,7 +100,7 @@ public sealed class LaunchEndpointTests : IDisposable
     [Fact]
     public async Task A_run_without_a_pass_is_refused_unasked_and_recorded()
     {
-        _channel.Answer = ApprovalAnswer.Approved;
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var served = Served.Start(LaunchEndpoint.NewName(), _server.Authority);
         await using var client = await AttachedAsync(served.Name);
 
@@ -123,7 +120,7 @@ public sealed class LaunchEndpointTests : IDisposable
 
     /// <summary>
     /// An agent that finds the endpoint gets nothing: a bridge's attachment is answered but not shown
-    /// as connected, and every request an agent, <c>keypaste grants</c>, <c>keypaste lock</c>,
+    /// as connected, and every request an agent, <c>keypaste lock</c>,
     /// <c>keypaste clients</c> or a token run makes ends the connection unanswered, asking nobody and
     /// recording nothing.
     /// </summary>
@@ -132,15 +129,11 @@ public sealed class LaunchEndpointTests : IDisposable
     [InlineData("credential")]
     [InlineData("run")]
     [InlineData("token")]
-    [InlineData("grants")]
-    [InlineData("revoke")]
     [InlineData("lock")]
-    [InlineData("access-list")]
-    [InlineData("access-change")]
     [InlineData("edit")]
     public async Task Every_other_request_ends_its_connection_unanswered(string kind)
     {
-        _channel.Answer = ApprovalAnswer.Approved;
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var served = Served.Start(LaunchEndpoint.NewName(), _server.Authority);
         await using var client = await ApproverClient.TryConnectAsync(served.Name, _wait, Token);
         Assert.NotNull(client);
@@ -156,12 +149,6 @@ public sealed class LaunchEndpointTests : IDisposable
             "run" => await client.ReleaseRunAsync(Run(), Token),
             "token" => await client.ReleaseTokenEnvAsync(
                 new TokenEnvRequest("kpt_launch_endpoint", "dev", EnvProfileNames.Default, ["deploy"], WorkDirectory) { Vault = VaultPath, Session = "session-one" },
-                Token),
-            "grants" => await client.GrantsAsync(new GrantsRequest { Vault = VaultPath, Session = "session-one" }, Token),
-            "revoke" => await client.RevokeGrantsAsync(new RevokeGrantsRequest([], null, All: true) { Vault = VaultPath, Session = "session-one" }, Token),
-            "access-list" => await client.ListAccessAsync(new AccessListRequest { Vault = VaultPath, Session = "session-one" }, Token),
-            "access-change" => await client.ChangeAccessAsync(
-                new AccessChangeRequest("claude-code", "so deploys stop asking") { Origin = AccessOrigin.Agent, Mode = "automatic", Vault = VaultPath, Session = "session-one" },
                 Token),
             "edit" => await client.EditAsync(
                 new EditRequest(new Editing.RemoveItem("env/dev/STRIPE_KEY")) { Vault = VaultPath, Session = "session-one" },
@@ -246,7 +233,6 @@ public sealed class LaunchEndpointTests : IDisposable
         Entry = "env/dev/.env",
         Field = "TOKEN",
         Reason = "deploy",
-        TtlSeconds = 60,
         Exposure = ["**"],
         Vault = VaultPath,
         Session = "session-one",

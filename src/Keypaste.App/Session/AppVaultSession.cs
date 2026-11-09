@@ -33,8 +33,8 @@ namespace Keypaste.App.Session;
 /// <para>
 /// <b>Every lock ends the unlock's <see cref="SessionLifetime"/> first</b>, before the vault is
 /// disposed, whatever the reason: manual, idle, minimize, an access change, a replaced vault or
-/// shutdown. That one transition is what withdraws requests an agent has waiting and zeroes the
-/// grants they were given (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
+/// shutdown. That one transition is what withdraws requests an agent has waiting
+/// (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
 /// </para>
 /// <para>
 /// <b>Another program's save is merged through the owner serving the unlock</b> (D-0542, D-0622, D-0638). Every write, reload,
@@ -283,48 +283,21 @@ internal sealed class AppVaultSession : IDisposable
     internal string Home => _home;
 
     /// <summary>
-    /// What a project tag change on the open vault does, naming the agents it would let get the entry
-    /// without asking: said on the change, never a reason to refuse it.
-    /// </summary>
-    /// <param name="vault">The open vault.</param>
-    /// <param name="entry">The entry.</param>
-    /// <param name="tags">The tags to add or remove, which read alike.</param>
-    /// <param name="adding">Whether they are added rather than removed.</param>
-    /// <returns>The change, or null when it needs no confirmation.</returns>
-    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    internal ProjectTagChange? PreviewTagChange(Vault vault, EntryName entry, IReadOnlyList<string> tags, bool adding) =>
-        ProjectTagChange.Preview(vault, entry, tags, adding, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
-
-    /// <summary>Which agents moving an entry would bring it into the view of, or take it out of (T-13).</summary>
-    /// <param name="vault">The open vault, before the move.</param>
-    /// <param name="from">The entry where it is.</param>
-    /// <param name="to">The entry where it would go.</param>
-    /// <returns>The agents on each side.</returns>
-    internal AgentViewChange AgentViewChangeOfMove(Vault vault, EntryName from, EntryName to) =>
-        AgentViewChange.OfMove(vault, from, to, KeypasteHome.ClientsPath(_home));
-
-    /// <summary>
-    /// What restoring one of an entry's revisions does to the projects it is in, each change said as a tag change
-    /// says it (D-0415); empty when the revision's project tags are the entry's own.
-    /// </summary>
-    /// <param name="vault">The open vault.</param>
-    /// <param name="entry">The entry.</param>
-    /// <param name="revision">The revision, from a reading taken since the vault last changed.</param>
-    /// <returns>The changes, in the order they are shown.</returns>
-    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    internal IReadOnlyList<ProjectTagChange> PreviewRestore(Vault vault, EntryName entry, EntryRevision revision) =>
-        ProjectTagChange.Restoring(vault, entry, revision, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
-
-    /// <summary>
-    /// The project environments an entry's own tags put it in, each saying whether an agent gets the entry
-    /// only once a person answers, judged by the vault's agent settings beneath this computer's ceilings.
+    /// The project environments an entry's own tags put it in, each saying whether an agent gets its variables
+    /// only once a person answers, by this computer's rules.
     /// </summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="entry">The entry.</param>
     /// <returns>The environments, empty for an entry in no project, or null when no entry answers to the name.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<EntryEnvironment>? ReadEnvironments(Vault vault, EntryName entry) =>
-        EntryEnvironment.Read(vault, entry, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
+        EntryEnvironment.Read(
+            vault,
+            entry,
+            new Core.Agents.SealedAgentRules(
+                new Core.Agents.AgentRulesFile(KeypasteHome.AgentsPath(_home)),
+                () => vault,
+                _ => new Core.Agents.AgentSave(Core.Agents.AgentSaveOutcome.Refused, "reading only")));
 
     /// <summary>
     /// The items the open vault changed since it was opened or last saved, which a reload discards: names
@@ -587,7 +560,7 @@ internal sealed class AppVaultSession : IDisposable
         {
             // The vault's ownership transfers to this session, and every route out of it — Lock,
             // Dispose, and a second TryUnlock replacing it — disposes it. CA2000 cannot see a
-            // lifetime that leaves the method. Same shape and same reason as GrantCache.Store.
+            // lifetime that leaves the method.
 #pragma warning disable CA2000
             opened = Vault.Open(path, master, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
@@ -1353,7 +1326,7 @@ internal sealed class AppVaultSession : IDisposable
     /// <para>
     /// For a person told that another program saved the vault (D-0412). The file is opened with the
     /// key this unlock holds, so nothing is asked again except a hardware key's touch. The lifetime
-    /// stays, so connected agents are not cut off, and every grant they hold is withdrawn, as after an
+    /// stays, so connected agents are not cut off, and what they have waiting is withdrawn, as after an
     /// access change (D-0318), with every request still waiting on a person, as a lock withdraws them,
     /// so an agent asks again. A change the open copy holds that no save wrote is discarded; nothing
     /// is merged. The app offers it only once a merge was refused (D-0543).
@@ -1423,7 +1396,7 @@ internal sealed class AppVaultSession : IDisposable
             return new ReloadResult(ReloadOutcome.Locked);
         }
 
-        // Before the swap, so no grant holding a value from the stale copy outlives it, and no prompt a
+        // Before the swap, so no prompt a
         // person answers afterwards releases a value from the copy that replaces it.
         lifetime?.Withdraw();
         Edited?.Invoke(this, VaultEdit.Everything);
@@ -1486,7 +1459,7 @@ internal sealed class AppVaultSession : IDisposable
             }
         }
 
-        // A merge withdraws every grant and prompt before it reads the file, so one asked twice for one save must find nothing to do.
+        // A merge withdraws every prompt before it reads the file, so one asked twice for one save must find nothing to do.
         try
         {
             if (vault.SaveState().Status is not (VaultSaveStatus.ChangedOnDisk or VaultSaveStatus.Unreadable))

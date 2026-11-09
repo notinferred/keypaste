@@ -105,26 +105,14 @@
         <TextBlock Name="AttributionText" Classes="caption" Text="{Binding Attribution}" />
       </StackPanel>
 
-      <StackPanel Spacing="4">
-        <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
-        <TextBlock Name="OnceOnlyText" Classes="prompt-note size-13" Text="{Binding OnceOnlyText}"
-                   Foreground="{DynamicResource KpTextSecondary}"
-                   IsVisible="{Binding OnceOnlyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      </StackPanel>
+      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
 
-      <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-          <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
-                  IsCancel="True" Command="{Binding DenyCommand}" />
-          <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
-                  Command="{Binding AllowOnceCommand}" />
-          <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
-                  HorizontalAlignment="Right"
-                  IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
-        </Grid>
-        <TextBlock Name="TimedCaptionText" Classes="caption" Text="{Binding TimedCaption}"
-                   IsVisible="{Binding TimedCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      </StackPanel>
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
+                Command="{Binding AllowOnceCommand}" />
+      </Grid>
 
     </StackPanel>
   </Border>

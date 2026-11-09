@@ -57,6 +57,4 @@ internal sealed class PairingViewModel : PromptViewModel
     /// <summary>What allowing does, and why the build named is a claim.</summary>
     internal string Explainer { get; } =
         "The browser names this build when it starts keypaste, and any program on this computer can name it too. Allow only a pairing you started in your browser just now. It lasts until you remove it in Settings.";
-
-    protected override int TimedSeconds => 0;
 }

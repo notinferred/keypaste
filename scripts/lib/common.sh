@@ -156,20 +156,36 @@ project_var() {
 # A path as a Windows program must be given it from Git Bash; unchanged elsewhere.
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 
-# Saves agents' settings in a vault as a person confirms them at `keypaste approve`'s terminal, before
-# anything else holds the vault: a short-lived agent with a home of its own answers yes to each change
-# and stops, so the gate's log and ceilings hold only what the gate itself does.
-#   agent_settings <keypaste> <vault> <master> '<keypaste clients words>'...
-# Each change's words are split on spaces and never globbed, so `--see **` reaches keypaste as written.
+# Turns run on, or off, for agents in this computer's rules the way a person does it with nothing else holding the
+# vault: a short-lived `keypaste approve` with a home of its own makes and seals each change, and the sealed
+# agents.toml and the home identity it is bound to are then put in $KEYPASTE_HOME, so the gate's own log holds
+# only what the gate itself does. Every agent sees URLs, and usernames unless Settings hides them, so a change naming only what an
+# agent may see does nothing; one naming a removed setting fails.
+#   agent_settings <keypaste> <vault> <master> '<agent> [--run on|off] [--see <selector>]...'...
 agent_settings() {
-  local cli=$1 vault=$2 master=$3 home pipe err pid change status=0 answers=''
-  local -a words
+  local cli=$1 vault=$2 master=$3 home pipe err pid change status=0 word agent run
+  local -a words runs=()
   shift 3
+  for change in "$@"; do
+    read -r -a words <<<"$change"
+    agent="${words[0]}" run=""
+    set -- "${words[@]:1}"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --see) shift ;;
+        --run) run="$2"; shift ;;
+        *) printf 'agent_settings: %s is no longer a setting\n' "$1" >&2; return 1 ;;
+      esac
+      shift
+    done
+    [ -z "$run" ] || runs+=("$agent --run $run")
+  done
+  [ "${#runs[@]}" -gt 0 ] || return 0
+  [ -n "${KEYPASTE_HOME:-}" ] || { printf 'agent_settings: set KEYPASTE_HOME to the home the rules are for\n' >&2; return 1; }
   home=$(mktemp -d)
   pipe="keypaste-settings-$$-${RANDOM}"
   err="$home/agent-stderr.txt"
-  for change in "$@"; do answers="${answers}y"$'\n'; done
-  printf '%s\n%s' "$master" "$answers" \
+  printf '%s\n' "$master" \
     | KEYPASTE_HOME="$(native "$home")" "$cli" approve --vault "$vault" --approver "$pipe" >/dev/null 2>"$err" &
   pid=$!
   for _ in $(seq 1 100); do
@@ -178,7 +194,7 @@ agent_settings() {
     sleep 0.2
   done
   if grep -q 'listening on' "$err" 2>/dev/null; then
-    for change in "$@"; do
+    for change in "${runs[@]}"; do
       read -r -a words <<<"$change"
       KEYPASTE_HOME="$(native "$home")" "$cli" clients "${words[@]}" --vault "$vault" --approver "$pipe" >/dev/null 2>>"$err" \
         || { status=1; break; }
@@ -188,6 +204,10 @@ agent_settings() {
   fi
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
+  if [ "$status" -eq 0 ]; then
+    word="$(cygpath -u "$KEYPASTE_HOME" 2>/dev/null || printf '%s' "$KEYPASTE_HOME")"
+    mkdir -p "$word" && cp "$home/agents.toml" "$home/agents.id" "$word/" || status=1
+  fi
   [ "$status" -eq 0 ] || cat "$err" >&2
   rm -rf "$home" 2>/dev/null || true
   return "$status"

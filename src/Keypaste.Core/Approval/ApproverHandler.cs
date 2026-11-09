@@ -6,43 +6,26 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// The approver's decision procedure: resolve, re-scope, check the grant, release under the agent's
-/// mode or ask a human, release one field.
+/// The approver's decision procedure: resolve, re-scope, decide by the field's category, honour a refusal,
+/// release under an Allow or ask a human, release one field.
 /// </summary>
 /// <remarks>
 /// <para>
 /// It lives in the core with no I/O of its own — no terminal, no dialog, no pipe — so every
-/// ordering that matters is reachable from a unit test. What it talks to are five seams: where
-/// entries are resolved and read, where names come from, where a human is, what they have already
-/// said yes to, and each agent's settings, which say what the agent may see and get and how it is asked.
+/// ordering that matters is reachable from a unit test. What it talks to are four seams: where
+/// entries are resolved and read, where names come from, where a human is, and the rules on this
+/// computer, which say how each category of field is answered for every agent.
 /// </para>
 /// <para>
-/// <b>The order is the security property.</b> An agent given no values is refused before anything
-/// is resolved, so it learns nothing of the vault from a credential request. Then resolve, then
-/// re-check what the agent can see, then look for a live grant, then honour a refusal a person just
-/// gave, then release under an Automatic mode, and only then ask a person; read the field last of
-/// all. Reading earlier would put a secret in memory for requests that are about to be refused, and
-/// asking earlier would let an agent raise a prompt for an entry it was never allowed to name.
+/// <b>The order is the security property.</b> Resolve, then re-check what the bridge lets the agent
+/// see, then refuse a Blocked category, then honour a refusal a person just gave, then release under
+/// Allow, and only then ask a person; read the field last of all. Reading earlier would put a secret
+/// in memory for requests that are about to be refused, and asking earlier would let an agent raise a
+/// prompt for an entry it was never allowed to name.
 /// </para>
 /// <para>
-/// <b>Where Automatic sits in that order.</b> After the reach re-check, because what an agent sees is
-/// the least of the bridge's <c>--expose</c>, its settings and this computer's ceilings, and no mode
-/// reaches past it. After the grant cache, because a live grant is a decision a person made about this
-/// exact request and re-attributing it to a mode would be a lie in the log. After the cooldown, because
-/// a person's explicit no outranks a mode. And in here rather than inside <see cref="ApprovalGate"/>,
-/// because a release nobody is asked about must not be able to collide with a prompt somebody is in
-/// the middle of answering.
-/// </para>
-/// <para>
-/// A person answers once or for the timed grant the prompt offers, which lasts the approver's
-/// ceiling whatever the agent asked for. An entry in a protected profile, or one whose mode is Ask
-/// every time, skips the grant cache and Automatic and is offered no timed grant, so it is asked about
-/// every time; a protected entry is so whatever any setting says.
-/// </para>
-/// <para>
-/// A TOTP code is offered no timed grant either: a grant holds the value it released, and a code is
-/// stale once its period ends. It is released once or under an Automatic mode, and the lifetime the
-/// reply carries is the code's time left in its period.
+/// A person answers Deny or Allow once. A passkey's fields are Blocked under every rule. The rules are
+/// this computer's, never a vault's, so an agent record a vault carries releases nothing unasked.
 /// </para>
 /// </remarks>
 public sealed class ApproverHandler
@@ -50,110 +33,128 @@ public sealed class ApproverHandler
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;
     private readonly ApprovalGate _gate;
-    private readonly GrantCache _grants;
-    private readonly IAgentSettings _settings;
-    private readonly HourlyLimit _hourly;
-    private readonly TimeProvider _clock;
+    private readonly IAgentRules _rules;
     private readonly Action<string>? _narrate;
     private readonly Func<EntryName, bool> _requiresLiveApproval;
 
-    /// <summary>Builds the handler over its five seams.</summary>
+    /// <summary>Builds the handler over its four seams.</summary>
     /// <param name="source">Where entries are resolved and one field is read.</param>
     /// <param name="lister">Where names come from. Deliberately not the same seam.</param>
     /// <param name="gate">Where a human is asked, and where the deadline lives.</param>
-    /// <param name="grants">What a human has already said yes to.</param>
-    /// <param name="settings">
-    /// Each agent's settings and this computer's ceilings; <see cref="IAgentSettings.Defaults"/> holds
-    /// every agent to the defaults, which is what keypaste did before they existed.
-    /// </param>
+    /// <param name="rules">The rules every agent's request is decided by; <see cref="IAgentRules.Defaults"/> asks about every value.</param>
     /// <param name="narrate">Optional: a line of running commentary for the operator's terminal.</param>
     /// <param name="requiresLiveApproval">
-    /// Which entries are asked about every time, with no grant and no Automatic release; null means the
-    /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>), so a host that
-    /// forgets it still asks live about a protected environment, by tag.
+    /// Which entries a scoped token may never release, a protected environment's; null means the
+    /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>).
     /// </param>
-    /// <param name="hourly">
-    /// The owner's hourly limits on Automatic, which outlive one unlock; null counts afresh, as a
-    /// restarted owner does.
-    /// </param>
-    /// <param name="clock">What an Automatic limit's time is judged against, and whose time zone a confirmation shows it in; null is the system clock.</param>
-    /// <exception cref="ArgumentNullException">Any of the five seams is null.</exception>
-    /// <remarks>
-    /// <paramref name="settings"/> is not nullable, and "every agent gets the defaults" is the value
-    /// <see cref="IAgentSettings.Defaults"/>. A nullable seam makes every future reader work out what
-    /// null means, and a thing with a meaning should be a value rather than an absence.
-    /// </remarks>
+    /// <exception cref="ArgumentNullException">Any of the four seams is null.</exception>
     public ApproverHandler(
         ICredentialSource source,
         IEntryNameLister lister,
         ApprovalGate gate,
-        GrantCache grants,
-        IAgentSettings settings,
+        IAgentRules rules,
         Action<string>? narrate = null,
-        Func<EntryName, bool>? requiresLiveApproval = null,
-        HourlyLimit? hourly = null,
-        TimeProvider? clock = null)
+        Func<EntryName, bool>? requiresLiveApproval = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(lister);
         ArgumentNullException.ThrowIfNull(gate);
-        ArgumentNullException.ThrowIfNull(grants);
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(rules);
 
         _source = source;
         _lister = lister;
         _gate = gate;
-        _grants = grants;
-        _settings = settings;
-        _clock = clock ?? TimeProvider.System;
-        _hourly = hourly ?? new HourlyLimit(_clock);
+        _rules = rules;
         _narrate = narrate;
         _requiresLiveApproval = requiresLiveApproval ?? source.RequiresLiveApproval;
     }
 
-    /// <summary>Whether a release of this entry is asked about live every time, by the rule this handler applies.</summary>
+    /// <summary>Whether a release of this entry is asked about live every time, by the rule a scoped token is held to.</summary>
     /// <param name="name">The entry.</param>
-    /// <returns><see langword="true"/> when no grant, mode or token may release it unprompted.</returns>
-    /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule.</remarks>
+    /// <returns><see langword="true"/> when no token may release it.</returns>
     public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
 
-    /// <summary>An entry's own tags, as the exposure and the agent's settings read them.</summary>
+    /// <summary>An entry's UUID as hex, which a line names it by.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>The UUID, or null when it cannot be read.</returns>
+    public string? ItemId(EntryName name) => _source.ItemId(name);
+
+    /// <summary>An item a remembered answer names, as every prompt shows it, or null when no live item has that UUID.</summary>
+    /// <param name="item">The UUID as hex.</param>
+    /// <returns>The item's name now.</returns>
+    public string? ItemShown(string item) => _source.ItemNamed(item) is { } name ? ApprovalPrompt.Shown(name) : null;
+
+    /// <summary>An entry's own tags, as the exposure and the categories read them.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>Its tags, or none when they cannot be read.</returns>
-    /// <remarks>For the release paths beside this one, so a run is held to the agent's reach as a credential request is.</remarks>
     public IReadOnlyList<string> Tags(EntryName name) => _source.Tags(name);
 
-    /// <summary>What applies to an agent's requests now: its settings in the vault beneath this computer's ceilings.</summary>
-    /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
-    /// <param name="access">What applies, when the settings could be read.</param>
-    /// <param name="problem">Why they could not be, otherwise empty.</param>
-    /// <returns>False only when <c>clients.toml</c> or the vault's settings cannot be read, which refuses every request.</returns>
-    public bool TryAccess(string? label, [NotNullWhen(true)] out EffectiveAccess? access, out string problem)
-    {
-        access = _settings.TryRead(label, out var records, out var caps, out problem)
-            ? EffectiveAccess.Create(label, records, caps)
-            : null;
+    /// <summary>The rules on this computer now.</summary>
+    /// <param name="rules">The rules, when they could be read.</param>
+    /// <param name="problem">Why not, otherwise empty.</param>
+    /// <returns>False only when the rules file cannot be read, which refuses every agent request.</returns>
+    public bool TryRules([NotNullWhen(true)] out AgentRules? rules, out string problem) => _rules.TryRead(out rules, out problem);
 
-        return access is not null;
+    /// <summary>Why the rules on file are ignored and the defaults hold, or null.</summary>
+    public string? RulesIgnored => _rules.Ignored;
+
+    /// <summary>Changes the rules as this owner does, sealing what it writes.</summary>
+    /// <param name="change">The new rules from those that hold now.</param>
+    /// <param name="problem">Why nothing changed, otherwise empty.</param>
+    /// <returns>Whether the rules now hold the change.</returns>
+    /// <remarks>A refusal a person gave for a field whose rule the change moves ends with it, so the field is decided by the new rule.</remarks>
+    public bool TryChangeRules(Func<AgentRules, AgentRules> change, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        var before = _rules.TryRead(out var held, out _) ? held : null;
+
+        if (!_rules.TryChange(change, out problem))
+        {
+            return false;
+        }
+
+        if (_rules.TryRead(out var after, out _))
+        {
+            _gate.ClearCooldowns(key => Moved(before, after, key));
+        }
+
+        return true;
     }
 
-    /// <summary>One agent's settings as the person's own screen shows them: what the vault says and what this computer holds back.</summary>
-    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
-    /// <param name="settings">Its settings, when they could be read.</param>
-    /// <param name="problem">Why they could not be, otherwise empty.</param>
-    /// <returns>False only when <c>clients.toml</c> or the vault's settings cannot be read.</returns>
-    public bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
+    /// <summary>Whether a change to the rules moved how a cooldown key's field is decided, for any agent; never for a key naming no field, such as a run's.</summary>
+    private bool Moved(AgentRules? before, AgentRules after, string cooldownKey)
     {
-        ArgumentNullException.ThrowIfNull(agent);
+        var bar = cooldownKey.IndexOf('|', StringComparison.Ordinal);
 
-        settings = _settings.TryRead(agent, out var records, out var caps, out problem)
-            ? AgentSettingsState.Read(agent, records, caps)
-            : null;
+        if (bar < 0)
+        {
+            return false;
+        }
 
-        return settings is not null;
+        var subject = cooldownKey[(bar + 1)..];
+        var resolved = _source.TryResolve(cooldownKey[..bar], out var name, out _);
+        var item = resolved ? _source.ItemId(name!) : null;
+        var category = subject.StartsWith(_attachmentKey, StringComparison.Ordinal) ? FieldCategory.Attachment
+            : resolved ? Category(name!, subject)
+            : FieldCategories.Of(subject, []);
+
+        return before is null || !string.Equals(before.Governing(item, subject, category), after.Governing(item, subject, category), StringComparison.Ordinal);
     }
 
-    /// <summary>Which entry names may be shown to an agent: those its bridge's exposure and its settings both reach.</summary>
+    /// <summary>Which category one field of an entry falls in.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field as a request or a run's set names it.</param>
+    /// <returns>Its category, read without reading the field's value.</returns>
+    public FieldCategory Category(EntryName name, string field)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        return FieldCategories.Of(field, _source.Tags(name), _source.IsProtected(name, field));
+    }
+
+    /// <summary>Which entry names may be shown to an agent: those its bridge's exposure reaches.</summary>
     /// <param name="request">The exposure the bridge is configured with, and its label.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
@@ -171,7 +172,7 @@ public sealed class ApproverHandler
                 new NamesReply(false, [], "this bridge's --expose is not usable", true) { Refusal = AuditMethod.Failed });
         }
 
-        if (!TryAccess(request.ClientLabel, out var access, out var problem))
+        if (!_rules.TryRead(out _, out var problem))
         {
             _narrate?.Invoke($"refused a listing: {Unusable(problem)}");
             return ValueTask.FromResult(new NamesReply(false, [], Unusable(problem), true) { Refusal = AuditMethod.Failed });
@@ -188,7 +189,7 @@ public sealed class ApproverHandler
         List<ListedEntry> seen =
         [
             .. names
-                .Select(entry => (Entry: entry, Reach: access.Reach(exposure, entry.Name, entry.Tags)))
+                .Select(entry => (Entry: entry, Reach: exposure.Reach(entry.Name, entry.Tags)))
                 .Where(listed => listed.Reach != ExposureReach.None)
                 .Select(listed => listed.Entry.Within(listed.Reach)),
         ];
@@ -196,9 +197,9 @@ public sealed class ApproverHandler
         return ValueTask.FromResult(new NamesReply(true, seen, string.Empty, true));
     }
 
-    /// <summary>Decides one credential request, asking a human if it has to.</summary>
+    /// <summary>Decides one credential request, asking a human if its category says to.</summary>
     /// <param name="request">What the agent asked for.</param>
-    /// <param name="connectionId">Who is asking, and what any resulting grant is scoped to.</param>
+    /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
     /// <returns>The decision, and the field value on the one path that has one.</returns>
     public async ValueTask<CredentialReply> RequestAsync(
@@ -209,7 +210,7 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Reason, request.TtlSeconds) is { } problem)
+        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Attachment, request.Reason) is { } problem)
         {
             return Refused(AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}");
         }
@@ -219,37 +220,55 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Failed, $"this bridge's --expose is not usable: {globError}");
         }
 
-        if (!TryAccess(request.ClientLabel, out var access, out var unusable))
+        if (!_rules.TryRead(out var rules, out var unusable))
         {
             _narrate?.Invoke($"refused a request: {Unusable(unusable)}");
             return Refused(AuditMethod.Failed, Unusable(unusable));
         }
 
-        // Before anything is resolved, so an agent given no values learns nothing of the vault from
-        // a credential request, and before the grant cache, so a grant it held earlier serves nothing.
-        if (!access.Values)
-        {
-            return Refused(AuditMethod.InjectOnly, "this agent is given no values; they reach only commands it runs");
-        }
-
         if (!_source.TryResolve(request.Entry, out var name, out var failure))
         {
-            // A name that resolves to nothing and one outside what the agent sees get the same answer:
-            // telling them apart would let an agent enumerate entries in parts of the vault it was
-            // never allowed to see (THREATS.md T-4). The audit line's reason still records which.
-            return failure switch
+            if (failure == CredentialFailure.Ambiguous && _source.TryChoose(request.Entry, out var items, out failure))
             {
-                CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
-                _ when IsStale(failure) => Refused(AuditMethod.VaultChanged, Stale(failure, "a request")),
-                _ => Refused(AuditMethod.OutOfScope, Explain(failure)),
-            };
+                return await PickAsync(request, rules, exposure, items, connectionId, cancellationToken).ConfigureAwait(false);
+            }
+
+            return Unresolved(failure);
         }
 
+        return await DecideAsync(request, rules, exposure, name, connectionId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>A request that named no single item refused, saying why.</summary>
+    /// <remarks>
+    /// A name that resolves to nothing and one outside what the agent sees get the same answer:
+    /// telling them apart would let an agent enumerate entries in parts of the vault it was
+    /// never allowed to see (THREATS.md T-4). The audit line's reason still records which.
+    /// </remarks>
+    private CredentialReply Unresolved(CredentialFailure failure) => failure switch
+    {
+        CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
+        _ when IsStale(failure) => Refused(AuditMethod.VaultChanged, Stale(failure, "a request")),
+        _ => Refused(AuditMethod.OutOfScope, Explain(failure)),
+    };
+
+    /// <summary>Whether the bridge lets the agent name this field of this item.</summary>
+    private bool Reaches(EntryExposure exposure, EntryName name, string field) =>
+        EntryExposure.Permits(exposure.Reach(name, _source.Tags(name)), field);
+
+    /// <summary>Decides a request one item answers to, from the re-check of what the agent can see on.</summary>
+    private async ValueTask<CredentialReply> DecideAsync(
+        CredentialRequest request,
+        AgentRules rules,
+        EntryExposure exposure,
+        EntryName name,
+        string connectionId,
+        CancellationToken cancellationToken)
+    {
         // The re-check that makes handles safe. The bridge can test a path against its globs
         // before forwarding, but it cannot resolve a handle or read a tag without the vault, so
         // without this a handle would be the way around what the agent may see.
-        var tags = _source.Tags(name);
-        var reach = access.Reach(exposure, name, tags);
+        var reach = exposure.Reach(name, _source.Tags(name));
 
         if (reach == ExposureReach.None)
         {
@@ -261,704 +280,345 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.OutOfScope, "this agent reaches the item through a project tag, which lets it see only the item's project variables");
         }
 
-        var handle = EntryHandle.For(name);
-        var display = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, 0).Entry;
-        var key = new GrantKey(connectionId, handle, request.Field);
-        var isProtected = _requiresLiveApproval(name);
-        var item = access.Item(tags, _clock.GetUtcNow());
+        var display = ApprovalPrompt.Shown(name);
+        var itemId = _source.ItemId(name);
+        var category = Category(name, request.Field);
+        var subject = Subject(request);
+        var agent = Named(request);
+        var decided = rules.Decide(agent, itemId, subject, category);
 
-        // A protected profile, or an entry whose mode is Ask every time, is asked about every time:
-        // no grant serves it and no mode releases it.
-        var onceOnly = isProtected
-            ? OnceOnly.ProtectedProfile
-            : item.Mode == AgentMode.Ask ? OnceOnly.AskEveryTime : OnceOnly.None;
-        var liveOnly = onceOnly != OnceOnly.None;
-        var isCode = string.Equals(request.Field, CredentialFields.Totp, StringComparison.Ordinal);
-
-        // Declared before the try so the copy the cache hands out is zeroed on every path — the
-        // repo's idiom for a disposable that only exists on one branch.
-        ReleasedField? live = null;
-
-        try
+        if (decided.Rule == CategoryRule.Block)
         {
-            if (!liveOnly && _grants.TryUse(key, out live, out var remaining))
-            {
-                return Deliver(
-                    new CredentialReply
-                    {
-                        Decision = AuditDecision.Granted,
-                        Method = AuditMethod.GrantCache,
-                        Reason = "served from an allowance a person had already given, inside its lifetime",
-                        Entry = display,
-                        TtlSeconds = (int)remaining.TotalSeconds,
-                        Value = live.Value.ToString(),
-                    },
-                    display,
-                    Invariant($"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)"));
-            }
-        }
-        finally
-        {
-            live?.Dispose();
+            var blocked = Blocked(category, decided.Level);
+            _narrate?.Invoke($"refused {display}: {blocked}");
+            return Refused(AuditMethod.Blocked, blocked, display) with { Item = itemId };
         }
 
-        // Before Automatic, not after. A person who refused this exact request a moment ago has
-        // said something more specific and more recent than any mode, and a mode must never
-        // resurrect a decision they just made.
-        if (_gate.IsInCooldown(CooldownKey(key)))
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(name), subject);
+
+        // Before Allow, not after. A person who refused this exact request a moment ago has said something more
+        // specific and more recent than the rule that held then; only changing that rule ends the refusal.
+        if (_gate.IsInCooldown(cooldownKey))
         {
             _narrate?.Invoke($"refused {display}: {Explain(ApprovalAnswer.Cooldown)}");
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
-        // A limit that is spent asks instead: the person is the fallback, never a refusal.
-        if (!liveOnly && access.TryAutomatic(item, _hourly))
+        if (decided.Rule == CategoryRule.Allow)
         {
-            return Automatic(request, name, display, key, access.Label!, cancellationToken);
+            return Unasked(request, name, itemId, display, cooldownKey, Allowed(category, decided.Level), AllowedBy(category, decided.Level), cancellationToken);
         }
 
-        // The person chooses once or the timed grant on screen, so its length is the approver's
-        // ceiling and never the agent's ttl_seconds.
-        var grantSeconds = liveOnly || isCode ? 0 : _gate.Limits.MaximumTtlSeconds;
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel) with
+        var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with
         {
-            OnceOnly = onceOnly == OnceOnly.None && isCode ? OnceOnly.TotpCode : onceOnly,
-            AlwaysFor = isProtected || item.Mode == AgentMode.Automatic ? null : AlwaysFor(access, tags),
+            Item = itemId,
+            OffersAlways = agent is not null && itemId is not null && rules.HasRoom,
         };
+        var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
+        var unremembered = answer switch
+        {
+            ApprovalAnswer.AlwaysAllowed => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Allow), confirmed: true)),
+            ApprovalAnswer.AlwaysBlocked => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Block), confirmed: true)),
+            _ => null,
+        };
+        var approved = answer != ApprovalAnswer.AlwaysAllowed ? "a person approved this one request"
+            : unremembered is null ? "a person approved this request and always allows this item's field to this agent"
+            : $"a person approved this one request; keypaste could not remember Always allow: {unremembered}";
 
-        // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
-        var generation = _grants.Generation;
-        var (answer, kept) = await _gate.AskKeepingAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
+        return Answered(request, name, itemId, display, cooldownKey, prompt.Client, answer, unremembered, approved, cancellationToken);
+    }
 
+    /// <summary>The agent a request's answers are remembered for: its bridge's label when it names one, otherwise null, which Settings alone decides.</summary>
+    private static string? Named(CredentialRequest request) => AgentNames.IsNamed(request.ClientLabel) ? request.ClientLabel : null;
+
+    /// <summary>Remembers a person's confirmed always as this owner changes the rules.</summary>
+    /// <returns>Null once it holds, otherwise why it does not.</returns>
+    private string? Remember(Func<AgentRules, AgentRules> change)
+    {
         try
         {
-            var reply = Answered(request, name, display, key, prompt, grantSeconds, generation, answer, cancellationToken);
-
-            // Always for's release goes with the slot the gate kept, so its confirmation follows with
-            // no other request in front of the person between them.
-            if (reply.AlwaysFor is null)
-            {
-                return reply;
-            }
-
-            reply = reply with { Kept = kept };
-            kept = null;
-            return reply;
+            return TryChangeRules(change, out var problem) ? null : problem;
         }
-        finally
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
-            kept?.Dispose();
+            return ex.Message;
         }
     }
+
+    /// <summary>
+    /// Asks the person to pick which of the items an agent's request names it gets, when more than one it can see does:
+    /// the agent did not name one item, so nothing is released unasked, whatever the rule for the field.
+    /// </summary>
+    /// <remarks>
+    /// Only the items the agent can see whose field is not Blocked are offered, so one it cannot get is never shown to be
+    /// there; when that leaves one, the request is decided as one naming it. Exactly the picked item's field is read, by its
+    /// UUID, once the person allows it.
+    /// </remarks>
+    private async ValueTask<CredentialReply> PickAsync(
+        CredentialRequest request,
+        AgentRules rules,
+        EntryExposure exposure,
+        IReadOnlyList<AnsweringItem> items,
+        string connectionId,
+        CancellationToken cancellationToken)
+    {
+        var agent = Named(request);
+        var subject = Subject(request);
+        List<AnsweringItem> seen = [.. items.Where(item => Reaches(exposure, item.Name, request.Field))];
+        List<AnsweringItem> offered = [.. seen.Where(item => rules.Decide(agent, item.Name.Uuid, subject, Category(item.Name, request.Field)).Rule != CategoryRule.Block)];
+
+        switch (offered.Count)
+        {
+            case 0 when seen.Count > 0:
+                return Refused(AuditMethod.Blocked, "every item answering to that name holds the field in a category the person blocks for this agent");
+            case 0:
+                return Refused(AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge");
+            case 1:
+                return await DecideAsync(request, rules, exposure, offered[0].Name, connectionId, cancellationToken).ConfigureAwait(false);
+            case > ApprovalPrompt.MaximumCandidates:
+                return Refused(AuditMethod.OutOfScope, $"more than {ApprovalPrompt.MaximumCandidates} items this agent can see answer to that name, too many to pick from; a person can rename or move some");
+        }
+
+        var shared = offered[0].Name;
+        var display = ApprovalPrompt.Shown(shared);
+        var cooldownKey = ApprovalGate.FieldKey(EntryHandle.For(shared), subject);
+
+        if (_gate.IsInCooldown(cooldownKey))
+        {
+            _narrate?.Invoke($"refused {display}: {Explain(ApprovalAnswer.Cooldown)}");
+            return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
+        }
+
+        // The pick is an answer for its item, so it outranks a category's rule, as an item's own Always allow does.
+        if (agent is not null
+            && rules.PickFor(agent, request.Entry, subject) is { } kept
+            && seen.FirstOrDefault(item => string.Equals(item.Name.Uuid, kept, StringComparison.OrdinalIgnoreCase)) is { } always
+            && rules.DecidePicked(agent, kept, subject, Category(always.Name, request.Field)) == CategoryRule.Allow)
+        {
+            return Unasked(
+                request,
+                always.Name,
+                always.Name.Uuid,
+                display,
+                cooldownKey,
+                "released without asking: the person always picks this item for that name for this agent",
+                "this pick always allowed",
+                cancellationToken);
+        }
+
+        List<ItemCandidate> candidates = [.. offered.Select(Candidate)];
+        var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with
+        {
+            Candidates = candidates,
+            OffersAlways = agent is not null && rules.HasRoom,
+        };
+        var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
+        var picked = pick.Picked is { } index ? candidates[index] : null;
+        var unremembered = pick.Answer == ApprovalAnswer.AlwaysAllowed && picked is not null
+            ? Remember(held => held.Remembering(new RememberedPick(agent!, request.Entry, subject, picked.Item), confirmed: true))
+            : null;
+        var approved = pick.Answer != ApprovalAnswer.AlwaysAllowed ? "a person picked this item and approved this one request"
+            : unremembered is null ? "a person picked this item and always gives it to this agent for that name"
+            : $"a person picked this item and approved this one request; keypaste could not remember Always allow: {unremembered}";
+
+        return Answered(
+            request,
+            picked?.Name ?? shared,
+            picked?.Item,
+            display,
+            cooldownKey,
+            prompt.Client,
+            pick.Answer,
+            unremembered,
+            approved,
+            cancellationToken);
+    }
+
+    /// <summary>One item on a picker.</summary>
+    private static ItemCandidate Candidate(AnsweringItem answering) => new()
+    {
+        Name = answering.Name,
+        Item = answering.Name.Uuid!,
+        Title = EntryNameSanitizer.Sanitize(answering.Name.Title).Text,
+        Group = EntryNameSanitizer.SanitizePath(answering.Name.GroupPath).Text,
+        Username = DisplayTextSanitizer.Sanitize(answering.Username).Text,
+        Url = DisplayTextSanitizer.Sanitize(answering.Url).Text,
+    };
 
     /// <summary>A prompted request once the person has answered.</summary>
     private CredentialReply Answered(
         CredentialRequest request,
         EntryName name,
+        string? itemId,
         string display,
-        GrantKey key,
-        ApprovalPrompt prompt,
-        int grantSeconds,
-        long generation,
+        string cooldownKey,
+        string client,
         ApprovalAnswer answer,
+        string? unremembered,
+        string approved,
         CancellationToken cancellationToken)
     {
-        var alwaysFor = answer == ApprovalAnswer.AlwaysForProject ? prompt.AlwaysFor : null;
-
-        // Always for allows this one request and then asks for the change; on a prompt that did not
-        // offer it, it is an answer nobody could have meant, so nothing is released.
-        if (answer == ApprovalAnswer.AlwaysForProject)
+        if (!answer.Releases() && answer != ApprovalAnswer.AlwaysAllowed)
         {
-            answer = alwaysFor is null ? ApprovalAnswer.Failed : ApprovalAnswer.ApprovedOnce;
-        }
+            // A block that could not be kept still holds this field back as a refusal does.
+            if (answer == ApprovalAnswer.AlwaysBlocked && unremembered is not null)
+            {
+                _gate.CoolDown(cooldownKey);
+            }
 
-        if (!answer.Releases())
-        {
-            _narrate?.Invoke($"refused {display} for {prompt.Client}: {Explain(answer)}");
-            return Refused(answer.ToAuditMethod(), Explain(answer), display);
+            var refused = answer != ApprovalAnswer.AlwaysBlocked ? Explain(answer)
+                : unremembered is null ? "a person refused this request and always refuses this item's field to this agent"
+                : $"a person refused this request; keypaste could not remember Always block: {unremembered}";
+            _narrate?.Invoke($"refused {display} for {client}: {refused}");
+            return Refused(answer.ToAuditMethod(), refused, display) with { Item = itemId };
         }
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
         {
-            return withdrawn;
+            return withdrawn with { Item = itemId };
         }
 
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
+        using var released = Release(name, request, out var readFailure, out var unfilled);
+
+        if (released is null)
         {
-            return Unread(readFailure, key, unfilled, display, prompt.Client);
+            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, client) with { Item = itemId };
         }
 
-        using (released)
-        {
-            // Stored even when the reply below turns out not to fit. The size belongs to the
-            // entry rather than to the request, so every retry would end the same way — and
-            // re-prompting for each one is THREATS.md T-11 with a lever attached. From the
-            // cache, the second ask is refused without troubling anybody, and the copy is
-            // zeroed at its ordinary TTL. A once answer keeps nothing, so it asks again, and so
-            // does a timed one given while Revoke all, an edit or a reload ended the grants: it
-            // is released once and said to be.
-            var timed = answer == ApprovalAnswer.Approved
-                && grantSeconds > 0
-                && _grants.Store(key, released, TimeSpan.FromSeconds(grantSeconds), prompt, generation);
-
-            return Deliver(
-                new CredentialReply
-                {
-                    Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Prompt,
-                    Reason = timed
-                        ? $"a person approved this request for {ApprovalLimits.Describe(grantSeconds)}"
-                        : "a person approved this one request",
-                    Entry = display,
-                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : timed ? grantSeconds : 0,
-                    Value = released.Value.ToString(),
-                    AlwaysFor = alwaysFor,
-                },
-                display,
-                timed
-                    ? Invariant($"released {display} to {prompt.Client} for {grantSeconds}s")
-                    : $"released {display} to {prompt.Client} once");
-        }
+        return Deliver(
+            new CredentialReply
+            {
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.Prompt,
+                Reason = approved,
+                Entry = display,
+                Item = itemId,
+                CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
+                Value = released.Value.ToString(),
+                ForAttachment = request.Attachment is not null,
+            },
+            display,
+            answer == ApprovalAnswer.AlwaysAllowed && unremembered is null ? $"released {display} to {client}, and always from now on" : $"released {display} to {client} once",
+            cooldownKey);
     }
 
-    /// <summary>Releases a field because the agent's mode for it is Automatic, a setting the person confirmed.</summary>
+    /// <summary>Releases a field nobody is asked about, because an Allow decides it: a URL, a username shown, a rule the person confirmed or an answer they told keypaste to remember.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>The approver's ceiling applies.</b> The lifetime the agent is told is its ask clamped by
-    /// <see cref="ApprovalLimits"/>, the one place that arithmetic lives.
-    /// </para>
-    /// <para>
-    /// <b>It does not seed the grant cache.</b> Doing so would serve every later request inside the
-    /// TTL for free and off the hourly limit, turning a limit on releases into a limit on grants; it
-    /// would hide releases two onward behind <c>grant-cache</c> lines that claim a person; and nobody
-    /// is being asked twice anyway. The cost is one vault read per call, which is CPU spent to buy an
-    /// accurate log.
-    /// </para>
-    /// <para>
-    /// The read is still last of all, exactly as on the prompted path: a mode that covers the entry is
-    /// not a reason to decrypt anything until the release itself is certain.
-    /// </para>
+    /// Its line names the category, and never a person, since nobody saw this request. The read is still
+    /// last of all, exactly as on the prompted path.
     /// </remarks>
-    private CredentialReply Automatic(
+    private CredentialReply Unasked(
         CredentialRequest request,
         EntryName name,
+        string? itemId,
         string display,
-        GrantKey key,
-        string agent,
+        string cooldownKey,
+        string why,
+        string allowedBy,
         CancellationToken cancellationToken)
     {
-        var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
-        var shown = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text;
+        var client = ApprovalPrompt.For(request.ClientName, name, request.Field, string.Empty, request.ClientLabel).Client;
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
         {
-            return withdrawn;
+            return withdrawn with { Item = itemId };
         }
 
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
+        using var released = Release(name, request, out var readFailure, out var unfilled);
+
+        if (released is null)
         {
-            return Unread(readFailure, key, unfilled, display, shown);
+            return Unread(readFailure, cooldownKey, request.Field, unfilled, display, client) with { Item = itemId };
         }
 
-        using (released)
-        {
-            // One line on the operator's terminal either way, and the only live signal that this
-            // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
-            return Deliver(
-                new CredentialReply
-                {
-                    Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Automatic,
-                    Reason = $"released without asking: {shown}'s mode for this item is Automatic",
-                    Entry = display,
-                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : ttl,
-                    Value = released.Value.ToString(),
-                },
-                display,
-                $"released {display} to {shown} without asking (Automatic)");
-        }
-    }
-
-    /// <summary>
-    /// The project environment a person may make Automatic from the prompt: offered for a named agent
-    /// asking for an entry in exactly one project, never for a protected one, and not where Automatic
-    /// already applies and only its hourly limit is spent.
-    /// </summary>
-    private static ProjectScope? AlwaysFor(EffectiveAccess access, IReadOnlyList<string> tags)
-    {
-        var members = tags.Select(ProjectTag.Read).Where(tag => tag.Kind == ProjectTagKind.Member).ToList();
-
-        return access.Label is not null
-            && members is [{ Project: { } project, Environment: { } environment }]
-            && ProjectScope.TryCreate(project, environment, out var scope, out _)
-                ? scope
-                : null;
-    }
-
-    /// <summary>Every agent's settings the vault holds, as keypaste reads them.</summary>
-    /// <returns>The settings, saying when they apply only beneath the defaults.</returns>
-    public AccessListReply ListAccess()
-    {
-        var list = _settings.List();
-
-        return new AccessListReply(
-            true,
-            [.. list.Records.Select(record => new AccessRow(record.Name, AcafRecord.Write(record.Record.Access), record.Record.Understood))],
-            true,
-            list.State == SavedRead.Current
-                ? string.Empty
-                : "the vault holds a change not saved yet, or another program changed its file, so these apply only beneath the defaults");
-    }
-
-    /// <summary>Changes one agent's settings: at once when the change gives it nothing more, otherwise only once the person confirms it.</summary>
-    /// <param name="request">The change, in <see cref="AccessEdit"/>'s words, which are read here again.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What became of it.</returns>
-    /// <remarks>One that says an agent asked meets the bridge's <see cref="AccessChangeRules"/> again here, its reason included.</remarks>
-    public ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (request.Reason.Length > AccessChangeRequest.MaximumReasonLength)
-        {
-            return ValueTask.FromResult(Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, $"the reason is longer than {AccessChangeRequest.MaximumReasonLength} characters"));
-        }
-
-        if (request.Origin == AccessOrigin.Agent && AccessChangeRules.Check(request) is { } problem)
-        {
-            return ValueTask.FromResult(Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, $"the {problem.Argument} argument {problem.Rule}"));
-        }
-
-        if (!AccessEdit.TryCreate(
-                request.Project,
-                request.Mode,
-                request.See,
-                request.Values,
-                request.Run,
-                request.PerHour,
-                request.Until,
-                request.Reset,
-                out var edit,
-                out var error))
-        {
-            return ValueTask.FromResult(Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, error));
-        }
-
-        return ChangeAccessAsync(request.Agent, edit, request.Origin, request.Reason, cancellationToken);
-    }
-
-    /// <summary>Changes one agent's settings, as <see cref="ChangeAccessAsync(AccessChangeRequest, CancellationToken)"/> does, from an edit already read.</summary>
-    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
-    /// <param name="edit">The change.</param>
-    /// <param name="origin">Where the request says it came from.</param>
-    /// <param name="reason">The requester's own reason, or empty.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What became of it.</returns>
-    /// <remarks>
-    /// <para>
-    /// A change is judged by what the record it leaves would let the agent do, against what applies now,
-    /// this computer's ceilings included; while that record would still hold parts keypaste does not
-    /// understand, what it already said stays inactive, and only what the change adds beyond it, or the
-    /// agent would get beneath the defaults, counts (<see cref="AccessChange"/>). One that gives nothing
-    /// more applies at once: to the ceilings, so a restore or a merge cannot undo it here, and, unless an
-    /// agent asked, to the vault's record. Any other is put to the person through the gate, under its
-    /// window, its one slot and its cooldown (THREATS.md T-11), and only once they confirm is the record
-    /// saved and this computer's ceiling lifted as far as the change goes. The record is changed only
-    /// where the change names something; one the change cannot be written into is refused before anyone
-    /// is asked, and when parts keypaste does not understand would remain, the confirmation and the
-    /// reply say the agent gets no more than the defaults until they are fixed.
-    /// </para>
-    /// <para>
-    /// The settings for every other agent, <c>*</c>, only ever take away from the defaults, so a change
-    /// that would give them more is refused before anybody is asked.
-    /// </para>
-    /// </remarks>
-    public ValueTask<AccessChangeReply> ChangeAccessAsync(
-        string agent,
-        AccessEdit edit,
-        AccessOrigin origin,
-        string reason,
-        CancellationToken cancellationToken) =>
-        ChangeAccessAsync(agent, edit, origin, reason, null, cancellationToken);
-
-    /// <summary>Changes one agent's settings, asking any confirmation in the slot Always for kept when there is one.</summary>
-    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
-    /// <param name="edit">The change.</param>
-    /// <param name="origin">Where the request says it came from.</param>
-    /// <param name="reason">The requester's own reason, or empty.</param>
-    /// <param name="kept">The slot the release's prompt kept (<see cref="CredentialReply"/>), or null.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What became of it.</returns>
-    internal async ValueTask<AccessChangeReply> ChangeAccessAsync(
-        string agent,
-        AccessEdit edit,
-        AccessOrigin origin,
-        string reason,
-        KeptSlot? kept,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(agent);
-        ArgumentNullException.ThrowIfNull(edit);
-        ArgumentNullException.ThrowIfNull(reason);
-
-        var reply = await DecideChangeAsync(agent, edit, origin, reason, kept, cancellationToken).ConfigureAwait(false);
-
-        // The change itself on every answer, so the line that records it says what was asked.
-        return reply with { Reason = $"{reply.Reason} ({EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text}: {edit})" };
-    }
-
-    private async ValueTask<AccessChangeReply> DecideChangeAsync(
-        string agent,
-        AccessEdit edit,
-        AccessOrigin origin,
-        string reason,
-        KeptSlot? kept,
-        CancellationToken cancellationToken)
-    {
-        // Always for tells the person why where they answered, once the release it allowed has left.
-        var narrate = origin == AccessOrigin.Prompt ? null : _narrate;
-
-        if (!AgentNames.IsValid(agent, out var nameError))
-        {
-            return Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, nameError);
-        }
-
-        if (!_settings.TryRead(agent, out var records, out var caps, out var problem))
-        {
-            narrate?.Invoke($"refused a change to {agent}'s settings: {Unusable(problem)}");
-            return Changed(AuditDecision.Denied, AuditMethod.Failed, Unusable(problem));
-        }
-
-        var current = EffectiveAccess.Create(agent, records, caps);
-        var writable = _settings.TryPreview(agent, edit, out var preview, out var refusal);
-        var written = preview ?? Unwritten(agent, records, edit);
-
-        if (string.Equals(agent, AgentNames.Any, StringComparison.Ordinal)
-            && !AccessChange.Classify(EffectiveAccess.Defaults, written.Access).IsNarrowing)
-        {
-            return Changed(
-                AuditDecision.Denied,
-                AuditMethod.InvalidRequest,
-                "the settings for every other agent, *, only take away from the defaults: never Automatic, more to see, values beyond them or commands");
-        }
-
-        // Judged by the record it would leave, which says more than the change names when it fixes a part keypaste could not read.
-        var change = AccessChange.Classify(current, records, written);
-
-        // What this computer's ceilings hold back already is lifted only by a change that names it.
-        if (_settings.TryPreview(agent, AccessEdit.VaultSettings, out var standing, out _))
-        {
-            change = change.Without(AccessChange.Classify(current, records, standing).Gains, edit.Names);
-        }
-
-        if (change.IsNarrowing)
-        {
-            return Made(agent, edit, origin, written, Narrow(agent, edit, records, change, origin, narrate));
-        }
-
-        if (!writable)
-        {
-            narrate?.Invoke($"did not change {agent}'s settings: {refusal}");
-            return Changed(AuditDecision.Denied, AuditMethod.Failed, refusal);
-        }
-
-        var prompt = AccessChangePrompt.For(agent, change, origin, reason, _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds) with { StaysBeneathDefaults = !written.Understood };
-
-        // Every request for more over the pipe shares one cooldown, whatever it asks for and whichever
-        // agent it names, since both the name and the origin are the requester's own claim: no program
-        // can keep a confirmation in front of the person by rewording, renaming or switching to a
-        // terminal. The app's own settings and Always for come only from the person at the owner, never
-        // over the pipe, so their refusals hold nothing back and nothing holds them back.
-        var overThePipe = origin is AccessOrigin.Agent or AccessOrigin.Terminal;
-        string[] cooldownKeys = overThePipe ? [ApprovalGate.AskedForMore] : [];
-        var answer = await _gate.AskAsync(cooldownKeys, prompt, coolUnanswered: overThePipe, kept, cancellationToken).ConfigureAwait(false);
-
-        if (!answer.Releases())
-        {
-            var why = answer switch
+        // One line on the operator's terminal either way, and the only live signal that this
+        // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
+        return Deliver(
+            new CredentialReply
             {
-                ApprovalAnswer.Denied => "a person refused this change",
-                ApprovalAnswer.Cooldown => CoolingDown(),
-                _ => Explain(answer),
-            };
-
-            narrate?.Invoke($"did not change {agent}'s settings: {why}");
-            return Changed(AuditDecision.Denied, answer.ToAuditMethod(), why);
-        }
-
-        if (Withdrawn(cancellationToken) is { } withdrawn)
-        {
-            return withdrawn;
-        }
-
-        var saved = _settings.Write(agent, edit);
-
-        if (!saved.Holds)
-        {
-            narrate?.Invoke($"did not change {agent}'s settings: {saved.Reason}");
-            return Changed(AuditDecision.Denied, MethodOf(saved), $"a person confirmed it, and the vault was not saved: {saved.Reason}") with
-            {
-                Unapplied = $"the vault was not saved: {saved.Reason}",
-            };
-        }
-
-        var lifted = Lifted(agent, change);
-        _narrate?.Invoke($"changed {agent}'s settings: {OnThisClock(edit)}");
-
-        var unapplied = (written.Understood, lifted) switch
-        {
-            (true, null) => null,
-            (true, _) => $"the vault holds it, but this computer's limits could not be lifted to match: {lifted}",
-            (false, null) => $"the vault holds it, but {AccessChangePrompt.BeneathDefaultsText}",
-            (false, _) => $"the vault holds it, but {AccessChangePrompt.BeneathDefaultsText}, and this computer's limits could not be lifted to match: {lifted}",
-        };
-
-        var confirmed = edit.UsesVault
-            ? $"a person confirmed it, lifting what this computer held back: {string.Join("; ", prompt.Gains)}"
-            : "a person confirmed it";
-
-        return Made(
-            agent,
-            edit,
-            origin,
-            written,
-            Changed(AuditDecision.Granted, AuditMethod.Prompt, unapplied is null ? confirmed : $"{confirmed}, and {unapplied}") with { Unapplied = unapplied });
-    }
-
-    /// <summary>
-    /// A change as made, and for Always for's, whether it left the agent Automatic for that environment
-    /// here: when it did not, the reply says why, so the person who chose it is told rather than left to
-    /// find each later request still asked about.
-    /// </summary>
-    private AccessChangeReply Made(string agent, AccessEdit edit, AccessOrigin origin, AcafRead written, AccessChangeReply reply)
-    {
-        if (origin != AccessOrigin.Prompt || reply is not { Decision: AuditDecision.Granted, Unapplied: null } || edit.Project is not { } scope)
-        {
-            return reply;
-        }
-
-        var why = !TryAccess(agent, out var after, out var problem) ? Unusable(problem)
-            : after.IsAutomaticIn(scope, _clock.GetUtcNow()) ? null
-            : written.Understood ? "keypaste still asks before releasing it there"
-            : AccessChangePrompt.BeneathDefaultsText;
-
-        return why is null ? reply : reply with { Reason = $"{reply.Reason}, but {why}", Unapplied = why };
-    }
-
-    /// <summary>
-    /// Resets this computer's ceilings when <c>clients.toml</c> holds what keypaste cannot parse, which
-    /// refuses every agent request: only once the person confirms, having been shown what each agent then
-    /// gets beyond the defaults, is the file set aside beside it and an empty one started.
-    /// </summary>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What became of it.</returns>
-    /// <remarks>
-    /// A file that could not be read at all is left as it is, since what it holds is not known and may be
-    /// well formed; one that can be used now has nothing to reset. The person's own, so it neither waits on
-    /// a cooldown nor starts one.
-    /// </remarks>
-    public async ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken)
-    {
-        switch (_settings.ProbeCaps(out var problem))
-        {
-            case CapsFile.Usable:
-                return Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's limits can be read, so there was nothing to reset");
-            case CapsFile.Unreadable:
-                return Changed(
-                    AuditDecision.Denied,
-                    AuditMethod.Failed,
-                    $"keypaste could not read this computer's limits, so it left the file as it is: {problem}; fix what keeps it from being read, or move it away yourself");
-        }
-
-        var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone, _gate.Limits.MaximumTtlSeconds);
-        var answer = await _gate.AskAsync([], prompt, coolUnanswered: false, cancellationToken).ConfigureAwait(false);
-
-        if (!answer.Releases())
-        {
-            return Changed(AuditDecision.Denied, answer.ToAuditMethod(), answer == ApprovalAnswer.Denied ? "a person refused this change" : Explain(answer));
-        }
-
-        if (Withdrawn(cancellationToken) is { } withdrawn)
-        {
-            return withdrawn;
-        }
-
-        return _settings.TryResetCaps(out var kept, out problem) switch
-        {
-            CapsChange.Written => Changed(
-                AuditDecision.Granted,
-                AuditMethod.Prompt,
-                $"a person confirmed it: every limit this computer kept on agents was cleared, and the file keypaste could not read was kept beside it as {Path.GetFileName(kept)}; {string.Join("; ", prompt.Gains)}") with
-            {
-                Kept = kept,
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.Allowed,
+                Reason = why,
+                Entry = display,
+                Item = itemId,
+                CodeSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : 0,
+                Value = released.Value.ToString(),
+                ForAttachment = request.Attachment is not null,
             },
-            CapsChange.Unchanged => Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's limits could be read again, so nothing was reset"),
-            _ => Changed(AuditDecision.Denied, AuditMethod.Failed, $"a person confirmed it, and this computer's limits were not reset: {problem}"),
-        };
+            display,
+            $"released {display} to {client} without asking ({allowedBy})");
     }
 
-    /// <summary>
-    /// What an agent's record would read as with a change made to it, for a change the vault cannot
-    /// take, so that what it would still lower on this computer is judged as its record would be.
-    /// </summary>
-    private static AcafRead Unwritten(string agent, AgentRecords records, AccessEdit edit)
+    /// <summary>Why a field an Allow decides was released, naming the answer that allowed it.</summary>
+    private static string Allowed(FieldCategory category, RuleLevel level) => (category, level) switch
     {
-        var own = AgentNames.IsNamed(agent) ? records.Own : records.Any;
-        var start = own.Count > 0 ? own[0] : records.Any.Count > 0 ? records.Any[0] : null;
-
-        return new AcafRead(edit.Apply(start?.Access ?? AgentAccess.Defaults), own.All(record => record.Understood), true)
-        {
-            Said = edit.Apply(start?.Said ?? AgentAccess.Defaults),
-        };
-    }
-
-    /// <summary>
-    /// Applies a change that gives an agent nothing more: to this computer's ceilings first, then, unless
-    /// the agent asked, to the vault, which takes a person's narrowing even when the ceilings cannot.
-    /// </summary>
-    private AccessChangeReply Narrow(
-        string agent,
-        AccessEdit edit,
-        AgentRecords records,
-        AccessChange change,
-        AccessOrigin origin,
-        Action<string>? narrate)
-    {
-        var unkept = Lowered(agent, records, change);
-
-        if (origin == AccessOrigin.Agent)
-        {
-            if (unkept is not null)
-            {
-                narrate?.Invoke($"did not change {agent}'s settings: {unkept}");
-                return Changed(AuditDecision.Denied, AuditMethod.Failed, unkept);
-            }
-
-            _narrate?.Invoke($"changed {agent}'s settings: {OnThisClock(edit)}");
-            return Changed(AuditDecision.Granted, AuditMethod.Narrowing, "applied at once on this computer, since it gives the agent nothing more");
-        }
-
-        var saved = _settings.Write(agent, edit);
-
-        if (!saved.Holds && unkept is not null)
-        {
-            narrate?.Invoke($"did not change {agent}'s settings: {unkept}; {saved.Reason}");
-            return Changed(AuditDecision.Denied, MethodOf(saved), $"{unkept}, and the vault was not saved: {saved.Reason}");
-        }
-
-        _narrate?.Invoke($"changed {agent}'s settings: {OnThisClock(edit)}");
-
-        var applied = (saved.Holds, unkept) switch
-        {
-            (true, null) => "applied at once, since it gives the agent nothing more",
-            (true, _) => $"applied at once in the vault, since it gives the agent nothing more, but {unkept}, so a restored or merged older copy of the vault could undo it here",
-            _ => $"applied at once on this computer, since it gives the agent nothing more, and the vault was not saved: {saved.Reason}",
-        };
-
-        return Changed(AuditDecision.Granted, AuditMethod.Narrowing, applied);
-    }
-
-    /// <summary>Lowers this computer's ceilings for a narrowing, as the file holds them now; null when they hold it, otherwise why not.</summary>
-    private string? Lowered(string agent, AgentRecords records, AccessChange change)
-    {
-        try
-        {
-            return _settings.TryChangeCaps(
-                caps =>
-                {
-                    var lowered = caps.Narrowed(agent, EffectiveAccess.Create(agent, records, caps), change);
-
-                    // Also where it takes away what a record not wholly understood says, so it holds once that record is fixed or an older one is merged back.
-                    return change.Said is { } said ? lowered.Narrowed(agent, said, change) : lowered;
-                },
-                out var error)
-                ? null
-                : $"this computer's limits could not be written: {error}";
-        }
-        catch (ArgumentException tooMany)
-        {
-            return $"this computer's limits could not hold it: {tooMany.Message}";
-        }
-    }
-
-    /// <summary>
-    /// Lifts this computer's ceilings as far as a confirmed change goes, from what the file holds once the
-    /// person has answered, so a ceiling written while they were asked stays; null when that was done, otherwise why not.
-    /// </summary>
-    private string? Lifted(string agent, AccessChange change)
-    {
-        try
-        {
-            return _settings.TryChangeCaps(caps => caps.Lifted(agent, change), out var error) ? null : error;
-        }
-        catch (ArgumentException tooMany)
-        {
-            return tooMany.Message;
-        }
-    }
-
-    /// <summary>A change as the operator's terminal reads it, its end on this computer's clock.</summary>
-    private string OnThisClock(AccessEdit edit) => edit.OnThisClock(edit.ToString(), _clock.LocalTimeZone);
-
-    private static AuditMethod MethodOf(AgentSave saved) => saved.Outcome switch
-    {
-        AgentSaveOutcome.Locked => AuditMethod.VaultLocked,
-        AgentSaveOutcome.ChangedOnDisk => AuditMethod.VaultChanged,
-        _ => AuditMethod.Failed,
+        (_, RuleLevel.Item) => $"released without asking: the person always allows this item's {FieldCategories.One(category)} to this agent",
+        (_, RuleLevel.Agent) => $"released without asking: the person allows {FieldCategories.Shown(category)} for this agent",
+        (FieldCategory.Url, _) => "released without asking: agents see an item's URL",
+        (FieldCategory.Username, _) => "released without asking: agents see an item's username",
+        _ => $"released without asking: the person allows {FieldCategories.Shown(category)} for every agent",
     };
 
-    private static AccessChangeReply Changed(AuditDecision decision, AuditMethod method, string reason) =>
-        new(decision, method, reason) { Unapplied = decision == AuditDecision.Denied ? reason : null };
+    /// <summary>The answer that allowed a release, as the operator's terminal names it.</summary>
+    private static string AllowedBy(FieldCategory category, RuleLevel level) => level switch
+    {
+        RuleLevel.Item => $"this item's {FieldCategories.One(category)} always allowed",
+        RuleLevel.Agent => $"{FieldCategories.Shown(category)} allowed for this agent",
+        _ => $"{FieldCategories.Shown(category)} allowed",
+    };
 
-    /// <summary>Refuses, before anything is written, a change withdrawn while the person was asked.</summary>
-    private static AccessChangeReply? Withdrawn(CancellationToken cancellationToken) =>
-        cancellationToken.IsCancellationRequested
-            ? Changed(AuditDecision.Denied, AuditMethod.Cancelled, "the request was withdrawn before anything was changed")
+    /// <summary>What a request's cooldown key names within its item: the field, or the attachment by its name.</summary>
+    private static string Subject(CredentialRequest request) =>
+        request.Attachment is { } attachment ? _attachmentKey + attachment : request.Field;
+
+    /// <summary>What a prompt says is asked for: the field, or the attachment by its name, scrubbed for display.</summary>
+    private static string Shown(CredentialRequest request) =>
+        request.Attachment is { } attachment ? $"attachment {EntryNameSanitizer.Sanitize(attachment).Text}" : EntryNameSanitizer.Sanitize(request.Field).Text;
+
+    private const string _attachmentKey = CredentialFields.Attachment + ":";
+
+    /// <summary>Reads what a request asks for, a field or an attachment, once it is authorized; null with the reason when it cannot.</summary>
+    private ReleasedField? Release(EntryName name, CredentialRequest request, out CredentialFailure failure, out string unfilled)
+    {
+        unfilled = string.Empty;
+        ReleasedField? released;
+
+        return (request.Attachment is { } attachment
+            ? _source.TryReadAttachment(name, attachment, out released, out failure)
+            : _source.TryRead(name, request.Field, out released, out failure, out unfilled))
+            ? released
             : null;
+    }
 
-    /// <summary>Why an agent request was refused when its settings could not be read.</summary>
-    private static string Unusable(string problem) => $"agent settings are not usable: {problem}";
+    /// <summary>Why a request for a Blocked category was refused.</summary>
+    /// <param name="category">The field's category.</param>
+    /// <param name="level">Which answer blocked it.</param>
+    /// <returns>The reason.</returns>
+    public static string Blocked(FieldCategory category, RuleLevel level = RuleLevel.Settings) => (category, level) switch
+    {
+        (FieldCategory.Passkey, _) => "a passkey's fields are never released to agents",
+        (_, RuleLevel.Item) => $"the person always refuses this item's {FieldCategories.One(category)} to this agent",
+        (_, RuleLevel.Agent) => $"the person blocks {FieldCategories.Shown(category)} for this agent",
+        _ => $"the person blocks {FieldCategories.Shown(category)} for agents",
+    };
 
-    /// <summary>Tells the person who chose Always for that the change it asked for did not take effect.</summary>
-    /// <param name="notice">What to tell them, from <see cref="AlwaysForNotice.For"/>.</param>
-    public void Tell(AlwaysForNotice notice) => _gate.Tell(notice);
+    /// <summary>Why an agent request was refused when the rules could not be read.</summary>
+    private static string Unusable(string problem) => $"agent rules are not usable: {problem}";
 
-    /// <summary>What a person is being asked about now and the grants they have given that are in force.</summary>
-    /// <returns>The waiting request, if any, and every live grant, none carrying a value.</returns>
+    /// <summary>What a person is being asked about now.</summary>
+    /// <returns>The waiting request, if any, carrying no value.</returns>
     public ApproverActivity Activity() =>
-        new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce())
+        new(_gate.Waiting is { } waiting ? [waiting] : [])
         {
-            WaitingChanges = _gate.WaitingChange is { } change ? [change] : [],
             WaitingEdits = _gate.WaitingEdit is { } edit ? [edit] : [],
         };
-
-    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
-    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
-    /// <remarks>No cooldown starts: a revoked grant is a decision withdrawn, not a request refused.</remarks>
-    public void Revoke(GrantKey key) => _grants.Revoke(key);
-
-    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now.</summary>
-    /// <param name="agent">Whether a grant, as <see cref="Activity"/> lists it, was given to the agent.</param>
-    /// <returns>How many grants ended.</returns>
-    public int RevokeAgent(Func<GrantInForce, bool> agent) => _grants.RevokeAgent(agent);
-
-    /// <summary>Ends every grant, so each request they would have answered is asked again.</summary>
-    public void RevokeAll() => _grants.RevokeEntries(VaultEdit.Everything);
-
-    /// <summary>Revokes the grants scoped to a connection that has gone.</summary>
-    /// <param name="connectionId">The connection that ended.</param>
-    public void Disconnected(string connectionId)
-    {
-        ArgumentNullException.ThrowIfNull(connectionId);
-
-        _grants.Revoke(connectionId);
-    }
 
     /// <summary>Hands back a release the peer can actually be sent, or a refusal saying why not.</summary>
     /// <param name="granted">The release, already authorized and already read.</param>
     /// <param name="display">The sanitized entry, for the refusal and the terminal.</param>
     /// <param name="narration">What to tell the operator when the release does leave.</param>
+    /// <param name="askedUnder">The cooldown a person was asked under, which an undeliverable release cools, or null where nobody was.</param>
     /// <returns><paramref name="granted"/>, or a denial under <see cref="AuditMethod.Undeliverable"/>.</returns>
     /// <remarks>
     /// <para>
@@ -970,15 +630,21 @@ public sealed class ApproverHandler
     /// again as it will be sent.
     /// </para>
     /// <para>
-    /// The refusal names which authority the release had, so an Automatic release is never written up
+    /// The refusal names which authority the release had, so a release under a rule is never written up
     /// as a person's (THREATS.md T-16).
     /// </para>
     /// </remarks>
-    private CredentialReply Deliver(CredentialReply granted, string display, string narration)
+    private CredentialReply Deliver(CredentialReply granted, string display, string narration, string? askedUnder = null)
     {
         if (!ApproverProtocol.Fits(granted))
         {
             _narrate?.Invoke($"could not deliver {display}: the reply is larger than one message");
+
+            // The size belongs to the entry, so every retry would end the same way, and asking again for each is T-11 with a lever attached.
+            if (askedUnder is not null)
+            {
+                _gate.CoolDown(askedUnder);
+            }
 
             return Refused(
                 AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(granted.Method), display);
@@ -997,7 +663,7 @@ public sealed class ApproverHandler
     /// A placeholder refusal cools the field down as a person's refusal does: asking again ends the same way
     /// until somebody edits the item, so each retry would otherwise put the same question to a person for nothing.
     /// </remarks>
-    private CredentialReply Unread(CredentialFailure failure, GrantKey key, string unfilled, string display, string client)
+    private CredentialReply Unread(CredentialFailure failure, string cooldownKey, string field, string unfilled, string display, string client)
     {
         if (IsStale(failure))
         {
@@ -1006,12 +672,15 @@ public sealed class ApproverHandler
 
         if (failure != CredentialFailure.Unfilled)
         {
-            return Refused(AuditMethod.Failed, Explain(failure), display);
+            return Refused(
+                AuditMethod.Failed,
+                failure == CredentialFailure.NoSuchField && string.Equals(field, CredentialFields.Attachment, StringComparison.Ordinal) ? "the item holds no attachment of that name" : Explain(failure),
+                display);
         }
 
-        var reason = unfilled.Length > 0 ? $"the item's {key.Field} {unfilled}" : Explain(failure);
+        var reason = unfilled.Length > 0 ? $"the item's {field} {unfilled}" : Explain(failure);
 
-        _gate.CoolDown(CooldownKey(key));
+        _gate.CoolDown(cooldownKey);
         _narrate?.Invoke($"refused {display} for {client}: {reason}; edit the item so keypaste can fill it in");
 
         return Refused(AuditMethod.Unfillable, reason, display);
@@ -1024,18 +693,8 @@ public sealed class ApproverHandler
     /// <param name="failure">Which way it no longer matches.</param>
     /// <param name="what">What was refused, for the operator's terminal.</param>
     /// <returns>The refusal's reason.</returns>
-    /// <remarks>
-    /// A file somebody else wrote zeroes every grant: each holds a value from the copy that is now
-    /// stale, which is not served again; the owner serves its merge with that file once saved, or what
-    /// a person reloads.
-    /// </remarks>
     private string Stale(CredentialFailure failure, string what)
     {
-        if (failure == CredentialFailure.ChangedOnDisk)
-        {
-            _grants.RevokeEntries(VaultEdit.Everything);
-        }
-
         _narrate?.Invoke(failure == CredentialFailure.ChangedOnDisk
             ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste approve to serve what the file holds now"
             : $"refused {what}: {Explain(failure)}");
@@ -1053,16 +712,6 @@ public sealed class ApproverHandler
             ? Refused(AuditMethod.Cancelled, "the request was withdrawn before anything was read", display)
             : null;
 
-    /// <summary>
-    /// What counts as "the same request" for the cooldown: the same field of the same entry, whichever
-    /// connection asks and whether a run reaches it, so a client that reconnects or starts another
-    /// bridge is refused without a second prompt (T-11).
-    /// </summary>
-    private static string CooldownKey(GrantKey key) => ApprovalGate.FieldKey(key.Handle, key.Field);
-
-    /// <summary>Why a request for more was not put to the person, and when it can be asked again.</summary>
-    private string CoolingDown() => _gate.CoolingDown("make it in the app's own agent settings, which do not wait");
-
     /// <summary>A value's lifetime as a reply carries it, rounded up so a code with part of a second left is not told it has none.</summary>
     private static int WholeSeconds(TimeSpan lifetime) => (int)Math.Ceiling(lifetime.TotalSeconds);
 
@@ -1072,7 +721,6 @@ public sealed class ApproverHandler
         Method = method,
         Reason = reason,
         Entry = entry,
-        TtlSeconds = 0,
     };
 
     private static string Explain(ApprovalAnswer answer) => answer switch
@@ -1098,6 +746,7 @@ public sealed class ApproverHandler
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
         CredentialFailure.Unfilled => "the item's field holds a KeePass placeholder keypaste does not fill in",
         CredentialFailure.NoCode => "the item has no TOTP keypaste can compute",
+        CredentialFailure.TooLarge => $"the attachment is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste releases",
         _ => "the vault could not be read",
     };
 }

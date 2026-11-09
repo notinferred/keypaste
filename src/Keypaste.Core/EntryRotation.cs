@@ -20,7 +20,7 @@ public enum RotateOutcome
 /// <remarks>
 /// It writes a new value into the vault only: a key a provider issued still has to be rotated at the
 /// provider and stored with <c>keypaste set</c>. The edit is an ordinary <see cref="Vault.UpdateEntry(VaultEntry)"/>,
-/// so every grant naming the entry ends (D-0318).
+/// so the next request for the entry reads the new value.
 /// </remarks>
 public static class EntryRotation
 {

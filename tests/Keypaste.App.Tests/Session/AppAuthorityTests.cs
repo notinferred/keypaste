@@ -252,6 +252,7 @@ public sealed class AppAuthorityTests
         Assert.Equal(OwnerKind.DesktopApp, serving.Owner.Kind);
         Assert.Equal(Environment.ProcessId, serving.Owner.ProcessId);
         Assert.Contains(serving.Session, AgentActivityViewModel.Describe(serving), StringComparison.Ordinal);
+        Assert.Contains("except what Settings allows for every agent: passwords, notes.", AgentActivityViewModel.Describe(serving, ["passwords", "notes"]), StringComparison.Ordinal);
 
         await using var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
         Assert.NotNull(client);
@@ -292,7 +293,6 @@ public sealed class AppAuthorityTests
         Entry = "example",
         Field = "password",
         Reason = "deploy",
-        TtlSeconds = 60,
         Exposure = ["**"],
         ClientLabel = TempVault.Agent,
         Vault = vault,

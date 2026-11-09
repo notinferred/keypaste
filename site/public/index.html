@@ -174,7 +174,7 @@
     <div class="hero-body">
       <p class="eyebrow">open source · reads and writes KDBX · no account, no server</p>
       <h1>A password manager your agents have to ask.</h1>
-      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you approve or deny that request (the next release adds allowing it once or for an hour).</p>
+      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you approve or deny that request (the next release adds allowing it once or always).</p>
 
       <div class="actions">
         <a class="button primary" href="#install">Install the CLI</a>
@@ -203,12 +203,10 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
-      released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 </pre>
         </div>
-        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
+        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back. That does not erase the client's copies or revoke the credential later. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
       </figure>
     </div>
   </div>
@@ -253,7 +251,7 @@ keypaste run dev -- npm start</pre>
       <figure class="demo">
         <img src="/demo/keypaste-demo.gif" width="960" height="734" loading="lazy"
              alt="An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.">
-        <figcaption>Rendered from the source's output for the next release before its prompt offered Always for, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
+        <figcaption>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
       </figure>
     </div>
   </section>
@@ -301,7 +299,7 @@ keypaste run dev -- npm start</pre>
           <ul>
             <li>The <a href="/products/desktop-app/">desktop app</a> for Windows, macOS and Linux</li>
             <li><a href="/products/project-environments/">Project tags</a> on ordinary entries</li>
-            <li><a href="/products/agent-approvals/">Approvals in the app</a>, once or for an hour</li>
+            <li><a href="/products/agent-approvals/">Approvals in the app</a>, once or always</li>
             <li><a href="/products/share-links/">Share links</a> and <a href="/products/ci-tokens/">scoped CI tokens</a></li>
             <li>Connecting every AI tool in one step</li>
           </ul>
@@ -436,7 +434,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
   <section id="desktop">
     <div class="wrap prose">
       <div class="section-head"><span class="num">08</span><h2>The desktop app</h2></div>
-      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Later, your vault can sync free through keypaste's cloud, which can't read it, and teams share projects through a relay that stores only ciphertext; complete KeePassXC parity stays out.</p>
+      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or always, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Later, your vault can sync free through keypaste's cloud, which can't read it, and teams share projects through a relay that stores only ciphertext; complete KeePassXC parity stays out.</p>
 
       <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 

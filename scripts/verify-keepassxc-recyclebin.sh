@@ -239,26 +239,21 @@ set -e
 [ "$refused_rc" -eq 1 ] || die "restoring an identity nothing answers to exited ${refused_rc}, expected 1"
 [ "$(bytes "$db")" = "$before_refusal" ] || die "a refused restore changed the vault file"
 
-# A restore that would produce two entries of one name is refused whole. A name cannot tell that
-# pair apart afterwards: Find refuses it and a credential release denies it as ambiguous.
-step "NEGATIVE CONTROL: a restore onto a name something else took is refused"
+# A restore keeps its own title beside an item that took it since, as the pair KeePassXC can make.
+step "A restore onto a name something else took comes back beside it"
 kprm "$entry" >/dev/null 2>&1 || die "keypaste rm failed on the re-deleted entry"
 kpnew "$entry" a-new-value
 
 taken_id=$(trash_id ROTATED)
 [ -n "$taken_id" ] || die "the re-deleted entry is not in the trash"
 
-before_refusal=$(bytes "$db")
-set +e
-occupied=$("$driver" trash-restore "$db" "$taken_id" 2>&1)
-occupied_rc=$?
-set -e
-[ "$occupied_rc" -eq 1 ] \
-  || die "restoring onto an occupied name exited ${occupied_rc}, expected 1. It said: ${occupied}"
-[ "$(bytes "$db")" = "$before_refusal" ] || die "a refused restore changed the vault file"
+restored=$("$driver" trash-restore "$db" "$taken_id" 2>&1) \
+  || die "restoring beside the item that took the name failed. It said: ${restored}"
 
-value=$(kpxc show -a Password "$db" "$entry")
-diff -u <(printf '%s\n' 'a-new-value') <(printf '%s\n' "$value") \
-  || die "the refused restore disturbed the entry that holds the name"
+tree=$(kpxc ls -R -f "$db")
+[ "$(grep -cx "${entry}" <<<"$tree")" = 2 ] \
+  || die "KeePassXC does not find both items called ${entry}. Its tree: ${tree}"
+grep -qF 'Recycle Bin/ROTATED' <<<"$tree" \
+  && die "KeePassXC still sees the restored entry in the recycle bin"
 
 printf '\nRECYCLE BIN GATE PASSED: KeePassXC reads what keypaste recycled, restored and purged.\n'

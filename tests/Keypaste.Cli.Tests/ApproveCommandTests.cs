@@ -3,7 +3,6 @@ using System.Text.Json;
 using Keypaste.Cli.Approval;
 using Keypaste.Cli.Commands;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -31,7 +30,7 @@ public sealed class ApproveCommandTests : IDisposable
 
     private string Home => _harness.Environment[KeypasteHome.EnvironmentVariable];
 
-    private static string Announced(string? retired, params string[] automatic)
+    private static string Announced(string? retired, params string[] allowed)
     {
         using var stderr = new StringWriter();
 
@@ -41,34 +40,30 @@ public sealed class ApproveCommandTests : IDisposable
             "test-session",
             ApprovalLimits.Default,
             retired,
-            automatic,
+            allowed,
             new AgentConsole(stderr, interactive: false));
 
         return stderr.ToString();
     }
 
     [Fact]
-    public void WithNothingAutomatic_ItSaysNothingIsReleasedWithoutYou()
+    public void WithNothingAllowed_ItSaysEveryValueWaitsForYou()
     {
         var text = Announced(null);
 
-        Assert.Contains("keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Automatic", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("without asking", text, StringComparison.Ordinal);
         Assert.DoesNotContain("policy.toml", text, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// The one claim that stops being true once an agent is Automatic: each such agent is named with
-    /// where, and the closing line says what is released without the person.
-    /// </summary>
+    /// <summary>The one claim that stops being true once a category is allowed: each is named, and the closing line says only the others wait.</summary>
     [Fact]
-    public void WithAnAgentAutomatic_ItNamesItAndStopsClaimingEverythingAsks()
+    public void WithACategoryAllowed_ItNamesItAndStopsClaimingEveryValueWaits()
     {
-        var text = Announced(null, "claude-code (billing:dev)", "codex (by default)");
+        var text = Announced(null, "passwords", "project variables");
 
-        Assert.Contains("keypaste: set to Automatic in the vault: claude-code (billing:dev); codex (by default)", text, StringComparison.Ordinal);
-        Assert.Contains("except what an agent above is Automatic for", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("nothing is released without you saying yes. Press", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: released to every agent without asking, by this computer's rules: passwords, project variables", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: every other value waits for you to say yes", text, StringComparison.Ordinal);
     }
 
     /// <summary>A policy file left from before is named once, so a person who wrote rules learns they no longer apply.</summary>
@@ -78,7 +73,7 @@ public sealed class ApproveCommandTests : IDisposable
         var text = Announced("/home/you/.keypaste/policy.toml");
 
         Assert.Single(text.Split(Environment.NewLine), line => line.Contains("policy.toml", StringComparison.Ordinal));
-        Assert.Contains("keypaste: /home/you/.keypaste/policy.toml is no longer read: each agent's settings are kept in the vault. `keypaste clients` shows them.", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: /home/you/.keypaste/policy.toml is no longer read: agents' rules are kept on this computer. `keypaste clients` shows them.", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -102,61 +97,6 @@ public sealed class ApproveCommandTests : IDisposable
         using var help = new CliHarness();
         help.Run("approve", "--help");
         Assert.Contains("--pair-browser <name>", help.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// A change from a terminal that gives an agent more is confirmed in the approver's own terminal, then
-    /// saved in the vault under its claim, where the next owner reads it; its line names the change.
-    /// </summary>
-    [Fact]
-    public async Task AChangeConfirmedInItsTerminal_IsSavedInTheVault()
-    {
-        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
-        using var terminal = Terminal(approver);
-
-        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("clients", "claude-code", "--mode", "automatic", "--run", "on", "--vault", _harness.VaultPath));
-
-        Assert.Contains("a person confirmed it (claude-code: mode automatic, run on)", terminal.Err, StringComparison.Ordinal);
-        Assert.Contains("keypaste: a change would give an agent more.", approver.Text, StringComparison.Ordinal);
-        Assert.Contains("by default: Automatic: released without asking, recorded in history", approver.Text, StringComparison.Ordinal);
-        Assert.Contains("may run commands, each still asked about", approver.Text, StringComparison.Ordinal);
-        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", approver.Text, StringComparison.Ordinal);
-
-        await approver.StopAsync(terminal);
-
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
-        {
-            var saved = Assert.Single(new AgentAccessStore(vault).Read("claude-code").Own);
-            Assert.Equal((AgentMode.Automatic, true), (saved.Access.Mode, saved.Access.Run));
-        }
-
-        var line = Assert.Single(Lines(), line => line.GetProperty("tool").GetString() == "access_change");
-        Assert.Equal(("granted", "prompt"), (line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
-        Assert.Equal("claude-code", line.GetProperty("client").GetProperty("label").GetString());
-    }
-
-    /// <summary>A confirmed change the vault cannot hold, because another program wrote its file, is refused and said, and nothing is saved.</summary>
-    [Fact]
-    public async Task AConfirmedChangeItCannotSave_IsRefusedAndSaid()
-    {
-        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
-        using var terminal = Terminal(approver);
-
-        using (var other = Vault.Open(_harness.VaultPath, _master))
-        {
-            other.AddEntry(new VaultEntry { GroupPath = "elsewhere", Title = "WRITTEN", Password = "by another program" });
-            other.Save();
-        }
-
-        terminal.AssertExit(CliApp.ExitInternalError, terminal.Run("clients", "claude-code", "--mode", "automatic", "--vault", _harness.VaultPath));
-
-        Assert.Contains("not changed: a person confirmed it, and the vault was not saved: another program changed the vault file", terminal.Err, StringComparison.Ordinal);
-        Assert.Contains("restart keypaste approve", terminal.Err, StringComparison.Ordinal);
-
-        await approver.StopAsync(terminal);
-
-        using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.Empty(new AgentAccessStore(vault).Read("claude-code").Own);
     }
 
     /// <summary>

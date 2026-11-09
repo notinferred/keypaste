@@ -28,7 +28,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 **For developers and their agents**
 
-- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Allow for 1 hour, and every request lands in a hash-chained audit log.
+- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once, or Always allow or Always block for that agent and item, or allow a kind of value for every agent in Settings or for one on its page, and every request lands in a hash-chained audit log.
 - Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). [PRODUCT §2](docs/PRODUCT.md) bounds it: no shell, and you approve the exact command.
 - Projects: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
@@ -44,7 +44,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
   <tr>
     <td>An agent's request, in the app</td>
     <td>A project and its <code>.env.keypaste</code></td>
-    <td>Requests, allowances and AI tools</td>
+    <td>Requests and AI tools</td>
   </tr>
 </table>
 
@@ -52,7 +52,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 ![An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.](docs/demo/keypaste-demo.gif)
 
-<sub>Rendered from the source's output for the next release before its prompt offered Always for, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
+<sub>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
 
 ```
 ────────────────────────────────────────────────────────────
@@ -67,9 +67,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
-      released without asking you from then on, and recorded in history.
-[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
@@ -294,13 +292,13 @@ Export uses single quotes where possible for consistent reading by `motdotla/dot
 
 ## Agent access
 
-In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_access_change`, asks for a change to that agent's own settings and waits for you to confirm one that gives it more, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
+In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_attachment`, asks for one attachment of an entry by its name, a fourth, `request_save`, asks you to save a value the agent never sees, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
 
-A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a setting you confirmed that makes that agent Automatic for the entry. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
+A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a kind of value you allowed for every agent and confirmed. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
 
-An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. Matching requests can reuse a live approval. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
+An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. In `v0.3.0` matching requests can reuse a live approval; in source each is asked again unless its kind of value is allowed. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
 
-The TTL expires keypaste's cached approval. It does not erase the client's copies or revoke the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
+`v0.3.0`'s TTL expires its cached approval, and in source setting a kind of value back to Ask stops later releases without asking. Neither erases the client's copies or revokes the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
 
 In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose` globs in your client configuration widen it. In 0.5.0 an agent sees every project's variables, the custom fields named like environment variables on entries tagged into a project, until you change its settings, and an `--expose` in the client configuration can only narrow that.
 
@@ -308,14 +306,14 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time offers Allow once only; Ask, allow for 1 hour, the default, adds a timed allow, so a repeat of that request goes unasked for that hour, or for up to 15 minutes on a whole run or a command; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Commands and protected environments are always asked. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
+In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Settings and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Settings hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
 
 ```sh
 keypaste clients
-keypaste clients claude-code --project billing:dev --mode automatic --per-hour 20
+keypaste clients claude-code --run on
 ```
 
-The app's Agents screen sets the same things, and its prompt's Always for button makes an item's environment Automatic after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1](https://keypaste.com/acaf/v1/), a published format other KeePass apps can read.
+The rules are kept on this computer in `~/.keypaste/agents.toml`, sealed with a key the vault holds, so neither a synced vault nor another program editing the file gives an agent more. [Agent settings](docs/policy.md) explains them.
 
 ### Seeing what happened
 
@@ -334,7 +332,7 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 
 Each audit record includes its predecessor's hash. `keypaste log verify` checks the chain and reports its limits on every pass: a complete recomputed chain and records removed from the end can escape detection.
 
-[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, cached grants and audit tampering.
+[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, standing approvals and audit tampering.
 
 [KeePass and agents](docs/keepass-and-agents.md) explains the local approval design and its relation to browser integration.
 

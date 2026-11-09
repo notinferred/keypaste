@@ -1,23 +1,21 @@
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// What came back from asking a human. Two values release a credential.
+/// What came back from asking a human. One value releases a credential.
 /// </summary>
 /// <remarks>
-/// Seven of the ten mean deny, and they are distinct only so the audit line and the refusal an
+/// All but two mean deny, and they are distinct only so the audit line and the refusal an
 /// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. docs/PRODUCT.md law
 /// 3.2 makes deny the default and law 3.7 makes every error path a denial, so the safe way to read
-/// this enum is: two values release, <see cref="Approved"/> and <see cref="ApprovedOnce"/>; anything
-/// else is a no, <see cref="AlwaysForProject"/> included unless the approver offered it.
-/// <see cref="ApprovalAnswers.Releases"/> reads it that way.
+/// this enum is: <see cref="ApprovedOnce"/> releases; anything else is a no.
+/// <see cref="ApprovalAnswers.Releases"/> reads it that way. <see cref="AlwaysAllowed"/> releases only on the
+/// credential path that offered it, which reads it itself; the gate turns either always into a denial on any
+/// prompt that did not offer it.
 /// </remarks>
 public enum ApprovalAnswer
 {
     /// <summary>Nobody was asked, because nothing could ask them. The default, and a denial.</summary>
     NoChannel = 0,
-
-    /// <summary>A human allowed this request and its reuse for the timed grant the prompt offered.</summary>
-    Approved = 1,
 
     /// <summary>A human said no.</summary>
     Denied = 2,
@@ -29,8 +27,8 @@ public enum ApprovalAnswer
     Cancelled = 4,
 
     /// <summary>
-    /// Another request was already in front of a human. Refused rather than queued: a queue is a
-    /// pipeline that eventually shows every prompt, which is the storm it was meant to prevent.
+    /// Another request was in front of a human and this one could not wait its turn: its agent already had
+    /// <see cref="ApprovalLimits.MaximumWaiting"/> waiting, or it names no agent and so never waits (F.80).
     /// </summary>
     Busy = 5,
 
@@ -46,11 +44,9 @@ public enum ApprovalAnswer
     /// <summary>A human allowed this one request and nothing after it.</summary>
     ApprovedOnce = 8,
 
-    /// <summary>A human allowed this one request and asked to make its project Automatic for the agent.</summary>
-    /// <remarks>
-    /// Not a release by itself: the approver reads it as <see cref="ApprovedOnce"/> followed by the
-    /// confirmation any widening needs, and only when the prompt offered it
-    /// (<see cref="ApprovalPrompt.AlwaysFor"/>); otherwise it is a denial.
-    /// </remarks>
-    AlwaysForProject = 9,
+    /// <summary>A human allowed this request and confirmed that this agent always gets this item's field, or the item they picked, without asking.</summary>
+    AlwaysAllowed = 9,
+
+    /// <summary>A human refused this request and confirmed that this agent is always refused this item's field without asking.</summary>
+    AlwaysBlocked = 10,
 }

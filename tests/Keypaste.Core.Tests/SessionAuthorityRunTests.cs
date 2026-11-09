@@ -5,15 +5,14 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Xunit;
-using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An agent's run over a real pipe (D-0358): the owner releases the variables only to a connection of
-/// its current session, only when the agent's settings let it run commands, only within what the agent
-/// can see, after the person approves the exact program, command, directory and names, or under a timed
-/// grant that same connection holds for that same command line.
+/// its current session, only when this computer turns run on for the agent, only within what its bridge
+/// can see and with no field in a Blocked category, after the person approves the exact program, command,
+/// directory and names, every time.
 /// </summary>
 public sealed class SessionAuthorityRunTests : IDisposable
 {
@@ -27,7 +26,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-run-").FullName;
     private readonly ApproverFixture _fixture = new();
     private readonly Vault _vault;
-    private readonly EnvGrantCache _grants;
     private readonly List<string> _narration = [];
     private readonly OwnerLog _log;
     private SessionLifetime? _lifetime = new("session-one");
@@ -59,31 +57,26 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 Assert.True(created.AddTag(wide, "env:wide"));
             }
 
-            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(created).Write(_label, Runs));
             created.Save();
         }
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
-        _grants = new EnvGrantCache(_fixture.Clock);
         _log = new OwnerLog(_directory);
-        _fixture.Settings.Records[_label] = Runs;
+        _fixture.Rules.Rules = Runs;
     }
 
-    /// <summary>What the test's agent may do: see as far as its bridge exposes, and run commands.</summary>
-    private static AgentAccess Runs { get; } = ApproverFixture.SeesAll with { Run = true };
+    /// <summary>The rules the test's agent is held to: every category asked, and run on for it.</summary>
+    private static AgentRules Runs { get; } = AgentRules.Defaults.WithRun(_label, run: true);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private string VaultPath => Path.Combine(_directory, "vault.kdbx");
-
-    private string ClientsPath => Path.Combine(_directory, "clients.toml");
 
     private static string Program => OperatingSystem.IsWindows() ? @"C:\tools\npm.exe" : "/usr/bin/npm";
 
     public void Dispose()
     {
         _lifetime?.Dispose();
-        _grants.Dispose();
         _log.Dispose();
         _vault.Dispose();
         _fixture.Dispose();
@@ -137,12 +130,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal([new EnvVariable("DATABASE_URL", _database), new EnvVariable("STRIPE_SECRET_KEY", _stripe)], reply.Set.Variables);
         Assert.Equal(["env/acme-api/.env"], reply.Entries);
         Assert.Equal(AuditMethod.Prompt, reply.Method);
-        Assert.Equal(0, reply.GrantedSeconds);
         Assert.Equal("session-one", reply.Session);
     }
 
     [Fact]
-    public async Task ATaggedField_IsNamedByItsEntryAndField_AndAProdTaggedMemberIsOnceOnly()
+    public async Task ATaggedField_IsNamedByItsEntryAndField()
     {
         var stripe = new EntryName("personal", "stripe");
         _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "stripe", Password = "stripe-login" });
@@ -164,8 +156,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         var prompt = Assert.IsType<RunPrompt>(_fixture.Channel.LastRunPrompt);
         Assert.Equal(new RunPromptVariable("STRIPE_WEBHOOK", "personal/stripe", "STRIPE_WEBHOOK"), prompt.Variables[2]);
-        Assert.Equal(0, prompt.GrantSeconds);
-        Assert.Equal(OnceOnly.ProtectedProfile, prompt.OnceOnly);
     }
 
     [Fact]
@@ -189,70 +179,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
             [new RunPromptVariable("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
             prompt.Variables);
         Assert.Equal("run the pending migration", prompt.Reason);
-        Assert.Equal(EnvGrantCache.CeilingSeconds, prompt.GrantSeconds);
         Assert.DoesNotContain(_database, prompt.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task AllowForTheWindow_ServesTheSameRunOnTheSameConnection_Unasked_WithTheLatestValues()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-
-        var first = await client.ReleaseRunAsync(Run(), Token);
-        Assert.Equal(EnvGrantCache.CeilingSeconds, first!.GrantedSeconds);
-
-        ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", "postgres://rotated");
-        _vault.Save();
-        _fixture.Channel.Answer = ApprovalAnswer.Denied;
-
-        var second = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.NotNull(second);
-        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
-        Assert.Equal(AuditMethod.GrantCache, second.Method);
-        Assert.Equal("postgres://rotated", second.Set.Variables[0].Value);
-        Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Contains(_narration, line => line.Contains("under an allowance", StringComparison.Ordinal) && line.Contains("npm run migrate", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task TheRunGrant_DoesNotCoverAnotherConnectionCommandDirectoryOrNameList()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        Assert.Equal(EnvOutcome.Resolved, (await client.ReleaseRunAsync(Run(), Token))!.Set.Outcome);
-
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var other = await AttachedAsync(owner);
-
-        await other.ReleaseRunAsync(Run(), Token);
-        await client.ReleaseRunAsync(Run(command: ["npm", "run", "seed"]), Token);
-        await client.ReleaseRunAsync(Run() with { Directory = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar) }, Token);
-        await client.ReleaseRunAsync(Run() with { Keys = ["DATABASE_URL"] }, Token);
-
-        Assert.Equal(5, _fixture.Channel.Asked);
-    }
-
-    [Fact]
-    public async Task Disconnecting_EndsThatConnectionsRunGrants()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        var client = await AttachedAsync(owner);
-        await client.ReleaseRunAsync(Run(), Token);
-        Assert.Single(owner.Authority.Activity.EnvGrants);
-
-        await client.DisposeAsync();
-
-        var deadline = DateTime.UtcNow + _wait;
-        while (owner.Authority.Activity.EnvGrants.Count > 0)
-        {
-            Assert.True(DateTime.UtcNow < deadline, "the grant outlived its connection");
-            await Task.Delay(20, Token);
-        }
     }
 
     [Fact]
@@ -265,14 +192,13 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await client.ReleaseRunAsync(Run(), Token);
         await client.ReleaseRunAsync(Run(), Token);
 
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
         Assert.Equal(2, _fixture.Channel.Asked);
     }
 
     [Fact]
-    public async Task AProtectedProfile_IsOnceOnly_AndNeverServedFromAGrant()
+    public async Task AProtectedProfile_IsAskedEveryTime()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -282,46 +208,39 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(_prod, first!.Set.Variables.Single().Value);
         Assert.Equal(EnvOutcome.Resolved, second!.Set.Outcome);
         Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Equal(0, _fixture.Channel.LastRunPrompt!.GrantSeconds);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt.OnceOnly);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
     [Fact]
-    public async Task AReferenceIntoAProtectedProfile_IsOnceOnly()
+    public async Task AReferenceIntoAProtectedProfile_IsAsked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.ReleaseRunAsync(References(("DB", "kp://acme-api/prod/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
 
         Assert.Equal([new EnvVariable("DB", _prod), new EnvVariable("GH", _github)], reply!.Set.Variables);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
         Assert.Equal(["env/acme-api/.env.prod", "personal/github"], reply.Entries);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
     [Fact]
-    public async Task AReferenceToAnEntryTaggedIntoAProtectedEnvironment_IsOnceOnly()
+    public async Task AReferenceToAnEntryTaggedIntoAProtectedEnvironment_IsAsked()
     {
         Assert.True(_vault.AddTag(new EntryName("personal", "github"), "env:acme-api:prod"));
         _vault.Save();
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, vaultSource: true);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token);
 
         Assert.Equal([new EnvVariable("GH", _github)], reply!.Set.Variables);
-        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
     [Fact]
     public async Task AnEntryOutsideTheExposure_IsRefusedUnasked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -392,7 +311,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task AReservedReference_IsRefused()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -406,7 +325,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task MoreThan32Variables_IsRefusedUnasked_ButOutsideTheExposureIsOutOfScopeFirst()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -421,7 +340,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task AWholeSetNamingPath_IsRefusedUnasked()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -444,7 +363,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         const string Reason = "the run names more items than an agent's run can carry back in one reply";
         Assert.Null(SessionAuthority.Unrecordable(EnvResolution.Resolve(_vault, "wide", EnvProfileNames.Default, keys: null, _fixture.Clock).Preview));
 
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -490,41 +409,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
-    public async Task AskEveryTime_OffersNoTimedChoice_AndUsesNoGrant()
+    public async Task AnUnreadableRulesFile_RefusesUnasked()
     {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nmode = \"ask\"\n");
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this, clients: true);
-        await using var client = await AttachedAsync(owner);
-
-        await client.ReleaseRunAsync(Run(), Token);
-        await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(2, _fixture.Channel.Asked);
-        Assert.Equal(0, _fixture.Channel.LastRunPrompt!.GrantSeconds);
-        Assert.Equal(OnceOnly.AskEveryTime, _fixture.Channel.LastRunPrompt.OnceOnly);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
-    }
-
-    [Fact]
-    public async Task NoValues_StillRuns()
-    {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
+        _fixture.Rules.Unreadable = "agents.toml: line 1: [[client]] is not a section keypaste reads here";
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, clients: true);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(EnvOutcome.Resolved, reply!.Set.Outcome);
-    }
-
-    [Fact]
-    public async Task AnUnreadableClientsFile_RefusesUnasked()
-    {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\npolicy = \"ask\"\n");
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this, clients: true);
+        await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.ReleaseRunAsync(Run(), Token);
@@ -542,7 +431,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await using var client = await AttachedAsync(owner);
 
         var denied = await client.ReleaseRunAsync(Run(), Token);
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var altered = await client.ReleaseRunAsync(Run(command: ["npm", "run", "migrate", "--verbose"]), Token);
 
         Assert.Equal(AuditMethod.Prompt, denied!.Method);
@@ -566,7 +455,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
             Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
         }
 
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var renewed = await AttachedAsync(owner);
         var again = await renewed.ReleaseRunAsync(Run(command: ["npm", "run", "migrate", "--verbose"]), Token);
         var other = await renewed.ReleaseRunAsync(Run() with { Profile = "prod" }, Token);
@@ -593,7 +482,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
             Assert.Equal(AuditMethod.Prompt, refused!.Method);
         }
 
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var renewed = await AttachedAsync(owner);
         var respelled = await renewed.ReleaseRunAsync(
             References(("GITHUB_USER", "kp:///personal/github#username"), ("DATABASE", "kp://acme-api/prod/DATABASE_URL")), Token);
@@ -658,7 +547,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Entry = entry,
         Field = field,
         Reason = "deploy",
-        TtlSeconds = 60,
         Exposure = ["env/acme-api/**", "personal/**"],
         ClientName = "claude-code-cli",
         ClientLabel = _label,
@@ -686,11 +574,10 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task ChangedOnDisk_IsVaultChanged_AndEndsTheRunGrants()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
         await client.ReleaseRunAsync(Run(), Token);
-        Assert.Single(owner.Authority.Activity.EnvGrants);
 
         using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
@@ -702,29 +589,12 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         AssertNothingReleased(reply);
         Assert.Equal(AuditMethod.VaultChanged, reply!.Method);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
-    }
-
-    [Fact]
-    public async Task EditingAnInjectedEntry_EndsItsRunGrant()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        await client.ReleaseRunAsync(Run(), Token);
-        await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token);
-        Assert.Equal(2, owner.Authority.Activity.EnvGrants.Count);
-
-        _grants.RevokeEntries(VaultEdit.Of(ProjectVariables.Home("acme-api")));
-
-        var left = Assert.Single(owner.Authority.Activity.EnvGrants);
-        Assert.Equal(["personal/github"], left.Entries);
     }
 
     [Fact]
     public async Task AnotherSessionsRequest_IsRefused()
     {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
@@ -735,28 +605,13 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
-    [Fact]
-    public async Task AutomaticNeverReleasesARun()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic };
-        fixture.Channel.Answer = ApprovalAnswer.Denied;
-        await using var owner = Owner.Start(this, fixture);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(reply);
-        Assert.Equal(1, fixture.Channel.Asked);
-    }
-
-    /// <summary>An agent whose settings do not let it run commands is refused before anything is resolved or anybody asked, an unnamed bridge's included.</summary>
+    /// <summary>An agent whose run is off is refused before anything is resolved or anybody asked, an unnamed bridge's included.</summary>
     [Fact]
     public async Task RunOff_IsRefusedUnasked_AndSoIsAnUnnamedBridge()
     {
         using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = ApproverFixture.SeesAll;
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Rules.Rules = AgentRules.Defaults;
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, fixture);
         await using var client = await AttachedAsync(owner);
 
@@ -767,45 +622,11 @@ public sealed class SessionAuthorityRunTests : IDisposable
         AssertNothingReleased(unnamed);
         Assert.Equal((AuditMethod.RunOff, AuditMethod.RunOff), (off!.Method, unnamed!.Method));
         Assert.Equal(0, fixture.Channel.Asked);
-        Assert.Contains(_narration, said => said.Contains("its settings do not let it run commands", StringComparison.Ordinal));
-    }
-
-    /// <summary>A run is held to what the agent can see as a credential request is: a variable outside it is out of scope, unasked.</summary>
-    [Fact]
-    public async Task ARunOutsideWhatTheAgentSees_IsOutOfScopeUnasked()
-    {
-        using var fixture = new ApproverFixture();
-        fixture.Settings.Records[_label] = Runs with { See = See("env/billing/**") };
-        fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this, fixture);
-        await using var client = await AttachedAsync(owner);
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        AssertNothingReleased(reply);
-        Assert.Equal(AuditMethod.OutOfScope, reply!.Method);
-        Assert.Equal(0, fixture.Channel.Asked);
-    }
-
-    /// <summary>The settings the vault holds, read by the owner itself, decide a run: run on asks, and a ceiling of run off on this computer refuses.</summary>
-    [Fact]
-    public async Task TheVaultsRecord_AndThisComputersCeiling_DecideARun()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this, clients: true);
-        await using var client = await AttachedAsync(owner);
-
-        var allowed = await client.ReleaseRunAsync(Run(), Token);
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nrun = \"off\"\n");
-        var capped = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(EnvOutcome.Resolved, allowed!.Set.Outcome);
-        Assert.Equal(AuditMethod.RunOff, capped!.Method);
-        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Contains(_narration, said => said.Contains("run is off for it on this computer", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Activity_ListsTheWaitingRun_AndItsGrant_AsKindRun()
+    public async Task Activity_ListsTheWaitingRun()
     {
         _fixture.Channel.Hold = true;
         await using var owner = Owner.Start(this);
@@ -820,71 +641,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
         _fixture.Clock.Advance(ApprovalLimits.Default.Window);
         await pending.WaitAsync(_wait, Token);
 
-        _fixture.Channel.Hold = false;
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var fresh = await AttachedAsync(owner);
-        await fresh.ReleaseRunAsync(Run(), Token);
-
-        var grant = Assert.Single(GrantSummary.Of(owner.Authority.Activity));
-        Assert.Equal("run", grant.Kind);
-        Assert.Equal("claude-code-cli", grant.Client);
-    }
-
-    [Fact]
-    public async Task RevokeClient_EndsItsCredentialAndRunGrants()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        await client.ReleaseRunAsync(Run(), Token);
-        Assert.Single(owner.Authority.Activity.EnvGrants);
-
-        owner.Authority.RevokeClient("someone-else");
-        Assert.Single(owner.Authority.Activity.EnvGrants);
-
-        owner.Authority.RevokeClient(_label);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
-    }
-
-    /// <summary>A stricter setting that ends the agent's grants while the person decides its run releases the run once and keeps no grant (D-0516).</summary>
-    [Fact]
-    public async Task RevokeClient_WhileItsRunIsAsked_LeavesItNoGrant()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        _fixture.Channel.WhileAsking = () =>
-        {
-            _fixture.Channel.WhileAsking = null;
-            owner.Authority.RevokeClient(_label);
-        };
-
-        var reply = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal((EnvOutcome.Resolved, 0), (reply!.Set.Outcome, reply.GrantedSeconds));
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
-    }
-
-    [Fact]
-    public async Task RevokingByTheListedClientName_EndsItsRunGrant()
-    {
-        _fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await using var owner = Owner.Start(this);
-        await using var client = await AttachedAsync(owner);
-        await client.ReleaseRunAsync(Run(), Token);
-        var listed = Assert.Single(GrantSummary.Of(owner.Authority.Activity));
-        Assert.Equal("claude-code-cli", listed.Client);
-
-        var reply = await client.RevokeGrantsAsync(
-            new RevokeGrantsRequest([], listed.Client, All: false) { Vault = VaultPath, Session = "session-one" },
-            Token);
-        _fixture.Channel.Answer = ApprovalAnswer.Denied;
-        var again = await client.ReleaseRunAsync(Run(), Token);
-
-        Assert.Equal(new RevokeGrantsReply(1, string.Empty), reply);
-        Assert.Empty(owner.Authority.Activity.EnvGrants);
-        Assert.Equal(AuditMethod.Prompt, again!.Method);
-        Assert.Equal(2, _fixture.Channel.Asked);
     }
 
     [Fact]
@@ -937,20 +693,14 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         internal SessionAuthority Authority { get; }
 
-        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool clients = false, bool vaultSource = false)
+        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool vaultSource = false)
         {
             var used = fixture ?? test._fixture;
-            IAgentSettings settings = clients
-                ? new VaultAgentSettings(() => test._vault, _ => AgentSave.Unchanged, new AccessCapsSource(test.ClientsPath))
-                : used.Settings;
             var handler = new ApproverHandler(
                 vaultSource ? new VaultCredentialSource(() => test._vault) : used.Source,
                 vaultSource ? new VaultEntryNameLister(() => test._vault) : used.Source,
                 used.Gate,
-                used.Grants,
-                settings,
-                hourly: used.Hourly,
-                clock: used.Clock);
+                used.Rules);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, test.VaultPath),
@@ -961,7 +711,6 @@ public sealed class SessionAuthorityRunTests : IDisposable
                     used.Gate,
                     lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
                     used.Clock,
-                    test._grants,
                     test._narration.Add),
                 clock: used.Clock);
 

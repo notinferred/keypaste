@@ -46,7 +46,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private GrantCache? _grants;
     private ApprovalGate? _gate;
     private ApproverListener? _listener;
     private CancellationTokenSource? _stop;
@@ -78,7 +77,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved (D-0317).
         _vault.Save();
 
-        _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
 
@@ -91,7 +89,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
                     new VaultCredentialSource(() => _vault),
                     new VaultEntryNameLister(() => _vault),
                     _gate,
-                    _grants,
                     TestSession.Settings()),
                 _log.Log));
 
@@ -122,7 +119,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         _listener?.Dispose();
         _stop?.Dispose();
         _gate?.Dispose();
-        _grants?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 
@@ -135,7 +131,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
             ["entry"] = "env/dev/DEPLOY_CERT",
             ["field"] = "notes",
             ["reason"] = "read the deployment certificate for the staging rollout",
-            ["ttl_seconds"] = 300,
         };
 
     private static Dictionary<string, object?> AskForThePassword() =>
@@ -144,7 +139,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
             ["entry"] = "env/dev/STRIPE_KEY",
             ["field"] = "password",
             ["reason"] = "deploy the billing service to staging",
-            ["ttl_seconds"] = 300,
         };
 
     private static string TextOf(CallToolResult result) =>
@@ -178,7 +172,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         var (harness, client) = await StartAsync();
         await using var _ = harness;
 
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var result = await client.CallToolAsync(
             ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
@@ -215,7 +209,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         var (harness, client) = await StartAsync();
         await using var _ = harness;
 
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var result = await client.CallToolAsync(
             ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
@@ -240,7 +234,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         var (harness, client) = await StartAsync();
         await using var _ = harness;
 
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         await client.CallToolAsync(ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
 

@@ -178,15 +178,6 @@ internal static class LogCommand
         json.WriteString("reason", entry.Reason);
         json.WriteString("session", entry.Session);
 
-        if (entry.GrantedSeconds is { } granted)
-        {
-            json.WriteNumber("granted_seconds", granted);
-        }
-        else
-        {
-            json.WriteNull("granted_seconds");
-        }
-
         json.WriteString("vault", entry.Vault);
         json.WriteStartArray("entries");
         foreach (var named in entry.Entries)

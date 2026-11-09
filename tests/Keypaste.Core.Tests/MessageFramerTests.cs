@@ -32,7 +32,6 @@ public sealed class MessageFramerTests
         Method = AuditMethod.Prompt,
         Reason = "a person approved this request",
         Entry = "env/dev/STRIPE_KEY",
-        TtlSeconds = 300,
         Value = value,
     };
 

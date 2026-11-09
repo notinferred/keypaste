@@ -18,7 +18,7 @@ public sealed record LaunchClaim(string Project, string Profile, string Director
 /// <remarks>
 /// A pass is the confirmation itself, carried to the run that Terminal starts, so it is spent the first
 /// time anything presents it, lasts <see cref="Lifetime"/>, and is forgotten with every other pass when
-/// the unlock that holds the store ends (D-0313). It is not a grant: nothing lists it and no later run
+/// the unlock that holds the store ends (D-0313). Nothing lists it and no later run
 /// can use it.
 /// </remarks>
 public sealed class LaunchPasses : IDisposable

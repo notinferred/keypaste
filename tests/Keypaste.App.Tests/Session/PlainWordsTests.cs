@@ -15,7 +15,6 @@ using Keypaste.App.Tests.Views;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Tests;
@@ -146,12 +145,6 @@ public sealed partial class PlainWordsTests
 
         agents.Settle();
 
-        foreach (var settings in model.Rows.Select(row => row.Settings).OfType<AgentSettingsViewModel>())
-        {
-            settings.IsMoreOpen = true;
-        }
-
-        agents.Settle();
         said.AddRange(Shown(agents.Window, "Agents, every Settings open"));
 
         foreach (var (open, key) in new (IRelayCommand Open, string Key)[] { (model.ConnectCommand, "cursor"), (model.DisconnectCommand, "gemini-cli"), (model.ConnectAgainCommand, "claude-code") })
@@ -364,12 +357,10 @@ public sealed partial class PlainWordsTests
 
     private static IEnumerable<(string Name, Window Window)> Prompts()
     {
-        Assert.True(ProjectScope.TryCreate("billing", "dev", out var dev, out var error), error);
         var preview = new EnvPreview("billing", ["STRIPE_KEY"]);
         var env = EnvReleasePrompt.For(preview, ["npm", "test"], "/home/maya/billing");
 
-        yield return ("the env prompt, timed", new EnvApprovalWindow(new EnvApprovalViewModel(env with { GrantSeconds = 900 })));
-        yield return ("the env prompt, once only", new EnvApprovalWindow(new EnvApprovalViewModel(env)));
+        yield return ("the env prompt", new EnvApprovalWindow(new EnvApprovalViewModel(env)));
 
         var run = new RunPrompt
         {
@@ -384,34 +375,22 @@ public sealed partial class PlainWordsTests
             Project = "billing",
             Profile = "dev",
             Variables = [new("STRIPE_KEY", "env/billing/.env", "STRIPE_KEY")],
-            GrantSeconds = 900,
         };
 
-        yield return ("the run prompt, timed", new RunApprovalWindow(new RunApprovalViewModel(run)));
-        yield return ("the run prompt, once only", new RunApprovalWindow(new RunApprovalViewModel(run with { GrantSeconds = 0 })));
+        yield return ("the run prompt", new RunApprovalWindow(new RunApprovalViewModel(run)));
 
-        var timed = ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env"), "STRIPE_KEY", "Run the tests against the dev account.", 3600, "work laptop");
+        var timed = ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env"), "STRIPE_KEY", "Run the tests against the dev account.", "work laptop");
 
-        yield return ("the credential prompt, timed", new ApprovalWindow(new ApprovalViewModel(timed with { AlwaysFor = dev })));
-        yield return ("the credential prompt, once only", new ApprovalWindow(new ApprovalViewModel(
-            ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env.prod"), "STRIPE_KEY", "Check the live account.", 0, null))));
+        yield return ("the credential prompt", new ApprovalWindow(new ApprovalViewModel(timed)));
+        yield return ("the credential prompt, from an unnamed agent", new ApprovalWindow(new ApprovalViewModel(
+            ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env.prod"), "STRIPE_KEY", "Check the live account.", null))));
 
-        var change = AccessChangePrompt.For(
-            "work laptop",
-            AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
-            AccessOrigin.Prompt,
-            string.Empty,
-            TimeZoneInfo.Utc,
-            ApprovalLimits.DefaultMaximumTtlSeconds);
-
-        yield return ("the access-change confirmation", new AccessChangeWindow(new AccessChangeViewModel(change)));
         yield return ("a terminal's edit", new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
         {
             Command = "keypaste env set",
             Item = "env/billing/.env",
             Changes = ["Adds STRIPE_KEY to billing/dev on env/billing/.env with the value the terminal sent."],
         })));
-        yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another prompt was already waiting for an answer"), _ => { }));
         yield return ("the locked notice", new LockedNoticeWindow("billing.kdbx", () => { }, TimeProvider.System));
         yield return ("a browser's pairing", new PairingWindow(new PairingViewModel(new PairingPrompt
         {

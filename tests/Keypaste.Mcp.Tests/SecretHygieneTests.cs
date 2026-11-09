@@ -89,17 +89,14 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     ];
 
     /// <summary>
-    /// What the agent may do through the first approver: see as far as the bridge exposes, and run
-    /// commands. Kept under the label the <em>operator</em> gave the bridge, never the name the client
-    /// asserts (THREATS.md T-3).
+    /// What the agent may do through the first approver: every value asked, and run on. Kept under the label the
+    /// <em>operator</em> gave the bridge, never the name the client asserts (THREATS.md T-3).
     /// </summary>
-    private static AgentAccess Sees { get; } = AgentAccess.Defaults with { See = Everything(), Run = true };
+    private static AgentRules Sees { get; } = AgentRules.Defaults.WithRun(McpHarness.ClientLabel, run: true);
 
-    /// <summary>
-    /// What the second approver holds for the same agent: Automatic for the billing project only, which
-    /// the stripe entry is tagged into, so the root token is inside the exposure and outside the row.
-    /// </summary>
-    private static AgentAccess AutomaticForBilling { get; } = Sees with { Projects = [new ProjectAccess(Billing(), AgentMode.Automatic)] };
+    /// <summary>What the second approver's rules hold for every agent: every category allowed, so nobody is asked.</summary>
+    private static AgentRules AllowsEverything { get; } =
+        FieldCategories.Ruled.Aggregate(Sees, (rules, category) => rules.Allowing(category, confirmed: true));
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -107,20 +104,18 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private GrantCache? _grants;
     private ApprovalGate? _gate;
     private ApproverListener? _listener;
     private CancellationTokenSource? _stop;
     private Task? _serving;
 
-    private GrantCache? _automaticGrants;
     private ApprovalGate? _automaticGate;
     private ApproverListener? _automaticListener;
     private CancellationTokenSource? _automaticStop;
     private Task? _automaticServing;
 
-    private readonly FakeAgentSettings _settings = new();
-    private readonly FakeAgentSettings _automaticSettings = new();
+    private readonly FakeAgentRules _settings = new();
+    private readonly FakeAgentRules _automaticSettings = new();
 
     private string PipeName { get; } =
         "keypaste-hygiene-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -171,10 +166,9 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved (D-0317).
         _vault.Save();
 
-        _settings.Records[McpHarness.ClientLabel] = Sees;
-        _automaticSettings.Records[McpHarness.ClientLabel] = AutomaticForBilling;
+        _settings.Rules = Sees;
+        _automaticSettings.Rules = AllowsEverything;
 
-        _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
 
@@ -182,7 +176,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             new VaultCredentialSource(() => _vault),
             new VaultEntryNameLister(() => _vault),
             _gate,
-            _grants,
             _settings);
 
         _stop = new CancellationTokenSource();
@@ -193,7 +186,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         // listeners rather than one whose settings change per test, so neither test's answers depend
         // on what another left behind.
 
-        _automaticGrants = new GrantCache(TimeProvider.System);
         _automaticGate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _automaticStop = new CancellationTokenSource();
         _automaticListener = new ApproverListener(
@@ -204,7 +196,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
                     new VaultCredentialSource(() => _vault),
                     new VaultEntryNameLister(() => _vault),
                     _automaticGate,
-                    _automaticGrants,
                     _automaticSettings),
                 _log.Log));
 
@@ -246,8 +237,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _automaticStop?.Dispose();
         _gate?.Dispose();
         _automaticGate?.Dispose();
-        _grants?.Dispose();
-        _automaticGrants?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 
@@ -269,14 +258,12 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     private static Dictionary<string, object?> Ask(
         string entry = "env/dev/STRIPE_KEY",
-        string field = "password",
-        int ttl = 300) =>
+        string field = "password") =>
         new()
         {
             ["entry"] = entry,
             ["field"] = field,
             ["reason"] = "deploy the billing service to staging",
-            ["ttl_seconds"] = ttl,
         };
 
     private static string TextOf(CallToolResult result) =>
@@ -321,7 +308,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     [Fact]
     public async Task OnApproval_TheRequestedFieldComesBack_AndOnlyThat()
     {
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = await StartAsync();
 
@@ -359,7 +346,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     {
         _vault!.SetFieldsUnchecked(new EntryName("env/dev", "STRIPE_KEY"), [new FieldWrite(TotpSpec.OtpField, SentinelTotpUri)]);
         _vault.Save();
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         using var spec = TotpSpec.FromUri(SentinelTotpUri, out _)!;
         var (harness, client) = await StartAsync();
@@ -400,7 +387,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     {
         _vault!.SetFieldsUnchecked(new EntryName("env/dev", "STRIPE_KEY"), [new FieldWrite(TotpSpec.OtpField, SentinelTotpUri)]);
         _vault.Save();
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = await StartAsync();
 
@@ -413,7 +400,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Assert.False(first.IsError);
             Assert.True(second.IsError);
             Assert.Equal(2, _human.Asked);
-            Assert.Equal(0, _grants!.Count);
             Assert.Equal(["granted", "denied"], _log!.Lines().Select(line => line.GetProperty("decision").GetString()));
 
             foreach (var sentinel in _everySentinel.Append(SentinelTotpSeed).Append(SentinelTotpUri))
@@ -435,7 +421,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     [InlineData("OPENAI_API_KEY", SentinelApiKey)]
     public async Task WhicheverFieldIsAskedFor_IsTheOnlyOneReleased(string field, string expected)
     {
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = await StartAsync();
 
@@ -462,7 +448,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     public async Task AValueNamingItsOwnFields_BringsThoseFilledIn_AndNoOtherField(bool automatic)
     {
         Plant("DATABASE_URL", "postgres://{USERNAME}:{S:OPENAI_API_KEY}@db");
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = automatic ? await StartAutomaticAsync() : await StartAsync();
 
@@ -499,7 +485,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     public async Task AValueThatCannotBeFilledIn_LeavesNoValueAnywhere(bool automatic)
     {
         Plant("DATABASE_URL", "postgres://{USERNAME}:{PASSWORD}@db/{S:Recovery codes}");
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = automatic ? await StartAutomaticAsync() : await StartAsync();
 
@@ -527,20 +513,17 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A custom field that is not env-named, KeePassXC's own attributes and a standard name in capitals
-    /// are refused by the bridge before the owner is asked, in the words the plan fixes, and audited as
-    /// an invalid field with no value anywhere.
+    /// A field a TOTP seed is read from and a standard name in capitals are refused by the bridge before the owner is asked,
+    /// in the words the plan fixes, and audited as an invalid field with no value anywhere.
     /// </summary>
     [Theory]
-    [InlineData("Recovery codes")]
     [InlineData("otp")]
     [InlineData("TimeOtp-Secret")]
     [InlineData("TimeOtp-Secret-Base32")]
-    [InlineData("KP2A_URL_1")]
     [InlineData("URL")]
     public async Task AFieldThatNeverLeaves_IsRefusedUnasked_AndAuditedAsInvalid(string field)
     {
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = await StartAsync();
 
@@ -550,7 +533,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             Assert.True(result.IsError);
             Assert.Equal(
-                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.",
+                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes, totp or the name of one of the item's custom fields. This call was recorded in the audit log.",
                 TextOf(result));
             Assert.Equal(0, _human.Asked);
 
@@ -628,7 +611,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     [Fact]
     public async Task AnEntryOutsideTheExposure_YieldsNothingByEitherName()
     {
-        _human.Answer = ApprovalAnswer.Approved;
+        _human.Answer = ApprovalAnswer.ApprovedOnce;
 
         var (harness, client) = await StartAsync();
 
@@ -682,7 +665,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             // The owner's log records that it happened — which, with no human witness, is the only
             // record that it happened at all — and records it as Automatic, never as an approval.
-            Assert.Contains("\"method\":\"automatic\"", _log!.Text(), StringComparison.Ordinal);
+            Assert.Contains("\"method\":\"allowed\"", _log!.Text(), StringComparison.Ordinal);
             Assert.DoesNotContain(SentinelPassword, _log.Text(), StringComparison.Ordinal);
             Assert.Empty(harness.AuditLines());
         }
@@ -711,30 +694,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             {
                 AssertNowhere(harness, each, text, $"an Automatic release of {field}");
             }
-        }
-    }
-
-    /// <summary>
-    /// An entry inside the bridge's exposure and in no project the agent is Automatic for. This is the
-    /// sentinel that makes "Automatic cannot widen" a claim about the mode: the exposure permits this
-    /// entry, so nothing but the row's own project is standing between the agent and it.
-    /// </summary>
-    [Fact]
-    public async Task AnEntryInsideTheExposureAndOutsideTheRow_StillNeedsAPerson()
-    {
-        _human.Answer = ApprovalAnswer.Denied;
-
-        var (harness, client) = await StartAutomaticAsync();
-
-        await using (harness)
-        {
-            var result = await client.CallToolAsync(
-                ToolText.CredentialToolName, Ask(entry: "env/prod/ROOT_TOKEN"), cancellationToken: Token);
-
-            Assert.True(result.IsError);
-            Assert.Equal(1, _human.Asked);
-
-            AssertNowhere(harness, SentinelOutsideTheRow, TextOf(result), "outside the row");
         }
     }
 
@@ -807,7 +766,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     /// </summary>
     [Theory]
     [InlineData(ApprovalAnswer.ApprovedOnce)]
-    [InlineData(ApprovalAnswer.Approved)]
     [InlineData(ApprovalAnswer.Denied)]
     [InlineData(ApprovalAnswer.TimedOut)]
     public async Task ARun_LeavesNoValueAnywhere_WhateverTheAnswer(ApprovalAnswer answer)
@@ -816,16 +774,14 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         Keypaste.Core.Tests.ProjectVariables.Set(_vault!, "dev", "STRIPE_KEY", SentinelPassword);
         _vault!.Save();
         var pipe = "keypaste-hygiene-run-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-        using var envGrants = new EnvGrantCache(TimeProvider.System);
         using var gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
-        using var grants = new GrantCache(TimeProvider.System);
         using var lifetime = new Keypaste.Core.Ownership.SessionLifetime(TestSession.Id);
         var authority = new Keypaste.Core.Ownership.SessionAuthority(
             Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
             () => lifetime,
-            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, grants, _settings),
+            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, _settings),
             audit: () => _log!.Log,
-            new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System, envGrants));
+            new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System));
         using var stop = new CancellationTokenSource();
         using var listener = new ApproverListener(pipe, authority);
         var serving = listener.RunAsync(stop.Token);
@@ -882,12 +838,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     {
         Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out var error), error);
         return exposure;
-    }
-
-    private static ProjectScope Billing()
-    {
-        Assert.True(ProjectScope.TryCreate("billing", null, out var scope, out var error), error);
-        return scope;
     }
 
     private sealed class ScriptedHuman : IApprovalChannel

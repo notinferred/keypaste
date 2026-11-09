@@ -63,7 +63,7 @@ run_server() {
     local id=3
     local entry
     for entry in "$@"; do
-      printf '{"jsonrpc":"2.0","id":%s,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/dev/%s","field":"password","reason":"ci probe","ttl_seconds":60}}}\n' \
+      printf '{"jsonrpc":"2.0","id":%s,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/dev/%s","field":"password","reason":"ci probe"}}}\n' \
         "$id" "$entry"
       id=$((id + 1))
     done

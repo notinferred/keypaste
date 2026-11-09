@@ -27,7 +27,6 @@ public sealed class ApproverConnectionTests
         Entry = entry,
         Field = "password",
         Reason = "deploy the billing service to staging",
-        TtlSeconds = 300,
         Exposure = ["env/**"],
         ClientName = "claude-code",
     };
@@ -122,7 +121,7 @@ public sealed class ApproverConnectionTests
         approver.StartApproving();
 
         // Longer than ConnectTimeout, so the bound cannot end the connect or the attach before the request is sent.
-        await using var connection = new ApproverConnection(approver.PipeName, _vault) { CredentialBound = TimeSpan.FromSeconds(2) };
+        await using var connection = new ApproverConnection(approver.PipeName, _vault) { ReleaseBound = TimeSpan.FromSeconds(2) };
 
         var (reply, outcome) = await connection.RequestAsync(Request(), Token).AsTask().WaitAsync(_promptly, Token);
 

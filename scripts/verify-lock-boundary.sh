@@ -61,7 +61,7 @@ start_request() {
   exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lock probe\",\"ttl_seconds\":60}}}" >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lock probe\"}}}" >&8
 }
 
 # Waits for the request's reply, then lets the bridge go.
@@ -147,7 +147,7 @@ else
   finish_request
   [ "$agent_exit" -eq 0 ] || die "keypaste approve did not stop cleanly on SIGTERM (exit $agent_exit)"
   grep -q 'withdrawn before you answered' "$AGENT_ERR" || die "SIGTERM did not withdraw the agent's prompt"
-  grep -q 'every allowance has ended' "$AGENT_ERR" || die "keypaste approve did not report that it locked"
+  grep -q 'keypaste approve has stopped. The vault is locked.' "$AGENT_ERR" || die "keypaste approve did not report that it locked"
   denied_as_locked "$AGENT_SESSION" "stopping keypaste approve"
   echo "ok: SIGTERM withdrew the request waiting at keypaste approve's prompt and it was audited as vault-locked"
 fi

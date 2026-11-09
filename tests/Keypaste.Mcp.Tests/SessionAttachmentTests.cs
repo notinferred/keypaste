@@ -21,7 +21,6 @@ public sealed class SessionAttachmentTests
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
 
     private static CredentialRequest Request() => new()
@@ -29,7 +28,6 @@ public sealed class SessionAttachmentTests
         Entry = "env/dev/STRIPE_KEY",
         Field = "password",
         Reason = "deploy the billing service to staging",
-        TtlSeconds = 60,
         Exposure = ["env/**"],
     };
 

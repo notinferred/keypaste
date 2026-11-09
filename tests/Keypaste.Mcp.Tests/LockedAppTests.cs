@@ -28,11 +28,7 @@ public sealed class LockedAppTests
         ["entry"] = "env/dev/STRIPE_KEY",
         ["field"] = "password",
         ["reason"] = "deploy the billing service to staging",
-        ["ttl_seconds"] = 60,
     };
-
-    private static Dictionary<string, object?> Change(string name, string value) =>
-        new() { ["reason"] = "the deploy task runs the billing migration", [name] = value };
 
     private static Dictionary<string, object?> Run(McpHarness harness) => new()
     {
@@ -58,7 +54,7 @@ public sealed class LockedAppTests
     private static McpHarness WithNobodyHoldingTheVault() =>
         new("keypaste-unheld-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))) { InItsOwnHome = true };
 
-    // A request for a value, a run, a listing and a change for more, in that order.
+    // A request for a value, a run and a listing, in that order.
     private static async Task<List<CallToolResult>> AskEveryWayAsync(McpClient client, McpHarness harness)
     {
         List<CallToolResult> results = [];
@@ -66,7 +62,6 @@ public sealed class LockedAppTests
         results.Add(await client.CallToolAsync(ToolText.CredentialToolName, Credential, cancellationToken: Token));
         results.Add(await client.CallToolAsync(ToolText.RunToolName, Run(harness), cancellationToken: Token));
         results.Add(await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token));
-        results.Add(await client.CallToolAsync(ToolText.AccessToolName, Change("mode", "automatic"), cancellationToken: Token));
 
         return results;
     }
@@ -82,7 +77,7 @@ public sealed class LockedAppTests
         var results = await AskEveryWayAsync(client, harness);
 
         Assert.All(results, result => Assert.True(result.IsError));
-        Assert.Equal([ToolText.AppLocked, ToolText.AppLocked, ToolText.AppLockedForListing, ToolText.AccessAppLocked], results.Select(TextOf));
+        Assert.Equal([ToolText.AppLocked, ToolText.AppLocked, ToolText.AppLockedForListing], results.Select(TextOf));
 
         var lines = harness.AuditLines().Select(Line).ToList();
         Assert.Equal(
@@ -90,11 +85,9 @@ public sealed class LockedAppTests
                 (AuditTools.Credential, "denied", "no-approver"),
                 (AuditTools.Run, "denied", "no-approver"),
                 (AuditTools.List, "denied", "no-approver"),
-                (AuditTools.AccessChange, "denied", "no-approver"),
             ],
             lines.Select(line => (Text(line, "tool"), Text(line, "decision"), Text(line, "method"))));
         Assert.Equal((_nobody, _nobody, ToolText.NoApproverForListing), (Text(lines[0], "reason"), Text(lines[1], "reason"), Text(lines[2], "reason")));
-        Assert.Equal($"{_nobody} ({McpHarness.ClientLabel}: mode automatic)", Text(lines[3], "reason"));
 
         for (var told = 0; told < results.Count; told++)
         {
@@ -102,21 +95,6 @@ public sealed class LockedAppTests
         }
 
         Assert.Equal(0, heard.CurrentCount);
-    }
-
-    [Fact]
-    public async Task AnAgentsChangeForLess_AppliesWithoutTellingTheLockedApp()
-    {
-        await using var harness = WithNobodyHoldingTheVault();
-        var client = await harness.StartAsync();
-        using var heard = new SemaphoreSlim(0);
-        using var app = LockedAppEndpoint.Listen(harness.LockedAppName!, () => heard.Release(), _ => { });
-
-        var narrowed = await client.CallToolAsync(ToolText.AccessToolName, Change("values", "no"), cancellationToken: Token);
-
-        Assert.False(narrowed.IsError);
-        Assert.Equal(ToolText.AccessNarrowed, TextOf(narrowed));
-        Assert.False(await heard.WaitAsync(_quiet, Token), "a change for less told the locked app");
     }
 
     [Fact]
@@ -133,7 +111,6 @@ public sealed class LockedAppTests
 
         Assert.Single(approver.Received);
         Assert.Equal(1, approver.Runs);
-        Assert.Single(approver.AccessReceived);
         Assert.DoesNotContain(results, result => TextOf(result).Contains("keypaste app is open", StringComparison.Ordinal));
         Assert.False(await heard.WaitAsync(_quiet, Token), "an owner's answer told the locked app");
     }
@@ -152,7 +129,7 @@ public sealed class LockedAppTests
         var results = await AskEveryWayAsync(client, harness);
 
         Assert.NotEqual(harness.LockedAppName, another);
-        Assert.Equal([ToolText.NoApprover, ToolText.NoApprover, ToolText.NoApproverForListing, ToolText.AccessNoOwner], results.Select(TextOf));
+        Assert.Equal([ToolText.NoApprover, ToolText.NoApprover, ToolText.NoApproverForListing], results.Select(TextOf));
         Assert.False(await heard.WaitAsync(_quiet, Token), "a bridge told the app locked on another vault");
     }
 }

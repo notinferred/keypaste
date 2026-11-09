@@ -34,7 +34,6 @@ public sealed class ApproverListenerTests
         Entry = entry,
         Field = "password",
         Reason = "deploy billing to staging",
-        TtlSeconds = 900,
         Exposure = ["env/**"],
         ClientName = "claude-code",
     };
@@ -553,17 +552,8 @@ public sealed class ApproverListenerTests
         await using var host = Host.Start(new RecordingHandler());
         await using var client = await ConnectAsync(host.PipeName);
 
-        var grants = await client.GrantsAsync(new GrantsRequest { Vault = "/v.kdbx", Session = "test-session" }, Token);
-        var revoked = await client.RevokeGrantsAsync(new RevokeGrantsRequest([], null, All: true), Token);
         var locked = await client.LockAsync(new LockRequest(), Token);
 
-        Assert.NotNull(grants);
-        Assert.False(grants.Answered);
-        Assert.Empty(grants.Grants);
-        Assert.Contains("does not list allowances", grants.Reason, StringComparison.Ordinal);
-        Assert.NotNull(revoked);
-        Assert.Equal(0, revoked.Revoked);
-        Assert.Contains("does not end allowances", revoked.Reason, StringComparison.Ordinal);
         Assert.NotNull(locked);
         Assert.False(locked.Locked);
         Assert.Contains("does not lock", locked.Reason, StringComparison.Ordinal);
@@ -676,7 +666,6 @@ public sealed class ApproverListenerTests
                     Decision = AuditDecision.Denied,
                     Method = AuditMethod.Cancelled,
                     Reason = "withdrawn",
-                    TtlSeconds = 0,
                 };
             }
 
@@ -686,7 +675,6 @@ public sealed class ApproverListenerTests
                 Method = AuditMethod.Prompt,
                 Reason = "a person approved this request",
                 Entry = request.Entry,
-                TtlSeconds = 300,
                 Value = Value,
             };
         }

@@ -476,16 +476,10 @@ public static class TerminalEdits
         _ = ProjectTag.TryFor(change.Project, change.Environment, out var tag, out _);
         IReadOnlyList<string> changing = change.Tagging ? [tag] : matching;
 
-        var preview = ProjectTagChange.Preview(vault, name, changing, change.Tagging, scene.ClientsPath, scene.Now)!;
+        var preview = ProjectTagChange.Preview(vault, name, changing, change.Tagging)!;
         var sentences = preview.Describe();
 
-        // Shown first to the person who allows it, so an agent that would get the item unasked is
-        // the first thing read, not the last.
-        IReadOnlyList<string> changes = preview.Automatic.Count > 0
-            ? [sentences[^1], .. sentences.Take(sentences.Count - 1)]
-            : sentences;
-
-        return Ready(new EditPreview(change.Action, Shown(entry.Path), changes)
+        return Ready(new EditPreview(change.Action, Shown(entry.Path), sentences)
         {
             Entry = name,
             Tags = changing,

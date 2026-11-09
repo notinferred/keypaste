@@ -97,8 +97,7 @@ internal sealed class EntryActivitySource : IDisposable
     }
 
     /// <summary>
-    /// What agents can name here: for each attached bridge, named as a screen names its client, the least of its
-    /// announced exposure and what its agent's settings let it see, so a bridge registered wide shows only what the owner allows (D-0378).
+    /// What agents can name here: for each attached bridge, named as a screen names its client, its announced exposure (D-0378).
     /// </summary>
     private List<AgentReach> Reach()
     {
@@ -106,11 +105,9 @@ internal sealed class EntryActivitySource : IDisposable
 
         foreach (var client in _authority.Clients)
         {
-            if (client.Exposure.Count > 0
-                && EntryExposure.TryCreate(client.Exposure, out var exposure, out _)
-                && _authority.Access(client.Label) is { } access)
+            if (client.Exposure.Count > 0 && EntryExposure.TryCreate(client.Exposure, out var exposure, out _))
             {
-                reach.Add(new AgentReach(ConnectedClient.Named(client.Label, client.Name), (name, tags) => access.Reach(exposure, name, tags)));
+                reach.Add(new AgentReach(ConnectedClient.Named(client.Label, client.Name), exposure.Reach));
             }
         }
 

@@ -141,13 +141,13 @@ public sealed class AppCommandsTests : IDisposable
         foreach (var header in new[]
         {
             "Rotate", "Show history", "Copy the reference", "Add field…", "New project…", "Export .env.keypaste…", "Run in a terminal", "Empty Trash",
-            "New token…", "Revoke token", "Revoke link", "End allowance", "Agent history", "Copy the TOTP code", "Restore as another name", "End all allowances", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
+            "New token…", "Revoke token", "Revoke link", "Agent history", "Copy the TOTP code", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
         })
         {
             Assert.NotNull(Find(commands, header));
         }
 
-        foreach (var header in new[] { "Rotate", "Add field…", "Empty Trash", "Revoke token", "Revoke link", "Copy the TOTP code", "Restore as another name", "End all allowances", "Verify chain", "Check status", "Clear the clipboard now", "Run in a terminal" })
+        foreach (var header in new[] { "Rotate", "Add field…", "Empty Trash", "Revoke token", "Revoke link", "Copy the TOTP code", "Verify chain", "Check status", "Clear the clipboard now", "Run in a terminal" })
         {
             Assert.False(Find(commands, header).CanRun(), $"{header} is on with nothing to act on");
         }

@@ -73,7 +73,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     public async Task AnApprovedRequest_ReleasesExactlyTheCustomField_AndThePromptNamesIt()
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
 
@@ -83,37 +83,13 @@ public sealed class CustomFieldReleaseTests : IDisposable
         Assert.Equal("api/OpenAI", reply.Entry);
     }
 
-    [Fact]
-    public async Task AGrantForOneField_ServesNoneOfTheEntrysOthers()
-    {
-        using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
-
-        var first = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
-        Assert.True(first.TtlSeconds > 0, "the approval was not a timed grant");
-
-        var again = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
-        Assert.Equal(AuditMethod.GrantCache, again.Method);
-        Assert.Equal(1, approver.Channel.Asked);
-
-        approver.Channel.Answer = ApprovalAnswer.Denied;
-        var password = await approver.Handler.RequestAsync(Request("password"), "conn-1", Token);
-
-        Assert.Equal(2, approver.Channel.Asked);
-        Assert.Equal("password", approver.Channel.LastPrompt!.Field);
-        Assert.Equal(AuditDecision.Denied, password.Decision);
-        Assert.Null(password.Value);
-    }
-
     [Theory]
-    [InlineData("Recovery codes")]
     [InlineData("otp")]
-    [InlineData("KP2A_URL_1")]
     [InlineData("URL")]
-    public async Task AnyOtherName_IsRefusedBeforeAnyoneIsAskedOrAnythingRead(string field)
+    public async Task A_TOTP_seed_or_a_standard_name_in_another_case_IsRefusedBeforeAnyoneIsAskedOrAnythingRead(string field)
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await approver.Handler.RequestAsync(Request(field), "conn-1", Token);
 
@@ -124,28 +100,27 @@ public sealed class CustomFieldReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task AnAutomaticMode_ReleasesTheField_WithNobodyAsked()
+    public async Task AnAllowedCategory_ReleasesTheField_WithNobodyAsked()
     {
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
         approver.Channel.Answer = ApprovalAnswer.Denied;
 
         var released = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(AuditMethod.Allowed, released.Method);
         Assert.Equal(_apiKey, released.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }
 
-    /// <summary>No mode reaches a field that never leaves: the field's name is refused before Automatic is considered.</summary>
+    /// <summary>A custom field is decided by its category whatever its name: one named with a space is released under the custom field rule's Allow.</summary>
     [Fact]
-    public async Task AnAutomaticMode_NeverReleasesAFieldThatNeverLeaves()
+    public async Task AnAllowedCategory_ReleasesACustomFieldOfAnyName()
     {
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
 
-        var refused = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
+        var released = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.InvalidRequest, refused.Method);
-        Assert.Null(refused.Value);
+        Assert.Equal((AuditMethod.Allowed, _recovery), (released.Method, released.Value));
         Assert.Equal(0, approver.Channel.Asked);
     }
 
@@ -153,7 +128,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     public async Task AnUnsavedFieldChange_ReleasesNothing()
     {
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         Assert.True(_vault.SetFields(_openAi, [new FieldWrite("OPENAI_API_KEY", "unsaved-value")]));
 
         var reply = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
@@ -173,8 +148,11 @@ public sealed class CustomFieldReleaseTests : IDisposable
             Assert.Equal(_apiKey, released.Value.ToString());
         }
 
-        Assert.False(source.TryRead(_openAi, "Recovery codes", out _, out failure, out _));
-        Assert.Equal(CredentialFailure.NoSuchField, failure);
+        Assert.True(source.TryRead(_openAi, "Recovery codes", out released, out failure, out _), failure.ToString());
+        using (released)
+        {
+            Assert.Equal(_recovery, released.Value.ToString());
+        }
 
         Assert.False(source.TryRead(_openAi, "MISSING_KEY", out _, out failure, out _));
         Assert.Equal(CredentialFailure.Empty, failure);
@@ -210,32 +188,32 @@ public sealed class CustomFieldReleaseTests : IDisposable
 
     /// <summary>A value naming its own item's fields is released filled in, and a timed grant serves the filled value (D-0465).</summary>
     [Fact]
-    public async Task AnApprovedRequest_ReleasesTheValueFilledIn_AndItsGrantServesThatValue()
+    public async Task AnApprovedRequest_ReleasesTheValueFilledIn()
     {
         Plant("DATABASE_URL", _databaseUrl);
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var first = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
         var again = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
 
         Assert.Equal(AuditMethod.Prompt, first.Method);
         Assert.Equal(_databaseUrlFilled, first.Value);
-        Assert.Equal(AuditMethod.GrantCache, again.Method);
+        Assert.Equal(AuditMethod.Prompt, again.Method);
         Assert.Equal(_databaseUrlFilled, again.Value);
-        Assert.Equal(1, approver.Channel.Asked);
+        Assert.Equal(2, approver.Channel.Asked);
         Assert.Equal("DATABASE_URL", approver.Channel.LastPrompt!.Field);
     }
 
     [Fact]
-    public async Task AnAutomaticRelease_IsFilledIn()
+    public async Task AnAllowedRelease_IsFilledIn()
     {
         Plant("DATABASE_URL", _databaseUrl);
-        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+        using var approver = new Approver(_vault, AgentRules.Defaults.Allowing(FieldCategory.CustomField, confirmed: true));
 
         var released = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(AuditMethod.Allowed, released.Method);
         Assert.Equal(_databaseUrlFilled, released.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }
@@ -250,7 +228,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     {
         Plant("DATABASE_URL", "postgres://u:{PASSWORD}@db/{S:Recovery codes}");
         using var approver = new Approver(_vault);
-        approver.Channel.Answer = ApprovalAnswer.Approved;
+        approver.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
         var reply = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
         var again = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
@@ -400,7 +378,6 @@ public sealed class CustomFieldReleaseTests : IDisposable
         Entry = "api/OpenAI",
         Field = field,
         Reason = "call the model",
-        TtlSeconds = 60,
         Exposure = ["api/**"],
         ClientName = "claude-code",
         ClientLabel = "claude-code",
@@ -409,27 +386,22 @@ public sealed class CustomFieldReleaseTests : IDisposable
     /// <summary>A real handler over the real vault, with only the person faked.</summary>
     private sealed class Approver : IDisposable
     {
-        internal Approver(Vault vault, AgentAccess? access = null)
+        internal Approver(Vault vault, AgentRules? rules = null)
         {
-            Settings.Records["claude-code"] = access ?? ApproverFixture.SeesAll;
-            Grants = new GrantCache(Clock);
+            Rules.Rules = rules ?? AgentRules.Defaults;
             Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
             Handler = new ApproverHandler(
                 new VaultCredentialSource(() => vault),
                 new VaultEntryNameLister(() => vault),
                 Gate,
-                Grants,
-                Settings,
-                clock: Clock);
+                Rules);
         }
 
-        internal FakeAgentSettings Settings { get; } = new();
+        internal FakeAgentRules Rules { get; } = new();
 
         internal FakeChannel Channel { get; } = new();
 
         internal ManualClock Clock { get; } = new();
-
-        internal GrantCache Grants { get; }
 
         internal ApprovalGate Gate { get; }
 
@@ -438,7 +410,6 @@ public sealed class CustomFieldReleaseTests : IDisposable
         public void Dispose()
         {
             Gate.Dispose();
-            Grants.Dispose();
         }
     }
 }

@@ -40,16 +40,6 @@ internal static class UseText
         };
     }
 
-    /// <summary>A remaining time in its largest whole unit, rounded up so a live grant never reads as over.</summary>
-    /// <param name="seconds">Seconds left.</param>
-    /// <returns>"42m", "2h" or "30s".</returns>
-    internal static string Left(int seconds) => seconds switch
-    {
-        >= 3600 => string.Create(CultureInfo.InvariantCulture, $"{(seconds + 3599) / 3600}h"),
-        >= 60 => string.Create(CultureInfo.InvariantCulture, $"{(seconds + 59) / 60}m"),
-        _ => string.Create(CultureInfo.InvariantCulture, $"{seconds}s"),
-    };
-
     /// <summary>A date as the detail pane's metadata rows show it: <c>yyyy-MM-dd · 22 days ago</c>, local time.</summary>
     /// <param name="at">The time, or null.</param>
     /// <param name="now">The time to measure from.</param>
@@ -82,7 +72,7 @@ internal static class UseText
     /// <param name="access">What the card shows.</param>
     /// <param name="seeing">The attached agents that can name the entry without having asked yet.</param>
     /// <returns>
-    /// "claude-code · grant, 42m left", "cursor", "ci-staging · token", "claude-code can see it · nothing released"
+    /// "cursor", "ci-staging · token", "claude-code can see it · nothing released"
     /// or "None active": who, never when, which the card's Last used line says.
     /// </returns>
     internal static string Summary(EntryAgentAccess? access, IReadOnlyList<string> seeing)
@@ -92,12 +82,6 @@ internal static class UseText
         if (access is null)
         {
             return "None active";
-        }
-
-        if (access.Grants.Count > 0)
-        {
-            var grant = access.Grants.MinBy(grant => grant.SecondsLeft)!;
-            return $"{grant.Client} · allowance, {Left(grant.SecondsLeft)} left";
         }
 
         if (access.Clients.Count > 0)
@@ -120,7 +104,7 @@ internal static class UseText
     /// <summary>How many lines the Agent access card lists under its summary.</summary>
     internal const int MaximumLines = 5;
 
-    /// <summary>The Agent access card's lines under its summary: each grant in force, then each client that received the entry.</summary>
+    /// <summary>The Agent access card's lines under its summary: each client that received the entry.</summary>
     /// <param name="access">What agents did with the entry.</param>
     /// <param name="now">The time to measure from.</param>
     /// <returns>Names, kinds and times, never a value; none when the summary already says all there is.</returns>
@@ -128,16 +112,14 @@ internal static class UseText
     {
         ArgumentNullException.ThrowIfNull(access);
 
-        if (access.Grants.Count + access.Clients.Count <= 1)
+        if (access.Clients.Count <= 1)
         {
             return [];
         }
 
-        var grants = access.Grants.Select(grant =>
-            $"{EntryNameSanitizer.Sanitize(grant.Client).Text} · {grant.Kind} allowance, {Left(grant.SecondsLeft)} left");
         var clients = access.Clients.Select(client =>
             string.Create(CultureInfo.InvariantCulture, $"{EntryNameSanitizer.Sanitize(client.Client).Text} · {Ago(client.LastAt, now)} · {client.Releases}×"));
 
-        return [.. grants.Concat(clients).Take(MaximumLines)];
+        return [.. clients.Take(MaximumLines)];
     }
 }

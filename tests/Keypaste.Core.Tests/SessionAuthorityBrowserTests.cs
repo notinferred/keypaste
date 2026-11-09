@@ -118,7 +118,6 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         Assert.True((await client.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, Token))!.Attached);
 
         var listing = await client.ListAsync(new NamesRequest(["**"]) { Vault = VaultPath, Session = "session-one" }, Token);
-        var grants = await client.GrantsAsync(new GrantsRequest { Vault = VaultPath, Session = "session-one" }, Token);
         var locking = await client.LockAsync(new LockRequest { Vault = VaultPath, Session = "session-one" }, Token);
 
         const string onlyFour = "a browser's connection only pairs, checks a pairing, fills and locks";
@@ -126,7 +125,6 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         Assert.False(listing.VaultUnlocked);
         Assert.Empty(listing.Names);
         Assert.Equal(onlyFour, listing.Reason);
-        Assert.Equal(onlyFour, grants?.Reason);
         Assert.Equal(new LockReply(false, onlyFour), locking);
         Assert.Equal(0, locks);
         Assert.Equal(0, _fixture.Channel.Asked);

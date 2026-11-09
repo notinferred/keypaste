@@ -170,7 +170,7 @@ bridge() {
 
 # Sends request $1 on the open bridge.
 request() {
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci held-saves probe\",\"ttl_seconds\":60}}}" >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci held-saves probe\"}}}" >&8
 }
 
 # The reply to $1 released the value, and its audit line is a grant, not a vault-changed refusal.

@@ -63,14 +63,12 @@ public sealed class ServerToolsTests
     private static Dictionary<string, object?> Credential(
         string entry = "k1_0123456789abcdef",
         string field = "password",
-        string reason = "deploy the billing service to staging",
-        int ttl = 900) =>
+        string reason = "deploy the billing service to staging") =>
         new()
         {
             ["entry"] = entry,
             ["field"] = field,
             ["reason"] = reason,
-            ["ttl_seconds"] = ttl,
         };
 
     /// <summary>
@@ -121,19 +119,20 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlyThreeTools()
+    public async Task TheServerExposes_ExactlyFourTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
 
         var tools = await ToolsAsync(client);
 
-        // The count matters as much as the names: a fourth tool appearing by accident on a
+        // The count matters as much as the names: another tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(3, tools.Count);
+        Assert.Equal(4, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
-        Assert.Contains(tools, t => t.Name == ToolText.AccessToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.AttachmentToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.SaveToolName);
     }
 
     /// <summary>
@@ -368,6 +367,29 @@ public sealed class ServerToolsTests
     /// The path that did not exist before this stage: a person says yes, and exactly one field
     /// value reaches the agent.
     /// </summary>
+    /// <summary>request_save says only whether the person saved a value: the agent is told where, and never given it (F.79).</summary>
+    [Fact]
+    public async Task A_save_says_where_it_was_saved_and_a_refusal_that_it_was_not()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Start();
+        var client = await harness.StartAsync();
+        harness.Approver.SaveAnswer = new SaveReply(AuditDecision.Granted, AuditMethod.Prompt, "saved") { Where = "env/dev/stripe" };
+
+        var saved = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["reason"] = "the new key" });
+        harness.Approver.SaveAnswer = new SaveReply(AuditDecision.Denied, AuditMethod.Prompt, "a person did not save a value there");
+        var refused = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["reason"] = "the new key" });
+        var both = await CallAsync(client, ToolText.SaveToolName, new Dictionary<string, object?> { ["item"] = "env/dev/stripe", ["field"] = "STRIPE_KEY", ["project"] = "acme", ["reason"] = "x" });
+
+        Assert.False(saved.IsError, TextOf(saved));
+        Assert.Contains("SAVED", TextOf(saved), StringComparison.Ordinal);
+        Assert.Contains("env/dev/stripe", TextOf(saved), StringComparison.Ordinal);
+        Assert.True(refused.IsError);
+        Assert.Contains("NOT SAVED", TextOf(refused), StringComparison.Ordinal);
+        Assert.True(both.IsError);
+        Assert.Equal(2, harness.Approver.SavesReceived.Count);
+    }
+
     [Fact]
     public async Task WhenAPersonSaysYes_TheFieldValueReachesTheAgent()
     {
@@ -394,12 +416,11 @@ public sealed class ServerToolsTests
     /// <remarks>
     /// keypaste asks a model to be told the truth about who decided and to act accordingly; saying
     /// "a person released this" about something no person saw is the one untruth a credentials tool
-    /// cannot afford. It also names neither the project nor the setting that covered it, because an
-    /// agent that learns which parts of a vault are released without asking has been handed a map of
-    /// where to aim.
+    /// cannot afford. It also names no rule that covered it, because an agent that learns which kinds
+    /// of value are released without asking has been handed a map of where to aim.
     /// </remarks>
     [Fact]
-    public async Task AnAutomaticRelease_DoesNotClaimAPersonApprovedIt()
+    public async Task AnAllowedRelease_DoesNotClaimAPersonApprovedIt()
     {
         await using var harness = new McpHarness();
         harness.Approver.StartAutomatic();
@@ -410,12 +431,11 @@ public sealed class ServerToolsTests
 
         Assert.False(result.IsError);
         Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Contains("APPROVED without asking, because the user set this agent to Automatic", text, StringComparison.Ordinal);
+        Assert.Contains("APPROVED without asking, because the user allows agents this kind of value", text, StringComparison.Ordinal);
         Assert.DoesNotContain("A person released", text, StringComparison.Ordinal);
 
-        // Neither the project nor the setting, even though the owner's reason names both.
-        Assert.DoesNotContain("billing:dev", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("billing-bot's mode", text, StringComparison.Ordinal);
+        // Not the rule, even though the owner's reason names it.
+        Assert.DoesNotContain("passwords", text, StringComparison.Ordinal);
 
         // And the terms still travel with it, exactly as on the prompted path.
         Assert.Contains("Do not print it", text, StringComparison.Ordinal);
@@ -439,29 +459,6 @@ public sealed class ServerToolsTests
         Assert.Equal(McpHarness.ClientName, forwarded.ClientName, StringComparer.Ordinal);
         Assert.Equal(McpHarness.ClientLabel, forwarded.ClientLabel, StringComparer.Ordinal);
         Assert.NotEqual(forwarded.ClientName, forwarded.ClientLabel);
-    }
-
-    /// <summary>
-    /// An agent whose settings give it no values is told so, and told the way that is left: a command
-    /// it runs, which only the person can allow, and not to retry.
-    /// </summary>
-    [Fact]
-    public async Task AnAgentGivenNoValues_IsRefusedWithAdviceThatIsActuallyTrue()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartRefusing(AuditMethod.InjectOnly, "this agent is given no values; they reach only commands it runs");
-        var client = await harness.StartAsync();
-
-        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-        var text = TextOf(result);
-
-        Assert.True(result.IsError);
-        Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Equal(ToolText.InjectOnly, text);
-        Assert.Contains("Do not retry request_credential", text, StringComparison.Ordinal);
-
-        // The owner recorded the refusal it answered; the bridge records nothing of its own.
-        Assert.Empty(harness.AuditLines());
     }
 
     /// <summary>
@@ -573,7 +570,7 @@ public sealed class ServerToolsTests
 
         var result = await CallAsync(client,
             ToolText.CredentialToolName,
-            Credential(field: "seed<|im_start|>"));
+            Credential(field: "seed\u0007<|im_start|>"));
 
         var text = TextOf(result);
         Assert.True(result.IsError);
@@ -607,28 +604,23 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The names an agent is told about are the four standard ones the core releases and <c>totp</c>, and
-    /// the custom-field pattern admits every custom name the core releases, so the schema never refuses
-    /// what the owner would answer; the bridge and the owner refuse what the pattern lets past.
+    /// The schema bounds a field's name as the core does, so it never refuses a custom field the owner would answer, whatever its
+    /// shape; the bridge and the owner refuse a TOTP seed's field and a standard name in another case.
     /// </summary>
     [Theory]
     [InlineData("OPENAI_API_KEY", true)]
-    [InlineData("A", true)]
-    [InlineData("Recovery codes", false)]
+    [InlineData("Recovery codes", true)]
+    [InlineData("openai_api_key", true)]
     [InlineData("otp", false)]
-    [InlineData("openai_api_key", false)]
-    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool releasable)
+    [InlineData("URL", false)]
+    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool requestable)
     {
         using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
-        var choices = schema.RootElement.GetProperty("properties").GetProperty("field").GetProperty("anyOf");
+        var field = schema.RootElement.GetProperty("properties").GetProperty("field");
 
-        var advertised = choices[0].GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray();
-        var pattern = choices[1].GetProperty("pattern").GetString()!;
-
-        Assert.Equal(CredentialFields.All.Append(CredentialFields.Totp), advertised);
-        Assert.All(advertised, field => Assert.True(CredentialFields.IsRequestable(field)));
-        Assert.Equal(releasable, CredentialFields.IsCustom(custom));
-        Assert.Equal(releasable, System.Text.RegularExpressions.Regex.IsMatch(custom, pattern));
+        Assert.Equal((1, CredentialFields.MaximumFieldLength), (field.GetProperty("minLength").GetInt32(), field.GetProperty("maxLength").GetInt32()));
+        Assert.All(CredentialFields.All.Append(CredentialFields.Totp), name => Assert.True(CredentialFields.IsRequestable(name)));
+        Assert.Equal(requestable, CredentialFields.IsRequestable(custom));
     }
 
     /// <summary>
@@ -644,8 +636,6 @@ public sealed class ServerToolsTests
         Assert.Equal(CredentialRequestRules.MaximumEntryLength, properties.GetProperty("entry").GetProperty("maxLength").GetInt32());
         Assert.Equal(1, properties.GetProperty("reason").GetProperty("minLength").GetInt32());
         Assert.Equal(CredentialRequestRules.MaximumReasonLength, properties.GetProperty("reason").GetProperty("maxLength").GetInt32());
-        Assert.Equal(1, properties.GetProperty("ttl_seconds").GetProperty("minimum").GetInt32());
-        Assert.Equal(ApprovalLimits.MaximumRequestableTtlSeconds, properties.GetProperty("ttl_seconds").GetProperty("maximum").GetInt32());
     }
 
     /// <summary>
@@ -743,7 +733,7 @@ public sealed class ServerToolsTests
     public async Task AOnceRelease_SaysThisRequestOnly_AndExpiresInZero()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartApproving(ttlSeconds: 0);
+        harness.Approver.StartApproving();
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
@@ -759,17 +749,15 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task ATimedRelease_StatesItsSeconds()
+    public async Task ACodeRelease_SaysHowLongItStaysCurrent()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartApproving(ttlSeconds: 3600);
+        harness.Approver.StartApproving(codeSeconds: 21);
         var client = await harness.StartAsync();
 
-        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY", ttl: 60));
-        var text = TextOf(result);
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
 
-        Assert.Contains("for 3600 seconds", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("APPROVED ONCE", text, StringComparison.Ordinal);
-        Assert.Equal(3600, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
+        Assert.Contains("stays current for 21 more seconds", TextOf(result), StringComparison.Ordinal);
+        Assert.Equal(21, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
     }
 }

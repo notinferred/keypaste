@@ -162,7 +162,7 @@ def request(request_id):
         "method": "tools/call",
         "params": {
             "name": "request_credential",
-            "arguments": {"entry": ENTRY, "field": KEY, "reason": REASON, "ttl_seconds": 900},
+            "arguments": {"entry": ENTRY, "field": KEY, "reason": REASON},
         },
     }
 

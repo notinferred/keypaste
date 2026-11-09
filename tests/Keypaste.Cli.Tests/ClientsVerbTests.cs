@@ -1,16 +1,12 @@
-using System.Text.Json;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste clients</c>, the one place to read and change agents' settings: through the process
-/// holding the vault, where a change that gives more waits for the person, and with nothing holding
-/// it, only a lowering of this computer's ceilings.
+/// <c>keypaste clients</c> lists this computer's agent rules and the agents it knows, turns an agent's run on or off and
+/// removes one, in <c>agents.toml</c>, needing nothing to hold the vault; every run is still asked.
 /// </summary>
 public sealed class ClientsVerbTests : IDisposable
 {
@@ -20,220 +16,132 @@ public sealed class ClientsVerbTests : IDisposable
 
     private string Home => _harness.Environment[KeypasteHome.EnvironmentVariable];
 
-    private string ClientsPath => KeypasteHome.ClientsPath(Home);
-
-    private AccessCaps Caps()
-    {
-        Assert.True(AccessCaps.TryLoad(ClientsPath, out var caps, out var problem), problem);
-        return caps;
-    }
+    private AgentRulesFile Rules => new(KeypasteHome.AgentsPath(Home));
 
     [Fact]
-    public void WithNoOwner_TheListShowsTheDefaults_AndSaysTheVaultsSettingsAreNotShown()
+    public void With_no_file_it_lists_every_category_asked_and_writes_nothing()
     {
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
 
-        Assert.Contains("  AGENT", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("*   (default)", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("allow-for-a-while  yes     off  tag:env:*", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("so only this computer's limits are shown", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("passwords", _harness.Out, StringComparison.Ordinal);
+        Assert.Contains("passkeys", _harness.Out, StringComparison.Ordinal);
+        Assert.Contains("block", _harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("allow", _harness.Out, StringComparison.Ordinal);
+        Assert.False(File.Exists(Rules.Path));
     }
 
-    /// <summary>
-    /// With nothing holding the vault, a change that only lowers this computer's ceilings is made, and recorded
-    /// under the verb's own name.
-    /// </summary>
+    /// <summary>With the vault held, the owner makes and seals the change, and records it.</summary>
     [Fact]
-    public void WithNoOwner_ALowering_IsWrittenAsACeiling()
+    public async Task Run_on_and_off_go_to_the_process_holding_the_vault()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--mode", "ask", "--values", "no"));
+        await using var owner = SessionOwner.Start(_harness, records: true);
 
-        Assert.Contains("applied on this computer, since it gives the agent nothing more (mode ask, values no)", _harness.Err, StringComparison.Ordinal);
-        var row = Assert.Single(Caps().Rows);
-        Assert.Equal(("cursor", AgentMode.Ask, false), (row.Label, row.Mode, row.Values));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "on", "--vault", _harness.VaultPath));
+        Assert.True(owner.Settings.Rules.Runs("claude-code"));
+        Assert.Contains("run on; each run is still asked; sealed by the process holding the vault", _harness.Err, StringComparison.Ordinal);
 
-        var line = Assert.Single(File.ReadAllLines(KeypasteHome.AuditPath(Home)));
-        using var parsed = JsonDocument.Parse(line);
-        Assert.Equal("access_change", parsed.RootElement.GetProperty("tool").GetString());
-        Assert.Equal("narrowing", parsed.RootElement.GetProperty("method").GetString());
-        Assert.Equal("keypaste clients", parsed.RootElement.GetProperty("client").GetProperty("name").GetString());
-        Assert.Equal("cursor", parsed.RootElement.GetProperty("client").GetProperty("label").GetString());
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "off", "--vault", _harness.VaultPath));
+        Assert.False(owner.Settings.Rules.Runs("claude-code"));
     }
 
-    /// <summary>With nothing holding the vault, anything that could give more, or remove what only the vault holds, is refused, saying how to start an owner.</summary>
-    [Theory]
-    [InlineData("--mode", "automatic")]
-    [InlineData("--values", "yes")]
-    [InlineData("--run", "on")]
-    [InlineData("--per-hour", "none")]
-    [InlineData("--reset", null)]
-    public void WithNoOwner_AWidening_IsRefused(string option, string? value)
-    {
-        string[] args = value is null ? ["clients", "cursor", option] : ["clients", "cursor", option, value];
-
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run(args));
-
-        Assert.Contains("Unlock the vault in the app or run `keypaste approve`, then run this again.", _harness.Err, StringComparison.Ordinal);
-        Assert.False(File.Exists(ClientsPath));
-    }
-
+    /// <summary>With nothing holding the vault, nothing can be sealed: turning run on is refused, and a change for less is written unsealed, which no owner follows.</summary>
     [Fact]
-    public void Json_ListsEachCeilingAsARow()
+    public void With_nothing_holding_the_vault_only_less_is_written_and_unsealed()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "*", "--values", "no"));
-        _harness.Stdout.GetStringBuilder().Clear();
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--run", "on"));
+        Assert.Contains("only the process holding it can seal", _harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(Rules.Path));
 
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--run", "off"));
+        Assert.True(Rules.TryReadFile(out var read, out var problem), problem);
+        Assert.Null(read.Seal);
+        Assert.Contains("written unsealed", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("\"method\":\"rules-changed\"", File.ReadAllText(KeypasteHome.AuditPath(Home)), StringComparison.Ordinal);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
+        Assert.Contains("is not sealed, so keypaste ignores it", _harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>The list shows each agent's own rules and the answers kept for it, each by the key --forget takes (F.78b).</summary>
+    [Fact]
+    public void The_list_shows_an_agents_own_rules_and_kept_answers_by_their_keys()
+    {
+        var answer = new RememberedAnswer("claude-code", "0123456789abcdef0123456789abcdef", "password", CategoryRule.Allow);
+        var pick = new RememberedPick("claude-code", "services/Mail", "password", "fedcba9876543210fedcba9876543210");
+        Directory.CreateDirectory(Home);
+        Assert.True(Rules.TryWrite(AgentRules.Defaults.With("claude-code", FieldCategory.Notes, CategoryRule.Block).Remembering(answer, confirmed: true).Remembering(pick, confirmed: true), seal: null, out var problem), problem);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
+        var text = _harness.Out;
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json"));
 
-        Assert.Equal("""[{"kind":"ceiling","label":"*","values":"no"}]""" + Environment.NewLine, _harness.Out);
+        Assert.Contains("ITS OWN RULE", text, StringComparison.Ordinal);
+        Assert.Contains($"{AgentRules.KeyOf(answer)}  always allows password of item 0123456789abcdef0123456789abcdef", text, StringComparison.Ordinal);
+        Assert.Contains($"{AgentRules.KeyOf(pick)}  always picks item fedcba9876543210fedcba9876543210 for password of services/Mail", text, StringComparison.Ordinal);
+        Assert.Contains("\"kind\":\"agent-rule\",\"agent\":\"claude-code\",\"value\":\"notes\",\"rule\":\"block\"", _harness.Out, StringComparison.Ordinal);
+        Assert.Contains($"\"key\":\"{AgentRules.KeyOf(pick)}\"", _harness.Out, StringComparison.Ordinal);
+    }
+
+    /// <summary>With the vault held, a set and a forget are made by the owner; one that would give more is refused.</summary>
+    [Fact]
+    public async Task Set_and_forget_go_to_the_process_holding_the_vault_and_give_less_only()
+    {
+        await using var owner = SessionOwner.Start(_harness, records: true);
+        var answer = new RememberedAnswer("claude-code", "0123456789abcdef0123456789abcdef", "password", CategoryRule.Allow);
+        owner.Settings.Rules = AgentRules.Defaults.Allowing(FieldCategory.Totp, confirmed: true).Remembering(answer, confirmed: true);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--set", "totp=block", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--set", "totp=settings", "--vault", _harness.VaultPath));
+        Assert.Contains("only the app's agent page sets", _harness.Err, StringComparison.Ordinal);
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--forget", AgentRules.KeyOf(answer), "--vault", _harness.VaultPath));
+
+        Assert.Equal(CategoryRule.Block, owner.Settings.Rules.RuleFor("claude-code", FieldCategory.Totp));
+        Assert.Empty(owner.Settings.Rules.Answers);
+        Assert.Contains("sealed by the process holding the vault", _harness.Err, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData("has/slash", "--mode", "ask")]
-    [InlineData("cursor", "--mode", "sometimes")]
-    [InlineData("cursor", "--values", "maybe")]
-    [InlineData("cursor", "--project", "a:b:c")]
-    [InlineData("cursor", "--until", "tomorrow")]
-    [InlineData("cursor", null, null)]
-    public void BadWords_AreUsage(string agent, string? option, string? value)
+    [InlineData("--set", "password=allow")]
+    [InlineData("--set", "passkey=block")]
+    [InlineData("--set", "password")]
+    [InlineData("--forget", "0123456789ab")]
+    public void A_set_or_forget_that_cannot_be_made_from_a_terminal_writes_nothing(string option, string value)
     {
-        string[] args = option is null ? ["clients", agent] : ["clients", agent, option, value!];
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", option, value));
 
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(args));
-
-        Assert.False(File.Exists(ClientsPath));
+        Assert.False(File.Exists(Rules.Path));
     }
 
     [Fact]
-    public async Task ThroughAnOwner_TheListShowsTheVaultsSettings()
+    public void Remove_refuses_an_agent_this_computer_does_not_know()
     {
-        _harness.SeedVault("unused-master");
-        await using var owner = SessionOwner.Start(_harness);
-        owner.Settings.Records["cursor"] = AgentAccess.Defaults with { Mode = AgentMode.Ask, Projects = [Row("billing:dev")] };
-
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
-
-        Assert.Contains("  cursor ", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("billing:dev", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("automatic", _harness.Out, StringComparison.Ordinal);
-        Assert.DoesNotContain("ceilings are shown", _harness.Err, StringComparison.Ordinal);
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "claude-code", "--remove"));
+        Assert.Contains("knows no agent named claude-code", _harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Through an owner, every agent is listed however long the listing, asked for in turns, and an agent
-    /// whose record alone is too long for one reply is listed with its settings for the whole agent and a
-    /// line saying how many project rows are not shown and where they all are.
-    /// </summary>
+    [Theory]
+    [InlineData("claude-code")]
+    [InlineData("claude-code", "--run", "maybe")]
+    [InlineData("claude-code", "--run", "on", "--remove")]
+    [InlineData("claude-code", "--set", "notes=block", "--forget", "0123456789ab")]
+    [InlineData("*", "--run", "on")]
+    [InlineData("--run", "on")]
+    public void An_unusable_change_is_refused_and_writes_nothing(params string[] arguments)
+    {
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(["clients", .. arguments]));
+
+        Assert.False(File.Exists(Rules.Path));
+    }
+
     [Fact]
-    public async Task ThroughAnOwner_EveryAgentIsListed_ARecordTooLongForOneReplyIncluded()
+    public void A_file_keypaste_cannot_read_is_named_and_left_as_it_is()
     {
-        _harness.SeedVault("unused-master");
-        await using var owner = SessionOwner.Start(_harness);
-        owner.Settings.Records["a-agent"] = AgentAccess.Defaults with { Mode = AgentMode.Ask };
-        owner.Settings.Records["b-huge"] = AgentAccess.Defaults with
-        {
-            Mode = AgentMode.Ask,
-            Projects = [.. Enumerable.Range(0, AgentAccess.MaximumProjects).Select(i => Row($"{new string('é', 100)}{i}"))],
-        };
-        owner.Settings.Records["c-agent"] = AgentAccess.Defaults with { Run = true };
+        Directory.CreateDirectory(Home);
+        File.WriteAllText(Rules.Path, "[[rules]]\npassword = \"sometimes\"\n");
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--run", "on"));
 
-        Assert.Contains("  a-agent ", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("  b-huge ", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("  c-agent ", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains(
-            $"b-huge has {AgentAccess.MaximumProjects} project rows not shown here, more than one reply carries; the app's Agents screen shows them all",
-            _harness.Err,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("than one reply holds", _harness.Err, StringComparison.Ordinal);
-
-        var before = _harness.Out.Length;
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json", "--vault", _harness.VaultPath));
-
-        using var listed = JsonDocument.Parse(_harness.Out[before..]);
-        var agents = listed.RootElement.EnumerateArray().Where(row => row.GetProperty("kind").GetString() == "agent").ToList();
-        Assert.Equal(["a-agent", "b-huge", "c-agent"], agents.Select(row => row.GetProperty("name").GetString()));
-        Assert.Equal(AgentAccess.MaximumProjects, agents[1].GetProperty("projects_not_shown").GetInt32());
-        Assert.False(agents[0].TryGetProperty("projects_not_shown", out _));
-    }
-
-    /// <summary>
-    /// Through an owner, a change that gives more waits for the person: confirmed it is saved, refused
-    /// nothing changes, and the next request for more, for any agent, is refused unasked with when to try again.
-    /// </summary>
-    [Fact]
-    public async Task ThroughAnOwner_AWidening_WaitsForThePerson()
-    {
-        _harness.SeedVault("unused-master");
-        await using var owner = SessionOwner.Start(_harness, records: true);
-
-        owner.Asked.Change = ApprovalAnswer.ApprovedOnce;
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--values", "no", "--vault", _harness.VaultPath));
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--project", "billing", "--mode", "automatic", "--vault", _harness.VaultPath));
-
-        Assert.Contains("applied at once, since it gives the agent nothing more (cursor: values no)", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("a person confirmed it (cursor: project billing, mode automatic)", _harness.Err, StringComparison.Ordinal);
-        var saved = owner.Settings.Records["cursor"];
-        Assert.False(saved.Values);
-        Assert.Equal(AgentMode.Automatic, Assert.Single(saved.Projects).Mode);
-
-        owner.Asked.Change = ApprovalAnswer.Denied;
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "cursor", "--run", "on", "--vault", _harness.VaultPath));
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "codex", "--mode", "automatic", "--vault", _harness.VaultPath));
-
-        Assert.Contains("not changed: a person refused this change (cursor: run on)", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("not changed: a request from an agent or a terminal for more access, or to change the vault, was refused or went unanswered a moment ago", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("try again in ", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("or make it in the app's own agent settings, which do not wait (codex: mode automatic)", _harness.Err, StringComparison.Ordinal);
-        Assert.False(owner.Settings.Records["cursor"].Run);
-        Assert.False(owner.Settings.Records.ContainsKey("codex"));
-        Assert.Equal(AccessOrigin.Terminal, owner.Asked.LastChange!.Origin);
-    }
-
-    /// <summary>
-    /// <c>--until</c> is read on this computer's clock and sent in UTC, which the vault's record and the
-    /// audit line hold, and the change and the list say it back on this computer's clock with its offset.
-    /// </summary>
-    [Fact]
-    public async Task ThroughAnOwner_UntilIsReadAndShownOnThisComputersClock_AndSentInUtc()
-    {
-        _harness.SeedVault("unused-master");
-        _harness.Clock.Zone = TestZones.PlusTwo;
-        await using var owner = SessionOwner.Start(_harness, records: true);
-        owner.Asked.Change = ApprovalAnswer.ApprovedOnce;
-
-        _harness.AssertExit(
-            CliApp.ExitSuccess,
-            _harness.Run("clients", "cursor", "--mode", "automatic", "--until", "2026-12-31", "--per-hour", "20", "--vault", _harness.VaultPath));
-
-        Assert.Equal(
-            new AccessLimit { PerHour = 20, Until = new DateTimeOffset(2026, 12, 31, 21, 59, 59, TimeSpan.Zero) },
-            owner.Settings.Records["cursor"].Limit);
-        Assert.Contains("a person confirmed it (cursor: mode automatic, per-hour 20, until 2026-12-31 23:59 +02:00)", _harness.Err, StringComparison.Ordinal);
-        Assert.True(AuditReader.TryRead(KeypasteHome.AuditPath(Home), out var entries, out _, out var error), error);
-        Assert.EndsWith("(cursor: mode automatic, per-hour 20, until 2026-12-31T21:59:59Z)", entries[^1].Reason, StringComparison.Ordinal);
-
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
-
-        Assert.Contains("automatic, until 2026-12-31 23:59 +02:00, at most 20 an hour", _harness.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>An end already past on this computer's clock is refused before anything is asked, shown on that clock.</summary>
-    [Fact]
-    public void AnUntilAlreadyPast_IsRefused_BeforeAnythingIsAsked()
-    {
-        _harness.Clock.Zone = TestZones.PlusTwo;
-
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "cursor", "--until", "2026-07-26 17:00"));
-
-        Assert.Contains("until 2026-07-26 17:00 +02:00 has already passed on this computer's clock", _harness.Err, StringComparison.Ordinal);
-        Assert.False(File.Exists(ClientsPath));
-    }
-
-    private static ProjectAccess Row(string name)
-    {
-        Assert.True(ProjectScope.TryParseName(name, out var scope, out var error), error);
-        return new ProjectAccess(scope, AgentMode.Automatic);
+        Assert.Contains("line 2", _harness.Err, StringComparison.Ordinal);
+        Assert.Equal("[[rules]]\npassword = \"sometimes\"\n", File.ReadAllText(Rules.Path));
     }
 }

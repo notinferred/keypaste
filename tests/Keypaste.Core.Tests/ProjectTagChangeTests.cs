@@ -1,15 +1,13 @@
-using Keypaste.Core.Agents;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>What a project tag change reaches, said before it is written (D-0415), and which agents it would let get the entry without asking.</summary>
+/// <summary>What a project tag change reaches, said before it is written (D-0415).</summary>
 public sealed class ProjectTagChangeTests : IDisposable
 {
     private static readonly EntryName _stripe = new("services", "Stripe");
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-tag-change-tests-").FullName;
-    private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
     private readonly Vault _vault;
 
     public ProjectTagChangeTests()
@@ -25,22 +23,8 @@ public sealed class ProjectTagChangeTests : IDisposable
         Directory.Delete(_directory, recursive: true);
     }
 
-    private string ClientsPath => Path.Combine(_directory, "clients.toml");
-
     private ProjectTagChange? Preview(IReadOnlyList<string> tags, bool adding) =>
-        ProjectTagChange.Preview(_vault, _stripe, tags, adding, ClientsPath, _now);
-
-    private void Record(string agent, AgentAccess access)
-    {
-        Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(_vault).Write(agent, access));
-        _vault.Save();
-    }
-
-    private static AgentAccess AutomaticIn(string project, string environment)
-    {
-        Assert.True(ProjectScope.TryCreate(project, environment, out var scope, out var error), error);
-        return AgentAccess.Defaults with { Projects = [new ProjectAccess(scope, AgentMode.Automatic)] };
-    }
+        ProjectTagChange.Preview(_vault, _stripe, tags, adding);
 
     [Fact]
     public void An_ordinary_tag_needs_no_question()
@@ -96,58 +80,6 @@ public sealed class ProjectTagChangeTests : IDisposable
     }
 
     /// <summary>
-    /// An agent set to Automatic where the change puts the entry, which sees it and is given values, is
-    /// named on the change; saying so asks nothing more of the person.
-    /// </summary>
-    [Fact]
-    public void A_tag_change_names_the_agents_it_would_let_get_the_entry_without_asking()
-    {
-        Record("claude-code", AutomaticIn("billing", "dev"));
-        Record("commands-only", AutomaticIn("billing", "dev") with { Values = false });
-        Record("asks", AgentAccess.Defaults);
-
-        var change = Preview(["env:billing:dev"], adding: true)!;
-
-        Assert.Equal(["claude-code"], change.Automatic);
-        Assert.False(change.CeilingsUnread);
-        Assert.Equal(
-            "Automatic: claude-code would get services/Stripe without asking, each release recorded in history.",
-            change.Describe()[^1]);
-
-        // A protected environment always asks, and a ceiling held here applies.
-        Assert.Empty(Preview(["env:billing:prod"], adding: true)!.Automatic);
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nmode = \"ask\"\n");
-        Assert.Empty(Preview(["env:billing:dev"], adding: true)!.Automatic);
-        Assert.Equal(2, Preview(["env:billing:dev"], adding: true)!.Describe().Count);
-
-        // Already in billing/dev through another tag, the change gives nobody anything new.
-        File.Delete(ClientsPath);
-        Assert.True(_vault.AddTag(_stripe, "env:billing"));
-        _vault.Save();
-        Assert.Empty(Preview(["env:billing:dev"], adding: true)!.Automatic);
-    }
-
-    /// <summary>
-    /// With this computer's <c>clients.toml</c> unreadable, the change names the agents the vault's settings
-    /// alone would release the entry to, since the file can only lower them, and says they get it once the
-    /// file reads again.
-    /// </summary>
-    [Fact]
-    public void With_clients_toml_unreadable_the_agents_the_vaults_settings_would_release_to_are_named()
-    {
-        Record("claude-code", AutomaticIn("billing", "dev"));
-        File.WriteAllText(ClientsPath, "this is not a clients file\n");
-
-        var change = Preview(["env:billing:dev"], adding: true)!;
-
-        Assert.True(change.CeilingsUnread);
-        Assert.Equal(["claude-code"], change.Automatic);
-        Assert.Equal(
-            "Automatic: by the vault's settings, claude-code would get services/Stripe without asking, each release recorded in history, once this computer's clients.toml can be read again; until then every agent request is refused.",
-            change.Describe()[^1]);
-    }
-
-    /// <summary>
     /// A variable joining an environment whose value holds a KeePass placeholder is named with each keyword it fills in
     /// from the entry, or with the one that refuses it, as a new value's prompt names them (D-0465); a change that puts
     /// the entry nowhere new names none, and no line holds a value.
@@ -156,8 +88,6 @@ public sealed class ProjectTagChangeTests : IDisposable
     public void Joining_names_each_variable_holding_a_placeholder_by_keyword_and_no_value()
     {
         Assert.True(_vault.SetFields(_stripe, [new FieldWrite("STRIPE_KEY", "sk-{USERNAME}:{PASSWORD}"), new FieldWrite("WEBHOOK", "{REF:P@I:0}")]));
-        Record("claude-code", AutomaticIn("billing", "dev"));
-
         var described = Preview(["env:billing"], adding: true)!.Describe();
 
         Assert.Equal(
@@ -166,7 +96,6 @@ public sealed class ProjectTagChangeTests : IDisposable
                 "Joining billing/dev: STRIPE_KEY, WEBHOOK.",
                 "STRIPE_KEY fills in {USERNAME} and {PASSWORD} from services/Stripe when it leaves.",
                 "WEBHOOK holds {REF:…}, which keypaste does not fill in, so it is refused wherever it would leave.",
-                "Automatic: claude-code would get services/Stripe without asking, each release recorded in history.",
             ],
             described);
         Assert.DoesNotContain(described, line => line.Contains("sk-", StringComparison.Ordinal) || line.Contains("login", StringComparison.Ordinal));
@@ -230,5 +159,5 @@ public sealed class ProjectTagChangeTests : IDisposable
     }
 
     private IReadOnlyList<ProjectTagChange> Restoring(EntryRevision revision) =>
-        ProjectTagChange.Restoring(_vault, _stripe, revision, ClientsPath, _now);
+        ProjectTagChange.Restoring(_vault, _stripe, revision);
 }

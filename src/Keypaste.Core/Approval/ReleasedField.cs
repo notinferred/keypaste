@@ -13,7 +13,7 @@ namespace Keypaste.Core.Approval;
 /// blanked (THREATS.md T-8).
 /// </para>
 /// <para>
-/// The value is held in a <see cref="SecretBuffer"/> so it can be zeroed when the grant expires.
+/// The value is held in a <see cref="SecretBuffer"/> so it can be zeroed once the reply is written.
 /// The honest limit is the one <see cref="SecretBuffer"/> already states: the value reached this
 /// type as a <see cref="string"/> out of <see cref="VaultEntry"/>, and that copy cannot be
 /// cleared. This narrows the window; it is not in-memory secrecy, and SECURITY.md says so.

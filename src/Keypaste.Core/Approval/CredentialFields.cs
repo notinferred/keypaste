@@ -15,6 +15,10 @@ public static class CredentialFields
     /// <remarks>Lower-case, so no custom field that leaves by name can be called this.</remarks>
     public const string Totp = "totp";
 
+    /// <summary>What a credential request names to be given one of the item's attachments, by the attachment's own name.</summary>
+    /// <remarks>Lower-case, so no custom field that leaves by name can be called this.</remarks>
+    public const string Attachment = "attachment";
+
     /// <summary>The standard releasable field names, lower-case, in the order the schema lists them.</summary>
     public static IReadOnlyList<string> All { get; } = ["password", "username", "url", "notes"];
 
@@ -22,7 +26,10 @@ public static class CredentialFields
     public const string Rule = "password, username, url, notes or a custom field named like an environment variable";
 
     /// <summary>What a credential request may name, completing a sentence such as "the field must be …".</summary>
-    public const string RequestRule = "password, username, url, notes, totp or a custom field named like an environment variable";
+    public const string RequestRule = "password, username, url, notes, totp or the name of one of the item's custom fields";
+
+    /// <summary>The longest custom field name an agent may ask for.</summary>
+    public const int MaximumFieldLength = 128;
 
     /// <summary>Whether a field name is one keypaste releases.</summary>
     /// <param name="field">The field name exactly as it arrived.</param>
@@ -44,7 +51,25 @@ public static class CredentialFields
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        return IsReleasable(field) || string.Equals(field, Totp, StringComparison.Ordinal);
+        return IsStandard(field) || IsAgentCustom(field) || string.Equals(field, Totp, StringComparison.Ordinal) || string.Equals(field, Attachment, StringComparison.Ordinal);
+    }
+
+    /// <summary>Whether an agent may name this as a custom field: any name an item can hold, whatever its shape, decided then by its category.</summary>
+    /// <param name="field">The field name exactly as it arrived.</param>
+    /// <returns>
+    /// <see langword="false"/> for a standard field's name in any case, a field a TOTP seed is read from, the request words
+    /// <see cref="Totp"/> and <see cref="Attachment"/>, and a name empty, over <see cref="MaximumFieldLength"/> or holding a control character.
+    /// </returns>
+    public static bool IsAgentCustom(string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        return field.Length is > 0 and <= MaximumFieldLength
+            && !field.Any(char.IsControl)
+            && !FieldNameRules.IsStandard(field)
+            && !TotpSpec.IsSourceField(field)
+            && !string.Equals(field, Totp, StringComparison.Ordinal)
+            && !string.Equals(field, Attachment, StringComparison.Ordinal);
     }
 
     /// <summary>Whether a field name is one of <see cref="All"/>, spelled exactly.</summary>

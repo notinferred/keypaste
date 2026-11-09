@@ -17,7 +17,6 @@ namespace Keypaste.Cli.Tests;
 internal sealed class UnlockedOwner : IAsyncDisposable
 {
     private readonly Vault _vault;
-    private readonly GrantCache _grants = new(TimeProvider.System);
     private readonly LaunchPasses _launches = new(TimeProvider.System);
     private readonly ApprovalGate _gate;
     private readonly AuditLog? _audit;
@@ -42,14 +41,12 @@ internal sealed class UnlockedOwner : IAsyncDisposable
             new VaultCredentialSource(() => _vault),
             new VaultEntryNameLister(() => _vault),
             _gate,
-            _grants,
-            IAgentSettings.Defaults);
+            IAgentRules.Defaults);
 
         var editor = new SessionEditor(
             _gate,
             asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
             Write,
-            KeypasteHome.ClientsPath(harness.Directory),
             TimeProvider.System,
             narrate: null,
             edited: null);
@@ -139,7 +136,6 @@ internal sealed class UnlockedOwner : IAsyncDisposable
         _listener.Dispose();
         Lifetime.Dispose();
         _gate.Dispose();
-        _grants.Dispose();
         _launches.Dispose();
         _audit?.Dispose();
         _vault.Dispose();

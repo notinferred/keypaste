@@ -1,4 +1,3 @@
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Editing;
@@ -23,10 +22,6 @@ public enum ApproverMessageKind
     /// <summary>The reply carrying a project's env set; no request has this kind (D-0416).</summary>
     Env = 4,
 
-    /// <summary>The grants the owner's current session holds, as a list shows them.</summary>
-    Grants = 5,
-    /// <summary>Ends grants of the owner's current session.</summary>
-    RevokeGrants = 6,
     /// <summary>Asks the owner to lock now.</summary>
     Lock = 7,
     /// <summary>A request for one profile of a project's env set, or a subset of its keys, for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
@@ -37,10 +32,6 @@ public enum ApproverMessageKind
     Run = 10,
     /// <summary>Withdraws the request a connection is waiting on: the owner still sends its reply, then ends the connection.</summary>
     Withdraw = 11,
-    /// <summary>Every agent's settings the vault holds, for <c>keypaste clients</c>.</summary>
-    AccessList = 12,
-    /// <summary>A change to one agent's settings, which the owner applies or puts to the person.</summary>
-    AccessChange = 13,
     /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves (D-0464).</summary>
     Edit = 14,
     /// <summary>A browser's request to pair, made only on a browser's attachment (D-0627).</summary>
@@ -51,6 +42,12 @@ public enum ApproverMessageKind
     BrowserFill = 17,
     /// <summary>A browser's request to lock now, made only on a browser's attachment.</summary>
     BrowserLock = 18,
+
+    /// <summary>A change to this computer's agent rules from <c>keypaste clients</c>, which the owner makes and seals.</summary>
+    RulesChange = 19,
+
+    /// <summary>An agent's request that the person save a value it never sees (F.79).</summary>
+    Save = 20,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -67,7 +64,7 @@ public sealed record AttachClient(string? Name, string? Version, string? Label)
 /// <param name="Vault">The vault the bridge was configured with, as an absolute path.</param>
 public sealed record AttachRequest(string Vault)
 {
-    /// <summary>The bridge's client, or null for a runner, <c>grants</c> or <c>lock</c>, which are not counted.</summary>
+    /// <summary>The bridge's client, or null for a runner or <c>lock</c>, which are not counted.</summary>
     public AttachClient? Client { get; init; }
 
     /// <summary>
@@ -190,11 +187,11 @@ public sealed record CredentialRequest
     /// <summary>Which field, or <c>totp</c> for the item's current TOTP code, already checked against <see cref="Approval.CredentialFields.IsRequestable"/>.</summary>
     public required string Field { get; init; }
 
+    /// <summary>The attachment's name when <see cref="Field"/> is <see cref="Approval.CredentialFields.Attachment"/>, otherwise null.</summary>
+    public string? Attachment { get; init; }
+
     /// <summary>The agent's stated reason, verbatim and untrusted (THREATS.md T-2).</summary>
     public required string Reason { get; init; }
-
-    /// <summary>How long the agent asked for. The approver decides what it actually gets.</summary>
-    public required int TtlSeconds { get; init; }
 
     /// <summary>The globs the bridge was configured with.</summary>
     public required IReadOnlyList<string> Exposure { get; init; }
@@ -260,8 +257,12 @@ public sealed record CredentialReply
     /// <summary>The entry the request resolved to, sanitized, or null when it resolved to none.</summary>
     public string? Entry { get; init; }
 
-    /// <summary>The TTL that was actually granted, or zero.</summary>
-    public int TtlSeconds { get; init; }
+    /// <summary>The UUID, as hex, of the one item the reply is about, which its audit line names; never on the wire.</summary>
+    /// <remarks>Null when the request reached no single item, as a picker nobody picked from has not.</remarks>
+    internal string? Item { get; init; }
+
+    /// <summary>How many seconds a released TOTP code has left in its period; zero for any other field.</summary>
+    public int CodeSeconds { get; init; }
 
     /// <summary>The released field value. Present only when <see cref="Decision"/> is granted.</summary>
     public string? Value { get; init; }
@@ -273,11 +274,8 @@ public sealed record CredentialReply
     /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
     public bool Recorded { get; init; }
 
-    /// <summary>The project environment the person chose Always for on this release, which the owner then asks them to confirm; never sent.</summary>
-    internal ProjectScope? AlwaysFor { get; init; }
-
-    /// <summary>The gate's slot, kept with <see cref="AlwaysFor"/> for that confirmation, which the owner then gives back; never sent.</summary>
-    internal KeptSlot? Kept { get; init; }
+    /// <summary>Whether this answers a request for an attachment, whose reply may fill <see cref="ApproverProtocol.MaximumAttachmentReplyFrameBytes"/>; never sent.</summary>
+    internal bool ForAttachment { get; init; }
 
     /// <summary>A description with the credential left out.</summary>
     /// <returns>The decision and method, and never the value.</returns>
@@ -332,98 +330,6 @@ public sealed record EnvReply(EnvResolved Set, string Reason)
     public override string ToString() => $"EnvReply {{ Outcome = {Set.Outcome}, Variables = {Set.Variables.Count} }}";
 }
 
-/// <summary>One grant in force, as <c>keypaste grants</c> lists it. It has no member for a value.</summary>
-/// <param name="Id">The id a revoke names it by, from <see cref="GrantId"/>.</param>
-/// <param name="Kind"><c>credential</c> for an agent's field, <c>env</c> for a <c>keypaste run --session</c> set, <c>run</c> for an agent's run.</param>
-/// <param name="Client">Who it was granted to, as the prompt showed it.</param>
-/// <param name="Scope">What it releases: the entry, or the project and profile.</param>
-/// <param name="Field">Which field, or <c>set</c> for an env set.</param>
-/// <param name="SecondsLeft">How long it has left, rounded up so a live grant never reads as over.</param>
-public sealed record GrantSummary(string Id, string Kind, string Client, string Scope, string Field, int SecondsLeft)
-{
-    /// <summary>A credential grant's row.</summary>
-    /// <param name="grant">The grant, as the owner's cache lists it.</param>
-    /// <returns>Its id, client, entry, field and remaining seconds.</returns>
-    public static GrantSummary From(GrantInForce grant)
-    {
-        ArgumentNullException.ThrowIfNull(grant);
-
-        return new GrantSummary(
-            GrantId.Of(grant.Key),
-            "credential",
-            grant.Approved.Client,
-            grant.Approved.Entry,
-            grant.Key.Field,
-            SecondsOf(grant.Remaining));
-    }
-
-    /// <summary>A timed grant's row for a repeated <c>keypaste run --session</c> or an agent's run.</summary>
-    /// <param name="grant">The grant, as the owner's env grants list it.</param>
-    /// <returns>Its id, the project and profile, and remaining seconds.</returns>
-    public static GrantSummary From(EnvGrantInForce grant)
-    {
-        ArgumentNullException.ThrowIfNull(grant);
-
-        return new GrantSummary(
-            GrantId.OfEnv(grant.Key),
-            grant.Client is null ? "env" : "run",
-            grant.Client ?? EnvClient,
-            $"{grant.Project} · {grant.Profile}",
-            "set",
-            SecondsOf(grant.Remaining));
-    }
-
-    /// <summary>Every grant an activity holds, agents' and runs' alike, soonest to end first.</summary>
-    /// <param name="activity">What the owner's current session holds.</param>
-    /// <returns>One row per grant.</returns>
-    public static IReadOnlyList<GrantSummary> Of(ApproverActivity activity)
-    {
-        ArgumentNullException.ThrowIfNull(activity);
-
-        return [.. activity.Grants.Select(From).Concat(activity.EnvGrants.Select(From)).OrderBy(grant => grant.SecondsLeft)];
-    }
-
-    /// <summary>Who an env grant is listed as given to.</summary>
-    public const string EnvClient = "keypaste run";
-
-    private static int SecondsOf(TimeSpan remaining) => (int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds));
-}
-
-/// <summary>Asks the owner which grants its current session holds.</summary>
-public sealed record GrantsRequest
-{
-    /// <summary>The vault this connection attached to.</summary>
-    public string Vault { get; init; } = string.Empty;
-
-    /// <summary>The session this connection attached to.</summary>
-    public string Session { get; init; } = string.Empty;
-}
-
-/// <summary>The grants in force, or why none were listed.</summary>
-/// <param name="Answered">Whether the owner admitted the request at all.</param>
-/// <param name="Grants">The grants, soonest to end first.</param>
-/// <param name="Complete">Whether these are all of them; a reply that would not fit one frame drops rows and says so.</param>
-/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
-public sealed record GrantsReply(bool Answered, IReadOnlyList<GrantSummary> Grants, bool Complete, string Reason);
-
-/// <summary>Asks the owner to end grants of its current session.</summary>
-/// <param name="Ids">The ids to end.</param>
-/// <param name="Client">Ends every grant given to this client, or null.</param>
-/// <param name="All">Ends every grant.</param>
-public sealed record RevokeGrantsRequest(IReadOnlyList<string> Ids, string? Client, bool All)
-{
-    /// <summary>The vault this connection attached to.</summary>
-    public string Vault { get; init; } = string.Empty;
-
-    /// <summary>The session this connection attached to.</summary>
-    public string Session { get; init; } = string.Empty;
-}
-
-/// <summary>How many grants were ended, or why none were.</summary>
-/// <param name="Revoked">How many grants ended.</param>
-/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
-public sealed record RevokeGrantsReply(int Revoked, string Reason);
-
 /// <summary>Asks the owner to lock now.</summary>
 public sealed record LockRequest
 {
@@ -439,77 +345,32 @@ public sealed record LockRequest
 /// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
 public sealed record LockReply(bool Locked, string Reason);
 
-/// <summary>Asks the owner for every agent's settings its vault holds, from where an earlier reply ended.</summary>
-public sealed record AccessListRequest
+/// <summary>What a change to this computer's agent rules does to one agent.</summary>
+public enum RulesChangeKind
 {
-    /// <summary>The vault this connection attached to.</summary>
-    public string Vault { get; init; } = string.Empty;
+    /// <summary>Lets it ask to run commands, each run still asked.</summary>
+    RunOn = 0,
 
-    /// <summary>The session this connection attached to.</summary>
-    public string Session { get; init; } = string.Empty;
+    /// <summary>Stops it running commands.</summary>
+    RunOff = 1,
 
-    /// <summary>How many of the listing's rows the requester already has; the reply starts after them.</summary>
-    public int From { get; init; }
+    /// <summary>Forgets it, which turns its run off.</summary>
+    Remove = 2,
+
+    /// <summary>Sets its own rule for one category to Ask, Block or what Settings sets, never to more without asking; the target is <c>category=rule</c>.</summary>
+    Set = 3,
+
+    /// <summary>Forgets one of its Always allow answers or picks; the target is the answer's key.</summary>
+    Forget = 4,
 }
 
-/// <summary>One agent's settings as the owner reads them from its vault.</summary>
-/// <param name="Name">The agent's name, or <c>*</c>.</param>
-/// <param name="Record">Its ACAF record as keypaste reads it: a part not understood is written at its narrowest.</param>
-/// <param name="Understood">Whether all of the record was understood; one that was not applies only beneath the defaults.</param>
-/// <param name="ProjectsNotShown">
-/// How many project rows <paramref name="Record"/> leaves out because the whole record would not fit one
-/// reply; none for a whole record.
-/// </param>
-public sealed record AccessRow(string Name, string Record, bool Understood, int ProjectsNotShown = 0);
-
-/// <summary>The agents' settings the vault holds, or why none were listed.</summary>
-/// <param name="Answered">Whether the owner admitted the request at all.</param>
-/// <param name="Agents">Each record, by name; a name with two records is listed twice.</param>
-/// <param name="Complete">
-/// Whether the listing ends with these; a reply that would not fit one frame carries the rows that do,
-/// and the rest are asked for from after them.
-/// </param>
-/// <param name="Reason">keypaste's own words for a refusal, or for records that apply only beneath the defaults; otherwise empty.</param>
-public sealed record AccessListReply(bool Answered, IReadOnlyList<AccessRow> Agents, bool Complete, string Reason);
-
-/// <summary>
-/// Asks the owner to change one agent's settings, in <see cref="AccessEdit"/>'s words, which the owner
-/// reads again itself. A change that gives the agent nothing more applies at once; any other is put to
-/// the person.
-/// </summary>
-/// <param name="Agent">The agent's name, or <c>*</c>.</param>
-/// <param name="Reason">The requester's own reason, untrusted, or empty.</param>
-public sealed record AccessChangeRequest(string Agent, string Reason)
+/// <summary>Asks the owner to change one agent in this computer's rules, which only the owner can seal.</summary>
+/// <param name="Agent">The agent's name, its bridge's <c>--client-label</c>.</param>
+/// <param name="Change">What changes.</param>
+public sealed record RulesChangeRequest(string Agent, RulesChangeKind Change)
 {
-    /// <summary>The longest reason a request may carry, as long as a credential request's.</summary>
-    public const int MaximumReasonLength = CredentialRequestRules.MaximumReasonLength;
-
-    /// <summary>Where the request says it came from: <see cref="AccessOrigin.Terminal"/> or <see cref="AccessOrigin.Agent"/>, which names its reason. A claim, never proof.</summary>
-    public AccessOrigin Origin { get; init; }
-
-    /// <summary>The row a mode and a limit apply to, or null.</summary>
-    public string? Project { get; init; }
-
-    /// <summary>The mode, or null.</summary>
-    public string? Mode { get; init; }
-
-    /// <summary>What the agent may see, or null.</summary>
-    public IReadOnlyList<string>? See { get; init; }
-
-    /// <summary><c>yes</c> or <c>no</c>, or null.</summary>
-    public string? Values { get; init; }
-
-    /// <summary><c>on</c> or <c>off</c>, or null.</summary>
-    public string? Run { get; init; }
-
-    /// <summary>An hourly limit or <c>none</c>, or null.</summary>
-    public string? PerHour { get; init; }
-
-    /// <summary>When Automatic stops or <c>none</c>, or null.</summary>
-    public string? Until { get; init; }
-
-    /// <summary>Whether the change starts from the defaults, or with a project removes its row.</summary>
-    public bool Reset { get; init; }
+    /// <summary>What a <see cref="RulesChangeKind.Set"/> or <see cref="RulesChangeKind.Forget"/> names, otherwise empty.</summary>
+    public string Target { get; init; } = string.Empty;
 
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
@@ -518,24 +379,13 @@ public sealed record AccessChangeRequest(string Agent, string Reason)
     public string Session { get; init; } = string.Empty;
 }
 
-/// <summary>What became of a requested change to an agent's settings.</summary>
-/// <param name="Decision">Whether it took effect.</param>
-/// <param name="Method">How: <see cref="AuditMethod.Narrowing"/> applied at once, <see cref="AuditMethod.Prompt"/> for the person's answer, or a refusal's method.</param>
+/// <summary>What became of a change to this computer's agent rules.</summary>
+/// <param name="Changed">Whether the rules now hold it, sealed.</param>
 /// <param name="Reason">keypaste's own words.</param>
-public sealed record AccessChangeReply(AuditDecision Decision, AuditMethod Method, string Reason)
+public sealed record RulesChangeReply(bool Changed, string Reason)
 {
-    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
-    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    /// <summary>Whether the owner recorded the change in its log.</summary>
     public bool Recorded { get; init; }
-
-    /// <summary>
-    /// Why the change does not apply on this computer as asked, in keypaste's own words: what refused it,
-    /// or what keeps a change the person confirmed from applying here; null when it applies. Never sent.
-    /// </summary>
-    internal string? Unapplied { get; init; }
-
-    /// <summary>Where a reset set an unreadable <c>clients.toml</c> aside; null for every other change. Never sent.</summary>
-    public string? Kept { get; init; }
 }
 
 /// <summary>
@@ -680,9 +530,6 @@ public sealed record RunRequest
 /// <param name="Reason">keypaste's own words.</param>
 public sealed record RunReply(EnvResolved Set, AuditMethod Method, string Reason)
 {
-    /// <summary>How long the grant that served or was given lasts, in seconds; zero for "allow once".</summary>
-    public int GrantedSeconds { get; init; }
-
     /// <summary>Each entry released or asked about, as <see cref="ApprovalPrompt.Shown"/> writes it.</summary>
     public IReadOnlyList<string> Entries { get; init; } = [];
 

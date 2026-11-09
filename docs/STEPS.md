@@ -8,25 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.76 — Let the person pick the item an agent asked for.** Needs: none. Worked first after K and B (founder, 2026-11-03, D-0684). Built, with F.77 (Once or Always, founder-selected 2026-11-07), on branch `f76-picker` and not merged: both merge with F.78 to F.80 once those are built there, and their records are on that branch.
-  - People keep two items for one website, and an agent's request that more than one item answers to is refused with "more than one item answers to that name" (`CredentialFailure.Ambiguous`, `VaultCredentialSource`), so the agent is left to guess another name. Instead, the app says the agent is requesting a credential and asks the person to pick one.
-  - The picker is not closed to the person: each item that answers shows its title, group, username, URL and the field the agent asked for, so the person sees the field they are picking, its value masked as everywhere else.
-  - It is the agent's prompt, keeping the prompt's rules (D-0326, D-0456, D-0634): no default, focus on Deny, the allows disarmed for a second and a fixed layout. Exactly the picked item's one field is released, and the owner's log names that item.
-  - Accepted when tests on the request path show a request two items answer to opening the picker, the picked item's field released and logged, Deny and a lock releasing nothing, and a request one item answers to unchanged.
-
-- [ ] **F.78 — Make an agent's settings what the person always allowed.** Needs: F.76 and F.77 on branch `f76-picker`, where it is built. Founder, 2026-11-07; built on F.77's and F.76's branch, merged with them ([F.77](steps/F.77.md)).
-  - A value request offers Deny, Allow once and Always allow, the last for this item or for everything this agent asks; the picker's Always allow remembers the pick for that name. A command offers Deny, Allow once or always allowing this agent to run commands. Production (an item's own tag `prod`, `production`, `prod-…`, `production-…`) is asked every time with Allow once only. Each always takes effect after the person confirms it and is logged as its own kind.
-  - An agent's page holds only what is always allowed, each with Remove, and whether it may run commands. Modes, Can see patterns, project rows, limits, Give values and this computer's ceilings are removed, with F.77's third mode, Always allowed rows in the vault and ACAF v1.2. Every agent sees item names, never values.
-  - What is always allowed lives in this computer's app configuration, never the vault, so a synced or edited vault releases nothing more. Agent records already in a vault are ignored and left in place. ACAF v1 and v1.1 stay published as written and say keypaste no longer uses them; PRODUCT is amended, dated, where v1.12 made ACAF the storage format and where the commands law and T-35 describe what changed.
-  - Accepted when tests on the request path show each choice's release and log, a confirmation needed before an always holds, Remove asking again, production asked under every always, a lock releasing nothing, and a vault carrying an agent record releasing nothing unasked.
-- [ ] **F.79 — Let an agent ask the person to save a value.** Needs: F.78. Founder, 2026-11-07, for 1.0.0.
-  - An agent names where a value belongs (project or item, field or variable name) and why; the app asks the person to type or paste the value, shows where it will go, and saves it only on their action. The agent never receives the value, only whether it was saved, and the request is logged. It keeps the prompts' rules: no default, focus on Cancel, the save disarmed for a second, a fixed layout.
-  - PRODUCT is amended, dated, since agents organizing the vault (T7) otherwise follows 1.0.0.
-  - Accepted when tests show a saved value reaching the named place and never the agent, a cancel or lock saving nothing, and an existing value replaced only after the person confirms it.
-- [ ] **F.80 — Let a request wait its turn.** Needs: F.78. Founder, 2026-11-07.
-  - A request arriving while a prompt is open waits its turn instead of being refused as busy, so two tabs of one agent are each answered. A looping agent cannot pile prompts up: the founder settles the bound before it is built, with a few waiting per agent and the refusal cooldown as the starting proposal.
-  - Accepted when tests show two concurrent requests each prompted in order, a cancelled or timed-out request leaving the queue, a lock emptying it, and the bound holding.
-
 ## T5 — Desktop delivery
 
 The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.

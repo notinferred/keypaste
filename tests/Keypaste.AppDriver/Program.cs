@@ -45,7 +45,7 @@ namespace Keypaste.AppDriver;
 /// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
-/// comes down, and the lines <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> and <c>close</c> click its buttons through
+/// comes down, and the lines <c>once</c>, <c>always</c>, <c>allow</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
 /// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
 /// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in
@@ -104,7 +104,6 @@ internal static class Program
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
         "       trash-restore <vault> <title>\n" +
-        "       trash-restore-as <vault> <title>\n" +
         "       revision-restore <vault> <entry-path> <row | oldest>\n" +
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
@@ -124,7 +123,7 @@ internal static class Program
         "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
         "             unsaved-edit <entry-path> <password>, unsaved-move <entry-path> <group-path>, unsaved-delete <entry-path>,\n" +
         "             unsaved-rename <group-path> <name>, write-open <file>, and with the app's own\n" +
-        "             prompt: approve, once, always, allow, deny, close, show-prompt; activity, revoke <n | all>;\n" +
+        "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
@@ -191,7 +190,6 @@ internal static class Program
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
                 ["trash-restore", var vault, var title] => await driver.RestoreRecycledAsync(vault, title).ConfigureAwait(true),
-                ["trash-restore-as", var vault, var title] => await driver.RestoreRecycledAsAsync(vault, title).ConfigureAwait(true),
                 ["revision-restore", var vault, var entry, var row] => await driver.RestoreRevisionAsync(vault, entry, row).ConfigureAwait(true),
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
@@ -875,26 +873,6 @@ internal sealed class Driver(string home)
             return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
         });
 
-    /// <summary>Presses Restore and, once it is refused for a taken name, the Restore as it offers.</summary>
-    internal Task<int> RestoreRecycledAsAsync(string vault, string title) =>
-        WithTrashAsync(vault, title, trash =>
-        {
-            Press(trash.RestoreCommand, "Restore");
-
-            if (trash.Error is null)
-            {
-                throw new DriverException($"Restore put '{title}' back under its own name, so nothing offered another");
-            }
-
-            if (!trash.OffersRestoreAs)
-            {
-                return Refused(trash.Error);
-            }
-
-            Press(trash.RestoreAsCommand, "Restore as");
-            return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
-        });
-
     private async Task<int> WithTrashAsync(string vault, string title, Func<TrashViewModel, int> act)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
@@ -1365,9 +1343,6 @@ internal sealed class Driver(string home)
                     Unpair(authority, command["unpair ".Length..]);
                     break;
 
-                case ["revoke", var which]:
-                    Revoke(authority, which);
-                    break;
 
                 case ["show-prompt"]:
                     Console.Out.WriteLine(await (screen ?? throw new DriverException("show-prompt needs the app's own prompt"))
@@ -1410,7 +1385,7 @@ internal sealed class Driver(string home)
                     await agents.ChangeAsync(label, change).ConfigureAwait(true);
                     break;
 
-                case [("approve" or "once" or "always" or "allow" or "deny" or "close") and var answer]:
+                case [("once" or "always" or "allow" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;
@@ -1491,11 +1466,6 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine($"waiting n={row.Number} {Describe(row)}");
         }
 
-        foreach (var row in model.Grants)
-        {
-            Console.Out.WriteLine($"grant n={row.Number} {Describe(row)}");
-        }
-
         // What Agents › History draws, read by that screen's own view model, which shows the whole file.
         using var history = new LogViewModel(home, agentsOnly: true);
 
@@ -1510,25 +1480,6 @@ internal sealed class Driver(string home)
         }
 
         Console.Out.WriteLine("activity end");
-    }
-
-    /// <summary>Presses End on one listed allowance, or End all.</summary>
-    private void Revoke(AppAuthority authority, string which)
-    {
-        using var model = OpenActivity(authority);
-
-        if (which == "all")
-        {
-            Press(model.EndAllCommand, "End all");
-        }
-        else
-        {
-            var row = model.Grants.SingleOrDefault(grant => grant.Number.ToString(CultureInfo.InvariantCulture) == which)
-                ?? throw new DriverException($"Agents lists no allowance {which}");
-            model.EndCommand.Execute(row);
-        }
-
-        Console.Out.WriteLine($"revoked {which}, {model.Grants.Count} left");
     }
 
     /// <summary>Presses Show the prompt on Agents, on the prompt's display thread, as the person's click does.</summary>
@@ -1707,14 +1658,10 @@ internal sealed class Driver(string home)
         internal async Task ShowSettingsAsync(string label)
         {
             var settings = await SettingsAsync(label).ConfigureAwait(true);
-            settings.Read();
-            string Chosen(IReadOnlyList<SettingChoice> choices) => choices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none";
+            settings.Refresh();
 
             Console.Out.WriteLine(
-                $"settings agent={settings.Agent} mode={Chosen(settings.ModeChoices)} values={Chosen(settings.ValueChoices)} " +
-                $"run={Chosen(settings.RunChoices)} see={settings.SeePattern} " +
-                $"rows={string.Join(',', settings.Rows.Select(row => $"{row.Name}:{Chosen(row.Modes)}"))} " +
-                $"held={(settings.IsHeldBack ? settings.HeldBack : "none")}" +
+                $"settings agent={settings.Agent} run={settings.RunChoices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none"}" +
                 (settings.HasProblem ? $" problem={settings.Problem}" : string.Empty));
         }
 
@@ -1722,31 +1669,15 @@ internal sealed class Driver(string home)
         internal async Task ChangeAsync(string label, string[] change)
         {
             var settings = await SettingsAsync(label).ConfigureAwait(true);
-            var changing = change switch
+
+            if (change is not ["run", var word])
             {
-                [("mode" or "values" or "run") and var setting, var word] => settings.ChooseAsync(Offered(settings, setting, word, null)),
-                ["see", var selectors] => See(settings, selectors),
-                ["row", var scope] => AddRow(settings, scope),
-                ["row-mode", var scope, var word] => settings.ChooseAsync(Offered(settings, "mode", word, scope)),
-                ["use-vault"] => settings.UseVaultAsync(),
-                _ => throw new DriverException($"setting does not understand '{string.Join(' ', change)}'"),
-            };
+                throw new DriverException($"setting does not understand '{string.Join(' ', change)}'");
+            }
 
-            _ = changing.ContinueWith(_ => Console.Out.WriteLine($"setting-done {settings.Message}"), TaskScheduler.Default);
-        }
-
-        private static Task See(AgentSettingsViewModel settings, string selectors)
-        {
-            settings.SeePattern = selectors;
-            return settings.ApplySeeAsync();
-        }
-
-        private static Task AddRow(AgentSettingsViewModel settings, string scope)
-        {
-            settings.NewRowScope = settings.NewRowScopes.Contains(scope, StringComparer.Ordinal)
-                ? scope
-                : throw new DriverException($"the settings offer no new row for {scope}");
-            return settings.AddRowAsync();
+            settings.ChooseCommand.Execute(settings.RunChoices.FirstOrDefault(choice => string.Equals(choice.Word, word, StringComparison.Ordinal))
+                ?? throw new DriverException($"the settings offer no run {word}"));
+            Console.Out.WriteLine($"setting-done {settings.Message}");
         }
 
         /// <summary>The settings open on a row, opened from its disclosure if they are not.</summary>
@@ -1771,22 +1702,6 @@ internal sealed class Driver(string home)
 
             row.IsOpen = true;
             return row.Settings ?? throw new DriverException($"{label}'s settings did not open");
-        }
-
-        private static SettingChoice Offered(AgentSettingsViewModel settings, string setting, string word, string? row)
-        {
-            var choices = row is null
-                ? setting switch
-                {
-                    "mode" => settings.ModeChoices,
-                    "values" => settings.ValueChoices,
-                    _ => settings.RunChoices,
-                }
-                : settings.Rows.FirstOrDefault(listed => string.Equals(listed.Name, row, StringComparison.Ordinal))?.Modes
-                    ?? throw new DriverException($"the settings have no row for {row}");
-
-            return choices.FirstOrDefault(choice => string.Equals(choice.Word, word, StringComparison.Ordinal))
-                ?? throw new DriverException($"the settings offer no {setting} {word}");
         }
 
         private static AgentRow Row(AgentActivityViewModel screen, string key) =>
@@ -1895,7 +1810,7 @@ internal sealed class Driver(string home)
         {
             Console.Out.WriteLine($"asking {prompt.Entry}");
             Console.Out.WriteLine("approved");
-            return ValueTask.FromResult(ApprovalAnswer.Approved);
+            return ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
         }
 
         public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)

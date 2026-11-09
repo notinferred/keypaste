@@ -3,7 +3,7 @@
 # runner at their pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and
 # Claude Desktop on macOS and Windows. It writes those tools' own configuration in the runner account's home, so it
 # refuses to run anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen
-# with keypaste use, so setup pins --vault, --audit-log, --clients and --approver (D-0389), and the bridge is the
+# with keypaste use, so setup pins --vault, --audit-log and --approver (D-0389), and the bridge is the
 # built keypaste.
 #
 # Seeded first: VS Code's, Cursor's and Claude Desktop's files each hold another server and another top-level key,
@@ -23,7 +23,7 @@
 # fix, and changes no tool's configuration, the pinned audit log or the default home's (D-0467).
 # VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. On Linux and macOS, codex
 # sandbox runs a shell from the project folder as docs/safe-agents.md sets Codex: its write inside that folder lands,
-# its appends to ~/.keypaste/clients.toml and to Codex's config.toml are refused and change neither (L.3).
+# its appends to ~/.keypaste/agents.toml and to Codex's config.toml are refused and change neither (L.3).
 # setup --remove --dry-run then finds every registration, so each of keypaste's readers reads the file its tool wrote
 # on this runner, and on Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the
 # seeds. A second connect changes no entry and no backup. Removing leaves no tool listing keypaste and gives each
@@ -168,8 +168,8 @@ header() { sed -n -E "s/^$1 +//p" "$OUT" | head -n 1; }
 
 # The arguments every tool's entry starts the bridge with, labelled with the tool's id.
 expected_args() {
-  jq -cn --arg vault "$PIN_VAULT" --arg audit "$PIN_AUDIT" --arg clients "$PIN_CLIENTS" --arg approver "$PIN_APPROVER" --arg label "$1" \
-    '["mcp", "--vault", $vault, "--audit-log", $audit, "--clients", $clients, "--approver", $approver, "--client-label", $label, "--allow-run", "--expose", "**"]'
+  jq -cn --arg vault "$PIN_VAULT" --arg audit "$PIN_AUDIT" --arg approver "$PIN_APPROVER" --arg label "$1" \
+    '["mcp", "--vault", $vault, "--audit-log", $audit, "--approver", $approver, "--client-label", $label, "--allow-run", "--expose", "**"]'
 }
 
 # The first object in a tool's JSON that names a command and its arguments.
@@ -293,10 +293,9 @@ every_tool 'configured(;|$)' configured
 BRIDGE="$(header 'keypaste mcp')"
 PIN_VAULT="$(header vault)"
 PIN_AUDIT="$(header 'audit log')"
-PIN_CLIENTS="$(header ceilings)"
 PIN_APPROVER="$(header approver)"
-[ -n "$BRIDGE" ] && [ -n "$PIN_AUDIT" ] && [ -n "$PIN_CLIENTS" ] && [ -n "$PIN_APPROVER" ] \
-  || die "setup under a KEYPASTE_HOME of its own did not pin an audit log, ceilings and an approver"
+[ -n "$BRIDGE" ] && [ -n "$PIN_AUDIT" ] && [ -n "$PIN_APPROVER" ] \
+  || die "setup under a KEYPASTE_HOME of its own did not pin an audit log and an approver"
 [ "$PIN_VAULT" = "$CHOSEN" ] || die "setup pinned the vault [$PIN_VAULT], not the chosen [$CHOSEN]"
 for id in $FILE_TOOLS; do
   grep -Eq "^  $id +configured; the original is kept as .*\\.keypaste-backup" "$OUT" || die "setup did not name $id's backup"
@@ -378,7 +377,7 @@ if [ "$platform" != windows ]; then
   sandboxed_append "$WORK/project/sandbox-probe" > "$OUT" 2>&1 \
     || die "Codex's sandbox refused a write inside its workspace, so it did not run as configured: $(cat "$OUT")"
   [ -s "$WORK/project/sandbox-probe" ] || die "Codex's sandbox reported a write inside its workspace that did not land"
-  for target in "$KEYPASTE_DIR/clients.toml" "$CODEX_FILE"; do
+  for target in "$KEYPASTE_DIR/agents.toml" "$CODEX_FILE"; do
     before="$(contents "$target")"
     if sandboxed_append "$target" > "$OUT" 2>&1; then die "Codex's sandbox let a command write $target"; fi
     grep -Eiq 'not permitted|read-only file system|permission denied' "$OUT" \

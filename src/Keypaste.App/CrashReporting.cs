@@ -25,8 +25,8 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>The locked notice an agent's request raises could not be shown.</summary>
     internal const string LockedNoticeSite = "LockedNotice.Show";
 
-    /// <summary>The notice after an Always for could not be shown.</summary>
-    internal const string AlwaysForNoticeSite = "WindowApprovalChannel.Tell";
+    /// <summary>The notice after an Always allow could not be shown.</summary>
+    internal const string AlwaysNoticeSite = "WindowApprovalChannel.Tell";
 
     /// <summary>A prompt window could not be shown, so the request was refused.</summary>
     internal const string PromptSite = "WindowApprovalChannel.Show";

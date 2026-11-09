@@ -715,17 +715,20 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             return;
         }
 
+        _activity = activity;
+
+        // Of an item another shares its name with, only what names this item's UUID is its own.
         var now = _session.Clock.GetUtcNow();
-        var access = activity.Access(Name);
+        var access = activity.Access(Name, byItem: SharesItsName);
         IReadOnlyList<string> tags = [.. Tags.Select(chip => chip.Tag)];
-        ShowsAgentAccess = activity.AgentsCanSee(Name, tags);
+        ShowsAgentAccess = activity.AgentsCanSee(Name, tags, byItem: SharesItsName);
         AgentAccess = access;
         AgentAccessSummary = UseText.Summary(access, activity.Seeing(Name, tags));
         LastUsedText = UseText.LastUsed(access.Use, now);
         AgentLines = UseText.Lines(access, now);
     }
 
-    /// <summary>The Agent access card's detail: each grant in force, then each client that received this entry.</summary>
+    /// <summary>The Agent access card's detail: each client that received this entry.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsAgentAccessSummary))]
     internal partial IReadOnlyList<string> AgentLines { get; private set; } = [];
@@ -795,7 +798,9 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     internal EntryName Name => new(_groupPath, _title) { Uuid = _uuid };
 
-    /// <summary>Whether another item has this name now, so what is recorded under it may be that item's.</summary>
+    private EntryActivity? _activity;
+
+    /// <summary>Whether another item has this name now, so the card reads only what is recorded of this item by its UUID.</summary>
     [ObservableProperty]
     internal partial bool SharesItsName { get; private set; }
 
@@ -808,7 +813,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <param name="nothingTells">Whether nothing the list draws tells them apart.</param>
     internal void ShowSharedName(bool shared, bool nothingTells)
     {
+        var changed = SharesItsName != shared;
         SharesItsName = shared;
+
+        if (changed && _activity is { } activity)
+        {
+            Apply(activity);
+        }
+
         NothingTellsItApart = nothingTells;
         Reference = shared ? null : KpReferences.ForEntry(Name);
         OnPropertyChanged(nameof(Reference));
@@ -1419,7 +1431,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         try
         {
-            PendingTagChange = _session.PreviewTagChange(vault, Name, [tag], adding);
+            PendingTagChange = ProjectTagChange.Preview(vault, Name, [tag], adding);
         }
         catch (VaultException e)
         {

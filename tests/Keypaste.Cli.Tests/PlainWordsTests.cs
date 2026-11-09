@@ -21,7 +21,6 @@ public sealed partial class PlainWordsTests
         ["token", "create"], ["token", "ls"], ["token", "revoke"], ["token", "bundle"],
         ["field", "ls"], ["field", "mv"], ["field", "rm"],
         ["attachment", "ls"], ["attachment", "add"], ["attachment", "replace"], ["attachment", "rm"], ["attachment", "save"],
-        ["grants", "revoke"],
         ["log", "verify"],
         ["share", "ls"], ["share", "revoke"],
     ];
@@ -29,7 +28,7 @@ public sealed partial class PlainWordsTests
     [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?)", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
-    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\bgrants(?=,| revoke| {2,})|\bclients(?= {2,})|(?<=share ls, )clients(?=\r?\n)|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
+    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\bclients(?= {2,})|(?<=share ls, )clients(?=\r?\n)|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
     private static partial Regex Interface();
 
     [Fact]

@@ -64,7 +64,7 @@ public sealed class CurrentStateTests : IDisposable
         await using var agent = await Agent.AttachAsync(this);
 
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
-        Assert.Equal((AuditMethod.GrantCache, "v1"), await agent.RequestAsync(_token));
+        Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
 
         OnScreen(entries =>
         {
@@ -81,7 +81,7 @@ public sealed class CurrentStateTests : IDisposable
         });
 
         Assert.Equal((AuditMethod.Prompt, "v2"), await agent.RequestAsync(_token));
-        Assert.Equal(2, _prompt.Asked);
+        Assert.Equal(3, _prompt.Asked);
     }
 
     public static TheoryData<string> Changes => ["delete", "move", "group-rename"];
@@ -92,7 +92,7 @@ public sealed class CurrentStateTests : IDisposable
     /// </summary>
     [Theory]
     [MemberData(nameof(Changes))]
-    public async Task A_deleted_moved_or_regrouped_entry_is_refused_and_its_grant_is_gone(string change)
+    public async Task A_deleted_moved_or_regrouped_entry_is_refused(string change)
     {
         await using var agent = await Agent.AttachAsync(this);
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
@@ -149,7 +149,7 @@ public sealed class CurrentStateTests : IDisposable
     }
 
     [Fact]
-    public async Task After_an_access_change_no_earlier_grant_releases_anything()
+    public async Task After_an_access_change_nothing_earlier_releases_anything()
     {
         await using var agent = await Agent.AttachAsync(this);
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
@@ -189,7 +189,7 @@ public sealed class CurrentStateTests : IDisposable
         await using var agent = await Agent.AttachAsync(this);
         var session = _session.SessionId;
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
-        Assert.Equal((AuditMethod.GrantCache, "v1"), await agent.RequestAsync(_token));
+        Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
 
         using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
         {
@@ -212,7 +212,7 @@ public sealed class CurrentStateTests : IDisposable
 
         Assert.Equal(session, _session.SessionId);
         Assert.Equal((AuditMethod.Prompt, "x"), await agent.RequestAsync(_token));
-        Assert.Equal(2, _prompt.Asked);
+        Assert.Equal(3, _prompt.Asked);
 
         using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal("x", saved.Find(_token)!.Password);
@@ -408,7 +408,6 @@ public sealed class CurrentStateTests : IDisposable
                     Entry = entry,
                     Field = "password",
                     Reason = "deploy",
-                    TtlSeconds = 60,
                     Exposure = ["env/**"],
                     ClientLabel = TempVault.Agent,
                     Vault = _vault,
@@ -454,7 +453,7 @@ public sealed class CurrentStateTests : IDisposable
         public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {
             await AnswerAsync(cancellationToken).ConfigureAwait(false);
-            return ApprovalAnswer.Approved;
+            return ApprovalAnswer.ApprovedOnce;
         }
 
         public async ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)

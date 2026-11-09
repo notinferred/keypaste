@@ -87,7 +87,7 @@ public sealed class HardwareKeyVaultHeldByTheAppTests : IDisposable
     public async Task Run_session_starts_the_child_with_the_set_the_app_released_and_asks_no_password()
     {
         using var key = new HardwareKey(_device, 2);
-        await using var owner = UnlockedOwner.Start(_harness, _pipe, _master, ApprovalAnswer.Approved, key);
+        await using var owner = UnlockedOwner.Start(_harness, _pipe, _master, ApprovalAnswer.ApprovedOnce, key);
 
         using (Hold())
         {

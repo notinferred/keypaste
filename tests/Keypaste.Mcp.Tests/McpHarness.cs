@@ -65,9 +65,6 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>Where this bridge records the calls no owner recorded.</summary>
     internal string AuditPath => KeypasteHome.AuditPath(_directory);
 
-    /// <summary>The ceilings a server in its own home lowers.</summary>
-    internal string ClientsPath => KeypasteHome.ClientsPath(_directory);
-
     /// <summary>Where the started bridge looks for the app open and locked on its vault, or null before it starts.</summary>
     internal string? LockedAppName => _options?.LockedAppName;
 
@@ -183,7 +180,8 @@ internal sealed class McpHarness : IAsyncDisposable
                 ? new ListEntryNamesTool(Source, options, _audit)
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
-        serverOptions.ToolCollection.Add(new RequestAccessChangeTool(options, _approver, _audit, Clock));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit, attachments: true));
+        serverOptions.ToolCollection.Add(new SaveValueTool(options, _approver, _audit));
 
         if (options.AllowRun)
         {

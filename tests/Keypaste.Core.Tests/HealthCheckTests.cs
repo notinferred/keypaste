@@ -303,12 +303,12 @@ public sealed class HealthCheckTests : IDisposable
     }
 
     [Fact]
-    public void Each_settings_file_that_does_not_parse_says_how_to_fix_it_and_clients_toml_is_never_to_be_deleted()
+    public void Each_settings_file_that_does_not_parse_says_how_to_fix_it()
     {
         var home = KeypasteHomeDirectory;
         Directory.CreateDirectory(home);
         File.WriteAllText(KeypasteHome.SettingsPath(home), "idle_timeout_seconds = 900\n");
-        File.WriteAllText(KeypasteHome.ClientsPath(home), "this is not toml\n");
+        File.WriteAllText(KeypasteHome.AgentsPath(home), "this is not toml\n");
         File.WriteAllText(KeypasteHome.RecentPath(home), "[[vault]]\nthis is not a pair at all\n");
         File.WriteAllText(KeypasteHome.ProjectsPath(home), "{");
         File.WriteAllText(KeypasteHome.RecommendationsPath(home), "[]");
@@ -316,7 +316,7 @@ public sealed class HealthCheckTests : IDisposable
 
         var findings = SettingsReading.Findings(SettingsReading.ReadAll(home));
 
-        Assert.Equal(["app.toml", "clients.toml", "recent.toml", "projects.json", "recommendations.json", "policy.toml"], findings.Select(finding => finding.Subject));
+        Assert.Equal(["app.toml", "agents.toml", "recent.toml", "projects.json", "recommendations.json", "policy.toml"], findings.Select(finding => finding.Subject));
         Assert.All(findings, finding => Assert.Equal(HealthArea.Settings, finding.Area));
 
         var app = Of("app.toml");
@@ -325,12 +325,11 @@ public sealed class HealthCheckTests : IDisposable
         Assert.Equal(KeypasteHome.SettingsPath(home), app.Where);
         Assert.Equal("fix line 1, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences", app.Fix);
 
-        var clients = Of("clients.toml");
-        Assert.Equal(HealthStatus.Fix, clients.Status);
-        Assert.StartsWith("line 1: ", clients.Says, StringComparison.Ordinal);
-        Assert.EndsWith("; agents are refused until it is fixed", clients.Says, StringComparison.Ordinal);
-        Assert.Equal($"fix line 1 of {KeypasteHome.ClientsPath(home)}, and keep the file: it holds this computer's limits on every agent", clients.Fix);
-        Assert.DoesNotContain("delete", clients.Fix, StringComparison.OrdinalIgnoreCase);
+        var agents = Of("agents.toml");
+        Assert.Equal(HealthStatus.Fix, agents.Status);
+        Assert.StartsWith("line 1: ", agents.Says, StringComparison.Ordinal);
+        Assert.EndsWith("; agents are refused until it is fixed", agents.Says, StringComparison.Ordinal);
+        Assert.Equal($"fix line 1 of {KeypasteHome.AgentsPath(home)}, or delete it to ask about every value again", agents.Fix);
 
         var recent = Of("recent.toml");
         Assert.StartsWith("line 2: ", recent.Says, StringComparison.Ordinal);
@@ -351,7 +350,7 @@ public sealed class HealthCheckTests : IDisposable
             },
             Of("recommendations.json"));
         Assert.Equal(
-            new HealthFinding(HealthArea.Settings, "policy.toml", HealthStatus.Note, "keypaste no longer reads it; agents' settings are kept in the vault") { Where = KeypasteHome.PolicyPath(home) },
+            new HealthFinding(HealthArea.Settings, "policy.toml", HealthStatus.Note, "keypaste no longer reads it; agents' rules are kept in agents.toml") { Where = KeypasteHome.PolicyPath(home) },
             Of("policy.toml"));
 
         HealthFinding Of(string subject) => findings.Single(finding => finding.Subject == subject);
@@ -367,10 +366,10 @@ public sealed class HealthCheckTests : IDisposable
             SettingsReading.Findings(SettingsReading.ReadAll(home)));
 
         Assert.True(AppSettings.Save(KeypasteHome.SettingsPath(home), AppSettings.Default));
-        File.WriteAllText(KeypasteHome.ClientsPath(home), string.Empty);
+        File.WriteAllText(KeypasteHome.AgentsPath(home), string.Empty);
 
         Assert.Equal(
-            [new HealthFinding(HealthArea.Settings, "settings", HealthStatus.Ok, "app.toml and clients.toml parse")],
+            [new HealthFinding(HealthArea.Settings, "settings", HealthStatus.Ok, "app.toml and agents.toml parse")],
             SettingsReading.Findings(SettingsReading.ReadAll(home)));
     }
 

@@ -17,12 +17,12 @@ readonly MASTER='ci-approval-master-pw'
 readonly SECRET='SENTINEL-E2E-PASSWORD-7c31f9'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
-# One entry with an env-named custom field, which may leave by name, and one that never does (C.5a).
+# One entry with two custom fields, each asked about by name, and the TOTP seeds and capitalized standard names refused (C.5a).
 readonly API_ENTRY='api/OpenAI'
 readonly API_PASSWORD='SENTINEL-E2E-OPENAI-PASSWORD-2b8d41'
 readonly API_KEY='SENTINEL-E2E-OPENAI-API-KEY-9e0c57'
 readonly RECOVERY='SENTINEL-E2E-RECOVERY-CODES-4f6a13'
-readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.'
+readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or the name of one of the item'\''s custom fields. This call was recorded in the audit log.'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AGENT_ERR OUT ERR'
@@ -93,7 +93,7 @@ ERR="$WORK/no-agent-stderr.txt"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci probe with no agent\",\"ttl_seconds\":60}}}"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci probe with no agent\"}}}"
   await_replies 5 "$OUT" 2 || true
 } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero with no agent running"
@@ -105,10 +105,10 @@ grep -q 'keypaste approve' "$OUT" || die "the no-agent refusal does not name the
 grep -q "$SECRET" "$OUT" && die "a credential was returned with no agent running"
 
 # --------------------------------------------------------------------------- start the approver
-# The master password first, then one answer per request: h, then d. The second request comes from
+# The master password first, then one answer per request: o, then d. The second request comes from
 # a new bridge, so a new connection, and is asked again. ConsoleSecretPrompt reads redirected input
 # one byte at a time precisely so this works.
-printf '%s\nh\nd\no\nd\n' "$MASTER" \
+printf '%s\no\nd\no\nd\n' "$MASTER" \
   | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -126,7 +126,7 @@ ask() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci approval probe\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci approval probe\"}}}"
     await_replies 8 "$out" "$id" || true
   } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
@@ -146,8 +146,8 @@ jq -e --arg s "$SECRET" 'select(.id == 2) | .result.structuredContent.value == $
   || die "the structured result does not carry the released value"
 
 # -------------------------------------------------------------------------------- the no path
-# A second bridge, so a second connection: the first one's grant belongs to a process that has
-# gone, which is exactly what makes this a fresh question rather than a cache hit.
+# A second bridge, so a second connection: the first one's process has
+# gone.
 OUT="$WORK/deny-stdout.txt"
 ERR="$WORK/deny-stderr.txt"
 ask 3 "$OUT" "$ERR"
@@ -166,7 +166,7 @@ ask_field() {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     jq -cn --argjson id "$id" --arg entry "$API_ENTRY" --arg field "$field" \
-      '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci custom field probe",ttl_seconds:60}}}'
+      '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci custom field probe"}}}'
     await_replies "$wait" "$out" "$id" || true
   } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --expose 'api/**' \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
@@ -183,7 +183,7 @@ for other in "$API_PASSWORD" "$RECOVERY" "$SECRET"; do
 done
 
 id=5
-for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+for field in otp TimeOtp-Secret TimeOtp-Secret-Base32 URL; do
   OUT="$WORK/refused-$id-stdout.txt"
   ERR="$WORK/refused-$id-stderr.txt"
   ask_field "$id" "$field" "$OUT" "$ERR" 3

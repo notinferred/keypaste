@@ -530,7 +530,7 @@ exercise() {
   intact "$db" archive/database-old
   refused "the app moving onto an occupied name" "$db" app relocate "$db" hosts/cache archive occupied
 
-  step "[$kind] delete and recover: the CLI recycles, the app restores; the app deletes and restores; the app restores under another title a name KeePassXC took"
+  step "[$kind] delete and recover: the CLI recycles, the app restores; the app deletes and restores; the app restores beside an item KeePassXC gave its name"
   did "keypaste rm" kp_cli "$db" rm archive/database-old --yes
   listed=$(kx ls "$db" -R -f)
   grep -qx 'Recycle Bin/database-old' <<<"$listed" || die "KeePassXC does not find the entry in its recycle bin"
@@ -543,16 +543,12 @@ exercise() {
   expect "$db" hosts/cache Password c-1
   did "keypaste rm" kp_cli "$db" rm archive/occupied --yes
   kx add "$db" archive/occupied -u kpxc >/dev/null || die "KeePassXC could not add an entry"
-  refused "the app restoring onto a name KeePassXC took" "$db" app trash-restore "$db" occupied
-  did "the app's restore under another title" app trash-restore-as "$db" occupied
-  expect "$db" "archive/occupied (restored)" Password o-1
-  [ "$(uuid_at "$db" "archive/occupied (restored)")" = "$(uuid occupied)" ] \
-    || die "KeePassXC finds another entry than the deleted one at 'archive/occupied (restored)'"
-  [ "$(revisions_at "$db" "archive/occupied (restored)")" = 1 ] \
-    || die "the restore under another title did not keep exactly the one revision the entry was deleted with"
-  expect "$db" archive/occupied UserName kpxc
+  did "the app's restore beside the item KeePassXC added" app trash-restore "$db" occupied
   listed=$(kx ls "$db" -R -f)
+  [ "$(grep -cx 'archive/occupied' <<<"$listed")" = 2 ] || die "KeePassXC does not find both items called archive/occupied"
   grep -qx 'Recycle Bin/occupied' <<<"$listed" && die "KeePassXC still finds the restored entry in its recycle bin"
+  [ "$(revisions "$db" "$(uuid occupied)")" = 1 ] \
+    || die "the restore did not keep exactly the one revision the entry was deleted with"
   intact "$db" archive/database-old
 
   step "[$kind] backup: the app restores the backup that holds KeePassXC's bytes, and exports"

@@ -168,8 +168,8 @@ public static class AuditText
             lines.Add($"{UnverifiedMark}  the hash chain does not vouch for this row. Run 'keypaste log verify'.");
         }
 
-        // THREATS.md T-12. A person approved one request and a later one was served from the same
-        // grant under different words; the second reason was never in front of anybody. It is worth
+        // THREATS.md T-12. A person approved one request and a later one was released without asking
+        // under different words; the second reason was never in front of anybody. It is worth
         // a mark precisely because nothing else about such a line looks unusual.
         if (entries.Any(e => e.ReasonUnread))
         {

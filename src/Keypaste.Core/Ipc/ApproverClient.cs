@@ -190,7 +190,11 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+        var frame = await ExchangeAsync(
+            ApproverProtocol.Encode(request),
+            cancellationToken,
+            withdrawable: true,
+            replyFrameBytes: request.Attachment is null ? MessageFramer.MaximumFrameBytes : ApproverProtocol.MaximumAttachmentReplyFrameBytes).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out CredentialReply? reply) ? reply : null;
     }
@@ -210,34 +214,6 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
 
-    /// <summary>Asks for the grants the owner's current session holds.</summary>
-    /// <param name="request">The attachment it is made under.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
-    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public async ValueTask<GrantsReply?> GrantsAsync(GrantsRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
-
-        return frame is not null && ApproverProtocol.TryDecode(frame, out GrantsReply? reply) ? reply : null;
-    }
-
-    /// <summary>Asks the owner to end grants.</summary>
-    /// <param name="request">Which grants, and the attachment it is made under.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
-    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public async ValueTask<RevokeGrantsReply?> RevokeGrantsAsync(RevokeGrantsRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
-
-        return frame is not null && ApproverProtocol.TryDecode(frame, out RevokeGrantsReply? reply) ? reply : null;
-    }
-
     /// <summary>Asks the owner to lock now.</summary>
     /// <param name="request">The attachment it is made under.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
@@ -252,32 +228,30 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out LockReply? reply) ? reply : null;
     }
 
-    /// <summary>Asks the owner for every agent's settings its vault holds.</summary>
-    /// <param name="request">The attachment it is made under.</param>
+    /// <summary>Asks the owner to change one agent in this computer's rules, which it seals.</summary>
+    /// <param name="request">The change, and the attachment it is made under.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public async ValueTask<AccessListReply?> ListAccessAsync(AccessListRequest request, CancellationToken cancellationToken)
+    public async ValueTask<RulesChangeReply?> ChangeRulesAsync(RulesChangeRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out AccessListReply? reply) ? reply : null;
+        return frame is not null && ApproverProtocol.TryDecode(frame, out RulesChangeReply? reply) ? reply : null;
     }
 
-    /// <summary>Asks the owner to change one agent's settings, which may wait for the person to confirm it.</summary>
-    /// <param name="request">The change, and the attachment it is made under.</param>
-    /// <param name="cancellationToken">Withdraws the request once it was sent, and any question with it; its reply is still returned.</param>
+    /// <summary>Asks the owner to put an agent's request to save a value to the person.</summary>
+    /// <param name="request">Where the value goes and why, and the attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public async ValueTask<AccessChangeReply?> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken)
+    public async ValueTask<SaveReply?> SaveAsync(SaveRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out AccessChangeReply? reply) ? reply : null;
+        return frame is not null && ApproverProtocol.TryDecode(frame, out SaveReply? reply) ? reply : null;
     }
 
     /// <summary>Asks the owner to make a terminal's edit, which waits for the person to allow it.</summary>

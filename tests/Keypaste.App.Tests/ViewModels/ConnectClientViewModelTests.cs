@@ -202,7 +202,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Under_another_home_the_vault_the_log_the_ceilings_and_the_apps_own_pipe_are_pinned()
+    public async Task Under_another_home_the_vault_the_log_and_the_apps_own_pipe_are_pinned()
     {
         using var model = Model(home: _fixture.Home);
         var session = _sessions[^1];
@@ -212,10 +212,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
         var pins = new McpServerPins(
             _fixture.Path_,
             Core.Audit.KeypasteHome.AuditPath(_fixture.Home),
-            Core.Ipc.ApproverEndpoint.Resolve(null, null, session.Identity),
-            Core.Audit.KeypasteHome.ClientsPath(_fixture.Home));
+            Core.Ipc.ApproverEndpoint.Resolve(null, null, session.Identity));
         Assert.Equal(Plan("claude-code", Registration(_server, pins, "claude-code")), model.Preview);
-        Assert.Contains($"--audit-log {pins.AuditLogPath} --clients {pins.ClientsPath}", model.Preview, StringComparison.Ordinal);
+        Assert.Contains($"--audit-log {pins.AuditLogPath} --approver", model.Preview, StringComparison.Ordinal);
     }
 
     [Fact]

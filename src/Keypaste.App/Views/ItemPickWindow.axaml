@@ -1,0 +1,133 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.ItemPickWindow"
+                    x:DataType="vm:ItemPickViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: an agent is asking for a credential"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- The credential prompt with a list of the items a request names in place of its one field. Every
+       block has a fixed height, the list three rows that scroll past them, so neither the agent's words
+       nor how many items there are move the buttons (THREATS.md T-2). Nothing is picked for the person,
+       no button is the default, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title size-16" Text="{Binding Client}"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="prompt-title size-16" Text=" wants 1 secret" />
+          </Grid>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="prompt-sub size-13" Text="via MCP · label " />
+            <TextBlock Name="LabelText" Classes="prompt-sub size-13" Text="{Binding Label}"
+                       MaxWidth="200" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call size-12" Padding="12,8">
+        <StackPanel>
+          <TextBlock Text="tool: keypaste.request_credential" />
+          <TextBlock Name="EntryText" Classes="value" Text="{Binding Entry}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Spacing="8">
+        <TextBlock Name="InstructionText" Classes="size-13" Text="{Binding Instruction}" Height="20"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <Border Classes="prompt-reason" Height="164" Padding="4">
+          <ListBox Name="Candidates" ItemsSource="{Binding Rows}" SelectedItem="{Binding Picked}" SelectionMode="Single"
+                   IsEnabled="{Binding IsChoosing}"
+                   AutomationProperties.Name="Items that answer to this request">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:PickRow">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Height="44"
+                      AutomationProperties.Name="{Binding Spoken}">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <!-- The mask is of one length whatever the value, which nothing has read: it is read only once the person allows it. -->
+                  <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Classes="caption mono" Text="{Binding Field}" HorizontalAlignment="Right"
+                               MaxWidth="140" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="size-14" Text="••••••••" HorizontalAlignment="Right"
+                               Foreground="{DynamicResource KpTextSecondary}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="The agent says it needs this because" />
+        <Border Classes="prompt-reason" Height="77">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,8" Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
+                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
+                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding Attribution}" />
+      </StackPanel>
+
+      <TextBlock Classes="prompt-note size-13"
+                 Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
+
+      <!-- Each slot keeps its place and width at both steps, so no button moves under the pointer, and the caption keeps its
+           two lines whatever it says (D-0326, T-2). No button is the default. -->
+      <TextBlock Name="CaptionText" Classes="prompt-note size-13" Text="{Binding AlwaysCaption}"
+                 Height="32" TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+      <Grid ColumnDefinitions="Auto,112,112,112,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+        <Button Grid.Column="1" Name="Back" Classes="prompt" Content="Back" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsConfirming}" Command="{Binding BackCommand}" />
+        <Button Grid.Column="2" Name="AlwaysAllow" Classes="prompt" Content="Always allow" HorizontalAlignment="Stretch"
+                IsVisible="{Binding ShowsAlwaysAllow}" Command="{Binding AlwaysAllowCommand}" />
+        <Button Grid.Column="2" Name="ConfirmAlways" Classes="prompt primary" Content="{Binding ConfirmLabel}" HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsConfirming}" Command="{Binding ConfirmAlwaysCommand}" />
+        <Button Grid.Column="3" Name="AlwaysBlock" Classes="prompt" Content="Always block" HorizontalAlignment="Stretch"
+                IsVisible="{Binding ShowsAlwaysBlock}" Command="{Binding AlwaysBlockCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

@@ -124,21 +124,10 @@
             BorderBrush="Transparent"
             Padding="12,8"
             Margin="0,0,0,12">
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
         <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="16" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
         <TextBlock ctl:MachineRuns.InText="True" Grid.Column="1" ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="size-13"
                    Foreground="{DynamicResource KpTextPrimary}" />
-        <!-- When the name is taken, the way back under another one; nothing moves until it is pressed. -->
-        <Button Grid.Column="2"
-                Name="RestoreAsButton"
-                Classes="sm"
-                MaxWidth="320"
-                VerticalAlignment="Center"
-                IsVisible="{Binding OffersRestoreAs}"
-                Command="{Binding RestoreAsCommand}"
-                AutomationProperties.Name="{Binding RestoreAsLabel}">
-          <TextBlock Text="{Binding RestoreAsLabel}" TextTrimming="CharacterEllipsis" />
-        </Button>
       </Grid>
     </Border>
 

@@ -11,11 +11,11 @@
 # may hold other tools of the catalogue, so only the rows of these two are asserted.
 #
 # The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
-# grants` reaches the app with no --vault. Agents finds both tools and offers Connect on each. Cancelling a plan
+# clients` reaches the app with no --vault. Agents finds both tools and offers Connect on each. Cancelling a plan
 # writes nothing. Running it registers exactly the command the plan showed, under the tool's own id, naming no
 # vault and offering run with every item in reach, and the tool's row then says Connected. The check starts that
-# command, which finds the chosen vault, raises the app's prompt for the one item Claude Code's settings let it
-# see, and after Approve the audit file holds a prompted grant naming the app's session and the tool's id.
+# command, which finds the chosen vault, is listed every item, since its registration reaches every item, raises the app's
+# prompt for the item picked, and after Approve the audit file holds a prompted grant naming the app's session and the tool's id.
 # keypaste doctor --json then exits 0, finding the versions, the vault, the app holding it and Claude Code's
 # registration working and noting Cursor as not connected, and changes no byte under the gate's home, the audit
 # file's included (D-0467). On Linux and macOS, keypaste alone, under a pseudo-terminal from `script` with no
@@ -24,8 +24,8 @@
 # chosen, Connect again pins this one with --vault and that bridge still reaches the app. Disconnect leaves the
 # tool listing no keypaste and its row offering Connect. For Cursor, which has no settings of its own, the plan
 # is the one edit of keypaste's entry and Cancel writes nothing; Connect's action changes no byte outside that entry and
-# keeps the seed as the backup, the check is listed only the projects' tagged items, as the defaults give, and
-# asks for the one picked; Disconnect gives back the seed's bytes, leaves the backup alone, and its row offers
+# keeps the seed as the backup, the check is listed every item too and asks
+# for the one picked; Disconnect gives back the seed's bytes, leaves the backup alone, and its row offers
 # Connect again. No configuration ever holds the master password, a keyfile, the session or a credential. Once
 # the app has shut down, doctor notes that nothing holds the vault it held and still exits 0.
 #
@@ -187,10 +187,7 @@ for project in alpha beta; do
   printf '%s\n' "$MASTER" | "$CLI" env set "$project" "$(printf '%s' "$project" | tr a-z A-Z)_KEY=$OTHER_SECRET" --vault "$VAULT" >/dev/null 2>&1 \
     || die "could not store project ${project}'s variable"
 done
-# Claude Code sees the one untagged item once a person lets it see env/ci/**, confirmed at keypaste approve's
-# terminal before the app holds the vault; Cursor, with no settings of its own, sees only the tagged ones,
-# however wide its connection is registered.
-agent_settings "$CLI" "$VAULT" "$MASTER" "$CLAUDE --see env/ci/**" || die "could not save $CLAUDE's settings in the vault"
+# Every agent is listed each item its registration reaches, and a registration from Connect reaches every item.
 
 exec 7>&-
 exec 7> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -202,8 +199,8 @@ FIRST="$(session_of)"
 # ------------------------------------------ the first unlock chose the vault, and the CLI uses it unnamed
 CHOSEN="$(env -u KEYPASTE_VAULT "$CLI" use 2>&1 | tr -d '\r\357\273\277')" || die "keypaste use printed no chosen vault: [$CHOSEN]"
 same_file "$CHOSEN" "$VAULT" || die "the first unlock chose [$CHOSEN], not the vault it unlocked [$VAULT]"
-GRANTS="$(env -u KEYPASTE_VAULT "$CLI" grants 2>&1)" || die "keypaste grants with no --vault failed: $GRANTS"
-case "$GRANTS" in *"nothing holds"*) die "keypaste grants with no --vault did not reach the app holding the chosen vault: $GRANTS" ;; esac
+LISTED="$(env -u KEYPASTE_VAULT "$CLI" clients 2>&1)" || die "keypaste clients with no --vault failed: $LISTED"
+case "$LISTED" in *"nothing holds"*) die "keypaste clients with no --vault did not reach the app holding the chosen vault: $LISTED" ;; esac
 
 # ----------------------------------------------- Agents finds both tools; a cancelled plan writes nothing
 expect_state "$CLAUDE" connect "before Connect"
@@ -234,10 +231,12 @@ case "$(last_message)" in Connected.*) ;; *) die "Connect's action did not conne
 clean_config "$CONFIG"
 
 # ----------------------------------- the check reaches the app's prompt through the registered bridge
-say '^prompt client' check
+say '^check-entry n=4' check
+grep -qx 'check-entry n=1 env/ci/DEPLOY_KEY' "$HOLD_OUT" || die "the picker does not list the untagged item"
+say '^prompt client' pick 1
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CLAUDE entry=env/ci/DEPLOY_KEY field=password" \
-  || die "the prompt does not show the check, the tool's id and the one item its settings let it see"
-say '^check end' approve
+  || die "the prompt does not show the check, the tool's id and the item picked"
+say '^check end' once
 case "$(last_check)" in
   "Connected: you approved env/ci/DEPLOY_KEY"*) ;;
   *) die "the check did not report the approval: $(last_check)" ;;
@@ -308,7 +307,8 @@ case "$(last_message)" in Connected.*) ;; *) die "connecting again failed: $(las
 [ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the plan showed"
 clean_config "$CONFIG"
 
-say '^prompt client' check
+say '^check-entry n=4' check
+say '^prompt client' pick 1
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "label=$CLAUDE entry=env/ci/DEPLOY_KEY field=password" \
   || die "the pinned bridge did not reach the app's prompt"
 say '^check end' deny
@@ -376,16 +376,15 @@ without_keypaste "$CURSOR" >"$STRIPPED"
 clean_config "$CURSOR"
 expect_state "$CURSOR_ID" connected "after Connect's action"
 
-# Through a bridge that reaches every item, an agent with no settings is listed the two projects' tagged
-# items, not the untagged ones, and asks for a variable.
-say '^check-entry n=2' check
-grep -qx 'check-entry n=1 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged item"
-grep -qx 'check-entry n=2 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged item"
-grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an item an agent with no settings does not see"
-say '^prompt client' pick 2
+# Through a bridge that reaches every item, the agent is listed every item and asks for a variable.
+say '^check-entry n=4' check
+grep -qx 'check-entry n=3 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged item"
+grep -qx 'check-entry n=4 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged item"
+grep -q '^check-entry n=5' "$HOLD_OUT" && die "the picker lists an item the vault does not hold"
+say '^prompt client' pick 4
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CURSOR_ID entry=env/beta/.env field=BETA_KEY" \
   || die "the prompt is not Cursor's registration asking for the picked item's variable"
-say '^check end' approve
+say '^check end' once
 case "$(last_check)" in
   "Connected: you approved env/beta/.env"*) ;;
   *) die "the check through Cursor's registration did not report the approval: $(last_check)" ;;

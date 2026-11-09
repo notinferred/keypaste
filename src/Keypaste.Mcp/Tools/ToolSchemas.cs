@@ -10,8 +10,8 @@ namespace Keypaste.Mcp.Tools;
 /// The SDK can build a schema by reflecting over a C# method signature, and it compiles perfectly
 /// well under this repository's trim and AOT analysers — that was checked, not assumed (D-0019).
 /// It is still not used here, because of what it generates: no <c>additionalProperties: false</c>,
-/// no enum on <c>field</c>, no bounds on <c>reason</c> or <c>ttl_seconds</c>, no behaviour hints at
-/// all, and <c>ttl_seconds</c> renamed to <c>ttlSeconds</c> because that is what the parameter was
+/// no enum on <c>field</c>, no bounds on <c>reason</c>, no behaviour hints at all, and names taken
+/// from whatever the parameter was
 /// called.
 /// </para>
 /// <para>
@@ -50,26 +50,96 @@ internal static class ToolSchemas
             },
             "field": {
               "type": "string",
-              "anyOf": [
-                { "enum": ["password", "username", "url", "notes", "totp"] },
-                { "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
-              ],
-              "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or one custom field of the item named like an environment variable, such as OPENAI_API_KEY. Never more than one."
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or the exact name of one of the item's custom fields, as list_entry_names gives it, such as OPENAI_API_KEY. Never more than one."
             },
             "reason": {
               "type": "string",
               "minLength": 1,
               "maxLength": 2000,
               "description": "Shown verbatim to the human who approves or denies. Be specific and honest."
-            },
-            "ttl_seconds": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 3600,
-              "description": "How long you would like it for. The person chooses once or an allowance for a set time; a release under an Automatic mode honours this number. A TOTP code lasts only until it changes, whatever you ask."
             }
           },
-          "required": ["entry", "field", "reason", "ttl_seconds"],
+          "required": ["entry", "field", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The arguments of <c>request_save</c>: an item and a field, or a project, an environment and a key, and why.</summary>
+    /// <remarks>The bounds are the owner's, which it applies again; which of the two places is named it checks itself.</remarks>
+    internal const string SaveInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The item's full path, such as work/github; it is created when no item has that path. Give it with field."
+            },
+            "field": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With item: password, or the name of a custom field, such as OPENAI_API_KEY."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "A project, for a variable of one of its environments. Give it with environment and key instead of item and field."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With project: the environment, such as dev or prod."
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "With project: the variable's name, such as DATABASE_URL."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human, who enters the value. Say what the value is and where they will find it."
+            }
+          },
+          "required": ["reason"],
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The arguments of <c>request_attachment</c>: which item, which attachment by name, and why.</summary>
+    /// <remarks>The bounds are <c>CredentialRequestRules</c>'s, which the owner applies again.</remarks>
+    internal const string AttachmentInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The handle from list_entry_names (preferred), or the item's full path."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The attachment's exact name, as the item holds it."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human who approves or denies. Be specific and honest."
+            }
+          },
+          "required": ["entry", "name", "reason"],
           "additionalProperties": false
         }
         """;
@@ -137,65 +207,6 @@ internal static class ToolSchemas
         }
         """;
 
-    /// <summary>The arguments of <c>request_access_change</c>: what to change, and why. No agent's name, since it is always this bridge's own.</summary>
-    /// <remarks>The bounds are <c>AccessChangeRules</c>'s, which the bridge and the owner apply again.</remarks>
-    internal const string AccessChangeInputJson = """
-        {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "type": "string",
-              "enum": ["ask", "allow-for-a-while", "automatic"],
-              "description": "ask: the person is asked every time. allow-for-a-while: asked, and they may allow for an hour. automatic: released without asking, within until and per_hour. With project, for that project or environment only."
-            },
-            "project": {
-              "type": "string",
-              "minLength": 1,
-              "description": "<project> or <project>:<environment>, as an item's project tag names it after env:. Holds only a mode and its limits."
-            },
-            "until": {
-              "type": "string",
-              "minLength": 1,
-              "description": "When automatic ends, after which the person is asked again: a time such as 2026-12-31T18:00:00+02:00, on this computer's clock when it has no offset, or a date such as 2026-12-31, which ends at the close of that day on this computer. Ask for the shortest time your task needs."
-            },
-            "per_hour": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000,
-              "description": "At most this many values released without asking in an hour, after which the person is asked again."
-            },
-            "see": {
-              "type": "array",
-              "items": { "type": "string", "minLength": 1, "maxLength": 128 },
-              "minItems": 1,
-              "maxItems": 16,
-              "description": "Everything this agent may see, in place of what it sees now: a place such as env/**, or a project's variables such as tag:env:billing or tag:env:billing:staging."
-            },
-            "values": {
-              "type": "string",
-              "enum": ["yes", "no"],
-              "description": "yes: request_credential may hand this agent values. no: values go only into commands it runs."
-            },
-            "run": {
-              "type": "string",
-              "enum": ["on", "off"],
-              "description": "on: this agent may ask to run commands with secrets, each approved by the person. off: it may not."
-            },
-            "reason": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 2000,
-              "description": "Shown verbatim to the person who confirms or refuses a change that gives you more. Be specific and honest."
-            }
-          },
-          "required": ["reason"],
-          "additionalProperties": false
-        }
-        """;
-
-    /// <summary>The parsed schema for <c>request_access_change</c>.</summary>
-    internal static readonly JsonElement AccessChangeInput = Parse(AccessChangeInputJson);
-
     /// <summary>The parsed schema for <c>run</c>.</summary>
     internal static readonly JsonElement RunInput = Parse(RunInputJson);
 
@@ -204,6 +215,12 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
+
+    /// <summary><see cref="SaveInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement SaveInput = Parse(SaveInputJson);
+
+    /// <summary><see cref="AttachmentInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement AttachmentInput = Parse(AttachmentInputJson);
 
     /// <summary>
     /// Detaches the element from its document, so the parsed schema outlives the parse without
