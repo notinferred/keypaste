@@ -24,15 +24,18 @@ internal sealed partial class NavItem : ObservableObject
     /// <summary>Whether the row draws a status dot: Agents does, for whether agents can reach this vault.</summary>
     internal bool HasDot { get; init; }
 
-    /// <summary>Whether the dot is green: this app is answering agents for the vault.</summary>
+    /// <summary>Whether the mark is a green dot: this app is answering agents for the vault.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(DotStopped))]
     internal partial bool DotLive { get; set; }
 
-    /// <summary>Whether the dot is red: this app holds the vault and refuses every agent request (D-0494).</summary>
+    /// <summary>Whether the mark is a red diamond: this app holds the vault and refuses every agent request.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(DotStopped))]
     internal partial bool DotDanger { get; set; }
+
+    /// <summary>Whether the mark is a ring: this app is not answering agents for the vault.</summary>
+    internal bool DotStopped => !DotLive && !DotDanger;
 
     /// <summary>Whether the row folds the rows under it: Items does, over the group tree.</summary>
     internal bool IsExpandable { get; init; }

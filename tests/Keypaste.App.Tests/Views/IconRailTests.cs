@@ -3,6 +3,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Platform;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
@@ -214,6 +215,43 @@ public sealed class IconRailTests
         Assert.Equal("Agents · Answering agents · 2 waiting · 1 connected", ToolTip.GetTip(row));
         Assert.Equal("Answering agents · 2 waiting · 1 connected", AutomationProperties.GetHelpText(row));
         Assert.False(Row(shell, DestinationKind.Settings).GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RailAgentsDot").IsEffectivelyVisible);
+    });
+
+    [Theory]
+    [InlineData(720, "RailAgentsDot", PlatformThemeVariant.Dark, ColorContrastPreference.NoPreference)]
+    [InlineData(720, "RailAgentsDot", PlatformThemeVariant.Light, ColorContrastPreference.NoPreference)]
+    [InlineData(720, "RailAgentsDot", PlatformThemeVariant.Dark, ColorContrastPreference.High)]
+    [InlineData(720, "RailAgentsDot", PlatformThemeVariant.Light, ColorContrastPreference.High)]
+    [InlineData(1100, "AgentsDot", PlatformThemeVariant.Dark, ColorContrastPreference.NoPreference)]
+    [InlineData(1100, "AgentsDot", PlatformThemeVariant.Light, ColorContrastPreference.NoPreference)]
+    public Task Agents_draws_a_different_shape_for_each_state_so_it_reads_without_colour(int width, string markName, PlatformThemeVariant variant, ColorContrastPreference contrast) => HeadlessSession.On(() =>
+    {
+        PlatformTheme.Set(variant, contrast);
+        using var shell = new RenderedShell("keypaste-agents-marks-");
+        shell.Window.Width = width;
+        shell.Frame();
+        var agents = Place(shell, DestinationKind.AgentActivity);
+
+        bool[] ShapeWhile(bool live, bool refusing)
+        {
+            agents.DotLive = live;
+            agents.DotDanger = refusing;
+            RenderedShell.Drain();
+            var mark = shell.Root.GetVisualDescendants().OfType<Border>().Single(border => border.Name == markName && border.IsEffectivelyVisible);
+            var frame = shell.Frame();
+            return frame.Shape(frame.Of(mark, shell.Window));
+        }
+
+        var running = ShapeWhile(live: true, refusing: false);
+        var refusing = ShapeWhile(live: false, refusing: true);
+        var stopped = ShapeWhile(live: false, refusing: false);
+
+        // One shape drawn three times differs by 0 pixels; the ring's hole is the smallest real difference.
+        const int leastDifferentPixels = 3;
+        int Difference(bool[] one, bool[] other) => one.Zip(other).Count(pair => pair.First != pair.Second);
+        Assert.True(Difference(running, stopped) >= leastDifferentPixels, $"running and stopped differ by {Difference(running, stopped)} pixels of shape");
+        Assert.True(Difference(running, refusing) >= leastDifferentPixels, $"running and refusing differ by {Difference(running, refusing)} pixels of shape");
+        Assert.True(Difference(stopped, refusing) >= leastDifferentPixels, $"stopped and refusing differ by {Difference(stopped, refusing)} pixels of shape");
     });
 
     [Fact]

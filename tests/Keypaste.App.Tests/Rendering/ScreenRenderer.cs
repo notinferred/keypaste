@@ -390,6 +390,14 @@ public sealed class ScreenRenderer
         shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
         Save(window, output, "50c-items-rail-720");
 
+        var agentsPlace = shell.RailPlaces.Single(place => place.Destination.Kind == DestinationKind.AgentActivity);
+        foreach (var (state, live, refusing) in new[] { ("running", true, false), ("refusing", false, true), ("stopped", false, false) })
+        {
+            agentsPlace.DotLive = live;
+            agentsPlace.DotDanger = refusing;
+            Save(window, output, $"50d-rail-agents-{state}");
+        }
+
         shell.Current = Destinations.Of(DestinationKind.EnvSets);
         foreach (var width in new[] { 840, 900, 999 })
         {

@@ -231,6 +231,8 @@
                             Classes="dot"
                             Classes.ok="{Binding DotLive}"
                             Classes.danger="{Binding DotDanger}"
+                            Classes.refusing="{Binding DotDanger}"
+                            Classes.stopped="{Binding DotStopped}"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             IsVisible="{Binding HasDot}" />
@@ -316,6 +318,8 @@
                               Classes="dot"
                               Classes.ok="{Binding DotLive}"
                               Classes.danger="{Binding DotDanger}"
+                              Classes.refusing="{Binding DotDanger}"
+                              Classes.stopped="{Binding DotStopped}"
                               IsVisible="{Binding HasDot}" />
                     </StackPanel>
                     <Button Grid.Column="4"

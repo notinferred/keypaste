@@ -100,6 +100,24 @@ internal sealed class DrawnFrame
         return new PixelRect(pixels.X - 4, pixels.Y - 4, pixels.Width + 8, pixels.Height + 8).Intersect(Everywhere);
     }
 
+    /// <summary>Which pixels of <paramref name="within"/> are more than halfway from its top-left corner's ground to its strongest ink: what is drawn there as a silhouette, whatever its colour or contrast.</summary>
+    internal bool[] Shape(PixelRect within)
+    {
+        var ground = _luminance[(within.Y * Width) + within.X];
+        var ink = new float[within.Width * within.Height];
+
+        for (var y = 0; y < within.Height; y++)
+        {
+            for (var x = 0; x < within.Width; x++)
+            {
+                ink[(y * within.Width) + x] = Math.Abs(_luminance[((within.Y + y) * Width) + within.X + x] - ground);
+            }
+        }
+
+        var halfway = ink.Max() / 2;
+        return [.. ink.Select(value => value > halfway)];
+    }
+
     /// <summary>Whether <paramref name="text"/>, drawn in <paramref name="style"/>, is in <paramref name="within"/>.</summary>
     internal bool Shows(string text, TextStyle style, PixelRect within) => Score(text, style, within) >= Threshold;
 

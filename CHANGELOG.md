@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Agents' status mark in the desktop app now differs by shape as well as colour: a filled dot while answering agents, a ring while not, a diamond while refusing them ([F.91](docs/steps/F.91.md)).
+
 A share link now records the item it was made from, on its audit line and its row, so Share links says which of two items with the same name it shares. Links and audit lines made before this stay as they were ([F.90](docs/steps/F.90.md)).
 
 When the audit log won't open and keypaste is refusing agents, the desktop app now says so once in a pop-up with the fix, and keeps a message on Agents until the log opens ([F.86](docs/steps/F.86.md)).

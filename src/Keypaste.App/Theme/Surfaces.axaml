@@ -201,6 +201,16 @@
     <Setter Property="Background" Value="{DynamicResource KpWarn}" />
     <Setter Property="BoxShadow" Value="{DynamicResource KpWaitingHalo}" />
   </Style>
+  <!-- Agents' mark: these two shapes, against a running agent's filled dot, tell its state without colour. -->
+  <Style Selector="Border.dot.stopped">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+  <Style Selector="Border.dot.refusing">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="RenderTransform" Value="rotate(45deg)" />
+  </Style>
 
   <Style Selector="Border.tile">
     <Setter Property="Width" Value="32" />
