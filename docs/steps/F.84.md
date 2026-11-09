@@ -1,6 +1,6 @@
 # F.84 — Merge another device's changes field by field
 
-Completed 2026-11-09 on `merge-by-field`, source only.
+Completed 2026-11-09 on `merge-by-field` at `f58e2769`, source only; ci fast tier 42683107734, dev desktop 42684358951 and dev desktop-gates 42686713837, all green on Linux.
 
 ## Amendments
 
