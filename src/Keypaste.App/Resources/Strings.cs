@@ -397,7 +397,6 @@ public static class Strings
     public static string OpenKeypasteAtLogin => Manager.GetString("OpenKeypasteAtLogin", CultureInfo.CurrentUICulture)!;
     public static string OpenProject => Manager.GetString("OpenProject", CultureInfo.CurrentUICulture)!;
     public static string OpenRecent => Manager.GetString("OpenRecent", CultureInfo.CurrentUICulture)!;
-    public static string OpenRecommendations => Manager.GetString("OpenRecommendations", CultureInfo.CurrentUICulture)!;
     public static string OpenTerminal => Manager.GetString("OpenTerminal", CultureInfo.CurrentUICulture)!;
     public static string OpenTheActivityLog => Manager.GetString("OpenTheActivityLog", CultureInfo.CurrentUICulture)!;
     public static string OpenTheScopedTokens => Manager.GetString("OpenTheScopedTokens", CultureInfo.CurrentUICulture)!;

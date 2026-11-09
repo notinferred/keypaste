@@ -21,6 +21,8 @@ internal static class UseText
     }
 
     /// <summary>What the reveal button's tooltip says.</summary>
+    internal static string FragileKeyFile(string name) => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, name);
+
     internal static string RevealFor(TimeSpan shownFor) => string.Format(CultureInfo.CurrentCulture, Strings.RevealForSeconds, shownFor.TotalSeconds);
 
     /// <summary>A time as how long ago it was, in its largest whole unit.</summary>

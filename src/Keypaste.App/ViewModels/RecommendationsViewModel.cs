@@ -1,5 +1,4 @@
 using System.Globalization;
-using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -106,7 +105,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     internal bool FragileKeyFileNeedsReview => !FragileKeyFileDismissed;
 
-    internal string FragileKeyFileWarning => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, FragileKeyFile);
+    internal string FragileKeyFileWarning => UseText.FragileKeyFile(FragileKeyFile ?? string.Empty);
 
     /// <summary>The one line that sums up what is listed; whatever was dismissed stays reachable from it.</summary>
     internal string Line

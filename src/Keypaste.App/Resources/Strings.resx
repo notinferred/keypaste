@@ -325,7 +325,6 @@
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
   <data name="OpenKeypasteAtLogin" xml:space="preserve"><value>Open keypaste at login</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="OpenRecommendations" xml:space="preserve"><value>Open recommendations</value></data>
   <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>
   <data name="OpenTheScopedTokens" xml:space="preserve"><value>Open the scoped tokens</value></data>
   <data name="OpenTheShareLinks" xml:space="preserve"><value>Open the share links</value></data>
@@ -620,7 +619,7 @@
   <data name="CopySetupPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
   <data name="ConnectAnApp" xml:space="preserve"><value>Connect an app</value></data>
   <data name="AddMcpManually" xml:space="preserve"><value>Add MCP manually</value></data>
-  <data name="AddMcpManuallyHelp" xml:space="preserve"><value>Paste this into your MCP client's configuration. keypaste has to be on your PATH, and Settings links it. Give each agent its own label.</value></data>
+  <data name="AddMcpManuallyHelp" xml:space="preserve"><value>Paste this into your AI tool's MCP configuration. keypaste has to be on your PATH, and Settings links it. Give each agent its own label.</value></data>
   <data name="CopyTheConfiguration" xml:space="preserve"><value>Copy the configuration</value></data>
   <data name="SetupPromptCopied" xml:space="preserve"><value>Setup prompt copied. Paste it into your agent.</value></data>
   <data name="ConfigurationCopied" xml:space="preserve"><value>Configuration copied.</value></data>

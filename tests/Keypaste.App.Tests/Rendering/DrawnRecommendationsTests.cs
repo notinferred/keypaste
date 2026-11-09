@@ -9,7 +9,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// V-C.2 and V.9 on screen: Settings › Recommendations draws each key left in notes and each weak or reused
+/// V-C.2 and V.9 on screen: Items › Recommendations draws each key left in notes and each weak or reused
 /// password by item, and no frame or automation name carries a value (D-0303, D-0232).
 /// </summary>
 public sealed class DrawnRecommendationsTests
@@ -20,7 +20,7 @@ public sealed class DrawnRecommendationsTests
     private const string _weak = "hunter2";
 
     [Fact]
-    public Task Settings_draws_each_key_and_no_value_and_counts_them_without_amber() => HeadlessSession.On(async () =>
+    public Task Recommendations_draws_each_key_and_no_value_and_counts_them_without_amber() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = _stripeLogin, Notes = $"STRIPE_SECRET_KEY={_keyValue}\n{_token}" }));
@@ -42,12 +42,12 @@ public sealed class DrawnRecommendationsTests
             AutomationSurface.AssertNothingExposes(shell.Window, value);
         }
 
-        var count = shell.Named<ListBox>("FooterNav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "2");
+        var count = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "2");
         Assert.DoesNotContain("amber", count.Classes);
     });
 
     [Fact]
-    public Task Settings_draws_each_weak_and_reused_password_by_item_and_never_the_password() => HeadlessSession.On(async () =>
+    public Task Recommendations_draws_each_weak_and_reused_password_by_item_and_never_the_password() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault =>
@@ -75,7 +75,7 @@ public sealed class DrawnRecommendationsTests
             AutomationSurface.AssertNothingExposes(shell.Window, value);
         }
 
-        var count = shell.Named<ListBox>("FooterNav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "3");
+        var count = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "3");
         Assert.DoesNotContain("amber", count.Classes);
     });
 

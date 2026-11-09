@@ -1,5 +1,3 @@
-using System.Globalization;
-using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -1302,7 +1300,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
     private static string? FragileNotice(string? keyfile) =>
         keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile
-            ? string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, System.IO.Path.GetFileName(keyfile))
+            ? UseText.FragileKeyFile(System.IO.Path.GetFileName(keyfile))
             : null;
 
     /// <summary>Why a file cannot be used as a keyfile, in the register of <see cref="Explain"/>.</summary>

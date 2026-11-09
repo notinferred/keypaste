@@ -55,7 +55,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal(["Trash", "Settings"], shell.FooterNav.Select(item => item.Title));
         Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
         Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
-        Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.False(env.IsExpanded);
 
         shell.FoldCommand.Press(env);
-        Assert.Equal(["Items", "Work", "env", "billing", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.Equal(["Items", "Work", "env", "billing", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
 
         shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env/billing");
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -83,7 +83,7 @@ public sealed class ShellViewModelTests : IDisposable
 
         // Items folds the whole tree and shows every item.
         shell.Fold(shell.MainNav[0], open: false);
-        Assert.Equal(["Items", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.Equal(["Items", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
         Assert.True(entries.SelectedGroup?.IsEverything);
         Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
     }
@@ -99,7 +99,7 @@ public sealed class ShellViewModelTests : IDisposable
         entries.BeginDeleteGroupCommand.Press();
 
         Assert.Null(entries.Error);
-        Assert.Equal(["Items", "env", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.Equal(["Items", "env", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
         Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
     }
 
