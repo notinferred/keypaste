@@ -3,6 +3,7 @@
                     xmlns:vm="using:Keypaste.App.ViewModels"
                     xmlns:views="using:Keypaste.App.Views"
                     xmlns:ctl="using:Keypaste.App.Controls"
+                    xmlns:res="using:Keypaste.App.Resources"
                     x:Class="Keypaste.App.Views.SaveValueWindow"
                     x:DataType="vm:SaveValueViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
@@ -65,7 +66,7 @@
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
           <ctl:MaskedInput x:Name="ValueInput" Grid.Column="0" AllowsPaste="True"
                            Sink="{Binding Value}" MaskedLength="{Binding Value.MaskedLength}"
-                           AutomationProperties.Name="The value to save" />
+                           AutomationProperties.Name="{x:Static res:Strings.TheValueToSave}" />
           <Button Grid.Column="1" Name="Generate" Classes="prompt" Content="Password" Command="{Binding GenerateCommand}"
                   ToolTip.Tip="Generate a password" />
           <Button Grid.Column="2" Name="GeneratePassphrase" Classes="prompt" Content="Passphrase" Command="{Binding GeneratePassphraseCommand}"

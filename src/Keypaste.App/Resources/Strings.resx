@@ -605,4 +605,5 @@
   <data name="WhatItGets" xml:space="preserve"><value>What it gets</value></data>
   <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
   <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
+  <data name="TheValueToSave" xml:space="preserve"><value>The value to save</value></data>
 </root>

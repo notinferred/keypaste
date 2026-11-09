@@ -594,6 +594,7 @@ public static class Strings
     public static string WaitingForYou => Manager.GetString("WaitingForYou", CultureInfo.CurrentUICulture)!;
     public static string What => Manager.GetString("What", CultureInfo.CurrentUICulture)!;
     public static string WhatAgentsGet => Manager.GetString("WhatAgentsGet", CultureInfo.CurrentUICulture)!;
+    public static string TheValueToSave => Manager.GetString("TheValueToSave", CultureInfo.CurrentUICulture)!;
     public static string WhatItGets => Manager.GetString("WhatItGets", CultureInfo.CurrentUICulture)!;
     public static string AlwaysAnswers => Manager.GetString("AlwaysAnswers", CultureInfo.CurrentUICulture)!;
     public static string NoAlwaysAnswersYet => Manager.GetString("NoAlwaysAnswersYet", CultureInfo.CurrentUICulture)!;
