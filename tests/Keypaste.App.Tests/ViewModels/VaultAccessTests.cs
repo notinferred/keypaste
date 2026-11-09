@@ -70,6 +70,53 @@ public sealed class VaultAccessTests : IDisposable
     // ------------------------------------------------------------------ the journeys
 
     [Fact]
+    public void Cancelling_the_form_closes_it_and_forgets_what_was_typed()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+        var access = settings.Access;
+        access.OpenFormCommand.Press();
+        Enter(access, _master, _later);
+
+        access.CloseFormCommand.Press();
+
+        Assert.False(access.IsFormOpen);
+        Assert.Equal(0, access.CurrentMaskedLength);
+        Assert.Equal(0, access.NewMaskedLength);
+    }
+
+    [Fact]
+    public async Task A_finished_change_closes_the_form_and_says_what_it_did()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+        var access = settings.Access;
+        access.OpenFormCommand.Press();
+        Enter(access, _master, _later);
+        access.ReviewCommand.Press();
+
+        await access.ChangeAsync();
+
+        Assert.False(access.IsFormOpen);
+        Assert.StartsWith("Changed.", access.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settings_shows_one_section_at_a_time_and_says_what_it_holds()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+
+        Assert.True(settings.ShowsGeneral);
+
+        settings.Section = SettingsSectionChoice.ThisVault;
+
+        Assert.False(settings.ShowsGeneral);
+        Assert.True(settings.ShowsThisVault);
+        Assert.Equal(SettingsSectionChoice.ThisVault.Note, settings.SectionNote);
+    }
+
+    [Fact]
     public async Task A_password_changed_in_settings_keeps_the_app_open_and_only_the_new_one_opens_after_a_lock()
     {
         using var session = Unlocked(_master);

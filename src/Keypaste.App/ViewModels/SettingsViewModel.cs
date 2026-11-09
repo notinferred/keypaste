@@ -138,6 +138,25 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// </remarks>
     internal IReadOnlyList<IdleChoice> IdleChoices { get; }
 
+    /// <summary>The parts of this screen, Browser only where a browser can reach this vault.</summary>
+    internal IReadOnlyList<SettingsSectionChoice> Sections =>
+        HasBrowserFill
+            ? [SettingsSectionChoice.General, SettingsSectionChoice.ThisVault, SettingsSectionChoice.Browser]
+            : [SettingsSectionChoice.General, SettingsSectionChoice.ThisVault];
+
+    /// <summary>The part of this screen in view.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SectionNote), nameof(ShowsGeneral), nameof(ShowsThisVault), nameof(ShowsBrowser))]
+    internal partial SettingsSectionChoice Section { get; set; } = SettingsSectionChoice.General;
+
+    internal string SectionNote => Section.Note;
+
+    internal bool ShowsGeneral => Section == SettingsSectionChoice.General;
+
+    internal bool ShowsThisVault => Section == SettingsSectionChoice.ThisVault;
+
+    internal bool ShowsBrowser => Section == SettingsSectionChoice.Browser;
+
     /// <summary>Whether Appearance shows, only where the system reports no light or dark of its own.</summary>
     internal bool OffersTheme { get; init; }
 
@@ -232,11 +251,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Browser fill: pairing a browser and the pairings the vault holds; null where nothing answers browsers.</summary>
     internal BrowserFillViewModel? BrowserFill { get; init; }
-
-    /// <summary>Settings › Agents: what every agent gets, present only where this app answers agents.</summary>
-    internal AgentRulesViewModel? AgentRules { get; init; }
-
-    internal bool HasAgentRules => AgentRules is not null;
 
     internal bool HasBrowserFill => BrowserFill is not null;
 
@@ -535,7 +549,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     {
         Access.Dispose();
         BrowserFill?.Dispose();
-        AgentRules?.Dispose();
     }
 
     private static string When(VaultBackup backup) =>

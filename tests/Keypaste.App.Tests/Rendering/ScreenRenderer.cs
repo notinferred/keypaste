@@ -847,7 +847,9 @@ public sealed class ScreenRenderer
         Save(window, output, "26-settings-tokens-revoke");
 
         shell.Current = Destinations.Of(DestinationKind.Settings);
-        var browserFill = Assert.IsType<SettingsViewModel>(shell.Content).BrowserFill!;
+        var settingsScreen = Assert.IsType<SettingsViewModel>(shell.Content);
+        settingsScreen.Section = SettingsSectionChoice.Browser;
+        var browserFill = settingsScreen.BrowserFill!;
         browserFill.PairCommand.Press();
         var pairing = new PairingItem("work laptop", "chrome-extension://oboonakemofpalcgghocfoadofidjkkk", "Last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
@@ -866,10 +868,24 @@ public sealed class ScreenRenderer
         Save(window, output, "04-settings-browser-fill-remove");
         browserFill.StopCommand.Press();
 
-        // Settings › Agents: the username switch and each category's rule, an Allow waiting on its confirmation, and the
+        settingsScreen.Section = SettingsSectionChoice.General;
+        WindowInput.Drain();
+        Save(window, output, "04-settings-general");
+        settingsScreen.Section = SettingsSectionChoice.ThisVault;
+        WindowInput.Drain();
+        Save(window, output, "04-settings-this-vault");
+        settingsScreen.Access.OpenFormCommand.Execute(null);
+        WindowInput.Drain();
+        Save(window, output, "04-settings-this-vault-change");
+        settingsScreen.Access.CloseFormCommand.Execute(null);
+
+        // Agents › What agents get: the username switch and each category's rule, an Allow waiting on its confirmation, and the
         // notice that the rules on file are ignored.
-        var rules = Assert.IsType<SettingsViewModel>(shell.Content).AgentRules!;
+        shell.Current = Destinations.Of(DestinationKind.AgentActivity);
+        WindowInput.Drain();
+        var rules = Assert.IsType<AgentActivityViewModel>(shell.Content).RulesForEveryAgent!;
         var card = window.GetVisualDescendants().OfType<Border>().First(border => border.Name == "AgentRulesCard");
+        scroller = card.GetVisualAncestors().OfType<ScrollViewer>().First();
         scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);
         WindowInput.Drain();
         Save(window, output, "04-settings-agent-rules");

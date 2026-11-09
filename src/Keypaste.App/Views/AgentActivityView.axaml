@@ -250,6 +250,10 @@
           </Border>
         </StackPanel>
 
+        <Panel IsVisible="{Binding HasAgentRules}">
+          <views:AgentRulesView DataContext="{Binding RulesForEveryAgent}" />
+        </Panel>
+
       </StackPanel>
     </Grid>
   </ScrollViewer>

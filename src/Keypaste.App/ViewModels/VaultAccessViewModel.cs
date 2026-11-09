@@ -93,6 +93,23 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     /// <summary>Whether the form, rather than the confirmation, is showing.</summary>
     internal bool IsEditing => !IsConfirming && !Busy;
 
+    /// <summary>Whether the form that changes what unlocks the vault is open.</summary>
+    [ObservableProperty]
+    internal partial bool IsFormOpen { get; private set; }
+
+    [RelayCommand]
+    private void OpenForm() => IsFormOpen = true;
+
+    [RelayCommand]
+    private void CloseForm()
+    {
+        if (IsEditing)
+        {
+            Forget(string.Empty);
+            IsFormOpen = false;
+        }
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditing))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand), nameof(ReviewCommand), nameof(ChooseKeyfileCommand))]
@@ -412,6 +429,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         }
 
         Forget(message);
+        IsFormOpen = false;
     }
 
     public void Dispose()

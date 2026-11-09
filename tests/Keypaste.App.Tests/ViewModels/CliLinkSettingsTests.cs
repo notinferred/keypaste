@@ -136,6 +136,7 @@ public sealed class CliLinkSettingsTests
         using var home = new TempHome();
         using var session = new AppVaultSession(new ManualClock());
         using var screen = Screen(home, session, FakeCliLink.At(CliLinkState.Foreign));
+        screen.Section = SettingsSectionChoice.ThisVault;
         var window = new Window { Content = new SettingsView { DataContext = screen } };
         window.Show();
 

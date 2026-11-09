@@ -1,0 +1,108 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.AgentRulesView"
+             x:DataType="vm:AgentRulesViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Border.settings">
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Border.settings-head">
+      <Setter Property="Padding" Value="20,16,20,4" />
+    </Style>
+    <Style Selector="Border.settings-row">
+      <Setter Property="Padding" Value="20,12" />
+    </Style>
+    <Style Selector="Border.settings-row:nth-child(n+3)">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- What agents get: the rules every agent's request is decided by on this computer. No amber: the confirmation's
+       Allow is a secondary button, so the screen keeps its one. -->
+  <Border Name="AgentRulesCard" Classes="card filled settings">
+    <StackPanel>
+      <Border Classes="settings-head">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <ctl:KpIcon Icon="bot" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.WhatAgentsGet}" />
+        </StackPanel>
+      </Border>
+      <Border Name="AgentRulesIgnored" Classes="settings-row" IsVisible="{Binding IsIgnored}">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <ctl:KpIcon Icon="triangle-alert" Size="16" Foreground="{DynamicResource KpDanger}" VerticalAlignment="Top" />
+          <TextBlock Grid.Column="1" Name="AgentRulesIgnoredText" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
+                     ctl:Announcer.Says="{Binding Ignored}" Text="{Binding Ignored}" />
+        </Grid>
+      </Border>
+      <Border Classes="settings-row" IsVisible="{Binding HasProblem}">
+        <TextBlock Name="AgentRulesProblem" Classes="body danger" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" />
+      </Border>
+      <Border Classes="settings-row" IsVisible="{Binding !HasProblem}">
+        <StackPanel Spacing="4">
+          <ToggleSwitch Name="ShowUsernames"
+                        Content="{x:Static res:Strings.AgentsSeeUsernames}"
+                        FontWeight="Medium"
+                        Classes="size-13-5"
+                        IsChecked="{Binding ShowsUsername}" />
+          <TextBlock Classes="caption" Margin="40,0,0,0" TextWrapping="Wrap"
+                     Text="{x:Static res:Strings.AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL}" />
+        </StackPanel>
+      </Border>
+      <Border Classes="settings-row" IsVisible="{Binding !HasProblem}">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachKindOfValueIsAskedAllowedOrBlocked}" />
+          <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CategoryRow">
+                <Grid ColumnDefinitions="160,*" ColumnSpacing="16" Margin="0,0,0,8">
+                  <TextBlock Classes="label" Text="{Binding Name}" VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Classes="segmented" HorizontalAlignment="Left">
+                    <ItemsControl ItemsSource="{Binding Choices}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CategoryChoice">
+                          <ctl:ChoiceSegment Classes="segment"
+                                             IsChecked="{Binding IsChosen, Mode=OneWay}"
+                                             Command="{Binding $parent[ItemsControl;1].((vm:AgentRulesViewModel)DataContext).ChooseCommand}"
+                                             CommandParameter="{Binding}"
+                                             AutomationProperties.Name="{Binding Words}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
+                              <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </ctl:ChoiceSegment>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Border>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Name="AllowConfirmation" Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True"
+                  ctl:FormKeys.Cancel="{Binding CancelAllowCommand}">
+            <StackPanel Spacing="8">
+              <TextBlock Name="AllowConfirmationText" Text="{Binding ConfirmText}" TextWrapping="Wrap" Classes="primary size-13" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere}" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Name="CancelAllow" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAllowCommand}" />
+                <Button Name="ConfirmAllow" Classes="sm" Content="{Binding ConfirmAction}" Command="{Binding ConfirmAllowCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <TextBlock Name="AgentRulesMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </Border>
+
+</UserControl>

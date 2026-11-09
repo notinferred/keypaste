@@ -127,7 +127,10 @@ public sealed class KeepUnsavedWorkTests
                 return new Form(() => revoking.Rows.Single().IsConfirming, () => { }, IsDanger: true);
 
             case "change access":
-                var access = shell.Show<SettingsViewModel>(DestinationKind.Settings).Access;
+                var accessScreen = shell.Show<SettingsViewModel>(DestinationKind.Settings);
+                accessScreen.Section = SettingsSectionChoice.ThisVault;
+                var access = accessScreen.Access;
+                access.OpenFormCommand.Execute(null);
                 access.SetPassword = true;
                 RenderedShell.Drain();
                 foreach (var (field, typed) in new[] { ("CurrentPassword", RenderedShell.Master), ("AccessNewPassword", "a much later password"), ("AccessConfirmPassword", "a much later password") })

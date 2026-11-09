@@ -130,6 +130,8 @@ public sealed class VaultAccessAutomationTests
             }
 
             Model = new SettingsViewModel(_session, _fixture.Home, new DesktopPreferences(_fixture.Home), _ => { }, paste: Clipboard.TryPasteIntoAsync);
+            Model.Section = SettingsSectionChoice.ThisVault;
+            Model.Access.OpenFormCommand.Execute(null);
             Model.Access.SetPassword = true;
 
             Window = new Window { Content = new SettingsView { DataContext = Model } };

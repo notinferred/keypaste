@@ -176,7 +176,7 @@ public sealed partial class BrowserPairingTests
         await PairAsync(app, "work laptop");
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
         browserFill.PairCommand.Press();
-        using var settings = new SettingsViewModel(app.Authority.Session, app.Home, new DesktopPreferences(app.Home), _ => { }) { BrowserFill = browserFill };
+        using var settings = new SettingsViewModel(app.Authority.Session, app.Home, new DesktopPreferences(app.Home), _ => { }) { BrowserFill = browserFill, Section = SettingsSectionChoice.Browser };
         var window = new Window { Content = new SettingsView { DataContext = settings } };
         window.Show();
         WindowInput.Drain();

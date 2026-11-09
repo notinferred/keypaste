@@ -163,6 +163,11 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     internal bool OffersHistory { get; }
 
+    /// <summary>The rules every agent's request is decided by on this computer; none without an owner to apply them.</summary>
+    internal AgentRulesViewModel? RulesForEveryAgent { get; init; }
+
+    internal bool HasAgentRules => RulesForEveryAgent is not null;
+
     /// <summary>One true sentence about what agents can do with this vault.</summary>
     [ObservableProperty]
     internal partial string Status { get; private set; } = string.Empty;
@@ -619,6 +624,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         _disposed = true;
+        RulesForEveryAgent?.Dispose();
         _closing.Cancel();
         _closing.Dispose();
         _timer.Dispose();

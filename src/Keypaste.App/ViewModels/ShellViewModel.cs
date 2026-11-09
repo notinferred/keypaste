@@ -949,7 +949,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log, openAgents: OpenAgents),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post), AgentRules = Authority is null ? null : new AgentRulesViewModel(Authority) },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast) { AskDiscard = AskDiscard },
@@ -994,7 +994,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     });
 
     private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory), Clipboard, _web);
+        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory), Clipboard, _web) { RulesForEveryAgent = Authority is null ? null : new AgentRulesViewModel(Authority) };
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
