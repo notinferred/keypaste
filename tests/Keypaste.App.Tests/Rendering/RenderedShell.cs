@@ -140,7 +140,10 @@ internal sealed class RenderedShell : IDisposable
         switch (name)
         {
             case "CurrentPassword" or "AccessNewPassword" or "AccessConfirmPassword":
-                Show<SettingsViewModel>(DestinationKind.Settings).Access.SetPassword = true;
+                var settings = Show<SettingsViewModel>(DestinationKind.Settings);
+                settings.Section = SettingsSectionChoice.ThisVault;
+                settings.Access.OpenFormCommand.Execute(null);
+                settings.Access.SetPassword = true;
                 break;
 
             case "NewEntryPassword":

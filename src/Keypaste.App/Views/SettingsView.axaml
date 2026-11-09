@@ -162,6 +162,38 @@
             </StackPanel>
           </Border>
 
+          <!-- The keypaste a terminal finds, which is this computer's and no vault's. -->
+          <Border Classes="card filled settings" IsVisible="{Binding CliLinkSupported}">
+            <Border Classes="settings-row">
+              <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                  <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.KeypasteInATerminal}" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
+                  </StackPanel>
+                  <Panel Grid.Column="1" VerticalAlignment="Top">
+                    <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
+                      <TextBlock Text="{x:Static res:Strings.Link}" />
+                    </Button>
+                    <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOtherKeypaste}">
+                      <TextBlock Text="{x:Static res:Strings.ReplaceX64ca19}" />
+                    </Button>
+                  </Panel>
+                </Grid>
+                <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
+                  <StackPanel Spacing="8">
+                    <TextBlock ctl:MachineRuns.InText="True" Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Name="KeepCli" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCliCommand}" />
+                      <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCliCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Border>
+          </Border>
+
           <!-- Appearance -->
           <Border Classes="card filled settings" IsVisible="{Binding OffersTheme}">
             <StackPanel>
@@ -455,34 +487,6 @@
                     <TextBlock Text="{x:Static res:Strings.UseThisVault}" />
                   </Button>
                 </Grid>
-              </Border>
-              <Border Classes="settings-row" IsVisible="{Binding CliLinkSupported}">
-                <StackPanel Spacing="12">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                      <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.KeypasteInATerminal}" />
-                      <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
-                      <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
-                    </StackPanel>
-                    <Panel Grid.Column="1" VerticalAlignment="Top">
-                      <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
-                        <TextBlock Text="{x:Static res:Strings.Link}" />
-                      </Button>
-                      <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOtherKeypaste}">
-                        <TextBlock Text="{x:Static res:Strings.ReplaceX64ca19}" />
-                      </Button>
-                    </Panel>
-                  </Grid>
-                  <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
-                    <StackPanel Spacing="8">
-                      <TextBlock ctl:MachineRuns.InText="True" Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Name="KeepCli" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCliCommand}" />
-                        <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCliCommand}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
               </Border>
             </StackPanel>
           </Border>

@@ -9,6 +9,7 @@ The founder selected this on 2026-11-09 after reviewing the screen. There is no 
 ## Judgment calls
 
 - **Three sections, General, This vault and Browser**, on a segmented control, each saying what it holds, which replaces one heading that was untrue of Vault access. Browser shows only where a browser can reach the vault. Advanced stays one row under every section, since it opens its own screen.
+- **The `keypaste` a terminal finds is under General**, since it belongs to this computer and no vault.
 - **Vault access opens behind Change…**. Cancelling the form zeroes what was typed, and a finished change closes it and keeps its message.
 - **What agents get moved to Agents**, under the list of agents, as `AgentRulesView`.
 - **Recommendations and its count stay in Settings**, since where they should live is the founder's to decide.
