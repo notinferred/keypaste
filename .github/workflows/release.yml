@@ -437,6 +437,10 @@ jobs:
         shell: bash
         run: scripts/verify-publisher-metadata.sh artifacts/stage
 
+      - name: Verify the notices list every package this archive carries
+        shell: bash
+        run: scripts/third-party-notices.sh check cli artifacts/stage/THIRD_PARTY_NOTICES.md
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-${{ matrix.rid }}

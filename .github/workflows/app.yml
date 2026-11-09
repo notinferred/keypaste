@@ -71,6 +71,7 @@ on:
       - 'scripts/verify-linux-appimage.sh'
       - 'scripts/verify-no-icu.sh'
       - 'scripts/verify-publisher-metadata.sh'
+      - 'scripts/third-party-notices.sh'
       - 'scripts/publish-desktop-bridge.sh'
       - 'scripts/sign-windows.sh'
       - 'scripts/verify-windows-signature.sh'
@@ -590,6 +591,10 @@ jobs:
       - name: Verify the packaged binaries publish as the project
         shell: bash
         run: scripts/verify-publisher-metadata.sh artifacts/stage
+
+      - name: Verify the notices list every package this archive carries
+        shell: bash
+        run: scripts/third-party-notices.sh check desktop artifacts/stage/THIRD_PARTY_NOTICES.md
 
       - name: Build and check the internal installer the definition declares
         if: matrix.msi

@@ -256,6 +256,7 @@ selftests=(
   'scripts/exercise-desktop-install.sh --selftest'
   'scripts/exercise-desktop-upgrade.sh --selftest'
   'scripts/exercise-desktop-acts.sh --selftest'
+  'scripts/third-party-notices.sh --selftest'
 )
 
 check_scripts() {
