@@ -152,7 +152,7 @@ RUN_OUT="$WORK/run-stdout.txt"
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
-[ "$(printf '%s' "$run_tools" | jq 'length')" = "4" ] || die "--allow-run did not list exactly 4 tools"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "5" ] || die "--allow-run did not list exactly 5 tools"
 printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
   || die "run is missing destructiveHint=true or openWorldHint=true"
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
