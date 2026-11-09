@@ -389,7 +389,8 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         }
 
         // The dialog's one line has to say which of two items it shares.
-        if (_item is { } item && SameNameTells.Of(read).Of(item) is { } tell)
+        var tells = SameNameTells.Of(read);
+        if (_item is { } item && tells.Of(item) is { } tell)
         {
             SelectedWhat = tell.Length > 0
                 ? SameNameTells.WithTell(RecommendationsViewModel.Shown(item), tell)
@@ -406,11 +407,11 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
         var wanted = Selected?.Id;
         var listed = await _service.ListAsync(vault, online, CancellationToken.None).ConfigureAwait(true);
-        Rows = [.. listed.Select(share => Row(share, online))];
+        Rows = [.. listed.Select(share => Row(share, online, tells))];
         Selected = wanted is null ? null : Rows.FirstOrDefault(row => row.Id == wanted);
     }
 
-    private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed, bool online)
+    private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed, bool online, SameNameTells tells)
     {
         var (info, status, left) = listed;
 
@@ -426,13 +427,26 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
         return new SharingRow(
             info.Id,
-            EntryNameSanitizer.SanitizePath(info.What).Text,
+            Named(info, tells),
             info.Recipient is { } to ? EntryNameSanitizer.SanitizeProse(to).Text : "Anyone with the link",
             info.Rule,
             text,
             tone,
             opens,
             Checked: online || !opens);
+    }
+
+    /// <summary>What was shared: its path, and which item it is where another has that path, read from the UUID the link recorded.</summary>
+    private static string Named(ShareInfo info, SameNameTells tells)
+    {
+        var path = EntryNameSanitizer.SanitizePath(info.What).Text;
+
+        if (info.Item is not { } item || tells.OfUuid(item) is not { } tell)
+        {
+            return path;
+        }
+
+        return SameNameTells.WithTell(path, tell.Length > 0 ? tell : $"item {item[..8]}");
     }
 
     private static TimeSpan TtlOf(string ttl) => ttl switch

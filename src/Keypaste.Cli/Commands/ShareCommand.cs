@@ -483,6 +483,7 @@ internal static class ShareCommand
 
         json.WriteString("id", info.Id);
         json.WriteString("what", info.What);
+        json.WriteString("item", info.Item);
         json.WriteString("field", info.Field);
         if (info.Recipient is null)
         {

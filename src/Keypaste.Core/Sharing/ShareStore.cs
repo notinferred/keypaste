@@ -14,6 +14,7 @@ namespace Keypaste.Core.Sharing;
 /// <param name="Views">How many views it was made with.</param>
 /// <param name="Passphrase">Whether opening it needs a passphrase.</param>
 /// <param name="Endpoint">The origin it was made on.</param>
+/// <param name="Item">The UUID, as hex, of the item shared, or null on a record written before links named one.</param>
 public sealed record ShareInfo(
     string Id,
     string What,
@@ -23,7 +24,8 @@ public sealed record ShareInfo(
     DateTimeOffset Expires,
     int Views,
     bool Passphrase,
-    string Endpoint)
+    string Endpoint,
+    string? Item = null)
 {
     /// <summary>The limits in words: <c>1 view · 24h · passphrase</c>.</summary>
     public string Rule
@@ -147,6 +149,11 @@ public sealed class ShareStore(Vault vault)
             json.WriteString("expires", Iso(info.Expires));
             json.WriteNumber("views", info.Views);
             json.WriteBoolean("passphrase", info.Passphrase);
+            if (info.Item is { } item)
+            {
+                json.WriteString("item", item);
+            }
+
             json.WriteEndObject();
         }
 
@@ -186,13 +193,23 @@ public sealed class ShareStore(Vault vault)
                 expiresAt,
                 viewCount,
                 passphrase.GetBoolean(),
-                entry.Url);
+                entry.Url,
+                ItemOf(root));
         }
         catch (JsonException)
         {
             return null;
         }
     }
+
+    // Another program can edit a record, and a revoke writes this value into the audit line.
+    private static string? ItemOf(JsonElement root) =>
+        root.TryGetProperty("item", out var item)
+        && item.ValueKind == JsonValueKind.String
+        && item.GetString() is { Length: 32 } hex
+        && hex.All(char.IsAsciiHexDigit)
+            ? hex
+            : null;
 
     private static bool TryTime(JsonElement element, out DateTimeOffset value)
     {

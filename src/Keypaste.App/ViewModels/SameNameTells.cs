@@ -36,6 +36,16 @@ internal sealed class SameNameTells
     internal string? Of(EntryName item) =>
         item.Uuid is { } uuid && _tells.TryGetValue((uuid, item), out var tell) ? tell : null;
 
+    /// <summary>The tell of the one item holding this UUID, empty when none, or null when no other item has its name or two items hold the UUID.</summary>
+    /// <param name="uuid">The UUID as hex.</param>
+    /// <returns>The tell.</returns>
+    internal string? OfUuid(string uuid)
+    {
+        var held = _tells.Where(tell => string.Equals(tell.Key.Uuid, uuid, StringComparison.Ordinal)).Take(2).ToList();
+
+        return held.Count == 1 ? held[0].Value : null;
+    }
+
     /// <summary>The path as a sentence names this item, with its tell when another item has the path too.</summary>
     /// <param name="item">The item.</param>
     /// <returns>What to show, sanitized.</returns>

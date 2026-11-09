@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Commands;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Sharing;
@@ -74,6 +75,30 @@ public sealed class ShareVerbTests : IDisposable
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    [Fact]
+    public void A_share_and_its_revoke_name_the_items_uuid_on_their_lines_and_its_listing()
+    {
+        string uuid;
+        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        {
+            uuid = vault.Find(new EntryName("env/acme-api", "STRIPE_KEY"))!.Uuid!;
+        }
+
+        Assert.True(ShareLink.TryParse(CreatePrinted(), out var id, out _));
+
+        _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--json", "--offline"));
+        using (var json = JsonDocument.Parse(_cli.Out))
+        {
+            Assert.Equal(uuid, Assert.Single(json.RootElement.EnumerateArray()).GetProperty("item").GetString());
+        }
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("revoke", id));
+
+        Assert.True(AuditReader.TryRead(KeypasteHome.AuditPath(Home), out var lines, out _, out var error), error);
+        Assert.Equal([("share-created", uuid), ("share-revoked", uuid)], lines.Select(line => (line.Method, line.Item)));
     }
 
     private string LocalExpiry(TimeSpan ttl) =>

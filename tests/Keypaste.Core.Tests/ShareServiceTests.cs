@@ -1,4 +1,7 @@
 using System.Net;
+using Keypaste.Core.Activity;
+using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
 using Xunit;
 
@@ -124,6 +127,143 @@ public sealed class ShareServiceTests : IDisposable
 
         Assert.False(bare.Ok);
         Assert.Contains("more than one item", bare.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>The fixture's Stripe item and a second of its name, saved, each addressed by its UUID.</summary>
+    private static (EntryName First, EntryName Second) PlantPair(Vault vault)
+    {
+        var first = ShareFixture.Stripe with { Uuid = vault.Find(ShareFixture.Stripe)!.Uuid };
+        vault.AddEntry(new VaultEntry { GroupPath = ShareFixture.Stripe.GroupPath, Title = ShareFixture.Stripe.Title, Password = "the-other-one" });
+        vault.Save();
+
+        var second = vault.ReadEntries().Single(entry => EntryName.Of(entry) == ShareFixture.Stripe && entry.Uuid != first.Uuid);
+        return (first, ShareFixture.Stripe with { Uuid = second.Uuid });
+    }
+
+    private async Task<ShareOutcome> Share(Vault vault, EntryName item)
+    {
+        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request() with { Entry = item }, CancellationToken.None);
+        Assert.True(outcome.Ok, outcome.Message);
+        return outcome;
+    }
+
+    private IReadOnlyList<AuditEntry> AuditLines()
+    {
+        Assert.True(AuditReader.TryRead(_fixture.AuditPath, out var entries, out var unreadable, out var error), error);
+        Assert.Equal(0, unreadable);
+        return entries;
+    }
+
+    [Fact]
+    public async Task TwoItemsOfOneName_EachShareAndRevokeLineNamesItsOwnItem()
+    {
+        EntryName first, second;
+        ShareOutcome firstShare, secondShare;
+        string firstToken, secondToken;
+
+        using (var vault = _fixture.Open())
+        {
+            (first, second) = PlantPair(vault);
+            firstShare = await Share(vault, first);
+            secondShare = await Share(vault, second);
+
+            var store = new ShareStore(vault);
+            Assert.True(store.TryGetRevokeToken(firstShare.Info!.Id, out firstToken!));
+            Assert.True(store.TryGetRevokeToken(secondShare.Info!.Id, out secondToken!));
+        }
+
+        Assert.NotEqual(first.Uuid, second.Uuid);
+        Assert.Equal(first.Uuid, firstShare.Info!.Item);
+        Assert.Equal(second.Uuid, secondShare.Info!.Item);
+
+        using (var reopened = _fixture.Open())
+        {
+            var recorded = new ShareStore(reopened).List().ToDictionary(info => info.Id, info => info.Item);
+            Assert.Equal(first.Uuid, recorded[firstShare.Info.Id]);
+            Assert.Equal(second.Uuid, recorded[secondShare.Info.Id]);
+
+            // The other way round from sharing, from the records alone, so nothing can fall back on the order or the name.
+            Assert.True((await _fixture.Service().RevokeAsync(reopened, secondShare.Info.Id, CancellationToken.None)).Ok);
+            Assert.True((await _fixture.Service().RevokeAsync(reopened, firstShare.Info.Id, CancellationToken.None)).Ok);
+        }
+
+        var lines = AuditLines();
+        Assert.Equal(
+            [("share-created", first.Uuid), ("share-created", second.Uuid), ("share-revoked", second.Uuid), ("share-revoked", first.Uuid)],
+            lines.Select(line => (line.Method, (string?)line.Item)));
+        Assert.All(lines, line => Assert.Equal("env/acme-api/STRIPE_SECRET_KEY", line.Entry));
+
+        var written = _fixture.AuditText();
+        Assert.True(ShareLink.TryParse(firstShare.Link!, out _, out var firstKey));
+        Assert.True(ShareLink.TryParse(secondShare.Link!, out _, out var secondKey));
+        foreach (var secret in new[] { firstKey, secondKey, firstToken, secondToken, ShareFixture.StripeValue, "the-other-one" })
+        {
+            Assert.DoesNotContain(secret, written, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(_fixture.AuditPath).Verdict);
+    }
+
+    [Fact]
+    public async Task ALogMixingOlderShareLinesWithNewOnes_VerifiesAndOnlyTheNewOnesNameAnItem()
+    {
+        AuditRecord Older(AuditMethod method) => new()
+        {
+            Tool = "share",
+            Client = new AuditClient("keypaste share", "0.9.0", null),
+            Args = new AuditArgs { Entry = "env/acme-api/STRIPE_SECRET_KEY", Field = "password" },
+            Decision = AuditDecision.Granted,
+            Method = method,
+            Reason = "share 0ld: 1 view, expires 2026-09-25T14:40:00Z, to anyone with the link",
+        };
+
+        void WriteOlder(AuditMethod method)
+        {
+            Assert.True(AuditLog.TryOpen(_fixture.AuditPath, _fixture.Clock, out var log, out var error), error);
+            using (log)
+            {
+                Assert.True(log!.TryAppend(Older(method), out error), error);
+            }
+        }
+
+        using var vault = _fixture.Open();
+        var (first, second) = PlantPair(vault);
+
+        WriteOlder(AuditMethod.ShareCreated);
+        var firstBytes = File.ReadAllLines(_fixture.AuditPath)[0];
+        var created = await Share(vault, first);
+        WriteOlder(AuditMethod.ShareRevoked);
+        Assert.True((await _fixture.Service().RevokeAsync(vault, created.Info!.Id, CancellationToken.None)).Ok);
+
+        var report = AuditChainVerifier.Verify(_fixture.AuditPath);
+        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
+        Assert.Equal(4, report.Records);
+        Assert.Empty(report.Findings);
+        Assert.Equal(firstBytes, File.ReadAllLines(_fixture.AuditPath)[0]);
+
+        var lines = AuditLines();
+        Assert.Equal(new string?[] { string.Empty, first.Uuid, string.Empty, first.Uuid }, lines.Select(line => (string?)line.Item));
+
+        // A line naming the path alone is neither item's, so it never reaches the other of the pair.
+        var activity = EntryActivity.Build(lines, string.Empty, ApproverActivity.None, [], _fixture.Clock.GetUtcNow());
+        Assert.Equal("keypaste share", Assert.Single(activity.Access(first, byItem: true).Clients).Client);
+        Assert.Empty(activity.Access(second, byItem: true).Clients);
+    }
+
+    [Fact]
+    public async Task Revoke_OfARecordNamingNoItem_WritesALineNamingNone()
+    {
+        const string id = "Qm9vYmFyQm9vYmFyQm9vYg";
+        var created = new DateTimeOffset(2026, 9, 24, 14, 40, 0, TimeSpan.Zero);
+
+        using var vault = _fixture.Open();
+        new ShareStore(vault).Add(new ShareInfo(id, "env/acme-api/STRIPE_SECRET_KEY", "password", null, created, created.AddDays(1), 1, false, "https://keypaste.com"), "t");
+        vault.Save();
+
+        var outcome = await _fixture.Service().RevokeAsync(vault, id, CancellationToken.None);
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.Equal(string.Empty, Assert.Single(AuditLines()).Item);
     }
 
     [Fact]

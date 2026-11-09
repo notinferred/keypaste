@@ -60,7 +60,7 @@ public sealed class SharingViewModelTests : IDisposable
         _vault.Dispose();
     }
 
-    private SharingViewModel Screen(string? unavailable = null) => new(
+    private SharingViewModel Screen(string? unavailable = null, EntryName? what = null) => new(
         _session,
         _countdown,
         new ShareService(
@@ -68,7 +68,31 @@ public sealed class SharingViewModelTests : IDisposable
             _clock,
             () => AuditLog.TryOpen(KeypasteHome.AuditPath(_vault.Home), _clock, out var log, out _) ? log : null),
         _toasts.Add,
-        unavailable);
+        unavailable,
+        what);
+
+    /// <summary>Two saved items at <c>services/Mail</c> with these usernames, each addressed by its UUID.</summary>
+    private (EntryName First, EntryName Second) PlantPair(string firstUsername, string secondUsername)
+    {
+        var vault = _session.Unlocked!;
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = firstUsername, Password = "first-mail-password" });
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = secondUsername, Password = "second-mail-password" });
+        vault.Save();
+
+        var uuids = vault.ReadEntries().Where(entry => entry.Title == "Mail").Select(entry => entry.Uuid).ToList();
+        var name = new EntryName("services", "Mail");
+        return (name with { Uuid = uuids[0] }, name with { Uuid = uuids[1] });
+    }
+
+    /// <summary>Shares the item as its Share… dialog does and returns the link's id.</summary>
+    private async Task<string> ShareFromTheDialog(EntryName item)
+    {
+        using var dialog = Screen(what: item);
+        await dialog.CreateCommand.PressAsync();
+        Assert.Null(dialog.Error);
+        Assert.True(ShareLink.TryParse(_clipboard.Content!, out var id, out _));
+        return id;
+    }
 
     [Fact]
     public void Defaults_Are24hAndOneView()
@@ -391,6 +415,59 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Null(screen.SelectedWhat);
         Assert.Null(screen.Error);
         Assert.True(screen.Passphrase.IsZeroed);
+    }
+
+    [Fact]
+    public async Task TwoItemsOfOneName_EachRowSaysWhichWasShared_AndItsRevokeLineNamesIt()
+    {
+        var (first, second) = PlantPair("alice", "bob");
+        var firstId = await ShareFromTheDialog(first);
+        var secondId = await ShareFromTheDialog(second);
+
+        using var screen = Screen();
+        await Until(() => screen.Rows.Count == 2);
+
+        var firstRow = screen.Rows.Single(row => row.Id == firstId);
+        var secondRow = screen.Rows.Single(row => row.Id == secondId);
+        Assert.Equal("services/Mail (alice)", firstRow.What);
+        Assert.Equal("services/Mail (bob)", secondRow.What);
+        Assert.Equal("Revoke the link to services/Mail (bob)? It stops opening for good.", secondRow.ConfirmText);
+
+        screen.Selected = secondRow;
+        await screen.RevokeCommand.PressAsync();
+
+        Assert.True(AuditReader.TryRead(KeypasteHome.AuditPath(_vault.Home), out var lines, out _, out var error), error);
+        Assert.Equal(second.Uuid, Assert.Single(lines, line => line.Method == "share-revoked").Item);
+        Assert.Equal(first.Uuid, lines.Single(line => line.Method == "share-created" && line.Reason.Contains(firstId, StringComparison.Ordinal)).Item);
+    }
+
+    [Fact]
+    public async Task TwoItemsWithNothingToTell_EachRowNamesItsUuid()
+    {
+        var (first, second) = PlantPair(string.Empty, string.Empty);
+        var firstId = await ShareFromTheDialog(first);
+        var secondId = await ShareFromTheDialog(second);
+
+        using var screen = Screen();
+        await Until(() => screen.Rows.Count == 2);
+
+        Assert.Equal($"services/Mail (item {first.Uuid![..8]})", screen.Rows.Single(row => row.Id == firstId).What);
+        Assert.Equal($"services/Mail (item {second.Uuid![..8]})", screen.Rows.Single(row => row.Id == secondId).What);
+    }
+
+    [Fact]
+    public async Task ARecordNamingNoItem_OnAPairsPath_StaysThePathAlone()
+    {
+        const string id = "Qm9vYmFyQm9vYmFyQm9vYg";
+        PlantPair("alice", "bob");
+        var now = _clock.GetUtcNow();
+        new ShareStore(_session.Unlocked!).Add(new ShareInfo(id, "services/Mail", "password", null, now, now.AddDays(1), 1, false, "https://keypaste.com"), "t");
+        _session.Unlocked!.Save();
+
+        using var screen = Screen();
+        await Until(() => screen.Rows.Count == 1);
+
+        Assert.Equal("services/Mail", screen.Rows[0].What);
     }
 
     private static async Task Until(Func<bool> condition)

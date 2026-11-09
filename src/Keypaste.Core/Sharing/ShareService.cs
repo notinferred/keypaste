@@ -177,7 +177,8 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             accepted.ExpiresAt,
             request.Views,
             sealedShare.HasPassphrase,
-            _client.Endpoint.GetLeftPart(UriPartial.Authority));
+            _client.Endpoint.GetLeftPart(UriPartial.Authority),
+            matches[0].Uuid);
 
         var store = new ShareStore(vault);
         if (!TryWrite(vault, () => store.Add(info, revokeToken), out var unsaved))
@@ -187,7 +188,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused($"the vault could not be saved ({unsaved}), so the link was withdrawn");
         }
 
-        if (!TryAudit(AuditMethod.ShareCreated, what, request.Field, ShareAuditReason.Created(info)))
+        if (!TryAudit(AuditMethod.ShareCreated, info, ShareAuditReason.Created(info)))
         {
             await _client.RevokeAsync(info.Id, revokeToken, CancellationToken.None).ConfigureAwait(false);
             TryForget(vault, store, info.Id, save: true);
@@ -228,7 +229,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return new ShareOutcome(false, null, info, ShareFailure.None, $"the link was revoked, but the vault could not be saved ({unsaved})");
         }
 
-        if (!TryAudit(AuditMethod.ShareRevoked, info.What, info.Field, $"share {info.Id} revoked"))
+        if (!TryAudit(AuditMethod.ShareRevoked, info, $"share {info.Id} revoked"))
         {
             return new ShareOutcome(false, null, info, ShareFailure.None, "the link was revoked, but the audit log could not be written");
         }
@@ -420,7 +421,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         }
     }
 
-    private bool TryAudit(AuditMethod method, string what, string field, string reason)
+    private bool TryAudit(AuditMethod method, ShareInfo info, string reason)
     {
         using var audit = _openAudit();
 
@@ -429,7 +430,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             {
                 Tool = _tool,
                 Client = new AuditClient("keypaste share", CoreInfo.Version, null),
-                Args = new AuditArgs { Entry = what, Field = field },
+                Args = new AuditArgs { Entry = info.What, Item = info.Item, Field = info.Field },
                 Decision = AuditDecision.Granted,
                 Method = method,
                 Reason = reason,

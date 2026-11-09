@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A share link now records the item it was made from, on its audit line and its row, so Share links says which of two items with the same name it shares. Links and audit lines made before this stay as they were ([F.90](docs/steps/F.90.md)).
+
 When the audit log won't open and keypaste is refusing agents, the desktop app now says so once in a pop-up with the fix, and keeps a message on Agents until the log opens ([F.86](docs/steps/F.86.md)).
 
 An item open in the desktop app now shows what another device, program or terminal changed, at once or, if you are editing it or have typed into one of its forms, when that form closes. Saving an edit or a rename now writes only what you changed, so it no longer undoes another device's change to the rest ([F.85](docs/steps/F.85.md)).

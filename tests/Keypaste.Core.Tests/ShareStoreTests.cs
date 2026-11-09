@@ -114,6 +114,47 @@ public sealed class ShareStoreTests : IDisposable
         Assert.Equal("ZZZZZZZZZZZZZZZZZZZZZA", Assert.Single(store.List()).Id);
     }
 
+    [Fact]
+    public void Add_RemembersTheItemsUuid_AcrossAReopen()
+    {
+        const string id = "Qm9vYmFyQm9vYmFyQm9vYg";
+        const string uuid = "0123456789ABCDEF0123456789ABCDEF";
+
+        using (var vault = _fixture.Open())
+        {
+            new ShareStore(vault).Add(Info(id) with { Item = uuid }, "t");
+            vault.Save();
+        }
+
+        using var reopened = _fixture.Open();
+        Assert.Equal(uuid, Assert.Single(new ShareStore(reopened).List()).Item);
+    }
+
+    /// <summary>A record written before links named their item, or one another program edited, names none and stays revocable.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData(",\"item\":\"not a uuid\"")]
+    [InlineData(",\"item\":\"0123456789ABCDEF0123456789ABCDE\"")]
+    [InlineData(",\"item\":42")]
+    public void List_ARecordNamingNoUsableItem_ReadsAsNamingNone(string item)
+    {
+        const string id = "Qm9vYmFyQm9vYmFyQm9vYg";
+
+        using var vault = _fixture.Open();
+        vault.AddEntry(new VaultEntry
+        {
+            GroupPath = ReservedGroups.Shares,
+            Title = id,
+            Password = "t",
+            Url = "https://keypaste.com",
+            Notes = "{\"v\":1,\"what\":\"Banking/Chase\",\"field\":\"password\",\"created\":\"2026-09-24T14:40:00Z\",\"expires\":\"2026-09-25T14:40:00Z\",\"views\":1,\"passphrase\":false" + item + "}",
+        });
+
+        var info = Assert.Single(new ShareStore(vault).List());
+        Assert.Equal(id, info.Id);
+        Assert.Null(info.Item);
+    }
+
     [Theory]
     [InlineData(1, 60 * 24, "1 view · 24h")]
     [InlineData(3, 60, "3 views · 1h")]
