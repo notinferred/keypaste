@@ -5,7 +5,7 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One project tag an entry lost in another app, as Settings › Recommendations lists it (V.11).</summary>
+/// <summary>One project tag an entry lost in another app, as Items › Recommendations lists it (V.11).</summary>
 internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
 {
     internal LostTagRow(RecommendationsViewModel owner, LostProjectTag finding, bool isDismissed)

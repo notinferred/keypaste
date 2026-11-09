@@ -63,7 +63,7 @@ Evidence: `AuditLogTests.AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact
 
 ## T-3 — Confused deputy: a malicious or impersonating client
 
-An MCP client supplies its own name and version without authentication. Any local process spawning the binary can claim to be `claude-code`. keypaste sanitizes this identity for the audit log and approval prompt but never uses it to authorize a release.
+An MCP client supplies its own name and version without authentication. Any local process spawning the binary can claim to be `claude-code`. keypaste sanitizes this identity for the audit log and approval prompt but never uses it to authorize a release. The same holds for the folder name a bridge sends, which only labels a live session on Agents and is never written to the audit log.
 
 A bridge also announces its exposure when it attaches (N.5). The app uses it only to decide whether an entry's Agent access card shows. A process that announces a wider or narrower exposure changes which cards show and nothing else: every request carries its own exposure, which the owner re-checks before it asks anyone (T-4).
 
@@ -353,7 +353,7 @@ Evidence: `Keypaste.Cli.Tests.KeyfileOptionTests` covers both sources and the fl
 
 KeePass accepts four keyfile forms, and keypaste opens all four because KeePassXC wrote vaults with all four: an XML keyfile, a 32-byte file, a 64-character hex file, and — the fallback — any other file, keyed by the SHA-256 of its contents. In the fourth case the key is the file's bytes, so editing the file, re-encoding it, or letting a synchroniser rewrite it destroys access to the vault permanently. No warning precedes that, and no recovery follows it beyond restoring the file's exact former contents.
 
-keypaste says so when it opens such a vault: the CLI in one line on stderr, once per open, naming the file, and the desktop in a notice when the vault opens. The only keyfile it writes is the KeePass XML keyfile the desktop makes when asked (D-0506), and neither `keypaste access`, the desktop's Settings nor creating a vault attaches one of this kind, so a vault keypaste protected cannot acquire this weakness; one it inherits keeps it, including across a password change.
+keypaste says so when it opens such a vault: the CLI in one line on stderr, once per open, naming the file, and the desktop as an item in Recommendations, which the person can dismiss. The only keyfile it writes is the KeePass XML keyfile the desktop makes when asked (D-0506), and neither `keypaste access`, the desktop's Settings nor creating a vault attaches one of this kind, so a vault keypaste protected cannot acquire this weakness; one it inherits keeps it, including across a password change.
 
 Two adjacent facts matter and are not warned about, because they are indistinguishable from a deliberate choice. A file of exactly 32 bytes is read as raw key material and a file of exactly 64 hexadecimal characters is decoded, by keypaste and by KeePassXC alike, so an ordinary document of one of those two lengths is not the fragile form and draws no line. And a keyfile is not a password: anyone who can read the file has that factor, so its protection lies in where it is kept.
 

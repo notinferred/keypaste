@@ -1,3 +1,5 @@
+using System.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -919,7 +921,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 var keyfile = _session.Unlocked?.KeyfilePath;
                 Remember(path, keyfile, _session.HardwareKeySlot);
                 ResetPassword();
-                Notice = FragileNotice(keyfile);
+                Notice = null;
                 _unlocked();
                 return;
             }
@@ -1038,7 +1040,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             {
                 Remember(path, keyfile, slot);
                 ResetPassword();
-                Notice = FragileNotice(keyfile);
+                Notice = null;
                 await LandAsync().ConfigureAwait(true);
                 return;
             }
@@ -1300,8 +1302,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
     private static string? FragileNotice(string? keyfile) =>
         keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile
-            ? $"This vault's key file, {System.IO.Path.GetFileName(keyfile)}, is an ordinary file keyed by its exact bytes. " +
-              "Editing it, re-saving it or letting something sync over it loses the vault for good. Change to a KeePass key file in Settings."
+            ? string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, System.IO.Path.GetFileName(keyfile))
             : null;
 
     /// <summary>Why a file cannot be used as a keyfile, in the register of <see cref="Explain"/>.</summary>

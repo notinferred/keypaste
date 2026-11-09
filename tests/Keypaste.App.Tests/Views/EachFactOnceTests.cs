@@ -261,14 +261,11 @@ public sealed class EachFactOnceTests
         var count = recommendations.NeedsReview;
         Assert.True(count > 0);
 
-        var settings = shell.Show<SettingsViewModel>(DestinationKind.Settings);
-        RenderedShell.Drain();
-
-        Assert.Equal(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommendations: {count} to review"), shell.Named<TextBlock>("RecommendationsLine").Text);
         Assert.DoesNotContain(Shown<TextBlock>(shell), block => block.Text == "STRIPE_SECRET_KEY");
-        Assert.Contains(shell.Named<ListBox>("FooterNav").GetVisualDescendants().OfType<TextBlock>(), block => block.Text == count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(count.ToString(System.Globalization.CultureInfo.InvariantCulture), shell.Shell.RecommendationsRow.Count);
+        Assert.Contains(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
 
-        settings.OpenRecommendationsCommand.Press();
+        shell.Shell.SelectedSidebarRow = shell.Shell.RecommendationsRow;
         RenderedShell.Drain();
 
         Assert.Same(recommendations, shell.Shell.Content);
@@ -279,7 +276,7 @@ public sealed class EachFactOnceTests
         // Leaving and coming back keeps the list, which the shell owns for the whole unlock.
         shell.Shell.BackCommand.Press();
         RenderedShell.Drain();
-        Assert.Equal(DestinationKind.Settings, shell.Shell.Current.Kind);
+        Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
         Assert.Equal(count, recommendations.NeedsReview);
 
         recommendations.Dismiss(Assert.Single(recommendations.Rows));
@@ -290,21 +287,19 @@ public sealed class EachFactOnceTests
         }
 
         RenderedShell.Drain();
-        Assert.StartsWith("Recommendations: nothing to review, ", shell.Named<TextBlock>("RecommendationsLine").Text, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, shell.Shell.RecommendationsRow.Count);
+        Assert.Contains(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
     });
 
     [Fact]
-    public Task Settings_draws_no_line_when_nothing_was_found() => HeadlessSession.On(async () =>
+    public Task The_sidebar_lists_no_recommendations_when_nothing_was_found() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell("keypaste-recommendations-none-");
         await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
         RenderedShell.Drain();
         Assert.True(shell.Shell.Recommendations.IsEmpty);
 
-        shell.Show<SettingsViewModel>(DestinationKind.Settings);
-        RenderedShell.Drain();
-
-        Assert.False(shell.Named<Border>("RecommendationsCard").IsEffectivelyVisible);
+        Assert.DoesNotContain(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
     });
 
     /// <summary>A column's usual item is the one holding most of its keys, a tie going to the first path in ordinal order.</summary>

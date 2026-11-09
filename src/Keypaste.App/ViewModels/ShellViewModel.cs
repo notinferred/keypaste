@@ -156,16 +156,16 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Recommendations = new RecommendationsViewModel(session, home, OpenEntry, post);
         Recommendations.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(RecommendationsViewModel.NeedsReview))
+            if (e.PropertyName is nameof(RecommendationsViewModel.NeedsReview) or nameof(RecommendationsViewModel.IsEmpty))
             {
-                SetCount(DestinationKind.Settings, Recommendations.NeedsReview);
+                ShowRecommendationsRow();
             }
         };
 
         // Built here rather than left to the first navigation. Assigning Current to the destination
         // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
         Show(_current);
-        SetCount(DestinationKind.Settings, Recommendations.NeedsReview);
+        ShowRecommendationsRow();
         ReadAuthority();
         ReadVaultStatus();
 
@@ -327,6 +327,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 #pragma warning restore CA1822
 
     /// <summary>The sidebar's main rows.</summary>
+    /// <summary>The sidebar's row for Recommendations, under Items while there is anything to list.</summary>
+    internal NavItem RecommendationsRow { get; } = new(Destinations.Of(DestinationKind.Recommendations));
+
     internal IReadOnlyList<NavItem> MainNav { get; }
 
     /// <summary>The sidebar's quieter rows at the bottom: Settings and Trash.</summary>
@@ -949,7 +952,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log, openAgents: OpenAgents),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast) { AskDiscard = AskDiscard },
@@ -1262,6 +1265,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             rows.AddRange(_projects);
         }
 
+        if (Recommendations is { IsEmpty: false })
+        {
+            rows.Add(RecommendationsRow);
+        }
+
         rows.AddRange(MainNav.Skip(1));
         return rows;
     }
@@ -1277,6 +1285,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         return true;
+    }
+
+    private void ShowRecommendationsRow()
+    {
+        RecommendationsRow.Count = Recommendations.NeedsReview > 0 ? Recommendations.NeedsReview.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        RebuildSidebar();
     }
 
     /// <summary>Replaces the sidebar's rows when they differ, keeping the list from writing back the row it had.</summary>

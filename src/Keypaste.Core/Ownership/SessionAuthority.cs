@@ -172,7 +172,7 @@ public sealed class SessionAuthority : IApproverHandler
                         pair.Value.Client.Version,
                         pair.Value.Client.Label,
                         pair.Value.AttachedAt,
-                        pair.Value.LastRequestAt) { Exposure = pair.Value.Exposure })
+                        pair.Value.LastRequestAt) { Exposure = pair.Value.Exposure, Folder = pair.Value.Client.Folder })
                     .OrderByDescending(client => client.LastRequestAt)
                     .ThenBy(client => client.ConnectionId, StringComparer.Ordinal),
             ];

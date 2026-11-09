@@ -84,6 +84,7 @@ internal sealed class AttachRequestFrame(AttachRequest request)
     public string? ClientName => request.Client?.Name;
     public string? ClientVersion => request.Client?.Version;
     public string? ClientLabel => request.Client?.Label;
+    public string? ClientFolder => request.Client?.Folder;
     public IReadOnlyList<string>? Exposure => request.Exposure;
     public string? Browser => request.Browser;
 }

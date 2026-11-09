@@ -475,7 +475,7 @@ public sealed class RunToolTests : IDisposable
             cancellationToken: Token);
 
         var attached = Assert.Single(harness.Approver.Attached);
-        Assert.Equal(new AttachClient(McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), attached.Client);
+        Assert.Equal(new AttachClient(McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), attached.Client! with { Folder = null });
         Assert.Equal(["env/**"], attached.Exposure);
     }
 

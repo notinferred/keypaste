@@ -63,24 +63,6 @@
 
         <TextBlock Classes="h1" Text="{x:Static res:Strings.Settings}" />
 
-        <!-- One line, opening their own screen, so Settings opens on settings; gone when nothing was found. -->
-        <Panel IsVisible="{Binding !Recommendations.IsEmpty, FallbackValue=False}">
-          <Border Name="RecommendationsCard"
-                  Classes="card filled settings"
-                  DataContext="{Binding Recommendations}"
-                  x:DataType="vm:RecommendationsViewModel">
-            <Border Classes="settings-row">
-              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                <ctl:KpIcon Grid.Column="0" Icon="clipboard-check" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Name="RecommendationsLine" Classes="row-label size-13-5" Text="{Binding Line}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <Button Grid.Column="2" Name="OpenRecommendations" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
-                        AutomationProperties.Name="{x:Static res:Strings.OpenRecommendations}"
-                        Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).OpenRecommendationsCommand}" />
-              </Grid>
-            </Border>
-          </Border>
-        </Panel>
-
         <StackPanel Spacing="8">
           <ListBox Name="SettingsSections" Classes="segmented" HorizontalAlignment="Left"
                    AutomationProperties.Name="{x:Static res:Strings.SettingsSections}"

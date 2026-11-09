@@ -90,6 +90,16 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
     /// <summary>Whether it can have settings of its own: a name they can be kept under, or Every other agent.</summary>
     internal bool HasSettings { get; }
 
+    /// <summary>The folders its live sessions say they run in, once each with how many; display only (T-3).</summary>
+    internal string Sessions =>
+        string.Join(", ", _card.Folders.GroupBy(folder => folder, StringComparer.Ordinal).Select(group => group.Count() > 1 ? $"{group.Key} ×{group.Count()}" : group.Key));
+
+    internal bool HasSessions => _card.Folders.Count > 0;
+
+    /// <summary>Whether the tab in view lists it.</summary>
+    [ObservableProperty]
+    internal partial bool IsShown { get; set; } = true;
+
     /// <summary>A found tool without keypaste, or one whose configuration keypaste cannot read, has Connect on its row.</summary>
     internal bool OffersConnect => Tool is not null && Presence?.State is McpToolState.NotConnected or McpToolState.CannotTell;
 
@@ -164,6 +174,9 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
             OnPropertyChanged(nameof(ShowsConnect));
             OnPropertyChanged(nameof(ShowsToolActions));
         }
+
+        OnPropertyChanged(nameof(Sessions));
+        OnPropertyChanged(nameof(HasSessions));
 
         var inUse = card.Connections > 0;
         IsLive = inUse || card.Presence?.State == McpToolState.Connected;

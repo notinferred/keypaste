@@ -17,6 +17,9 @@ public sealed record ConnectedClient(
     DateTimeOffset AttachedAt,
     DateTimeOffset LastRequestAt)
 {
+    /// <summary>The folder it said it runs in, or null; display only (T-3).</summary>
+    public string? Folder { get; init; }
+
     /// <summary>The globs it said it answers with when it attached, or empty when it said none (N.5).</summary>
     public IReadOnlyList<string> Exposure { get; init; } = [];
 

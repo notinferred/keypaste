@@ -65,6 +65,19 @@ public sealed class McpClientCardsTests
     }
 
     [Fact]
+    public void Each_live_session_says_its_folder_and_a_card_cleans_what_it_says()
+    {
+        var card = Assert.Single(Agents(
+            [Connected("c1", "Claude Code", "claude-code") with { Folder = "repo" }, Connected("c2", "Claude Code", "claude-code") with { Folder = "re\u202Epo" }],
+            []));
+
+        Assert.Equal(2, card.Connections);
+        Assert.Equal(2, card.Folders.Count);
+        Assert.Contains("repo", card.Folders);
+        Assert.DoesNotContain(card.Folders, folder => folder.Contains('\u202E', StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ATokenRun_IsNoMcpClient()
     {
         var token = Line(string.Empty, "keypaste run --token", 1, tool: "run") with { Method = "token" };

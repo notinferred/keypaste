@@ -96,7 +96,7 @@ internal static class Destinations
         new(DestinationKind.EnvSets, () => Strings.Projects, "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
         new(DestinationKind.AgentHistory, () => Strings.History, "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
         new(DestinationKind.Advanced, () => Strings.Advanced, "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
-        new(DestinationKind.Recommendations, () => Strings.Recommendations, "clipboard-check", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Recommendations, () => Strings.Recommendations, "clipboard-check", OwnsHeader: true, Parent: DestinationKind.Entries),
         new(DestinationKind.Log, () => Strings.ActivityLog, "activity", OwnsHeader: true, Parent: DestinationKind.Advanced),
         new(DestinationKind.Sharing, () => Strings.ShareLinks, "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
         new(DestinationKind.Tokens, () => Strings.ScopedTokens, "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),

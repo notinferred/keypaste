@@ -661,8 +661,9 @@ public static partial class ApproverProtocol
             var name = Optional(root, "client_name");
             var version = Optional(root, "client_version");
             var label = Optional(root, "client_label");
+            var folder = Optional(root, "client_folder");
 
-            if (new[] { name, version, label }.Any(field => field?.Length > AttachClient.MaximumLength))
+            if (new[] { name, version, label, folder }.Any(field => field?.Length > AttachClient.MaximumLength))
             {
                 return false;
             }
@@ -686,7 +687,7 @@ public static partial class ApproverProtocol
 
             request = new AttachRequest(vault)
             {
-                Client = name is null && version is null && label is null ? null : new AttachClient(name, version, label),
+                Client = name is null && version is null && label is null ? null : new AttachClient(name, version, label) { Folder = folder },
                 Exposure = exposure,
                 Browser = browser,
             };

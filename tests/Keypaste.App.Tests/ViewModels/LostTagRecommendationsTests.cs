@@ -1,6 +1,5 @@
 using KeePassLib;
 using KeePassLib.Security;
-using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
@@ -136,7 +135,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     private static NavItem Settings(ShellViewModel shell) =>
-        shell.FooterNav.Single(item => item.Destination.Kind == DestinationKind.Settings);
+        shell.RecommendationsRow;
 
     private ShellViewModel Shell() =>
         new(_session, _fixture.Home, authority: null, clock: _clock, post: null);

@@ -1,5 +1,6 @@
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 
 namespace Keypaste.Core.Clients;
 
@@ -37,6 +38,9 @@ public sealed record McpClientCard(
 
     /// <summary>Whether the tool was found on this computer and holds keypaste; null when it was not found, or the card is no tool's.</summary>
     public McpToolPresence? Presence { get; init; }
+
+    /// <summary>The folder each live session says it runs in; display only (T-3).</summary>
+    public IReadOnlyList<string> Folders { get; init; } = [];
 }
 
 /// <summary>
@@ -105,6 +109,11 @@ public static class McpClientCards
 
             var draft = Card(key, Nonempty(client.Label), client.Name);
             draft.Connections++;
+            if (client.Folder is { Length: > 0 } folder)
+            {
+                draft.Folders.Add(EntryNameSanitizer.Sanitize(folder, AttachClient.MaximumLength).Text);
+            }
+
             draft.Seen(client.LastRequestAt);
         }
 
@@ -152,6 +161,7 @@ public static class McpClientCards
                 draft.LastSeen,
                 rules.Runs(draft.Label))
             {
+                Folders = draft.Folders,
                 Tool = draft.Finding?.Tool ?? McpClientCatalog.All.FirstOrDefault(known => string.Equals(known.Id, draft.Label, StringComparison.Ordinal)),
                 Presence = draft.Finding?.Presence,
             };
@@ -210,6 +220,8 @@ public static class McpClientCards
         internal string? Name { get; set; }
 
         internal int Connections { get; set; }
+
+        internal List<string> Folders { get; } = [];
 
         internal McpToolFinding? Finding { get; set; }
 

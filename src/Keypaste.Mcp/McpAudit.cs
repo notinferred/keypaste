@@ -46,7 +46,21 @@ internal static class McpAudit
 
         return said.Name is null && said.Version is null && options.ClientLabel is null
             ? null
-            : new AttachClient(said.Name, said.Version, options.ClientLabel);
+            : new AttachClient(said.Name, said.Version, options.ClientLabel) { Folder = WorkingFolder() };
+    }
+
+    /// <summary>The name of the folder this bridge runs in, left out when it is too long to send whole or cannot be read.</summary>
+    private static string? WorkingFolder()
+    {
+        try
+        {
+            var name = Path.GetFileName(Environment.CurrentDirectory.TrimEnd(Path.DirectorySeparatorChar));
+            return name.Length is > 0 and <= AttachClient.MaximumLength ? name : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>How long a tool call waits for a handshake that is already in flight.</summary>

@@ -152,7 +152,7 @@ public sealed class UnlockKeyfileTests : IDisposable
     }
 
     [Fact]
-    public async Task A_vault_keyed_to_an_ordinary_file_opens_with_a_warning_the_shell_shows()
+    public async Task A_vault_keyed_to_an_ordinary_file_opens_and_its_warning_is_a_recommendation()
     {
         var document = Path.Combine(_home.Path, "notes.txt");
         File.WriteAllText(document, "an ordinary document someone might edit");
@@ -162,13 +162,23 @@ public sealed class UnlockKeyfileTests : IDisposable
         model.Offer(path);
         _picker.KeyfilePath = document;
         await model.ChooseKeyfileAsync();
-        Assert.Contains("keyed by its exact bytes", model.Message, StringComparison.Ordinal);
+        Assert.Contains("is changed or lost", model.Message, StringComparison.Ordinal);
 
         Type(model, _master);
         await model.UnlockAsync();
 
         Assert.Equal(1, _unlockedCalls);
-        Assert.Contains("notes.txt", model.Notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("notes.txt", model.Notice ?? string.Empty, StringComparison.Ordinal);
+
+        using var recommendations = new RecommendationsViewModel(_session, _home.Path);
+        Assert.Contains("notes.txt", recommendations.FragileKeyFileWarning, StringComparison.Ordinal);
+        Assert.Equal(1, recommendations.NeedsReview);
+
+        recommendations.DismissFragileKeyFileCommand.Execute(null);
+
+        Assert.Equal(0, recommendations.NeedsReview);
+        using var next = new RecommendationsViewModel(_session, _home.Path);
+        Assert.True(next.FragileKeyFileDismissed);
     }
 
     [Fact]

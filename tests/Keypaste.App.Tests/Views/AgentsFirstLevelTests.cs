@@ -37,11 +37,38 @@ public sealed class AgentsFirstLevelTests
 
     private static readonly string[] _kinds =
     [
-        "Button/AgentHistory", "Button/ShowPrompt", "Button/ConnectTool",
+        "Button/AddAnAgent", "ListBox/AgentsTabs", "Button/AgentHistory", "Button/ShowPrompt", "Button/ConnectTool",
         "Expander/AgentSettings",
     ];
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public Task The_Agents_tab_leaves_out_a_tool_not_connected() => HeadlessSession.On(async () =>
+    {
+        await using var agents = await Agents.StartAsync();
+        var model = agents.Model;
+
+        model.Tab = Keypaste.App.Resources.Strings.Agents;
+        agents.Settle();
+
+        Assert.False(model.Rows.Single(row => row.Key == "cursor").IsShown);
+        Assert.True(model.Rows.Single(row => row.Key == "claude-code").IsShown);
+    });
+
+    [Fact]
+    public Task Add_MCP_manually_opens_Connections_with_the_configuration() => HeadlessSession.On(async () =>
+    {
+        await using var agents = await Agents.StartAsync();
+        var model = agents.Model;
+        model.Tab = Keypaste.App.Resources.Strings.Agents;
+
+        model.AddMcpManuallyCommand.Execute(null);
+
+        Assert.True(model.ShowsConnections);
+        Assert.True(model.ShowsManualConfig);
+        Assert.Contains("\"keypaste\"", model.ManualConfigText, StringComparison.Ordinal);
+    });
 
     [Fact]
     public Task Agents_first_level_holds_at_most_twelve_kinds_of_control() => HeadlessSession.On(async () =>
@@ -270,6 +297,7 @@ public sealed class AgentsFirstLevelTests
             await model.Looking.WaitAsync(_wait, Token);
 
             var agents = new Agents(fixture, clock, person, authority, model, window);
+            model.ConnectAnAppCommand.Execute(null);
             agents.Settle();
             return agents;
         }

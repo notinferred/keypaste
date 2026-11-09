@@ -52,7 +52,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         DesktopPreferences preferences,
         Action<AppTheme> applyTheme,
         IVaultFilePicker? picker = null,
-        RecommendationsViewModel? recommendations = null,
         Action<DestinationKind>? open = null,
         Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
@@ -79,9 +78,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker, paste);
-        Recommendations = recommendations;
         OpenAdvancedCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Advanced), () => open is not null);
-        OpenRecommendationsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Recommendations), () => open is not null);
         LinkCliCommand = new AsyncRelayCommand(LinkCliAsync, () => OffersCliLink && !IsCliLinking);
         BeginReplaceCliCommand = new RelayCommand(
             () => IsConfirmingCliReplace = true,
@@ -94,11 +91,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
     internal RelayCommand OpenAdvancedCommand { get; }
-
-    internal RelayCommand OpenRecommendationsCommand { get; }
-
-    /// <summary>Recommendations, owned by the shell for the unlock; null where no shell built this screen.</summary>
-    internal RecommendationsViewModel? Recommendations { get; }
 
     /// <summary>Changing the vault's master password and keyfile.</summary>
     internal VaultAccessViewModel Access { get; }

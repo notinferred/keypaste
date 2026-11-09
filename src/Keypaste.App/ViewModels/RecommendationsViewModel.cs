@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -12,12 +13,12 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Rows">Each item with it.</param>
 internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyList<PasswordRow> Rows);
 
-/// <summary>Settings › Recommendations: keys left in notes (C.2, D-0372), project tags another app dropped (V.11) and weak, reused or expired passwords (V.9), for review.</summary>
+/// <summary>Items › Recommendations: keys left in notes (C.2, D-0372), project tags another app dropped (V.11) and weak, reused or expired passwords (V.9), for review.</summary>
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is
 /// checked when the shell is built, which is on unlock, and again after each save. Nothing here is
-/// shown anywhere else: no banner, no toast, only a quiet count on the Settings row.
+/// shown anywhere else: no banner, no toast, only a quiet count on its sidebar row.
 /// </para>
 /// <para>
 /// A check reads every live entry under the vault's lock and rates each password against a
@@ -92,12 +93,27 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             .Select(group => new PasswordGroup(PasswordRow.Heading(group.Key), PasswordRow.Reason(group.Key), [.. group])),
     ];
 
-    /// <summary>The one line Settings shows; whatever was dismissed stays reachable from it.</summary>
+    /// <summary>The vault's key file, when it is one keyed by its exact bytes (T-28).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasFragileKeyFile), nameof(FragileKeyFileWarning), nameof(Line))]
+    internal partial string? FragileKeyFile { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(Line), nameof(FragileKeyFileNeedsReview))]
+    internal partial bool FragileKeyFileDismissed { get; private set; }
+
+    internal bool HasFragileKeyFile => FragileKeyFile is not null;
+
+    internal bool FragileKeyFileNeedsReview => !FragileKeyFileDismissed;
+
+    internal string FragileKeyFileWarning => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, FragileKeyFile);
+
+    /// <summary>The one line that sums up what is listed; whatever was dismissed stays reachable from it.</summary>
     internal string Line
     {
         get
         {
-            var dismissed = Rows.Count + LostTags.Count + Passwords.Count - NeedsReview;
+            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + (HasFragileKeyFile ? 1 : 0) - NeedsReview;
 
             return NeedsReview > 0
                 ? string.Create(CultureInfo.InvariantCulture, $"Recommendations: {NeedsReview} to review")
@@ -107,9 +123,10 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>
-        Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed);
+        Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed)
+        + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0);
 
-    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && !HasFragileKeyFile;
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
@@ -219,10 +236,14 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             Rows = [];
             LostTags = [];
             Passwords = [];
+            FragileKeyFile = null;
             return;
         }
 
         var vaultKey = VaultKey();
+        var keyfile = _session.Unlocked?.KeyfilePath;
+        FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
+        FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
         var rows = _noteKeys
             .Select(finding => new RecommendationRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)
@@ -335,6 +356,15 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         Message = string.Empty;
         _open?.Invoke(name);
     }
+
+    [RelayCommand]
+    private void DismissFragileKeyFile() => Dismiss(FragileKeyFileDismissal(VaultKey()));
+
+    [RelayCommand]
+    private void ReviewFragileKeyFileAgain() => ReviewAgain(FragileKeyFileDismissal(VaultKey()));
+
+    private Dismissal FragileKeyFileDismissal(string vaultKey) =>
+        new(vaultKey, RecommendationDismissals.FragileKeyFile, RecommendationDismissals.FragileKeyFile, FragileKeyFile ?? string.Empty);
 
     internal void Dismiss(RecommendationRow row) =>
         Dismiss(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.NoteKey, row.Key));

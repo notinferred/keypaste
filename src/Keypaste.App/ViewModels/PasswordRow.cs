@@ -4,7 +4,7 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One weak, reused or expired password, as Settings › Recommendations lists it: the item and the problem, never the value (V.9).</summary>
+/// <summary>One weak, reused or expired password, as Items › Recommendations lists it: the item and the problem, never the value (V.9).</summary>
 internal sealed class PasswordRow : IRecommendationRow
 {
     private const int _namedSharers = 3;

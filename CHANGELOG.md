@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Agents now has **Add an agent**, with a setup prompt to copy, a specific app to connect or MCP to add by hand, keeps connections on their own tab and shows the folder each live session reports. Recommendations moved under Items, and the key file warning moved there from the banner ([F.83](docs/steps/F.83.md)).
+
 Settings is now three sections, General, This vault and Browser, and changing what unlocks the vault opens behind Change…. What agents get moved to Agents ([F.82](docs/steps/F.82.md)).
 
 A save KeePassXC makes while keypaste has the vault open no longer marks every item with browser-extension data as changed: the merge reports only what KeePassXC changed, and untouched items keep their dates and history. Every save now opens what it wrote before replacing the vault, so a bad write is refused ([F.81](docs/steps/F.81.md)).

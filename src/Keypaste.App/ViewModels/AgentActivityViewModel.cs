@@ -60,6 +60,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     private readonly ObservableCollection<ActivityRow> _waiting = [];
     private bool _disposed;
+    private bool _tabChosen;
+    private bool _applyingDefaultTab;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
     /// <param name="home">The keypaste home whose audit log and <c>agents.toml</c> are read.</param>
@@ -102,6 +104,99 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         Look();
 
         _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
+    }
+
+    /// <summary>The two halves of this screen: who is connected, and what can be connected.</summary>
+    internal IReadOnlyList<string> Tabs { get; } = [Resources.Strings.Agents, Resources.Strings.Connections];
+
+    /// <summary>The tab in view, which opens on Agents once anything is connected and until the person chooses one.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsAgents), nameof(ShowsConnections), nameof(ShowsAgentRules), nameof(HasNoConnectedAgents), nameof(ShowsManualConfigCard))]
+    internal partial string Tab { get; set; } = Resources.Strings.Connections;
+
+    internal bool ShowsAgents => Tab == Resources.Strings.Agents;
+
+    internal bool ShowsConnections => !ShowsAgents;
+
+    internal bool ShowsAgentRules => ShowsAgents && HasAgentRules;
+
+    /// <summary>Whether the Agents tab has nothing to list but Every other agent.</summary>
+    internal bool HasNoConnectedAgents => ShowsAgents && !_rows.Any(row => row.Tool is not null && !row.OffersConnect) && (_authority?.Clients.Count ?? 0) == 0;
+
+    /// <summary>What Add MCP manually offers, for an MCP client keypaste does not know.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsManualConfigCard))]
+    internal partial bool ShowsManualConfig { get; private set; }
+
+    internal bool ShowsManualConfigCard => ShowsConnections && ShowsManualConfig;
+
+    /// <summary>What Copy setup prompt puts on the clipboard, for an agent to connect itself.</summary>
+    internal static string SetupPrompt => Resources.Strings.SetupPromptText;
+
+    /// <summary>The server block for any MCP client's configuration; the label gives the agent settings of its own.</summary>
+    internal static string ManualConfig =>
+        """
+        {
+          "mcpServers": {
+            "keypaste": {
+              "command": "keypaste",
+              "args": ["mcp", "--client-label", "my-agent"]
+            }
+          }
+        }
+        """;
+
+    internal string ManualConfigText { get; } = ManualConfig;
+
+    [RelayCommand]
+    private Task CopySetupPromptAsync() => CopyAsync(SetupPrompt, Resources.Strings.SetupPromptCopied);
+
+    [RelayCommand]
+    private Task CopyManualConfigAsync() => CopyAsync(ManualConfig, Resources.Strings.ConfigurationCopied);
+
+    private async Task CopyAsync(string text, string said)
+    {
+        if (_clipboard is not null)
+        {
+            await _clipboard.CopyPlainAsync(text, said).ConfigureAwait(true);
+            _toast(said, ToastTone.Success);
+        }
+    }
+
+    [RelayCommand]
+    private void ConnectAnApp() => ChooseTab(manual: false);
+
+    [RelayCommand]
+    private void AddMcpManually() => ChooseTab(manual: true);
+
+    private void ChooseTab(bool manual)
+    {
+        _tabChosen = true;
+        Tab = Resources.Strings.Connections;
+        ShowsManualConfig = manual;
+    }
+
+    partial void OnTabChanged(string value)
+    {
+        _tabChosen |= !_applyingDefaultTab;
+        ShowRows();
+    }
+
+    private void ShowRows()
+    {
+        if (!_tabChosen && _looked && (_authority?.Clients.Count > 0 || _rows.Any(row => row.Tool is not null && !row.OffersConnect)))
+        {
+            _applyingDefaultTab = true;
+            Tab = Resources.Strings.Agents;
+            _applyingDefaultTab = false;
+        }
+
+        foreach (var row in _rows)
+        {
+            row.IsShown = ShowsConnections || !row.OffersConnect;
+        }
+
+        OnPropertyChanged(nameof(HasNoConnectedAgents));
     }
 
     /// <summary>The AI tools found and the agents of this vault, Every other agent last; a row stays where it was first listed while the screen is open.</summary>
@@ -364,6 +459,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         Place(listed);
+        ShowRows();
 
         foreach (var (key, row) in _byKey.Where(pair => !listed.Contains(pair.Value)).ToList())
         {

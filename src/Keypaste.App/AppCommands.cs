@@ -404,9 +404,13 @@ internal sealed class AppCommands
             removeMember,
         ]);
 
+        var copySetupPrompt = Routed(Strings.CopySetupPrompt, () => Agents(), agents => agents.CopySetupPromptCommand);
+        var connectAnApp = Routed(Strings.ConnectAnApp, () => Agents(), agents => agents.ConnectAnAppCommand);
+        var addMcpManually = Routed(Strings.AddMcpManually, () => Agents(), agents => agents.AddMcpManuallyCommand);
         var agents = new AppMenuGroup(Strings.Agents,
         [
             agentSettings, connect, connectAgain, disconnect, _line,
+            copySetupPrompt, connectAnApp, addMcpManually, _line,
             showPrompt, _line,
             agentHistory, verifyChain, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,

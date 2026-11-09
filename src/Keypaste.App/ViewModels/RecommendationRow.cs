@@ -2,7 +2,7 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One key left in notes, as Settings › Recommendations lists it: entry and key, never the value.</summary>
+/// <summary>One key left in notes, as Items › Recommendations lists it: entry and key, never the value.</summary>
 internal sealed class RecommendationRow : ObservableObject, IRecommendationRow
 {
     private bool _isSelected;

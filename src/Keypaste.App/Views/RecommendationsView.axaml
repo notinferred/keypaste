@@ -32,6 +32,19 @@
 
       <TextBlock Name="RecommendationsEmpty" Classes="caption" IsVisible="{Binding IsEmpty}" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
 
+      <Border Name="FragileKeyFileCard" Classes="card filled" Padding="20,16" IsVisible="{Binding HasFragileKeyFile}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.KeyFile}" />
+            <TextBlock ctl:MachineRuns.InText="True" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding FragileKeyFileWarning}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" VerticalAlignment="Top">
+            <Button Name="DismissFragileKeyFile" Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" IsVisible="{Binding FragileKeyFileNeedsReview}" Command="{Binding DismissFragileKeyFileCommand}" />
+            <Button Name="ReviewFragileKeyFileAgain" Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" IsVisible="{Binding FragileKeyFileDismissed}" Command="{Binding ReviewFragileKeyFileAgainCommand}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
       <TextBlock Name="RecommendationsMessage"
                  Classes="caption"
                  TextWrapping="Wrap"

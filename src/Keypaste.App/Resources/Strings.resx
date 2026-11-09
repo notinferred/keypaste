@@ -614,4 +614,17 @@
   <data name="General" xml:space="preserve"><value>General</value></data>
   <data name="ThisVault" xml:space="preserve"><value>This vault</value></data>
   <data name="Browser" xml:space="preserve"><value>Browser</value></data>
+  <data name="FragileKeyFileWarningValue" xml:space="preserve"><value>If {0} is changed or lost, this vault can't be opened. Keep an exact copy somewhere safe, and don't open it in an editor. A KeePass key file can be re-saved safely: choose one under Settings, This vault, Vault access.</value></data>
+  <data name="Connections" xml:space="preserve"><value>Connections</value></data>
+  <data name="AddAnAgent" xml:space="preserve"><value>Add an agent</value></data>
+  <data name="CopySetupPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
+  <data name="ConnectAnApp" xml:space="preserve"><value>Connect an app</value></data>
+  <data name="AddMcpManually" xml:space="preserve"><value>Add MCP manually</value></data>
+  <data name="AddMcpManuallyHelp" xml:space="preserve"><value>Paste this into your MCP client's configuration. keypaste has to be on your PATH, and Settings links it. Give each agent its own label.</value></data>
+  <data name="CopyTheConfiguration" xml:space="preserve"><value>Copy the configuration</value></data>
+  <data name="SetupPromptCopied" xml:space="preserve"><value>Setup prompt copied. Paste it into your agent.</value></data>
+  <data name="ConfigurationCopied" xml:space="preserve"><value>Configuration copied.</value></data>
+  <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
+  <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
+  <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>
 </root>

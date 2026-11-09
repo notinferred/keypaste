@@ -56,6 +56,9 @@ public enum ApproverMessageKind
 /// <param name="Label">The bridge's raw <c>--client-label</c>, or null.</param>
 public sealed record AttachClient(string? Name, string? Version, string? Label)
 {
+    /// <summary>The name of the folder the agent says it runs in, display only (T-3), or null.</summary>
+    public string? Folder { get; init; }
+
     /// <summary>The longest identity field an attach frame carries.</summary>
     public const int MaximumLength = 64;
 }

@@ -883,7 +883,14 @@ public sealed class ScreenRenderer
         // notice that the rules on file are ignored.
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         WindowInput.Drain();
-        var rules = Assert.IsType<AgentActivityViewModel>(shell.Content).RulesForEveryAgent!;
+        var agentsScreen = Assert.IsType<AgentActivityViewModel>(shell.Content);
+        agentsScreen.AddMcpManuallyCommand.Execute(null);
+        WindowInput.Drain();
+        Save(window, output, "02-agents-connections-manual");
+        agentsScreen.Tab = Keypaste.App.Resources.Strings.Agents;
+        WindowInput.Drain();
+        Save(window, output, "02-agents-tab");
+        var rules = agentsScreen.RulesForEveryAgent!;
         var card = window.GetVisualDescendants().OfType<Border>().First(border => border.Name == "AgentRulesCard");
         scroller = card.GetVisualAncestors().OfType<ScrollViewer>().First();
         scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);

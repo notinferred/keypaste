@@ -300,7 +300,7 @@
                         AutomationProperties.HelpText="{Binding Detail}"
                         ToolTip.Tip="{Binding Detail}">
                     <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2"
                                Classes="label muted"
                                Text="{Binding Count}"
@@ -430,7 +430,7 @@
               </Grid>
             </Border>
 
-            <!-- What a restore did, a fragile keyfile, that this vault was just chosen, or what a merge saved and named. Quiet. -->
+            <!-- What a restore did, that this vault was just chosen, or what a merge saved and named. Quiet. -->
             <Border IsVisible="{Binding HasNotice}"
                     Classes="card"
                     BorderBrush="{DynamicResource KpBorderSubtle}"
