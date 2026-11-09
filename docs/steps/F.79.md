@@ -1,6 +1,6 @@
 # F.79 — Let an agent ask the person to save a value
 
-Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78c. Runs: RUNS.
+Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.78c. Runs on Linux at `5065f175`: ci fast tier 42539967548 and dev desktop 42539968187; dev desktop-gates 42538675376 at `a7cfad23`, which changed only the save window's accessible name since; all green.
 
 ## Amendments
 
@@ -20,7 +20,9 @@ The founder settled the row's open points on 2026-11-08: an agent may name an ex
 
 ## Evidence
 
-Run locally, each class once: Keypaste.Core.Tests `ValueSaveRequestTests` (8, new), `ApproverProtocolTests` and `SessionAuthorityEditTests`; Keypaste.App.Tests `SaveValueViewModelTests` (3, new), `SaveValueWindowTests` (1, new), `LanguageAndRegionTests` and `PlainWordsTests`; Keypaste.Cli.Tests `TerminalApprovalChannelTests`, with the save case; the whole of Keypaste.Mcp.Tests, 170 passed, with `ServerToolsTests.A_save_says_where_it_was_saved_and_a_refusal_that_it_was_not` and the tool counts at four. `bash scripts/verify.sh compile` passed. `verify-mcp-stdio.sh` now expects four tools.
+Run locally, each class once: Keypaste.Core.Tests `ValueSaveRequestTests` (8, new), `ApproverProtocolTests` and `SessionAuthorityEditTests`; Keypaste.App.Tests `SaveValueViewModelTests` (3, new), `SaveValueWindowTests` (1, new), `LanguageAndRegionTests` and `PlainWordsTests`; Keypaste.Cli.Tests `TerminalApprovalChannelTests`, with the save case; the whole of Keypaste.Mcp.Tests, 170 passed, with `ServerToolsTests.A_save_says_where_it_was_saved_and_a_refusal_that_it_was_not` and the tool counts at four. `bash scripts/verify.sh compile` passed. `verify-mcp-stdio.sh` now expects four tools, and five with `--allow-run`.
+
+In CI, two first attempts failed on checks the change had to meet, each fixed at its cause: ci 42537661413 at `b2a4e92b`, cancelled once integration failed, on `verify-mcp-stdio.sh`'s count of five tools with `--allow-run`; dev desktop 42538644566 at `a7cfad23` on `InteractionRulesTests.Every_secret_field_is_named_by_a_fixed_label`, the save window's value field now named from the resources.
 
 ## Limits and follow-ups
 
