@@ -237,6 +237,26 @@ public sealed class VaultSaveTests : IDisposable
     /// <summary>
     /// A write that fails partway through a save is reported, and the vault stays as it was.
     /// </summary>
+    [Fact]
+    public void A_save_whose_bytes_do_not_open_again_is_refused_and_leaves_the_vault_as_it_was()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("unreadable");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var before = File.ReadAllBytes(path);
+        vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+        vault.AfterSerializing = bytes =>
+        {
+            bytes[bytes.Length / 2] ^= 1;
+            return bytes;
+        };
+
+        var failure = Record.Exception(vault.Save);
+
+        Assert.IsType<VaultException>(failure);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
     /// <remarks>
     /// A pipe at the temporary file's name stands in for a disk that fills during the save: each
     /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails.

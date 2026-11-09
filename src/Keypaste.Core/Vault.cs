@@ -2553,6 +2553,9 @@ public sealed class Vault : IDisposable
         Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: !_backedUp, cancellationToken: cancellationToken);
     }
 
+    /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
+    internal Func<byte[], byte[]>? AfterSerializing { set => _interop.AfterSerializing = value; }
+
     /// <summary>Writes the vault to <see cref="Path"/>, discarding whatever else was written
     /// there.</summary>
     /// <remarks>

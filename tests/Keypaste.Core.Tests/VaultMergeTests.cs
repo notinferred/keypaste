@@ -22,6 +22,7 @@ public sealed class VaultMergeTests : IDisposable
 {
     private const string _password = "correct horse battery staple";
     private const string _work = "work";
+    private const string _keePassXcStamp = "_LAST_MODIFIED";
 
     private static readonly EntryName _stripe = new(_work, "stripe");
 
@@ -448,6 +449,73 @@ public sealed class VaultMergeTests : IDisposable
         });
         Assert.Empty(report.Conflicts);
         Assert.False(report.TookFromOpenCopy);
+    }
+
+    /// <summary>KeePassXC rewrites an item's <c>_LAST_MODIFIED</c> on every save, so a new stamp alone is no change to the item.</summary>
+    [Fact]
+    public void AStampKeePassXcRewrote_IsNotAChangeToTheItem()
+    {
+        Seed(database => Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "first save"), "stripe", "other");
+        using var open = Vault.Open(VaultPath, _password);
+        InFile(FilePath, database =>
+        {
+            Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "next save");
+            Edit(database, "other", _later, entry => entry.CustomData.Set("KPXC_note", "theirs"));
+        });
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.Empty(entry.History);
+            Assert.Equal(_seeded, entry.LastModificationTime);
+        });
+        Assert.Empty(report.Conflicts);
+    }
+
+    /// <summary>KeePassXC keeps a version without its custom data, and that version still shows the file descends from this copy's.</summary>
+    [Fact]
+    public void AVersionKeePassXcKeptWithoutCustomData_IsStillTheBase()
+    {
+        Seed(database => Entry(database, "stripe").CustomData.Set("KeePassXC-Browser Settings", "{}"), "stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        InFile(FilePath, database =>
+        {
+            Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, "theirs")));
+            Entry(database, "stripe").History.GetAt(0).CustomData.Remove("KeePassXC-Browser Settings");
+        });
+
+        var report = Merge(open);
+
+        Read(FilePath, database => Assert.Single(Entry(database, "stripe").History));
+        Assert.Empty(report.Conflicts);
+    }
+
+    /// <summary>The item KeePassXC recycles keeps no version and carries a new stamp, and is still the file's whole.</summary>
+    [Fact]
+    public void AnItemKeePassXcRecycledAndRestamped_IsTheFilesWhole()
+    {
+        Seed(
+            database =>
+            {
+                Recycle(database, AddEntry(Group(database, _work), "binned", _seeded));
+                Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "first save");
+            },
+            "stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        InFile(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            entry.CustomData.Set(_keePassXcStamp, "next save");
+            MoveTo(entry, database.RootGroup.FindGroup(database.RecycleBinUuid, true)!, _later);
+            entry.LastModificationTime = _later;
+        });
+
+        var report = Merge(open);
+
+        Read(FilePath, database => Assert.Empty(Entry(database, "stripe").History));
+        Assert.Empty(report.Conflicts);
     }
 
     /// <summary>

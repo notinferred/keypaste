@@ -24,6 +24,8 @@
 #   G6   An item KeePassXC recycles while the app edits it ends in the bin with the edit, and one the app
 #        restores after KeePassXC purged it survives.
 #
+#   G13  KeePassXC saves one item of a vault whose items carry custom data: the merge reports one change
+#        and the items KeePassXC only re-stamped gain no history.
 # Usage:  scripts/verify-keepassxc-merge.sh <work-directory>
 # Env:    KP_COMPAT_PASSWORD   master password for the vaults        (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
@@ -348,6 +350,7 @@ EOF
           <Times><CreationTime>${at}</CreationTime><LastModificationTime>${at}</LastModificationTime><LocationChanged>${at}</LocationChanged></Times>
           <String><Key>Title</Key><Value>${item}</Value></String>
           <String><Key>Password</Key><Value ProtectInMemory="True">${item}-0</Value></String>
+          ${entry_custom_data:-}
         </Entry>
 EOF
     done
@@ -697,6 +700,19 @@ checked "$v"
 kx rm "$v" services/Beta >/dev/null || die "KeePassXC could not recycle Beta"
 [ "$(edit services/Beta beta-app-g6)" = 'saved services/Beta' ] || die "the app's edit of the recycled Beta was not saved"
 [ "$(kx show "$v" 'Recycle Bin/Beta' -a Password)" = beta-app-g6 ] || die "Beta is not in the bin with the app's edit"
+checked "$v"
+
+# ------------------------------------------------------------------------------------- G13
+step "G13: KeePassXC saves one item, and the items it only re-stamped keep their dates and history"
+entry_custom_data='<CustomData><Item><Key>KeePassXC-Browser Settings</Key><Value>{"Allow":[]}</Value></Item></CustomData>'
+seed g13 10 root Lambda Mu
+entry_custom_data=
+v=$dir/g13.kdbx
+hold "$v"
+kx edit "$v" services/Mu -u kpxc-g13 >/dev/null || die "KeePassXC could not edit Mu"
+line=$(merge)
+[ "$line" = 'merged updated' ] || die "the app reported more than KeePassXC's one change: ${line}"
+expect_entry Lambda "$(exported "$v" g13)" '(.history | length) == 0' "an item KeePassXC only re-stamped gained history"
 checked "$v"
 
 # ------------------------------------------------------------------------------------- NEGATIVE CONTROL

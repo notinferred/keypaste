@@ -258,10 +258,10 @@ pipe="keypaste-projects-$$-$(date +%s)"
 audit="$KEYPASTE_HOME/audit.jsonl"
 logged=$(lines_in "$audit")
 agent_err="$dir/agent.err"
-# One answer per request, in order: once for the dev entry, once then a for the prod entry, which no
-# prompt offers any more and so denies (once first, because a refusal cools that field down for every
-# bridge, D-0425), a for the entry KeePassXC tagged through the merge, and once for env/billing/prod/DB.
-printf '%s\no\no\na\na\no\n' "$pw" | "$kp" approve --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
+# One answer per request, in order: once for the dev entry, once then n for the prod entry, which
+# denies (once first, because a refusal cools that field down for every bridge, D-0425), n for the
+# entry KeePassXC tagged through the merge, and once for env/billing/prod/DB.
+printf '%s\no\no\nn\nn\no\n' "$pw" | "$kp" approve --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
   >/dev/null 2>"$agent_err" &
 agent_pid=$!
 for _ in $(seq 1 100); do
@@ -553,8 +553,8 @@ tr -d '\r' <"$expose_out" >"$expose_out.lf"
 listing=$(jq -sc 'map(select(.id == 2))[0].result.structuredContent.entries' <"$expose_out.lf")
 [ "$(jq -c 'map(.name) | sort' <<<"$listing")" = '["Database","Shared","Stripe"]' ] \
   || die "the default did not list exactly the tagged entries: ${listing}"
-jq -e 'any(.[]; .name == "Stripe" and .group == "services" and .fields == ["STRIPE_SECRET_KEY"] and .tags == ["env:billing"])' <<<"$listing" >/dev/null \
-  || die "Stripe was not listed with STRIPE_SECRET_KEY alone and env:billing: ${listing}"
+jq -e 'any(.[]; .name == "Stripe" and .group == "services" and .fields == ["Region","STRIPE_SECRET_KEY"] and .tags == ["env:billing"])' <<<"$listing" >/dev/null \
+  || die "Stripe was not listed with its two custom fields and env:billing: ${listing}"
 grep -qF -- '-c1b' <<<"$listing" && die "the listing carried a value: ${listing}"
 jq -se 'any(.[]; .id == 3 and .result.isError == false)' <"$expose_out.lf" >/dev/null \
   || die "the tagged entry's variable was not released: $(cat "$expose_out.lf")"
@@ -580,7 +580,7 @@ token=$(printf '%s\n' "$pw" | "$kp" token create gate-ci --scope 'read:billing/d
   || die "keypaste token create failed: $(cat "$dir/token.err")"
 [ -n "$token" ] || die "keypaste token create printed no token: $(cat "$dir/token.err")"
 
-step "C.1b: run --session through a real keypaste approve names the source entries, and a set holding a prod-tagged member is asked once only"
+step "C.1b: run --session through a real keypaste approve names the source entries, and each run is asked, a set holding a prod-tagged member too"
 fields_pipe="keypaste-fields-$$-$(date +%s)"
 fields_err="$dir/fields-agent.err"
 cleanup_fields() {
@@ -613,8 +613,8 @@ out=$("$kp" run --session billing -p staging --vault "$(native "$fields")" --app
   || die "run --session -p staging failed: $(cat "$dir/session-staging.err") / $(cat "$fields_err")"
 [ "$out" = "$shared_set" ] || die "the staging session child's environment was: ${out}"
 grep -qF 'services/Shared' <<<"$(tr -d '\r' <"$fields_err")" || die "the agent's prompt does not name services/Shared"
-[ "$(tr -d '\r' <"$fields_err" | grep -c 'it is asked about every time')" = 1 ] \
-  || die "the staging set holding a prod-tagged member was not asked once only: $(cat "$fields_err")"
+[ "$(tr -d '\r' <"$fields_err" | grep -c 'it is asked about every time')" = 2 ] \
+  || die "the dev run and the staging run were not each asked: $(cat "$fields_err")"
 grep -qF -- '-c1b' "$fields_err" && die "a value reached the agent's terminal"
 
 step "C.1b: the token's dev run is audited with its source entries, and its staging set, holding a prod-tagged member, is refused"

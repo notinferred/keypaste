@@ -433,8 +433,50 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     private void Write()
     {
-        Replace(Serialize);
+        Replace(SerializeAndProve);
         _database.Modified = false;
+    }
+
+    /// <summary>The custom-data item KeePassXC rewrites on every save, so a new value of it is no change to its owner.</summary>
+    private const string _keePassXcStamp = "_LAST_MODIFIED";
+
+    /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
+    internal Func<byte[], byte[]>? AfterSerializing { get; set; }
+
+    /// <summary>The vault as KDBX bytes, proven to open again before they can replace the file.</summary>
+    /// <remarks>A hardware key is not proven with: a save asks it once, and opening the bytes would ask it again.</remarks>
+    /// <exception cref="VaultException">The bytes did not open.</exception>
+    private byte[] SerializeAndProve()
+    {
+        var bytes = Serialize();
+
+        if (AfterSerializing is { } change)
+        {
+            bytes = change(bytes);
+        }
+
+        if (HardwareKey is not null)
+        {
+            return bytes;
+        }
+
+        PwDatabase check = new();
+
+        try
+        {
+            check.MasterKey = _database.MasterKey;
+            new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
+            return bytes;
+        }
+        catch (Exception ex)
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            throw new VaultException("keypaste could not read back what it was about to save. Nothing was replaced.", ex);
+        }
+        finally
+        {
+            check.Close();
+        }
     }
 
     /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
@@ -3970,13 +4012,13 @@ internal sealed class KeePassInterop : IDisposable
         Dictionary<PwUuid, BaseRecord> groups = new();
         foreach (PwGroup group in GroupsOf(_database))
         {
-            groups[group.Uuid] = new BaseRecord(group.ParentGroup?.Uuid ?? PwUuid.Zero, group.LocationChanged, digests.Of(group), IsRecycled(group, bin));
+            groups[group.Uuid] = new BaseRecord(group.ParentGroup?.Uuid ?? PwUuid.Zero, group.LocationChanged, digests.Of(group), IsRecycled(group, bin), []);
         }
 
         Dictionary<PwUuid, BaseRecord> entries = new();
         foreach (PwEntry entry in _database.RootGroup.GetEntries(true))
         {
-            entries[entry.Uuid] = new BaseRecord(entry.ParentGroup.Uuid, entry.LocationChanged, digests.Of(entry), IsRecycled(entry, bin));
+            entries[entry.Uuid] = new BaseRecord(entry.ParentGroup.Uuid, entry.LocationChanged, digests.Of(entry), IsRecycled(entry, bin), digests.OfHistoryCopy(entry));
         }
 
         return new MergeBase(key, groups, entries, Deletions(_database));
@@ -4067,7 +4109,8 @@ internal sealed class KeePassInterop : IDisposable
     /// <param name="LocationChanged">When it was last moved.</param>
     /// <param name="Digest">Its content's keyed digest.</param>
     /// <param name="Recycled">Whether it was in the recycle bin.</param>
-    internal sealed record BaseRecord(PwUuid Parent, DateTime LocationChanged, byte[] Digest, bool Recycled);
+    /// <param name="HistoryCopyDigest">An entry's digest as the version KeePassXC would keep of it; empty for a group.</param>
+    internal sealed record BaseRecord(PwUuid Parent, DateTime LocationChanged, byte[] Digest, bool Recycled, byte[] HistoryCopyDigest);
 
     /// <summary>One version in an entry's history as a merge builds it.</summary>
     /// <param name="Entry">The version.</param>
@@ -4354,7 +4397,7 @@ internal sealed class KeePassInterop : IDisposable
             // The file descends from the base when the base's version is in its history: its change is taken whatever the stamps say.
             // So is a later file whose version differs only in place and stamps, as KeePassXC stamps an entry it recycles and keeps no version.
             bool onlyTheirs = !equal && !onlyMine && known is not null && Same(myDigest, known.Digest)
-                && (HeldIn(history, known.Digest) || (Second(theirs.LastModificationTime) > Second(mine.LastModificationTime) && SameContent(mine, theirs)));
+                && (HeldIn(history, known.Digest) || KeptByKeePassXc(theirs, known) || (Second(theirs.LastModificationTime) > Second(mine.LastModificationTime) && SameContent(mine, theirs)));
             bool byTime = !equal && !onlyMine && !onlyTheirs;
             bool tie = byTime && Second(mine.LastModificationTime) == Second(theirs.LastModificationTime);
             bool mineCurrent = onlyMine || (byTime && Second(mine.LastModificationTime) >= Second(theirs.LastModificationTime));
@@ -4458,10 +4501,20 @@ internal sealed class KeePassInterop : IDisposable
         private bool Changed(PwEntry entry, BaseRecord known) => !Same(_digests.Of(entry), known.Digest) || Moved(entry, known);
 
         private static bool SameContent(PwEntry mine, PwEntry theirs) =>
-            mine.EqualsEntry(
-                theirs,
+            Unstamped(mine).EqualsEntry(
+                Unstamped(theirs),
                 PwCompareOptions.IgnoreParentGroup | PwCompareOptions.IgnoreTimes | PwCompareOptions.IgnoreHistory | PwCompareOptions.NullEmptyEquivStd,
                 MemProtCmpMode.Full);
+
+        private bool KeptByKeePassXc(PwEntry theirs, BaseRecord known) =>
+            theirs.History.Any(version => Same(_digests.OfHistoryCopy(version), known.HistoryCopyDigest));
+
+        private static PwEntry Unstamped(PwEntry entry)
+        {
+            PwEntry copy = entry.CloneDeep();
+            copy.CustomData.Remove(_keePassXcStamp);
+            return copy;
+        }
 
         private static void Add(PwEntry entry, PwGroup group) => group.AddEntry(entry, true, false);
 
@@ -4803,14 +4856,19 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// An entry is compared as <c>EqualsEntry</c> compares it with <c>IgnoreParentGroup</c>, <c>IgnoreLastAccess</c>, <c>IgnoreHistory</c>
     /// and <c>NullEmptyEquivStd</c>, times in whole seconds, and a group by what <c>AssignProperties</c> copies but its access times. Each
-    /// attachment enters as its SHA-256, taken once per instance. Custom data's own times, which KeePassLib keeps internal, and a merge's mark on a version it kept are left out.
+    /// attachment enters as its SHA-256, taken once per instance. Custom data's own times, which KeePassLib keeps internal, the stamp KeePassXC rewrites on every save and a merge's mark on a version it kept are left out.
     /// </remarks>
     private sealed class ContentDigests(byte[] key) : IDisposable
     {
         private readonly IncrementalHash _hmac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, key);
         private readonly Dictionary<ProtectedBinary, byte[]> _attachments = new(ReferenceEqualityComparer.Instance);
 
-        internal byte[] Of(PwEntry entry)
+        internal byte[] Of(PwEntry entry) => Digest(entry, customData: true);
+
+        /// <summary>An entry's digest without its custom data, which KeePassXC leaves out of the versions it keeps in history.</summary>
+        internal byte[] OfHistoryCopy(PwEntry entry) => Digest(entry, customData: false);
+
+        private byte[] Digest(PwEntry entry, bool customData)
         {
             _hmac.AppendData("entry"u8);
             Add(entry.Uuid);
@@ -4872,7 +4930,11 @@ internal sealed class KeePassInterop : IDisposable
             Add(entry.OverrideUrl);
             Add(entry.QualityCheck);
             Add(entry.Tags);
-            Add(entry.CustomData);
+            if (customData)
+            {
+                Add(entry.CustomData);
+            }
+
             return _hmac.GetHashAndReset();
         }
 
@@ -4955,7 +5017,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             List<KeyValuePair<string, string>> items =
             [
-                .. data.Where(item => !string.Equals(item.Key, PwEntry.KeptVersionKey, StringComparison.Ordinal))
+                .. data.Where(item => item.Key is not (PwEntry.KeptVersionKey or _keePassXcStamp))
                     .OrderBy(item => item.Key, StringComparer.Ordinal),
             ];
             Add((long)items.Count);
