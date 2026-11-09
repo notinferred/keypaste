@@ -122,6 +122,9 @@ internal sealed class AppAuthority : IDisposable
     /// <remarks>Reading it opens nothing, so Agents can say it every second and an unlock alone still creates no log.</remarks>
     internal string? LastAuditFailure => _host.LastAuditFailure;
 
+    /// <summary>Whether this failure of the audit log is yet to be told to the person; true once until a log opens.</summary>
+    internal bool ClaimAuditFailureNews() => _host.ClaimAuditFailureNews();
+
     /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
     /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both.</remarks>
     /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>

@@ -180,7 +180,7 @@ public sealed class SessionOwnershipTests
 
         Assert.False(File.Exists(log));
         Assert.Null(authority.LastAuditFailure);
-        Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
+        Assert.Empty(agents.AuditRefusal);
         Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
 
         Directory.CreateDirectory(log);
@@ -198,7 +198,7 @@ public sealed class SessionOwnershipTests
 
         var failure = authority.LastAuditFailure;
         Assert.NotNull(failure);
-        Assert.EndsWith(AgentActivityViewModel.Unrecorded(failure), agents.Status, StringComparison.Ordinal);
+        Assert.Equal(AgentActivityViewModel.Unrecorded(failure), agents.AuditRefusal);
         Assert.Equal("Refusing agents · the audit log won't open", shell.AgentsDetail);
         Assert.Equal((false, true), (dot.DotLive, dot.DotDanger));
 
@@ -211,9 +211,104 @@ public sealed class SessionOwnershipTests
         clock.Advance(TimeSpan.FromSeconds(1));
 
         Assert.Null(authority.LastAuditFailure);
-        Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
+        Assert.Empty(agents.AuditRefusal);
         Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
         Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
+    }
+
+    /// <summary>
+    /// The pop-up is once per failure: agents retrying, a timed-out toast and a lock and unlock with the
+    /// log still broken raise nothing further (F.86).
+    /// </summary>
+    [Fact]
+    public async Task A_log_that_will_not_open_pops_up_once_however_often_agents_retry_or_the_vault_relocks()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var log = KeypasteHome.AuditPath(fixture.Home);
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Directory.CreateDirectory(log);
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+
+        using (var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock))
+        {
+            Assert.Empty(shell.Toasts.Shown);
+
+            for (var retry = 0; retry < 3; retry++)
+            {
+                await RefusedRequestAsync(authority, fixture.Path_);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                var shown = Assert.Single(shell.Toasts.Shown);
+                Assert.True(shown.IsWarning);
+                Assert.Contains("audit log won't open", shown.Message, StringComparison.Ordinal);
+                Assert.Contains("Fix the log file", shown.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain(fixture.Home, shown.Message, StringComparison.Ordinal);
+            }
+
+            clock.Advance(TimeSpan.FromMinutes(1));
+            Assert.Empty(shell.Toasts.Shown);
+
+            await RefusedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Empty(shell.Toasts.Shown);
+        }
+
+        authority.Session.Lock(VaultLockReason.Manual);
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+
+        using var after = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        await RefusedRequestAsync(authority, fixture.Path_);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.NotNull(authority.LastAuditFailure);
+        Assert.Empty(after.Toasts.Shown);
+    }
+
+    /// <summary>
+    /// A log that opened and later fails again is a new failure. An open log stays open until the lock,
+    /// so that is the only way one can come back (F.86).
+    /// </summary>
+    [Fact]
+    public async Task A_log_that_opened_and_fails_again_pops_up_again()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var log = KeypasteHome.AuditPath(fixture.Home);
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Directory.CreateDirectory(log);
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+
+        using (var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock))
+        {
+            await RefusedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Single(shell.Toasts.Shown);
+
+            Directory.Delete(log);
+            await ListedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Null(authority.LastAuditFailure);
+            Assert.Single(shell.Toasts.Shown);
+        }
+
+        authority.Session.Lock(VaultLockReason.Manual);
+        File.Delete(log);
+        Directory.CreateDirectory(log);
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+
+        using var after = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        Assert.Empty(after.Toasts.Shown);
+
+        await RefusedRequestAsync(authority, fixture.Path_);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Contains("audit log won't open", Assert.Single(after.Toasts.Shown).Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -285,6 +380,37 @@ public sealed class SessionOwnershipTests
         Assert.Equal(-1, bytes.AsSpan().IndexOf(keyBytes.AsSpan(0, 16)));
         Assert.DoesNotContain(Convert.ToHexString(keyBytes, 0, 16), Encoding.UTF8.GetString(bytes), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(Convert.ToBase64String(keyBytes, 0, 15), Encoding.UTF8.GetString(bytes), StringComparison.Ordinal);
+    }
+
+    internal static async Task RefusedRequestAsync(AppAuthority authority, string vault)
+    {
+        await using var agent = await AttachedAgentAsync(authority, vault);
+        var refused = await agent.Client.ListAsync(Listing(vault, agent.Session), Token);
+        Assert.NotNull(refused);
+        Assert.False(refused.Recorded);
+    }
+
+    internal static async Task ListedRequestAsync(AppAuthority authority, string vault)
+    {
+        await using var agent = await AttachedAgentAsync(authority, vault);
+        var listed = await agent.Client.ListAsync(Listing(vault, agent.Session), Token);
+        Assert.NotNull(listed);
+        Assert.True(listed.Recorded);
+    }
+
+    private static async Task<AttachedAgent> AttachedAgentAsync(AppAuthority authority, string vault)
+    {
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+        var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+        Assert.NotNull(client);
+        var attached = (await client.AttachAsync(new AttachRequest(vault), Token))?.Session;
+        Assert.NotNull(attached);
+        return new AttachedAgent(client, attached);
+    }
+
+    private sealed record AttachedAgent(ApproverClient Client, string Session) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => Client.DisposeAsync();
     }
 
     private static NamesRequest Listing(string vault, string session) =>

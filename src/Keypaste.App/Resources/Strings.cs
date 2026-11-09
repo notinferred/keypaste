@@ -291,6 +291,7 @@ public static class Strings
     public static string KeypasteHelp => Manager.GetString("KeypasteHelp", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHome => Manager.GetString("KeypasteHome", CultureInfo.CurrentUICulture)!;
     public static string KeypasteInATerminal => Manager.GetString("KeypasteInATerminal", CultureInfo.CurrentUICulture)!;
+    public static string KeypasteIsRefusingEveryAgentRequest => Manager.GetString("KeypasteIsRefusingEveryAgentRequest", CultureInfo.CurrentUICulture)!;
     public static string KeypasteOpensOnlyWebAddressesStartingHttpX58cb44 => Manager.GetString("KeypasteOpensOnlyWebAddressesStartingHttpX58cb44", CultureInfo.CurrentUICulture)!;
     public static string KeypasteRemembersThePathsOfVaultsYouXb13291 => Manager.GetString("KeypasteRemembersThePathsOfVaultsYouXb13291", CultureInfo.CurrentUICulture)!;
     public static string KeypasteWasAskedToOpenThisFileX50ed11 => Manager.GetString("KeypasteWasAskedToOpenThisFileX50ed11", CultureInfo.CurrentUICulture)!;

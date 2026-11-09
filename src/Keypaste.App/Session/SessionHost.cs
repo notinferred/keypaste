@@ -59,6 +59,7 @@ internal sealed class SessionHost : IDisposable
     private readonly Action<Exception>? _unexpected;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
+    private int _auditFailureTold;
     private bool _disposed;
 
     /// <param name="session">The session whose vault is served.</param>
@@ -132,6 +133,12 @@ internal sealed class SessionHost : IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// Whether this failure of the audit log is yet to be told to the person, true once until a log opens,
+    /// so agents retrying and a lock and unlock with the log still broken tell it no more.
+    /// </summary>
+    internal bool ClaimAuditFailureNews() => Interlocked.Exchange(ref _auditFailureTold, 1) == 0;
 
     /// <summary>
     /// The session agents reaching <see cref="Endpoint"/> would be answered under, read from the
@@ -405,7 +412,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), () => Volatile.Write(ref _auditFailureTold, 0), _unexpected);
             _hosted = hosted;
 
             // The authority answering agents merges another program's save, so its withdrawal and its line are the merge's.
@@ -550,9 +557,10 @@ internal sealed class SessionHost : IDisposable
             string? approverOverride,
             string? launchName,
             Action<EditDone> edited,
+            Action auditOpened,
             Action<Exception>? unexpected)
         {
-            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
+            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home), auditOpened);
             SessionServer? server = null;
             LaunchEndpoint? launches = null;
 
@@ -678,7 +686,7 @@ internal sealed class SessionHost : IDisposable
     /// The home's audit log, opened at the first request or a Run's check before its card, so an
     /// unlock alone creates no log, and tried again at the next after an open that failed.
     /// </summary>
-    private sealed class AuditOpener(string path) : IDisposable
+    private sealed class AuditOpener(string path, Action opened) : IDisposable
     {
         private readonly Lock _gate = new();
         private AuditLog? _log;
@@ -711,9 +719,10 @@ internal sealed class SessionHost : IDisposable
 
                 if (_log is null && !_disposed)
                 {
-                    if (AuditLog.TryOpen(path, TimeProvider.System, out var opened, out var error))
+                    if (AuditLog.TryOpen(path, TimeProvider.System, out var log, out var error))
                     {
-                        _log = opened;
+                        _log = log;
+                        opened();
                     }
                     else
                     {

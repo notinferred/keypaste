@@ -65,6 +65,13 @@
           </Grid>
         </Border>
 
+        <Border IsVisible="{Binding HasAuditRefusal}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
+            <TextBlock Grid.Column="1" Name="AuditRefusalText" Classes="body secondary" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding AuditRefusal}" Text="{Binding AuditRefusal}" VerticalAlignment="Center" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
+
         <!-- Only the prompt window answers (T-2): a row names what was asked, never the agent's reason, and
              Show the prompt brings that window forward with Deny focused and its allows disarmed. -->
         <StackPanel Spacing="8" IsVisible="{Binding HasWaiting}">

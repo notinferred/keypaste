@@ -9,6 +9,7 @@ using Keypaste.App.Tests.Session;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -63,6 +64,46 @@ public sealed class AgentActivityViewTests
         var panel = Assert.Single(window.GetVisualDescendants().OfType<AgentSettingsView>(), panel => panel.IsEffectivelyVisible);
         Assert.Same(row.Settings, panel.DataContext);
         Assert.Equal("claude-code", row.Settings!.Agent);
+        window.Close();
+    });
+
+    /// <summary>The message is drawn while the app is serving agents, not only in the card shown when it is not, and goes when the log opens (F.86).</summary>
+    [Fact]
+    public Task A_log_that_will_not_open_stays_on_Agents_until_it_opens() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var log = KeypasteHome.AuditPath(fixture.Home);
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyToAsk());
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        var tools = new FakeTools(Path.Combine(fixture.Home, "computer"));
+        using var model = new AgentActivityViewModel(authority, fixture.Home, clock, action => Dispatcher.UIThread.Post(action), tools.Connector());
+        var window = new Window { Content = new AgentActivityView { DataContext = model } };
+        window.Show();
+        await model.Looking;
+        WindowInput.Drain();
+        var message = window.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Name == "AuditRefusalText");
+        Assert.False(message.IsEffectivelyVisible);
+
+        Directory.CreateDirectory(log);
+        await SessionOwnershipTests.RefusedRequestAsync(authority, fixture.Path_);
+        model.Refresh();
+        WindowInput.Drain();
+
+        Assert.True(message.IsEffectivelyVisible);
+        Assert.Equal(AgentActivityViewModel.Unrecorded(authority.LastAuditFailure!), message.Text);
+
+        Directory.Delete(log);
+        await SessionOwnershipTests.ListedRequestAsync(authority, fixture.Path_);
+        model.Refresh();
+        WindowInput.Drain();
+
+        Assert.False(message.IsEffectivelyVisible);
         window.Close();
     });
 }

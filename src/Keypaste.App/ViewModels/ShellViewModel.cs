@@ -1398,6 +1398,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
             AgentsRefusing = Authority.LastAuditFailure is not null;
             AgentsServing = true;
+
+            if (AgentsRefusing && Authority.ClaimAuditFailureNews())
+            {
+                ShowToast(Resources.Strings.KeypasteIsRefusingEveryAgentRequest, ToastTone.Warning);
+            }
+
             AgentsDetail = AgentsRefusing
                 ? "Refusing agents · the audit log won't open"
                 : waiting > 0

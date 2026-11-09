@@ -267,6 +267,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     [ObservableProperty]
     internal partial string Status { get; private set; } = string.Empty;
 
+    /// <summary>That every agent request is refused while the audit log will not open, or empty when none is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAuditRefusal))]
+    internal partial string AuditRefusal { get; private set; } = string.Empty;
+
+    internal bool HasAuditRefusal => AuditRefusal.Length > 0;
+
     /// <summary>Why waiting requests cannot be read, or empty when they were.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting))]
@@ -384,14 +391,14 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(HasUnnamedAgentsNote));
 
         // With agents.toml unreadable every agent request is refused, so nobody is answered without asking.
-        var said = Describe(
+        Status = Describe(
             status,
             status is AuthorityStatus.Serving && rules is not null
                 ? [.. FieldCategories.Ruled.Where(category => rules.RuleFor(category) == CategoryRule.Allow).Select(FieldCategories.Shown)]
                 : []);
-        Status = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
-            ? $"{said} {Unrecorded(unopened)}"
-            : said;
+        AuditRefusal = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
+            ? Unrecorded(unopened)
+            : string.Empty;
     }
 
     /// <summary>

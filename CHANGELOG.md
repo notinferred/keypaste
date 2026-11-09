@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+When the audit log won't open and keypaste is refusing agents, the desktop app now says so once in a pop-up with the fix, and keeps a message on Agents until the log opens ([F.86](docs/steps/F.86.md)).
+
 An item open in the desktop app now shows what another device, program or terminal changed, at once or, if you are editing it or have typed into one of its forms, when that form closes. Saving an edit or a rename now writes only what you changed, so it no longer undoes another device's change to the rest ([F.85](docs/steps/F.85.md)).
 
 keypaste now keeps both devices' changes when they edited different fields of one item, and offers a sync tool's conflicted copy for review and merge in Recommendations. Groups holding same-named items can be moved and renamed, and a vault file that disappears or can't be read can be saved back from what is open ([F.84](docs/steps/F.84.md)).
