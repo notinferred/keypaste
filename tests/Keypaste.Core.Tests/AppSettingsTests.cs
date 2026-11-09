@@ -125,6 +125,22 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal((false, "2026-11-06"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsAgreed));
     }
 
+    [Fact]
+    public void The_share_terms_line_stays_remembered_through_a_save_from_a_copy_read_before_it_was_shown()
+    {
+        var readBefore = AppSettings.Load(SettingsFile);
+        Assert.False(readBefore.ShareTermsLineShown);
+
+        Assert.True(AppSettings.Save(SettingsFile, readBefore with { ShareTermsLineShown = true }));
+        Assert.True(AppSettings.Save(SettingsFile, readBefore with { Theme = AppTheme.Dark }));
+
+        var settings = AppSettings.Load(SettingsFile);
+        Assert.True(settings.ShareTermsLineShown);
+        Assert.Equal(AppTheme.Dark, settings.Theme);
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);
+        Assert.False(Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.SectionName, StringComparison.Ordinal)).TryGet("terms_line_shown", out _));
+    }
+
     /// <summary>Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer.</summary>
     [Theory]
     [InlineData("crash_reports = 1", true)]

@@ -94,6 +94,8 @@ public sealed record AppSettings
     internal const string WindowListShareKey = "list_share";
     internal const string WindowSidebarHiddenKey = "sidebar_hidden";
     internal const string WindowZoomKey = "zoom";
+    internal const string ShareSectionName = "share";
+    internal const string ShareTermsLineShownKey = "terms_line_shown";
     internal const string WindowTableSortsKey = "table_sorts";
     internal const string WindowTableWidthsKey = "table_widths";
 
@@ -160,6 +162,13 @@ public sealed record AppSettings
 
     /// <summary>How the person left the desktop app's window, or null until it has been kept or when the file's bounds make no window.</summary>
     public WindowLayout? Window { get; init; }
+
+    /// <summary>Whether <c>keypaste share</c> has printed its line linking the terms of use from this home.</summary>
+    /// <remarks>
+    /// In its own section, since a ninth key in <c>[[settings]]</c> makes the file unreadable to whichever reader meets it.
+    /// Only true is written, so a copy read before the line was printed, such as the running desktop app's, cannot take it back.
+    /// </remarks>
+    public bool ShareTermsLineShown { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -232,6 +241,14 @@ public sealed record AppSettings
         if (document.Tables.FirstOrDefault(IsWindowSection) is { } window)
         {
             settings = settings with { Window = ReadWindow(window) };
+        }
+
+        if (document.Tables.FirstOrDefault(IsShareSection) is { } share)
+        {
+            settings = settings with
+            {
+                ShareTermsLineShown = share.TryGet(ShareTermsLineShownKey, out var shown) && shown.Value.Kind == TomlValueKind.Number && shown.Value.Number != 0,
+            };
         }
 
         return true;
@@ -348,6 +365,7 @@ public sealed record AppSettings
 
         // With no layout to write, a [[window]] whose bounds did not read stays as a hand edit left it, among the other sections.
         var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
+        var share = settings.ShareTermsLineShown ? existing.Tables.FirstOrDefault(IsShareSection) : null;
 
         try
         {
@@ -366,7 +384,17 @@ public sealed record AppSettings
                 }
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window)))
+            if (settings.ShareTermsLineShown)
+            {
+                writer.BlankLine().Table(ShareSectionName).Number(ShareTermsLineShownKey, 1, "1 once keypaste share has printed its line linking the terms of use");
+
+                if (share is not null && !TryWrite(writer, share.Pairs.Where(pair => !string.Equals(pair.Key, ShareTermsLineShownKey, StringComparison.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -444,6 +472,8 @@ public sealed record AppSettings
         new TomlWriter(TomlLimits.Paths).CanWrite(VaultKey, RecentVaults.Portable(vaultPath), _vaultComment);
 
     private static bool IsWindowSection(TomlTable table) => string.Equals(table.Name, WindowSectionName, StringComparison.Ordinal);
+
+    private static bool IsShareSection(TomlTable table) => string.Equals(table.Name, ShareSectionName, StringComparison.Ordinal);
 
     private static string? TextOf(TomlTable table, string key) =>
         table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;

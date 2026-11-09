@@ -19,6 +19,7 @@ public sealed class ShareVerbTests : IDisposable
 {
     private const string _master = "share-master-5e1d";
     private const string _stripeValue = "sk_live_THE-VALUE-THAT-MUST-NOT-PRINT";
+    private const string _termsLine = "  keypaste.com's terms of use cover share links: https://keypaste.com/terms";
 
     private readonly CliHarness _cli = new();
     private readonly FakeShareServer _server = new();
@@ -63,6 +64,8 @@ public sealed class ShareVerbTests : IDisposable
         _cli.Stdout.GetStringBuilder().Clear();
         _cli.Stderr.GetStringBuilder().Clear();
     }
+
+    private static string[] Lines(string text) => text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
     private string Audit()
     {
@@ -145,6 +148,129 @@ public sealed class ShareVerbTests : IDisposable
         Assert.Contains("\"views\":3", _server.Requests[0].Body, StringComparison.Ordinal);
         Assert.Contains("\"ttl_seconds\":3600", _server.Requests[0].Body, StringComparison.Ordinal);
         Assert.DoesNotContain("sam@acme.dev", _server.Transcript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_first_share_from_a_home_links_the_terms_on_stderr_and_the_next_does_not()
+    {
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+
+        Assert.Single(Lines(_cli.Err), line => line == _termsLine);
+        Assert.True(ShareLink.TryParse(Assert.Single(Lines(_cli.Out)), out var id, out var key));
+        var remembered = File.ReadAllText(KeypasteHome.SettingsPath(Home));
+        Assert.DoesNotContain(key, remembered, StringComparison.Ordinal);
+        Assert.DoesNotContain(id, remembered, StringComparison.Ordinal);
+        Assert.DoesNotContain(_stripeValue, remembered, StringComparison.Ordinal);
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+        Assert.DoesNotContain("terms of use", _cli.Err, StringComparison.Ordinal);
+
+        Clear();
+        _cli.Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(_cli.Directory, "another-home");
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+        Assert.Contains(_termsLine, Lines(_cli.Err));
+    }
+
+    [Fact]
+    public void A_listing_in_json_stays_parseable_and_leaves_the_terms_line_for_the_first_share()
+    {
+        _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
+        using (JsonDocument.Parse(_cli.Out))
+        {
+            Assert.DoesNotContain("terms of use", _cli.Err, StringComparison.Ordinal);
+        }
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+        Assert.Contains(_termsLine, Lines(_cli.Err));
+        Assert.DoesNotContain("terms of use", _cli.Out, StringComparison.Ordinal);
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
+        using var json = JsonDocument.Parse(_cli.Out);
+        Assert.Single(json.RootElement.EnumerateArray());
+        Assert.DoesNotContain("terms of use", _cli.Err, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_share_that_cannot_remember_the_line_still_succeeds_and_shows_it_again(bool settingsIsDirectory)
+    {
+        var settings = KeypasteHome.SettingsPath(Home);
+        Directory.CreateDirectory(Home);
+        const string handEdit = "this is = not [[ a settings file\n";
+        if (settingsIsDirectory)
+        {
+            Directory.CreateDirectory(settings);
+        }
+        else
+        {
+            File.WriteAllText(settings, handEdit);
+        }
+
+        for (var share = 0; share < 2; share++)
+        {
+            Clear();
+            _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+            Assert.Contains(_termsLine, Lines(_cli.Err));
+            Assert.True(ShareLink.TryParse(Assert.Single(Lines(_cli.Out)), out _, out _));
+        }
+
+        if (!settingsIsDirectory)
+        {
+            Assert.Equal(handEdit, File.ReadAllText(settings));
+        }
+    }
+
+    [Fact]
+    public void A_share_whose_write_of_the_fact_is_refused_still_succeeds()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var viaOwnServer = Share("env/acme-api/STRIPE_KEY", "--print", "--endpoint", "https://share.example.org");
+        _cli.AssertExit(CliApp.ExitSuccess, viaOwnServer);
+        Clear();
+
+        var writable = File.GetUnixFileMode(Home);
+        File.SetUnixFileMode(Home, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+            Assert.Contains(_termsLine, Lines(_cli.Err));
+            Assert.True(ShareLink.TryParse(Assert.Single(Lines(_cli.Out)), out _, out _));
+        }
+        finally
+        {
+            File.SetUnixFileMode(Home, writable);
+        }
+    }
+
+    [Fact]
+    public void A_share_withdrawn_for_want_of_a_clipboard_keeps_the_terms_line_for_the_first_that_lands()
+    {
+        _cli.Clipboard.SetStatus = ClipboardStatus.NoDisplay;
+        Assert.Equal(CliApp.ExitInternalError, Share("env/acme-api/STRIPE_KEY"));
+        Assert.DoesNotContain("terms of use", _cli.Err, StringComparison.Ordinal);
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+        Assert.Contains(_termsLine, Lines(_cli.Err));
+    }
+
+    [Fact]
+    public void A_share_to_another_service_does_not_link_keypaste_coms_terms_or_use_up_the_line()
+    {
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print", "--endpoint", "https://share.example.org"));
+        Assert.DoesNotContain("terms of use", _cli.Err, StringComparison.Ordinal);
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
+        Assert.Contains(_termsLine, Lines(_cli.Err));
     }
 
     [Fact]

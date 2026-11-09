@@ -6,6 +6,7 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Settings;
 using Keypaste.Core.Sharing;
 using Keypaste.Infrastructure;
 
@@ -22,6 +23,8 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class ShareCommand
 {
+    private const string _termsUrl = "https://keypaste.com/terms";
+
     private static readonly TimeSpan _defaultTtl = TimeSpan.FromHours(24);
 
     private static readonly Argument<string> _item = Syntax.Operand("item", "the item, or a kp:// reference, which names its own field");
@@ -177,6 +180,11 @@ internal static class ShareCommand
             Announce(context, outcome.Info!, endpoint, print);
             return CliApp.ExitSuccess;
         });
+
+        if (exit == CliApp.ExitSuccess && ShareEndpoint.IsDefault(endpoint))
+        {
+            LinkTermsOnce(context);
+        }
 
         if (copied)
         {
@@ -444,6 +452,24 @@ internal static class ShareCommand
         if (info.Passphrase)
         {
             context.Stderr.WriteLine("  passphrase: send it separately");
+        }
+    }
+
+    private static void LinkTermsOnce(CliContext context)
+    {
+        var settingsPath = KeypasteHome.SettingsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var readable = AppSettings.TryLoad(settingsPath, out var settings);
+        if (settings.ShareTermsLineShown)
+        {
+            return;
+        }
+
+        context.Stderr.WriteLine($"  keypaste.com's terms of use cover share links: {_termsUrl}");
+
+        // A file that does not read is left for whoever is editing it, and a line not remembered only shows again.
+        if (readable)
+        {
+            AppSettings.Save(settingsPath, settings with { ShareTermsLineShown = true });
         }
     }
 
