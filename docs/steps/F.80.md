@@ -1,6 +1,6 @@
 # F.80 — Let a request wait its turn
 
-Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.79. Runs: RUNS.
+Completed 2026-11-08 on `f76-picker`, source only and not merged, with F.76 to F.79. Runs on Linux at `dff90d3b`: ci fast tier 42542381818, dev desktop 42542943103 and dev desktop-gates 42542974487, all green at the first attempt.
 
 ## Amendments
 
