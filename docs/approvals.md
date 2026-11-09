@@ -93,7 +93,7 @@ The audit line records it as `allowed`, never as a person's approval, and the ne
 
 An explicit refusal tells the agent not to retry. The same request is refused for one minute without prompting again. A timeout allows retry because nobody made a decision.
 
-Only one request is displayed at a time. Additional requests on that connection, including entry listings, receive `BUSY` immediately. They are not queued, and the response does not identify the call already in progress.
+Only one request is displayed at a time. In source, an agent's request that arrives meanwhile waits its turn and is shown once the one before it is answered, at most three waiting for each agent; a fourth receives `BUSY`, and so does a call beyond the four a bridge carries at once. A request whose agent gives up, and every waiting request when the vault locks, leaves the queue, and one a person just refused is not shown again while its minute lasts.
 
 There is no pause button for an agent that keeps asking. The rules are the pause: block a kind of value in Settings and every agent's requests for it are refused before anything in the vault is read, with no prompt, and `keypaste clients <agent> --run off` stops its commands the same way. Changing a field's kind in Settings also ends the minute a refusal holds it back ([policy](policy.md)).
 

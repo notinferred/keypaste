@@ -565,7 +565,7 @@ public sealed class SessionAuthority : IApproverHandler
         Withdrawals.AddOwner(waiting);
 
         var decided = await Decided(
-            token => _saver.DecideAsync(request, lifetime, waiting, token),
+            token => _saver.DecideAsync(request, connectionId, lifetime, waiting, token),
             lifetime,
             (method, reason) => new SaveReply(AuditDecision.Denied, method, reason),
             waiting,
@@ -1000,7 +1000,7 @@ public sealed class SessionAuthority : IApproverHandler
                 preview.Profile,
                 [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))]);
 
-            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
+            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();

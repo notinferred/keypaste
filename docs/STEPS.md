@@ -8,10 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.80 — Let a request wait its turn.** Needs: none ([F.78b](steps/F.78b.md), [F.79](steps/F.79.md)). Founder, 2026-11-07.
-  - A request arriving while a prompt is open waits its turn instead of being refused as busy, so two tabs of one agent are each answered. A looping agent cannot pile prompts up: the founder settles the bound before it is built, with a few waiting per agent and the refusal cooldown as the starting proposal.
-  - Accepted when tests show two concurrent requests each prompted in order, a cancelled or timed-out request leaving the queue, a lock emptying it, and the bound holding.
-
 ## T5 — Desktop delivery
 
 The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.

@@ -318,12 +318,12 @@ internal static class ToolText
     /// between five and fifty-five seconds and the bridge is not told which.
     /// </remarks>
     internal const string Busy = """
-        keypaste: BUSY. keypaste handles one request at a time on this connection and is already
-        handling another, so this one was not queued behind it. Nothing was decided and nothing was
-        released.
+        keypaste: BUSY. This agent already has as many requests waiting for the person as keypaste
+        lets one agent have, so this one was not queued behind them. Nothing was decided and nothing
+        was released.
 
-        The other request may be waiting on a person, so it can take as long as they take to
-        answer. Wait for it to finish rather than retrying in a loop. This call was recorded in the
+        The others may be waiting on a person, so they can take as long as they take to answer.
+        Wait for them to finish rather than retrying in a loop. This call was recorded in the
         audit log.
         """;
 

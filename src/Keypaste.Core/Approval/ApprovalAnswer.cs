@@ -27,8 +27,8 @@ public enum ApprovalAnswer
     Cancelled = 4,
 
     /// <summary>
-    /// Another request was already in front of a human. Refused rather than queued: a queue is a
-    /// pipeline that eventually shows every prompt, which is the storm it was meant to prevent.
+    /// Another request was in front of a human and this one could not wait its turn: its agent already had
+    /// <see cref="ApprovalLimits.MaximumWaiting"/> waiting, or it names no agent and so never waits (F.80).
     /// </summary>
     Busy = 5,
 

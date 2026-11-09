@@ -20,8 +20,8 @@ internal enum VaultAvailability
     Failed = 2,
 
     /// <summary>
-    /// The connection to the approver was already carrying an exchange, so this listing was refused
-    /// rather than queued behind it. <see cref="ToolText.Busy"/> is what the agent is told.
+    /// Every connection the bridge may open to the approver was carrying an exchange, so this listing was
+    /// refused rather than queued. <see cref="ToolText.Busy"/> is what the agent is told.
     /// </summary>
     Busy = 3,
 

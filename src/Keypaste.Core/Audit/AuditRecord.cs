@@ -56,7 +56,7 @@ public enum AuditMethod
     /// <summary>No approver was reachable, so there was nobody to ask.</summary>
     NoApprover = 9,
 
-    /// <summary>Another request was already in front of a person. Refused rather than queued.</summary>
+    /// <summary>Another request was in front of a person and this one could not wait its turn.</summary>
     Busy = 10,
 
     /// <summary>The same request was refused a moment ago and has not served its cooldown.</summary>

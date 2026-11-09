@@ -40,11 +40,12 @@ public sealed class SessionSaver
 
     /// <summary>Decides one request: checks the place, asks the person for the value, then writes and saves it.</summary>
     /// <param name="request">The request, already admitted to <paramref name="lifetime"/>.</param>
+    /// <param name="connectionId">The connection it came on, which an unlabelled agent waits its turn as.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>
     /// <param name="waiting">The lifetime's <see cref="SessionLifetime.Waiting"/> as the request began.</param>
     /// <param name="cancellationToken">Withdraws the question when the agent stops waiting, the vault is locked or it is reloaded.</param>
     /// <returns>Whether it was saved.</returns>
-    internal async ValueTask<SaveReply> DecideAsync(SaveRequest request, SessionLifetime lifetime, CancellationToken waiting, CancellationToken cancellationToken)
+    internal async ValueTask<SaveReply> DecideAsync(SaveRequest request, string connectionId, SessionLifetime lifetime, CancellationToken waiting, CancellationToken cancellationToken)
     {
         if (SaveRequestRules.Check(request) is { } problem)
         {
@@ -102,7 +103,7 @@ public sealed class SessionSaver
             Creates = check.Creates,
             Replaces = check.Replaces,
         };
-        var said = await _gate.AskSavingAsync($"save\0{where}\0{request.Named}", prompt, cancellationToken).ConfigureAwait(false);
+        var said = await _gate.AskSavingAsync($"save\0{where}\0{request.Named}", prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
 
         if (!lifetime.IsLive || waiting.IsCancellationRequested)
         {

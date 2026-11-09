@@ -746,8 +746,9 @@ public sealed class DesktopApprovalTests
             Assert.Null(answered.Value);
         });
 
+    /// <summary>A second request while the prompt is up waits its turn behind it, one window on screen, and is shown once the first is answered (F.80).</summary>
     [Fact]
-    public Task A_second_request_while_the_prompt_is_up_is_refused_as_busy() =>
+    public Task A_second_request_while_the_prompt_is_up_waits_its_turn() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -755,13 +756,21 @@ public sealed class DesktopApprovalTests
             var window = await app.PromptAsync();
 
             await using var other = await app.ConnectAsync();
-            var second = await app.Ask(other).WaitAsync(_wait, Token);
+            var second = app.Ask(other);
+            await Task.Delay(200, Token);
+            WindowInput.Drain();
 
-            Assert.Equal(AuditMethod.Busy, second!.Method);
             Assert.Single(app.Windows);
+            Assert.False(second.IsCompleted);
 
-            Click(window, "Deny");
+            // Allowed rather than refused, since a refusal would hold the same request waiting behind it back (T-11).
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
             await first.WaitAsync(_wait, Token);
+            var next = await app.PromptAsync(count: 2);
+            Click(next, "Deny");
+
+            Assert.Equal(AuditMethod.Prompt, (await second.WaitAsync(_wait, Token))!.Method);
         });
 
     /// <summary>

@@ -8,15 +8,14 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// What a second tool call gets while the first one is still in front of a person.
+/// What a second tool call gets while the first one is still in front of a person: a lane of its own to the owner, whose
+/// queue it waits in (F.80), until every lane this bridge may open is busy, when the next comes back busy at once.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Through one real MCP connection, which is the whole point of the file. <c>ApprovalGate</c> has
-/// refused a concurrent prompt since 2.2 and <c>ApprovalGateTests</c> proved it — but the bridge
-/// queued requests in front of that check, so the refusal was unreachable for two calls on one
-/// connection and the second became a delayed second prompt. A test that asks the gate directly
-/// cannot see that, which is why STEPS V-F.3b rules one out as evidence.
+/// Through one real MCP connection, which is the whole point of the file: the bridge must not queue a call in front of the
+/// owner's queue, where the bound per agent is kept (THREATS.md T-11), and a test that asks the gate directly cannot see
+/// what the bridge does with a second call.
 /// </para>
 /// <para>
 /// The cancellation and disconnection halves of F.3b are in <c>ApproverConnectionTests</c>
@@ -29,7 +28,7 @@ public sealed class ConcurrentRequestsTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    /// <summary>How long a call gets to come back before it counts as having been queued.</summary>
+    /// <summary>How long a call gets to come back, or to reach the owner, before it counts as having been held up in the bridge.</summary>
     /// <remarks>
     /// Generous on purpose. The assertion is "promptly rather than behind a human", and a human is
     /// bounded by <c>ApprovalLimits.Window</c> at forty-five seconds, so ten seconds separates the
@@ -85,101 +84,44 @@ public sealed class ConcurrentRequestsTests
         return await call;
     }
 
-    /// <summary>
-    /// The defect F.3b exists to close: a second request used to wait for the first to be answered.
-    /// </summary>
-    [Fact]
-    public async Task ASecondRequestWhileAPromptIsOpen_ComesBackBusyWithoutWaitingForIt()
+    /// <summary>Waits until the owner has received this many requests, each parked there.</summary>
+    private static async Task ReachedAsync(FakeApprover approver, int count)
     {
-        await using var harness = new McpHarness();
-        harness.Approver.Hold = true;
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync();
+        var deadline = DateTime.UtcNow + _promptly;
 
-        var held = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential("env/dev/FIRST"),
-            cancellationToken: Token).AsTask();
-
-        await HoldingAsync(harness.Approver);
-
-        var refusal = await PromptlyAsync(
-            client.CallToolAsync(
-                ToolText.CredentialToolName,
-                Credential("env/dev/SECOND"),
-                cancellationToken: Token).AsTask(),
-            "the second request did not come back while the first was still open: it was queued behind the prompt");
-
-        Assert.True(refusal.IsError);
-        Assert.Contains("BUSY", TextOf(refusal), StringComparison.Ordinal);
-
-        harness.Approver.Held.TrySetResult();
-        await held;
-
-        // The load-bearing half. A queued request eventually reaches the approver and becomes a
-        // second prompt; a refused one never arrives at all.
-        Assert.Single(harness.Approver.Received);
-    }
-
-    /// <summary>
-    /// The refusal says it was recorded, so it has to have been. Law 3.3 does not make an exception
-    /// for the calls keypaste itself turned away.
-    /// </summary>
-    [Fact]
-    public async Task TheBusyRefusalIsRecordedInTheAuditLog()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.Hold = true;
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync();
-
-        var held = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential("env/dev/FIRST"),
-            cancellationToken: Token).AsTask();
-
-        await HoldingAsync(harness.Approver);
-
-        await PromptlyAsync(
-            client.CallToolAsync(
-                ToolText.CredentialToolName,
-                Credential("env/dev/SECOND"),
-                cancellationToken: Token).AsTask(),
-            "the second request was queued behind the prompt, so there is no refusal to have recorded");
-
-        Assert.Equal(1, MethodsOf(harness).Count(method => method == "busy"));
-
-        harness.Approver.Held.TrySetResult();
-        await held;
-
-        // The refusal is the bridge's to record; the request the owner answered is the owner's.
-        Assert.Equal(["busy"], MethodsOf(harness));
-
-        // Never alongside a release: a refusal that reads as a grant is the one shape the log must
-        // not be able to take.
-        foreach (var line in harness.AuditLines())
+        while (approver.Received.Count < count)
         {
-            using var parsed = JsonDocument.Parse(line);
-
-            if (parsed.RootElement.GetProperty("method").GetString() == "busy")
-            {
-                Assert.Equal("denied", parsed.RootElement.GetProperty("decision").GetString());
-                Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
-            }
+            Assert.True(DateTime.UtcNow < deadline, $"only {approver.Received.Count} of {count} requests reached the owner.");
+            await Task.Delay(20, Token);
         }
     }
 
-    /// <summary>
-    /// The listing shares the one pipe, so it is refused by the same rule.
-    /// </summary>
-    /// <remarks>
-    /// Pointed at an approver of this test's own, so the names come back through the real
-    /// <c>ApproverEntryNameSource</c> rather than the fake source the rest of the bridge tests use.
-    /// That is the path the shipped binary runs, and the only one where a listing contends for the
-    /// slot at all.
-    /// </remarks>
+    private static Task<CallToolResult> Call(ModelContextProtocol.Client.McpClient client, string entry) =>
+        client.CallToolAsync(ToolText.CredentialToolName, Credential(entry), cancellationToken: Token).AsTask();
+
+    /// <summary>A second request while a prompt is open goes to the owner on a lane of its own, which queues it, and both are answered.</summary>
     [Fact]
-    public async Task AListingWhileARequestIsOpen_IsBusyAndIsRecorded()
+    public async Task ASecondRequestWhileAPromptIsOpen_ReachesTheOwnerAndIsAnswered()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Hold = true;
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        var first = Call(client, "env/dev/FIRST");
+        await HoldingAsync(harness.Approver);
+        var second = Call(client, "env/dev/SECOND");
+        await ReachedAsync(harness.Approver, 2);
+
+        harness.Approver.Held.TrySetResult();
+
+        Assert.False((await first).IsError);
+        Assert.False((await second).IsError);
+    }
+
+    /// <summary>A listing while a request is open goes on another lane and is answered, since it asks nobody.</summary>
+    [Fact]
+    public async Task AListingWhileARequestIsOpen_IsAnswered()
     {
         await using var approver = new FakeApprover();
         approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
@@ -189,118 +131,59 @@ public sealed class ConcurrentRequestsTests
         await using var harness = new McpHarness(approver.PipeName);
         var client = await harness.StartAsync();
 
-        var held = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential("env/dev/STRIPE_KEY"),
-            cancellationToken: Token).AsTask();
-
+        var held = Call(client, "env/dev/STRIPE_KEY");
         await HoldingAsync(approver);
 
-        var refusal = await PromptlyAsync(
+        var listing = await PromptlyAsync(
             client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token).AsTask(),
-            "the listing waited for the prompt instead of being refused");
+            "the listing waited for the prompt");
 
-        Assert.True(refusal.IsError);
-        Assert.Contains("BUSY", TextOf(refusal), StringComparison.Ordinal);
-        Assert.Equal(1, MethodsOf(harness).Count(method => method == "busy"));
+        Assert.False(listing.IsError);
+        Assert.Contains("STRIPE_KEY", TextOf(listing), StringComparison.Ordinal);
 
         approver.Held.TrySetResult();
         await held;
     }
 
     /// <summary>
-    /// Busy is a moment, not a state. Once the prompt is answered the next request is asked
-    /// normally, which is what makes "wait and try again" honest advice.
+    /// Once every lane carries a request, the next is refused as busy at once and recorded, never queued in the bridge; and
+    /// the lanes come back once those are answered, so a busy bridge is not a wedged one.
     /// </summary>
     [Fact]
-    public async Task AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally()
+    public async Task WithEveryLaneBusy_TheNextIsRefusedAtOnce_AndTheLanesComeBack()
     {
         await using var harness = new McpHarness();
         harness.Approver.Hold = true;
         harness.Approver.StartApproving();
         var client = await harness.StartAsync();
 
-        var held = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential("env/dev/FIRST"),
-            cancellationToken: Token).AsTask();
+        List<Task<CallToolResult>> held = [.. Enumerable.Range(0, ApproverConnection.Lanes).Select(lane => Call(client, $"env/dev/HELD{lane}"))];
+        await ReachedAsync(harness.Approver, ApproverConnection.Lanes);
 
-        await HoldingAsync(harness.Approver);
-
-        var refused = await PromptlyAsync(
-            client.CallToolAsync(
-                ToolText.CredentialToolName,
-                Credential("env/dev/SECOND"),
-                cancellationToken: Token).AsTask(),
-            "the second request was queued behind the prompt");
-
-        Assert.True(refused.IsError);
-
-        harness.Approver.Held.TrySetResult();
-        await held;
-
-        harness.Approver.Hold = false;
-
-        var fresh = await PromptlyAsync(
-            client.CallToolAsync(
-                ToolText.CredentialToolName,
-                Credential("env/dev/THIRD"),
-                cancellationToken: Token).AsTask(),
-            "the slot was never given back, so the next request had nobody to ask");
-
-        Assert.False(fresh.IsError);
-        Assert.Contains(FakeApprover.Sentinel, TextOf(fresh), StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// A refusal never took the slot, so it must not release one either.
-    /// </summary>
-    /// <remarks>
-    /// The failure this guards against is a busy return placed inside the block whose
-    /// <c>finally</c> releases the semaphore. Every slot here is a <c>SemaphoreSlim(1, 1)</c>, so an
-    /// extra release throws rather than silently admitting two — but a bridge that throws on its
-    /// second refusal is still a wedged bridge, and nothing else in the suite would notice.
-    /// </remarks>
-    [Fact]
-    public async Task TheSlotSurvivesRefusal_SoARefusedBridgeIsNotAWedgedOne()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.Hold = true;
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync();
-
-        var held = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential("env/dev/FIRST"),
-            cancellationToken: Token).AsTask();
-
-        await HoldingAsync(harness.Approver);
-
-        for (var attempt = 0; attempt < 5; attempt++)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            var refusal = await PromptlyAsync(
-                client.CallToolAsync(
-                    ToolText.CredentialToolName,
-                    Credential("env/dev/SPAM" + attempt),
-                    cancellationToken: Token).AsTask(),
-                $"refusal {attempt} was queued rather than refused");
+            var refusal = await PromptlyAsync(Call(client, $"env/dev/SPAM{attempt}"), $"refusal {attempt} was held up in the bridge");
 
             Assert.True(refusal.IsError);
             Assert.Contains("BUSY", TextOf(refusal), StringComparison.Ordinal);
         }
 
-        harness.Approver.Held.TrySetResult();
-        await held;
+        Assert.Equal(3, MethodsOf(harness).Count(method => method == "busy"));
+        Assert.Equal(ApproverConnection.Lanes, harness.Approver.Received.Count);
 
+        harness.Approver.Held.TrySetResult();
+        Assert.All(await Task.WhenAll(held), result => Assert.False(result.IsError));
         harness.Approver.Hold = false;
 
-        var after = await PromptlyAsync(
-            client.CallToolAsync(
-                ToolText.CredentialToolName,
-                Credential("env/dev/AFTER"),
-                cancellationToken: Token).AsTask(),
-            "the bridge was wedged by its own refusals");
+        var after = await PromptlyAsync(Call(client, "env/dev/AFTER"), "the bridge was wedged by its busy lanes");
 
         Assert.False(after.IsError);
+        Assert.Contains(FakeApprover.Sentinel, TextOf(after), StringComparison.Ordinal);
+
+        foreach (var line in harness.AuditLines().Where(line => line.Contains("\"method\":\"busy\"", StringComparison.Ordinal)))
+        {
+            Assert.Contains("\"decision\":\"denied\"", line, StringComparison.Ordinal);
+            Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
+        }
     }
 }

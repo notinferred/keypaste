@@ -230,13 +230,13 @@ public sealed class ApproverHandler
         {
             if (failure == CredentialFailure.Ambiguous && _source.TryChoose(request.Entry, out var items, out failure))
             {
-                return await PickAsync(request, rules, exposure, items, cancellationToken).ConfigureAwait(false);
+                return await PickAsync(request, rules, exposure, items, connectionId, cancellationToken).ConfigureAwait(false);
             }
 
             return Unresolved(failure);
         }
 
-        return await DecideAsync(request, rules, exposure, name, cancellationToken).ConfigureAwait(false);
+        return await DecideAsync(request, rules, exposure, name, connectionId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>A request that named no single item refused, saying why.</summary>
@@ -262,6 +262,7 @@ public sealed class ApproverHandler
         AgentRules rules,
         EntryExposure exposure,
         EntryName name,
+        string connectionId,
         CancellationToken cancellationToken)
     {
         // The re-check that makes handles safe. The bridge can test a path against its globs
@@ -313,7 +314,7 @@ public sealed class ApproverHandler
             Item = itemId,
             OffersAlways = agent is not null && itemId is not null && rules.HasRoom,
         };
-        var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
+        var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
         var unremembered = answer switch
         {
             ApprovalAnswer.AlwaysAllowed => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Allow), confirmed: true)),
@@ -358,6 +359,7 @@ public sealed class ApproverHandler
         AgentRules rules,
         EntryExposure exposure,
         IReadOnlyList<AnsweringItem> items,
+        string connectionId,
         CancellationToken cancellationToken)
     {
         var agent = Named(request);
@@ -372,7 +374,7 @@ public sealed class ApproverHandler
             case 0:
                 return Refused(AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge");
             case 1:
-                return await DecideAsync(request, rules, exposure, offered[0].Name, cancellationToken).ConfigureAwait(false);
+                return await DecideAsync(request, rules, exposure, offered[0].Name, connectionId, cancellationToken).ConfigureAwait(false);
             case > ApprovalPrompt.MaximumCandidates:
                 return Refused(AuditMethod.OutOfScope, $"more than {ApprovalPrompt.MaximumCandidates} items this agent can see answer to that name, too many to pick from; a person can rename or move some");
         }
@@ -410,7 +412,7 @@ public sealed class ApproverHandler
             Candidates = candidates,
             OffersAlways = agent is not null && rules.HasRoom,
         };
-        var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken).ConfigureAwait(false);
+        var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
         var picked = pick.Picked is { } index ? candidates[index] : null;
         var unremembered = pick.Answer == ApprovalAnswer.AlwaysAllowed && picked is not null
             ? Remember(held => held.Remembering(new RememberedPick(agent!, request.Entry, subject, picked.Item), confirmed: true))
