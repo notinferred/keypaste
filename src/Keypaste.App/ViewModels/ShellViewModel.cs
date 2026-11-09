@@ -69,6 +69,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private IReadOnlyList<GroupNode> _groups = [];
     private string? _openProject;
     private bool _rebuildingSidebar;
+    private int _conflictedCopiesSaid;
     private bool _agentsServing;
     private bool _agentsRefusing;
     private string _agentsDetail = string.Empty;
@@ -159,6 +160,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             if (e.PropertyName is nameof(RecommendationsViewModel.NeedsReview) or nameof(RecommendationsViewModel.IsEmpty))
             {
                 ShowRecommendationsRow();
+            }
+
+            if (e.PropertyName == nameof(RecommendationsViewModel.ConflictedCopies))
+            {
+                SayWhenACopyArrives();
             }
         };
 
@@ -1287,6 +1293,16 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         return true;
     }
 
+    private void SayWhenACopyArrives()
+    {
+        if (Recommendations.ConflictedCopies.Count > _conflictedCopiesSaid)
+        {
+            ShowToast(Resources.Strings.AnotherDevicesChangesWerentMerged, ToastTone.Information);
+        }
+
+        _conflictedCopiesSaid = Recommendations.ConflictedCopies.Count;
+    }
+
     private void ShowRecommendationsRow()
     {
         RecommendationsRow.Count = Recommendations.NeedsReview > 0 ? Recommendations.NeedsReview.ToString(CultureInfo.InvariantCulture) : string.Empty;
@@ -1537,6 +1553,16 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _ => VaultPath,
         };
 
+        OffersSaveOverFile = false;
+        Recommendations.LookForConflictedCopies();
+
+        if (!File.Exists(vault.Path))
+        {
+            OffersSaveOverFile = true;
+            VaultChanged = $"{VaultName} is no longer where it was. What's open here is safe until you lock it. Save it back, or put the file back and keypaste carries on.";
+            return;
+        }
+
         if (state.Status != VaultSaveStatus.ChangedOnDisk)
         {
             _reloadFailure = null;
@@ -1547,6 +1573,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         // The poll and the folder watch merge another program's save; Reload is offered for one keypaste did not merge.
         if (_session.MergeRefusal() is { } refused)
         {
+            OffersSaveOverFile = refused.Outcome == VaultMergeSaveOutcome.Unreadable;
             VaultChanged = string.Concat(
                 $"Another program saved {VaultName}, and keypaste could not merge it: {MergeNotice.Refused(refused)}. Agents are refused until you reload it.",
                 state.Unwritten ? Discarded() : string.Empty,
@@ -1685,6 +1712,21 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Opens what the file holds now in place of the open copy, offered once a merge was refused.</summary>
     [RelayCommand]
     private void Reload() => Leave(ReloadNow);
+
+    /// <summary>Whether the banner offers to write what is open over a file that is gone or unreadable.</summary>
+    [ObservableProperty]
+    internal partial bool OffersSaveOverFile { get; private set; }
+
+    [RelayCommand]
+    private void SaveOverFile()
+    {
+        if (_session.SaveOpenCopyOverFile() is { } failed)
+        {
+            _reloadFailure = failed;
+        }
+
+        ReadVaultStatus();
+    }
 
     private void ReloadNow()
     {

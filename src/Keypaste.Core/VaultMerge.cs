@@ -89,7 +89,14 @@ public sealed record VaultMergeReport(
     IReadOnlyList<MergeConflict> Conflicts,
     IReadOnlyList<MergeKeptItem> Kept,
     IReadOnlyList<MergeRenamedGroup> RenamedGroups,
-    IReadOnlyList<string> Agents);
+    IReadOnlyList<string> Agents)
+{
+    /// <summary>Each item whose changes on both sides were joined, the earlier versions being in its history.</summary>
+    public IReadOnlyList<EntryName> Combined { get; init; } = [];
+
+    /// <summary>Each item the merged copy took from the open copy, added or changed.</summary>
+    public IReadOnlyList<EntryName> Taken { get; init; } = [];
+}
 
 /// <summary>An item both copies changed.</summary>
 /// <param name="Item">Its name in the merged copy.</param>

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+keypaste now keeps both devices' changes when they edited different fields of one item, and offers a sync tool's conflicted copy for review and merge in Recommendations. Groups holding same-named items can be moved and renamed, and a vault file that disappears or can't be read can be saved back from what is open ([F.84](docs/steps/F.84.md)).
+
 Agents now has **Add an agent**, with a setup prompt to copy, a specific app to connect or MCP to add by hand, keeps connections on their own tab and shows the folder each live session reports. Recommendations moved under Items, and the key file warning moved there from the banner ([F.83](docs/steps/F.83.md)).
 
 Settings is now three sections, General, This vault and Browser, and changing what unlocks the vault opens behind Change…. What agents get moved to Agents ([F.82](docs/steps/F.82.md)).

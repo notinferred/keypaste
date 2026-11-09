@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recommendations;
 
@@ -92,6 +93,80 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             .Select(group => new PasswordGroup(PasswordRow.Heading(group.Key), PasswordRow.Reason(group.Key), [.. group])),
     ];
 
+    /// <summary>Sync tools' conflicted copies beside the vault, each to review and merge.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasConflictedCopies), nameof(Line))]
+    internal partial IReadOnlyList<ConflictedCopyRow> ConflictedCopies { get; private set; } = [];
+
+    internal bool HasConflictedCopies => ConflictedCopies.Count > 0;
+
+    /// <summary>Looks again for conflicted copies, keeping the rows of those still there.</summary>
+    internal void LookForConflictedCopies()
+    {
+        var found = _disposed || _session.Unlocked is not { } vault ? [] : Core.ConflictedCopies.Beside(vault.Path);
+
+        if (!found.SequenceEqual(ConflictedCopies.Select(row => row.Path), StringComparer.Ordinal))
+        {
+            ConflictedCopies = [.. found.Select(path => ConflictedCopies.FirstOrDefault(row => row.Path == path) ?? new ConflictedCopyRow(this, path))];
+        }
+    }
+
+    /// <summary>Works out what merging a copy would change, which writes nothing.</summary>
+    internal async Task ReviewAsync(ConflictedCopyRow row)
+    {
+        if (await RunMerge(row, save: false).ConfigureAwait(true) is not { Report: { } report })
+        {
+            return;
+        }
+
+        List<string> names = [.. report.Taken.Take(20).Select(ApprovalPrompt.Shown)];
+        var more = report.Taken.Count > names.Count ? string.Create(CultureInfo.InvariantCulture, $", and {report.Taken.Count - names.Count} more") : string.Empty;
+        row.Review = report.Taken.Count == 0
+            ? "This copy has nothing your vault doesn't. Merging only moves it in with the backups."
+            : string.Create(CultureInfo.InvariantCulture, $"{report.Taken.Count} from this copy will come in: {string.Join(", ", names)}{more}. Anything that replaces a value keeps the other in that item's history.");
+    }
+
+    /// <summary>Merges a copy into the vault's file and moves the copy in with the backups.</summary>
+    internal async Task MergeAsync(ConflictedCopyRow row)
+    {
+        if (await RunMerge(row, save: true).ConfigureAwait(true) is { Outcome: VaultMergeSaveOutcome.Saved })
+        {
+            row.Review = null;
+            Message = $"Merged {row.Name} and moved it in with this vault's backups.";
+            LookForConflictedCopies();
+        }
+    }
+
+    private async Task<VaultMergeSave?> RunMerge(ConflictedCopyRow row, bool save)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            return null;
+        }
+
+        row.Busy = true;
+        row.Message = null;
+
+        try
+        {
+            var result = await Task.Run(() => vault.MergeConflictedCopy(row.Path, save)).ConfigureAwait(true);
+
+            if (result.Outcome is VaultMergeSaveOutcome.Saved or VaultMergeSaveOutcome.Unchanged)
+            {
+                return result;
+            }
+
+            row.Message = result.Outcome == VaultMergeSaveOutcome.KeyRefused
+                ? "This copy doesn't open with the password and key file you unlocked with. Open it in KeePassXC to merge it."
+                : $"This copy can't be merged: {MergeNotice.Refused(new MergeResult(result.Outcome, result.Reason, null, [], false, DateTimeOffset.MinValue))}.";
+            return null;
+        }
+        finally
+        {
+            row.Busy = false;
+        }
+    }
+
     /// <summary>The vault's key file, when it is one keyed by its exact bytes (T-28).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasFragileKeyFile), nameof(FragileKeyFileWarning), nameof(Line))]
@@ -112,7 +187,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         get
         {
-            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + (HasFragileKeyFile ? 1 : 0) - NeedsReview;
+            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + (HasFragileKeyFile ? 1 : 0) + ConflictedCopies.Count - NeedsReview;
 
             return NeedsReview > 0
                 ? string.Create(CultureInfo.InvariantCulture, $"Recommendations: {NeedsReview} to review")
@@ -123,9 +198,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>
         Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed)
-        + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0);
+        + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0) + ConflictedCopies.Count;
 
-    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && !HasFragileKeyFile;
+    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && !HasFragileKeyFile && ConflictedCopies.Count == 0;
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
@@ -236,6 +311,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             LostTags = [];
             Passwords = [];
             FragileKeyFile = null;
+            ConflictedCopies = [];
             return;
         }
 
@@ -243,6 +319,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         var keyfile = _session.Unlocked?.KeyfilePath;
         FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
         FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
+        LookForConflictedCopies();
         var rows = _noteKeys
             .Select(finding => new RecommendationRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)

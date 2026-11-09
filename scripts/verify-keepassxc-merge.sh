@@ -26,6 +26,7 @@
 #
 #   G13  KeePassXC saves one item of a vault whose items carry custom data: the merge reports one change
 #        and the items KeePassXC only re-stamped gain no history.
+#   G14  The app and KeePassXC change different fields of one item: both changes are kept.
 # Usage:  scripts/verify-keepassxc-merge.sh <work-directory>
 # Env:    KP_COMPAT_PASSWORD   master password for the vaults        (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
@@ -475,12 +476,12 @@ kx edit "$v" services/Zeta -u kpxc-g3b >/dev/null || die "KeePassXC could not ed
 sleep 2.1
 [ "$(edit services/Zeta zeta-app-g3)" = 'saved services/Zeta' ] || die "the app's newer edit of Zeta was not saved"
 case "$(last_merge)" in
-  *"You and the other program both changed services/Zeta. Your version is current; the other program's is in its history."*) ;;
-  *) die "the notice did not name Zeta as changed in both with the app's version current: $(last_merge)" ;;
+  *"You and the other program both changed services/Zeta. keypaste kept each change"*) ;;
+  *) die "the notice did not say Zeta's changes on both sides were kept: $(last_merge)" ;;
 esac
 json=$(entry_in "$(exported "$v" g3b)" Zeta)
-jq -e '.current.password == "zeta-app-g3" and .current.username == "" and any(.history[]; .username == "kpxc-g3b")' <<<"$json" >/dev/null \
-  || die "Zeta is not the app's newer version with KeePassXC's in its history: ${json}"
+jq -e '.current.password == "zeta-app-g3" and .current.username == "kpxc-g3b" and any(.history[]; .username == "kpxc-g3b" and .password == "Zeta-0")' <<<"$json" >/dev/null \
+  || die "Zeta does not hold both changes with KeePassXC's version in its history: ${json}"
 checked "$v"
 
 cp "$v" "$dir/g3-fork.kdbx"
@@ -490,12 +491,12 @@ kx edit "$dir/g3-fork.kdbx" services/Eta -u kpxc-g3c >/dev/null || die "KeePassX
 cp "$dir/g3-fork.kdbx" "$v"
 line=$(merge)
 case "$line" in
-  *"You and the other program both changed services/Eta. The other program's version is current; yours is in its history."*) ;;
-  *) die "the notice did not name Eta as changed in both with KeePassXC's version current: ${line}" ;;
+  *"You and the other program both changed services/Eta. keypaste kept each change"*) ;;
+  *) die "the notice did not say Eta's changes on both sides were kept: ${line}" ;;
 esac
 json=$(entry_in "$(exported "$v" g3c)" Eta)
-jq -e '.current.username == "kpxc-g3c" and .current.password == "Eta-0" and any(.history[]; .password == "eta-app-g3")' <<<"$json" >/dev/null \
-  || die "Eta is not KeePassXC's newer version with the app's in its history: ${json}"
+jq -e '.current.username == "kpxc-g3c" and .current.password == "eta-app-g3" and any(.history[]; .password == "eta-app-g3" and .username == "")' <<<"$json" >/dev/null \
+  || die "Eta does not hold both changes with the app's version in its history: ${json}"
 checked "$v"
 
 # ------------------------------------------------------------------------------------- G1
@@ -713,6 +714,17 @@ kx edit "$v" services/Mu -u kpxc-g13 >/dev/null || die "KeePassXC could not edit
 line=$(merge)
 [ "$line" = 'merged updated' ] || die "the app reported more than KeePassXC's one change: ${line}"
 expect_entry Lambda "$(exported "$v" g13)" '(.history | length) == 0' "an item KeePassXC only re-stamped gained history"
+checked "$v"
+
+# ------------------------------------------------------------------------------------- G14
+step "G14: the app and KeePassXC change different fields of one item, and both changes are kept"
+seed g14 10 root Nu
+v=$dir/g14.kdbx
+hold "$v"
+act 'unsaved-edit services/Nu nu-app-g14' '^changed \|^refused:' >/dev/null
+kx edit "$v" services/Nu -u kpxc-g14 >/dev/null || die "KeePassXC could not edit Nu"
+merge >/dev/null
+expect_entry Nu "$(exported "$v" g14)" '.current.username == "kpxc-g14" and .current.password == "nu-app-g14"' "the two changes to different fields were not both kept"
 checked "$v"
 
 # ------------------------------------------------------------------------------------- NEGATIVE CONTROL

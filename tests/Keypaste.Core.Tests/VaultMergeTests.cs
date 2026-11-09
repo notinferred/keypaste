@@ -61,10 +61,10 @@ public sealed class VaultMergeTests : IDisposable
         {
             var entry = Assert.Single(database.RootGroup.GetEntries(true));
             Assert.Equal(uuid, entry.Uuid.ToHexString());
-            Assert.Equal(("billing", "stripe-live", Value("stripe", 0)), (entry.ParentGroup.Name, Title(entry), Password(entry)));
-            Assert.Equal([Value("stripe", 0), "mine"], HistoryPasswords(entry));
+            Assert.Equal(("billing", "stripe-live", "mine"), (entry.ParentGroup.Name, Title(entry), Password(entry)));
+            Assert.Equal([Value("stripe", 0), "mine", Value("stripe", 0)], HistoryPasswords(entry));
         });
-        Assert.Equal(new MergeConflict(new EntryName("billing", "stripe-live"), OpenCopyCurrent: false), Assert.Single(report.Conflicts));
+        Assert.Equal(new EntryName("billing", "stripe-live"), Assert.Single(report.Combined));
     }
 
     /// <summary>The file holds the base's version in the entry's history, so its change is taken though its clock stamped it earlier (D-0538).</summary>
@@ -474,6 +474,75 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Empty(report.Conflicts);
     }
 
+    /// <summary>Two devices changing different fields of one entry both keep their change, and neither version is lost.</summary>
+    [Fact]
+    public void ChangesToDifferentFields_AreBothKept()
+    {
+        Seed("stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        Update(open, "stripe", "mine");
+        InFile(FilePath, database => Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://theirs.test"))));
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.Equal("mine", Password(entry));
+            Assert.Equal("https://theirs.test", entry.Strings.ReadSafe(PwDefs.UrlField));
+            Assert.True(entry.LastModificationTime > _later);
+            Assert.Contains(entry.History, version => Password(version) == "mine" && version.Strings.ReadSafe(PwDefs.UrlField).Length == 0);
+            Assert.Contains(entry.History, version => version.Strings.ReadSafe(PwDefs.UrlField) == "https://theirs.test");
+        });
+        Assert.Equal(_stripe, Assert.Single(report.Combined));
+        Assert.Empty(report.Conflicts);
+        Assert.True(report.TookFromOpenCopy);
+    }
+
+    [Fact]
+    public void ABothChangedField_IsTheNewers_WhileAFieldOnlyTheOlderChangedJoinsIt()
+    {
+        Seed("stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        Assert.True(open.UpdateEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Username = "older-user", Password = "mine" }));
+        InFile(FilePath, database => Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, "theirs"))));
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.Equal("theirs", Password(entry));
+            Assert.Equal("older-user", entry.Strings.ReadSafe(PwDefs.UserNameField));
+            Assert.Contains(entry.History, version => Password(version) == "mine");
+        });
+        Assert.Single(report.Combined);
+    }
+
+    [Fact]
+    public void WithNoVersionBothKeep_TheNewerWinsAndTheOlderIsInHistory()
+    {
+        Seed("stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        Update(open, "stripe", "mine");
+        InFile(FilePath, database =>
+        {
+            Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://theirs.test")));
+            Entry(database, "stripe").History.Clear();
+        });
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.NotEqual("mine", Password(entry));
+            Assert.Contains(entry.History, version => Password(version) == "mine");
+        });
+        Assert.Empty(report.Combined);
+        Assert.Single(report.Conflicts);
+    }
+
     /// <summary>KeePassXC keeps a version without its custom data, and that version still shows the file descends from this copy's.</summary>
     [Fact]
     public void AVersionKeePassXcKeptWithoutCustomData_IsStillTheBase()
@@ -563,7 +632,7 @@ public sealed class VaultMergeTests : IDisposable
             Assert.Equal(database.RecycleBinUuid, entry.ParentGroup.Uuid);
         });
         Assert.Empty(report.Conflicts);
-        Assert.Empty(report.Kept);
+        Assert.Equal(new MergeKeptItem(new EntryName("Recycle Bin", "stripe"), DeletedInFile: false, Recycled: true), Assert.Single(report.Kept));
     }
 
     /// <summary>A restore is a change the purge never saw, so the item stays where the restore put it (D-0540).</summary>
@@ -673,7 +742,7 @@ public sealed class VaultMergeTests : IDisposable
         {
             var entry = Entry(database, "stripe");
             var holding = entry.History.Append(entry).Where(version => version.Binaries.Get("statement.pdf") is not null).ToList();
-            Assert.Equal([Value("stripe", 0), "second", "mine", "second"], holding.Select(Password));
+            Assert.Equal([Value("stripe", 0), "second", "mine", "second", "mine"], holding.Select(Password));
             Assert.All(holding, version => Assert.Equal(statement, version.Binaries.Get("statement.pdf").ReadData()));
             Assert.Equal(key, Entry(database, "github").Binaries.Get("id.pem").ReadData());
         });

@@ -626,4 +626,10 @@
   <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
   <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>
+  <data name="AnotherDevicesChangesWerentMerged" xml:space="preserve"><value>Another device's changes weren't merged. Review them in Recommendations.</value></data>
+  <data name="ChangesFromAnotherDevice" xml:space="preserve"><value>Changes from another device</value></data>
+  <data name="ASyncToolKeptThisCopyBecauseTwoDevicesSavedAtOnce" xml:space="preserve"><value>A sync tool kept this copy because two devices saved at once. Its changes are not in your vault yet.</value></data>
+  <data name="ReviewAndMerge" xml:space="preserve"><value>Review and merge</value></data>
+  <data name="Merge" xml:space="preserve"><value>Merge</value></data>
+  <data name="SaveWhatsOpenHere" xml:space="preserve"><value>Save what's open here</value></data>
 </root>

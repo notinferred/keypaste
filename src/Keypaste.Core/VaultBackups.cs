@@ -112,6 +112,35 @@ public static class VaultBackups
             || target.StartsWith(backups + Path.DirectorySeparatorChar, PathIdentity.Comparison);
     }
 
+    /// <summary>Moves a conflicted copy already merged in with the vault's backups, under its own name, so no rotation removes it.</summary>
+    /// <param name="vaultPath">The vault.</param>
+    /// <param name="copyPath">The copy.</param>
+    /// <returns>Where it is now.</returns>
+    public static string Archive(string vaultPath, string copyPath)
+    {
+        ArgumentNullException.ThrowIfNull(vaultPath);
+        ArgumentNullException.ThrowIfNull(copyPath);
+
+        var folder = DirectoryFor(vaultPath);
+        Directory.CreateDirectory(folder);
+        var name = Path.GetFileNameWithoutExtension(copyPath);
+        var target = Path.Combine(folder, Path.GetFileName(copyPath));
+
+        for (var counter = 2; File.Exists(target); counter++)
+        {
+            target = Path.Combine(folder, $"{name}.{counter.ToString(CultureInfo.InvariantCulture)}{Path.GetExtension(copyPath)}");
+        }
+
+        File.Move(copyPath, target);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(target, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        return target;
+    }
+
     /// <summary>The backups of the vault at <paramref name="vaultPath"/>, newest first.</summary>
     /// <remarks>
     /// Only files this type named are listed. Anything else in the directory — a copy somebody made

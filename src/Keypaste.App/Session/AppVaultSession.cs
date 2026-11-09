@@ -261,6 +261,37 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
+    /// <summary>Puts what is open over a file keypaste cannot read or that is gone, keeping that file as a backup.</summary>
+    /// <returns>Why it could not, or null.</returns>
+    internal string? SaveOpenCopyOverFile()
+    {
+        lock (_editGate)
+        {
+            Vault? vault;
+
+            lock (_gate)
+            {
+                vault = _vault;
+                _refusal = null;
+            }
+
+            if (vault is null)
+            {
+                return "The vault is locked.";
+            }
+
+            try
+            {
+                vault.SaveOverwriting();
+                return null;
+            }
+            catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException)
+            {
+                return ex.Message;
+            }
+        }
+    }
+
     /// <summary>The last merge's refusal, while the file still holds the bytes it refused; null otherwise.</summary>
     /// <remarks>Hashes the file, as the status line's comparison does. The watch and the poll merge again only once this is null (D-0543).</remarks>
     internal MergeResult? MergeRefusal()

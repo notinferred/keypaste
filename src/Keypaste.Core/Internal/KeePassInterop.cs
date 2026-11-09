@@ -928,7 +928,7 @@ internal sealed class KeePassInterop : IDisposable
 
         string target = ChildPath(parentPath, name);
 
-        if (RefuseCollision(Projected(null, null, located.Group, target)) is { } collision)
+        if (RefuseCollision(Projected(null, null, located.Group, target), movedTogether: true) is { } collision)
         {
             return collision == OrganizeOutcome.DestinationOccupied
                 ? GroupOutcome.DestinationOccupied
@@ -995,7 +995,7 @@ internal sealed class KeePassInterop : IDisposable
             return GroupOutcome.DestinationOccupied;
         }
 
-        if (RefuseCollision(Projected(null, null, located.Group, target)) is { } collision)
+        if (RefuseCollision(Projected(null, null, located.Group, target), movedTogether: true) is { } collision)
         {
             return collision == OrganizeOutcome.DestinationOccupied
                 ? GroupOutcome.DestinationOccupied
@@ -2283,12 +2283,15 @@ internal sealed class KeePassInterop : IDisposable
     /// and trapping such a vault so nothing else in it could be reorganized would be worse than the
     /// ambiguity. Reading stays permissive; only the new ambiguity is refused.
     /// </remarks>
-    private static OrganizeOutcome? RefuseCollision(List<(string GroupPath, string Title, bool Written)> projected)
+    /// <param name="projected">Every entry after the change, each marked if the change moves it.</param>
+    /// <param name="movedTogether">Whether the moved entries keep their places relative to each other, as a group's do, so only an entry left where it was can collide with one.</param>
+    private static OrganizeOutcome? RefuseCollision(List<(string GroupPath, string Title, bool Written)> projected, bool movedTogether = false)
     {
         Dictionary<(string, string), int> byName = [];
         Dictionary<string, int> byPath = [];
+        int allowed = movedTogether ? 0 : 1;
 
-        foreach (var row in projected)
+        foreach (var row in projected.Where(row => !movedTogether || !row.Written))
         {
             byName[(row.GroupPath, row.Title)] = byName.GetValueOrDefault((row.GroupPath, row.Title)) + 1;
             string joined = ChildPath(row.GroupPath, row.Title);
@@ -2297,7 +2300,7 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (var row in projected)
         {
-            if (row.Written && byName[(row.GroupPath, row.Title)] > 1)
+            if (row.Written && byName.GetValueOrDefault((row.GroupPath, row.Title)) > allowed)
             {
                 return OrganizeOutcome.DestinationOccupied;
             }
@@ -2305,7 +2308,7 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (var row in projected)
         {
-            if (row.Written && byPath[ChildPath(row.GroupPath, row.Title)] > 1)
+            if (row.Written && byPath.GetValueOrDefault(ChildPath(row.GroupPath, row.Title)) > allowed)
             {
                 return OrganizeOutcome.DestinationAmbiguous;
             }
@@ -4151,6 +4154,8 @@ internal sealed class KeePassInterop : IDisposable
         private readonly PwGroup? _myBin;
         private readonly PwGroup? _theirBin;
         private readonly List<(PwEntry Entry, bool MineCurrent)> _conflicts = [];
+        private readonly List<PwEntry> _combined = [];
+        private readonly List<PwEntry> _taken = [];
         private readonly List<MergeKeptItem> _kept = [];
         private readonly List<(PwGroup Group, string LostName)> _renamed = [];
 
@@ -4209,7 +4214,11 @@ internal sealed class KeePassInterop : IDisposable
                 }
             }
 
-            return new VaultMergeReport(!Same(before, StateOf(_result)), conflicts, [.. _kept], renamed, ChangedAgents(agents, AgentsIn(_file)));
+            return new VaultMergeReport(!Same(before, StateOf(_result)), conflicts, [.. _kept], renamed, ChangedAgents(agents, AgentsIn(_file)))
+            {
+                Combined = [.. _combined.Select(entry => NameIn(_file, entry))],
+                Taken = [.. _taken.Select(entry => NameIn(_file, entry)).Where(name => !ReservedGroups.IsReserved(name.GroupPath))],
+            };
         }
 
         /// <summary>Takes each group both copies hold by the rules for content and place, and adds each only the open copy holds, every parent first.</summary>
@@ -4404,7 +4413,7 @@ internal sealed class KeePassInterop : IDisposable
             int theirCount = history.Count;
 
             bool equal = Same(myDigest, theirDigest);
-            bool onlyMine = !equal && known is not null && Same(theirDigest, known.Digest);
+            bool onlyMine = !equal && ((known is not null && Same(theirDigest, known.Digest)) || IsAncestor(theirs, mine));
 
             // The file descends from the base when the base's version is in its history: its change is taken whatever the stamps say.
             // So is a later file whose version differs only in place and stamps, as KeePassXC stamps an entry it recycles and keeps no version.
@@ -4414,6 +4423,8 @@ internal sealed class KeePassInterop : IDisposable
             bool tie = byTime && Second(mine.LastModificationTime) == Second(theirs.LastModificationTime);
             bool mineCurrent = onlyMine || (byTime && Second(mine.LastModificationTime) >= Second(theirs.LastModificationTime));
             PwEntry? displaced = onlyMine || byTime ? VersionOf(mineCurrent ? theirs : mine) : null;
+            PwEntry? newer = byTime ? VersionOf(mineCurrent ? mine : theirs) : null;
+            FieldsToKeep? combination = byTime && !IsReservedEntry(mine, theirs) ? FieldsOnlyTheOlderChanged(mine, theirs, displaced!, newer!) : null;
 
             foreach (PwEntry version in mine.History)
             {
@@ -4422,12 +4433,19 @@ internal sealed class KeePassInterop : IDisposable
 
             bool displacedHeld = displaced is not null && Hold(history, displaced, copy: false, kept: true);
 
+            if (combination is not null)
+            {
+                Hold(history, newer!, copy: false, kept: true);
+            }
+
             if (mineCurrent)
             {
                 theirs.AssignProperties(mine, false, false, false);
             }
 
-            if (tie)
+            combination?.ApplyTo(theirs);
+
+            if (tie || combination is not null)
             {
                 // Two changes in one second: the open copy's is current, a second after every version and deletion it competes with.
                 theirs.LastModificationTime = After(history.Select(version => version.Entry.LastModificationTime)
@@ -4435,16 +4453,131 @@ internal sealed class KeePassInterop : IDisposable
                     .Concat(DeletionsOf(theirs.Uuid)));
             }
 
-            if (mineCurrent || history.Count != theirCount)
+            if (mineCurrent || combination is not null || history.Count != theirCount)
             {
                 SetHistory(theirs, history);
             }
 
             Place(mine, theirs, known);
 
-            if (byTime && displacedHeld)
+            if (mineCurrent || combination is not null)
+            {
+                _taken.Add(theirs);
+            }
+
+            // Recycling moves an entry, so this copy's deletion looks like a place and the file's newer edit would go unmentioned.
+            if (known is { Recycled: false } && IsRecycled(mine, _myBin) && !Same(theirDigest, known.Digest))
+            {
+                Report(NameIn(_file, theirs), deletedInFile: false, recycled: true);
+            }
+
+            if (combination is not null)
+            {
+                _combined.Add(theirs);
+            }
+            else if (byTime && displacedHeld)
             {
                 _conflicts.Add((theirs, mineCurrent));
+            }
+        }
+
+        /// <summary>Whether a later copy keeps this version in its history, so nothing has happened to it since.</summary>
+        private bool IsAncestor(PwEntry version, PwEntry later)
+        {
+            byte[] digest = _digests.OfHistoryCopy(version);
+            return later.History.Any(held => Same(_digests.OfHistoryCopy(held), digest));
+        }
+
+        private bool IsReservedEntry(PwEntry mine, PwEntry theirs) =>
+            ReservedGroups.IsReserved(_open.PathOf(mine.ParentGroup) ?? string.Empty)
+            || ReservedGroups.IsReserved(_file.PathOf(theirs.ParentGroup) ?? string.Empty);
+
+        /// <summary>
+        /// What only the older of two changed versions changed since the latest version both keep in history, to join the newer; null
+        /// with no such version or nothing to join. A field both changed stays the newer's, the other value being in history.
+        /// </summary>
+        private FieldsToKeep? FieldsOnlyTheOlderChanged(PwEntry mine, PwEntry theirs, PwEntry older, PwEntry newer)
+        {
+            if (LatestSharedVersion(mine, theirs) is not { } shared)
+            {
+                return null;
+            }
+
+            List<string> strings =
+            [
+                .. older.Strings.Select(field => field.Key).Union(shared.Strings.Select(field => field.Key), StringComparer.Ordinal)
+                    .Where(name => !SameString(older, shared, name) && SameString(newer, shared, name)),
+            ];
+            List<string> attachments =
+            [
+                .. older.Binaries.Select(field => field.Key).Union(shared.Binaries.Select(field => field.Key), StringComparer.Ordinal)
+                    .Where(name => !SameAttachment(older, shared, name) && SameAttachment(newer, shared, name)),
+            ];
+            bool tags = !older.Tags.SequenceEqual(shared.Tags, StringComparer.Ordinal) && newer.Tags.SequenceEqual(shared.Tags, StringComparer.Ordinal);
+
+            return strings.Count == 0 && attachments.Count == 0 && !tags ? null : new FieldsToKeep(older, strings, attachments, tags);
+        }
+
+        /// <summary>The newest version in both histories, matched without custom data, which KeePassXC leaves out of those it keeps.</summary>
+        private PwEntry? LatestSharedVersion(PwEntry mine, PwEntry theirs)
+        {
+            List<byte[]> held = [.. theirs.History.Select(_digests.OfHistoryCopy)];
+
+            return mine.History
+                .Where(version => { byte[] digest = _digests.OfHistoryCopy(version); return held.Exists(other => Same(other, digest)); })
+                .OrderByDescending(version => version.LastModificationTime)
+                .FirstOrDefault();
+        }
+
+        private static bool SameString(PwEntry one, PwEntry other, string name)
+        {
+            ProtectedString? first = one.Strings.Get(name);
+            ProtectedString? second = other.Strings.Get(name);
+
+            return ((first?.IsEmpty ?? true) && (second?.IsEmpty ?? true)) || (first is not null && second is not null && first.Equals(second, false));
+        }
+
+        private static bool SameAttachment(PwEntry one, PwEntry other, string name)
+        {
+            ProtectedBinary? first = one.Binaries.Get(name);
+            ProtectedBinary? second = other.Binaries.Get(name);
+
+            return first is null ? second is null : second is not null && first.Equals(second, false);
+        }
+
+        /// <summary>The fields of an older version that join the newer one.</summary>
+        private sealed record FieldsToKeep(PwEntry Older, IReadOnlyList<string> Strings, IReadOnlyList<string> Attachments, bool Tags)
+        {
+            internal void ApplyTo(PwEntry entry)
+            {
+                foreach (string name in Strings)
+                {
+                    if (Older.Strings.Get(name) is { IsEmpty: false } value)
+                    {
+                        entry.Strings.Set(name, value);
+                    }
+                    else
+                    {
+                        entry.Strings.Remove(name);
+                    }
+                }
+
+                foreach (string name in Attachments)
+                {
+                    if (Older.Binaries.Get(name) is { } content)
+                    {
+                        entry.Binaries.Set(name, content);
+                    }
+                    else
+                    {
+                        entry.Binaries.Remove(name);
+                    }
+                }
+
+                if (Tags)
+                {
+                    entry.Tags = [.. Older.Tags];
+                }
             }
         }
 
@@ -4453,7 +4586,9 @@ internal sealed class KeePassInterop : IDisposable
         {
             if (!_theirDeletions.TryGetValue(mine.Uuid, out DateTime deleted))
             {
-                Add(mine.CloneDeep(), _groups[mine.ParentGroup.Uuid]);
+                PwEntry added = mine.CloneDeep();
+                Add(added, _groups[mine.ParentGroup.Uuid]);
+                _taken.Add(added);
                 return;
             }
 

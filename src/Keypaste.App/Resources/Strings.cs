@@ -14,6 +14,7 @@ public static class Strings
     public static string AProjectIsTheItemsInYourX9f49b8 => Manager.GetString("AProjectIsTheItemsInYourX9f49b8", CultureInfo.CurrentUICulture)!;
     public static string AReportHoldsTheVersionSystemScreenX3de709 => Manager.GetString("AReportHoldsTheVersionSystemScreenX3de709", CultureInfo.CurrentUICulture)!;
     public static string ARowsEyeButtonShowsItsValueXc068c4 => Manager.GetString("ARowsEyeButtonShowsItsValueXc068c4", CultureInfo.CurrentUICulture)!;
+    public static string ASyncToolKeptThisCopyBecauseTwoDevicesSavedAtOnce => Manager.GetString("ASyncToolKeptThisCopyBecauseTwoDevicesSavedAtOnce", CultureInfo.CurrentUICulture)!;
     public static string ATokenLetsAScriptOrCIX41bca7 => Manager.GetString("ATokenLetsAScriptOrCIX41bca7", CultureInfo.CurrentUICulture)!;
     public static string AboutKeypaste => Manager.GetString("AboutKeypaste", CultureInfo.CurrentUICulture)!;
     public static string AboutWindowTitle => Manager.GetString("AboutWindowTitle", CultureInfo.CurrentUICulture)!;
@@ -57,6 +58,7 @@ public static class Strings
     public static string All => Manager.GetString("All", CultureInfo.CurrentUICulture)!;
     public static string AllItems => Manager.GetString("AllItems", CultureInfo.CurrentUICulture)!;
     public static string AlwaysAnswers => Manager.GetString("AlwaysAnswers", CultureInfo.CurrentUICulture)!;
+    public static string AnotherDevicesChangesWerentMerged => Manager.GetString("AnotherDevicesChangesWerentMerged", CultureInfo.CurrentUICulture)!;
     public static string AnswerInThePromptWindow => Manager.GetString("AnswerInThePromptWindow", CultureInfo.CurrentUICulture)!;
     public static string AnsweringAgents => Manager.GetString("AnsweringAgents", CultureInfo.CurrentUICulture)!;
     public static string Appearance => Manager.GetString("Appearance", CultureInfo.CurrentUICulture)!;
@@ -77,6 +79,7 @@ public static class Strings
     public static string ChangeAccess => Manager.GetString("ChangeAccess", CultureInfo.CurrentUICulture)!;
     public static string ChangeEllipsis => Manager.GetString("ChangeEllipsis", CultureInfo.CurrentUICulture)!;
     public static string ChangeWhatUnlocksThisVault => Manager.GetString("ChangeWhatUnlocksThisVault", CultureInfo.CurrentUICulture)!;
+    public static string ChangesFromAnotherDevice => Manager.GetString("ChangesFromAnotherDevice", CultureInfo.CurrentUICulture)!;
     public static string Changing => Manager.GetString("Changing", CultureInfo.CurrentUICulture)!;
     public static string Characters => Manager.GetString("Characters", CultureInfo.CurrentUICulture)!;
     public static string CheckStatus => Manager.GetString("CheckStatus", CultureInfo.CurrentUICulture)!;
@@ -323,6 +326,7 @@ public static class Strings
     public static string Maximize => Manager.GetString("Maximize", CultureInfo.CurrentUICulture)!;
     public static string MayRunCommands => Manager.GetString("MayRunCommands", CultureInfo.CurrentUICulture)!;
     public static string Menu => Manager.GetString("Menu", CultureInfo.CurrentUICulture)!;
+    public static string Merge => Manager.GetString("Merge", CultureInfo.CurrentUICulture)!;
     public static string Minimize => Manager.GetString("Minimize", CultureInfo.CurrentUICulture)!;
     public static string Missing => Manager.GetString("Missing", CultureInfo.CurrentUICulture)!;
     public static string MoreActions => Manager.GetString("MoreActions", CultureInfo.CurrentUICulture)!;
@@ -474,6 +478,7 @@ public static class Strings
     public static string Reveal => Manager.GetString("Reveal", CultureInfo.CurrentUICulture)!;
     public static string RevealForSeconds => Manager.GetString("RevealForSeconds", CultureInfo.CurrentUICulture)!;
     public static string ReviewAgain => Manager.GetString("ReviewAgain", CultureInfo.CurrentUICulture)!;
+    public static string ReviewAndMerge => Manager.GetString("ReviewAndMerge", CultureInfo.CurrentUICulture)!;
     public static string ReviewValueAgain => Manager.GetString("ReviewValueAgain", CultureInfo.CurrentUICulture)!;
     public static string Revision => Manager.GetString("Revision", CultureInfo.CurrentUICulture)!;
     public static string Revoke => Manager.GetString("Revoke", CultureInfo.CurrentUICulture)!;
@@ -491,6 +496,7 @@ public static class Strings
     public static string SaveACopyToAFile => Manager.GetString("SaveACopyToAFile", CultureInfo.CurrentUICulture)!;
     public static string SaveANewKeyFile => Manager.GetString("SaveANewKeyFile", CultureInfo.CurrentUICulture)!;
     public static string SaveAttachmentLabel => Manager.GetString("SaveAttachmentLabel", CultureInfo.CurrentUICulture)!;
+    public static string SaveWhatsOpenHere => Manager.GetString("SaveWhatsOpenHere", CultureInfo.CurrentUICulture)!;
     public static string Scope => Manager.GetString("Scope", CultureInfo.CurrentUICulture)!;
     public static string ScopeNamesNoProtectedEnvironmentHere => Manager.GetString("ScopeNamesNoProtectedEnvironmentHere", CultureInfo.CurrentUICulture)!;
     public static string ScopeOfAWholeSet => Manager.GetString("ScopeOfAWholeSet", CultureInfo.CurrentUICulture)!;

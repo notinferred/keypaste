@@ -51,7 +51,7 @@ internal static class MergeNotice
 
     /// <summary>Whether the notice names an item or group both copies changed, or one kept against a deletion, so it stays until dismissed.</summary>
     internal static bool NamesAConflict(MergeResult merged) =>
-        merged?.Report is { } report && report.Conflicts.Count + report.Kept.Count + report.RenamedGroups.Count > 0;
+        merged?.Report is { } report && report.Conflicts.Count + report.Combined.Count + report.Kept.Count + report.RenamedGroups.Count > 0;
 
     /// <summary>Why keypaste did not merge another program's save, as the banner's clause.</summary>
     internal static string Refused(MergeResult refused)
@@ -104,6 +104,11 @@ internal static class MergeNotice
             yield return conflict.OpenCopyCurrent
                 ? $"You and the other program both changed {ApprovalPrompt.Shown(conflict.Item)}. Your version is current; the other program's is in its history."
                 : $"You and the other program both changed {ApprovalPrompt.Shown(conflict.Item)}. The other program's version is current; yours is in its history.";
+        }
+
+        foreach (var combined in report.Combined)
+        {
+            yield return $"You and the other program both changed {ApprovalPrompt.Shown(combined)}. keypaste kept each change, and where you both changed one field the newer value is current and the other is in its history.";
         }
 
         foreach (var kept in report.Kept)

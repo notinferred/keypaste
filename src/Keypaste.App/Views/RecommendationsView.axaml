@@ -32,6 +32,27 @@
 
       <TextBlock Name="RecommendationsEmpty" Classes="caption" IsVisible="{Binding IsEmpty}" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
 
+      <ItemsControl Name="ConflictedCopiesList" ItemsSource="{Binding ConflictedCopies}" IsVisible="{Binding HasConflictedCopies}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ConflictedCopyRow">
+            <Border Name="ConflictedCopyCard" Classes="card filled" Padding="20,16" Margin="0,0,0,12">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.ChangesFromAnotherDevice}" />
+                <TextBlock ctl:MachineRuns.InText="True" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Name}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ASyncToolKeptThisCopyBecauseTwoDevicesSavedAtOnce}" />
+                <TextBlock Name="ConflictedCopyReview" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Review}" IsVisible="{Binding IsReviewed}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Foreground="{DynamicResource KpDanger}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Name="ReviewConflictedCopy" Classes="sm" Content="{x:Static res:Strings.ReviewAndMerge}" IsVisible="{Binding OffersReview}" Command="{Binding ReviewChangesCommand}" />
+                  <Button Name="CancelConflictedCopy" Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" IsVisible="{Binding IsReviewed}" IsEnabled="{Binding IsIdle}" Command="{Binding CancelReviewCommand}" />
+                  <Button Name="MergeConflictedCopy" Classes="sm" Content="{x:Static res:Strings.Merge}" IsVisible="{Binding IsReviewed}" IsEnabled="{Binding IsIdle}" Command="{Binding MergeCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
       <Border Name="FragileKeyFileCard" Classes="card filled" Padding="20,16" IsVisible="{Binding HasFragileKeyFile}">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
           <StackPanel Spacing="4">

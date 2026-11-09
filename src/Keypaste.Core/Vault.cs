@@ -213,6 +213,81 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>
+    /// Merges a sync tool's conflicted copy of this vault into its file, and with <paramref name="save"/> saves that and moves the
+    /// copy in with the vault's backups. This open copy is left alone and takes the result as another program's save.
+    /// </summary>
+    /// <param name="copyPath">The conflicted copy, opened with this unlock's key.</param>
+    /// <param name="save">False only to say what merging would do.</param>
+    /// <returns>What the merge took from the copy, or why there is no merge.</returns>
+    public VaultMergeSave MergeConflictedCopy(string copyPath, bool save)
+    {
+        ArgumentNullException.ThrowIfNull(copyPath);
+        KeePassInterop.KeyCopy key;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfRekeyed();
+            key = _interop.CopyKey();
+        }
+
+        try
+        {
+            using var copy = Reread(copyPath, key);
+            using var file = Reread(Path, key);
+            var merged = copy.MergeInto(file, out var report);
+
+            if (merged != VaultMergeOutcome.Merged)
+            {
+                return new VaultMergeSave(
+                    merged == VaultMergeOutcome.AnotherVault ? VaultMergeSaveOutcome.AnotherVault : VaultMergeSaveOutcome.DuplicateUuids,
+                    $"'{copyPath}' could not be merged with this vault.");
+            }
+
+            if (!save)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.Unchanged, string.Empty) { Report = report };
+            }
+
+            if (report!.TookFromOpenCopy)
+            {
+                file.Commit(file.HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: true, applyFloor: false);
+            }
+
+            VaultBackups.Archive(Path, copyPath);
+            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report };
+        }
+        catch (InvalidMasterPasswordException ex)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.KeyRefused, ex.Message);
+        }
+        catch (HardwareKeyException ex)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.HardwareKeyUnanswered, ex.Message);
+        }
+        catch (VaultChangedOnDiskException ex)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.ChangedAgain, ex.Message);
+        }
+        catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.Unreadable, ex.Message);
+        }
+    }
+
+    private static Vault Reread(string path, KeePassInterop.KeyCopy key)
+    {
+        var bytes = File.ReadAllBytes(path);
+
+        if (KdbxHeader.Of(bytes) is not { FormatMajorVersion: >= 4 })
+        {
+            throw new VaultException($"'{path}' is not a KeePass database keypaste can merge.");
+        }
+
+        return new Vault(KeePassInterop.Reopen(path, bytes, key), path, SHA256.HashData(bytes));
+    }
+
     /// <summary>How many times one detection of another program's save starts its merge again for a save that landed before the merged copy's.</summary>
     internal const int MergeAttempts = 3;
 
