@@ -1,6 +1,6 @@
 # F.83 — Agents opens on who is connected
 
-Completed 2026-11-09 on `agents-and-recommendations`, source only.
+Completed 2026-11-09 on `agents-and-recommendations` at `5a113823`, source only; ci fast tier 42663647469, dev desktop 42664794411 and dev desktop-gates 42667193923, all green on Linux. An earlier dev desktop, 42659519311, failed nine tests the move left behind.
 
 ## Amendments
 
