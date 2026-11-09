@@ -1,6 +1,6 @@
 # F.81 — Leave what another program's save did not change
 
-Completed 2026-11-09 on `merge-keeps-untouched-items`, source only.
+Completed 2026-11-09 on `merge-keeps-untouched-items`, source only; ci fast tier 42635322902 green at the first attempt.
 
 ## Amendments
 
