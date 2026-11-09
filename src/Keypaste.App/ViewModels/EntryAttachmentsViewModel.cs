@@ -1,4 +1,3 @@
-#pragma warning disable RS0030 // One of the item pane's two attachment files.
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Ownership;
@@ -93,7 +92,9 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
 
         try
         {
+#pragma warning disable RS0030 // The item's attachments, read for their names and sizes.
             Rows = [.. (vault.Attachments(_item) ?? []).Select(attachment => new EntryAttachmentRow(this, attachment))];
+#pragma warning restore RS0030
         }
         catch (VaultException e)
         {
@@ -150,7 +151,9 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
 
         try
         {
+#pragma warning disable RS0030 // Core writes the copy to the path the person chose.
             outcome = vault.SaveAttachment(_item, row.Name, path, out failure);
+#pragma warning restore RS0030
         }
         catch (VaultException e)
         {
@@ -165,16 +168,22 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
 
         switch (outcome)
         {
+#pragma warning disable RS0030 // What the save came to, which holds no content.
             case AttachmentSaveOutcome.Saved:
+#pragma warning restore RS0030
                 var readers = OperatingSystem.IsWindows() ? "it has its folder's permissions" : "only you can read it";
                 Note = $"Saved {row.DisplayName} to {Shown(path)}. The file isn't encrypted, and {readers}. Delete it when you're done: keypaste can't take it back.";
                 break;
 
+#pragma warning disable RS0030 // What the save came to, which holds no content.
             case AttachmentSaveOutcome.PathAlreadyExists:
+#pragma warning restore RS0030
                 _report("There's already a file there, and keypaste won't replace it. Save again and choose a name that isn't taken.");
                 break;
 
+#pragma warning disable RS0030 // What the save came to, which holds no content.
             case AttachmentSaveOutcome.NotFound:
+#pragma warning restore RS0030
                 _report($"{row.DisplayName} is no longer on this item. Check the list, then try again.");
                 Read();
                 break;
@@ -201,9 +210,13 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
 
         var name = Path.GetFileName(path);
 
+#pragma warning disable RS0030 // The size limit, checked before the dropped file is read.
         if (HandedFile.LengthOf(path) > EntryAttachment.MaximumSize)
+#pragma warning restore RS0030
         {
+#pragma warning disable RS0030 // The size limit the refusal names.
             return $"{Shown(name)} is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste attaches.";
+#pragma warning restore RS0030
         }
 
         if (!VaultNameRules.IsValidAttachmentName(name, out var why))
@@ -275,8 +288,10 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
             using var content = File.OpenRead(path);
             write = _session.Write(
                 vault => replacing
+#pragma warning disable RS0030 // Core reads the file the person chose into the item.
                     ? vault.ReplaceAttachment(_item, attachment, content, out kept)
                     : vault.AddAttachment(_item, attachment, content, out kept),
+#pragma warning restore RS0030
                 attached => attached);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -302,7 +317,9 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
         }
 
         var kept = true;
+#pragma warning disable RS0030 // The removal the person confirmed.
         var write = _session.Write(vault => vault.RemoveAttachment(_item, row.Name, out kept), removed => removed);
+#pragma warning restore RS0030
         Finish(write, $"{row.DisplayName} is no longer on this item.", $"{row.DisplayName} is removed for good: {_notKept}", kept);
     }
 

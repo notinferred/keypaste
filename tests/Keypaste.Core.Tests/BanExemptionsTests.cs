@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The architecture rules the compiler holds through each project's <c>BannedSymbols.txt</c> are switched off only where
-/// this list says, and KeePassLib is reachable only from <c>Internal/KeePassInterop.cs</c> (D-0675).
+/// this list says, and KeePassLib is reachable only from <c>Internal/KeePassInterop.cs</c>.
 /// </summary>
 /// <remarks>
 /// A <c>#pragma</c>, a <c>SuppressMessage</c>, a <c>NoWarn</c> or an <c>.editorconfig</c> severity would turn a ban off
@@ -25,7 +25,7 @@ public sealed class BanExemptionsTests
         ["src/Keypaste.App/CrashReporting.cs"] = 2,
         ["src/Keypaste.App/ViewModels/ConnectClientViewModel.cs"] = 1,
         ["src/Keypaste.App/ViewModels/EntryAttachmentRow.cs"] = 1,
-        ["src/Keypaste.App/ViewModels/EntryAttachmentsViewModel.cs"] = 1,
+        ["src/Keypaste.App/ViewModels/EntryAttachmentsViewModel.cs"] = 9,
         ["src/Keypaste.App/ViewModels/EntryDetailViewModel.cs"] = 1,
         ["src/Keypaste.App/ViewModels/ShellViewModel.cs"] = 3,
         ["src/Keypaste.App/Views/OpenerProcess.cs"] = 1,

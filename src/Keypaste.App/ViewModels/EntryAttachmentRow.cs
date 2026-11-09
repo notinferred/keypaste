@@ -1,4 +1,3 @@
-#pragma warning disable RS0030 // One of the item pane's two attachment files (D-0534).
 using System.Buffers;
 using Keypaste.Core;
 
@@ -18,8 +17,10 @@ internal sealed class EntryAttachmentRow
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(attachment);
 
+#pragma warning disable RS0030 // The name and size the pane draws, never the content.
         Name = attachment.Name;
         SizeText = attachment.SizeText;
+#pragma warning restore RS0030
         SaveCommand = new AsyncRelayCommand(() => owner.SaveAsync(this), () => owner.CanPick);
         ReplaceCommand = new AsyncRelayCommand(() => owner.ReplaceAsync(this), () => owner.CanPick);
         RemoveCommand = new RelayCommand(() => owner.BeginRemove(this));
