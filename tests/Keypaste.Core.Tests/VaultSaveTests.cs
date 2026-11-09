@@ -237,6 +237,28 @@ public sealed class VaultSaveTests : IDisposable
     /// <summary>
     /// A write that fails partway through a save is reported, and the vault stays as it was.
     /// </summary>
+    [Theory]
+    [InlineData(UnixFileMode.UserRead | UnixFileMode.UserWrite)]
+    [InlineData(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead)]
+    public void A_save_keeps_the_permissions_the_vault_file_had(UnixFileMode mode)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows keeps a file's access list through its own replace.");
+            return;
+        }
+
+        var (vault, home) = NewVaultInItsOwnDirectory("permissions");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        File.SetUnixFileMode(path, mode);
+        vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+
+        vault.Save();
+
+        Assert.Equal(mode, File.GetUnixFileMode(path));
+    }
+
     [Fact]
     public void A_save_whose_bytes_do_not_open_again_is_refused_and_leaves_the_vault_as_it_was()
     {

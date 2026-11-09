@@ -20,6 +20,10 @@ On a private copy of the founder's vault, 469 entries with 371 carrying KeePassX
 
 `verify-keepassxc-projects.sh` had three expectations F.77 and F.78a left behind: `a` now starts an Always allow, custom fields are listed whatever their name, and every run's prompt says it is asked each time.
 
+## Follow-up
+
+The founder's copy, tested action by action on 2026-11-09, showed a save resetting the vault file's permissions: a 600 file became 644 through the rename. A save now gives the replacement the vault's own mode before the rename, and `A_save_keeps_the_permissions_the_vault_file_had` holds it.
+
 ## Limits and follow-ups
 
 The tests made on the founder's copy, opening without writing and 30 forced kills during a save, were one-off and are not regression tests. Reading back adds about one key derivation to each save.
