@@ -1,6 +1,6 @@
 # F.82 — Make Settings a screen you can find things on
 
-Completed 2026-11-09 on `settings-sections`, source only.
+Completed 2026-11-09 on `settings-sections` at `21d1e2db`, source only; ci fast tier 42642737116, dev desktop 42643837231 and dev desktop-gates 42646380242, all green on Linux.
 
 ## Amendments
 
