@@ -186,7 +186,6 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Empty(report.Conflicts);
         Assert.Empty(report.Kept);
         Assert.Empty(report.RenamedGroups);
-        Assert.Empty(report.Agents);
         Assert.Equal(file.ReadEntries(includeReserved: true), merged.ReadEntries(includeReserved: true));
         Assert.Equal(Revisions(file.ReadHistory(_stripe)!), Revisions(merged.ReadHistory(_stripe)!));
         Assert.Equal(file.TombstoneCount, merged.TombstoneCount);

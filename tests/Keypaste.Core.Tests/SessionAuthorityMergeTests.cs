@@ -126,8 +126,8 @@ public sealed class SessionAuthorityMergeTests : IDisposable
     }
 
     /// <summary>
-    /// A merge the owner saved writes one line, naming the item changed in both copies, the one kept against a deletion and the agent
-    /// whose settings the other program changed, and no value from either copy (D-0545).
+    /// A merge the owner saved writes one line, naming the item changed in both copies and the one kept against a deletion, and no
+    /// value from either copy (D-0545).
     /// </summary>
     [Fact]
     public async Task ASavedMerge_IsRecordedOnOneLine_NamingItemsAndNeverAValue()
@@ -140,11 +140,6 @@ public sealed class SessionAuthorityMergeTests : IDisposable
             var later = DateTime.UtcNow.AddHours(1);
             Edit(database, _github, _theirs, later);
             Purge(database, _stripe, later);
-
-            var agent = database.RootGroup.GetEntries(true).Single(entry => entry.Strings.ReadSafe(PwDefs.TitleField) == ApproverFixture.Agent);
-            agent.CreateBackup(database);
-            agent.Strings.Set("acaf", new ProtectedString(false, """{"acaf":1,"mode":"ask"}"""));
-            agent.LastModificationTime = later;
         });
 
         var merged = owner.Authority.Merge(_vault, Swap, _surface);
@@ -161,7 +156,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
         Assert.Equal("session-one", line.GetProperty("session").GetString());
         Assert.Equal(["work/github", "work/stripe"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
         Assert.Equal(
-            "merged another program's save with the changes this copy held, and saved it: 1 item changed in both copies; 1 item kept against a deletion; the settings of claude-code changed",
+            "merged another program's save with the changes this copy held, and saved it: 1 item changed in both copies; 1 item kept against a deletion",
             line.GetProperty("reason").GetString());
 
         var text = _log.Text();
@@ -169,6 +164,30 @@ public sealed class SessionAuthorityMergeTests : IDisposable
         Assert.DoesNotContain(_theirs, text, StringComparison.Ordinal);
         Assert.DoesNotContain("github-0", text, StringComparison.Ordinal);
         Assert.DoesNotContain("stripe-0", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>A retired agent record the other program changed is merged like any entry, and the line says nothing of settings, since no request reads that record.</summary>
+    [Fact]
+    public async Task AMergeChangingARetiredAgentRecord_CarriesIt_AndItsLineSaysNothingOfSettings()
+    {
+        const string changed = """{"acaf":1,"mode":"ask"}""";
+        await using var owner = Owner.Start(this);
+        Update(_stripe, _mine);
+        InFile(database =>
+        {
+            var agent = database.RootGroup.GetEntries(true).Single(entry => entry.Strings.ReadSafe(PwDefs.TitleField) == ApproverFixture.Agent);
+            agent.CreateBackup(database);
+            agent.Strings.Set("acaf", new ProtectedString(false, changed));
+            agent.LastModificationTime = DateTime.UtcNow.AddHours(1);
+        });
+
+        var merged = owner.Authority.Merge(_vault, Swap, _surface);
+
+        Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
+        Assert.Contains(changed, _vault.ReadRecords(ReservedGroups.Agents, "acaf").Select(record => record.Value));
+        Assert.Equal(
+            "merged another program's save with the changes this copy held, and saved it",
+            Assert.Single(_log.Lines()).GetProperty("reason").GetString());
     }
 
     private static void AssertRefusedAsChanged(CredentialReply? reply)

@@ -82,14 +82,12 @@ public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason
 /// <param name="Conflicts">Each item both copies changed, the version not current kept in its history.</param>
 /// <param name="Kept">Each item one copy deleted after the other changed it, kept with that change.</param>
 /// <param name="RenamedGroups">Each group both copies changed under different names, whose losing name KDBX keeps no history of.</param>
-/// <param name="Agents">Each agent whose record in the merged copy differs from the open copy's, by name, in ordinal order.</param>
-/// <remarks>Items in keypaste's own groups are named only as the agents whose records they are.</remarks>
+/// <remarks>Nothing in keypaste's own groups is named.</remarks>
 public sealed record VaultMergeReport(
     bool TookFromOpenCopy,
     IReadOnlyList<MergeConflict> Conflicts,
     IReadOnlyList<MergeKeptItem> Kept,
-    IReadOnlyList<MergeRenamedGroup> RenamedGroups,
-    IReadOnlyList<string> Agents)
+    IReadOnlyList<MergeRenamedGroup> RenamedGroups)
 {
     /// <summary>Each item whose changes on both sides were joined, the earlier versions being in its history.</summary>
     public IReadOnlyList<EntryName> Combined { get; init; } = [];

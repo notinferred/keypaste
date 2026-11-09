@@ -4185,7 +4185,6 @@ internal sealed class KeePassInterop : IDisposable
         internal VaultMergeReport Run()
         {
             byte[] before = StateOf(_result);
-            Dictionary<PwUuid, (string Name, byte[] Digest)> agents = AgentsIn(_open);
 
             MergeGroups();
             AdoptMyBin();
@@ -4214,7 +4213,7 @@ internal sealed class KeePassInterop : IDisposable
                 }
             }
 
-            return new VaultMergeReport(!Same(before, StateOf(_result)), conflicts, [.. _kept], renamed, ChangedAgents(agents, AgentsIn(_file)))
+            return new VaultMergeReport(!Same(before, StateOf(_result)), conflicts, [.. _kept], renamed)
             {
                 Combined = [.. _combined.Select(entry => NameIn(_file, entry))],
                 Taken = [.. _taken.Select(entry => NameIn(_file, entry)).Where(name => !ReservedGroups.IsReserved(name.GroupPath))],
@@ -4953,46 +4952,6 @@ internal sealed class KeePassInterop : IDisposable
             Span<byte> bytes = stackalloc byte[sizeof(long)];
             BinaryPrimitives.WriteInt64LittleEndian(bytes, value);
             state.AppendData(bytes);
-        }
-
-        /// <summary>Each agent's record a copy holds, by UUID, with the agent's name and the record's digest.</summary>
-        private Dictionary<PwUuid, (string Name, byte[] Digest)> AgentsIn(KeePassInterop copy)
-        {
-            Dictionary<PwUuid, (string Name, byte[] Digest)> agents = new();
-
-            foreach (PwEntry entry in copy._database.RootGroup.GetEntries(true))
-            {
-                if (string.Equals(copy.PathOf(entry.ParentGroup), ReservedGroups.Agents, StringComparison.Ordinal))
-                {
-                    agents[entry.Uuid] = (entry.Strings.ReadSafe(PwDefs.TitleField), _digests.Of(entry));
-                }
-            }
-
-            return agents;
-        }
-
-        private static List<string> ChangedAgents(
-            Dictionary<PwUuid, (string Name, byte[] Digest)> before, Dictionary<PwUuid, (string Name, byte[] Digest)> after)
-        {
-            SortedSet<string> names = new(StringComparer.Ordinal);
-
-            foreach ((PwUuid id, (string name, byte[] digest)) in before)
-            {
-                if (!after.TryGetValue(id, out var now) || !Same(now.Digest, digest))
-                {
-                    names.Add(name);
-                }
-            }
-
-            foreach ((PwUuid id, (string name, byte[] digest)) in after)
-            {
-                if (!before.TryGetValue(id, out var then) || !Same(then.Digest, digest))
-                {
-                    names.Add(name);
-                }
-            }
-
-            return [.. names];
         }
 
         private static EntryName NameIn(KeePassInterop copy, PwEntry entry) =>

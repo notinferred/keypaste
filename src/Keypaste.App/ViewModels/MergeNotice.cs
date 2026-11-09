@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -39,11 +38,6 @@ internal static class MergeNotice
         if (more > 0)
         {
             said.Append(more == 1 ? " One more was merged the same way." : Invariant($" {more} more were merged the same way."));
-        }
-
-        if (report.Agents.Count > 0)
-        {
-            said.Append(CultureInfo.InvariantCulture, $" The other program's settings for {Listed([.. report.Agents.Select(Shown)])} now apply.");
         }
 
         return said.ToString();

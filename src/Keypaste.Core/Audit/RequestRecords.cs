@@ -344,7 +344,7 @@ public static class RequestRecords
     /// <param name="vault">The vault's identity key.</param>
     /// <returns>
     /// The record to append: its entries the items changed in both copies and those kept against a deletion, as many as the line holds,
-    /// and its reason how many of each and the agents whose settings changed, by name.
+    /// and its reason how many of each.
     /// </returns>
     public static AuditRecord Merge(AuditClient client, VaultMergeReport report, string? session, string? vault)
     {
@@ -379,11 +379,6 @@ public static class RequestRecords
         if (report.Kept.Count > 0)
         {
             said.Add($"{Count(report.Kept.Count, "item")} kept against a deletion");
-        }
-
-        if (report.Agents.Count > 0)
-        {
-            said.Add($"the settings of {string.Join(", ", report.Agents.Select(agent => EntryNameSanitizer.Sanitize(agent, AuditClient.MaximumTextLength).Text))} changed");
         }
 
         var reason = said.Count == 0

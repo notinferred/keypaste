@@ -414,8 +414,7 @@ public sealed partial class PlainWordsTests
             true,
             [new MergeConflict(item, true), new MergeConflict(item, false)],
             [new MergeKeptItem(item, true, true), new MergeKeptItem(item, true, false), new MergeKeptItem(item, false, true), new MergeKeptItem(item, false, false)],
-            [new MergeRenamedGroup("env/billing", "billing-old")],
-            ["claude-code", "cursor"]);
+            [new MergeRenamedGroup("env/billing", "billing-old")]);
         var carried = new[] { item, new EntryName(ReservedGroups.Agents, "claude-code") };
         var said = new List<(string Where, string Text)>
         {

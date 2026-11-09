@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's merge notice and the merge's audit line no longer say another program's settings for an agent now apply: those records in the vault decide nothing, and an Always allow you remove stays removed through a merge ([F.92](docs/steps/F.92.md)).
+
 Agents' status mark in the desktop app now differs by shape as well as colour: a filled dot while answering agents, a ring while not, a diamond while refusing them ([F.91](docs/steps/F.91.md)).
 
 A share link now records the item it was made from, on its audit line and its row, so Share links says which of two items with the same name it shares. Links and audit lines made before this stay as they were ([F.90](docs/steps/F.90.md)).
