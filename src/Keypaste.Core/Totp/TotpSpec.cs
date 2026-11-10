@@ -185,6 +185,9 @@ public sealed class TotpSpec : IDisposable
         || string.Equals(name, _legacySettings, StringComparison.Ordinal)
         || name.StartsWith(_keePass2Prefix, StringComparison.Ordinal);
 
+    /// <summary>The fields KeePassXC 2.8 clears when it sets or removes an item's TOTP: <c>otp</c>, <c>TOTP Seed</c> and <c>TOTP Settings</c>.</summary>
+    internal static IReadOnlyList<string> KeePassXcFields { get; } = [OtpField, _legacySeed, _legacySettings];
+
     /// <summary>Whether an item may have a TOTP, judged by which of its seed fields hold anything, so no value is read.</summary>
     /// <param name="holds">Whether the item's custom field of this name holds anything.</param>
     /// <returns>

@@ -44,6 +44,7 @@ public static class Strings
     public static string AddKey => Manager.GetString("AddKey", CultureInfo.CurrentUICulture)!;
     public static string AddMcpManually => Manager.GetString("AddMcpManually", CultureInfo.CurrentUICulture)!;
     public static string AddMcpManuallyHelp => Manager.GetString("AddMcpManuallyHelp", CultureInfo.CurrentUICulture)!;
+    public static string AddOneTimeCode => Manager.GetString("AddOneTimeCode", CultureInfo.CurrentUICulture)!;
     public static string AddTag => Manager.GetString("AddTag", CultureInfo.CurrentUICulture)!;
     public static string AddToValueAsAField => Manager.GetString("AddToValueAsAField", CultureInfo.CurrentUICulture)!;
     public static string Advanced => Manager.GetString("Advanced", CultureInfo.CurrentUICulture)!;
@@ -394,6 +395,7 @@ public static class Strings
     public static string OnThisMachine => Manager.GetString("OnThisMachine", CultureInfo.CurrentUICulture)!;
     public static string OneSetOfKeysAValuePerX101ace => Manager.GetString("OneSetOfKeysAValuePerX101ace", CultureInfo.CurrentUICulture)!;
     public static string OneSetOfKeysPerProjectAXb4239d => Manager.GetString("OneSetOfKeysPerProjectAXb4239d", CultureInfo.CurrentUICulture)!;
+    public static string OneTimeCode => Manager.GetString("OneTimeCode", CultureInfo.CurrentUICulture)!;
     public static string Open => Manager.GetString("Open", CultureInfo.CurrentUICulture)!;
     public static string OpenAKeypasteVault => Manager.GetString("OpenAKeypasteVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAVault => Manager.GetString("OpenAVault", CultureInfo.CurrentUICulture)!;
@@ -416,6 +418,7 @@ public static class Strings
     public static string OpenVault => Manager.GetString("OpenVault", CultureInfo.CurrentUICulture)!;
     public static string OpeningThisScreenAsksTheShareServerXdb6227 => Manager.GetString("OpeningThisScreenAsksTheShareServerXdb6227", CultureInfo.CurrentUICulture)!;
     public static string OptionalOneYouHaveOrANewX7bc1a7 => Manager.GetString("OptionalOneYouHaveOrANewX7bc1a7", CultureInfo.CurrentUICulture)!;
+    public static string OptionalTheSetupKeyOrOtpauthLink => Manager.GetString("OptionalTheSetupKeyOrOtpauthLink", CultureInfo.CurrentUICulture)!;
     public static string PairABrowser => Manager.GetString("PairABrowser", CultureInfo.CurrentUICulture)!;
     public static string PairedBrowsers => Manager.GetString("PairedBrowsers", CultureInfo.CurrentUICulture)!;
     public static string Passphrase => Manager.GetString("Passphrase", CultureInfo.CurrentUICulture)!;
@@ -449,6 +452,8 @@ public static class Strings
     public static string RemoveKey => Manager.GetString("RemoveKey", CultureInfo.CurrentUICulture)!;
     public static string RemovePairing => Manager.GetString("RemovePairing", CultureInfo.CurrentUICulture)!;
     public static string RemoveTag => Manager.GetString("RemoveTag", CultureInfo.CurrentUICulture)!;
+    public static string RemoveTheOneTimeCode => Manager.GetString("RemoveTheOneTimeCode", CultureInfo.CurrentUICulture)!;
+    public static string RemoveTheOneTimeCodeFromThisItem => Manager.GetString("RemoveTheOneTimeCodeFromThisItem", CultureInfo.CurrentUICulture)!;
     public static string RemoveThePairingValue => Manager.GetString("RemoveThePairingValue", CultureInfo.CurrentUICulture)!;
     public static string RemoveThisAttachment => Manager.GetString("RemoveThisAttachment", CultureInfo.CurrentUICulture)!;
     public static string RemoveThisKeyFromItsItem => Manager.GetString("RemoveThisKeyFromItsItem", CultureInfo.CurrentUICulture)!;
@@ -462,6 +467,7 @@ public static class Strings
     public static string Replace => Manager.GetString("Replace", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAWeakOrReusedPasswordOnX22ee0c => Manager.GetString("ReplaceAWeakOrReusedPasswordOnX22ee0c", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAttachmentLabel => Manager.GetString("ReplaceAttachmentLabel", CultureInfo.CurrentUICulture)!;
+    public static string ReplaceTheOneTimeCode => Manager.GetString("ReplaceTheOneTimeCode", CultureInfo.CurrentUICulture)!;
     public static string ReplaceTheOtherKeypaste => Manager.GetString("ReplaceTheOtherKeypaste", CultureInfo.CurrentUICulture)!;
     public static string ReplaceTheValue => Manager.GetString("ReplaceTheValue", CultureInfo.CurrentUICulture)!;
     public static string ReplaceValue => Manager.GetString("ReplaceValue", CultureInfo.CurrentUICulture)!;
@@ -532,6 +538,7 @@ public static class Strings
     public static string SettingsSections => Manager.GetString("SettingsSections", CultureInfo.CurrentUICulture)!;
     public static string SettingsThisVaultNote => Manager.GetString("SettingsThisVaultNote", CultureInfo.CurrentUICulture)!;
     public static string SetupGivesEachToolALabel => Manager.GetString("SetupGivesEachToolALabel", CultureInfo.CurrentUICulture)!;
+    public static string SetupKeyOrOtpauthLink => Manager.GetString("SetupKeyOrOtpauthLink", CultureInfo.CurrentUICulture)!;
     public static string SetupPromptCopied => Manager.GetString("SetupPromptCopied", CultureInfo.CurrentUICulture)!;
     public static string SetupPromptText => Manager.GetString("SetupPromptText", CultureInfo.CurrentUICulture)!;
     public static string Share => Manager.GetString("Share", CultureInfo.CurrentUICulture)!;
@@ -576,6 +583,7 @@ public static class Strings
     public static string TheOldValueStaysInTheItemsX346d21 => Manager.GetString("TheOldValueStaysInTheItemsX346d21", CultureInfo.CurrentUICulture)!;
     public static string ThePassword => Manager.GetString("ThePassword", CultureInfo.CurrentUICulture)!;
     public static string ThePasswordAsAnObject => Manager.GetString("ThePasswordAsAnObject", CultureInfo.CurrentUICulture)!;
+    public static string TheSetupKeyOrOtpauthLinkASiteShows => Manager.GetString("TheSetupKeyOrOtpauthLinkASiteShows", CultureInfo.CurrentUICulture)!;
     public static string TheTOTPCode => Manager.GetString("TheTOTPCode", CultureInfo.CurrentUICulture)!;
     public static string TheTokenAsAnObject => Manager.GetString("TheTokenAsAnObject", CultureInfo.CurrentUICulture)!;
     public static string TheTotpCodeAsAnObject => Manager.GetString("TheTotpCodeAsAnObject", CultureInfo.CurrentUICulture)!;

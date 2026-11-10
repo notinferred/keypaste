@@ -13,7 +13,8 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The entry pane shows an item's TOTP as a masked code and the seconds until the next one, computes the
-/// code only at a hold or a copy, and holds neither the code nor the seed (9.2b).
+/// code only at a hold or a copy, and holds neither the code nor the seed (9.2b); its one-time code is added,
+/// replaced and removed through core's TOTP write.
 /// </summary>
 public sealed class EntryTotpTests : IDisposable
 {
@@ -23,6 +24,7 @@ public sealed class EntryTotpTests : IDisposable
     private const string _seed = "12345678901234567890";
     private const string _codeAt09 = "07081804";
     private const string _codeAt11 = "14050471";
+    private const string _seedBase32 = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
     private static readonly EntryName _github = new("Work", "GitHub");
     private static readonly EntryName _broken = new("Work", "Broken");
@@ -177,6 +179,142 @@ public sealed class EntryTotpTests : IDisposable
 
         Assert.Null(detail.Totp);
         Assert.Equal(1, totp.SecondsLeft);
+    }
+
+    [Fact]
+    public void Add_one_time_code_sets_up_an_item_without_one_and_its_code_shows_at_once()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_plain);
+
+        Assert.True(detail.CanAddTotp);
+        detail.BeginSetTotpCommand.Press();
+        Assert.True(detail.IsSettingTotp);
+        Assert.Equal("this one-time code", Typed(detail, _seedBase32));
+        Assert.All(Strings(detail), text => Assert.DoesNotContain(_seedBase32, text, StringComparison.Ordinal));
+
+        detail.ConfirmSetTotpCommand.Press();
+
+        Assert.False(detail.IsSettingTotp);
+        Assert.True(detail.NewTotp.IsZeroed);
+        Assert.False(detail.CanAddTotp);
+        Assert.True(detail.ShowsTotp);
+        Assert.Equal(6, detail.Totp!.MaskedLength);
+        Assert.Equal(_codeAt09[2..], detail.Totp.Reveal());
+
+        using var vault = Vault.Open(_vaultPath, _master);
+        Assert.Equal($"otpauth://totp/Plain?secret={_seedBase32}&period=30&digits=6&issuer=Plain", vault.ReadField(_plain, TotpSpec.OtpField));
+        Assert.Single(vault.ReadHistory(_plain)!);
+    }
+
+    [Fact]
+    public void Replace_writes_a_new_one_time_code_over_one_keypaste_refused()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_broken);
+
+        Assert.False(detail.CanAddTotp);
+        detail.BeginSetTotpCommand.Press();
+        Typed(detail, $"otpauth://totp/Broken?secret={_seedBase32}&digits=8");
+        detail.ConfirmSetTotpCommand.Press();
+
+        Assert.Null(detail.TotpProblem);
+        Assert.Equal(_codeAt09, detail.Totp!.Reveal());
+    }
+
+    [Fact]
+    public void A_setup_core_refuses_says_why_keeps_the_form_open_and_writes_nothing()
+    {
+        var before = File.ReadAllBytes(_vaultPath);
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_plain);
+
+        detail.BeginSetTotpCommand.Press();
+        Typed(detail, "otpauth://hotp/Plain?secret=GEZDGNBVGY3TQOJQ&counter=1");
+        detail.ConfirmSetTotpCommand.Press();
+
+        Assert.True(detail.IsSettingTotp);
+        Assert.True(detail.HasTotpSetupProblem);
+        Assert.Equal("The otp field holds a counter-based HOTP, which keypaste does not compute.", detail.TotpSetupProblem);
+        Assert.Null(detail.Totp);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        detail.CancelSetTotpCommand.Press();
+
+        Assert.False(detail.IsSettingTotp);
+        Assert.False(detail.HasTotpSetupProblem);
+        Assert.True(detail.NewTotp.IsZeroed);
+    }
+
+    [Fact]
+    public void Remove_asks_first_and_then_removes_the_one_time_code_keeping_it_in_the_history()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_broken);
+
+        detail.BeginRemoveTotpCommand.Press();
+        Assert.True(detail.IsRemovingTotp);
+        detail.CancelRemoveTotpCommand.Press();
+        Assert.False(detail.IsRemovingTotp);
+        Assert.NotNull(detail.TotpProblem);
+
+        detail.BeginRemoveTotpCommand.Press();
+        detail.ConfirmRemoveTotpCommand.Press();
+
+        Assert.False(detail.IsRemovingTotp);
+        Assert.Null(detail.TotpProblem);
+        Assert.True(detail.CanAddTotp);
+        Assert.DoesNotContain(detail.Fields, row => row.Name == TotpSpec.OtpField);
+
+        using var vault = Vault.Open(_vaultPath, _master);
+        Assert.Null(vault.ReadField(_broken, TotpSpec.OtpField));
+        Assert.Contains(vault.ReadHistory(_broken)!, revision => revision.CustomFields.Any(field => field.Name == TotpSpec.OtpField));
+    }
+
+    [Fact]
+    public void Opening_another_field_form_closes_the_one_time_code_form_and_clears_what_was_typed()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_plain);
+
+        detail.BeginSetTotpCommand.Press();
+        Typed(detail, _seedBase32);
+        Assert.True(detail.HasOwnPrimary);
+
+        detail.BeginAddFieldCommand.Press();
+
+        Assert.True(detail.IsAddingField);
+        Assert.False(detail.IsSettingTotp);
+        Assert.True(detail.NewTotp.IsZeroed);
+
+        detail.BeginSetTotpCommand.Press();
+
+        Assert.False(detail.IsAddingField);
+        Assert.True(detail.IsSettingTotp);
+    }
+
+    [Fact]
+    public void Editing_offers_no_one_time_code_change()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_plain);
+
+        detail.EditCommand.Press();
+
+        Assert.False(detail.CanAddTotp);
+        Assert.False(detail.BeginSetTotpCommand.CanExecute(null));
+        Assert.False(detail.BeginRemoveTotpCommand.CanExecute(null));
+    }
+
+    /// <summary>Types a setup into the open one-time code form, and answers what leaving the form would lose.</summary>
+    private static string? Typed(EntryDetailViewModel detail, string setup)
+    {
+        foreach (var c in setup)
+        {
+            detail.NewTotp.Type(c);
+        }
+
+        return detail.UnsavedDraft;
     }
 
     /// <summary>Every string property a model answers, skipping one that refuses in its state.</summary>

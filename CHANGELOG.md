@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+In the desktop app you can give an item a one-time code (TOTP) by pasting the setup key or `otpauth://` link a site shows, in New item or from the item's pane, which can also replace or remove it. keypaste keeps it in the `otp` field as KeePassXC 2.8 does, and the item shows the live code and its countdown.
+
 The desktop app's password generator now lets you choose a character password's length, with a number or a slider, which kinds of character it uses (letters, digits, symbols), and whether to leave out lookalikes such as 0 and O.
 
 The desktop app locks after 30 minutes without input by default, where it locked after five. Settings still offers one minute to eight hours, and a saved choice is kept.

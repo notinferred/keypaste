@@ -640,4 +640,12 @@
   <data name="ReviewAndMerge" xml:space="preserve"><value>Review and merge</value></data>
   <data name="Merge" xml:space="preserve"><value>Merge</value></data>
   <data name="SaveWhatsOpenHere" xml:space="preserve"><value>Save what's open here</value></data>
+  <data name="AddOneTimeCode" xml:space="preserve"><value>Add one-time code</value></data>
+  <data name="OneTimeCode" xml:space="preserve"><value>One-time code</value></data>
+  <data name="OptionalTheSetupKeyOrOtpauthLink" xml:space="preserve"><value>Optional: the setup key or otpauth:// link a site shows beside its QR code. Each code then shows on the item.</value></data>
+  <data name="RemoveTheOneTimeCode" xml:space="preserve"><value>Remove the one-time code</value></data>
+  <data name="RemoveTheOneTimeCodeFromThisItem" xml:space="preserve"><value>Remove the one-time code from this item? Its setup stays in the item's history.</value></data>
+  <data name="ReplaceTheOneTimeCode" xml:space="preserve"><value>Replace the one-time code</value></data>
+  <data name="SetupKeyOrOtpauthLink" xml:space="preserve"><value>Setup key or otpauth:// link</value></data>
+  <data name="TheSetupKeyOrOtpauthLinkASiteShows" xml:space="preserve"><value>The setup key or otpauth:// link a site shows beside its QR code. A setup it replaces stays in the item's history.</value></data>
 </root>

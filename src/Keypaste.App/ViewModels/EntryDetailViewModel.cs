@@ -2,6 +2,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
+using Keypaste.Core.Totp;
 
 namespace Keypaste.App.ViewModels;
 
@@ -30,7 +31,8 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// An item with a TOTP gets <see cref="Totp"/>, whose code is computed the same way, at the press
-///; one keypaste cannot compute says why in <see cref="TotpProblem"/> instead.
+///; one keypaste cannot compute says why in <see cref="TotpProblem"/> instead. A one-time code is added, replaced
+/// or removed through core's own TOTP write, its setup entered into a <see cref="SecretField"/> as a password is.
 /// </para>
 /// </remarks>
 internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
@@ -118,6 +120,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
+        BeginSetTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenSetTotp), () => !IsSettingTotp && !IsEditing);
+        ConfirmSetTotpCommand = new RelayCommand(ConfirmSetTotp, () => IsSettingTotp);
+        CancelSetTotpCommand = new RelayCommand(CancelSetTotp, () => IsSettingTotp);
+        BeginRemoveTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenRemoveTotp), () => !IsRemovingTotp && !IsEditing);
+        ConfirmRemoveTotpCommand = new RelayCommand(ConfirmRemoveTotp, () => IsRemovingTotp);
+        CancelRemoveTotpCommand = new RelayCommand(() => IsRemovingTotp = false, () => IsRemovingTotp);
 
         _title = entry.Title;
         _groupPath = entry.GroupPath;
@@ -134,6 +142,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         NewPassword = new SecretField(clipboard);
         NewFieldValue = new SecretField(clipboard);
         ReplacementFieldValue = new SecretField(clipboard);
+        NewTotp = new SecretField(clipboard);
         _restored = restored;
         History = new EntryHistoryViewModel(session, clipboard, this, Restored);
         Attachments = new EntryAttachmentsViewModel(session, Name, picker, report, History.Refresh);
@@ -172,6 +181,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             {
                 OnPropertyChanged(nameof(ShowsTotp));
                 OnPropertyChanged(nameof(HasStandardRows));
+                OnPropertyChanged(nameof(CanAddTotp));
                 previous?.Dispose();
             }
         }
@@ -181,10 +191,48 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTotpProblem), nameof(HasStandardRows))]
+    [NotifyPropertyChangedFor(nameof(ShowsTotpProblem), nameof(HasStandardRows), nameof(CanAddTotp))]
     internal partial string? TotpProblem { get; private set; }
 
     internal bool ShowsTotpProblem => !IsEditing && TotpProblem is not null;
+
+    /// <summary>Whether Add one-time code is offered: the item has no TOTP, readable or refused.</summary>
+    internal bool CanAddTotp => !IsEditing && _totp is null && TotpProblem is null;
+
+    /// <summary>A one-time code's setup key or <c>otpauth://totp/</c> link, while the form that adds or replaces it is open.</summary>
+    internal SecretField NewTotp { get; }
+
+    /// <summary>Whether the form that adds or replaces the one-time code is open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOwnPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(BeginSetTotpCommand), nameof(ConfirmSetTotpCommand), nameof(CancelSetTotpCommand))]
+    internal partial bool IsSettingTotp { get; private set; }
+
+    /// <summary>Why core refused the setup entered, naming no value; null otherwise.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTotpSetupProblem))]
+    internal partial string? TotpSetupProblem { get; private set; }
+
+    internal bool HasTotpSetupProblem => TotpSetupProblem is not null;
+
+    /// <summary>Whether removing the one-time code waits on the person's confirmation.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginRemoveTotpCommand), nameof(ConfirmRemoveTotpCommand), nameof(CancelRemoveTotpCommand))]
+    internal partial bool IsRemovingTotp { get; private set; }
+
+    /// <summary>Opens the form that adds a one-time code, or replaces the one the item has.</summary>
+    internal RelayCommand BeginSetTotpCommand { get; }
+
+    internal RelayCommand ConfirmSetTotpCommand { get; }
+
+    internal RelayCommand CancelSetTotpCommand { get; }
+
+    /// <summary>Asks whether to remove the item's one-time code.</summary>
+    internal RelayCommand BeginRemoveTotpCommand { get; }
+
+    internal RelayCommand ConfirmRemoveTotpCommand { get; }
+
+    internal RelayCommand CancelRemoveTotpCommand { get; }
 
     /// <summary>The entry's own tags, never its group's.</summary>
     [ObservableProperty]
@@ -230,7 +278,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>What leaving would lose: the first form here holding what was typed, or a tag being typed; null when none does.</summary>
     internal string? UnsavedDraft =>
-        EditDraft() ?? AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft()
+        EditDraft() ?? AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft() ?? SetTotpDraft()
         ?? (DraftTag.Trim().Length > 0 ? "this tag" : null);
 
     internal Func<string?> EditDraft => () =>
@@ -245,6 +293,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     internal Func<string?> ReplaceFieldDraft => () =>
         IsReplacingField && ReplacementFieldValue.HasValue && !ReplacementFieldValue.IsGenerated ? "this new value" : null;
+
+    internal Func<string?> SetTotpDraft => () => IsSettingTotp && NewTotp.HasValue ? "this one-time code" : null;
 
     internal Func<string?> RenameFieldDraft => () =>
         IsRenamingField && DraftFieldRename.Trim() != _renamingField?.Name ? "this new name" : null;
@@ -271,7 +321,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal bool IsReplacingField => _replacingField is not null;
 
     /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding, replacing or renaming a field.</summary>
-    internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField;
+    internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField || IsSettingTotp;
 
     /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
     internal bool TakesWholeView => IsEditing || History.IsOpen;
@@ -583,6 +633,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private void OpenReplaceField(EntryFieldRow row)
     {
+        CloseTotpForms();
         IsAddingField = false;
         RemovingField = null;
         RenamingField = null;
@@ -594,6 +645,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal void BeginRemoveField(EntryFieldRow row) =>
         LeavingFieldForm(() =>
         {
+            CloseTotpForms();
             IsAddingField = false;
             ReplacingField = null;
             RenamingField = null;
@@ -611,6 +663,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         LeavingFieldForm(() =>
         {
+            CloseTotpForms();
             IsAddingField = false;
             ReplacingField = null;
             RemovingField = null;
@@ -622,7 +675,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Opens another of the pane's field forms, first asking when the one open holds what was typed.</summary>
     private void LeavingFieldForm(Action open)
     {
-        if ((AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft()) is { } draft && AskDiscard is { } ask)
+        if ((AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft() ?? SetTotpDraft()) is { } draft && AskDiscard is { } ask)
         {
             ask(draft, open, null);
         }
@@ -957,8 +1010,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal EntryAttachmentsViewModel Attachments { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
-    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(BeginSetTotpCommand), nameof(BeginRemoveTotpCommand))]
     internal partial bool IsEditing { get; private set; }
 
     [ObservableProperty]
@@ -1084,6 +1137,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ReplacingField = null;
         RemovingField = null;
         RenamingField = null;
+        CloseTotpForms();
+        NewTotp.Dispose();
         Environments = [];
         DraftFieldName = string.Empty;
         DraftTag = string.Empty;
@@ -1302,6 +1357,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private void BeginAddField()
     {
+        CloseTotpForms();
         ReplacingField = null;
         RemovingField = null;
         RenamingField = null;
@@ -1445,6 +1501,71 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         if (Write(vault => vault.RemoveField(Name, row.Name), $"{row.DisplayName} is no longer on this item."))
         {
             RemovingField = null;
+        }
+    }
+
+    private void OpenSetTotp()
+    {
+        IsAddingField = false;
+        ReplacingField = null;
+        RemovingField = null;
+        RenamingField = null;
+        IsRemovingTotp = false;
+        NewTotp.Clear();
+        TotpSetupProblem = null;
+        IsSettingTotp = true;
+        Report(null);
+    }
+
+    private void OpenRemoveTotp()
+    {
+        IsAddingField = false;
+        ReplacingField = null;
+        RemovingField = null;
+        RenamingField = null;
+        CloseTotpForms();
+        IsRemovingTotp = true;
+        Report(null);
+    }
+
+    private void CloseTotpForms()
+    {
+        IsSettingTotp = false;
+        IsRemovingTotp = false;
+        NewTotp.Clear();
+        TotpSetupProblem = null;
+    }
+
+    private void CancelSetTotp()
+    {
+        CloseTotpForms();
+        Report(null);
+        FormClosed?.Invoke();
+    }
+
+    /// <summary>Writes the setup entered as the item's TOTP through core, which refuses one it cannot compute, naming no value.</summary>
+    private void ConfirmSetTotp()
+    {
+        var setup = NewTotp.Compose();
+
+        if (!TotpSetup.IsAccepted(setup, out var refusal))
+        {
+            TotpSetupProblem = DisplayTextSanitizer.Sanitize(refusal).Text;
+            return;
+        }
+
+        if (Write(vault => vault.SetTotp(Name, setup), null))
+        {
+            CloseTotpForms();
+            FormClosed?.Invoke();
+        }
+    }
+
+    private void ConfirmRemoveTotp()
+    {
+        if (Write(vault => vault.RemoveTotp(Name), "This item has no one-time code keypaste can remove."))
+        {
+            IsRemovingTotp = false;
         }
     }
 
