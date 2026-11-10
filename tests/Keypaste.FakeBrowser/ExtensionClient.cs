@@ -18,6 +18,9 @@ public sealed class ExtensionClient : IDisposable
     private readonly Stream _toHost;
     private readonly Stream _fromHost;
     private readonly BoxKeyPair _keys = NaclBox.NewKeyPair();
+
+    // KeePassXC holds a client's session keys under its clientID, so one id for the connection, as the extension keeps one, or nothing it sends can be opened.
+    private readonly string _clientId = NewNonce();
     private readonly List<string> _signals = [];
     private byte[]? _hostKey;
 
@@ -91,7 +94,7 @@ public sealed class ExtensionClient : IDisposable
     public async Task<JsonObject> ChangePublicKeysAsync(string nonce, CancellationToken cancellationToken)
     {
         await SendAsync(
-            new JsonObject { ["action"] = "change-public-keys", ["publicKey"] = PublicKey, ["nonce"] = nonce, ["clientID"] = NewNonce() },
+            new JsonObject { ["action"] = "change-public-keys", ["publicKey"] = PublicKey, ["nonce"] = nonce, ["clientID"] = _clientId },
             cancellationToken).ConfigureAwait(false);
 
         var reply = await ReceiveAsync(cancellationToken).ConfigureAwait(false) ?? throw new EndOfStreamException("the host closed its output");
@@ -127,7 +130,7 @@ public sealed class ExtensionClient : IDisposable
             }
         }
 
-        var request = new JsonObject { ["action"] = action, ["message"] = Seal(message, nonce), ["nonce"] = nonce, ["clientID"] = NewNonce() };
+        var request = new JsonObject { ["action"] = action, ["message"] = Seal(message, nonce), ["nonce"] = nonce, ["clientID"] = _clientId };
 
         if (triggerUnlock)
         {

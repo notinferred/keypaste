@@ -48,7 +48,7 @@ CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C c
 backend, and test for a Keypaste.Browser.Tests class, first build the libsodium those tests load with
 scripts/build-libsodium.sh, which needs curl, OpenSSL 3, and make with a C compiler or Visual Studio's.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
-(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), and Node 22 with npm and
+(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), on Linux an X display (Xvfb is enough), and Node 22 with npm and
 curl for the site's Worker. Native AOT, packaging, other operating systems and live install checks stay in CI.
 USAGE
 }

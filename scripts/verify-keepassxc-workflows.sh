@@ -32,9 +32,12 @@
 # remembered Allow list (KeePassXC-Browser Settings) and an entry's BrowserHideEntry. After every write each item reads back
 # from KeePassXC with its key and value as imported. On a fifth vault, after keypaste's CLI and app have saved it, keypaste's
 # owner, holding it as the app does, refuses that pairing when tests/Keypaste.FakeBrowser presents it to keypaste's relay, and
-# answers a database hash of its own.
+# answers a database hash of its own. KeePassXC's own browser server then answers that pairing through keepassxc-proxy on the
+# vault keypaste saved, unlocked in KeePassXC's window, as it does on a vault keypaste never touched, under the same database
+# hash (F.98). A real associate needs a person's confirmation, so what is checked is test-associate on the seeded pairing.
 #
-# NEGATIVE CONTROL: a vault KeePassXC stripped of an attachment, one imported without its entry CustomData, and one imported
+# NEGATIVE CONTROL: the same pairing on the vault keypaste never touched must be answered, so a failure on keypaste's vault is
+# keypaste's and not the method's; KeePassXC must refuse another identification key, error 8; a vault KeePassXC stripped of an attachment, one imported without its entry CustomData, and one imported
 # without KeePassXC-Browser's pairing must each fail the same check every workflow passes, and KeePassXC's AES vault must fail
 # the Twofish check.
 set -euo pipefail
@@ -668,6 +671,83 @@ exec 7>&-
 wait_for '^shut down' "$hold_out"
 intact "$db" servers/database
 echo "    refused with error 8; keypaste's hash is $own_hash"
+
+# KeePassXC opens the vault $1 in its window with its browser integration on, and $2 names its own settings and socket under
+# the work directory, so a KeePassXC already open is left alone and no KeePassXC finds another's socket left behind. A subshell, for its exports.
+# Answers go to $dir/pairing-$2.txt one JSON line each: the key exchange, the database hash, then the pairing's check. On a
+# failure it says why and returns 1.
+kpxc_pairing() (
+  vault=$1 name=$2
+  home="$(cd "$dir" && pwd)/pairing-$name"
+  answers="$dir/pairing-$name.txt"
+  kpxc_flags=()
+  if [ "$(uname -s)" = Linux ]; then
+    ini="$home/config/keepassxc/keepassxc.ini"
+    export XDG_CONFIG_HOME="$home/config" XDG_CACHE_HOME="$home/cache" XDG_RUNTIME_DIR="$home/run"
+    mkdir -p "$home/run"
+    chmod 700 "$home/run"
+  else
+    ini="$home/keepassxc.ini"
+    kpxc_flags=(--config "$(native "$ini")" --localconfig "$(native "$home/keepassxc_local.ini")")
+    mkdir -p "$home/tmp"
+    export TMPDIR="$home/tmp" USER="keypaste-gate-$name-$$" USERNAME="keypaste-gate-$name-$$"
+  fi
+  mkdir -p "$(dirname "$ini")"
+  printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n\n[Browser]\nEnabled=true\nUpdateBinaryPath=false\n' >"$ini"
+
+  printf '%s\n' "$cur_pw" | "$gui" ${kpxc_flags[@]+"${kpxc_flags[@]}"} --pw-stdin "$(native "$vault")" >"$answers.gui" 2>&1 &
+  gui_pid=$!
+  answered= exited=
+  for _ in $(seq 1 15); do
+    kill -0 "$gui_pid" 2>/dev/null || { exited=yes; break; }
+    if "$fake" "$(native "$proxy")" chrome --id-key "$kpxc_key" --within 8 get-databasehash test-associate=kp81d-keepassxc >"$answers" 2>&1 \
+      && sed -n 3p "$answers" | jq -e '.success == "true" and .id == "kp81d-keepassxc"' >/dev/null 2>&1; then
+      answered=yes
+      "$fake" "$(native "$proxy")" chrome --id-key "$other_key" --within 8 test-associate=kp81d-keepassxc >"$answers.refused" 2>&1 || true
+      break
+    fi
+    sleep 2
+  done
+
+  if [ -r "/proc/$gui_pid/winpid" ]; then
+    taskkill //F //T //PID "$(cat "/proc/$gui_pid/winpid")" >/dev/null 2>&1 || true
+  else
+    kill -TERM "$gui_pid" 2>/dev/null || true
+  fi
+  for _ in $(seq 1 60); do kill -0 "$gui_pid" 2>/dev/null || break; sleep 0.5; done
+  kill -9 "$gui_pid" 2>/dev/null || true
+  rc=0
+  wait "$gui_pid" 2>/dev/null || rc=$?
+
+  if [ -n "$exited" ]; then echo "KeePassXC exited with $rc before answering: $(cat "$answers.gui")"; exit 1; fi
+  if [ -z "$answered" ]; then echo "KeePassXC did not answer the pairing: $(cat "$answers" 2>/dev/null) KeePassXC said: $(cat "$answers.gui")"; exit 1; fi
+  sed -n 2p "$answers.refused" | jq -e '.errorCode == "8"' >/dev/null 2>&1 \
+    || { echo "KeePassXC did not refuse another identification key with error 8: $(cat "$answers.refused")"; exit 1; }
+)
+
+step "browser data: KeePassXC's own browser server answers the pairing on a vault keypaste never touched and on the vault keypaste saved"
+gui=$(keepassxc_app)
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) proxy="$(dirname "$gui")/keepassxc-proxy.exe" ;;
+  Darwin) proxy="$(dirname "$gui")/keepassxc-proxy" ;;
+  *)
+    proxy=$(command -v keepassxc-proxy || true)
+    [ -n "${DISPLAY:-}" ] || die "no X display: KeePassXC's browser server is checked on a real one (Xvfb on a runner), as KeePassXC 2.7.6 segfaulted with it under Qt's offscreen platform"
+    ;;
+esac
+[ -n "$proxy" ] && [ -x "$proxy" ] || die "keepassxc-proxy was not found beside KeePassXC; this gate must never be skipped"
+other_key=$(head -c 32 /dev/urandom | base64 | tr -d '\n')
+kpxc_import "$dir/pairing-control.kdbx" "$pw" "" "$dir/seed.xml"
+why=$(kpxc_pairing "$dir/pairing-control.kdbx" control) \
+  || die "KeePassXC did not answer its own pairing on a vault keypaste never touched, so this check proves nothing about keypaste: $why"
+control_hash=$(sed -n 2p "$dir/pairing-control.txt" | jq -er '.hash') || die "KeePassXC answered no database hash on the control vault: $(cat "$dir/pairing-control.txt")"
+why=$(kpxc_pairing "$db" keypaste) || die "KeePassXC answered its own pairing on the control vault and not after keypaste's saves: $why"
+kpxc_hash=$(sed -n 2p "$dir/pairing-keypaste.txt" | jq -er '.hash') || die "KeePassXC answered no database hash after keypaste's saves: $(cat "$dir/pairing-keypaste.txt")"
+[ "$kpxc_hash" = "$control_hash" ] \
+  || die "keypaste's saves changed the hash KeePassXC answers, from $control_hash to $kpxc_hash, so the extension would file its pairing under another database"
+[ "$kpxc_hash" != "$own_hash" ] || die "keypaste answered KeePassXC's own database hash, so the extension would file both pairings in one slot"
+intact "$db" servers/database
+echo "    KeePassXC answered kp81d-keepassxc on both vaults under $kpxc_hash and refused another key with error 8"
 
 step "templates: the app makes one item from each template, and KeePassXC reads each whole, with no revision"
 db="$dir/templates.kdbx"

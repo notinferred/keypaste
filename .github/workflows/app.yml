@@ -252,6 +252,16 @@ jobs:
             dotnet build "$project" --no-restore -c Release
           done
 
+      - name: Start Xvfb
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/apt-install.sh xvfb
+          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+
       - name: Verify every workflow on KeePassXC-made vaults through the CLI and the app
         shell: bash
         run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
