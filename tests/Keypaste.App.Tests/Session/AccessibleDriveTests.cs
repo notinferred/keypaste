@@ -57,7 +57,7 @@ public sealed class AccessibleDriveTests
         shell.Named<ToggleButton>("AddEntry").IsChecked = true;
         AssertNamedByText(shell, "Items");
 
-        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.AgentHistory, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             AssertNamedByText(shell, kind.ToString());

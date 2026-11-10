@@ -14,16 +14,6 @@
 
       <Border Classes="group">
         <ctl:GroupedRows>
-          <ctl:FieldRow Label="{x:Static res:Strings.ActivityLog}">
-            <ctl:FieldRow.Actions>
-              <Button Name="OpenActivityLog" Classes="ghost sm"
-                      ToolTip.Tip="{x:Static res:Strings.EveryAgentRequestTokenRunAndShareOnThisMachine}"
-                      AutomationProperties.Name="{x:Static res:Strings.OpenTheActivityLog}"
-                      Command="{Binding OpenActivityLogCommand}">
-                <ctl:KpIcon Icon="chevron-right" Size="14" />
-              </Button>
-            </ctl:FieldRow.Actions>
-          </ctl:FieldRow>
           <ctl:FieldRow Label="{x:Static res:Strings.ShareLinks}">
             <TextBlock Name="ShareLinksNote" Classes="size-13" Foreground="{DynamicResource KpTextSecondary}" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
             <ctl:FieldRow.Actions>

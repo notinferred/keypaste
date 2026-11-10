@@ -14,7 +14,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -24,22 +23,7 @@ public sealed class SortAndSizeTablesTests
     private static Rect InWindow(Visual control, TopLevel window) =>
         new Rect(control.Bounds.Size).TransformToAABB(control.TransformToVisual(window)!.Value);
 
-    private static ColumnHead Head(RenderedShell shell, string column) =>
-        shell.Window.GetVisualDescendants().OfType<ColumnHead>().Single(head => head.Column == column);
-
-    private static ColumnGrip Grip(RenderedShell shell, string column) =>
-        shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == column);
-
     private static List<string> Titles(EntriesViewModel entries) => [.. entries.Rows.Select(row => row.Title)];
-
-    private static void Press(RenderedShell shell, Control control)
-    {
-        var at = InWindow(control, shell.Window).Center;
-        shell.Window.MouseMove(at);
-        shell.Window.MouseDown(at, MouseButton.Left);
-        shell.Window.MouseUp(at, MouseButton.Left);
-        shell.Frame();
-    }
 
     private static RenderedShell ShellWith(string prefix, int width, int height, params string[] titles)
     {
@@ -56,22 +40,6 @@ public sealed class SortAndSizeTablesTests
         shell.Window.Height = height;
         return shell;
     }
-
-    private static RenderedShell LogShell(string prefix)
-    {
-        var shell = new RenderedShell(prefix);
-        using var home = new TempAuditHome();
-        home.Append("env/dev/STRIPE_KEY");
-        Directory.CreateDirectory(Path.GetDirectoryName(KeypasteHome.AuditPath(shell.Home))!);
-        File.Copy(home.LogPath, KeypasteHome.AuditPath(shell.Home), overwrite: true);
-        shell.Window.Width = 1280;
-        shell.Window.Height = 800;
-        shell.Show<LogViewModel>(DestinationKind.Log).RefreshCommand.Press();
-        shell.Frame();
-        return shell;
-    }
-
-    private static TextBlock LabelOf(ColumnHead head) => head.GetVisualDescendants().OfType<TextBlock>().Single();
 
     private static EntriesViewModel Items(RenderedShell shell)
     {
@@ -188,255 +156,21 @@ public sealed class SortAndSizeTablesTests
         Assert.Null(states.WidthsText);
 
         states.Items.Press(TableStates.Url);
-        states.Log.Press(TableStates.Time);
         states.Trash.Resize(TableStates.Title, 10, [200, 200, 160]);
 
         var read = TableStates.Read(states.SortsText, states.WidthsText);
 
-        Assert.Equal("items:url:asc,log:time:asc", states.SortsText);
+        Assert.Equal("items:url:asc", states.SortsText);
         Assert.Equal("trash:210,190,160", states.WidthsText);
         Assert.Equal(states.Items.Order, read.Items.Order);
-        Assert.Equal(states.Log.Order, read.Log.Order);
         Assert.Equal([210d, 190d, 160d], read.Trash.Widths!);
 
         var odd = TableStates.Read("items:password:asc,trash:title:up,nothing", "items:1,2;log:1,2,3,4,5,x");
 
         Assert.Null(odd.Items.Order);
         Assert.Null(odd.Items.Widths);
-        Assert.Null(odd.Log.Widths);
         Assert.Equal(TableStates.Deleted, odd.Trash.Order!.Value.Column);
     }
-
-    [Fact]
-    public Task A_head_is_a_named_control_of_at_least_20_by_20_and_a_press_on_its_grip_does_not_sort() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-heads-");
-        var table = shell.Shell.Tables.Log;
-        var head = Head(shell, TableStates.Actor);
-        var grip = Grip(shell, TableStates.Actor);
-
-        Assert.Equal("Actor, not sorted", AutomationProperties.GetName(head));
-        Assert.Equal("Resize the Actor column", AutomationProperties.GetName(grip));
-        Assert.True(head.Bounds is { Width: >= 20, Height: >= 20 }, $"the head is {head.Bounds}");
-        Assert.True(grip.Bounds is { Width: >= 20, Height: >= 20 }, $"the grip is {grip.Bounds}");
-
-        Press(shell, grip);
-        Assert.Equal(TableStates.Time, table.Order?.Column);
-
-        Press(shell, head);
-        Assert.Equal("Actor, sorted ascending", AutomationProperties.GetName(head));
-        Assert.Equal(new TableOrder(TableStates.Actor, false), table.Order);
-
-        Press(shell, head);
-        Assert.Equal("Actor, sorted descending", AutomationProperties.GetName(head));
-        Assert.Equal(new TableOrder(TableStates.Actor, true), table.Order);
-    });
-
-    [Fact]
-    public Task An_edge_says_what_it_is_to_a_screen_reader_and_a_tooltip_and_reports_its_width() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-peer-");
-        var grip = Grip(shell, TableStates.Actor);
-        var columns = grip.FindAncestorOfType<LogColumns>()!;
-
-        Assert.Equal("Resize the Actor column. The left and right arrow keys change the width.", ToolTip.GetTip(grip));
-
-        var peer = ControlAutomationPeer.CreatePeerForElement(grip);
-        Assert.IsNotType<NoneAutomationPeer>(peer);
-        Assert.True(peer.IsControlElement());
-        Assert.True(peer.IsKeyboardFocusable());
-        Assert.Equal("Resize the Actor column", peer.GetName());
-        Assert.Equal("The left and right arrow keys change the width.", peer.GetHelpText());
-
-        var width = peer.GetProvider<IRangeValueProvider>()!;
-        Assert.Equal(columns.DrawnWidths[1], width.Value, 1d);
-        Assert.Equal(TableStates.LogColumns[1].Least, width.Minimum);
-        Assert.True(width.Maximum > width.Value);
-
-        var reported = new List<double>();
-        peer.PropertyChanged += (_, change) =>
-        {
-            if (change.Property == RangeValuePatternIdentifiers.ValueProperty)
-            {
-                reported.Add((double)change.NewValue!);
-            }
-        };
-
-        var asked = width.Value + 16;
-        width.SetValue(asked);
-        shell.Frame();
-
-        Assert.Equal(asked, columns.DrawnWidths[1], 1d);
-        Assert.Equal(asked, Assert.Single(reported), 1d);
-    });
-
-    [Fact]
-    public Task An_edge_draws_the_control_edge_and_changes_under_the_pointer() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-hover-");
-        var grip = Grip(shell, TableStates.Actor);
-        var line = grip.GetVisualDescendants().OfType<Border>().Single(border => border.Classes.Contains("column-grip-line"));
-
-        Color Resource(string key) =>
-            Assert.IsAssignableFrom<ISolidColorBrush>(shell.Window.FindResource(shell.Window.ActualThemeVariant, key)).Color;
-        Color Drawn() => Assert.IsAssignableFrom<ISolidColorBrush>(line.Background).Color;
-
-        Assert.Equal(Resource("KpBorderControl"), Drawn());
-
-        shell.Window.MouseMove(InWindow(grip, shell.Window).Center);
-        shell.Frame();
-
-        Assert.Equal(Resource("TextControlBorderBrushPointerOver"), Drawn());
-    });
-
-    [Fact]
-    public Task A_tables_columns_keep_their_own_widths_until_one_is_resized() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-log-widths-");
-        var columns = Grip(shell, TableStates.Time).FindAncestorOfType<LogColumns>()!;
-
-        Assert.Equal(84, columns.DrawnWidths[0], 1d);
-        Assert.Equal(110, columns.DrawnWidths[1], 1d);
-        Assert.Equal(100, columns.DrawnWidths[2], 1d);
-        Assert.Equal(100, columns.DrawnWidths[5], 1d);
-    });
-
-    [Fact]
-    public Task Each_heads_text_starts_where_its_rows_text_does() => HeadlessSession.On(() =>
-    {
-        using var log = LogShell("keypaste-table-align-log-");
-        var logRow = log.Window.GetVisualDescendants().OfType<LogColumns>().First(columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        var time = logRow.GetVisualDescendants().OfType<TextBlock>().First(block => Grid.GetColumn(block) == 0);
-        Assert.Equal(InWindow(time, log.Window).X, InWindow(LabelOf(Head(log, TableStates.Time)), log.Window).X, 0.01);
-    });
-
-    [Fact]
-    public Task A_head_reads_whole_with_no_sort_at_the_narrowest_sidebar_width() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-whole-");
-        shell.Window.Width = 840;
-        shell.Frame();
-
-        foreach (var head in shell.Window.GetVisualDescendants().OfType<ColumnHead>().Where(head => head.IsEffectivelyVisible))
-        {
-            Assert.All(LabelOf(head).TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"{head.Column} is cut"));
-        }
-    });
-
-    [Fact]
-    public Task At_its_least_a_sorted_heads_arrow_stays_clear_of_its_edge_and_a_target_is_left() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-least-log-");
-        var table = shell.Shell.TableInView!;
-
-        foreach (var grip in shell.Window.GetVisualDescendants().OfType<ColumnGrip>().ToList())
-        {
-            var columns = grip.FindAncestorOfType<TableColumns>()!;
-            var index = table.Columns.ToList().FindIndex(column => column.Key == grip.Column);
-
-            table.Reset();
-            shell.Frame();
-            table.Resize(grip.Column, -5000, columns.DrawnWidths);
-            shell.Frame();
-            Assert.Equal(table.Columns[index].Least, columns.DrawnWidths[index], 1d);
-
-            table.Press(grip.Column);
-            shell.Frame();
-
-            var head = Head(shell, grip.Column);
-            var arrow = head.GetVisualDescendants().OfType<KpIcon>().Single();
-            var edge = InWindow(grip, shell.Window).Left;
-            var arrowEnds = InWindow(arrow, shell.Window).Right;
-            Assert.True(arrowEnds <= edge, $"{grip.Column}'s arrow ends at {arrowEnds}, its edge starts at {edge}");
-            Assert.True(edge - InWindow(head, shell.Window).Left >= 20, $"{grip.Column}'s head has less than a 20 wide target left of its edge");
-        }
-
-        table.Reset();
-    });
-
-    [Fact]
-    public Task A_head_sorts_and_an_edge_moves_from_the_keyboard() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-keys-");
-
-        var head = Head(shell, TableStates.Actor);
-        head.Focus(NavigationMethod.Tab);
-        WindowInput.Drain();
-        var ring = Assert.Single(AdornerLayer.GetAdornerLayer(head)!.Children);
-        Assert.True(ring.Clip is null || ring.Clip.Bounds.Contains(ring.Bounds), "the head's focus ring is clipped to the head");
-        shell.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
-        shell.Window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
-        shell.Frame();
-        Assert.Equal(new TableOrder(TableStates.Actor, false), shell.Shell.Tables.Log.Order);
-
-        var grip = Grip(shell, TableStates.Actor);
-        var before = grip.FindAncestorOfType<LogColumns>()!.DrawnWidths[1];
-        grip.Focus(NavigationMethod.Tab);
-        shell.Window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
-        shell.Window.KeyReleaseQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
-        shell.Frame();
-        Assert.Equal(before + 8, grip.FindAncestorOfType<LogColumns>()!.DrawnWidths[1], 1d);
-    });
-
-    [Theory]
-    [InlineData(100)]
-    [InlineData(200)]
-    public Task Dragging_an_edge_follows_the_pointer_and_every_row_stays_under_its_head(int percent) => HeadlessSession.On(() =>
-    {
-        InterfaceZoom.Set(percent);
-        using var shell = LogShell("keypaste-table-drag-");
-        shell.Window.Width = 1920;
-        shell.Window.Height = 1200;
-        shell.Frame();
-        var grip = Grip(shell, TableStates.Actor);
-        var edge = InWindow(grip, shell.Window);
-        var by = 40d;
-
-        shell.Window.MouseMove(edge.Center);
-        shell.Window.MouseDown(edge.Center, MouseButton.Left);
-        WindowInput.Drain();
-        shell.Window.MouseMove(edge.Center + new Point(by, 0));
-        WindowInput.Drain();
-        shell.Window.MouseUp(edge.Center + new Point(by, 0), MouseButton.Left);
-        shell.Frame();
-
-        Assert.Equal(edge.X + by, InWindow(grip, shell.Window).X, 1d);
-
-        var row = shell.Window.GetVisualDescendants().OfType<LogColumns>().First(columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        Assert.Equal(Head(shell, TableStates.Actor).Bounds.Width, row.DrawnWidths[1], 1d);
-        Assert.Equal(Head(shell, TableStates.Action).Bounds.Width, row.DrawnWidths[2], 1d);
-    });
-
-    [Theory]
-    [InlineData(100)]
-    [InlineData(200)]
-    public Task An_edge_of_a_table_with_gaps_between_its_columns_follows_the_pointer_too(int percent) => HeadlessSession.On(() =>
-    {
-        InterfaceZoom.Set(percent);
-        using var shell = LogShell("keypaste-table-gaps-");
-        shell.Window.Width = 1920;
-        shell.Window.Height = 1200;
-        shell.Frame();
-        var head = Head(shell, TableStates.Actor);
-        var grip = Grip(shell, TableStates.Actor);
-        var columns = grip.FindAncestorOfType<LogColumns>()!;
-        Assert.Equal(head.Bounds.Width, columns.DrawnWidths[1], 1d);
-        var edge = InWindow(grip, shell.Window);
-        var by = -30d;
-
-        shell.Window.MouseMove(edge.Center);
-        shell.Window.MouseDown(edge.Center, MouseButton.Left);
-        WindowInput.Drain();
-        shell.Window.MouseMove(edge.Center + new Point(by, 0));
-        WindowInput.Drain();
-        shell.Window.MouseUp(edge.Center + new Point(by, 0), MouseButton.Left);
-        shell.Frame();
-
-        // Layout rounds a column to a whole design pixel.
-        Assert.Equal(edge.X + by, InWindow(grip, shell.Window).X, percent / 100d + 0.01);
-        Assert.Equal(head.Bounds.Width, columns.DrawnWidths[1], 1d);
-        Assert.Equal(Head(shell, TableStates.Action).Bounds.Width, columns.DrawnWidths[2], 1d);
-    });
 
     [Fact]
     public Task The_selected_row_stays_selected_and_in_view_and_the_pane_stays_open_through_a_sort() => HeadlessSession.On(() =>
@@ -532,70 +266,18 @@ public sealed class SortAndSizeTablesTests
     });
 
     [Fact]
-    public void Sorting_the_log_changes_only_its_rows_and_never_the_chain_or_its_verdict()
-    {
-        using var home = new TempAuditHome();
-        home.Append("env/dev/ZETA", "env/dev/ALPHA", "env/dev/MID");
-        var path = KeypasteHome.AuditPath(home.Home);
-        var before = File.ReadAllBytes(path);
-
-        using var screen = new LogViewModel(home.Home);
-        var verdict = screen.Verdict;
-        var summary = screen.Summary;
-        var newestFirst = screen.Rows.Select(row => row.Source.Line).ToList();
-
-        Assert.Equal(TableStates.Time, screen.Table.Order!.Value.Column);
-        Assert.True(screen.Table.Order.Value.Descending);
-        Assert.Equal(newestFirst.OrderDescending(), newestFirst);
-
-        screen.Table.Press(TableStates.Time);
-        Assert.Equal(newestFirst.Order(), screen.Rows.Select(row => row.Source.Line));
-
-        screen.Table.Press(TableStates.Secrets);
-        var secrets = screen.Rows.Select(row => row.Secrets).ToList();
-        Assert.Equal(secrets.OrderBy(name => name, StringComparer.OrdinalIgnoreCase), secrets);
-
-        Assert.Same(verdict, screen.Verdict);
-        Assert.Equal(summary, screen.Summary);
-        Assert.Equal(before, File.ReadAllBytes(path));
-
-        home.Append("env/dev/BETA");
-        screen.Refresh();
-        secrets = [.. screen.Rows.Select(row => row.Secrets)];
-        Assert.Equal(4, secrets.Count);
-        Assert.Equal(secrets.OrderBy(name => name, StringComparer.OrdinalIgnoreCase), secrets);
-        Assert.True(screen.Verdict!.IsOk);
-    }
-
-    [Fact]
-    public void A_log_whose_clock_stepped_back_keeps_the_files_order_until_the_time_head_is_pressed()
+    public void A_log_whose_clock_stepped_back_keeps_the_files_order_newest_first()
     {
         using var home = new TempAuditHome();
         home.AppendAt(AppClock.Start, "env/dev/FIRST");
         home.AppendAt(AppClock.Start.AddMinutes(60), "env/dev/SECOND");
         home.AppendAt(AppClock.Start.AddMinutes(-60), "env/dev/THIRD");
 
-        using var screen = new LogViewModel(home.Home);
-        List<string> Secrets() => [.. screen.Rows.Select(row => row.Secrets)];
-        var written = Secrets();
+        var screen = new LogViewModel(home.Home);
+        var written = screen.Rows.Select(row => row.Secrets).ToList();
+
         Assert.Equal(3, written.Count);
         Assert.Contains("THIRD", written[0], StringComparison.Ordinal);
         Assert.Contains("FIRST", written[2], StringComparison.Ordinal);
-
-        var head = TableStates.Time;
-        screen.Table.Press(head);
-        Assert.Contains("THIRD", Secrets()[0], StringComparison.Ordinal);
-        Assert.Contains("SECOND", Secrets()[2], StringComparison.Ordinal);
-        Assert.False(screen.Table.IsOwnWay);
-
-        screen.Table.Press(head);
-        Assert.Equal("Time, sorted newest first", screen.Table.HeadName(head));
-        Assert.Contains("SECOND", Secrets()[0], StringComparison.Ordinal);
-        Assert.Contains("THIRD", Secrets()[2], StringComparison.Ordinal);
-        Assert.False(screen.Table.IsOwnWay);
-
-        screen.Table.Reset();
-        Assert.Equal(written, Secrets());
-        Assert.Equal("Time, sorted newest first", screen.Table.HeadName(head));
     }
 }

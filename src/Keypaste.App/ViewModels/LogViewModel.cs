@@ -43,7 +43,7 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// inserted would read exactly like one keypaste wrote. The verdict's paragraphs wait to be asked for.
 /// </para>
 /// </remarks>
-internal sealed partial class LogViewModel : ObservableObject, IDisposable
+internal sealed partial class LogViewModel : ObservableObject
 {
     /// <summary>What an empty machine is told.</summary>
     internal const string NothingYet = "Nothing has asked keypaste for a credential on this machine yet.";
@@ -68,59 +68,31 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     /// <param name="home">keypaste's home, whose <c>audit.jsonl</c> is read.</param>
     /// <param name="clock">The clock times are shown against.</param>
     /// <param name="clipboard">Where the chain's hash is copied.</param>
-    /// <param name="agentsOnly">
-    /// Agents › History: the agent and token records only, with no filter to widen it. The whole
-    /// log, with its filters, is Settings › Advanced's Activity log.
-    /// </param>
-    /// <param name="table">How the table is sorted and sized, or null for its own way.</param>
     /// <param name="openAgents">Goes to Agents, the next step from an empty log.</param>
-    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false, TableState? table = null, Action? openAgents = null)
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, Action? openAgents = null)
     {
         OpenAgentsCommand = new RelayCommand(() => openAgents?.Invoke(), () => openAgents is not null);
-        Table = table ?? TableStates.NewLog();
-        Table.OrderChanged += Apply;
         _path = KeypasteHome.AuditPath(home);
         _clock = clock ?? TimeProvider.System;
         _clipboard = clipboard;
-        _filter = agentsOnly ? Filters[1] : Filters[0];
-        IsAgentHistory = agentsOnly;
+        _filter = Filters[0];
 
-        VerifyCommand = new RelayCommand(ToggleVerdict, () => OffersChainCheck && _verdict is not null);
-        CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => OffersChainCheck && _clipboard is not null && _verdict is { HasHash: true });
+        VerifyCommand = new RelayCommand(ToggleVerdict, () => _verdict is not null);
+        CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => _clipboard is not null && _verdict is { HasHash: true });
 
         Refresh();
     }
 
-    /// <summary>How the table is sorted and sized. Sorting reads the rows already drawn: the chain, its verdict and the file are untouched.</summary>
-    internal TableState Table { get; }
-
-    /// <summary>Whether this is Agents › History rather than the whole activity log.</summary>
-    internal bool IsAgentHistory { get; }
-
-    internal bool ShowsFilters => !IsAgentHistory;
-
-    /// <summary>
-    /// Whether the hash check, Verify chain and Copy hash, is offered: on the activity log only.
-    /// History still marks a row the chain does not vouch for, and points at the log to say why.
-    /// </summary>
-    internal bool OffersChainCheck => !IsAgentHistory;
-
-    /// <summary>Whether Verify chain is drawn: a table was read, and this screen offers the check.</summary>
-    internal bool OffersVerify => OffersChainCheck && HasTable;
+    /// <summary>Whether Verify chain is drawn: a table was read.</summary>
+    internal bool OffersVerify => HasTable;
 
     /// <summary>Where a person is sent to learn why a row or the file is not vouched for.</summary>
-    private string ChainSays(string what) => OffersChainCheck
-        ? $"Verify chain says {what}."
-        : $"The activity log in Settings › Advanced says {what}.";
+    private static string ChainSays(string what) => $"Verify chain says {what}.";
 
     /// <summary>The legend for a row the hash chain does not vouch for.</summary>
-    internal string UnverifiedLegend => $"The hash chain does not vouch for rows marked like this. {ChainSays("why")}";
+    public static string UnverifiedLegend => $"The hash chain does not vouch for rows marked like this. {ChainSays("why")}";
 
-    internal string Title => IsAgentHistory ? "History" : "Activity log";
-
-    internal string Subtitle => IsAgentHistory
-        ? "What agents and tokens asked for, and what came of it. Kept on this machine, each line tied to the one before it, so an edit shows."
-        : "Every agent request, token run and share. Kept on this machine, each line tied to the one before it, so an edit shows.";
+    public static string Subtitle => "Every agent request, token run and share. Kept on this machine, each line tied to the one before it, so an edit shows.";
 
     internal IReadOnlyList<LogFilterOption> Filters { get; } =
     [
@@ -174,6 +146,10 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
         set => Choose(value, LogFilter.Denied);
     }
 
+    /// <summary>The line opened to its detail, or null.</summary>
+    [ObservableProperty]
+    internal partial LogRow? Chosen { get; set; }
+
     /// <summary>The records the filter keeps, newest first until another order is chosen.</summary>
     internal IReadOnlyList<LogRow> Rows => _rows;
 
@@ -185,7 +161,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     internal bool FilterEmpty => HasTable && _rows.Count == 0;
 
     /// <summary>Whether a filter hides every line, so widening it would show some.</summary>
-    internal bool OffersShowAll => FilterEmpty && ShowsFilters && _filter.Filter != LogFilter.All;
+    internal bool OffersShowAll => FilterEmpty && _filter.Filter != LogFilter.All;
 
     [RelayCommand]
     private void ShowWholeLog() => ShowAll = true;
@@ -317,7 +293,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
             _ => _ => true,
         };
 
-        _rows = Divide([.. TableSorting.Sorted(_all.Where(keep), Table.Order, SortValueOf, TieBetween)]);
+        _rows = Divide([.. _all.Where(keep)]);
         _unverifiedShown = _rows.Any(row => row.Unverified);
         _unreadShown = _rows.Any(row => row.ReasonUnread);
         _summary = HasTable ? Tally(_rows.Count, _history.Total, _filter.Words) : string.Empty;
@@ -331,23 +307,6 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(OffersShowAll));
         OnPropertyChanged(nameof(HasNotes));
     }
-
-    private static SortValue SortValueOf(LogRow row, string column) => column switch
-    {
-        TableStates.Actor => new(row.Actor),
-        TableStates.Action => new(row.Action),
-        TableStates.Secrets => new(LogRow.UnlessNone(row.Secrets)),
-        TableStates.Where => new(LogRow.UnlessNone(row.Where)),
-        TableStates.Result => new(row.Result),
-        _ => SortValue.At(row.Source.At?.UtcTicks),
-    };
-
-    /// <summary>Rows that tie stay newest first, by where the file has them, so a sorted table's days keep together; oldest first reverses them too.</summary>
-    private int TieBetween(LogRow left, LogRow right) => Table.Order is { Column: TableStates.Time, Descending: false }
-        ? left.Source.Line.CompareTo(right.Source.Line)
-        : right.Source.Line.CompareTo(left.Source.Line);
-
-    public void Dispose() => Table.OrderChanged -= Apply;
 
     /// <summary>Marks the first row of each day with its divider; a table of today alone needs none.</summary>
     private List<LogRow> Divide(List<LogRow> rows)
