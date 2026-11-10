@@ -79,20 +79,6 @@ public sealed class SortAndSizeTablesTests
         return shell;
     }
 
-    private static RenderedShell LogShell(string prefix)
-    {
-        var shell = new RenderedShell(prefix);
-        using var home = new TempAuditHome();
-        home.Append("env/dev/STRIPE_KEY");
-        Directory.CreateDirectory(Path.GetDirectoryName(KeypasteHome.AuditPath(shell.Home))!);
-        File.Copy(home.LogPath, KeypasteHome.AuditPath(shell.Home), overwrite: true);
-        shell.Window.Width = 1280;
-        shell.Window.Height = 800;
-        shell.Show<LogViewModel>(DestinationKind.Log).RefreshCommand.Press();
-        shell.Frame();
-        return shell;
-    }
-
     private static TextBlock LabelOf(ColumnHead head) => head.GetVisualDescendants().OfType<TextBlock>().Single();
 
     private static void DeleteOne(RenderedShell shell)
@@ -329,27 +315,6 @@ public sealed class SortAndSizeTablesTests
     });
 
     [Fact]
-    public Task A_tables_columns_keep_their_own_widths_until_one_is_resized() => HeadlessSession.On(() =>
-    {
-        using var shell = LogShell("keypaste-table-log-widths-");
-        var columns = Grip(shell, TableStates.Time).FindAncestorOfType<LogColumns>()!;
-
-        Assert.Equal(84, columns.DrawnWidths[0], 1d);
-        Assert.Equal(110, columns.DrawnWidths[1], 1d);
-        Assert.Equal(100, columns.DrawnWidths[2], 1d);
-        Assert.Equal(100, columns.DrawnWidths[5], 1d);
-    });
-
-    [Fact]
-    public Task Each_heads_text_starts_where_its_rows_text_does() => HeadlessSession.On(() =>
-    {
-        using var log = LogShell("keypaste-table-align-log-");
-        var logRow = log.Window.GetVisualDescendants().OfType<LogColumns>().First(columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        var time = logRow.GetVisualDescendants().OfType<TextBlock>().First(block => Grid.GetColumn(block) == 0);
-        Assert.Equal(InWindow(time, log.Window).X, InWindow(LabelOf(Head(log, TableStates.Time)), log.Window).X, 0.01);
-    });
-
-    [Fact]
     public Task A_head_reads_whole_with_no_sort_at_the_narrowest_sidebar_width() => HeadlessSession.On(() =>
     {
         using var shell = ShellWith("keypaste-table-whole-", 840, 800, "beta");
@@ -361,19 +326,13 @@ public sealed class SortAndSizeTablesTests
         }
     });
 
-    [Theory]
-    [InlineData("trash")]
-    [InlineData("log")]
-    public Task At_its_least_a_sorted_heads_arrow_stays_clear_of_its_edge_and_a_target_is_left(string name) => HeadlessSession.On(() =>
+    [Fact]
+    public Task At_its_least_a_sorted_heads_arrow_stays_clear_of_its_edge_and_a_target_is_left() => HeadlessSession.On(() =>
     {
-        using var shell = name == "log" ? LogShell("keypaste-table-least-log-") : ShellWith($"keypaste-table-least-{name}-", 1280, 800, "beta");
-
-        if (name == "trash")
-        {
-            DeleteOne(shell);
-            shell.Show<TrashViewModel>(DestinationKind.Trash);
-            shell.Frame();
-        }
+        using var shell = ShellWith("keypaste-table-least-trash-", 1280, 800, "beta");
+        DeleteOne(shell);
+        shell.Show<TrashViewModel>(DestinationKind.Trash);
+        shell.Frame();
 
         var table = shell.Shell.TableInView!;
 

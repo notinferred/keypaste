@@ -251,8 +251,6 @@ public sealed class ScreenRenderer
         Save(window, output, "60-empty-projects");
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         Save(window, output, "60-agents-unavailable");
-        shell.Current = Destinations.Of(DestinationKind.AgentHistory);
-        Save(window, output, "60-empty-agent-history");
         shell.Current = Destinations.Of(DestinationKind.Log);
         Save(window, output, "60-empty-log");
         shell.Current = Destinations.Of(DestinationKind.Settings);
@@ -895,11 +893,11 @@ public sealed class ScreenRenderer
         agentsScreen.AddMcpManuallyCommand.Execute(null);
         WindowInput.Drain();
         Save(window, output, "02-agents-connections-manual");
-        agentsScreen.Tab = Keypaste.App.Resources.Strings.Agents;
+        agentsScreen.Choose(agentsScreen.Rows.Single(row => row.IsEveryOther));
         WindowInput.Drain();
         Save(window, output, "02-agents-tab");
         var rules = agentsScreen.RulesForEveryAgent!;
-        var card = window.GetVisualDescendants().OfType<Border>().First(border => border.Name == "AgentRulesCard");
+        var card = window.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Name == "AgentRulesCard");
         scroller = card.GetVisualAncestors().OfType<ScrollViewer>().First();
         scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);
         WindowInput.Drain();

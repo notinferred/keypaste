@@ -9,7 +9,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -19,8 +18,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// Agents' first level, what it shows with every disclosure and pane closed, holds at most twelve kinds of
-/// control over every state it can be in, a control repeated on every row counted once (D-0455).
+/// Agents' first level, what it shows with no Connect pane open, holds at most twelve kinds of
+/// control over every state it can be in, a control repeated on every row counted once.
 /// </summary>
 /// <remarks>
 /// A kind is a control's type and name. Only controls Agents' own markup and row templates declare are
@@ -37,36 +36,39 @@ public sealed class AgentsFirstLevelTests
 
     private static readonly string[] _kinds =
     [
-        "Button/AddAnAgent", "ListBox/AgentsTabs", "Button/AgentHistory", "Button/ShowPrompt", "Button/ConnectTool",
-        "Expander/AgentSettings",
+        "Button/AddAnAgent", "ListBox/AgentRows", "Button/OpenActivity", "Button/ShowPrompt", "Button/BackToList",
+        "Button/ConnectTool", "Button/ConnectToolAgain", "Button/DisconnectTool", "ChoiceSegment/RunChoice",
+        "ChoiceSegment/CategoryChoice", "ChoiceSegment/RuleChoice", "Button/RemoveAnswer",
     ];
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public Task The_Agents_tab_leaves_out_a_tool_not_connected() => HeadlessSession.On(async () =>
+    public Task The_list_holds_a_tool_not_connected_and_choosing_it_offers_Connect() => HeadlessSession.On(async () =>
     {
         await using var agents = await Agents.StartAsync();
         var model = agents.Model;
+        var cursor = model.Rows.Single(row => row.Key == "cursor");
 
-        model.Tab = Keypaste.App.Resources.Strings.Agents;
+        model.Choose(model.Rows.Single(row => row.Key == "claude-code"));
         agents.Settle();
+        Assert.DoesNotContain(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "ConnectTool", IsEffectivelyVisible: true });
 
-        Assert.False(model.Rows.Single(row => row.Key == "cursor").IsShown);
-        Assert.True(model.Rows.Single(row => row.Key == "claude-code").IsShown);
+        model.Choose(cursor);
+        agents.Settle();
+        Assert.Contains(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "ConnectTool", IsEffectivelyVisible: true } && button.DataContext == cursor);
     });
 
     [Fact]
-    public Task Add_MCP_manually_opens_Connections_with_the_configuration() => HeadlessSession.On(async () =>
+    public Task Add_MCP_manually_shows_the_configuration_in_the_detail() => HeadlessSession.On(async () =>
     {
         await using var agents = await Agents.StartAsync();
         var model = agents.Model;
-        model.Tab = Keypaste.App.Resources.Strings.Agents;
 
         model.AddMcpManuallyCommand.Execute(null);
 
-        Assert.True(model.ShowsConnections);
         Assert.True(model.ShowsManualConfig);
+        Assert.Null(model.Selected);
         Assert.Contains("\"keypaste\"", model.ManualConfigText, StringComparison.Ordinal);
     });
 
@@ -94,12 +96,11 @@ public sealed class AgentsFirstLevelTests
     });
 
     /// <summary>
-    /// One Connect pane is open at a time, and opening another closes the first; any number of Settings stay open
-    /// through the screen's refresh and an agent attaching, which lists it first, as the same controls, so what has
-    /// the focus in them keeps it.
+    /// The chosen agent's settings stay the same controls through the screen's refresh and an agent attaching, which lists
+    /// it first, so what has the focus in them keeps it; and one Connect pane is open at a time, opening another closes the first.
     /// </summary>
     [Fact]
-    public Task Connect_opens_one_pane_and_Settings_panels_survive_a_refresh() => HeadlessSession.On(async () =>
+    public Task The_chosen_agents_settings_survive_a_refresh_and_Connect_opens_one_pane() => HeadlessSession.On(async () =>
     {
         await using var agents = await Agents.StartAsync();
         var model = agents.Model;
@@ -107,14 +108,24 @@ public sealed class AgentsFirstLevelTests
         var gemini = model.Rows.Single(row => row.Key == "gemini-cli");
         var claude = model.Rows.Single(row => row.Key == "claude-code");
 
-        Disclosure(agents.Window, claude).IsExpanded = true;
-        Disclosure(agents.Window, AgentNames.Any, model).IsExpanded = true;
+        model.Choose(claude);
         agents.Settle();
         var panels = Panels(agents.Window);
-        Assert.Equal(2, panels.Count);
+        Assert.Single(panels);
         var controls = PanelControls(agents.Window);
         var focused = controls.Single(panel => panel.DataContext == claude.Settings).GetVisualDescendants().OfType<ToggleButton>().Single(button => AutomationProperties.GetName(button) == "On");
         focused.Focus();
+        Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
+
+        await using var another = await agents.AttachAsync(new AttachClient("zed", "1.0", "zed"));
+        model.Refresh();
+        agents.Clock.Advance(TimeSpan.FromSeconds(2));
+        agents.Settle();
+
+        Assert.Equal("zed", model.Rows[0].Key);
+        Assert.Same(claude, model.Selected);
+        Assert.Equal(panels, Panels(agents.Window));
+        Assert.Equal(controls, PanelControls(agents.Window));
         Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
 
         model.ConnectCommand.Press(cursor);
@@ -125,20 +136,8 @@ public sealed class AgentsFirstLevelTests
 
         Assert.Null(cursor.Connection);
         Assert.NotNull(gemini.Connection);
-        focused.Focus();
+        Assert.Same(gemini, model.Selected);
         Assert.Single(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "CloseConnection", IsEffectivelyVisible: true });
-
-        await using var another = await agents.AttachAsync(new AttachClient("zed", "1.0", "zed"));
-        model.Refresh();
-        agents.Clock.Advance(TimeSpan.FromSeconds(2));
-        agents.Settle();
-
-        Assert.Equal("zed", model.Rows[0].Key);
-        Assert.True(Disclosure(agents.Window, claude).IsExpanded);
-        Assert.Equal(panels, Panels(agents.Window));
-        Assert.Equal(controls, PanelControls(agents.Window));
-        Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
-        Assert.NotNull(gemini.Connection);
     });
 
     /// <summary>A waiting request's Show the prompt stays the same button as they count down, so a press or the focus on one is not lost at a tick.</summary>
@@ -233,12 +232,6 @@ public sealed class AgentsFirstLevelTests
             : name;
     }
 
-    private static Expander Disclosure(Window window, AgentRow row) =>
-        window.GetVisualDescendants().OfType<Expander>().Single(expander => expander.DataContext == row);
-
-    private static Expander Disclosure(Window window, string key, AgentActivityViewModel model) =>
-        Disclosure(window, model.Rows.Single(row => row.Key == key));
-
     private static List<object?> Panels(Window window) => [.. PanelControls(window).Select(panel => panel.DataContext)];
 
     private static List<AgentSettingsView> PanelControls(Window window) =>
@@ -290,7 +283,7 @@ public sealed class AgentsFirstLevelTests
             }
 
             var tools = new FakeTools(Path.Combine(fixture.Home, "computer")).ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable().VsCodeMoved();
-            var model = new AgentActivityViewModel(authority, fixture.Home, clock, action => Dispatcher.UIThread.Post(action), tools.Connector(), openHistory: () => { });
+            var model = new AgentActivityViewModel(authority, fixture.Home, clock, action => Dispatcher.UIThread.Post(action), tools.Connector(), openActivity: () => { });
 #pragma warning restore CA2000
             var window = new Window { Width = width, Height = 900, Content = new AgentActivityView { DataContext = model } };
             window.Show();

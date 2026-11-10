@@ -43,7 +43,7 @@ public sealed class FinishThePolishTests
         Assert.Equal("Settings - keypaste", shell.Window.Title);
 
         shell.Show<LogViewModel>(DestinationKind.Log);
-        Assert.Equal("Activity log - keypaste", shell.Window.Title);
+        Assert.Equal("Activity - keypaste", shell.Window.Title);
 
         shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<ProjectRow>().First(row => row.Name == "secret-project");
         shell.Frame();
@@ -233,7 +233,7 @@ public sealed class FinishThePolishTests
     [InlineData(999, 100, false)]
     [InlineData(1000, 100, false)]
     [InlineData(840, 200, false)]
-    public Task The_logs_Result_reads_whole_between_840_and_1000(int width, int percent, bool barsHide) => HeadlessSession.On(() =>
+    public Task The_activitys_Result_reads_whole_between_840_and_1000(int width, int percent, bool barsHide) => HeadlessSession.On(() =>
     {
         using var bars = new ScrollBarsSetting(barsHide);
         InterfaceZoom.Set(percent);
@@ -247,10 +247,9 @@ public sealed class FinishThePolishTests
         log.RefreshCommand.Press();
         shell.Frame();
 
-        var scroll = shell.Named<ScrollViewer>("TableScroll");
-        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, $"the table scrolls sideways at {width}");
-        var row = Assert.Single(shell.Window.GetVisualDescendants().OfType<LogColumns>(), columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        var result = row.GetVisualDescendants().OfType<TextBlock>().Last(block => block.IsEffectivelyVisible);
+        var scroll = shell.Named<Grid>("LogPage").FindAncestorOfType<ScrollViewer>()!;
+        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, $"the log scrolls sideways at {width}");
+        var result = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.IsEffectivelyVisible && block.Text == log.Rows[0].Result);
         Assert.All(result.TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"{result.Text} is cut at {width}"));
     });
 

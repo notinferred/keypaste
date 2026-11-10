@@ -156,24 +156,20 @@ public sealed class FourPlacesJourneyTests
             var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
 
-            // Agents and History.
+            // Agents and Activity: the records and the chain's check.
             Chord(main, PhysicalKey.Digit2);
-            Press(main, Named<Button>(main, "AgentHistory"));
-            var history = Assert.IsType<LogViewModel>(shell.Content);
-            Assert.True(history.IsAgentHistory);
-            AmberElements.AssertOne(main, null, "History");
-            Assert.Contains(history.Rows, row => row.Actor == _label);
+            Press(main, Named<Button>(main, "OpenActivity"));
+            var log = Assert.IsType<LogViewModel>(shell.Content);
+            AmberElements.AssertOne(main, null, "Activity");
+            Assert.Contains(log.Rows, row => row.Actor == _label);
+            Press(main, Named<Button>(main, "VerifyChain"));
+            Assert.True(log.VerdictShown);
+            AmberElements.AssertOne(main, null, "Activity, its verdict shown");
 
-            // Settings › Advanced: the whole log and its check, then the share links, revoked.
+            // Settings › Advanced: the share links, revoked.
             Chord(main, PhysicalKey.Digit4);
             AmberElements.AssertOne(main, null, "Settings");
             Press(main, Named<Button>(main, "OpenAdvanced"));
-            Press(main, Named<Button>(main, "OpenActivityLog"));
-            var log = Assert.IsType<LogViewModel>(shell.Content);
-            Press(main, Named<Button>(main, "VerifyChain"));
-            Assert.True(log.VerdictShown);
-            AmberElements.AssertOne(main, null, "the activity log, its verdict shown");
-            Press(main, Named<Button>(main, "Back"));
             Press(main, Named<Button>(main, "OpenShareLinks"));
             var links = Assert.IsType<SharingViewModel>(shell.Content);
             await Until(() => links.Rows.Count == 1);

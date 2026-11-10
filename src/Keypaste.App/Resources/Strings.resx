@@ -4,7 +4,6 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
-  <data name="AITools" xml:space="preserve"><value>AI tools</value></data>
   <data name="AProjectIsTheItemsInYourX4fbb7f" xml:space="preserve"><value>A project is the items in your vault tagged with its name, such as env:billing-api, with a value per environment. Tag an item in Items, run keypaste env set billing-api STRIPE_KEY, or choose New project.</value></data>
   <data name="AProjectIsTheItemsInYourX9f49b8" xml:space="preserve"><value>A project is the items in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first item or key.</value></data>
   <data name="AReportHoldsTheVersionSystemScreenX3de709" xml:space="preserve"><value>A report holds the version, system, screen and where the code failed, never your vault, a path or who you are.</value></data>
@@ -12,7 +11,7 @@
   <data name="ATokenLetsAScriptOrCIX41bca7" xml:space="preserve"><value>A token lets a script or CI job run with a scoped set, without you or the vault's password. It only feeds keypaste run and never prints a value.</value></data>
   <data name="AboutKeypaste" xml:space="preserve"><value>About keypaste…</value></data>
   <data name="Action" xml:space="preserve"><value>Action</value></data>
-  <data name="ActivityLog" xml:space="preserve"><value>Activity log</value></data>
+  <data name="Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="Actor" xml:space="preserve"><value>Actor</value></data>
   <data name="ActualSize" xml:space="preserve"><value>Actual size</value></data>
   <data name="Add" xml:space="preserve"><value>Add</value></data>
@@ -161,7 +160,6 @@
   <data name="EnvKeypaste" xml:space="preserve"><value>.env.keypaste</value></data>
   <data name="EnvironmentName" xml:space="preserve"><value>Environment name</value></data>
   <data name="Environments" xml:space="preserve"><value>Environments</value></data>
-  <data name="EveryAgentRequestTokenRunAndShareOnThisMachine" xml:space="preserve"><value>Every agent request, token run and share on this machine, with a check that none was changed.</value></data>
   <data name="EverythingRunInThatTerminalCanReadX8c42c2" xml:space="preserve"><value>Everything run in that terminal can read these values.</value></data>
   <data name="Expires" xml:space="preserve"><value>Expires</value></data>
   <data name="Export" xml:space="preserve"><value>Export</value></data>
@@ -322,7 +320,6 @@
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
   <data name="OpenKeypasteAtLogin" xml:space="preserve"><value>Open keypaste at login</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>
   <data name="OpenTheScopedTokens" xml:space="preserve"><value>Open the scoped tokens</value></data>
   <data name="OpenTheShareLinks" xml:space="preserve"><value>Open the share links</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
@@ -438,7 +435,7 @@
   <data name="TermsOfUse" xml:space="preserve"><value>Terms of use</value></data>
   <data name="ThatBackupsKeyFile" xml:space="preserve"><value>That backup's key file</value></data>
   <data name="ThatBackupsMasterPassword" xml:space="preserve"><value>That backup's master password</value></data>
-  <data name="TheActivityLogShareLinksScopedTokensX927922" xml:space="preserve"><value>The activity log, share links, scoped tokens and diagnostics.</value></data>
+  <data name="TheActivityLogShareLinksScopedTokensX927922" xml:space="preserve"><value>Share links, scoped tokens and diagnostics.</value></data>
   <data name="TheCheckAsksTheYubiKeyTheUnlockX4a39c1" xml:space="preserve"><value>The check asks the YubiKey the unlock screen chose.</value></data>
   <data name="TheGroupsNewName" xml:space="preserve"><value>The group's new name</value></data>
   <data name="TheNameAProjectReadsItUnderX9a2ebe" xml:space="preserve"><value>The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment.</value></data>
@@ -579,7 +576,6 @@
   <data name="ViewMenu" xml:space="preserve"><value>View</value></data>
   <data name="WindowMenu" xml:space="preserve"><value>Window</value></data>
   <data name="RevokeToken" xml:space="preserve"><value>Revoke token</value></data>
-  <data name="AgentHistory" xml:space="preserve"><value>Agent history</value></data>
   <data name="ExampleItemPath" xml:space="preserve"><value>Work/github</value></data>
   <data name="ExampleProjectDirectory" xml:space="preserve"><value>~/code/acme-api</value></data>
   <data name="ExampleWebAddress" xml:space="preserve"><value>https://example.com</value></data>
@@ -595,7 +591,6 @@
   <data name="AgentsSeeUsernames" xml:space="preserve"><value>Agents see usernames</value></data>
   <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
   <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
-  <data name="WhatAgentsGet" xml:space="preserve"><value>What agents get</value></data>
   <data name="WhatItGets" xml:space="preserve"><value>What it gets</value></data>
   <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
   <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
@@ -610,7 +605,6 @@
   <data name="ThisVault" xml:space="preserve"><value>This vault</value></data>
   <data name="Browser" xml:space="preserve"><value>Browser</value></data>
   <data name="FragileKeyFileWarningValue" xml:space="preserve"><value>If {0} is changed or lost, this vault can't be opened. Keep an exact copy somewhere safe, and don't open it in an editor. A KeePass key file can be re-saved safely: choose one under Settings, This vault, Vault access.</value></data>
-  <data name="Connections" xml:space="preserve"><value>Connections</value></data>
   <data name="AddAnAgent" xml:space="preserve"><value>Add an agent</value></data>
   <data name="CopySetupPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
   <data name="ConnectAnApp" xml:space="preserve"><value>Connect an app</value></data>
@@ -621,6 +615,10 @@
   <data name="ConfigurationCopied" xml:space="preserve"><value>Configuration copied.</value></data>
   <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
+  <data name="Usernames" xml:space="preserve"><value>Usernames</value></data>
+  <data name="Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="CanSee" xml:space="preserve"><value>Can see</value></data>
+  <data name="WhenItAsks" xml:space="preserve"><value>When it asks</value></data>
   <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>
   <data name="KeypasteCantWriteItsAuditLog" xml:space="preserve"><value>keypaste is refusing agent requests because it can't write its audit log. Free some disk space or close the other keypaste, and the next request tries again. Agents says why.</value></data>
   <data name="KeypasteIsRefusingEveryAgentRequest" xml:space="preserve"><value>keypaste is refusing every agent request because its audit log won't open. Fix the log file, and the next request opens it again. Agents says why.</value></data>
