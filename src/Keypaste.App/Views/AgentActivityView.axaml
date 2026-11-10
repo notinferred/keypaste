@@ -136,7 +136,7 @@
                       <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
                       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                         <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="muted size-12" Text="{Binding Status}" TextTrimming="CharacterEllipsis" ctl:MachineRuns.InText="True" />
+                        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Status}" TextTrimming="CharacterEllipsis" ctl:MachineRuns.InText="True" />
                       </Grid>
                     </StackPanel>
                   </Grid>
@@ -187,7 +187,7 @@
                 <Border Classes="group">
                   <ctl:GroupedRows>
                     <ctl:FieldRow Label="{x:Static res:Strings.Connection}" Classes="top-label">
-                      <StackPanel Spacing="2">
+                      <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                           <!-- Top, so a status that wraps keeps its dot on the first line. -->
                           <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Top" Margin="0,6,0,0" />
@@ -196,9 +196,7 @@
                         </Grid>
                         <TextBlock Name="AgentSessions" Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.InText="True" IsVisible="{Binding HasSessions}"
                                    Text="{Binding Sessions, StringFormat={x:Static res:Strings.LiveInValue}}" />
-                      </StackPanel>
-                      <ctl:FieldRow.Actions>
-                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsToolActions}">
+                        <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding ShowsToolActions}">
                           <Button Name="ConnectToolAgain" Classes="ghost sm" MaxWidth="260"
                                   IsVisible="{Binding OffersConnectAgain}"
                                   Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectAgainCommand}"
@@ -211,8 +209,8 @@
                                   Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).DisconnectCommand}"
                                   CommandParameter="{Binding}"
                                   AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.DisconnectValue}}" />
-                        </StackPanel>
-                      </ctl:FieldRow.Actions>
+                        </WrapPanel>
+                      </StackPanel>
                     </ctl:FieldRow>
                     <ctl:FieldRow Label="{x:Static res:Strings.CanSee}" Classes="top-label" IsVisible="{Binding HasSettings}">
                       <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL}" />

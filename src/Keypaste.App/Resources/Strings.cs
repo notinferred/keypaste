@@ -226,7 +226,6 @@ public static class Strings
     public static string ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb => Manager.GetString("ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb", CultureInfo.CurrentUICulture)!;
     public static string ForgetRecentVaults => Manager.GetString("ForgetRecentVaults", CultureInfo.CurrentUICulture)!;
     public static string ForgetThemAll => Manager.GetString("ForgetThemAll", CultureInfo.CurrentUICulture)!;
-    public static string FoundOnThisComputerAndAnyAgentX88444b => Manager.GetString("FoundOnThisComputerAndAnyAgentX88444b", CultureInfo.CurrentUICulture)!;
     public static string FragileKeyFileWarningValue => Manager.GetString("FragileKeyFileWarningValue", CultureInfo.CurrentUICulture)!;
     public static string FreeSoftwareUnderTheGNUAfferoGeneralXba93e5 => Manager.GetString("FreeSoftwareUnderTheGNUAfferoGeneralXba93e5", CultureInfo.CurrentUICulture)!;
     public static string General => Manager.GetString("General", CultureInfo.CurrentUICulture)!;

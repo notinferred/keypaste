@@ -283,10 +283,10 @@
                     </Panel>
 
                     <!-- A chosen line opens to keypaste's account of it and the full time. -->
-                    <Border IsVisible="{Binding $parent[ListBoxItem].IsSelected}" Padding="16,0,16,10">
+                    <Border IsVisible="{Binding $parent[ListBoxItem].IsSelected}" Padding="16,0,16,12">
                       <StackPanel Spacing="4">
                         <TextBlock ctl:MachineRuns.InText="True" Text="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Classes="size-12" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" />
+                                   Classes="caption" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" />
                         <TextBlock Text="{Binding When}" FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextMuted}" />
                       </StackPanel>
                     </Border>
@@ -296,7 +296,7 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <Border Padding="16,10" IsVisible="{Binding FilterEmpty}">
+            <Border Padding="16,12" IsVisible="{Binding FilterEmpty}">
               <StackPanel Orientation="Horizontal" Spacing="12">
                 <TextBlock Text="{x:Static res:Strings.NothingInThisLogMatchesThisFilter}"
                            Classes="size-13"

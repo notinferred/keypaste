@@ -79,7 +79,7 @@ public sealed class AgentsFirstLevelTests
         await EveryStateAsync(window => kinds.UnionWith(Operable(window).Select(Kind)));
 
         Assert.True(kinds.Count <= _most, $"Agents' first level holds {kinds.Count} kinds of control: {string.Join(", ", kinds)}");
-        Assert.Superset(new HashSet<string>(_kinds, StringComparer.Ordinal), kinds);
+        Assert.True(kinds.IsSubsetOf(_kinds), $"outside the known kinds: {string.Join(", ", kinds.Except(_kinds))}");
     });
 
     /// <summary>A control with no name would slip past the count, and one a reader names by its type tells the person nothing.</summary>
