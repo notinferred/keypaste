@@ -27,6 +27,7 @@
     <StyleInclude Source="avares://keypaste-app/Theme/Inputs.axaml" />
     <StyleInclude Source="avares://keypaste-app/Theme/Lists.axaml" />
     <StyleInclude Source="avares://keypaste-app/Theme/Surfaces.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Groups.axaml" />
     <StyleInclude Source="avares://keypaste-app/Theme/Chrome.axaml" />
     <StyleInclude Source="avares://keypaste-app/Theme/TextSizes.axaml" />
   </Application.Styles>

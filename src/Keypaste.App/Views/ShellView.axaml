@@ -6,6 +6,7 @@
              xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.ShellView"
              x:DataType="vm:ShellViewModel"
+             ctl:PressToCopy.Clipboard="{Binding Clipboard}"
              Background="{DynamicResource KpBgApp}">
 
   <UserControl.Resources>
@@ -84,18 +85,14 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
 
-    <Style Selector="Button.titlebar-lock">
-      <Setter Property="Height" Value="26" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="12,0" />
+    <Style Selector="Border#TitleBar">
+      <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
-    <Style Selector="Button.titlebar-lock /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    </Style>
-    <Style Selector="Button.titlebar-lock:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Style Selector="Border#TitleBar.beside-sidebar">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
     </Style>
   </UserControl.Styles>
 
@@ -103,14 +100,17 @@
 
     <Grid RowDefinitions="40,*">
 
-      <!-- Titlebar: the window's title area, drawn by the app, draggable everywhere but its controls. -->
+      <!-- The window's title area, draggable everywhere but its controls. It holds what the sidebar's foot would hold only while there is no sidebar or rail. -->
       <Border Grid.Row="0"
               Name="TitleBar"
-              Background="{DynamicResource KpBgPanel}"
-              BorderBrush="{DynamicResource KpBorderSubtle}"
-              BorderThickness="0,0,0,1"
               WindowDecorationProperties.ElementRole="TitleBar">
         <Grid Name="TitleColumns" ColumnDefinitions="232,Auto,*">
+
+          <!-- The sidebar's surface, carried up under the traffic lights while the sidebar shows beside the content. -->
+          <Border Name="TitleOverSidebar"
+                  Background="{DynamicResource KpBgPanel}"
+                  BorderBrush="{DynamicResource KpBorderSubtle}"
+                  BorderThickness="0,0,1,0" />
 
           <!-- Only while the person has hidden the sidebar: Agents, Settings and the groups would otherwise have nothing on screen pointing to them. In a narrow window, where the rail is what a person expects to see, it says so in words. -->
           <Button Grid.Column="1"
@@ -130,59 +130,27 @@
             </StackPanel>
           </Button>
 
-          <!-- The idle warning's first line, said once as the warning comes, while the ticking text below stays quiet. -->
+          <!-- The idle warning's first line, said once as the warning comes, while the ticking text stays quiet. -->
           <Border Grid.Column="2" ctl:Announcer.Says="{Binding CountdownAnnouncement}" />
 
+          <!-- With the sidebar and the rail away, the foot is drawn here so the vault's state and Lock stay in view. -->
           <Grid Grid.Column="2"
-                ColumnDefinitions="Auto,*,Auto"
-                HorizontalAlignment="Right"
+                ColumnDefinitions="Auto,*"
                 Margin="8,0,12,0"
                 VerticalAlignment="Center">
-
-            <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
-            <TextBlock Classes="size-13 muted"
+            <TextBlock Name="TitleCountdown"
+                       Classes="size-13 muted"
                        Text="{Binding Countdown}"
-                       IsVisible="{Binding HasCountdown}"
                        VerticalAlignment="Center"
-                       Margin="0,0,12,0" />
-
-            <Grid Grid.Column="1"
-                  ColumnDefinitions="Auto,*,Auto,Auto"
-                  Margin="8,0,12,0"
-                  ToolTip.Tip="{Binding VaultStatusDetail}"
-                  WindowDecorationProperties.ElementRole="User">
-              <Border Classes="dot"
-                      Margin="0,0,6,0"
-                      Classes.ok="{Binding VaultStatusOk}"
-                      Classes.idle="{Binding VaultStatusPending}"
-                      Classes.danger="{Binding VaultStatusDanger}" />
-              <!-- A long file name gives way in its middle, so the save state at the end always shows. -->
-              <TextBlock Grid.Column="1"
-                         Name="VaultFileName"
-                         Classes="mono size-12 muted"
-                         Text="{Binding VaultName}"
-                         TextTrimming="PrefixCharacterEllipsis"
-                         VerticalAlignment="Center" />
-              <!-- Drawn, because Instrument Sans's middle dot advances 1.3 and inks past that, against the next word. -->
-              <Border Grid.Column="2" Width="2" Height="2" CornerRadius="4" Margin="4,0" VerticalAlignment="Center" Background="{DynamicResource KpTextMuted}" />
-              <TextBlock Grid.Column="3"
-                         Name="VaultSaveState"
-                         Classes="size-13 muted"
-                         Text="{Binding VaultSaveWords}"
-                         VerticalAlignment="Center" />
-            </Grid>
-
-            <Button Grid.Column="2"
-                    Classes="titlebar-lock size-12"
-                    Command="{Binding LockCommand}"
-                    ToolTip.Tip="{x:Static res:Strings.LockNow}"
-                    AutomationProperties.Name="{x:Static res:Strings.LockNow}"
-                    WindowDecorationProperties.ElementRole="User">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="lock" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.LockLabel}" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
+                       Margin="0,0,12,0">
+              <TextBlock.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="HasCountdown" />
+                  <Binding Path="SidebarHidden" />
+                </MultiBinding>
+              </TextBlock.IsVisible>
+            </TextBlock>
+            <Decorator Name="TitleFootSlot" Grid.Column="1" />
           </Grid>
 
         </Grid>
@@ -211,6 +179,40 @@
                     AutomationProperties.Name="{x:Static res:Strings.ShowGroupsAndProjects}">
               <ctl:KpIcon Icon="panel-left" Size="20" />
             </Button>
+
+            <!-- The sidebar's foot in the rail's terms: the countdown near a lock, and Lock, with the save state on its dot. -->
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <Panel Name="RailCountdown"
+                     Width="40"
+                     Height="24"
+                     Background="Transparent"
+                     IsVisible="{Binding HasCountdown}"
+                     ToolTip.Tip="{Binding Countdown}"
+                     ToolTip.Placement="Right"
+                     AutomationProperties.Name="{Binding Countdown}">
+                <ctl:KpIcon Icon="hourglass" Size="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
+              </Panel>
+              <Button Name="RailLock"
+                      Classes="icon ghost"
+                      Width="40"
+                      Height="40"
+                      Command="{Binding LockCommand}"
+                      ToolTip.Tip="{Binding VaultStatusDetail}"
+                      ToolTip.Placement="Right"
+                      AutomationProperties.Name="{x:Static res:Strings.LockNow}"
+                      AutomationProperties.HelpText="{Binding VaultStatusDetail}">
+                <Panel Width="28" Height="28">
+                  <ctl:KpIcon Icon="lock" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Border Classes="dot"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Top"
+                          Classes.ok="{Binding VaultStatusOk}"
+                          Classes.idle="{Binding VaultStatusPending}"
+                          Classes.danger="{Binding VaultStatusDanger}"
+                          Classes.refusing="{Binding VaultStatusDanger}" />
+                </Panel>
+              </Button>
+            </StackPanel>
 
             <ListBox Name="RailNav"
                      AutomationProperties.Name="{x:Static res:Strings.Places}"
@@ -257,12 +259,56 @@
                 Background="{DynamicResource KpBgPanel}"
                 BorderBrush="{DynamicResource KpBorderSubtle}"
                 BorderThickness="0,0,1,0">
-          <DockPanel Margin="8,16">
+          <DockPanel Margin="8,4,8,8">
 
-            <ctl:BrandWordmark DockPanel.Dock="Top"
-                               HorizontalAlignment="Left"
-                               Margin="12,2,8,24"
-                               Width="104" />
+            <!-- The vault's file and save state, and Lock: what the title bar held. -->
+            <StackPanel DockPanel.Dock="Bottom">
+              <TextBlock Name="FootCountdown"
+                         Classes="size-13 muted"
+                         Text="{Binding Countdown}"
+                         IsVisible="{Binding HasCountdown}"
+                         TextWrapping="Wrap"
+                         Margin="8,8,0,0" />
+              <Decorator Name="SidebarFootSlot">
+                <Border Name="VaultFoot" Classes="vault-foot">
+                  <Grid ColumnDefinitions="*,Auto">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                        HorizontalAlignment="Left"
+                        ToolTip.Tip="{Binding VaultStatusDetail}"
+                        WindowDecorationProperties.ElementRole="User">
+                    <Border Classes="dot"
+                            Margin="0,0,6,0"
+                            Classes.ok="{Binding VaultStatusOk}"
+                            Classes.idle="{Binding VaultStatusPending}"
+                            Classes.danger="{Binding VaultStatusDanger}" />
+                    <!-- A long file name gives way in its middle, so the save state at the end always shows. -->
+                    <TextBlock Grid.Column="1"
+                               Name="VaultFileName"
+                               Classes="mono size-12 muted"
+                               Text="{Binding VaultName}"
+                               TextTrimming="PrefixCharacterEllipsis"
+                               VerticalAlignment="Center" />
+                    <!-- Drawn, because Instrument Sans's middle dot advances 1.3 and inks past that, against the next word. -->
+                    <Border Grid.Column="2" Width="2" Height="2" CornerRadius="4" Margin="4,0" VerticalAlignment="Center" Background="{DynamicResource KpTextMuted}" />
+                    <TextBlock Grid.Column="3"
+                               Name="VaultSaveState"
+                               Classes="size-13 muted"
+                               Text="{Binding VaultSaveWords}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                    <Button Grid.Column="1"
+                            Name="LockButton"
+                            Classes="foot-lock size-12"
+                            Margin="4,0,0,0"
+                            Command="{Binding LockCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.LockNow}"
+                            AutomationProperties.Name="{x:Static res:Strings.LockNow}"
+                            WindowDecorationProperties.ElementRole="User"
+                            Content="{x:Static res:Strings.LockLabel}" />
+                  </Grid>
+                </Border>
+              </Decorator>
+            </StackPanel>
 
             <!-- Trash and Settings, quieter, at the bottom. -->
             <ListBox Name="FooterNav"

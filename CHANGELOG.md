@@ -4,6 +4,16 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's Items, Agents and Trash are now a list on the left and the chosen thing on the right, in rows grouped by hairlines instead of boxes and cards. Pressing a value copies it, an item is edited where it is read, Items and Trash sort from a menu in the list's header instead of by column heads, an explanation sits behind a tooltip, the vault's name, save state, Lock and idle countdown are at the foot of the sidebar, and Settings has sections down the side ([F.110](docs/steps/F.110.md)).
+
+The password generator in the desktop app is now a panel on the password field instead of a dialog, with the length, character kinds, Leave out lookalikes, word count and separator, and Copy, New item and Add as a field ([F.110](docs/steps/F.110.md)).
+
+New item in the desktop app now starts from a kind and a title, and a button on the left of the form adds the fields you want, each kind starting with its usual ones ([F.110](docs/steps/F.110.md)).
+
+Agents in the desktop app now holds the connections, what each agent gets and Activity, the log of what agents and tokens asked for, one line an event, which replaces Agents › History and Settings › Advanced's activity log ([F.110](docs/steps/F.110.md)).
+
+The desktop app now locks after 30 minutes without input instead of five. Settings still offers one minute to eight hours, and idle locking still cannot be turned off ([F.110](docs/steps/F.110.md)).
+
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).
 
 When the audit log has opened but can no longer be written, the desktop app now says so once in a pop-up with the fix and keeps a message on Agents until a line is written ([F.102](docs/steps/F.102.md)).
@@ -67,7 +77,7 @@ The desktop app's window title now names the screen you are on, the pointing han
 
 Dates, times and table sorting in the desktop app now follow your language and region. The words are still English, no language has been added, and windows run left to right until a translation exists. A Linux machine with no ICU starts as before, in plain ISO dates and code point order ([Q.16](docs/steps/Q.16.md)).
 
-The desktop app's Items, Trash and activity log tables now sort by a column's head, again to reverse, and their columns size by a drag or the arrow keys. Both last across runs, View › Reset table order and widths undoes them, and neither touches the vault or the audit log ([Q.15](docs/steps/Q.15.md)).
+The desktop app's Items and Trash lists sort from a menu in the list's header. The order lasts across runs, View › Reset list order undoes it, and it never touches the vault or the audit log ([Q.15](docs/steps/Q.15.md), [F.110](docs/steps/F.110.md)).
 
 In source, the desktop app can use the system's notifications; no person has seen one, and macOS posts them only from a signed build, which does not exist yet. A request that arrives while keypaste is in the background still opens its prompt, and also posts a notification, naming no item, vault or agent, whose Show the prompt brings the prompt forward with focus on Deny; a notification never answers a request and is gone once the request is. On macOS and Linux the notice that an agent found the app locked is to be an ordinary notification with Open keypaste; on Windows, and wherever the system cannot post one, it stays keypaste's own notice window. keypaste cannot see Focus or do-not-disturb, so the system may hold a notice with no window appearing ([Q.14](docs/steps/Q.14.md)).
 

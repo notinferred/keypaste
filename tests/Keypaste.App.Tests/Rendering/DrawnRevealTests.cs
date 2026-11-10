@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
+using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Tests;
@@ -31,6 +32,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// </remarks>
 public sealed class DrawnRevealTests
 {
+    // The list and the detail share 1000 wide with too little left for a 32-character value beside its label and Reveal.
+    private const double _roomForValues = 1100;
+
     public static TheoryData<string> Surfaces => ["current", "revision", "env", "field", "plain-field"];
 
     [Theory]
@@ -38,6 +42,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_Reveal_draws_the_value_and_a_second_takes_it_off_the_frame(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = _roomForValues;
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
         var dots = new string('•', cell.MaskedLength);
@@ -85,6 +90,7 @@ public sealed class DrawnRevealTests
     public Task Locking_while_shown_takes_the_value_off_the_next_frame(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = _roomForValues;
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
@@ -134,6 +140,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_a_masked_cell_leaves_it_masked(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = _roomForValues;
         var (cell, _) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
@@ -224,6 +231,49 @@ public sealed class DrawnRevealTests
         cell.EndReveal();
     });
 
+    [Fact]
+    public Task A_click_on_Reveal_draws_the_value_where_the_detail_replaces_the_list() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell();
+        shell.Window.Width = 720;
+        var (cell, value) = shell.Open("current");
+        var style = TextStyle.Of(cell);
+        var toggle = shell.ToggleOf(cell);
+
+        Assert.True(shell.Window.GetVisualDescendants().OfType<ListDetail>().Single().ShowsBack, "the detail does not stand in the list's place");
+        ToolTip.SetServiceEnabled(toggle, false);
+
+        shell.Tap(toggle);
+        var shown = shell.Frame();
+        Assert.True(shown.Shows(value, style, shown.Of(cell, shell.Window)), "the revealed value is not drawn in its cell");
+
+        shell.Tap(toggle);
+        var hidden = shell.Frame();
+        Assert.False(hidden.Shows(value, style, hidden.Everywhere), "the value is still drawn after the second click");
+    });
+
+    /// <summary>A value longer than its cell wraps inside the cell, so none of it is cut and the cell keeps its width at rest.</summary>
+    [Fact]
+    public Task A_long_revealed_value_wraps_within_its_cell() => HeadlessSession.On(() =>
+    {
+        var longValue = new string('x', 150);
+        using var shell = new RenderedShell(seed: vault => vault.AddEntry(new Core.VaultEntry { Title = "long", Username = "me", Password = longValue }));
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows.Single(row => row.Title == "long");
+        RenderedShell.Drain();
+        var cell = shell.Named<RevealedValue>("CurrentPassword");
+        shell.Frame();
+        var atRest = cell.Bounds;
+
+        cell.BeginReveal();
+        shell.Frame();
+
+        Assert.Equal(longValue, cell.Rendered);
+        Assert.Equal(atRest.Width, cell.Bounds.Width);
+        Assert.True(cell.Bounds.Height > atRest.Height, "the value did not wrap");
+        cell.EndReveal();
+    });
+
     public static TheoryData<string, string> WaysOut()
     {
         var data = new TheoryData<string, string>();
@@ -244,6 +294,7 @@ public sealed class DrawnRevealTests
     public Task Each_way_out_takes_the_value_off_the_frame_and_the_toggle_says_Reveal_again(string surface, string way) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = _roomForValues;
         var clock = new ManualClock();
         shell.Window.SetValue(RevealedValue.ClockProperty, clock);
         var (cell, value) = shell.Open(surface);
@@ -287,6 +338,7 @@ public sealed class DrawnRevealTests
     public Task Leaving_the_item_takes_its_value_off_the_frame(string how) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => vault.AddEntry(new Core.VaultEntry { GroupPath = "work", Title = "gitlab", Username = "me", Password = "other-password-of-gitlab" }));
+        shell.Window.Width = _roomForValues;
         var (cell, value) = shell.Open("current");
         var style = TextStyle.Of(cell);
         var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
@@ -354,6 +406,7 @@ public sealed class DrawnRevealTests
     public Task An_idle_lock_takes_the_value_off_the_next_frame() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = _roomForValues;
         var (cell, value) = shell.Open("current");
         var style = TextStyle.Of(cell);
         cell.BeginReveal();
@@ -361,7 +414,7 @@ public sealed class DrawnRevealTests
         var shown = shell.Frame();
         Assert.True(shown.Shows(value, style, shown.Everywhere), "the value is not drawn before the lock");
 
-        ((ManualClock)shell.Session.Clock).Advance(TimeSpan.FromMinutes(5));
+        ((ManualClock)shell.Session.Clock).Advance(AppVaultSession.DefaultIdleTimeout);
         shell.UntilLocked();
 
         Assert.False(cell.IsRevealed);

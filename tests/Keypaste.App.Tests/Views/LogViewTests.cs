@@ -32,7 +32,8 @@ public sealed class LogViewTests
             .Select(block => block.Text)
             .ToList();
 
-        Assert.Contains("STRIPE_KEY", shown);
+        Assert.Contains("STRIPE_KEY", model.Rows[0].Subject, StringComparison.Ordinal);
+        Assert.Contains(model.Rows[0].Subject, shown);
         Assert.Contains(model.Summary, shown);
         Assert.Contains(model.ShortPath, shown);
         Assert.Contains(model.Rows[0].Result, shown);

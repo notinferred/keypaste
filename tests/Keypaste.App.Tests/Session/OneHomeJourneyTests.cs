@@ -1,7 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -110,16 +109,6 @@ public sealed class OneHomeJourneyTests
             Assert.DoesNotContain(new TokenStore(app.Authority.Session.Unlocked!).List(), token => token.Name == _token);
             AmberElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens, the token revoked");
 
-            // The whole log's hash check, from Settings › Advanced.
-            Press(main, Named<Button>(main, "Back"));
-            Press(main, Named<Button>(main, "OpenActivityLog"));
-            var log = Assert.IsType<LogViewModel>(shell.Content);
-            Press(main, Named<Button>(main, "VerifyChain"));
-            Assert.True(log.VerdictShown);
-            Press(main, Named<Button>(main, "CopyHash"));
-            await Until(() => shell.Clipboard.Label == "Latest hash");
-            AmberElements.AssertOne(main, null, "the activity log, its verdict shown");
-
             // The facts a support question needs, from Settings › Advanced.
             Press(main, Named<Button>(main, "Back"));
             Press(main, Named<Button>(main, "OpenDiagnostics"));
@@ -130,10 +119,10 @@ public sealed class OneHomeJourneyTests
             Assert.Contains(DiagnosticsViewModel.Version, facts);
             AmberElements.AssertOne(main, null, "Diagnostics");
 
-            // An agent's settings, opened from its row's Settings on Agents, which carries no dropdown until they are.
+            // An agent's settings, opened by choosing its row on Agents, which carries no dropdown until they are.
             await using var bridge = await ConnectAsync(app.Authority, vault);
             Chord(main, PhysicalKey.Digit2);
-            await Until(() => Disclosure(main) is not null, () => "no row for the bridge");
+            await Until(() => AgentRowOf(main) is not null, () => "no row for the bridge");
             AssertNamesNone(main, "Agents");
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
             AmberElements.AssertOne(main, null, "Agents");
@@ -146,18 +135,23 @@ public sealed class OneHomeJourneyTests
             }
 
             WindowInput.Drain();
-            Press(main, Disclosure(main)!);
+            Press(main, AgentRowOf(main)!);
             await Until(
                 () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),
                 () => "the settings did not open");
             AmberElements.AssertOne(main, null, "Agents, an agent's settings open");
             AmberElements.AssertOne(main, null, "Agents, the mode changed");
 
-            // History shows the records and leaves the check to the activity log.
-            Press(main, Named<Button>(main, "AgentHistory"));
-            Assert.True(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
-            AssertNamesNone(main, "History");
-            AmberElements.AssertOne(main, null, "History");
+            // Activity holds the records and the chain's hash check.
+            Press(main, Named<Button>(main, "OpenActivity"));
+            var log = Assert.IsType<LogViewModel>(shell.Content);
+            Assert.Contains(log.Rows, row => row.Actor == _label);
+            AmberElements.AssertOne(main, null, "Activity");
+            Press(main, Named<Button>(main, "VerifyChain"));
+            Assert.True(log.VerdictShown);
+            Press(main, Named<Button>(main, "CopyHash"));
+            await Until(() => shell.Clipboard.Label == "Latest hash");
+            AmberElements.AssertOne(main, null, "Activity, its verdict shown");
 
             Chord(main, PhysicalKey.L);
             await Until(() => root.Content is UnlockView);
@@ -182,10 +176,10 @@ public sealed class OneHomeJourneyTests
     private static Button VisibleButton(Window window, string content) =>
         window.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Content as string == content);
 
-    /// <summary>The header of the Settings disclosure on this journey's agent's row, once the screen lists it.</summary>
-    private static ToggleButton? Disclosure(Window window) =>
-        window.GetVisualDescendants().OfType<ToggleButton>()
-            .SingleOrDefault(toggle => toggle is { Name: "PART_ExpanderHeader", TemplatedParent: Expander { DataContext: AgentRow { Label: _label } }, IsEffectivelyVisible: true });
+    /// <summary>This journey's agent's row in the Agents list, once the screen lists it.</summary>
+    private static ListBoxItem? AgentRowOf(Window window) =>
+        window.GetVisualDescendants().OfType<ListBoxItem>()
+            .SingleOrDefault(item => item is { DataContext: AgentRow { Label: _label }, IsEffectivelyVisible: true });
 
     /// <summary>A record of this journey's own, so the log has a table to check.</summary>
     private static void Record(string vault)

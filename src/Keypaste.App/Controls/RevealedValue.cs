@@ -84,6 +84,10 @@ internal sealed class RevealedValue : Control
     internal static readonly StyledProperty<double> KeepsClearProperty =
         AvaloniaProperty.Register<RevealedValue, double>(nameof(KeepsClear));
 
+    /// <summary>Whether a shown value wraps within the width it has, taller instead of cut, for a cell whose width is fixed at rest.</summary>
+    internal static readonly StyledProperty<bool> WrapsShownValueProperty =
+        AvaloniaProperty.Register<RevealedValue, bool>(nameof(WrapsShownValue));
+
     private const double _revealInset = 6;
     private const double _revealEdge = 16;
 
@@ -98,7 +102,7 @@ internal sealed class RevealedValue : Control
     static RevealedValue()
     {
         AffectsRender<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty, ForegroundProperty, RevealBackgroundProperty);
-        AffectsMeasure<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty);
+        AffectsMeasure<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty, WrapsShownValueProperty);
     }
 
     /// <summary>Whichever cell is showing a value now: the app shows one at a time.</summary>
@@ -148,6 +152,12 @@ internal sealed class RevealedValue : Control
 
     /// <summary>How wide a shown value may be drawn from the cell's left edge.</summary>
     internal double ShownRoom => Room(Bounds.Width);
+
+    internal bool WrapsShownValue
+    {
+        get => GetValue(WrapsShownValueProperty);
+        set => SetValue(WrapsShownValueProperty, value);
+    }
 
     internal IBrush? RevealBackground
     {
@@ -244,6 +254,12 @@ internal sealed class RevealedValue : Control
     protected override Size MeasureOverride(Size availableSize)
     {
         var text = Layout();
+
+        if (_shown is not null && WrapsShownValue && availableSize.Width is > 0 and < double.PositiveInfinity && text.Width > availableSize.Width)
+        {
+            text.MaxTextWidth = availableSize.Width;
+        }
+
         return new Size(text.Width, text.Height);
     }
 
@@ -267,7 +283,14 @@ internal sealed class RevealedValue : Control
         // clipping ancestor allows; past that it is cut with an ellipsis.
         var room = Room(bounds.Width);
 
-        if (text.WidthIncludingTrailingWhitespace > room + 1)
+        if (WrapsShownValue)
+        {
+            if (text.WidthIncludingTrailingWhitespace > bounds.Width + 1)
+            {
+                text.MaxTextWidth = Math.Max(1, bounds.Width);
+            }
+        }
+        else if (text.WidthIncludingTrailingWhitespace > room + 1)
         {
             text.MaxLineCount = 1;
             text.MaxTextWidth = room;

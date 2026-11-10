@@ -166,73 +166,111 @@
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="32,12,32,24">
+  <Grid RowDefinitions="Auto,*">
+    <Grid Margin="32,12,32,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1080" />
+        <ColumnDefinition Width="0" />
+      </Grid.ColumnDefinitions>
+        <!-- Header: the project's name and picker, its file actions behind the menu, and Run, the one amber action. -->
+        <StackPanel Spacing="12">
+          <ctl:HeaderRow Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+              <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}" />
+              <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
+              <ComboBox Classes="project title size-24" Margin="0,0,-32,0" HorizontalAlignment="Left"
+                        IsVisible="{Binding HasOpenProject}"
+                        ItemsSource="{Binding ProjectChoices}"
+                        SelectedItem="{Binding SelectedProject}"
+                        ToolTip.Tip="{x:Static res:Strings.ChooseAProject}"
+                        AutomationProperties.Name="{x:Static res:Strings.Project}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="mono" Text="{Binding}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+                <ComboBox.SelectionBoxItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                      <ctl:KpIcon Icon="chevron-down" Size="16" VerticalAlignment="Center"
+                                  Foreground="{DynamicResource KpTextMuted}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.SelectionBoxItemTemplate>
+              </ComboBox>
+              <Button Classes="icon ghost sm" Width="22" Height="22" Margin="0,0,0,6" VerticalAlignment="Bottom"
+                      ToolTip.Tip="{x:Static res:Strings.NewProject}"
+                      Command="{Binding BeginAddCommand}"
+                      IsVisible="{Binding HasOpenProject}"
+                      AutomationProperties.Name="{x:Static res:Strings.NewProject}">
+                <ctl:KpIcon Icon="plus" Size="14" />
+              </Button>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom"
+                        IsVisible="{Binding HasOpenProject}">
+              <Button Name="ProjectMore" Classes="ghost" ToolTip.Tip="{x:Static res:Strings.MoreActions}"
+                      AutomationProperties.Name="{x:Static res:Strings.MoreActions}">
+                <ctl:KpIcon Icon="more-horizontal" Size="16" />
+                <Button.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedRight">
+                    <MenuItem Name="ProjectImportEnv" Header="{x:Static res:Strings.ImportEnvLabel}" Command="{Binding OpenProject.Import.ChooseCommand}" />
+                    <MenuItem Name="ProjectExportEnv" Header="{x:Static res:Strings.ExportEnvKeypasteLabel}" Command="{Binding OpenProject.ExportReferencesCommand}" />
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
+              <Button Name="RunProject" Classes="primary" Command="{Binding OpenProject.Launch.RunProjectCommand}"
+                      AutomationProperties.Name="{x:Static res:Strings.RunInATerminal}"
+                      ToolTip.Tip="{x:Static res:Strings.RunInATerminal}">
+                <TextBlock Text="{x:Static res:Strings.RunProject}" />
+              </Button>
+            </StackPanel>
+          </ctl:HeaderRow>
+
+          <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasOpenProject}">
+          <Border Classes="segmented" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal">
+              <ctl:ChoiceSegment Name="ProjectKeysTab" Classes="segment"
+                                 IsChecked="{Binding OpenProject.ShowingKeys, Mode=OneWay}"
+                                 Command="{Binding OpenProject.ShowKeysCommand}"
+                                 AutomationProperties.Name="{x:Static res:Strings.ProjectKeys}">
+                <TextBlock Text="{x:Static res:Strings.ProjectKeys}" VerticalAlignment="Center" />
+              </ctl:ChoiceSegment>
+              <ctl:ChoiceSegment Name="ProjectItemsTab" Classes="segment"
+                                 IsChecked="{Binding OpenProject.ShowingItems, Mode=OneWay}"
+                                 Command="{Binding OpenProject.ShowItemsCommand}"
+                                 AutomationProperties.Name="{x:Static res:Strings.Items}">
+                <TextBlock Text="{x:Static res:Strings.Items}" VerticalAlignment="Center" />
+              </ctl:ChoiceSegment>
+            </StackPanel>
+          </Border>
+          <Button Name="LearnMoreProject" Classes="link" VerticalAlignment="Center" Content="{x:Static res:Strings.LearnMore}"
+                  AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutAProject}">
+            <Button.Flyout>
+              <Flyout Placement="Bottom">
+                <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          </StackPanel>
+
+          <StackPanel Spacing="4" IsVisible="{Binding OpenProject.ShowingItems}">
+            <TextBlock Name="RunNeedsDirectory" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !OpenProject.Launch.IsMapped}"
+                       Text="{x:Static res:Strings.RunNeedsADirectoryAndCommandSetThemOnTheKeysTab}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !OpenProject.Launch.IsSupported}"
+                       Text="{Binding OpenProject.Launch.UnsupportedReason}" />
+          </StackPanel>
+        </StackPanel>
+    </Grid>
+
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="32,0,32,24">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
         <ColumnDefinition Width="0" />
       </Grid.ColumnDefinitions>
       <StackPanel Grid.Column="0" Spacing="24">
-
-        <!-- Header: the title, the project picker, and the file actions. -->
-        <StackPanel Spacing="6">
-            <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}" />
-            <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
-            <ComboBox Classes="project title size-24" Margin="0,0,-32,0" HorizontalAlignment="Left"
-                      IsVisible="{Binding HasOpenProject}"
-                      ItemsSource="{Binding ProjectChoices}"
-                      SelectedItem="{Binding SelectedProject}"
-                      ToolTip.Tip="{x:Static res:Strings.ChooseAProject}"
-                      AutomationProperties.Name="{x:Static res:Strings.Project}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <TextBlock Classes="mono" Text="{Binding}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-              <ComboBox.SelectionBoxItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding}" VerticalAlignment="Center" />
-                    <ctl:KpIcon Icon="chevron-down" Size="16" VerticalAlignment="Center"
-                                Foreground="{DynamicResource KpTextMuted}" />
-                  </StackPanel>
-                </DataTemplate>
-              </ComboBox.SelectionBoxItemTemplate>
-            </ComboBox>
-            <ctl:HeaderRow Spacing="12">
-            <Panel VerticalAlignment="Bottom">
-            <!-- Left-aligned, so the button stays beside the words, and a star column, so the words wrap before they reach Import. -->
-            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left" IsVisible="{Binding HasOpenProject}">
-              <TextBlock Classes="subtitle" VerticalAlignment="Center" TextWrapping="Wrap" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
-              <Button Grid.Column="1" Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
-                      ToolTip.Tip="{x:Static res:Strings.NewProject}"
-                      Command="{Binding BeginAddCommand}"
-                      IsVisible="{Binding !IsAdding}"
-                      AutomationProperties.Name="{x:Static res:Strings.NewProject}">
-                <ctl:KpIcon Icon="plus" Size="14" />
-              </Button>
-            </Grid>
-            <TextBlock Classes="subtitle" IsVisible="{Binding !HasOpenProject}"
-                       Text="{x:Static res:Strings.OneSetOfKeysPerProjectAXb4239d}" />
-            </Panel>
-
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom"
-                      IsVisible="{Binding HasOpenProject}">
-            <Button Command="{Binding OpenProject.Import.ChooseCommand}" AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="file-up" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.ImportEnvLabel}" />
-              </StackPanel>
-            </Button>
-            <Button Command="{Binding OpenProject.ExportReferencesCommand}" AutomationProperties.Name="{x:Static res:Strings.ExportEnvKeypaste}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="file-down" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.ExportEnvKeypasteLabel}" />
-              </StackPanel>
-            </Button>
-          </StackPanel>
-        </ctl:HeaderRow>
-        </StackPanel>
 
         <Border Classes="banner" IsVisible="{Binding HasError}" ctl:ShowInView.Scrolls="True" Background="{DynamicResource KpDangerTint}">
           <Grid ColumnDefinitions="Auto,*">
@@ -279,7 +317,7 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" AutomationProperties.Name="{x:Static res:Strings.ProjectName}" />
               <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-              <Button Classes="primary" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
+              <Button Classes.primary="{Binding !HasOpenProject}" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
             <TextBlock x:Name="NewProjectProblem" ctl:ShowInView.Scrolls="True"
                        Classes="caption danger"
@@ -295,7 +333,7 @@
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="keypaste env set billing-api STRIPE_KEY"
                        Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
             <Button Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
-                    HorizontalAlignment="Left" />
+                    Classes="primary" HorizontalAlignment="Left" />
           </StackPanel>
         </Border>
 
@@ -318,7 +356,7 @@
                     <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Import.CancelCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
+                      <Button Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -336,10 +374,29 @@
                   </StackPanel>
                 </Border>
 
+                <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
+                          <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Launch.ConfirmLaunchCommand}" ctl:FormKeys.Cancel="{Binding Launch.CancelLaunchCommand}" BorderBrush="{DynamicResource KpBorderStrong}"
+                                  Background="{DynamicResource KpBgCard}" Padding="16">
+                            <StackPanel Spacing="6">
+                              <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
+                              <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat={x:Static res:Strings.InValue}}" TextWrapping="Wrap" />
+                              <TextBlock Classes="mono secondary size-12" Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption" Text="{Binding Launch.ConfirmSources}" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
+                                <Button Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                              </StackPanel>
+                            </StackPanel>
+                          </Border>
+                
+                <StackPanel Spacing="24" IsVisible="{Binding ShowingKeys}">
                 <!-- The matrix: every key against every environment. A cell holds no value; the selected
                      environment's cells reveal theirs through a control that publishes nothing to
                      the accessibility bus (THREATS.md T-22). -->
                 <StackPanel Spacing="8">
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ARowsEyeButtonShowsItsValueXc068c4}" />
                   <Border Classes="table">
                     <StackPanel>
                       <Border Classes="table-head top">
@@ -501,8 +558,6 @@
                     </StackPanel>
                   </Border>
 
-                  <TextBlock Classes="caption"
-                             Text="{x:Static res:Strings.ARowsEyeButtonShowsItsValueXc068c4}" />
                 </StackPanel>
 
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->
@@ -515,7 +570,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" AutomationProperties.Name="{x:Static res:Strings.EnvironmentName}" />
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddProfileCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
+                      <Button Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
                     </StackPanel>
                     <TextBlock x:Name="NewProfileProblem" ctl:ShowInView.Scrolls="True"
                                Classes="caption danger"
@@ -581,7 +636,7 @@
                                Text="{Binding NewValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
+                      <Button Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -619,7 +674,7 @@
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
+                      <Button Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -634,11 +689,13 @@
                   </StackPanel>
                 </Border>
 
+                </StackPanel>
+
+                <StackPanel Spacing="24" IsVisible="{Binding ShowingItems}">
                 <!-- Each environment's entries: the tag env:<project> or env:<project>:<environment> on an
                      entry puts its variables in. Add entry tags one and Remove takes the tag off, each after
                      saying what it reaches (D-0415); neither deletes an entry or a field. -->
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Items}" />
                   <Border Classes="table">
                     <ItemsControl ItemsSource="{Binding Environments}">
                       <ItemsControl.ItemTemplate>
@@ -731,12 +788,13 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="CancelTagChange" Classes="ghost" Content="{x:Static res:Strings.Cancel}"
                               Command="{Binding CancelTagChangeCommand}" />
-                      <Button Name="ConfirmTagChange" Classes.primary="{Binding TagChangeAdds}" Classes.danger="{Binding !TagChangeAdds}"
+                      <Button Name="ConfirmTagChange" Classes.danger="{Binding !TagChangeAdds}"
                               Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
-                <ctl:AutoFitColumns MinColumnWidth="360" Spacing="12">
+                </StackPanel>
+                <ctl:AutoFitColumns MinColumnWidth="360" Spacing="12" IsVisible="{Binding ShowingKeys}">
 
                   <!-- The .env.keypaste the selected environment exports: references only, safe to commit. -->
                   <Border Classes="terminal" VerticalAlignment="Top">
@@ -804,9 +862,9 @@
                         </Grid>
                       </Border>
                       <TextBlock Classes="caption" Text="{Binding RunCommandNote}" IsVisible="{Binding !HasRunCommand}" />
-
-                      <TextBlock Classes="caption"
+                      <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasRunCommand}"
                                  Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
+
                       <TextBlock Classes="caption"
                                  Text="{x:Static res:Strings.ThroughAnAgentOrATokenAXbc5a7a}" />
 
@@ -827,32 +885,10 @@
                         <Button Grid.Row="1" Grid.Column="1" Content="{x:Static res:Strings.Save}" Margin="8,0,0,0" Command="{Binding Launch.SaveCommand}" />
                       </Grid>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding Launch.RunProjectCommand}" AutomationProperties.Name="{x:Static res:Strings.RunInATerminal}">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:KpIcon Icon="terminal" Size="14" />
-                            <TextBlock Text="{x:Static res:Strings.RunInATerminal}" />
-                          </StackPanel>
-                        </Button>
                         <Button Classes="ghost" Content="{x:Static res:Strings.OpenTerminal}" Command="{Binding Launch.OpenTerminalCommand}" />
                       </StackPanel>
                       <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}" Text="{Binding Launch.UnsupportedReason}" />
 
-                      <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
-                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Launch.ConfirmLaunchCommand}" ctl:FormKeys.Cancel="{Binding Launch.CancelLaunchCommand}" BorderBrush="{DynamicResource KpBorderStrong}"
-                              Background="{DynamicResource KpBgCard}" Padding="16">
-                        <StackPanel Spacing="6">
-                          <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
-                          <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat={x:Static res:Strings.InValue}}" TextWrapping="Wrap" />
-                          <TextBlock Classes="mono secondary size-12" Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmSources}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
-                          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
-                            <Button Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
-                          </StackPanel>
-                        </StackPanel>
-                      </Border>
                     </StackPanel>
                   </Border>
                 </ctl:AutoFitColumns>
@@ -864,6 +900,7 @@
 
       </StackPanel>
     </Grid>
-  </ScrollViewer>
+    </ScrollViewer>
+  </Grid>
 
 </UserControl>

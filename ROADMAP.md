@@ -17,7 +17,7 @@ The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md)
 - the app gets simpler;
 - connecting an agent takes one step.
 
-[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read. v1.12 (D-0430) lets a rule the person set release a value, offers run on every bridge keypaste connects but off until the person turns it on for that agent, lets an agent ask only about its own settings, with a change that gives it more taking effect once the person confirms it, makes the Agent Credential Access Format keypaste's storage format for agent access, and adds to T7 an agent that organizes the vault without seeing its values. v1.15 (D-0530) makes the first public desktop release 1.0.0, with no release before it, and puts T6, Auto-Type, attachment editing and T7 in it. v1.16 (D-0532) lets keypaste save an attachment the person asks for, written once where they choose, and v1.17 (D-0556) lets the desktop app send a crash report once the person chooses to, and v1.18 (D-0632) moves Auto-Type out of 1.0.0 into the backlog, leaving web logins to browser fill. v1.19 (D-0667) adds design principles (§7) and an order for taking dependencies (§4.9), and moves T7 after 1.0.0 (D-0669). v1.21 (D-0685) replaces those principles with seven, Truth to Character, in DESIGN-PRINCIPLES, applied through DESIGN, which takes in BRAND. v1.22 has the desktop app send crash reports once the person agrees to the terms of use on its first-launch screen, which says that this includes them, until they turn them off in Settings ([Q.19](docs/steps/Q.19.md)). v1.23, a draft of the founder's direction of 2026-11-07 on branch `f77-once-or-always`, replaces timed allowing everywhere with Allow once and, for an item, a confirmed Always allow, and adds a confirmed mode, Automatic with commands, that starts an agent's commands without asking.
+[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read. v1.12 (D-0430) lets a rule the person set release a value, offers run on every bridge keypaste connects but off until the person turns it on for that agent, lets an agent ask only about its own settings, with a change that gives it more taking effect once the person confirms it, makes the Agent Credential Access Format keypaste's storage format for agent access, and adds to T7 an agent that organizes the vault without seeing its values. v1.15 (D-0530) makes the first public desktop release 1.0.0, with no release before it, and puts T6, Auto-Type, attachment editing and T7 in it. v1.16 (D-0532) lets keypaste save an attachment the person asks for, written once where they choose, and v1.17 (D-0556) lets the desktop app send a crash report once the person chooses to, and v1.18 (D-0632) moves Auto-Type out of 1.0.0 into the backlog, leaving web logins to browser fill. v1.19 (D-0667) adds design principles (§7) and an order for taking dependencies (§4.9), and moves T7 after 1.0.0 (D-0669). v1.21 (D-0685) replaces those principles with seven, Truth to Character, in DESIGN-PRINCIPLES, applied through DESIGN, which takes in BRAND. v1.22 has the desktop app send crash reports once the person agrees to the terms of use on its first-launch screen, which says that this includes them, until they turn them off in Settings ([Q.19](docs/steps/Q.19.md)). v1.23, a draft of the founder's direction of 2026-11-07 on branch `f77-once-or-always`, replaces timed allowing everywhere with Allow once and, for an item, a confirmed Always allow, and adds a confirmed mode, Automatic with commands, that starts an agent's commands without asking. v1.25 (2026-11-10, F.110) replaces the seven design principles with Apple's eight in DESIGN-PRINCIPLES and sets the idle lock's default to 30 minutes.
 
 ## Track order
 
@@ -27,8 +27,8 @@ The tracks are PRODUCT's, and they are worked in this order:
 2. T2 the shared unlock session;
 3. T4 project environments;
 4. T3 AI requests;
-5. T5 desktop delivery;
-6. T6 daily driver;
+5. T6 daily driver;
+6. T5 desktop delivery;
 7. T7 agents without values;
 8. T8 cloud vault and team projects;
 9. T9 CI and deploys, with T11 server access by choice alongside;
@@ -44,6 +44,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 |---|---|
 | Worked first: the architecture rules hold in the compiler, test classes run on the founder's machine, CI caches restores and a branch runs only its fast tier, and established libraries replace hand-written retries, CLI parsing, parser test suites and the app's bindings (D-0670, D-0672). | K.7, K.8, K.9, K.10, K.11, K.12, B.5 |
 | Worked next, after K and B: when more than one item answers to an agent's request, such as two logins for one website, the app says the agent is requesting a credential and the person picks one, seeing each item and the field they pick (D-0684). | F.76 |
+| Worked next, before any signing or release work (the founder's direction of 2026-11-10): the app's layout and password generator are reworked, browser fill is finished, and the fixes still marked For 1.0.0 are closed. Touch ID follows, as soon as the Mac app is signed. | F.110, F.111, 8.1e, 8.3a2, 8.3a3, F.112, 3.5b, 4.10b |
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. The terminal finds items and shows their fields without printing a value unless asked. | V.7a, V.7b, C.2, N.13 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project, and nothing else does: keypaste keeps no compatibility with its own releases before 0.5.0. An entry that loses its tag in another app is flagged, and a value's `{PASSWORD}`-style placeholders fill in from its own entry. | C.1a, C.1b, C.1c, C.6, C.4, V.11, P.3b1 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. It says at once when another program saved the vault. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14, N.16 |
@@ -58,16 +59,16 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | The gaps the 2026-10-22 sweep deferred that a person would notice are fixed, each still marked **For 1.0.0.** in its step record's limits; the test-coverage gaps are marked **After 1.0.0.**, and the CI failures BACKLOG lists do not hold the release (D-0669, D-0673). | — |
 | Once 1.0.0's bytes are published, the same day: install with Homebrew, Scoop or winget; a Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links; a one-prompt setup page on keypaste.com; and the guides on keypaste.com's Astro pages, with a content security policy (D-0401). | 3.7a, 3.7b, 3.7c, G.6a, G.6b, G.6c, G.6d, G.6e, G.7, L.2b |
 
-Outside inputs gate this release:
+Outside inputs gate this release, each taken up when the work that needs it is next:
 
-- a Windows signing identity (H-0017);
-- the terms of use approved by the founder or a lawyer (H-0027), and the crash-report database made and switched on (H-0028);
-- Apple Developer enrollment (3.5a, H-0015);
+- Apple's Developer ID and notarization credentials, when 3.5b reaches signing (3.5a, H-0015);
+- a Windows signing identity (H-0017), before 4.7c2, allowing up to 20 business days for Microsoft's validation;
+- the terms of use approved by the founder or a lawyer (H-0027), and the crash-report database made and switched on (H-0028), before 4.7c2;
 - for the reach tasks, the MCP Registry namespace and hosting (H-0022) and the package-manager and plugin-directory submissions (H-0023).
 
 A person's check on real hardware, such as Windows Hello or a physical YubiKey, does not hold the release: each is a note in [BACKLOG](docs/BACKLOG.md), and a published claim about it waits for its evidence (D-0557).
 
-Published version prefixes are immutable. If Apple enrollment lags, the choice at 4.7c2 is to wait, or to ship macOS as `1.0.1`.
+Published version prefixes are immutable. If macOS signing lags, the choice at 4.7c2 is to wait, or to ship macOS as `1.0.1`.
 
 keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 

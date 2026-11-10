@@ -8,7 +8,8 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// The value lives in a <see cref="SecretField"/>, drawn from the generator straight into its buffer, and leaves it
-/// only for the clearing clipboard, a reveal, or the field of the form that keeps it.
+/// only for the clearing clipboard, a reveal, or the field of the form that keeps it. Anchored to a form's password
+/// field, the panel instead shows that field's own options and acts on the value the field holds, which the form draws.
 /// </remarks>
 internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRevealSource, IDisposable
 {
@@ -16,6 +17,7 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     private readonly Action<SecretField> _newItem;
     private readonly Action<SecretField, string>? _addField;
     private readonly Action _close;
+    private readonly Action? _refresh;
     private bool _disposed;
 
     /// <param name="clipboard">The clipboard that clears itself.</param>
@@ -39,17 +41,58 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
         _addField = addField;
         _close = close;
         Item = item;
+        Generator = new GeneratorViewModel();
         Value = new SecretField(clipboard);
         Generator.PropertyChanged += (_, _) => Regenerate();
         Regenerate();
     }
 
+    /// <summary>The panel anchored to a form's field: the form's generator and the value its field holds, which the form fills.</summary>
+    /// <param name="clipboard">The clipboard that clears itself.</param>
+    /// <param name="generator">The options the form draws its value by.</param>
+    /// <param name="field">The form's field, which stays the form's and is not disposed with the panel.</param>
+    /// <param name="refresh">Draws a new value into the field.</param>
+    /// <param name="newItem">Opens New item with the value as its password.</param>
+    /// <param name="addField">Adds the value as a protected field of the name given.</param>
+    /// <param name="item">The title of the item the value would be added to.</param>
+    /// <param name="close">Closes the panel.</param>
+    internal GeneratePasswordViewModel(
+        ClipboardCountdown clipboard,
+        GeneratorViewModel generator,
+        SecretField field,
+        Action refresh,
+        Action<SecretField> newItem,
+        Action<SecretField, string>? addField,
+        string? item,
+        Action close)
+    {
+        ArgumentNullException.ThrowIfNull(clipboard);
+        ArgumentNullException.ThrowIfNull(generator);
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(refresh);
+        ArgumentNullException.ThrowIfNull(newItem);
+        ArgumentNullException.ThrowIfNull(close);
+
+        _clipboard = clipboard;
+        _newItem = newItem;
+        _addField = addField;
+        _close = close;
+        _refresh = refresh;
+        Item = item;
+        Generator = generator;
+        Value = field;
+        ShowsValue = false;
+    }
+
     /// <inheritdoc/>
     public event EventHandler? Changed;
 
-    internal GeneratorViewModel Generator { get; } = new();
+    internal GeneratorViewModel Generator { get; }
 
     internal SecretField Value { get; }
+
+    /// <summary>Whether the panel draws the value itself; a form's field already does.</summary>
+    internal bool ShowsValue { get; } = true;
 
     /// <summary>The chosen item's title, which Add as a field adds to.</summary>
     internal string? Item { get; }
@@ -80,12 +123,22 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
         }
 
         _disposed = true;
-        Value.Dispose();
+
+        if (_refresh is null)
+        {
+            Value.Dispose();
+        }
     }
 
     [RelayCommand]
     private void Regenerate()
     {
+        if (_refresh is not null)
+        {
+            _refresh();
+            return;
+        }
+
         if (_disposed || Generator.Recipe is not { } recipe)
         {
             return;

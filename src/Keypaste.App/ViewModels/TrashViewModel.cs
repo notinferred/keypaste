@@ -1,4 +1,5 @@
 using Avalonia.Collections;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 
@@ -50,7 +51,12 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
         Table.OrderChanged += OnOrderChanged;
 
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null && !IsConfirming);
-        SelectedRows.CollectionChanged += (_, _) => PurgeCommand?.NotifyCanExecuteChanged();
+        SelectedRows.CollectionChanged += (_, _) =>
+        {
+            PurgeCommand?.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(HasSeveralSelected));
+            OnPropertyChanged(nameof(DetailTitle));
+        };
         PurgeCommand = new RelayCommand(
             () => IsConfirmingPurge = true,
             () => SelectedRows.Count <= 1 && _selected is not null && !IsConfirming);
@@ -68,7 +74,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>What is in the bin, most recently deleted first until another order is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(EmptyPrompt))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(EmptyPrompt), nameof(OffersChoice))]
     [NotifyCanExecuteChangedFor(nameof(EmptyCommand))]
     internal partial IReadOnlyList<TrashRow> Rows { get; private set; } = [];
 
@@ -87,6 +93,8 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selected, value))
             {
                 OnPropertyChanged(nameof(HasSelection));
+                OnPropertyChanged(nameof(OffersChoice));
+                OnPropertyChanged(nameof(DetailTitle));
                 OnPropertyChanged(nameof(PurgePrompt));
                 RestoreCommand.NotifyCanExecuteChanged();
                 PurgeCommand.NotifyCanExecuteChanged();
@@ -100,6 +108,41 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the bin holds entries but none is picked, so Restore and Delete wait on one.</summary>
     internal bool HasSelection => _selected is not null;
+
+    /// <summary>Whether the detail invites a choice: something is in the bin and nothing is picked.</summary>
+    internal bool OffersChoice => !IsEmpty && !HasSelection;
+
+#pragma warning disable CA1822
+    internal string ListTitle => Strings.Trash;
+#pragma warning restore CA1822
+
+    /// <summary>Whether more than one row is picked, which Restore takes together and Delete for good does not.</summary>
+    internal bool HasSeveralSelected => SelectedRows.Count > 1;
+
+    /// <summary>What the detail is headed with: the picked row's name, or how many are picked.</summary>
+    internal string DetailTitle => SelectedRows.Count > 1 ? Invariant($"{SelectedRows.Count} items") : _selected?.DisplayTitle ?? string.Empty;
+
+    /// <summary>The list's sorts: each of its columns, and which way the one in force runs.</summary>
+    internal IReadOnlyList<SortChoice> SortChoices =>
+    [
+        .. Table.Columns.Select(column => new SortChoice(
+            column.Key,
+            column.Name,
+            Table.HeadName(column.Key),
+            Table.Order is { AsRowsArrive: false } order && order.Column == column.Key ? (order.Descending ? "arrow-down" : "arrow-up") : null)),
+    ];
+
+    /// <summary>A sort's choice from the list's header: its column, and again to reverse.</summary>
+    [RelayCommand]
+    private void SortBy(string column) => Table.Press(column);
+
+    /// <summary>The way back from the detail that stands in a narrow list's place.</summary>
+    [RelayCommand]
+    private void CloseDetail()
+    {
+        SelectedRows.Clear();
+        Selected = null;
+    }
 
     /// <summary>Whether this vault recycles a deleted entry at all.</summary>
     internal bool RecyclesDeletedEntries => _session.Unlocked?.RecyclesDeletedEntries == true;
@@ -244,11 +287,12 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         _sorting = true;
         Rows = [.. Arranged(Rows)];
-        _sorting = false;
-
         SelectedRows.Clear();
         SelectedRows.AddRange(chosen);
+        _sorting = false;
+
         OnPropertyChanged(nameof(Selected));
+        OnPropertyChanged(nameof(SortChoices));
     }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>

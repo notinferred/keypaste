@@ -236,7 +236,7 @@ internal sealed class AppCommands
 
         var groupsAndProjects = new AppCommand(Strings.ShowGroupsAndProjects, [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
-        var resetTable = new AppCommand(Strings.ResetTableOrderAndWidths, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
+        var resetTable = new AppCommand(Strings.ResetListOrder, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
 
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =
@@ -335,13 +335,13 @@ internal sealed class AppCommands
         var agentSettings = new AppCommand(
             Strings.AgentSettingsLabel,
             [],
-            () => Agents() is not null && Target<AgentRow>() is { HasSettings: true, IsOpen: false },
+            () => Agents() is { } agents && Target<AgentRow>() is { HasSettings: true } row && agents.Selected != row,
             OpenAgentSettings);
         var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
         var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
         var disconnect = Routed(Strings.DisconnectLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
         var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
-        var agentHistory = Routed(Strings.AgentHistory, Agents, agents => agents.OpenHistoryCommand);
+        var openActivity = Routed(Strings.Activity, Agents, agents => agents.OpenActivityCommand);
         var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
         var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
         var verifyChain = Routed(Strings.VerifyChain, Log, log => log.VerifyCommand) with { Says = () => Log()?.VerifyLabel ?? Strings.VerifyChain };
@@ -412,7 +412,7 @@ internal sealed class AppCommands
             agentSettings, connect, connectAgain, disconnect, _line,
             copySetupPrompt, connectAnApp, addMcpManually, _line,
             showPrompt, _line,
-            agentHistory, verifyChain, copyHash, refreshLog, showWholeLog, _line,
+            openActivity, verifyChain, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,
             deleteReport,
         ]);
@@ -771,9 +771,9 @@ internal sealed class AppCommands
 
     private void OpenAgentSettings()
     {
-        if (Agents() is not null && Target<AgentRow>() is { } agent)
+        if (Agents() is { } agents && Target<AgentRow>() is { } agent)
         {
-            agent.IsOpen = true;
+            agents.Choose(agent);
         }
     }
 

@@ -2,48 +2,41 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
-using Keypaste.App.Views;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// With an entry open, Items keeps its toolbar, the list, the divider and the entry's preview whole and
-/// apart at the main window's default size and at its former minimum (V-F.22), and a comparison of two
-/// revisions takes the whole view (D-0376).
+/// With an entry open, Items keeps its list and the entry side by side and whole at the main window's default size and its minimum, a comparison of two revisions
+/// takes the whole view, and where both cannot fit the entry replaces the list with a way back.
 /// </summary>
 /// <remarks>
 /// Observed on Linux in F.2b3b: in the default window the toolbar was wider than the list's column,
-/// so the search box shrank under Add and the entry's title met Delete. Organize and Delete now live
-/// in the entry's ⋯ menu, so the header's Copy, Rotate and ⋯ are what the title must stay clear of. Bounds are read from the
-/// window's own layout after a frame is drawn, as <see cref="RenderedShell"/> lays out any screen.
+/// so the search box shrank under Add and the entry's title met Delete. Bounds are read from the window's own layout after a frame is drawn, as <see cref="RenderedShell"/> lays out any screen.
 /// </remarks>
 public sealed class EntriesViewLayoutTests
 {
     /// <summary>Room for a few words of a search, the least that still reads as a search box.</summary>
     private const double _searchMinimum = 160d;
 
-    /// <summary>Room for two rows and the column heads, the least that still reads as a list.</summary>
+    /// <summary>Room for two rows, the least that still reads as a list.</summary>
     private const double _listMinimum = 100d;
-
-    /// <summary>Room for a short username or the start of a web address.</summary>
-    private const double _columnMinimum = 72d;
 
     public static TheoryData<double, double, bool> Sizes => new()
     {
         { 1000, 680, false },
         { 960, 520, false },
-        { 840, 520, false },
         { 1000, 680, true },
         { 960, 520, true },
     };
 
     [Theory]
     [MemberData(nameof(Sizes))]
-    public Task An_open_entry_leaves_the_toolbar_list_and_preview_whole_and_apart(double width, double height, bool comparing) =>
+    public Task An_open_entry_leaves_the_list_and_the_entry_whole_and_apart(double width, double height, bool comparing) =>
         HeadlessSession.On(() =>
         {
             using var shell = new RenderedShell("keypaste-entries-layout-");
@@ -67,14 +60,11 @@ public sealed class EntriesViewLayoutTests
 
             // The search in the list header is the only one, under the name it has always had.
             Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "Search");
-            var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
             var controls = new Dictionary<string, Rect>
             {
-                ["Search"] = search,
-                ["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry")),
                 ["the entry's title"] = Bounds(shell, shell.Named<TextBlock>("EntryTitle")),
                 ["Copy"] = Bounds(shell, shell.Named<Button>("CopyPassword")),
-                ["Rotate"] = Bounds(shell, shell.Named<Button>("RotateFromPane")),
+                ["Edit"] = Bounds(shell, shell.Named<Button>("EditItem")),
                 ["the entry's menu"] = Bounds(shell, shell.Named<ToggleButton>("EntryMenu")),
             };
             var rows = shell.Named<ListBox>("Rows");
@@ -82,7 +72,6 @@ public sealed class EntriesViewLayoutTests
             var content = Bounds(shell, shell.Root);
 
             Assert.Equal(width, shell.Window.Bounds.Width);
-            Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
             Assert.True(content.Contains(pane), $"the entry's pane {pane} leaves the window's content {content} at {at}");
 
             var panes = new Dictionary<string, Rect> { ["the entry's pane"] = pane };
@@ -95,24 +84,22 @@ public sealed class EntriesViewLayoutTests
             else
             {
                 var list = Bounds(shell, rows);
+                var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
                 panes["the list"] = list;
-                panes["the divider"] = Bounds(shell, shell.Named<GridSplitter>("PaneDivider"));
+                controls["Search"] = search;
+                controls["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry"));
+                Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
+                Assert.Equal(ListDetail.ListWidth, shell.Named<Border>("ListColumn").Bounds.Width, 0.5);
                 Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
-                Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
+                Assert.True(list.Right <= pane.Left, $"the list {list} is not left of the entry {pane} at {at}");
 
-                // The username and URL columns (D-0488) keep room for several characters each, side by side.
-                var username = Bounds(shell, shell.Named<ColumnHead>("UsernameHead"));
-                var url = Bounds(shell, shell.Named<ColumnHead>("UrlHead"));
-                Assert.True(username.Width >= _columnMinimum, $"the username column is {username.Width:0} px wide at {at}");
-                Assert.True(url.Width >= _columnMinimum, $"the URL column is {url.Width:0} px wide at {at}");
-                Assert.True(username.Right <= url.Left, $"the username column {username} runs into the URL column {url} at {at}");
-                Assert.True(content.Contains(url), $"the URL column {url} leaves the window's content {content} at {at}");
-
-                // The web address's link and its own Copy fit the preview's width, apart (N.5).
-                var link = Bounds(shell, shell.Named<Button>("OpenUrl"));
+                // The web address's Copy and Open fit the entry's width, apart.
                 var copy = Bounds(shell, shell.Named<Button>("CopyUrl"));
-                Assert.True(link.Right <= copy.Left, $"the web address {link} runs into its Copy {copy} at {at}");
-                Assert.True(pane.Left <= link.Left && copy.Right <= pane.Right, $"the web address row leaves the preview {pane} at {at}");
+                var open = Bounds(shell, shell.Named<Button>("OpenUrl"));
+                Assert.True(copy.Right <= open.Left, $"the web address {copy} runs into its Open {open} at {at}");
+                Assert.True(pane.Left <= copy.Left && open.Right <= pane.Right, $"the web address row leaves the entry {pane} at {at}");
+
+                Assert.False(shell.Named<Button>("BackToList").IsEffectivelyVisible, $"a Back shows beside the list at {at}");
             }
 
             foreach (var (name, bounds) in controls)
@@ -124,68 +111,44 @@ public sealed class EntriesViewLayoutTests
             AssertApart(panes, at);
         });
 
-    /// <summary>At the minimum width the sidebar collapses to the rail and Username and URL go; what is left of the table, the toolbar and the preview stays whole (Q.10).</summary>
+    /// <summary>Where both cannot fit, the list stands alone until an item is chosen, the item replaces it with a Back, and Back returns.</summary>
     [Theory]
     [InlineData(720, 520)]
-    [InlineData(720, 680)]
-    [InlineData(839, 520)]
-    public Task A_narrow_window_lays_Items_out_without_the_sidebar_or_the_two_columns(double width, double height) =>
+    [InlineData(840, 680)]
+    public Task Where_both_cannot_fit_the_entry_replaces_the_list_with_a_Back(double width, double height) =>
         HeadlessSession.On(() =>
         {
-            using var shell = new RenderedShell("keypaste-entries-narrow-");
+            using var shell = new RenderedShell("keypaste-entries-single-");
             shell.Window.Width = width;
             shell.Window.Height = height;
             var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-            entries.Selected = entries.Rows.Single(row => row.Title == "github");
-            RenderedShell.Drain();
             shell.Frame();
+            var rows = shell.Named<ListBox>("Rows");
+            var back = shell.Named<Button>("BackToList");
             var at = $"{width}×{height}";
 
             Assert.Equal(width, shell.Window.Bounds.Width);
-            Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible, $"the sidebar shows at {at}");
-            Assert.False(shell.Named<ColumnHead>("UsernameHead").IsEffectivelyVisible, $"the username column shows at {at}");
-            Assert.False(shell.Named<ColumnHead>("UrlHead").IsEffectivelyVisible, $"the URL column shows at {at}");
+            Assert.True(rows.IsEffectivelyVisible, $"the list is away with nothing chosen at {at}");
+            Assert.False(back.IsEffectivelyVisible);
 
-            var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
-            var controls = new Dictionary<string, Rect>
-            {
-                ["Search"] = search,
-                ["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry")),
-                ["the entry's title"] = Bounds(shell, shell.Named<TextBlock>("EntryTitle")),
-                ["Copy"] = Bounds(shell, shell.Named<Button>("CopyPassword")),
-                ["Rotate"] = Bounds(shell, shell.Named<Button>("RotateFromPane")),
-                ["the entry's menu"] = Bounds(shell, shell.Named<ToggleButton>("EntryMenu")),
-            };
-            var list = Bounds(shell, shell.Named<ListBox>("Rows"));
-            var pane = Bounds(shell, shell.Named<ContentControl>("EntryPane"));
+            entries.Selected = entries.Rows.Single(row => row.Title == "github");
+            RenderedShell.Drain();
+            shell.Frame();
+
+            Assert.False(rows.IsEffectivelyVisible, $"the list stayed beside an entry with no room at {at}");
+            Assert.True(shell.Named<ContentControl>("EntryPane").IsEffectivelyVisible);
+            Assert.True(back.IsEffectivelyVisible, $"no way back at {at}");
+
             var content = Bounds(shell, shell.Root);
+            Assert.True(content.Contains(Bounds(shell, shell.Named<Button>("CopyPassword"))), $"Copy password leaves the window at {at}");
 
-            Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
-            Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
-            Assert.Equal(width - WindowChrome.RailWidth, list.Width, 0.5);
-            Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
-            Assert.True(content.Contains(pane), $"the entry's pane {pane} leaves the window's content {content} at {at}");
+            shell.Tap(back);
+            RenderedShell.Drain();
+            shell.Frame();
 
-            // Each row keeps its title, kind and group, side by side and inside the list.
-            var row = shell.Named<ListBox>("Rows").ContainerFromIndex(0)!.GetVisualDescendants().OfType<EntryColumns>().Single();
-            var title = row.Children[1];
-            var username = row.Children[2];
-            var url = row.Children[3];
-            Assert.False(username.IsEffectivelyVisible, $"a row's username shows at {at}");
-            Assert.False(url.IsEffectivelyVisible, $"a row's URL shows at {at}");
-            Assert.True(title.Bounds.Width >= _columnMinimum, $"a row's title is {title.Bounds.Width:0} px wide at {at}");
-
-            var link = Bounds(shell, shell.Named<Button>("OpenUrl"));
-            var copy = Bounds(shell, shell.Named<Button>("CopyUrl"));
-            Assert.True(link.Right <= copy.Left, $"the web address {link} runs into its Copy {copy} at {at}");
-            Assert.True(pane.Left <= link.Left && copy.Right <= pane.Right, $"the web address row leaves the preview {pane} at {at}");
-
-            foreach (var (name, bounds) in controls)
-            {
-                Assert.True(content.Contains(bounds), $"{name} at {bounds} leaves the window's content {content} at {at}");
-            }
-
-            AssertApart(controls, at);
+            Assert.Null(entries.Detail);
+            Assert.True(rows.IsEffectivelyVisible);
+            Assert.False(back.IsEffectivelyVisible);
         });
 
     private static void AssertApart(Dictionary<string, Rect> placed, string at)

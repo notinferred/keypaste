@@ -10,7 +10,6 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
-using Keypaste.App.Views;
 using Keypaste.Core;
 using Xunit;
 
@@ -64,8 +63,9 @@ public sealed class EachFactOnceTests
 
         var row = FieldMenu(shell, "API_TOKEN").GetVisualAncestors().OfType<StackPanel>().First();
         Assert.Equal(
-            ["Reveal API_TOKEN", "Copy API_TOKEN", "More actions for API_TOKEN"],
+            ["Reveal API_TOKEN", "More actions for API_TOKEN"],
             row.GetVisualChildren().OfType<Control>().Where(control => control.IsVisible).Select(AutomationProperties.GetName));
+        Assert.Equal("Copy API_TOKEN", AutomationProperties.GetName(FieldMenu(shell, "API_TOKEN").GetVisualAncestors().OfType<FieldRow>().First().GetVisualDescendants().OfType<PressToCopy>().Single()));
 
         var menu = PressMenu(FieldMenu(shell, "API_TOKEN"));
         Assert.Equal(["Copy value", "Replace value…", "Generate value…", "Rename field…", "Stop protecting field", "-", "Remove field"], Headers(menu));
@@ -174,7 +174,7 @@ public sealed class EachFactOnceTests
         Assert.DoesNotContain("Username", labels);
         Assert.DoesNotContain("Password", labels);
         Assert.DoesNotContain("URL", labels);
-        Assert.False(shell.Named<RevealedValue>("CurrentPassword").IsEffectivelyVisible);
+        Assert.DoesNotContain(Shown<RevealedValue>(shell), value => value.Name == "CurrentPassword");
         Assert.False(shell.Named<Button>("CopyPassword").IsEffectivelyVisible);
         Assert.DoesNotContain(Shown<Control>(shell), control => AutomationProperties.GetName(control) == "Reveal the password");
 
@@ -194,7 +194,7 @@ public sealed class EachFactOnceTests
             block => block.Text == "Copy password");
     });
 
-    /// <summary>The header names a chosen group, so its column goes, and the pane names the subgroup a row is in instead.</summary>
+    /// <summary>The header names a chosen group, so sorting by it goes, and the pane names the subgroup a row is in instead.</summary>
     [Fact]
     public Task The_Group_column_gives_way_to_the_header_naming_it() => HeadlessSession.On(() =>
     {
@@ -207,14 +207,14 @@ public sealed class EachFactOnceTests
             });
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
 
-        Assert.True(shell.Named<ColumnHead>("GroupHead").IsEffectivelyVisible);
+        Assert.Contains(entries.SortChoices, choice => choice.Column == TableStates.Group);
         entries.Table.Press(TableStates.Group);
         Assert.Equal(TableStates.Group, entries.Table.Order?.Column);
 
         entries.SelectedGroup = entries.Groups.Single(group => group.Path == "work");
         RenderedShell.Drain();
 
-        Assert.False(shell.Named<ColumnHead>("GroupHead").IsEffectivelyVisible);
+        Assert.DoesNotContain(entries.SortChoices, choice => choice.Column == TableStates.Group);
         Assert.NotEqual(TableStates.Group, entries.Table.Order?.Column);
 
         entries.Selected = entries.Rows.Single(row => row.Title == "direct");
@@ -225,7 +225,7 @@ public sealed class EachFactOnceTests
         entries.ShowEveryItem();
         RenderedShell.Drain();
 
-        Assert.True(shell.Named<ColumnHead>("GroupHead").IsEffectivelyVisible);
+        Assert.Contains(entries.SortChoices, choice => choice.Column == TableStates.Group);
         Assert.Equal(TableStates.Group, entries.Table.Order?.Column);
     });
 
@@ -445,7 +445,7 @@ public sealed class EachFactOnceTests
         var trash = shell.Show<TrashViewModel>(DestinationKind.Trash);
         trash.Selected = null;
         RenderedShell.Drain();
-        var rows = Shown<ListBox>(shell).Single(list => list.Classes.Contains("table-body"));
+        var rows = Shown<ListBox>(shell).Single(list => AutomationProperties.GetName(list) == "Deleted items");
         var before = rows.TranslatePoint(default, shell.Window);
 
         trash.Selected = Assert.Single(trash.Rows);

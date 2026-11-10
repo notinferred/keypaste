@@ -62,7 +62,7 @@ public sealed class MinimizeLockTests
         Assert.True(app.Session.IsUnlocked);
         Assert.Null(app.Reason);
 
-        clock.Advance(TimeSpan.FromMinutes(5));
+        clock.Advance(app.Session.IdleTimeout + TimeSpan.FromSeconds(1));
 
         Assert.False(app.Session.IsUnlocked);
         Assert.Equal(VaultLockReason.Idle, app.Reason);
@@ -185,11 +185,10 @@ public sealed class MinimizeLockTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>()
-            .Single(box => Equals(box.Content, "Lock when the window is minimized"));
+        var toggles = window.GetVisualDescendants().OfType<ToggleSwitch>().Where(box => box.Name == "LockWhenMinimized");
 
         Assert.Equal(MinimizeLock.IsSupported, screen.MinimizeLockSupported);
-        Assert.Equal(MinimizeLock.IsSupported, toggle.IsEffectivelyVisible);
+        Assert.Equal(MinimizeLock.IsSupported, toggles.Any(toggle => toggle.IsEffectivelyVisible));
 
         window.Close();
     });

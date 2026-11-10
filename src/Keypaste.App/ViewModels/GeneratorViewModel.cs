@@ -48,6 +48,35 @@ internal sealed partial class GeneratorViewModel : ObservableObject
         set => UseWords = !value;
     }
 
+    /// <summary>How many characters a password gets.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial int Length { get; set; } = PasswordGenerator.DefaultLength;
+
+    /// <summary>Whether lowercase and uppercase letters may appear.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial bool Letters { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial bool Digits { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial bool Symbols { get; set; } = true;
+
+    /// <summary>Whether to leave out the characters that look alike, such as 0 and O.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial bool LeaveOutLookalikes { get; set; }
+
+    /// <summary>The fewest characters the generator will produce.</summary>
+    internal static int MinimumLength => PasswordGenerator.MinimumLength;
+
+    /// <summary>The most characters the generator will produce.</summary>
+    internal static int MaximumLength => PasswordGenerator.MaximumLength;
+
     /// <summary>How many words a passphrase gets.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
@@ -94,8 +123,8 @@ internal sealed partial class GeneratorViewModel : ObservableObject
         : string.Format(
             CultureInfo.CurrentCulture,
             "{0} characters — about {1:F0} bits",
-            PasswordRecipe.Default.Length,
-            PasswordRecipe.Default.Bits);
+            Length,
+            CharacterRecipe.Bits);
 
     /// <summary>Why the current choice cannot be generated, or null when it can.</summary>
     internal string? Error => Recipe is null && Refusal() is { Length: > 0 } refusal ? refusal : null;
@@ -112,7 +141,7 @@ internal sealed partial class GeneratorViewModel : ObservableObject
         {
             if (!UseWords)
             {
-                return SecretRecipe.For(PasswordRecipe.Default);
+                return CharacterRecipe.TryValidate(out _) ? SecretRecipe.For(CharacterRecipe) : null;
             }
 
             if (_separator.Length != 1)
@@ -126,11 +155,22 @@ internal sealed partial class GeneratorViewModel : ObservableObject
         }
     }
 
+    private PasswordRecipe CharacterRecipe => new()
+    {
+        Length = Length,
+        Alphabet = (Letters ? PasswordAlphabet.Lowercase | PasswordAlphabet.Uppercase : PasswordAlphabet.None)
+            | (Digits ? PasswordAlphabet.Digits : PasswordAlphabet.None)
+            | (Symbols ? PasswordAlphabet.Symbols : PasswordAlphabet.None),
+        ExcludeLookalikes = LeaveOutLookalikes,
+    };
+
     private string Refusal()
     {
         if (!UseWords)
         {
-            return string.Empty;
+            return CharacterRecipe.TryValidate(out var problem)
+                ? string.Empty
+                : string.Concat(char.ToUpperInvariant(problem[0]).ToString(), problem.AsSpan(1), ".");
         }
 
         if (_separator.Length != 1)

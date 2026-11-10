@@ -1,0 +1,79 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:views="using:Keypaste.App.Views"
+             x:Class="Keypaste.App.Views.GeneratorPanel"
+             x:DataType="vm:GeneratePasswordViewModel">
+
+  <!-- The one generator panel: anchored to a form's password field, or shown by Generate password… on its own.
+       The value is drawn only while revealed, as every secret is; a form's own field is its value. -->
+  <StackPanel Name="GeneratorBody" Spacing="12" KeyboardNavigation.TabNavigation="Cycle">
+
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+      <ctl:KpIcon Grid.Column="0" Icon="wand-2" Size="16" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
+      <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.GenerateAPassword}" VerticalAlignment="Center" />
+      <Button Grid.Column="2"
+              Name="Regenerate"
+              Classes="icon ghost sm"
+              ToolTip.Tip="{x:Static res:Strings.GenerateAnother}"
+              AutomationProperties.Name="{x:Static res:Strings.GenerateAnother}"
+              Command="{Binding RegenerateCommand}">
+        <ctl:KpIcon Icon="refresh-cw" Size="14" />
+      </Button>
+      <Button Grid.Column="3"
+              Name="CloseGenerator"
+              Classes="icon ghost sm"
+              ToolTip.Tip="{x:Static res:Strings.Close}"
+              AutomationProperties.Name="{x:Static res:Strings.Close}"
+              Command="{Binding CancelCommand}">
+        <ctl:KpIcon Icon="x" Size="16" />
+      </Button>
+    </Grid>
+
+    <Border Classes="group" IsVisible="{Binding ShowsValue}">
+      <Grid ColumnDefinitions="*,Auto" Margin="12,4,4,4" MinHeight="36">
+        <ctl:RevealedValue Grid.Column="0"
+                           Name="GeneratedValue"
+                           Source="{Binding}"
+                           MaskedLength="{Binding MaskedLength}"
+                           AutomationProperties.Name="{x:Static res:Strings.ThePassword}"
+                           FontFamily="{DynamicResource KpMono}"
+                           VerticalAlignment="Center"
+                           ClipToBounds="True"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+        <ctl:RevealButton Grid.Column="1"
+                          Name="RevealGenerated"
+                          Classes="ghost sm"
+                          VerticalAlignment="Center"
+                          Target="{Binding #GeneratedValue}"
+                          ShowsWord="True"
+                          Subject="{x:Static res:Strings.ThePasswordAsAnObject}" />
+      </Grid>
+    </Border>
+
+    <views:GeneratorOptions DataContext="{Binding Generator}" />
+
+    <StackPanel Spacing="8" IsVisible="{Binding CanAddField}">
+      <TextBlock Classes="label" Text="{Binding Item, StringFormat={x:Static res:Strings.AddToValueAsAField}}" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Name="GeneratedFieldName"
+                 Classes="mono"
+                 PlaceholderText="API_KEY"
+                 AutomationProperties.Name="{x:Static res:Strings.FieldName}"
+                 Text="{Binding FieldName}" />
+        <Button Grid.Column="1" Name="AddGeneratedField" Content="{x:Static res:Strings.AddAsAField}" Command="{Binding AddFieldCommand}" />
+      </Grid>
+    </StackPanel>
+
+    <TextBlock Classes="caption" TextWrapping="Wrap"
+               Text="{x:Static res:Strings.CopyPutsItOnTheClipboardWhichX66e478}" />
+
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Name="GeneratedNewItem" Content="{x:Static res:Strings.NewItemLabel}" AutomationProperties.Name="{x:Static res:Strings.NewItem}" Command="{Binding NewItemCommand}" />
+      <Button Name="CopyGenerated" Classes.primary="{Binding ShowsValue}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
+    </StackPanel>
+
+  </StackPanel>
+</UserControl>

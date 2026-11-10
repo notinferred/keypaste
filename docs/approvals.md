@@ -107,9 +107,9 @@ The prompt offers Deny and Allow once, and for an agent whose bridge has a label
 
 In source, a request for an attachment, which an agent makes by the attachment's name with `request_attachment`, shows `attachment` and that name as its field, and Allow once releases that one attachment, at most 5 MiB.
 
-The app does not read `policy.toml`. A credential it releases without a press of Allow once is an item's URL, its username while Agents see usernames is on, or a kind of value you allowed in Settings and confirmed, and History shows it as allowed. A run under a scoped token is released without a prompt unless its profile is protected ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
+The app does not read `policy.toml`. A credential it releases without a press of Allow once is an item's URL, its username while Agents see usernames is on, or a kind of value you allowed in Settings and confirmed, and Activity shows it as allowed. A run under a scoped token is released without a prompt unless its profile is protected ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
 
-The Agents screen lists the request in front of you under Waiting for you, with the agent, the item and field it asks for and the seconds left, never its reason, and Show the prompt, which brings the prompt window forward with focus on Deny and its allows disarmed for another second; you answer only in that window. History, at the top of the screen, opens what agents and tokens asked for, and the activity log in Settings › Advanced shows the whole file.
+The Agents screen lists the request in front of you under Waiting for you, with the agent, the item and field it asks for and the seconds left, never its reason, and Show the prompt, which brings the prompt window forward with focus on Deny and its allows disarmed for another second; you answer only in that window. Activity, at the foot of the agents list, opens what agents and tokens asked for, and filters to Agents, You or Denied.
 
 ## Runs that ask for a project's variables
 
