@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's password generator now lets you choose a character password's length, with a number or a slider, which kinds of character it uses (letters, digits, symbols), and whether to leave out lookalikes such as 0 and O.
+
 The desktop app locks after 30 minutes without input by default, where it locked after five. Settings still offers one minute to eight hours, and a saved choice is kept.
 
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).

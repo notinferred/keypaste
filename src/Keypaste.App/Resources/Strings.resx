@@ -142,6 +142,7 @@
   <data name="DeletedItems" xml:space="preserve"><value>Deleted items</value></data>
   <data name="Denied" xml:space="preserve"><value>Denied</value></data>
   <data name="Diagnostics" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="Digits" xml:space="preserve"><value>Digits</value></data>
   <data name="Discard" xml:space="preserve"><value>Discard</value></data>
   <data name="DisconnectValue" xml:space="preserve"><value>Disconnect {0}</value></data>
   <data name="Dismissed" xml:space="preserve"><value>Dismissed</value></data>
@@ -242,7 +243,10 @@
   <data name="LastUsed" xml:space="preserve"><value>Last used</value></data>
   <data name="LastUsedValue" xml:space="preserve"><value>Last used {0}</value></data>
   <data name="LeaveThisEmptyToKeepTheCurrentX151c53" xml:space="preserve"><value>Leave this empty to keep the current password. A replacement keeps the old one in this item's history.</value></data>
+  <data name="LeaveOutLookalikes" xml:space="preserve"><value>Leave out lookalikes</value></data>
+  <data name="Length" xml:space="preserve"><value>Length</value></data>
   <data name="LetAScriptOrCIJobRunX39c663" xml:space="preserve"><value>Let a script or CI job run with a scoped set, without you or the vault's password.</value></data>
+  <data name="Letters" xml:space="preserve"><value>Letters</value></data>
   <data name="Link" xml:space="preserve"><value>Link</value></data>
   <data name="LinkTheKeypasteCommand" xml:space="preserve"><value>Link the keypaste command</value></data>
   <data name="LinksYouMadeFromAnItemsMenuXfaa446" xml:space="preserve"><value>Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it.</value></data>
@@ -257,6 +261,7 @@
   <data name="LogDayYesterday" xml:space="preserve"><value>Yesterday</value></data>
   <data name="Login" xml:space="preserve"><value>Login</value></data>
   <data name="LookingForAIToolsOnThisComputer" xml:space="preserve"><value>Looking for AI tools on this computer…</value></data>
+  <data name="LookalikesTip" xml:space="preserve"><value>Leaves out characters that look alike, such as 0 and O or 1 and l.</value></data>
   <data name="LowercaseLettersDigitsAndDashesSuchAsX8d843c" xml:space="preserve"><value>Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key or item creates it, and prod and production environments always ask before release.</value></data>
   <data name="MODECapitals" xml:space="preserve"><value>MODE</value></data>
   <data name="MapGroupsIntoThisVault" xml:space="preserve"><value>Map groups into this vault</value></data>
@@ -433,6 +438,7 @@
   <data name="StopUsingAKeyFile" xml:space="preserve"><value>Stop using a key file</value></data>
   <data name="StopUsingTheYubiKey" xml:space="preserve"><value>Stop using the YubiKey</value></data>
   <data name="StopWaitingForTheYubiKey" xml:space="preserve"><value>Stop waiting for the YubiKey</value></data>
+  <data name="Symbols" xml:space="preserve"><value>Symbols</value></data>
   <data name="TOKEN" xml:space="preserve"><value>TOKEN</value></data>
   <data name="TOTP" xml:space="preserve"><value>TOTP</value></data>
   <data name="TagAnItemFromYourVaultIntoX85a64e" xml:space="preserve"><value>Tag an item from your vault into this environment</value></data>

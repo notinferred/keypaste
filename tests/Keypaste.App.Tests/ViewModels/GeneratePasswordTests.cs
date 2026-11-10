@@ -115,6 +115,20 @@ public sealed class GeneratePasswordTests : IDisposable
     }
 
     [Fact]
+    public void A_generated_field_follows_the_length_chosen()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var pin = detail.Fields.Single(field => field.Name == "PIN");
+
+        pin.GenerateCommand.Execute(null);
+        detail.Generator.Length = 32;
+
+        Assert.True(detail.ReplacementFieldValue.IsGenerated);
+        Assert.Equal(32, detail.ReplacementFieldValue.MaskedLength);
+    }
+
+    [Fact]
     public Task Generate_password_copies_through_the_countdown_and_starts_a_new_item_with_it() => HeadlessSession.On(async () =>
     {
         using var vault = new TempVault();

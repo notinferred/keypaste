@@ -28,6 +28,88 @@ public sealed class GeneratorViewModelTests
     }
 
     [Fact]
+    public void The_default_character_options_are_the_core_s_default_recipe()
+    {
+        var generator = new GeneratorViewModel();
+
+        Assert.Equal(PasswordGenerator.DefaultLength, generator.Length);
+        Assert.True(generator.Letters);
+        Assert.True(generator.Digits);
+        Assert.True(generator.Symbols);
+        Assert.False(generator.LeaveOutLookalikes);
+        Assert.Equal("20 characters — about 128 bits", generator.Strength);
+    }
+
+    [Fact]
+    public void The_character_options_make_the_recipe_the_core_generates()
+    {
+        var generator = new GeneratorViewModel { Length = 32, Symbols = false, LeaveOutLookalikes = true };
+
+        Assert.Equal("32-character password", generator.Recipe?.Describe("password"));
+        Assert.Equal("32 characters — about 187 bits", generator.Strength);
+        Assert.Null(generator.Error);
+    }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void Any_one_kind_of_character_is_enough(bool letters, bool digits, bool symbols)
+    {
+        var generator = new GeneratorViewModel { Letters = letters, Digits = digits, Symbols = symbols };
+
+        Assert.NotNull(generator.Recipe);
+        Assert.Null(generator.Error);
+    }
+
+    [Fact]
+    public void Turning_every_kind_of_character_off_offers_no_recipe_and_shows_the_core_s_reason()
+    {
+        var generator = new GeneratorViewModel { Letters = false, Digits = false, Symbols = false };
+        new PasswordRecipe { Length = generator.Length, Alphabet = PasswordAlphabet.None }.TryValidate(out var reason);
+
+        Assert.Null(generator.Recipe);
+        Assert.Equal(reason, generator.Error);
+    }
+
+    [Theory]
+    [InlineData(7)]
+    [InlineData(0)]
+    [InlineData(257)]
+    public void A_length_the_core_refuses_offers_no_recipe_and_shows_the_core_s_reason(int length)
+    {
+        var generator = new GeneratorViewModel { Length = length };
+        (PasswordRecipe.Default with { Length = length }).TryValidate(out var reason);
+
+        Assert.Null(generator.Recipe);
+        Assert.Equal(reason, generator.Error);
+    }
+
+    [Fact]
+    public void Each_character_option_raises_the_strength_and_error_lines()
+    {
+        var generator = new GeneratorViewModel();
+        var raised = new List<string>();
+        generator.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        generator.Length = 24;
+        generator.Letters = false;
+        generator.Digits = false;
+        generator.Symbols = false;
+        generator.LeaveOutLookalikes = true;
+
+        Assert.Equal(
+            [
+                nameof(GeneratorViewModel.Length), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
+                nameof(GeneratorViewModel.Letters), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
+                nameof(GeneratorViewModel.Digits), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
+                nameof(GeneratorViewModel.Symbols), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
+                nameof(GeneratorViewModel.LeaveOutLookalikes), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
+            ],
+            raised);
+    }
+
+    [Fact]
     public void Choosing_words_gives_a_six_word_recipe()
     {
         var generator = new GeneratorViewModel { UseWords = true };
@@ -124,6 +206,8 @@ public sealed class GeneratorViewModelTests
     {
         Assert.Equal(PasswordGenerator.MinimumWords, GeneratorViewModel.MinimumWords);
         Assert.Equal(PasswordGenerator.MaximumWords, GeneratorViewModel.MaximumWords);
+        Assert.Equal(PasswordGenerator.MinimumLength, GeneratorViewModel.MinimumLength);
+        Assert.Equal(PasswordGenerator.MaximumLength, GeneratorViewModel.MaximumLength);
     }
 
     /// <summary>
