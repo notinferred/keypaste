@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.Input;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Globalization;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
@@ -80,7 +81,9 @@ namespace Keypaste.AppDriver;
 internal static class Program
 {
     private const string _usage =
-        "usage: open <vault>\n" +
+        "usage: globalization\n" +
+        "            (prints whether this process can load ICU and how it compares text)\n" +
+        "       open <vault>\n" +
         "       welcome [--keepassxc-config <ini>]\n" +
         "       open-offered <n> [--keepassxc-config <ini>]\n" +
         "       create <vault> [--new-keyfile <keyfile>]\n" +
@@ -141,6 +144,8 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
+        IcuFallback.Apply();
+
         var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 
         if (string.IsNullOrEmpty(home))
@@ -155,6 +160,7 @@ internal static class Program
         {
             return args switch
             {
+                ["globalization"] => Driver.ReportGlobalization(),
                 ["open", var vault] => await driver.OpenAsync(vault).ConfigureAwait(true),
                 ["welcome"] => driver.Welcome(KeePassXcDatabases.LocalConfigPaths),
                 ["welcome", "--keepassxc-config", var ini] => driver.Welcome(() => [ini]),
@@ -290,6 +296,14 @@ internal sealed class Driver(string home)
     private readonly string? _keyfile = NullIfEmpty(Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_KEYFILE"));
     private readonly string _newPassword = Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_NEW_PASSWORD") ?? string.Empty;
     private readonly Picker _picker = new();
+
+    /// <summary>Says whether this process can load ICU and how its text really compares, as <c>scripts/verify-no-icu.sh</c> reads.</summary>
+    internal static int ReportGlobalization()
+    {
+        // ICU puts a before B; with no ICU comparison is ordinal, and B's code point comes first.
+        var collation = string.Compare("a", "B", CultureInfo.InvariantCulture, CompareOptions.None) > 0 ? "ordinal" : "linguistic";
+        return Did(string.Create(CultureInfo.InvariantCulture, $"globalization icu={(IcuFallback.IcuLoads() ? "loads" : "none")} collation={collation}"));
+    }
 
     internal async Task<int> OpenAsync(string vault)
     {

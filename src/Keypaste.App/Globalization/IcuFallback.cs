@@ -20,7 +20,7 @@ internal static class IcuFallback
         }
     }
 
-    private static bool IcuLoads()
+    internal static bool IcuLoads()
     {
         for (var major = _newestIcu; major >= _oldestIcu; major--)
         {

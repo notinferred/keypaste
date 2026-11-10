@@ -231,6 +231,8 @@ check_desktop_gates() {
   integration_script scripts/verify-held-saves.sh
   integration_script scripts/verify-crash-report.sh
   integration_script scripts/verify-browser-host.sh
+  # A machine with no ICU is a Linux machine; .NET on Windows and macOS uses the system's own.
+  if [ "$(uname -s)" = Linux ]; then integration_script scripts/verify-no-icu.sh --unlock-and-save; fi
   # The macOS install and upgrade legs run under the stock bash 3.2 (D-0398).
   if [ "$(uname -s)" = Darwin ]; then
     run /bin/bash scripts/exercise-desktop-install.sh --selftest
@@ -338,7 +340,7 @@ integration_script() {
   local log code=0
   log="artifacts/gates/$(basename "$1" .sh).log"
   mkdir -p artifacts/gates
-  run "$timeout_command" --verbose --kill-after=10s 8m bash "$1" >"$log" 2>&1 || code=$?
+  run "$timeout_command" --verbose --kill-after=10s 8m bash "$@" >"$log" 2>&1 || code=$?
   cat "$log"
   return "$code"
 }
