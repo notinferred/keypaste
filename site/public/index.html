@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>keypaste — a local password manager for projects and AI</title>
-<meta name="description" content="A local KeePass-compatible password manager with project environments and approved AI access. The CLI and MCP bridge are in beta; the desktop app is being built.">
+<title>keypaste — your centralized access manager</title>
+<meta name="description" content="Passwords, environment variables, team access and AI agents in one place, on a database you own. The CLI and MCP bridge are in beta; the desktop app is being built, and team and enterprise features are planned.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
@@ -12,431 +12,171 @@
 <link rel="preload" href="/fonts/InstrumentSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/brand.css">
-<style>
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
-  @media (min-width: 720px) { .wrap { padding: 0 32px; } }
-
-  .hero { position: relative; isolation: isolate; }
-  .hero::before {
-    content: ""; position: absolute; inset: 0; z-index: -1;
-    background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
-                      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 16px 16px;
-    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
-    mask-image: linear-gradient(to bottom, #000 55%, transparent);
-  }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 72px; }
-  .top nav { display: flex; gap: 20px; font: 400 12px/1 var(--font-mono); }
-  .top nav a { color: var(--text-muted); }
-  .top nav a:hover { color: var(--text-primary); text-decoration: none; }
-  @media (max-width: 420px) { .top nav a.optional { display: none; } }
-
-  .hero-body { max-width: 760px; padding: 64px 0 88px; }
-  .eyebrow { margin: 0 0 20px; color: var(--text-muted); font: 400 12px/1.5 var(--font-mono); }
-  h1 {
-    margin: 0 0 20px; font-size: clamp(38px, 6.6vw, 54px); font-weight: 600;
-    letter-spacing: -0.045em; line-height: 1.04; text-wrap: balance;
-  }
-  .lead { margin: 0 0 28px; max-width: 640px; color: var(--text-secondary); font-size: 20px; line-height: 1.45; text-wrap: pretty; }
-  @media (max-width: 560px) { .lead { font-size: 18px; } }
-  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-  .release {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 24px 0 0;
-    color: var(--text-muted); font: 400 12px/1.5 var(--font-mono);
-  }
-  .release b { color: var(--text-secondary); font-weight: 400; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--status-ok); }
-  .dot.waiting { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
-
-  figure { margin: 0; }
-  .hero figure { margin-top: 56px; }
-  figcaption, .caption { color: var(--text-muted); font-size: 14px; line-height: 1.55; text-wrap: pretty; }
-  figcaption { margin-top: 14px; max-width: 680px; }
-  .terminal-bar .live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
-
-  section { padding: 72px 0; border-top: 1px solid var(--border-subtle); }
-  .section-head { display: flex; align-items: baseline; gap: 14px; margin: 0 0 16px; }
-  .section-head .num { color: var(--text-muted); font: 400 12px/1 var(--font-mono); }
-  h2 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; }
-  @media (max-width: 560px) { h2 { font-size: 26px; } section { padding: 56px 0; } }
-  .intro { margin: 0 0 32px; max-width: 680px; color: var(--text-secondary); font-size: 16px; text-wrap: pretty; }
-  .prose > * { max-width: 760px; }
-  .prose > p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; text-wrap: pretty; }
-  .prose > p.caption { color: var(--text-muted); font-size: 14px; }
-  .prose > .terminal { margin: 0 0 16px; }
-  .prose strong, .prose b { color: var(--text-primary); font-weight: 600; }
-  p code, td code, li code {
-    padding: 1px 5px; border: 1px solid var(--border-subtle); border-radius: 4px;
-    background: var(--bg-panel); color: var(--text-primary); font-size: 0.86em; white-space: nowrap;
-  }
-
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
-  .card {
-    display: flex; flex-direction: column; padding: 24px;
-    border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-panel);
-  }
-  .card h3 { margin: 16px 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.3; }
-  .card p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; text-wrap: pretty; }
-  .card p.caption { margin: 16px 0 0; color: var(--text-muted); font-size: 13px; }
-  .card .terminal { margin-top: auto; }
-  .card .terminal pre { padding: 12px 14px; font-size: 12px; }
-  .icon-tile {
-    display: grid; place-items: center; width: 36px; height: 36px;
-    border: 1px solid var(--border-default); border-radius: 7px; background: var(--bg-card);
-  }
-  .icon {
-    width: 18px; height: 18px; fill: none; stroke: var(--text-muted);
-    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
-  }
-
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
-  .tile { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; }
-  .tile h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
-  .tile p { margin: 0; color: var(--text-secondary); font-size: 14px; text-wrap: pretty; }
-  .status {
-    margin: 12px 0 0; padding: 16px 20px; border: 1px solid var(--border-default); border-radius: 10px;
-    background: var(--bg-panel); color: var(--text-secondary); font-size: 14px; text-wrap: pretty;
-  }
-  .status b { color: var(--text-primary); font-weight: 600; }
-
-  .stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
-  .stage { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; }
-  .stage p { margin: 12px 0 0; color: var(--text-muted); font-size: 13px; }
-  .stage ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-  .stage li { color: var(--text-secondary); font-size: 14px; text-wrap: pretty; }
-  .label {
-    display: inline-block; padding: 4px 7px; border: 1px solid var(--border-default); border-radius: 4px;
-    font: 400 11px/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
-  }
-  .label.beta { color: var(--status-ok); border-color: currentColor; }
-  .label.building { color: var(--text-primary); border-color: var(--border-strong); }
-  .label.planned { color: var(--text-secondary); border-style: dashed; }
-  .label.out { color: var(--text-muted); }
-  .stages + .caption { margin: 16px 0 0; }
-
-  .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--border-subtle); border-radius: 10px; }
-
-  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border-default); border-radius: 10px; }
-  table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px; }
-  th {
-    padding: 10px 16px; background: var(--bg-panel); color: var(--text-muted); text-align: left;
-    font: 500 11px/1.4 var(--font-sans); letter-spacing: 0.04em; white-space: nowrap;
-  }
-  td { padding: 14px 16px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); vertical-align: top; }
-  td:first-child, td:last-child { font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); white-space: nowrap; }
-  td b { color: var(--text-primary); font-weight: 600; }
-  @media (max-width: 560px) {
-    table { min-width: 0; }
-    thead { display: none; }
-    tr, td { display: block; }
-    tr + tr { border-top: 1px solid var(--border-subtle); }
-    td { padding: 0 16px 12px; border-top: 0; }
-    td:first-child { padding-top: 16px; }
-    td:last-child { padding-bottom: 16px; color: var(--text-muted); }
-    td:first-child::before { content: "If you have "; color: var(--text-muted); }
-    td:last-child::before { content: "Fixed in "; }
-  }
-
-  form.signup { display: flex; flex-wrap: wrap; gap: 8px; max-width: 520px; margin: 8px 0 12px; }
-  form.signup label.field { flex: 1 1 16rem; }
-  form.signup input[type="email"] {
-    width: 100%; height: 40px; padding: 0 12px;
-    border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-panel);
-    color: var(--text-primary); font: 400 14px var(--font-sans); caret-color: var(--accent);
-  }
-  form.signup input[type="email"]::placeholder { color: var(--text-muted); }
-  form.signup input[type="email"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
-  /* Offscreen rather than hidden: a bot skips type="hidden" and fills this in. */
-  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-
-  footer { padding: 40px 0 64px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 13px; }
-  footer .wordmark { margin-bottom: 16px; }
-  footer p { margin: 0 0 6px; max-width: 760px; }
-</style>
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js" type="module"></script>
+<script src="/hero.js" type="module"></script>
 </head>
 <body>
-<header class="hero">
+<header class="top">
   <div class="wrap">
-    <div class="top">
-      <a class="wordmark" href="/" aria-label="keypaste home">
-        <svg width="112" height="22.67" viewBox="0 0 494.08 100" aria-hidden="true"><path class="mark-ink" d="M189.85 100H218.85V91.95H209.2V71.5Q212.2 75.25 216.2 77.4Q221.2 80.1 227.5 80.1Q235.55 80.1 241.43 76.55Q247.3 73 250.5 66.7Q253.7 60.4 253.7 52.25Q253.7 46.15 251.85 41.05Q250 35.95 246.65 32.2Q243.3 28.45 238.7 26.4Q234.1 24.35 228.55 24.35Q223.15 24.35 219.28 26.35Q215.4 28.35 212.98 31.87Q210.55 35.4 209.6 40H209.2V25.45H189.85V33.5H199.8V91.95H189.85ZM19.3 70.95V62.9L32.4 52.55L46.15 70.95H37V79H64.5V70.95H57.75L39.3 47.15L56.55 33.5H63.85V25.45H29.25V33.5H44.45L19.3 53.9V0H0V8.05H9.9V70.95H0V79H27.9V70.95ZM97.4 80Q106.15 80 112.7 75.9Q119.25 71.8 122.15 64.7L113.25 61.35Q111.3 66 107.17 68.67Q103.05 71.35 97.3 71.35Q91.75 71.35 87.78 68.92Q83.8 66.5 81.7 62.25Q80.15 59.15 79.7 55.4H123.05Q123.15 54.95 123.2 54.27Q123.25 53.6 123.25 52.4Q123.25 44.15 120.08 37.85Q116.9 31.55 110.97 28Q105.05 24.45 96.9 24.45Q88.85 24.45 82.8 28.02Q76.75 31.6 73.4 37.92Q70.05 44.25 70.05 52.4Q70.05 60.5 73.35 66.72Q76.65 72.95 82.8 76.47Q88.95 80 97.4 80ZM447.1 80Q455.85 80 462.4 75.9Q468.95 71.8 471.85 64.7L462.95 61.35Q461 66 456.88 68.67Q452.75 71.35 447 71.35Q441.45 71.35 437.48 68.92Q433.5 66.5 431.4 62.25Q429.85 59.15 429.4 55.4H472.75Q472.85 54.95 472.9 54.27Q472.95 53.6 472.95 52.4Q472.95 44.15 469.78 37.85Q466.6 31.55 460.68 28Q454.75 24.45 446.6 24.45Q438.55 24.45 432.5 28.02Q426.45 31.6 423.1 37.92Q419.75 44.25 419.75 52.4Q419.75 60.5 423.05 66.72Q426.35 72.95 432.5 76.47Q438.65 80 447.1 80ZM305.45 79H316.95V70.95H309.4V42.8Q309.4 36.6 307 32.52Q304.6 28.45 299.83 26.4Q295.05 24.35 287.85 24.35Q281.1 24.35 276.33 26.15Q271.55 27.95 268.73 31.57Q265.9 35.2 265 40.65L274 42.5Q274.95 37.75 278.3 35.38Q281.65 33 287.5 33Q291.55 33 294.35 34.17Q297.15 35.35 298.58 37.65Q300 39.95 300 43.35V44.95L279.7 49.15Q271.05 50.95 267.3 54.52Q263.55 58.1 263.55 64.7Q263.55 72.05 267.95 75.88Q272.35 79.7 280.75 79.7Q288.95 79.7 293.7 75.4Q298.45 71.1 299.6 62.7H300V72.55Q300 75.65 301.4 77.33Q302.8 79 305.45 79ZM160.6 25.45V33.5H170.3L156.8 68.65H156.6L142.65 33.5H151.35V25.45H125.95V33.5H132.5L151.6 80.15L150.3 83.4Q148.6 87.5 144.48 89.62Q140.35 91.75 135.15 91.75H129.7V100H135.15Q143.9 100 149.9 96.25Q155.9 92.5 158.75 85.5L179.7 33.5H185.4V25.45ZM351.3 80Q360 80 364.38 75.88Q368.75 71.75 368.75 64.45Q368.75 57.35 364.13 53.15Q359.5 48.95 348.2 47.2Q341.1 46 337.78 44.08Q334.45 42.15 334.45 38.8Q334.45 35.85 336.78 33.95Q339.1 32.05 343.5 32.05Q348.95 32.05 352.68 34.9Q356.4 37.75 357.2 42.2H366.6V25.45H357.2V36.6H356.8Q356.35 33 354.62 30.27Q352.9 27.55 349.7 26Q346.5 24.45 341.6 24.45Q333.65 24.45 329.35 28.5Q325.05 32.55 325.05 39.05Q325.05 45.65 329.95 49.8Q334.85 53.95 346.65 55.8Q353.85 56.95 356.62 58.88Q359.4 60.8 359.4 64.45Q359.4 68.35 356.73 70.38Q354.05 72.4 349 72.4Q343 72.4 339.05 69.55Q335.1 66.7 334.25 62.2H324.85V79H334.25V68.1H334.65Q335.15 71.6 337.18 74.28Q339.2 76.95 342.73 78.47Q346.25 80 351.3 80ZM208.9 52.4Q208.9 46.6 211 42.17Q213.1 37.75 217.05 35.27Q221 32.8 226.45 32.8Q231.7 32.8 235.68 35.27Q239.65 37.75 241.83 42.12Q244 46.5 244 52.25Q244 57.95 241.9 62.33Q239.8 66.7 235.88 69.18Q231.95 71.65 226.45 71.65Q220.9 71.65 216.95 69.18Q213 66.7 210.95 62.38Q208.9 58.05 208.9 52.4ZM393.4 64.65V33.5H410.85L410.95 25.45H393.4V11.95H384V25.45H375V33.5H384V64.65Q384 69.4 385.53 72.83Q387.05 76.25 390.18 78.12Q393.3 80 398.2 80Q402.95 80 405.95 78.2Q408.95 76.4 410.38 72.95Q411.8 69.5 411.8 64.55V59.4H403.45V64.65Q403.45 68 402.15 69.72Q400.85 71.45 398.4 71.45Q395.95 71.45 394.68 69.78Q393.4 68.1 393.4 64.65ZM113.7 48.25H79.85Q80.35 45 81.7 42.25Q83.9 37.85 87.8 35.38Q91.7 32.9 96.9 32.9Q102.3 32.9 106.1 35.35Q109.9 37.8 111.9 42Q113.25 44.85 113.7 48.25ZM463.4 48.25H429.55Q430.05 45 431.4 42.25Q433.6 37.85 437.5 35.38Q441.4 32.9 446.6 32.9Q452 32.9 455.8 35.35Q459.6 37.8 461.6 42Q462.95 44.85 463.4 48.25ZM300.35 51.55Q300.25 57.4 298.1 61.85Q295.8 66.5 291.73 69.08Q287.65 71.65 282.3 71.65Q277.9 71.65 275.6 69.75Q273.3 67.85 273.3 64.1Q273.3 60.75 275.25 58.77Q277.2 56.8 281.25 55.85Z"/><path class="mark-dot" d="M480.45 79H494.08V65.37H480.45Z"/></svg>
+    <a class="wordmark" href="/" aria-label="keypaste home">
+      <picture>
+        <source srcset="/brand/keypaste-wordmark-light.svg" media="(prefers-color-scheme: light)">
+        <img src="/brand/keypaste-wordmark-dark.svg" width="112" height="23" alt="">
+      </picture>
+    </a>
+    <nav aria-label="Site">
+      <a href="/products/">Products</a>
+      <a class="optional" href="/how-it-works/">How it works</a>
+      <a class="optional" href="/compare/">Compare</a>
+      <a href="/docs/">Docs</a>
+      <a class="button optional" href="https://github.com/notinferred/keypaste" aria-label="keypaste on GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
+        Star<span class="count" data-github-stars hidden></span>
       </a>
-      <nav aria-label="Site">
-        <a href="/products/">products</a>
-        <a class="optional" href="/how-it-works/">how it works</a>
-        <a class="optional" href="/compare/">compare</a>
-        <a class="optional" href="/docs/">docs</a>
-        <a href="#install">install</a>
-        <a href="https://github.com/notinferred/keypaste">source</a>
-      </nav>
-    </div>
-
-    <div class="hero-body">
-      <p class="eyebrow">open source · reads and writes KDBX · no account, no server</p>
-      <h1>A password manager your agents have to ask.</h1>
-      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you approve or deny that request (the next release adds allowing it once or always).</p>
-
-      <div class="actions">
-        <a class="button primary" href="#install">Install the CLI</a>
-        <a class="button" href="/how-it-works/">How it works</a>
-        <a class="button" href="https://github.com/notinferred/keypaste">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-          Read the source
-        </a>
-      </div>
-
-      <p class="release"><span class="dot" aria-hidden="true"></span><b>CLI/MCP v0.3.0 published</b><span>· macOS, Linux, Windows · unsigned</span><span>· desktop app not yet released</span></p>
-
-      <figure>
-        <div class="terminal">
-          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste agent<span class="live"><span class="dot waiting" aria-hidden="true"></span>next release · in source</span></div>
-<pre>
-────────────────────────────────────────────────────────────
-keypaste: an agent is asking for a credential.
-
-  agent    claude-code (claude-code)
-  item     env/demo/.env
-  field    STRIPE_KEY
-
-  the agent says it needs this because:
-    deploy the billing service to staging
-
-  That sentence was written by the agent, not by keypaste. Treat it as a claim.
-
-[d] deny  [o] once  [a] always  [b] block  45s ›
-</pre>
-        </div>
-        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back. That does not erase the client's copies or revoke the credential later. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
-      </figure>
-    </div>
+      <a class="button inverse" href="/download/">Download</a>
+    </nav>
   </div>
 </header>
 
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-body">
+      <p class="eyebrow">passwords · environment variables · team access · AI agents</p>
+      <h1>Your centralized access manager.</h1>
+      <p class="tagline">Built for the AI era, ready for an enterprise.</p>
+      <p class="lead">Passwords, environment variables, team access and AI agents stop being separate products. keypaste manages them in one place, on a database you own.</p>
+      <div class="actions">
+        <a class="button primary large" href="/download/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download keypaste</a>
+        <a class="button large" href="#products">See what it does<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="hero-field" role="img" aria-label="Five separate groups of dots, labelled password manager, secrets platform, .env files, CI variables and team sharing, move together into one square grid labelled keypaste."></canvas>
+
+  <div class="wrap">
+    <p class="release"><span class="dot" aria-hidden="true"></span><b>CLI/MCP v0.3.0 published</b><span>· macOS, Linux, Windows · unsigned</span><span>· desktop app not yet released</span><span>· team and enterprise features planned</span></p>
+  </div>
+</section>
+
 <main>
-  <section id="vault">
+  <section class="band" id="products">
     <div class="wrap">
-      <div class="section-head"><span class="num">01</span><h2>One vault, two jobs</h2></div>
-      <p class="intro">The same file holds the passwords you type and the secrets your code runs with. Nothing about it is special to keypaste: KeePassXC opens it too.</p>
-
-      <div class="cards">
-        <article class="card">
-          <span class="icon-tile"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5"/></svg></span>
-          <h3>Your passwords</h3>
-          <p>Logins with a username, password and URL, filed in groups, in the KDBX format KeePassXC opens. <code>get</code> copies a password to the clipboard and clears it after twenty seconds; it prints the value only when you pass <code>--show</code>.</p>
-          <div class="terminal">
-<pre>keypaste add github --username me --url https://github.com
-keypaste get github</pre>
-          </div>
-          <p class="caption">The desktop app, for browsing, editing and restoring entry history, runs from source and has no public download yet.</p>
-        </article>
-
-        <article class="card">
-          <span class="icon-tile"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
-          <h3>Your projects and their agents</h3>
-          <p>A project's variables are entries under <code>env/&lt;project&gt;</code>. <code>keypaste run</code> injects them into one child process, and an agent asking over MCP gets one field, only after you approve it or a rule you wrote covers it. Every request is logged locally, granted or refused.</p>
-          <div class="terminal">
-<pre>keypaste env pull dev
-keypaste run dev -- npm start</pre>
-          </div>
-          <p class="caption">keypaste does not revoke a credential at its provider, and a value an agent already received stays with that agent.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section id="demo">
-    <div class="wrap">
-      <div class="section-head"><span class="num">02</span><h2>Sixty seconds, end to end</h2></div>
-      <p class="intro">An agent asks for one credential, a person approves it, the deploy runs and the audit log records it. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">The demo script</a> has every step.</p>
-      <figure class="demo">
-        <img src="/demo/keypaste-demo.gif" width="960" height="734" loading="lazy"
-             alt="An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.">
-        <figcaption>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <section id="what">
-    <div class="wrap">
-      <div class="section-head"><span class="num">03</span><h2>What it is, and what it is not yet</h2></div>
-      <div class="tiles">
-        <div class="tile">
-          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v1"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><rect width="8" height="5" x="2" y="13" rx="1"/><path d="M8 13v-2a2 2 0 1 0-4 0v2"/></svg>Local-first, offline</h3>
-          <p>Your vault is a file on your disk. Local use needs no account, service or network. Existing file-sync tools can transport the encrypted file; keypaste has no merge or managed-sync workflow.</p>
-        </div>
-        <div class="tile">
-          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>Standard KDBX, not a new format</h3>
-          <p>CI checks KDBX read/write compatibility against real keepassxc-cli on Linux, macOS and Windows on qualifying pushes to main and on each pull request that changes the code that writes vaults. Your file remains portable; this does not claim complete KeePassXC feature coverage.</p>
-        </div>
-        <div class="tile">
-          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>Open source, AGPL</h3>
-          <p>Auditable by anyone. A tool that handles secrets should not ask to be trusted on faith.</p>
-        </div>
+      <div class="band-head">
+        <h2>One place for all of it</h2>
+        <p>Each of these is a separate product somewhere else. Here they are parts of one.</p>
       </div>
 
-      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. <a href="#roadmap">Where keypaste is going</a> labels everything else.</p>
+      <article class="feature">
+        <div>
+          <div class="labels"><span class="label beta">CLI · Beta</span><span class="label building">App · Building</span></div>
+          <h3>Every login, where you expect it.</h3>
+          <p>Logins with a username, password and URL, filed in groups, with search, copy and a generator. They live in the KeePass format, so KeePassXC opens the same file.</p>
+          <a class="more" href="/products/desktop-app/">The desktop app</a>
+        </div>
+        <figure class="shot">
+          <picture>
+            <source srcset="/app/items-light.png" media="(prefers-color-scheme: light)">
+            <img src="/app/items-dark.png" width="1280" height="800" loading="lazy"
+                 alt="keypaste's Items screen: a sidebar with groups, projects and agents, a list of items, and the selected login's fields with its password masked.">
+          </picture>
+        </figure>
+      </article>
+
+      <article class="feature flip">
+        <div>
+          <div class="labels"><span class="label beta">Beta</span></div>
+          <h3>Your project's secrets, without the .env file.</h3>
+          <p>A project's variables live in your vault. One command puts them into one program's environment, and nothing is written to disk.</p>
+          <a class="more" href="/products/project-environments/">Project environments</a>
+        </div>
+        <div class="terminal">
+          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>~/project</div>
+<pre>keypaste env pull dev            # imports ./.env
+keypaste run dev -- npm start    # nothing on disk</pre>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div>
+          <div class="labels"><span class="label beta">Terminal · Beta</span><span class="label building">App · Building</span></div>
+          <h3>AI agents ask. You answer.</h3>
+          <p>An agent asks for one field. You see who is asking and why, and you approve or deny that request. Every request is logged locally, granted or refused.</p>
+          <a class="more" href="/products/agent-approvals/">Agent approvals</a>
+        </div>
+        <figure class="shot prompt">
+          <picture>
+            <source srcset="/app/approval-light.png" media="(prefers-color-scheme: light)">
+            <img src="/app/approval-dark.png" width="508" height="548" loading="lazy"
+                 alt="keypaste's approval prompt: claude-code wants one secret, DATABASE_URL, with the reason the agent gave and the answers Deny and Allow once.">
+          </picture>
+        </figure>
+      </article>
     </div>
   </section>
 
-  <section id="roadmap">
+  <section class="band" id="enterprise">
     <div class="wrap">
-      <div class="section-head"><span class="num">04</span><h2>Where keypaste is going</h2></div>
-      <p class="intro">keypaste starts with one person and the KeePass file they already have: logins and project secrets in one vault, programs run with their variables, and agents that have to ask. After the first desktop release it grows in three directions. An agent gets to use a credential without ever holding it, because the unlocked app attaches it to the request for the site it belongs to. Your vault can sync free through keypaste's cloud, encrypted on your device so keypaste can never read it. And a team shares a project's secrets through a relay that stores only ciphertext, on keypaste.com or its own server, with identities for CI and deploys and single sign-on for organizations; a team that wants a server to hold a project's key can choose that. No server will ever read your personal vault, and local use never needs an account.</p>
-
-      <div class="stages">
-        <div class="stage">
-          <span class="label beta">Beta</span>
-          <p>A published download, pre-1.0.</p>
-          <ul>
-            <li><a href="/products/cli/">The keypaste CLI</a>: vault, logins and generator</li>
-            <li><a href="/products/agent-approvals/">Agent approvals</a> in the terminal, over MCP</li>
-            <li><a href="/products/project-environments/">Project environments</a> and <code>keypaste run</code></li>
-          </ul>
-        </div>
-        <div class="stage">
-          <span class="label building">Building</span>
-          <p>In the source, not downloadable yet.</p>
-          <ul>
-            <li>The <a href="/products/desktop-app/">desktop app</a> for Windows, macOS and Linux</li>
-            <li><a href="/products/project-environments/">Project tags</a> on ordinary entries</li>
-            <li><a href="/products/agent-approvals/">Approvals in the app</a>, once or always</li>
-            <li><a href="/products/share-links/">Share links</a> and <a href="/products/ci-tokens/">scoped CI tokens</a></li>
-            <li>Connecting every AI tool in one step</li>
-          </ul>
-        </div>
-        <div class="stage">
+      <div class="band-head">
+        <h2>The goal: ready for an enterprise</h2>
+        <p>keypaste is not there yet, and says so. The place that holds one person's access is planned to hold a team's and an organization's, with no server that can read anyone's personal vault.</p>
+      </div>
+      <div class="grid">
+        <a class="cell" href="/products/cloud-vault/">
           <span class="label planned">Planned</span>
-          <p>Committed in the roadmap.</p>
-          <ul>
-            <li><a href="/products/daily-driver/">Touch ID and Windows Hello, TOTP, browser fill, merging a synced file, importers</a></li>
-            <li><a href="/products/agents-without-values/">Agents that use a credential without holding it</a></li>
-            <li><a href="/products/cloud-vault/">A free cloud vault</a> keypaste can't read; keeping it local stays an option</li>
-            <li><a href="/products/team-projects/">Team projects</a>, end-to-end encrypted</li>
-            <li><a href="/products/ci-and-deploys/">Identities for CI and deploys</a>, and syncs pushed from your own machine</li>
-            <li><a href="/products/server-access/">Server access</a> a team project can choose</li>
-            <li><a href="/products/organizations/">Organizations</a> with single sign-on and SCIM</li>
-          </ul>
+          <h3>Cloud vault</h3>
+          <p>Your vault synced free across your devices, encrypted on each one so keypaste can never read it.</p>
+        </a>
+        <a class="cell" href="/products/team-projects/">
+          <span class="label planned">Planned</span>
+          <h3>Team projects</h3>
+          <p>A project's secrets shared with your team through a relay that stores only ciphertext.</p>
+        </a>
+        <a class="cell" href="/products/ci-and-deploys/">
+          <span class="label planned">Planned</span>
+          <h3>CI and deploys</h3>
+          <p>Identities for CI jobs and deploy targets, and syncs pushed from your own machine.</p>
+        </a>
+        <a class="cell" href="/products/organizations/">
+          <span class="label planned">Planned</span>
+          <h3>Organizations</h3>
+          <p>Single sign-on, SCIM, approval for production changes and audit export.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="own">
+    <div class="wrap">
+      <div class="band-head">
+        <h2>Centralized, and still yours</h2>
+      </div>
+      <div class="grid">
+        <div class="cell plain">
+          <h3>A file, not an account</h3>
+          <p>Your vault is a standard KeePass file on your disk. Local use needs no account, service or network.</p>
         </div>
-        <div class="stage">
-          <span class="label out">Not planned</span>
-          <p>Out of scope.</p>
-          <ul>
-            <li>A server that can read your personal vault</li>
-            <li>Phone and web vault apps; KeePass apps open a local vault</li>
-            <li>PKI, KMS, privileged-access management and dynamic secrets</li>
-          </ul>
+        <div class="cell plain">
+          <h3>Open source</h3>
+          <p>AGPL, auditable by anyone. A tool that handles secrets should not ask to be trusted on faith.</p>
+        </div>
+        <div class="cell plain">
+          <h3>Nothing to migrate out of</h3>
+          <p>KeePassXC opens the same file, and CI checks that it does on Linux, macOS and Windows.</p>
         </div>
       </div>
-      <p class="caption">Labels change when a release ships. <a href="/products/">Every product</a> has a page on how it works, and <a href="/compare/">the comparisons</a> show how keypaste differs from the alternatives. The order, and the work behind each label, is in the <a href="https://github.com/notinferred/keypaste/blob/main/ROADMAP.md">roadmap</a>.</p>
     </div>
   </section>
 
-  <section id="install">
-    <div class="wrap prose">
-      <div class="section-head"><span class="num">05</span><h2>Install</h2></div>
-      <p class="intro">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine.</p>
-
-      <div class="terminal">
-        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>macOS · Apple Silicon</div>
-<!-- install:macos -->
-<pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz.sha256
-shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256
-tar -xzf keypaste-0.3.0-osx-arm64.tar.gz
-mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
-<!-- /install:macos -->
+  <section class="band closing">
+    <div class="wrap">
+      <h2>All your access. One place.</h2>
+      <p>The CLI is published today. The desktop app ships as 1.0.</p>
+      <div class="actions">
+        <a class="button primary large" href="/download/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download keypaste</a>
+        <a class="button large" href="/docs/">Read the docs<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
       </div>
-
-      <p class="caption"><b>macOS 14 or later.</b> That floor is what .NET 10 supports rather than a version this project has measured, so no run backs this floor.</p>
-
-      <div class="terminal">
-        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>Linux · x64 and arm64</div>
-<!-- install:linux -->
-<pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz.sha256
-sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256
-tar -xzf keypaste-0.3.0-linux-x64.tar.gz
-mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
-<!-- /install:linux -->
-      </div>
-
-      <p class="caption">For arm64, substitute <code>linux-arm64</code> in all three filenames. <b>glibc 2.35 or later:</b> Debian 12, Ubuntu 22.04 and newer. The release workflow runs the x64 binary on a clean Debian 12 and requires Alpine to refuse it; the equivalent container check is not implemented for arm64.</p>
-
-      <p>Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. The checksum proves the bytes arrived intact, not who made them: it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Source-build instructions and the v0.3.0 build-attestation procedure are in the README.</p>
-
-      <p>Then a vault, and a project with no <code>.env</code> in it:</p>
-
-      <div class="terminal">
-        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>~/project</div>
-<pre>keypaste init ~/vault.kdbx
-export KEYPASTE_VAULT=~/vault.kdbx
-
-keypaste env pull dev            # imports ./.env, then offers to delete it
-keypaste run dev -- npm start    # injected into the child process, nothing on disk</pre>
-      </div>
-    </div>
-  </section>
-
-  <section id="agents">
-    <div class="wrap prose">
-      <div class="section-head"><span class="num">06</span><h2>Connect an MCP client</h2></div>
-      <p class="intro">The current CLI workflow uses two processes. <code>keypaste-mcp</code> is started by your MCP client and forwards requests without opening the vault. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
-
-      <div class="terminal">
-<pre>keypaste agent --vault ~/vault.kdbx</pre>
-      </div>
-
-      <p>The downloads above are <strong>v0.3.0</strong>, which includes <code>setup</code>: it finds installed clients and configures each through its own <code>mcp add</code>, and a client without one gets its block printed to paste. Only <code>v0.1.0</code> lacks it; on that release use the <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a> instead.</p>
-
-      <div class="terminal">
-<pre>keypaste setup --vault ~/vault.kdbx</pre>
-      </div>
-
-      <p><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. keypaste leaves the returned field value out of the log, but request names and reasons remain and may contain sensitive text:</p>
-
-      <div class="terminal">
-        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste log</div>
-<pre>
-  time (UTC)           agent        item           decision  method
-  2026-07-26 14:03:09  claude-code  -              granted   exposure
-  2026-07-26 14:03:11  claude-code  env/demo/.env  granted   prompt
-  2026-07-26 14:07:44  claude-code  env/demo/.env  denied    prompt
-</pre>
-      </div>
-    </div>
-  </section>
-
-  <section id="upgrade">
-    <div class="wrap prose">
-      <div class="section-head"><span class="num">07</span><h2>Running an older version?</h2></div>
-      <p class="intro">Published versions are never rewritten here, so the old archives are still served and still broken. Replacing the binary is the fix. Full detail is in the <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">changelog</a>.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>IF YOU HAVE</th><th>WHAT IT DOES</th><th>FIXED IN</th></tr></thead>
-          <tbody>
-            <tr>
-              <td>0.1.0</td>
-              <td>Can destroy your vault: <b>env export can delete your vault</b>, writing a project's variables over it in plaintext and taking every other entry and its history. Also: env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; and moving the clock back can revive an expired approval.</td>
-              <td>0.2.0</td>
-            </tr>
-            <tr>
-              <td>0.2.0</td>
-              <td>Can lose an edit: <b>saving while another program saves the same vault can undo its change</b>, with the lost edit in no history and nowhere else. Two saves within about two seconds was enough, which is what a password manager and an agent sharing a vault do. Two more that lose nothing are listed in the changelog.</td>
-              <td>0.3.0</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section id="desktop">
-    <div class="wrap prose">
-      <div class="section-head"><span class="num">08</span><h2>The desktop app</h2></div>
-      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or always, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Later, your vault can sync free through keypaste's cloud, which can't read it, and teams share projects through a relay that stores only ciphertext; complete KeePassXC parity stays out.</p>
-
-      <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 
       <form class="signup" method="post" action="/subscribe">
         <label class="field">
@@ -445,29 +185,48 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
                  aria-label="Your email address">
         </label>
         <span class="hp" aria-hidden="true"><label for="website">Leave this empty</label> <input id="website" type="text" name="website" tabindex="-1" autocomplete="off"></span>
-        <button class="button primary" type="submit">Notify me</button>
+        <button class="button" type="submit">Tell me when the app ships</button>
       </form>
-    </div>
-  </section>
-
-  <section id="contact">
-    <div class="wrap prose">
-      <div class="section-head"><span class="num">09</span><h2>Found something wrong?</h2></div>
-      <p class="intro">Bugs, missing features and "this made no sense to me" all go to the <a href="https://github.com/notinferred/keypaste/issues">issue tracker</a>, and are read by the person who wrote it. Anything that looks like a security problem goes to <a href="mailto:security@keypaste.com">security@keypaste.com</a> instead of the tracker; <a href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md">SECURITY.md</a> says what happens next and how fast.</p>
-      <div class="actions">
-        <a class="button" href="https://github.com/notinferred/keypaste">Read the source on GitHub</a>
-      </div>
+      <small>One installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent; any future message requires confirmation first.</small>
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <a class="wordmark" href="/" aria-label="keypaste home">
-      <svg width="112" height="22.67" viewBox="0 0 494.08 100" aria-hidden="true"><path class="mark-ink" d="M189.85 100H218.85V91.95H209.2V71.5Q212.2 75.25 216.2 77.4Q221.2 80.1 227.5 80.1Q235.55 80.1 241.43 76.55Q247.3 73 250.5 66.7Q253.7 60.4 253.7 52.25Q253.7 46.15 251.85 41.05Q250 35.95 246.65 32.2Q243.3 28.45 238.7 26.4Q234.1 24.35 228.55 24.35Q223.15 24.35 219.28 26.35Q215.4 28.35 212.98 31.87Q210.55 35.4 209.6 40H209.2V25.45H189.85V33.5H199.8V91.95H189.85ZM19.3 70.95V62.9L32.4 52.55L46.15 70.95H37V79H64.5V70.95H57.75L39.3 47.15L56.55 33.5H63.85V25.45H29.25V33.5H44.45L19.3 53.9V0H0V8.05H9.9V70.95H0V79H27.9V70.95ZM97.4 80Q106.15 80 112.7 75.9Q119.25 71.8 122.15 64.7L113.25 61.35Q111.3 66 107.17 68.67Q103.05 71.35 97.3 71.35Q91.75 71.35 87.78 68.92Q83.8 66.5 81.7 62.25Q80.15 59.15 79.7 55.4H123.05Q123.15 54.95 123.2 54.27Q123.25 53.6 123.25 52.4Q123.25 44.15 120.08 37.85Q116.9 31.55 110.97 28Q105.05 24.45 96.9 24.45Q88.85 24.45 82.8 28.02Q76.75 31.6 73.4 37.92Q70.05 44.25 70.05 52.4Q70.05 60.5 73.35 66.72Q76.65 72.95 82.8 76.47Q88.95 80 97.4 80ZM447.1 80Q455.85 80 462.4 75.9Q468.95 71.8 471.85 64.7L462.95 61.35Q461 66 456.88 68.67Q452.75 71.35 447 71.35Q441.45 71.35 437.48 68.92Q433.5 66.5 431.4 62.25Q429.85 59.15 429.4 55.4H472.75Q472.85 54.95 472.9 54.27Q472.95 53.6 472.95 52.4Q472.95 44.15 469.78 37.85Q466.6 31.55 460.68 28Q454.75 24.45 446.6 24.45Q438.55 24.45 432.5 28.02Q426.45 31.6 423.1 37.92Q419.75 44.25 419.75 52.4Q419.75 60.5 423.05 66.72Q426.35 72.95 432.5 76.47Q438.65 80 447.1 80ZM305.45 79H316.95V70.95H309.4V42.8Q309.4 36.6 307 32.52Q304.6 28.45 299.83 26.4Q295.05 24.35 287.85 24.35Q281.1 24.35 276.33 26.15Q271.55 27.95 268.73 31.57Q265.9 35.2 265 40.65L274 42.5Q274.95 37.75 278.3 35.38Q281.65 33 287.5 33Q291.55 33 294.35 34.17Q297.15 35.35 298.58 37.65Q300 39.95 300 43.35V44.95L279.7 49.15Q271.05 50.95 267.3 54.52Q263.55 58.1 263.55 64.7Q263.55 72.05 267.95 75.88Q272.35 79.7 280.75 79.7Q288.95 79.7 293.7 75.4Q298.45 71.1 299.6 62.7H300V72.55Q300 75.65 301.4 77.33Q302.8 79 305.45 79ZM160.6 25.45V33.5H170.3L156.8 68.65H156.6L142.65 33.5H151.35V25.45H125.95V33.5H132.5L151.6 80.15L150.3 83.4Q148.6 87.5 144.48 89.62Q140.35 91.75 135.15 91.75H129.7V100H135.15Q143.9 100 149.9 96.25Q155.9 92.5 158.75 85.5L179.7 33.5H185.4V25.45ZM351.3 80Q360 80 364.38 75.88Q368.75 71.75 368.75 64.45Q368.75 57.35 364.13 53.15Q359.5 48.95 348.2 47.2Q341.1 46 337.78 44.08Q334.45 42.15 334.45 38.8Q334.45 35.85 336.78 33.95Q339.1 32.05 343.5 32.05Q348.95 32.05 352.68 34.9Q356.4 37.75 357.2 42.2H366.6V25.45H357.2V36.6H356.8Q356.35 33 354.62 30.27Q352.9 27.55 349.7 26Q346.5 24.45 341.6 24.45Q333.65 24.45 329.35 28.5Q325.05 32.55 325.05 39.05Q325.05 45.65 329.95 49.8Q334.85 53.95 346.65 55.8Q353.85 56.95 356.62 58.88Q359.4 60.8 359.4 64.45Q359.4 68.35 356.73 70.38Q354.05 72.4 349 72.4Q343 72.4 339.05 69.55Q335.1 66.7 334.25 62.2H324.85V79H334.25V68.1H334.65Q335.15 71.6 337.18 74.28Q339.2 76.95 342.73 78.47Q346.25 80 351.3 80ZM208.9 52.4Q208.9 46.6 211 42.17Q213.1 37.75 217.05 35.27Q221 32.8 226.45 32.8Q231.7 32.8 235.68 35.27Q239.65 37.75 241.83 42.12Q244 46.5 244 52.25Q244 57.95 241.9 62.33Q239.8 66.7 235.88 69.18Q231.95 71.65 226.45 71.65Q220.9 71.65 216.95 69.18Q213 66.7 210.95 62.38Q208.9 58.05 208.9 52.4ZM393.4 64.65V33.5H410.85L410.95 25.45H393.4V11.95H384V25.45H375V33.5H384V64.65Q384 69.4 385.53 72.83Q387.05 76.25 390.18 78.12Q393.3 80 398.2 80Q402.95 80 405.95 78.2Q408.95 76.4 410.38 72.95Q411.8 69.5 411.8 64.55V59.4H403.45V64.65Q403.45 68 402.15 69.72Q400.85 71.45 398.4 71.45Q395.95 71.45 394.68 69.78Q393.4 68.1 393.4 64.65ZM113.7 48.25H79.85Q80.35 45 81.7 42.25Q83.9 37.85 87.8 35.38Q91.7 32.9 96.9 32.9Q102.3 32.9 106.1 35.35Q109.9 37.8 111.9 42Q113.25 44.85 113.7 48.25ZM463.4 48.25H429.55Q430.05 45 431.4 42.25Q433.6 37.85 437.5 35.38Q441.4 32.9 446.6 32.9Q452 32.9 455.8 35.35Q459.6 37.8 461.6 42Q462.95 44.85 463.4 48.25ZM300.35 51.55Q300.25 57.4 298.1 61.85Q295.8 66.5 291.73 69.08Q287.65 71.65 282.3 71.65Q277.9 71.65 275.6 69.75Q273.3 67.85 273.3 64.1Q273.3 60.75 275.25 58.77Q277.2 56.8 281.25 55.85Z"/><path class="mark-dot" d="M480.45 79H494.08V65.37H480.45Z"/></svg>
-    </a>
-    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a> · Everything else: <a href="https://github.com/notinferred/keypaste/issues">the issue tracker</a></p>
-    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored for a possible desktop installation announcement. Addresses remain unconfirmed and no mail is currently sent; confirmation is required before any future message.</p>
+    <div class="columns">
+      <picture>
+        <source srcset="/brand/keypaste-wordmark-light.svg" media="(prefers-color-scheme: light)">
+        <img src="/brand/keypaste-wordmark-dark.svg" width="112" height="23" alt="keypaste">
+      </picture>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/products/">Products</a></li>
+          <li><a href="/download/">Download</a></li>
+          <li><a href="https://github.com/notinferred/keypaste/blob/main/ROADMAP.md">Roadmap</a></li>
+          <li><a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <ul>
+          <li><a href="/how-it-works/">How it works</a></li>
+          <li><a href="/how-it-works/security/">Security model</a></li>
+          <li><a href="/compare/">Compare</a></li>
+          <li><a href="/docs/">Docs</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/notinferred/keypaste">Source</a></li>
+          <li><a href="https://github.com/notinferred/keypaste/issues">Issues</a></li>
+          <li><a href="mailto:security@keypaste.com">security@keypaste.com</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="fine">This page sets no cookies and loads no third-party scripts. Its own scripts draw the animation and ask GitHub for the star count, so GitHub sees that request. If you enter your email it is stored for a possible desktop installation announcement.</p>
   </div>
 </footer>
 </body>

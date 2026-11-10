@@ -1,0 +1,29 @@
+---
+import { Badge } from '@astrojs/starlight/components';
+import products from '../data/products.json';
+import { statuses } from '../data/status.js';
+
+const groups = Object.entries(statuses).map(([id, status]) => ({
+  ...status,
+  products: products.filter((product) => product.status === id),
+}));
+---
+
+{
+  groups.map((group) => (
+    <section class="kp-group not-content">
+      <p class="kp-status">
+        <Badge text={group.label} variant={group.variant} size="medium" />
+        <span>{group.meaning}</span>
+      </p>
+      <div class="kp-cards">
+        {group.products.map((product) => (
+          <a class="kp-card" href={`/products/${product.slug}/`}>
+            <strong>{product.name}</strong>
+            <span>{product.summary}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  ))
+}

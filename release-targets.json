@@ -31,7 +31,7 @@
         ],
         "disclosed_in": [
           "README.md",
-          "site/public/index.html",
+          "site/public/download/index.html",
           "CHANGELOG.md",
           "SECURITY.md",
           "docs/RELEASE.md"
@@ -39,12 +39,12 @@
       },
       "defects_disclosed_in": [
         "README.md",
-        "site/public/index.html",
+        "site/public/download/index.html",
         "SECURITY.md"
       ],
       "upgrade_notice_on": [
         "SECURITY.md",
-        "site/public/index.html"
+        "site/public/download/index.html"
       ],
       "targets": [
         {
@@ -58,7 +58,7 @@
           "install_check": "linux",
           "advertised_on": [
             "README.md",
-            "site/public/index.html"
+            "site/public/download/index.html"
           ],
           "install_runner": "ubuntu-24.04"
         },
@@ -74,7 +74,7 @@
           "install_check": "linux-arm64",
           "advertised_on": [
             "README.md",
-            "site/public/index.html"
+            "site/public/download/index.html"
           ],
           "install_runner": "ubuntu-22.04-arm",
           "install_block": "linux",
@@ -91,7 +91,7 @@
           "install_check": "macos",
           "advertised_on": [
             "README.md",
-            "site/public/index.html"
+            "site/public/download/index.html"
           ],
           "install_runner": "macos-15",
           "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",

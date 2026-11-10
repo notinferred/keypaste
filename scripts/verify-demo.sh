@@ -48,16 +48,16 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 
 # Every page that reproduces the approval dialog and the log table, and is therefore held to what
 # the binaries print. Adding a page here costs nothing; leaving one out is how a transcript rots.
-# site/public/index.html is keypaste.com, and it is in this list for the same reason the README is:
-# the dialog is the first thing on it, and a marketing page is exactly where a stale transcript
-# survives longest, and docs/keepass-and-agents.md is here for the same reason again. The checks
+# site/public/download/index.html is keypaste.com's download page, and it is in this list for the
+# same reason the README is: a public page is exactly where a stale transcript survives longest,
+# and docs/keepass-and-agents.md is here for the same reason again. The checks
 # are grep and diff over a text file, so the markup is no obstacle.
 #
 # docs/launch.md holds the block every launch post pastes, which is the copy most likely to be read by
 # someone who has never run the binary. Note the dialog extraction below is a sed range, so a page
 # in this list must carry exactly one copy of the block: a second, shortened one would be extracted
 # too and the diff would fail. That is why docs/launch.md keeps one copy and its posts reference it.
-readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html docs/keepass-and-agents.md docs/launch.md'
+readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/download/index.html docs/keepass-and-agents.md docs/launch.md'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AGENT_ERR OUT ERR DIFF'

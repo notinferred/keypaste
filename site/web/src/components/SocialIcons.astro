@@ -1,0 +1,17 @@
+---
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+
+const links = [
+  ['Products', '/products/'],
+  ['How it works', '/how-it-works/'],
+  ['Compare', '/compare/'],
+  ['Docs', '/docs/'],
+];
+const path = Astro.url.pathname;
+---
+
+<nav class="kp-nav" aria-label="Site">
+  {links.map(([label, href]) => <a href={href} aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
+  <a class="kp-download" href="/download/">Download</a>
+</nav>
+<Default><slot /></Default>

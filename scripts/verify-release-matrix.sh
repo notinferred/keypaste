@@ -5,7 +5,7 @@
 # Before this file there was no such answer. The four CLI targets were written down independently in
 # release.yml's build matrix, its post-transport asset count, its publication allowlist, four
 # csprojs' RuntimeIdentifiers, verify-release-destination.sh's fixture, the README install blocks,
-# site/public/index.html and docs/RELEASE.md's table. Adding one was five edits with nothing holding
+# site/public/download/index.html and docs/RELEASE.md's table. Adding one was five edits with nothing holding
 # them together, and nothing at all could fail when they disagreed.
 #
 # THE DISTINCTION THIS FILE RESTS ON. release-targets.json holds two different records and they must
@@ -37,7 +37,7 @@
 # WHAT IT CANNOT HOLD, said here rather than left to be assumed:
 #
 #   - THE LIVE SITE. site/ deploys by hand (`wrangler deploy`; there is no site workflow). This
-#     reads site/public/index.html at the checked-out ref, so keypaste.com can serve something this
+#     reads site/public/download/index.html at the checked-out ref, so keypaste.com can serve something this
 #     already passed and nothing here would notice. Checking the public origin is publication
 #     evidence - docs/RELEASE.md requirements 4 and 7, owned by R.0b/R.0c.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
@@ -552,7 +552,7 @@ validate_documents() {
 
   # Every advertised target with an install check has a block naming its archive, on each page the
   # definition says carries that target. Which pages carry which target is a recorded fact rather
-  # than an assumption: site/public/index.html deliberately publishes macOS and Linux and sends
+  # than an assumption: site/public/download/index.html deliberately publishes macOS and Linux and sends
   # Windows, Intel Macs and Alpine to the README, and a check that demanded a Windows block there
   # would be wrong about the product rather than about the page.
   for c in $(jqr '.components | keys[]' "$def"); do
@@ -601,7 +601,7 @@ validate_documents() {
   done
 
   # A floor claim on a page is a value in the definition or it is not made.
-  for page in README.md site/public/index.html docs/RELEASE.md; do
+  for page in README.md site/public/download/index.html docs/RELEASE.md; do
     [ -f "$root/$page" ] || continue
     while IFS= read -r claim; do
       [ -n "$claim" ] || continue
@@ -643,7 +643,7 @@ EOF
   # fail the same way, or the check is satisfied by silence.
   #
   # Scoped to the pages a target is advertised ON rather than to all of them, because they do not
-  # advertise the same set: site/public/index.html sends Windows readers to the README, and neither
+  # advertise the same set: site/public/download/index.html sends Windows readers to the README, and neither
   # page has any business carrying a desktop floor while nothing desktop can be downloaded.
   for c in $(jqr '.components | keys[]' "$def"); do
     for rid in $(json_array "$def" ".components.\"$c\".targets | map(select(.advertised == true) | .rid)"); do
@@ -1296,12 +1296,12 @@ echo "== fixtures: a definition the repository contradicts"
 # A complete fake tree, so the only thing wrong with it is the thing being tested. A missing file
 # would refuse for its own reason and prove nothing about the check above it.
 FAKE="$WORK/root"
-mkdir -p "$FAKE/.github/workflows" "$FAKE/site/public"
+mkdir -p "$FAKE/.github/workflows" "$FAKE/site/public/download"
 cp "$DEFINITION" "$FAKE/release-targets.json"
 cp README.md CHANGELOG.md SECURITY.md "$PROPS" Directory.Packages.props "$FAKE/"
 mkdir -p "$FAKE/docs"
 cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
-cp site/public/index.html "$FAKE/site/public/"
+cp site/public/download/index.html "$FAKE/site/public/download/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
 cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/build-windows-installer.sh scripts/sign-windows.sh \
