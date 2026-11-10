@@ -31,6 +31,10 @@ These are retained feature ideas, not discarded features or promises for the fir
 
 | Idea | Boundary for reconsideration |
 |---|---|
+| TOTP as a New item field | New item offers no TOTP field, because Core refuses writing `otp`. Reconsider with a Core write rule for KeePassXC's `otp` field ([F.110](steps/F.110.md)). |
+| Editing an item's title in place | Edit keeps the title read-only and Rename or move does it, since a second core write would be needed. Reconsider when Edit gains one save for title and fields ([F.110](steps/F.110.md)). |
+| Columns sized by dragging | No list has column heads or grips since F.110; Items and Trash sort from a menu. Reconsider if people ask for resizable columns ([F.110](steps/F.110.md)). |
+| A Trash sort-menu test | Trash's sort menu has no test of its own for opening, focus, Escape and reordering ([F.110](steps/F.110.md)). Reconsider at the next Trash change. |
 | Show on Agents what waits behind the prompt on screen: a save request is not listed while it waits ([F.79](steps/F.79.md)), and the screen shows the one prompt, not how many requests wait their turn behind it ([F.80](steps/F.80.md)). | When the Agents screen is next changed, or a person cannot tell why an agent's call is taking long. |
 | A request queued behind other agents' prompts can reach the bridge's 235 seconds and be withdrawn, which the agent reads as a failed exchange ([F.80](steps/F.80.md)). | If agents report failed exchanges where a person was simply answering others. |
 | LastPass's Social Security, passport and address notes are not identities, since LastPass names no type Identity and only an item tagged `Identity` is one ([F.78c](steps/F.78c.md)). | If people importing from LastPass expect those values decided as identity values. |
