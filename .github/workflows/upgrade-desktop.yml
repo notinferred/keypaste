@@ -78,7 +78,7 @@ jobs:
           bash scripts/build-upgrade-candidates.sh "$RID" artifacts/dist 0.0.1 0.0.2 0.0.3
           ls -l artifacts/dist
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: upgrade-candidates-${{ matrix.rid }}
           path: artifacts/dist/
@@ -96,7 +96,7 @@ jobs:
           mkdir -p artifacts/fixture-cli
           bash scripts/publish-desktop-bridge.sh "$RID" artifacts/fixture-cli
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: inputs.rehearsal
         with:
           name: fixture-cli-${{ matrix.rid }}
@@ -251,7 +251,7 @@ jobs:
               "$RUNNER_TEMP/cli" upgrade-desktop
           fi
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: ${{ inputs.rehearsal && 'upgrade-desktop-rehearsal' || 'upgrade-desktop' }}-${{ matrix.rid }}
