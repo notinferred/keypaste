@@ -576,4 +576,29 @@ public sealed class ShareServiceTests : IDisposable
         var unreachable = await service.ListAsync(vault, online: true, CancellationToken.None);
         Assert.Equal("unknown", unreachable.Single(row => row.Info.Id == live.Info.Id).Status);
     }
+
+    [Fact]
+    public async Task ForgetExpired_WithALineThatCannotBeWritten_KeepsTheRemovals_WritesTheOthers_AndSaysSo()
+    {
+        using var vault = _fixture.Open();
+        var service = _fixture.Service();
+        var first = await service.CreateAsync(vault, ShareFixture.Request() with { Ttl = TimeSpan.FromHours(1) }, CancellationToken.None);
+        var second = await service.CreateAsync(vault, ShareFixture.Request() with { Ttl = TimeSpan.FromHours(1) }, CancellationToken.None);
+        var kept = await service.CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
+        _fixture.Clock.Advance(TimeSpan.FromHours(2));
+        var opens = 0;
+        _fixture.OnAudit = () => _fixture.AuditBroken = ++opens == 1;
+
+        var outcome = service.ForgetExpired(vault);
+
+        Assert.Equal(2, outcome.Forgotten);
+        Assert.Equal("forgot 2 expired links, but the audit log could not be written for 1 of them", outcome.Failure);
+        Assert.Equal(kept.Info!.Id, Assert.Single(new ShareStore(vault).List()).Id);
+        Assert.Single(AuditLines(), line => line.Method == "share-revoked");
+        Assert.True(ShareLink.TryParse(first.Link!, out _, out var firstKey));
+        Assert.True(ShareLink.TryParse(second.Link!, out _, out var secondKey));
+        Assert.DoesNotContain(firstKey, _fixture.AuditText(), StringComparison.Ordinal);
+        Assert.DoesNotContain(secondKey, _fixture.AuditText(), StringComparison.Ordinal);
+        Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(_fixture.AuditPath).Verdict);
+    }
 }

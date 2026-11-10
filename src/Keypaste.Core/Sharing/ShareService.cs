@@ -27,6 +27,11 @@ public sealed record ShareOutcome(bool Ok, string? Link, ShareInfo? Info, ShareF
         $"ShareOutcome {{ Ok = {Ok}, Link = {(Link is null ? "null" : "(redacted)")}, Info = {Info}, Failure = {Failure}, Message = {Message} }}";
 }
 
+/// <summary>What forgetting expired shares did.</summary>
+/// <param name="Forgotten">How many links were forgotten.</param>
+/// <param name="Failure">Why the command should fail, or null when every line was written.</param>
+public sealed record ExpiredShares(int Forgotten, string? Failure);
+
 /// <summary>
 /// Shares one entry's fields as an encrypted, expiring, view-limited link, and revokes it (D-0354).
 /// </summary>
@@ -235,6 +240,43 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         }
 
         return new ShareOutcome(true, null, info, ShareFailure.None, string.Empty);
+    }
+
+    /// <summary>Forgets every share past its expiry, which the server has already withdrawn, recording each as a revoke does.</summary>
+    /// <remarks>As for a revoke, what is done stands when a line cannot be written and the caller is told; each remaining line is still tried.</remarks>
+    public ExpiredShares ForgetExpired(Vault vault)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+
+        var store = new ShareStore(vault);
+        var now = _clock.GetUtcNow();
+        var expired = store.List().Where(info => info.Expires <= now).ToList();
+
+        if (expired.Count == 0)
+        {
+            return new ExpiredShares(0, null);
+        }
+
+        List<ShareInfo> forgotten = [];
+
+        if (!TryWrite(vault, () => forgotten.AddRange(expired.Where(info => store.Remove(info.Id))), out var unsaved))
+        {
+            return new ExpiredShares(0, $"the expired links were not forgotten, because the vault could not be saved ({unsaved})");
+        }
+
+        var unrecorded = 0;
+
+        foreach (var info in forgotten)
+        {
+            if (!TryAudit(AuditMethod.ShareRevoked, info, $"share {info.Id} expired and forgotten"))
+            {
+                unrecorded++;
+            }
+        }
+
+        return new ExpiredShares(
+            forgotten.Count,
+            unrecorded > 0 ? Invariant($"forgot {forgotten.Count} expired link{(forgotten.Count == 1 ? string.Empty : "s")}, but the audit log could not be written for {unrecorded} of them") : null);
     }
 
     /// <summary>Every recorded share with its status: <c>N views left</c>, <c>gone</c>, <c>expired</c> or <c>unknown</c>.</summary>

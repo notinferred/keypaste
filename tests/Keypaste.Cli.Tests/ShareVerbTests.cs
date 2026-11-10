@@ -533,7 +533,6 @@ public sealed class ShareVerbTests : IDisposable
 
         Assert.Contains("  ✓ forgot 1 expired link", _cli.Err, StringComparison.Ordinal);
         Assert.Equal(requests, _server.Requests.Count);
-        Assert.DoesNotContain("share-revoked", Audit(), StringComparison.Ordinal);
 
         Clear();
         _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
@@ -542,6 +541,58 @@ public sealed class ShareVerbTests : IDisposable
 
         Clear();
         Assert.Equal(CliApp.ExitUsageError, Share("revoke", longId, "--expired"));
+    }
+
+    [Fact]
+    public void ShareRevoke_Expired_WritesOneLinePerLinkRemoved_NamingItsItem_AndNoSecret()
+    {
+        string uuid;
+        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        {
+            uuid = vault.Find(new EntryName("env/acme-api", "STRIPE_KEY"))!.Uuid!;
+        }
+
+        Assert.True(ShareLink.TryParse(CreatePrinted("--ttl", "1h"), out var firstId, out var firstKey));
+        Assert.True(ShareLink.TryParse(CreatePrinted("--ttl", "1h"), out var secondId, out var secondKey));
+        Assert.True(ShareLink.TryParse(CreatePrinted("--ttl", "7d"), out var keptId, out _));
+        _cli.Clock.Now = _server.Now.AddHours(2);
+
+        _cli.AssertExit(CliApp.ExitSuccess, Share("revoke", "--expired"));
+
+        Assert.True(AuditReader.TryRead(KeypasteHome.AuditPath(Home), out var lines, out _, out var error), error);
+        var revoked = lines.Where(line => line.Method == "share-revoked").ToList();
+        Assert.Equal(2, revoked.Count);
+        Assert.All(revoked, line =>
+        {
+            Assert.Equal(uuid, line.Item);
+            Assert.Equal("env/acme-api/STRIPE_KEY", line.Entry);
+        });
+
+        Assert.Contains(revoked, line => line.Reason.Contains(firstId, StringComparison.Ordinal));
+        Assert.Contains(revoked, line => line.Reason.Contains(secondId, StringComparison.Ordinal));
+        Assert.DoesNotContain(revoked, line => line.Reason.Contains(keptId, StringComparison.Ordinal));
+
+        var written = Audit();
+        Assert.DoesNotContain(firstKey, written, StringComparison.Ordinal);
+        Assert.DoesNotContain(secondKey, written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ShareRevoke_Expired_WithAnAuditLogThatCannotBeWritten_ForgetsTheLinksAndSaysSo()
+    {
+        Assert.True(ShareLink.TryParse(CreatePrinted("--ttl", "1h"), out var id, out _));
+        _cli.Clock.Now = _server.Now.AddHours(2);
+
+        using (new FileStream(KeypasteHome.AuditPath(Home) + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.Equal(CliApp.ExitInternalError, Share("revoke", "--expired"));
+        }
+
+        Assert.Contains("the audit log could not be written", _cli.Err, StringComparison.Ordinal);
+
+        Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
+        Assert.DoesNotContain(id, _cli.Out, StringComparison.Ordinal);
     }
 
     [Theory]

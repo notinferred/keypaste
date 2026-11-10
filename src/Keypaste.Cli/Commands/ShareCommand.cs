@@ -253,16 +253,15 @@ internal static class ShareCommand
 
             if (expired)
             {
-                var now = context.Clock.GetUtcNow();
-                var removed = store.List().Where(info => info.Expires <= now).Count(info => store.Remove(info.Id));
-                if (removed > 0)
+                var forgotten = service.ForgetExpired(vault);
+                if (forgotten.Failure is { } failure)
                 {
-                    vault.Save();
+                    return Refuse(context, failure, CliApp.ExitInternalError);
                 }
 
-                context.Stderr.WriteLine(removed == 0
+                context.Stderr.WriteLine(forgotten.Forgotten == 0
                     ? "  nothing has expired"
-                    : $"  {done} forgot {removed} expired link{(removed == 1 ? string.Empty : "s")}");
+                    : $"  {done} forgot {forgotten.Forgotten} expired link{(forgotten.Forgotten == 1 ? string.Empty : "s")}");
                 return CliApp.ExitSuccess;
             }
 
