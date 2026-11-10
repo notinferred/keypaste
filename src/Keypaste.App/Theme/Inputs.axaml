@@ -115,13 +115,13 @@
     <Setter Property="Opacity" Value="0.5" />
   </Style>
 
-  <!-- A horizontal slider whose track and thumb sit inside the 32px the control keeps, so nothing in it reaches past its own bounds. -->
+  <!-- A horizontal slider whose track and thumb sit inside the 32px the control keeps, with no validation adorner, whose clip cut the track by the 1px it overshoots. -->
   <Style Selector="Slider">
     <Setter Property="MinHeight" Value="32" />
     <Setter Property="Template">
       <ControlTemplate>
-        <DataValidationErrors>
-          <Track Name="PART_Track" Orientation="Horizontal" Height="20" Margin="0,0,2,0" VerticalAlignment="Center">
+        <Panel>
+          <Track Name="PART_Track" Orientation="Horizontal" Height="20" VerticalAlignment="Center">
             <Track.DecreaseButton>
               <RepeatButton Name="PART_DecreaseButton" Classes="slider-track" Background="{DynamicResource SliderTrackValueFill}" />
             </Track.DecreaseButton>
@@ -136,7 +136,7 @@
               </Thumb.Template>
             </Thumb>
           </Track>
-        </DataValidationErrors>
+        </Panel>
       </ControlTemplate>
     </Setter>
   </Style>
