@@ -361,7 +361,7 @@ public sealed class DrawnRevealTests
         var shown = shell.Frame();
         Assert.True(shown.Shows(value, style, shown.Everywhere), "the value is not drawn before the lock");
 
-        ((ManualClock)shell.Session.Clock).Advance(TimeSpan.FromMinutes(5));
+        ((ManualClock)shell.Session.Clock).Advance(shell.Session.IdleTimeout + TimeSpan.FromSeconds(1));
         shell.UntilLocked();
 
         Assert.False(cell.IsRevealed);
