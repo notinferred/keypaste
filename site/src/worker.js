@@ -10,7 +10,7 @@
 // The database credential is not in this repository and is not in this Worker's environment. It
 // lives in an account-level Hyperdrive config; env.HYPERDRIVE.connectionString is a local handle.
 // The role behind it can INSERT into one table and cannot SELECT from it, so nothing reachable from
-// here can read the list back. See DECISIONS.md D-0036 and site/README.md.
+// here can read the list back. See site/README.md.
 import postgres from "postgres";
 import { handleCrash, isCrashRoute, sweepCrashes } from "./crash.js";
 import { handleShare, isShareRoute, readCapped, sweepShares } from "./share.js";
@@ -63,6 +63,14 @@ async function subscribe(request, env, ctx) {
   const origin = request.headers.get("origin");
   if (origin && !ORIGINS.has(origin)) {
     return refuse("That submission did not come from keypaste.com.");
+  }
+
+  if (env.SUBSCRIBE_LIMIT && !(await env.SUBSCRIBE_LIMIT.limit({ key: request.headers.get("cf-connecting-ip") ?? "unknown" })).success) {
+    return page(
+      429,
+      "That did not save",
+      "Too many signups came from your connection in the last minute, so your address was not stored. Try again in a minute.",
+    );
   }
 
   const contentType = request.headers.get("content-type") ?? "";
