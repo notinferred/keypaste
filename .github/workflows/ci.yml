@@ -330,7 +330,7 @@ jobs:
     if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 19
     env:
       KEYPASTE_BIN: artifacts/release/linux-x64/keypaste
     steps:
