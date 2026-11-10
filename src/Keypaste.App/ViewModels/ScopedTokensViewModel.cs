@@ -42,6 +42,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     private string _scope = string.Empty;
     private string _expiry = ExpiryOptions[1];
     private MintedToken? _minted;
+    private bool _changeHeldOff;
 
     internal ScopedTokensViewModel(AppVaultSession session, ClipboardCountdown? clipboard = null, Action<string>? toast = null)
     {
@@ -55,7 +56,11 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         CancelFormCommand = new RelayCommand(CloseForm);
         CreateCommand = new RelayCommand(CreateFromForm);
         CopyMintedCommand = new AsyncRelayCommand(CopyMintedAsync, () => _minted is not null && _clipboard is not null);
-        DoneMintedCommand = new RelayCommand(() => SetMinted(null));
+        DoneMintedCommand = new RelayCommand(() =>
+        {
+            SetMinted(null);
+            ShowHeldChange();
+        });
         RevokeCommand = new RelayCommand<ScopedTokenRow>(RevokeRow, row => row is not null);
         AskRevokeCommand = new RelayCommand<ScopedTokenRow>(row => Confirm(row?.Id), row => row is not null);
         CancelRevokeCommand = new RelayCommand(() => Confirm(null));
@@ -88,7 +93,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     }
 
     /// <inheritdoc/>
-    public string? UnsavedDraft => FormDraft();
+    public string? UnsavedDraft => FormDraft() ?? (_minted is { IsCopied: false } ? "this uncopied token" : null);
 
     internal Func<string?> FormDraft => () =>
         IsFormOpen && (_name.Trim().Length > 0 || _scope.Trim().Length > 0) ? "this new token" : null;
@@ -286,10 +291,31 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         return failure;
     }
 
+    /// <summary>Reads the tokens again after a merge in place, so a minted token stays on screen; a form or a token not yet copied holds this off until it closes.</summary>
+    internal void ShowChangeFromElsewhere()
+    {
+        if (UnsavedDraft is not null)
+        {
+            _changeHeldOff = true;
+            return;
+        }
+
+        _changeHeldOff = false;
+        Refresh();
+    }
+
     public void Dispose()
     {
         SetMinted(null);
         Rows = [];
+    }
+
+    private void ShowHeldChange()
+    {
+        if (_changeHeldOff)
+        {
+            ShowChangeFromElsewhere();
+        }
     }
 
     private void CloseForm()
@@ -297,6 +323,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         IsFormOpen = false;
         Name = string.Empty;
         Scope = string.Empty;
+        ShowHeldChange();
     }
 
     private void CreateFromForm()
@@ -338,7 +365,9 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
 
             if (_clipboard.Failure is null)
             {
+                minted.IsCopied = true;
                 _toast($"Copied {minted.Name}");
+                ShowHeldChange();
             }
         }
     }
@@ -402,6 +431,9 @@ internal sealed class MintedToken(string token, string name, string note) : IRev
     internal string Name { get; } = name;
 
     internal string Note { get; } = note;
+
+    /// <summary>Whether a copy reached the clipboard; until one does the token is an unsaved draft.</summary>
+    internal bool IsCopied { get; set; }
 
     public int MaskedLength => _token?.Length ?? 0;
 

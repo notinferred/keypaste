@@ -229,6 +229,10 @@ public sealed class DrawnRevealWaysOutTests
             case "done":
                 shell.Tap(shell.Named<Button>("DoneToken"));
                 break;
+            case "another place" when shell.Shell.Content is ScopedTokensViewModel:
+                shell.Shell.Current = Destinations.All.Single(d => d.Kind == DestinationKind.Settings);
+                shell.Shell.ConfirmDiscardCommand.Press();
+                break;
             case "another place":
                 shell.Show<SettingsViewModel>(DestinationKind.Settings);
                 break;
@@ -252,6 +256,13 @@ public sealed class DrawnRevealWaysOutTests
                 break;
             case "menu" when shell.Shell.Content is EntriesViewModel:
                 shell.Tap(shell.Named<ToggleButton>("AddEntry"));
+                break;
+            case "menu" when shell.Shell.Content is ScopedTokensViewModel tokens:
+                // A right-click chooses the row, which an uncopied token would hold off.
+                shell.Tap(shell.Named<Button>("CopyToken"));
+                RenderedShell.Drain();
+                Assert.Null(tokens.UnsavedDraft);
+                OpenSidebarMenu(shell);
                 break;
             case "menu":
                 OpenSidebarMenu(shell);

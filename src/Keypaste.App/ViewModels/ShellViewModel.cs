@@ -1664,6 +1664,10 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     entries.ShowChangeFromElsewhere();
                     break;
 
+                case ScopedTokensViewModel tokens:
+                    tokens.ShowChangeFromElsewhere();
+                    break;
+
                 case IHoldsDraft { UnsavedDraft: not null }:
                     break;
 

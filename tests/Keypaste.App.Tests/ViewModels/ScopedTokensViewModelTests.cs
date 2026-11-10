@@ -138,6 +138,25 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task AMintedTokenWhoseCopyFailed_StillCountsAsUnsaved()
+    {
+        var clipboard = new FakeClipboard { SetFails = true };
+        using var countdown = new ClipboardCountdown(clipboard, _clock);
+        using var screen = new ScopedTokensViewModel(_session, countdown);
+        screen.OpenFormCommand.Press();
+        screen.Name = "ci-staging";
+        screen.Scope = "read:acme-api/staging/*";
+        screen.CreateCommand.Press();
+        Assert.Equal("this uncopied token", screen.UnsavedDraft);
+
+        await screen.CopyMintedCommand.PressAsync();
+        await countdown.SettledAsync();
+
+        Assert.NotNull(countdown.Failure);
+        Assert.Equal("this uncopied token", screen.UnsavedDraft);
+    }
+
+    [Fact]
     public async Task TheForm_MintsATokenHeldOnlyForARevealOrACopy_AndForgetsItOnDone()
     {
         var clipboard = new FakeClipboard();

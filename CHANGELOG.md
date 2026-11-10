@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A scoped token you have just created and not yet copied now stays on its screen when another device's changes are merged, and leaving the screen asks first ([F.101](docs/steps/F.101.md)).
+
 On a Mac whose every display is asleep, the desktop app now waits for a display and then starts, instead of crashing at launch ([F.96](docs/steps/F.96.md)).
 
 The desktop app's first-launch screen now says that continuing agrees to the terms of use for keypaste's online services and to sending crash reports, and that the software itself is under AGPL-3.0. The wording is a draft until the terms are approved ([F.95](docs/steps/F.95.md)).

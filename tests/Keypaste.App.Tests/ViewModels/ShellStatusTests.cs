@@ -9,6 +9,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
+using Keypaste.Core.Tokens;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -1018,6 +1019,165 @@ public sealed class ShellStatusTests
 
         Assert.Same(tokens, shell.Content);
         Assert.Equal("half-typed", tokens.Name);
+    }
+
+    /// <summary>A minted token is shown once and only this screen holds it, so a merge must not rebuild the screen under it.</summary>
+    [Fact]
+    public async Task AMerge_KeepsAMintedTokenNotYetCopied()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var tokens = Minted(shell);
+        var token = tokens.Minted!.Reveal();
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        await MergedByThePoll(shell, clock);
+
+        Assert.Same(tokens, shell.Content);
+        Assert.Equal(token, tokens.Minted?.Reveal());
+    }
+
+    [Fact]
+    public async Task AMergeAMintedTokenHeldOff_IsShownOnceTheTokenIsDone_AndTheTokenIsForgotten()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var tokens = Minted(shell);
+        var minted = tokens.Minted!;
+
+        MintElsewhere(fixture, "from-elsewhere");
+        await MergedByThePoll(shell, clock);
+        Assert.DoesNotContain(tokens.Rows, row => row.Name == "from-elsewhere");
+
+        tokens.DoneMintedCommand.Press();
+
+        Assert.Contains(tokens.Rows, row => row.Name == "from-elsewhere");
+        Assert.Null(tokens.UnsavedDraft);
+        Assert.Null(minted.Reveal());
+    }
+
+    [Fact]
+    public async Task AMergeAMintedTokenHeldOff_IsShownOnceTheTokenIsCopied_AndTheTokenStaysUntilDone()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+        var tokens = Minted(shell);
+        var token = tokens.Minted!.Reveal();
+
+        MintElsewhere(fixture, "from-elsewhere");
+        await MergedByThePoll(shell, clock);
+        await tokens.CopyMintedCommand.PressAsync();
+
+        Assert.Contains(tokens.Rows, row => row.Name == "from-elsewhere");
+        Assert.Null(tokens.UnsavedDraft);
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        await MergedByThePoll(shell, clock);
+
+        Assert.Same(tokens, shell.Content);
+        Assert.Equal(token, tokens.Minted?.Reveal());
+    }
+
+    [Fact]
+    public void LeavingAMintedTokenNotYetCopied_AsksFirst_AndDiscardingForgetsIt()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var tokens = Minted(shell);
+        var minted = tokens.Minted!;
+        var token = minted.Reveal();
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        Assert.Equal("Discard this uncopied token?", shell.DiscardPrompt);
+        shell.KeepDraftCommand.Press();
+        Assert.Same(tokens, shell.Content);
+        Assert.Equal(token, minted.Reveal());
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        shell.ConfirmDiscardCommand.Press();
+
+        Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
+        Assert.Null(minted.Reveal());
+    }
+
+    [Fact]
+    public async Task LeavingAMintedTokenOnceCopied_AsksNothing_AndForgetsIt()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+        var tokens = Minted(shell);
+        var minted = tokens.Minted!;
+        await tokens.CopyMintedCommand.PressAsync();
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+
+        Assert.False(shell.HasDiscardPrompt);
+        Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
+        Assert.Null(minted.Reveal());
+    }
+
+    [Fact]
+    public async Task AMintedTokenHeldThroughAMerge_IsForgottenWhenTheShellCloses()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var minted = Minted(shell).Minted!;
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        await MergedByThePoll(shell, clock);
+        shell.Dispose();
+
+        Assert.Null(minted.Reveal());
+    }
+
+    private static ScopedTokensViewModel Minted(ShellViewModel shell)
+    {
+        shell.Current = Destinations.Of(DestinationKind.Tokens);
+        var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
+        tokens.OpenFormCommand.Press();
+        tokens.Name = "ci-staging";
+        tokens.Scope = "read:billing/dev/*";
+        tokens.CreateCommand.Press();
+        Assert.NotNull(tokens.Minted);
+        return tokens;
+    }
+
+    private static void MintElsewhere(TempVault fixture, string name)
+    {
+        Assert.True(TokenScope.TryParseList("read:billing/dev/*", out var scopes, out var refused), refused);
+        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.True(new TokenStore(other).TryCreate(name, scopes, TimeSpan.FromDays(7), false, DateTimeOffset.UtcNow, out _, out _, out var error), error);
+        other.Save();
     }
 
     private static async Task MergedByThePoll(ShellViewModel shell, ManualClock clock)
