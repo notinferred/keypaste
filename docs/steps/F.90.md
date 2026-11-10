@@ -1,6 +1,6 @@
 # F.90 — Say which of two same-named items a share link came from
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; CI has not run on it, so no run IDs are recorded. Implemented only, in RELEASE's terms.
+Completed 2026-11-09 on `backlog-2026-11`, source only; ci 42822341787 and app 42822347029 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux. Implemented only, in RELEASE's terms.
 
 ## Amendments
 

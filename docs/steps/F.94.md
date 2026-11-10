@@ -1,6 +1,6 @@
 # F.94 — List every package a release carries
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; CI has not run on it, so it names no runs.
+Completed 2026-11-09 on `backlog-2026-11`, source only; ci 42822341787 and app 42822347029 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux.
 
 ## Amendments
 

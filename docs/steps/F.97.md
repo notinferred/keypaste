@@ -1,6 +1,6 @@
 # F.97 — A vault unlocks and saves on Linux with no ICU
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; the gate has not run, so there are no run IDs and the question stays open in BACKLOG until it passes.
+Completed 2026-11-09 on `backlog-2026-11`, source only; dev 42726262372, `desktop-gates` on `ubuntu-24.04` at `b8e7eb5b`, and app 42822347029's `desktop gates (ubuntu-24.04)` at the final code `4fa4c1e9`, both green, each printing `icu=none collation=ordinal` from the container.
 
 ## Amendments
 

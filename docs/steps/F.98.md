@@ -1,6 +1,6 @@
 # F.98 — KeePassXC's own browser server answers its pairing after keypaste's saves
 
-Completed 2026-11-09 on `backlog-2026-11` and repaired 2026-11-10 on `backlog-ci`, whose gate ran at `72936674`; runs app 42819316329 (jobs `keepassxc workflows` on `ubuntu-24.04` and `windows-2025`, both green), dev 42810833630, 42811913260, 42812628953, 42813322153, 42814922694 and 42816855771 (probes on that branch, removed), and app 42727503590 (the failure repaired).
+Completed 2026-11-09 on `backlog-2026-11` and repaired 2026-11-10 on `backlog-ci`, whose gate ran at `72936674`; runs app 42819316329 (jobs `keepassxc workflows` on `ubuntu-24.04` and `windows-2025`, both green), dev 42810833630, 42811913260, 42812628953, 42813322153, 42814922694 and 42816855771 (probes on that branch, removed), and app 42727503590 (the failure repaired). The same two jobs ran green at the final code `4fa4c1e9` in app 42822347029.
 
 ## Amendments
 

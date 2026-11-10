@@ -1,6 +1,6 @@
 # F.95 — The first-launch screen says what agreeing covers
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; CI has not run on it, so there are no run IDs. Legal wording, and a draft: it awaits the approval of the founder or a lawyer under H-0027, and nothing here shows it is sufficient.
+Completed 2026-11-09 on `backlog-2026-11`, source only; ci 42822341787 and app 42822347029 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux. Legal wording, and a draft: it awaits the approval of the founder or a lawyer under H-0027, and nothing here shows it is sufficient.
 
 ## Amendments
 

@@ -1,6 +1,6 @@
 # F.99 — Restore the merge gate's attachment, token and refusal cases
 
-Prepared 2026-11-09 on `backlog-2026-11`, source only. The gate has not run with these cases yet: none of G7, G8 and G11 has passed against KeePassXC, and G11 has never run at all. Run IDs go here once ci has run the commit.
+Completed 2026-11-09 on `backlog-2026-11`, source only; ci 42729638860 at `43ab6807`, `compat` green on all three runners with G7, G8 and G11, and ci 42822341787 at the final code `4fa4c1e9`, green on the same three.
 
 ## Amendments
 
@@ -23,10 +23,9 @@ Each read from ci 41106436785's logs (jobs 124237393410, 124237393799 and 124237
 
 ## Evidence
 
-No KeePassXC exists on this machine, so only `bash -n` and the gate's XML reader and jq filters, against a hand-made export, were exercised here. Everything else is what ci will show, in `compat (ubuntu-24.04)` on KeePassXC 2.7.6 and `compat (macos-15)` and `compat (windows-2025)` on 2.8.0, each in the step "Verify the app merges KeePassXC's saves through real KeePassXC".
+No KeePassXC exists on this machine, so only `bash -n` and the gate's XML reader and jq filters, against a hand-made export, were exercised here. ci 42729638860 ran the rest, in `compat (ubuntu-24.04)` on KeePassXC 2.7.6 and `compat (macos-15)` and `compat (windows-2025)` on 2.8.0, each in the step "Verify the app merges KeePassXC's saves through real KeePassXC", where G7, G8 and G11 ran and the gate printed `MERGE GATE PASSED` on all three. G8's last step printed that a record edited after the revocation carried the verifier back and the token ran.
 
 ## Limits and follow-ups
 
-- The ci dispatch is the first run of G11 and the first of G7 and G8 on the corrected method. The new cases add perhaps 40 seconds on Windows to a step whose slowest green run took 46 seconds under a two-minute limit; the limit is left alone until that time is measured.
+- With the new cases the merge step took 63 s on `windows-2025` in ci 42729638860 and 60 s in ci 42822341787, under its two-minute limit; its slowest green run before them took 46 s.
 - The same-attachment conflict G7 used to cover needs the app to change an attachment through the merge, which the driver does not do.
-- THREATS' sentence saying real KeePassXC's merge is not shown changes once G8 passes.

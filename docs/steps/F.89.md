@@ -1,6 +1,6 @@
 # F.89 — What the Windows and Linux menus draw for a chord
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; CI has not run on it, so no run IDs are recorded. No code changed.
+Completed 2026-11-09 on `backlog-2026-11`, source only. No code changed, so no run bears on it.
 
 ## Amendments
 

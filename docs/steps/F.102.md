@@ -1,6 +1,6 @@
 # F.102 — Tell the person when the audit log stops being written
 
-Completed 2026-11-10 on `backlog-23-25`, source only; no CI run has happened yet, so no run IDs are recorded.
+Completed 2026-11-10 on `backlog-23-25`, source only; ci 42822341787 and app 42822347029 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux.
 
 ## Amendments
 

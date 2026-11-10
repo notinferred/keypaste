@@ -1,6 +1,6 @@
 # F.100 — Listen for the next bridge without the thread pool
 
-Completed 2026-11-10 on `backlog-knock`, source only. Dev runs below.
+Completed 2026-11-10 on `backlog-knock`, source only. Dev runs below; the exact code's Windows evidence is app 42822347029 and ci 42822341787 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux.
 
 ## Amendments
 

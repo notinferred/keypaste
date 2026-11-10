@@ -1,6 +1,6 @@
 # F.96 — The desktop app waits for a display on a Mac whose displays sleep
 
-Completed 2026-11-09 on `backlog-2026-11`, source only; CI has not run on it, so there are no run IDs.
+Completed 2026-11-09 on `backlog-2026-11`, source only; ci 42822341787 and app 42822347029 at the final code `4fa4c1e9`, both green on Windows, macOS and Linux.
 
 ## Amendments
 

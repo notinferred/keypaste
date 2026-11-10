@@ -1,6 +1,6 @@
 # F.105 — The KeePassXC install limits, fitted to measured runs
 
-Completed 2026-11-10 on `backlog-ci`, source only; no new runs. Read: `gh api` job and step times of `keepassxc first run (ubuntu-24.04)` since 2026-10-14 and `aot publish (linux-x64)` since 2026-11-04, and the job logs of ci 42266260601, ci 42299832656, ci 42156288498, app 42157932479, app 41891465844 and app 41904307592.
+Completed 2026-11-10 on `backlog-ci`, source only; ci 42822341787 at the final code `4fa4c1e9` ran `aot publish (linux-x64)` under this limit, green. Read: `gh api` job and step times of `keepassxc first run (ubuntu-24.04)` since 2026-10-14 and `aot publish (linux-x64)` since 2026-11-04, and the job logs of ci 42266260601, ci 42299832656, ci 42156288498, app 42157932479, app 41891465844 and app 41904307592.
 
 ## Evidence
 

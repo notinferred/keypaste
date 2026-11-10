@@ -1,6 +1,6 @@
 # F.104 — `keepassxc first run`'s limit, after finding where its time goes
 
-Completed 2026-11-10 on `backlog-ci`, source only; no new runs. Read: `gh api` job and step times of 181 runs of the job since 2026-10-14 (172 green), and the 58 Windows job logs since B.5's cache began on 2026-11-04, including app 42223860031 and app 42251019859.
+Completed 2026-11-10 on `backlog-ci`, source only; app 42822347029 at the final code `4fa4c1e9` ran the job under this limit, green on all three runners. Read: `gh api` job and step times of 181 runs of the job since 2026-10-14 (172 green), and the 58 Windows job logs since B.5's cache began on 2026-11-04, including app 42223860031 and app 42251019859.
 
 ## Amendments
 
