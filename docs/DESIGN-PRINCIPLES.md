@@ -13,6 +13,7 @@ Test: every claim on a screen, in the CLI, on keypaste.com or in a guide matches
 - No fake urgency, no hidden cost and no exit harder than the way in: the vault stays a KeePass file the person can open in another app, and leaving keypaste loses nothing.
 - When keypaste refuses something it says why, in plain words, and every allow says how long it lasts.
 - A screen shows the state as it is: saved, unsaved or changed on disk, locked or unlocked, never a reassurance the code has not checked.
+- A goal is named as a goal. keypaste.com may say what keypaste is built to become, such as ready for an enterprise, only on a page that labels what is published, building and planned (founder's direction, 2026-11-10).
 
 ## 2. Responsibility
 

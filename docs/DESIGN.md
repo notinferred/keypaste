@@ -2,7 +2,7 @@
 
 The system every keypaste surface is designed from, the desktop app, the CLI, the site, the README, the store listings and the installers, written down before a screen is designed ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6). This page owns how a screen is put together, the marks, the palette, the type, the shape, the icons, the terminal rules, the voice, the interaction rules and the usage rules. Where a value also has to exist as code, the file named below holds it, and the app's views hold each screen's exact sizes.
 
-**Brand status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below. Amended 2026-11-01 by the founder: the interaction rules below, from the audit against Apple's Human Interface Guidelines (D-0682). Amended 2026-11-07 by the founder, because the numbers made screens louder, against "too much to look at": a card's or an inline form's heading takes the dialog title's size, the list header drops under the item's title, a helper line is no larger than its label, and sidebar rows draw 16px icons ([Q.19](steps/Q.19.md)).
+**Brand status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below. Amended 2026-11-01 by the founder: the interaction rules below, from the audit against Apple's Human Interface Guidelines (D-0682). Amended 2026-11-07 by the founder, because the numbers made screens louder, against "too much to look at": a card's or an inline form's heading takes the dialog title's size, the list header drops under the item's title, a helper line is no larger than its label, and sidebar rows draw 16px icons ([Q.19](steps/Q.19.md)). Amended 2026-11-10 by the founder: keypaste.com's hero fills the first screen, its headline scales past the display size, and it carries the site's one animation.
 
 ## The desktop's places
 
@@ -61,7 +61,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 
 | Style | Size and weight |
 |---|---|
-| Display | 54/600, −0.045em |
+| Display | 54/600, keypaste.com's hero headline up to 76/600, −0.045em |
 | Heading | 24–30/600, −0.03em to −0.035em. A screen's title and an open item's title; the app draws 24 |
 | List header | 20/600, −0.01em. What a list shows, All items or a group, and New item's title: under the item's title, which outranks it |
 | Dialog, card and form title | 15–16/600, −0.01em. A dialog's, a card's, a list's or an inline form's heading, and a prompt's; the app draws 16 |
@@ -83,7 +83,7 @@ Spacing is a 4px base on a 16px grid: 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56. Ra
 
 Shadows appear only on overlays: dialogs `0 24px 64px rgba(0,0,0,.55)`, toasts and popovers `0 8px 24px rgba(0,0,0,.35)`. A modal backdrop is `rgba(8,9,10,.6)` with a 3px blur. Backgrounds are flat ink; the 16px hairline grid is kept for brand moments such as the lock screen.
 
-Hover raises one ink step. A selected row takes a 10% amber tint and a 2px amber inset bar. Focus is a 2px ink gap and a 2px amber ring; a focused field has a 1px amber border and a 3px 15% amber glow. Muted text on a hovered or selected row, a toast or a keycap takes the secondary colour. Waiting is an amber dot with a 3px halo, except in a prompt, whose dot is muted with no halo, since its one amber is its answer. Motion is 120ms for hover and 200ms for overlays, eased `cubic-bezier(.2,.8,.2,1)`, with no bounce.
+Hover raises one ink step. A selected row takes a 10% amber tint and a 2px amber inset bar. Focus is a 2px ink gap and a 2px amber ring; a focused field has a 1px amber border and a 3px 15% amber glow. Muted text on a hovered or selected row, a toast or a keycap takes the secondary colour. Waiting is an amber dot with a 3px halo, except in a prompt, whose dot is muted with no halo, since its one amber is its answer. Motion is 120ms for hover and 200ms for overlays, eased `cubic-bezier(.2,.8,.2,1)`, with no bounce. keypaste.com's hero carries the one animation, dots that gather from five groups into one square, drawn by the page's only script ([hero.js](../site/public/hero.js)); it is still under reduced motion and stops while off screen.
 
 ## Icons
 

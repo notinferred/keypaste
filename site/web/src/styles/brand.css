@@ -55,6 +55,115 @@
   --sl-color-black: #ffffff;
 }
 
+/* The landing page's heading tracking, so a content page reads as the same site. */
+h1,
+.sl-markdown-content :is(h2, h3) {
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.site-title img {
+  height: 1.45rem;
+}
+
+/* The landing page's nav, in the header's right group, which Starlight hides on a phone in favour of the menu. */
+.kp-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--sl-text-sm);
+  font-weight: 500;
+}
+.kp-nav a {
+  padding: 0.4rem 0.7rem;
+  border-radius: 7px;
+  color: var(--sl-color-gray-2);
+  text-decoration: none;
+}
+.kp-nav a:hover,
+.kp-nav a[aria-current] {
+  background: var(--sl-color-gray-5);
+  color: var(--sl-color-white);
+}
+.kp-nav a.kp-download,
+.kp-nav a.kp-download:hover {
+  margin-inline-start: 0.5rem;
+  padding-inline: 0.9rem;
+  background: #f2b544;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: #111214;
+  font-weight: 600;
+}
+
+/* DESIGN's selected row: an amber tint and an inset bar, not a filled block. */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--sl-color-accent);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+
+/* DESIGN's label: mono capitals in an outline, never a filled chip. */
+.sl-badge {
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sl-font-mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sl-badge.success {
+  border-color: currentColor;
+  color: oklch(0.8 0.13 155);
+}
+:root[data-theme='light'] .sl-badge.success {
+  color: oklch(0.5 0.13 155);
+}
+.sl-badge.note {
+  border-color: var(--sl-color-gray-3);
+  color: var(--sl-color-white);
+}
+.sl-badge.default {
+  border: 1px dashed var(--sl-color-gray-3);
+  color: var(--sl-color-gray-2);
+}
+
+.kp-group {
+  margin-top: 2.5rem;
+}
+.kp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.kp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 10px;
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+  line-height: 1.5;
+  text-decoration: none;
+}
+.kp-card:hover {
+  border-color: var(--sl-color-gray-4);
+}
+.kp-card strong {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-base);
+  font-weight: 600;
+}
+
 .kp-status {
   display: flex;
   align-items: center;

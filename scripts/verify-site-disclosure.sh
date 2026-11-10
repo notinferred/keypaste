@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Asks keypaste.com whether the disclosure is actually on it.
 #
-# verify-release-matrix.sh reads site/public/index.html at the checked-out ref, and says so, so it
+# verify-release-matrix.sh reads site/public/download/index.html at the checked-out ref, and says so, so it
 # goes green the moment a commit lands and says nothing about what the origin serves. What sits on
 # the far side of that gap is the list of ways the advertised download can destroy somebody's vault.
 # So this one asks the origin instead of the working tree.
@@ -26,7 +26,7 @@
 # here is the verdict, and a retry loop around it would turn propagation into a recorded failure.
 #
 # Usage:
-#   scripts/verify-site-disclosure.sh [url]     (default: https://keypaste.com/)
+#   scripts/verify-site-disclosure.sh [url]     (default: https://keypaste.com/download/)
 #   scripts/verify-site-disclosure.sh --selftest
 #
 # Environment:
@@ -134,7 +134,7 @@ $(jqr '[.published[] | select((.known_defects // []) | length > 0) | .version] |
 EOF
 
   [ "$missing" -eq 0 ] || die \
-    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - push a repaired site/public/index.html, or deploy this ref by hand with npx wrangler deploy from site/"
+    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - push a repaired site/public/download/index.html, or deploy this ref by hand with npx wrangler deploy from site/"
   [ "$notice_missing" -eq 0 ] || die \
     "$url is serving a page that drops the upgrade notice for $notice_missing superseded release(s) - the people running them have no other way to find out"
 
@@ -285,5 +285,5 @@ FIXDEF
 
 case "${1:-}" in
   --selftest) selftest ;;
-  *)          run_check "${1:-https://keypaste.com/}" ;;
+  *)          run_check "${1:-https://keypaste.com/download/}" ;;
 esac
