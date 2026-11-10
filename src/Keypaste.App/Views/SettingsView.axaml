@@ -9,24 +9,6 @@
              x:DataType="vm:SettingsViewModel">
 
   <UserControl.Styles>
-    <!-- A settings card: a heading, then rows split by hairlines. -->
-    <Style Selector="Border.settings">
-      <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="Border.settings-head">
-      <Setter Property="Padding" Value="20,16,20,4" />
-    </Style>
-    <Style Selector="Border.settings-row">
-      <Setter Property="Padding" Value="20,12" />
-    </Style>
-    <Style Selector="Border.settings-row:nth-child(n+3)">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-      <Setter Property="BorderThickness" Value="0,1,0,0" />
-    </Style>
-    <Style Selector="TextBlock.row-label">
-      <Setter Property="FontWeight" Value="Medium" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
     <Style Selector="SelectableTextBlock.fact-value">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
       <Setter Property="TextWrapping" Value="Wrap" />
@@ -58,111 +40,129 @@
       </StackPanel>
     </Border>
 
-    <ScrollViewer>
-      <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+    <ctl:ListDetail x:Name="Split" ShowsDetail="{Binding SectionIsOpen}">
 
-        <TextBlock Classes="h1" Text="{x:Static res:Strings.Settings}" />
-
-        <StackPanel Spacing="8">
-          <ListBox Name="SettingsSections" Classes="segmented" HorizontalAlignment="Left"
+      <!-- The parts of Settings, and the way on to Advanced, which is a screen of its own. -->
+      <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
+        <StackPanel Margin="12,16,12,8" Spacing="8">
+          <TextBlock Classes="list-title" Text="{Binding ListTitle}" />
+          <ListBox Name="SettingsSections" Classes="nav"
                    AutomationProperties.Name="{x:Static res:Strings.SettingsSections}"
                    ItemsSource="{Binding Sections}" SelectedItem="{Binding Section}" />
-          <TextBlock Classes="subtitle" TextWrapping="Wrap" Text="{Binding SectionNote}" />
+          <Button Name="OpenAdvanced"
+                  Classes="ghost"
+                  HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Stretch"
+                  ToolTip.Tip="{x:Static res:Strings.TheActivityLogShareLinksScopedTokensX927922}"
+                  AutomationProperties.Name="{x:Static res:Strings.OpenAdvanced}"
+                  Command="{Binding OpenAdvancedCommand}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{x:Static res:Strings.Advanced}" VerticalAlignment="Center" />
+              <ctl:KpIcon Grid.Column="1" Icon="chevron-right" Size="14" />
+            </Grid>
+          </Button>
         </StackPanel>
+      </Border>
 
-        <StackPanel Spacing="20" IsVisible="{Binding ShowsGeneral}">
-          <!-- Security -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="shield" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Security}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="6">
-                  <TextBlock Classes="label" Text="{x:Static res:Strings.LockTheVaultAfter}" />
-                  <ComboBox ItemsSource="{Binding IdleChoices}"
-                            AutomationProperties.Name="{x:Static res:Strings.LockTheVaultAfter}"
-                            SelectedItem="{Binding Idle}"
-                            MinWidth="160"
-                            HorizontalAlignment="Left">
-                    <ComboBox.ItemTemplate>
-                      <DataTemplate x:DataType="vm:IdleChoice">
-                        <TextBlock Text="{Binding Label}" />
-                      </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                  </ComboBox>
-                  <TextBlock Classes="caption" Text="{x:Static app:ShortcutText.IdleLock}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row" IsVisible="{Binding MinimizeLockSupported}">
-                <StackPanel Spacing="4">
-                  <ToggleSwitch Content="{x:Static res:Strings.LockWhenTheWindowIsMinimized}"
-                                FontWeight="Medium"
-                                Classes="size-13-5"
-                                IsChecked="{Binding LockWhenMinimized}" />
-                  <TextBlock Classes="caption" Margin="40,0,0,0"
-                             Text="{Binding MinimizeHelp}" />
-                </StackPanel>
-              </Border>
+      <DockPanel>
+        <Border DockPanel.Dock="Top" IsVisible="{Binding #Split.ShowsBack}">
+          <Button x:Name="BackToSections"
+                  Classes="ghost sm"
+                  HorizontalAlignment="Left"
+                  Margin="24,12,0,0"
+                  Command="{Binding CloseSectionCommand}"
+                  AutomationProperties.Name="{Binding ListTitle, StringFormat={x:Static res:Strings.BackToValue}}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ctl:KpIcon Icon="chevron-left" Size="14" />
+              <TextBlock Text="{Binding ListTitle}" VerticalAlignment="Center" />
             </StackPanel>
-          </Border>
+          </Button>
+        </Border>
 
-          <!-- Startup -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="rotate-cw" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Startup}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="4">
-                  <ToggleSwitch Name="StayInTray"
-                                Content="{Binding StayInTrayLabel}"
-                                FontWeight="Medium"
-                                Classes="size-13-5"
-                                IsChecked="{Binding StayInTray}" />
-                  <TextBlock Classes="caption" Margin="40,0,0,0"
-                             Text="{Binding CloseHelp}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row" IsVisible="{Binding OpenAtLoginSupported}">
-                <StackPanel Spacing="4">
-                  <ToggleSwitch Name="OpenAtLogin"
-                                Content="{x:Static res:Strings.OpenKeypasteAtLogin}"
-                                FontWeight="Medium"
-                                Classes="size-13-5"
-                                IsChecked="{Binding OpenAtLogin}" />
-                  <TextBlock Classes="caption" Margin="40,0,0,0"
-                             Text="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}" />
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Stretch">
 
-          <!-- The keypaste a terminal finds, which is this computer's and no vault's. -->
-          <Border Classes="card filled settings" IsVisible="{Binding CliLinkSupported}">
-            <Border Classes="settings-row">
-              <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                  <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.KeypasteInATerminal}" />
-                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
-                    <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
-                  </StackPanel>
-                  <Panel Grid.Column="1" VerticalAlignment="Top">
-                    <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
-                      <TextBlock Text="{x:Static res:Strings.Link}" />
-                    </Button>
-                    <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOtherKeypaste}">
-                      <TextBlock Text="{x:Static res:Strings.ReplaceX64ca19}" />
-                    </Button>
-                  </Panel>
-                </Grid>
+            <TextBlock Classes="list-title" Text="{Binding Section}" ToolTip.Tip="{Binding SectionNote}" />
+
+            <StackPanel Spacing="16" IsVisible="{Binding ShowsGeneral}">
+
+              <Border Classes="group">
+                <ctl:GroupedRows>
+                  <ctl:FieldRow Label="{x:Static res:Strings.LockAfter}">
+                    <ComboBox ItemsSource="{Binding IdleChoices}"
+                              AutomationProperties.Name="{x:Static res:Strings.LockAfter}"
+                              AutomationProperties.HelpText="{x:Static app:ShortcutText.IdleLock}"
+                              ToolTip.Tip="{x:Static app:ShortcutText.IdleLock}"
+                              SelectedItem="{Binding Idle}"
+                              MinWidth="160"
+                              HorizontalAlignment="Left">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:IdleChoice">
+                          <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Label="{x:Static res:Strings.LockWhenMinimized}" IsVisible="{Binding MinimizeLockSupported}">
+                    <ctl:FieldRow.Actions>
+                      <ToggleSwitch Name="LockWhenMinimized"
+                                    AutomationProperties.Name="{x:Static res:Strings.LockWhenTheWindowIsMinimized}"
+                                    AutomationProperties.HelpText="{Binding MinimizeHelp}"
+                                    ToolTip.Tip="{Binding MinimizeHelp}"
+                                    IsChecked="{Binding LockWhenMinimized}" />
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Label="{Binding StayInTrayLabel}">
+                    <ctl:FieldRow.Actions>
+                      <ToggleSwitch Name="StayInTray"
+                                    AutomationProperties.Name="{Binding StayInTrayLabel}"
+                                    AutomationProperties.HelpText="{Binding CloseHelp}"
+                                    ToolTip.Tip="{Binding CloseHelp}"
+                                    IsChecked="{Binding StayInTray}" />
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Label="{x:Static res:Strings.OpenAtLogin}" IsVisible="{Binding OpenAtLoginSupported}">
+                    <ctl:FieldRow.Actions>
+                      <ToggleSwitch Name="OpenAtLogin"
+                                    AutomationProperties.Name="{x:Static res:Strings.OpenKeypasteAtLogin}"
+                                    AutomationProperties.HelpText="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}"
+                                    ToolTip.Tip="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}"
+                                    IsChecked="{Binding OpenAtLogin}" />
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Label="{x:Static res:Strings.Theme}" IsVisible="{Binding OffersTheme}">
+                    <ListBox Name="ThemeChoice" AutomationProperties.Name="{x:Static res:Strings.Theme}"
+                             ToolTip.Tip="{x:Static res:Strings.ThisDesktopReportsNoLightOrDark}"
+                             Classes="segmented"
+                             HorizontalAlignment="Left"
+                             ItemsSource="{Binding Themes}"
+                             SelectedItem="{Binding Theme}" />
+                  </ctl:FieldRow>
+                </ctl:GroupedRows>
+              </Border>
+
+              <!-- The keypaste a terminal finds, which is this computer's and no vault's. -->
+              <StackPanel Spacing="12" IsVisible="{Binding CliLinkSupported}">
+                <Border Classes="group">
+                  <ctl:GroupedRows>
+                    <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.KeypasteInATerminal}">
+                      <StackPanel Spacing="4">
+                        <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
+                        <TextBlock ctl:MachineRuns.InText="True" Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
+                      </StackPanel>
+                      <ctl:FieldRow.Actions>
+                        <Panel VerticalAlignment="Top">
+                          <Button Name="LinkCli" Command="{Binding LinkCliCommand}" IsVisible="{Binding OffersCliLink}" AutomationProperties.Name="{x:Static res:Strings.LinkTheKeypasteCommand}">
+                            <TextBlock Text="{x:Static res:Strings.Link}" />
+                          </Button>
+                          <Button Name="ReplaceCli" Command="{Binding BeginReplaceCliCommand}" IsVisible="{Binding OffersCliReplace}" AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOtherKeypaste}">
+                            <TextBlock Text="{x:Static res:Strings.ReplaceX64ca19}" />
+                          </Button>
+                        </Panel>
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
+                  </ctl:GroupedRows>
+                </Border>
                 <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
                   <StackPanel Spacing="8">
                     <TextBlock ctl:MachineRuns.InText="True" Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
@@ -173,113 +173,65 @@
                   </StackPanel>
                 </Border>
               </StackPanel>
-            </Border>
-          </Border>
 
-          <!-- Appearance -->
-          <Border Classes="card filled settings" IsVisible="{Binding OffersTheme}">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="sun" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Appearance}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                  <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Theme}" />
-                    <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ThisDesktopReportsNoLightOrDark}" />
+              <StackPanel Spacing="12">
+                <Border Classes="group">
+                  <ctl:GroupedRows>
+                    <ctl:FieldRow Label="{x:Static res:Strings.RecentVaults}">
+                      <ctl:FieldRow.Actions>
+                        <Button Name="AskForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.ForgetRecentVaults}" Command="{Binding AskForgetAllCommand}"
+                                ToolTip.Tip="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}"
+                                IsVisible="{Binding !IsConfirmingForgetAll}" />
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
+                  </ctl:GroupedRows>
+                </Border>
+                <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{x:Static res:Strings.ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb}" TextWrapping="Wrap" Classes="primary size-13" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Name="CancelForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelForgetAllCommand}" />
+                      <Button Name="ConfirmForgetAll" Classes="danger sm" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding ForgetAllCommand}" />
+                    </StackPanel>
                   </StackPanel>
-                  <ListBox Grid.Column="1"
-                           Name="ThemeChoice" AutomationProperties.Name="{x:Static res:Strings.Theme}"
-                           Classes="segmented"
-                           VerticalAlignment="Center"
-                           ItemsSource="{Binding Themes}"
-                           SelectedItem="{Binding Theme}" />
-                </Grid>
+                </Border>
+              </StackPanel>
+
+              <Border Name="CrashReportsCard" Classes="group" IsVisible="{Binding HasCrashReports}">
+                <ctl:GroupedRows>
+                  <ctl:FieldRow Label="{x:Static res:Strings.CrashReports}">
+                    <ctl:FieldRow.Actions>
+                      <ToggleSwitch Name="SendCrashReports"
+                                    AutomationProperties.Name="{x:Static res:Strings.SendCrashReports}"
+                                    AutomationProperties.HelpText="{x:Static res:Strings.WhatFailedAndWhereInKeypastesCodeX12c043}"
+                                    ToolTip.Tip="{x:Static res:Strings.WhatFailedAndWhereInKeypastesCodeX12c043}"
+                                    IsChecked="{Binding SendCrashReports}" />
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                </ctl:GroupedRows>
               </Border>
             </StackPanel>
-          </Border>
 
-          <!-- Recent vaults -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="folder-open" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RecentVaults}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="8">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                    <TextBlock Grid.Column="0" Classes="caption"
-                               Text="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}" />
-                    <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="{x:Static res:Strings.ForgetRecentVaults}" Command="{Binding AskForgetAllCommand}"
-                            IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
-                  </Grid>
-                  <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
-                    <StackPanel Spacing="8">
-                      <TextBlock Text="{x:Static res:Strings.ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb}" TextWrapping="Wrap" Classes="primary size-13" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Name="CancelForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelForgetAllCommand}" />
-                        <Button Name="ConfirmForgetAll" Classes="danger sm" Content="{x:Static res:Strings.ForgetThemAll}" Command="{Binding ForgetAllCommand}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
+            <StackPanel Spacing="16" IsVisible="{Binding ShowsThisVault}">
 
-          <Border Name="CrashReportsCard" Classes="card filled settings" IsVisible="{Binding HasCrashReports}">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.CrashReports}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="4">
-                  <ToggleSwitch Name="SendCrashReports"
-                                Content="{x:Static res:Strings.SendCrashReports}"
-                                FontWeight="Medium"
-                                Classes="size-13-5"
-                                IsChecked="{Binding SendCrashReports}" />
-                  <TextBlock Classes="caption" Margin="40,0,0,0" TextWrapping="Wrap"
-                             Text="{x:Static res:Strings.WhatFailedAndWhereInKeypastesCodeX12c043}" />
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
-        </StackPanel>
-
-        <StackPanel Spacing="20" IsVisible="{Binding ShowsThisVault}">
-          <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
-          <Border Classes="card filled settings" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="key-round" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.VaultAccess}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="12">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                    <StackPanel Spacing="4">
-                      <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}" />
-                      <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
+              <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
+              <StackPanel Spacing="12" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
+                <Border Classes="group">
+                  <ctl:GroupedRows>
+                    <ctl:FieldRow Label="{x:Static res:Strings.VaultAccess}">
+                      <TextBlock Name="AccessFactors" Classes="size-13" Text="{Binding Factors}" TextWrapping="Wrap"
+                                 ToolTip.Tip="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}"
                                  Foreground="{DynamicResource KpTextSecondary}" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Name="OpenAccessForm" Content="{x:Static res:Strings.ChangeEllipsis}" VerticalAlignment="Top"
-                            IsVisible="{Binding !IsFormOpen}" Command="{Binding OpenFormCommand}"
-                            AutomationProperties.Name="{x:Static res:Strings.ChangeWhatUnlocksThisVault}" />
-                  </Grid>
+                      <ctl:FieldRow.Actions>
+                        <Button Name="OpenAccessForm" Classes="ghost sm" Content="{x:Static res:Strings.ChangeEllipsis}"
+                                IsVisible="{Binding !IsFormOpen}" Command="{Binding OpenFormCommand}"
+                                AutomationProperties.Name="{x:Static res:Strings.ChangeWhatUnlocksThisVault}" />
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
+                  </ctl:GroupedRows>
+                </Border>
 
-                  <StackPanel Name="AccessForm" Spacing="12" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True">
+                <StackPanel Name="AccessForm" Spacing="12" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True">
                   <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left" Width="420">
                     <StackPanel Spacing="6">
                       <TextBlock Classes="label" Text="{x:Static res:Strings.CurrentMasterPassword}" />
@@ -386,179 +338,129 @@
                     </StackPanel>
                   </Border>
 
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
-                    <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding Busy}" />
-                    <TextBlock Classes="caption" Text="{x:Static res:Strings.Changing}" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <TextBlock ctl:MachineRuns.InText="True" Name="AccessMessage"
-                             Classes="caption"
-                             ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
-                             IsVisible="{Binding HasMessage}"
-                             Foreground="{DynamicResource KpTextSecondary}" />
                 </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
-
-          <!-- Backups -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="history" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Backups}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
+                  <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding Busy}" />
+                  <TextBlock Classes="caption" Text="{x:Static res:Strings.Changing}" VerticalAlignment="Center" />
                 </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="8">
-                  <TextBlock Classes="caption" Text="{Binding BackupsRule}" />
-                  <Border Classes="field" Padding="12,8">
-                    <SelectableTextBlock Classes="fact-value size-12" Text="{Binding BackupsPath}" VerticalAlignment="Center" />
-                  </Border>
-                  <TextBlock ctl:MachineRuns.InText="True" Name="BackupsSummary"
-                             Classes="size-13"
-                             TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextPrimary}"
-                             Text="{Binding BackupsSummary}" />
-                  <TextBlock Classes="caption" Text="{Binding RestoreHint}" IsVisible="{Binding HasBackupCopies}" />
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
-
-          <!-- Export -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="download" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Export}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                  <TextBlock Grid.Column="0" Classes="caption" Text="{Binding ElsewhereAdvice}" />
-                  <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.ExportAnEncryptedCopy}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <ctl:KpIcon Icon="file-lock-2" Size="14" />
-                      <TextBlock Text="{x:Static res:Strings.ExportAnEncryptedCopy}" />
-                    </StackPanel>
-                  </Button>
-                </Grid>
-              </Border>
-            </StackPanel>
-          </Border>
-
-          <!-- Agents and the CLI -->
-          <Border Classes="card filled settings">
-            <StackPanel>
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="terminal" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AgentsAndTheCLI}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                  <StackPanel Grid.Column="0" Spacing="6">
-                    <TextBlock ctl:MachineRuns.InText="True" Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
-                    <TextBlock ctl:MachineRuns.InText="True" Classes="caption" Text="{Binding ChosenVaultRule}" />
-                  </StackPanel>
-                  <Button Grid.Column="1" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.UseThisVaultForAgentsAndTheXb47c9a}">
-                    <TextBlock Text="{x:Static res:Strings.UseThisVault}" />
-                  </Button>
-                </Grid>
-              </Border>
-            </StackPanel>
-          </Border>
-        </StackPanel>
-
-        <StackPanel Spacing="20" IsVisible="{Binding ShowsBrowser}">
-          <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds. -->
-          <Border Name="BrowserFillCard" Classes="card filled settings" IsVisible="{Binding HasBrowserFill}">
-            <StackPanel DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
-              <Border Classes="settings-head">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="globe" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.BrowserFill}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="8">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                      <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.PairABrowser}" />
-                      <TextBlock Classes="caption" TextWrapping="Wrap"
-                                 Text="{x:Static res:Strings.KeePassXCBrowserPairsWithKeypasteAsItX779e5d}" />
-                    </StackPanel>
-                    <Panel Grid.Column="1" VerticalAlignment="Top">
-                      <Button Name="PairBrowser" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
-                              AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
-                      <Button Name="StopPairing" Classes="ghost" Content="{x:Static res:Strings.StopPairing}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
-                              AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
-                    </Panel>
-                  </Grid>
-                  <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
-                             Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
-                  <TextBlock ctl:MachineRuns.InText="True" Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
-                </StackPanel>
-              </Border>
-              <Border Classes="settings-row">
-                <StackPanel Spacing="8">
-                  <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.PairedBrowsers}" />
-                  <TextBlock Classes="caption" Text="{x:Static res:Strings.NoBrowserIsPairedWithThisVault}" IsVisible="{Binding HasNoRows}" />
-                  <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:PairingItem">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,8" Background="Transparent">
-                          <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="size-13-5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
-                            <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
-                            <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Top"
-                                  AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RemoveThePairingValue}}"
-                                  IsVisible="{Binding !IsConfirmingRemove}"
-                                  Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).AskRemoveCommand}"
-                                  CommandParameter="{Binding}" />
-                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
-                                      IsVisible="{Binding IsConfirmingRemove}" ctl:ShowInView.OnShow="True">
-                            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}"
-                                    Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).CancelRemoveCommand}"
-                                    CommandParameter="{Binding}" />
-                            <Button Classes="danger sm" Content="{x:Static res:Strings.Remove}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.ConfirmRemovingThePairingValue}}"
-                                    Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
-                                    CommandParameter="{Binding}" />
-                          </StackPanel>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </Border>
-        </StackPanel>
-
-        <!-- Settings › Advanced, a screen of its own with what the everyday screens leave out. -->
-        <Border Name="AdvancedCard" Classes="card filled settings">
-          <Border Classes="settings-row">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-              <ctl:KpIcon Grid.Column="0" Icon="layers" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
-              <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Advanced}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.TheActivityLogShareLinksScopedTokensX927922}" />
+                <TextBlock ctl:MachineRuns.InText="True" Name="AccessMessage"
+                           Classes="caption"
+                           ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
+                           IsVisible="{Binding HasMessage}"
+                           Foreground="{DynamicResource KpTextSecondary}" />
               </StackPanel>
-              <Button Grid.Column="2" Name="OpenAdvanced" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
-                      AutomationProperties.Name="{x:Static res:Strings.OpenAdvanced}"
-                      Command="{Binding OpenAdvancedCommand}" />
-            </Grid>
-          </Border>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
+
+              <Border Classes="group">
+                <ctl:GroupedRows>
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Backups}">
+                    <StackPanel Spacing="4">
+                      <TextBlock ctl:MachineRuns.InText="True" Name="BackupsSummary"
+                                 Classes="size-13"
+                                 TextWrapping="Wrap"
+                                 ToolTip.Tip="{Binding BackupsRule}"
+                                 Foreground="{DynamicResource KpTextPrimary}"
+                                 Text="{Binding BackupsSummary}" />
+                      <SelectableTextBlock Classes="fact-value size-12" Text="{Binding BackupsPath}" />
+                      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding RestoreHint}" IsVisible="{Binding HasBackupCopies}" />
+                    </StackPanel>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Label="{x:Static res:Strings.Export}">
+                    <ctl:FieldRow.Actions>
+                      <Button Classes="ghost sm" Command="{Binding ExportCommand}"
+                              ToolTip.Tip="{Binding ElsewhereAdvice}"
+                              AutomationProperties.Name="{x:Static res:Strings.ExportAnEncryptedCopy}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="file-lock-2" Size="14" />
+                          <TextBlock Text="{x:Static res:Strings.ExportAnEncryptedCopy}" />
+                        </StackPanel>
+                      </Button>
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.AgentsAndTheCLI}">
+                    <TextBlock ctl:MachineRuns.InText="True" Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding ChosenVaultRule}"
+                               Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
+                    <ctl:FieldRow.Actions>
+                      <Button Classes="ghost sm" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.UseThisVaultForAgentsAndTheXb47c9a}">
+                        <TextBlock Text="{x:Static res:Strings.UseThisVault}" />
+                      </Button>
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
+                </ctl:GroupedRows>
+              </Border>
+            </StackPanel>
+
+            <StackPanel Spacing="16" IsVisible="{Binding ShowsBrowser}">
+              <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds. -->
+              <Border Name="BrowserFillCard" IsVisible="{Binding HasBrowserFill}">
+                <StackPanel Spacing="12" DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
+                  <Border Classes="group">
+                    <ctl:GroupedRows>
+                      <ctl:FieldRow Label="{x:Static res:Strings.BrowserFill}">
+                        <StackPanel Spacing="4">
+                          <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
+                                     Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
+                          <TextBlock ctl:MachineRuns.InText="True" Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+                        </StackPanel>
+                        <ctl:FieldRow.Actions>
+                          <Panel VerticalAlignment="Top">
+                            <Button Name="PairBrowser" Classes="ghost sm" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
+                                    ToolTip.Tip="{x:Static res:Strings.KeePassXCBrowserPairsWithKeypasteAsItX779e5d}"
+                                    AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
+                            <Button Name="StopPairing" Classes="ghost sm" Content="{x:Static res:Strings.StopPairing}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
+                                    AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
+                          </Panel>
+                        </ctl:FieldRow.Actions>
+                      </ctl:FieldRow>
+                    </ctl:GroupedRows>
+                  </Border>
+
+                  <TextBlock Classes="th" Text="{x:Static res:Strings.PairedBrowsers}" Margin="4,0" />
+                  <TextBlock Classes="caption" Margin="4,0" Text="{x:Static res:Strings.NoBrowserIsPairedWithThisVault}" IsVisible="{Binding HasNoRows}" />
+                  <Border Classes="group" IsVisible="{Binding HasRows}">
+                    <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PairingItem">
+                          <ctl:FieldRow Label="{Binding Name}">
+                            <StackPanel Spacing="2">
+                              <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
+                              <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ctl:FieldRow.Actions>
+                              <Panel VerticalAlignment="Top">
+                                <Button Classes="ghost sm" Content="{x:Static res:Strings.Remove}"
+                                        AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.RemoveThePairingValue}}"
+                                        IsVisible="{Binding !IsConfirmingRemove}"
+                                        Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).AskRemoveCommand}"
+                                        CommandParameter="{Binding}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8"
+                                            IsVisible="{Binding IsConfirmingRemove}" ctl:ShowInView.OnShow="True">
+                                  <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}"
+                                          Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).CancelRemoveCommand}"
+                                          CommandParameter="{Binding}" />
+                                  <Button Classes="danger sm" Content="{x:Static res:Strings.Remove}" AutomationProperties.Name="{Binding Name, StringFormat={x:Static res:Strings.ConfirmRemovingThePairingValue}}"
+                                          Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
+                                          CommandParameter="{Binding}" />
+                                </StackPanel>
+                              </Panel>
+                            </ctl:FieldRow.Actions>
+                          </ctl:FieldRow>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Border>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+
+    </ctl:ListDetail>
   </DockPanel>
 
 </UserControl>
