@@ -34,7 +34,7 @@ public sealed class AppSettingsTests : IDisposable
         var settings = AppSettings.Load(SettingsFile);
 
         Assert.Equal(AppSettings.Default, settings);
-        Assert.Equal(300, settings.IdleTimeoutSeconds);
+        Assert.Equal(1800, settings.IdleTimeoutSeconds);
         Assert.Equal(AppTheme.System, settings.Theme);
         Assert.False(settings.LockWhenMinimized);
     }
