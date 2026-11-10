@@ -403,9 +403,8 @@ public sealed class SortAndSizeTablesTests
         Assert.Equal(edge.X + by, InWindow(grip, shell.Window).X, 1d);
 
         var row = shell.Window.GetVisualDescendants().OfType<LogColumns>().First(columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        var cell = row.Children.First(child => Grid.GetColumn(child) == 2);
-        var text = cell as TextBlock ?? cell.GetVisualDescendants().OfType<TextBlock>().First();
-        Assert.Equal(InWindow(LabelOf(Head(shell, TableStates.Action)), shell.Window).X, InWindow(text, shell.Window).X, 1d);
+        Assert.Equal(Head(shell, TableStates.Actor).Bounds.Width, row.DrawnWidths[1], 1d);
+        Assert.Equal(Head(shell, TableStates.Action).Bounds.Width, row.DrawnWidths[2], 1d);
     });
 
     [Theory]
