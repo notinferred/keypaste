@@ -23,6 +23,11 @@
 #   G5   A purge of an item the app did not change goes with its tombstone; one it changed is in the bin.
 #   G6   An item KeePassXC recycles while the app edits it ends in the bin with the edit, and one the app
 #        restores after KeePassXC purged it survives.
+#   G7   An item's attachment survives a merge byte for byte, and a merge joining KeePassXC's new attachment to the
+#        app's newer change keeps each whole version in history, each read back through a restore and KeePassXC.
+#   G8   A revoked token stays revoked through KeePassXC's merge of a copy still holding it, either way round, and
+#        through that copy moved over the file; a copy edited after the revocation brings it back, THREATS' limit.
+#   G11  Another vault and a truncated file are refused, the complete file is then merged, and a changed password locks.
 #
 #   G13  KeePassXC saves one item of a vault whose items carry custom data: the merge reports one change
 #        and the items KeePassXC only re-stamped gain no history.
@@ -49,6 +54,7 @@ dir=${1:-}
 require jq
 require node
 drv=$(app_driver)
+kp=$(keypaste_bin)
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -167,6 +173,7 @@ function version(entry) {
     title: strings.Title || "",
     username: strings.UserName || "",
     password: strings.Password || "",
+    notes: strings.Notes || "",
     modified: seconds(text(kid(times, "LastModificationTime"))),
     location: seconds(text(kid(times, "LocationChanged"))),
     previous: text(kid(entry, "PreviousParentGroup")) || null,
@@ -271,6 +278,13 @@ if (command === "entry") {
   console.log(JSON.stringify(found ? {
     group: found.group,
     path: found.path,
+    current: version(found.node),
+    history: kids(kid(found.node, "History"), "Entry").map(version),
+  } : null));
+} else if (command === "token") {
+  const found = [...walked.entries.values()].find((e) => e.path === ".keypaste/tokens" && version(e.node).username === args[0]);
+  console.log(JSON.stringify(found ? {
+    id: version(found.node).title,
     current: version(found.node),
     history: kids(kid(found.node, "History"), "Entry").map(version),
   } : null));
@@ -703,6 +717,200 @@ kx rm "$v" services/Beta >/dev/null || die "KeePassXC could not recycle Beta"
 [ "$(kx show "$v" 'Recycle Bin/Beta' -a Password)" = beta-app-g6 ] || die "Beta is not in the bin with the app's edit"
 checked "$v"
 
+# ------------------------------------------------------------------------------------- G7
+step "G7: KeePassXC attaches a file beside the app's edit of another item, and an attachment and a password joined by a merge"
+seed g7 10 root Alpha Doc Ctl
+v=$dir/g7.kdbx
+printf 'first attachment\000\001\002 bytes\n' >"$dir/first.bin"
+head -c 4096 /dev/urandom >"$dir/second.bin"
+kx attachment-import "$v" services/Doc file.bin "$(native "$dir/first.bin")" >/dev/null || die "KeePassXC could not attach to Doc"
+hold "$v"
+kx attachment-import "$v" services/Ctl file.bin "$(native "$dir/second.bin")" >/dev/null || die "KeePassXC could not attach to Ctl"
+[ "$(edit services/Alpha alpha-app-g7)" = 'saved services/Alpha' ] || die "the app's edit beside KeePassXC's attachment was not saved"
+kx attachment-export "$v" services/Ctl file.bin "$(native "$dir/ctl.out")" >/dev/null || die "KeePassXC cannot export Ctl's attachment"
+cmp -s "$dir/ctl.out" "$dir/second.bin" || die "Ctl's attachment changed through the merge"
+checked "$v"
+kx attachment-import "$v" services/Doc file.bin "$(native "$dir/second.bin")" -f >/dev/null || die "KeePassXC could not replace Doc's attachment"
+sleep 2.1
+[ "$(edit services/Doc doc-app-g7)" = 'saved services/Doc' ] || die "the app's newer edit of Doc was not saved"
+case "$(last_merge)" in
+  *"You and the other program both changed services/Doc. keypaste kept each change"*) ;;
+  *) die "the notice did not say Doc's changes on both sides were kept: $(last_merge)" ;;
+esac
+[ "$(kx show "$v" services/Doc -a Password)" = doc-app-g7 ] || die "Doc's password is not the app's change"
+kx attachment-export "$v" services/Doc file.bin "$(native "$dir/doc.out")" >/dev/null || die "KeePassXC cannot export Doc's attachment"
+cmp -s "$dir/doc.out" "$dir/second.bin" || die "Doc's current attachment is not the one KeePassXC replaced it with"
+checked "$v"
+json=$(exported "$v" g7)
+release
+refs=$(entry_in "$json" Doc | jq -c '[.current.attachments[0].ref] + [.history[].attachments[0].ref]')
+echo "    measured: the export gives the attachments of Doc and its history the Ref numbers ${refs}, one number for all of them from KeePassXC 2.8.0"
+
+# KeePassXC 2.8.0's KDBX 4 export numbers every attachment 0, so a version's bytes are read by restoring it in a copy.
+restored_attachment() {
+  local want=$1 expected=$2 row copy=$dir/g7-restored.kdbx out=$dir/g7-restored.bin
+  row=$(entry_in "$json" Doc | jq -r --arg want "$want" '.history | sort_by(-.modified) | map(.password) | index($want)')
+  [ "$row" != null ] || die "no version of Doc in its history has the password ${want}: $(entry_in "$json" Doc)"
+  cp "$v" "$copy"
+  KEYPASTE_DRIVER_PASSWORD="$pw" "$drv" revision-restore "$(native "$copy")" services/Doc "$row" >"$dir/g7-restore.out" 2>&1 \
+    || die "the app could not restore Doc's version at row ${row}: $(cat "$dir/g7-restore.out")"
+  [ "$(kx show "$copy" services/Doc -a Password)" = "$want" ] || die "the restore of Doc at row ${row} did not give ${want}"
+  rm -f "$out"
+  kx attachment-export "$copy" services/Doc file.bin "$(native "$out")" >/dev/null || die "KeePassXC cannot export the attachment of the version with ${want}"
+  cmp -s "$out" "$expected" || die "the version of Doc with the password ${want} does not hold $(basename "$expected") byte for byte"
+}
+restored_attachment doc-app-g7 "$dir/first.bin"
+restored_attachment Doc-0 "$dir/second.bin"
+
+# ------------------------------------------------------------------------------------- G8
+step "G8: a revoked token, and KeePassXC merging a copy still holding it into the file the app holds"
+cat >"$dir/g8.xml" <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-merge</Generator><DatabaseName>merge</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid root)</UUID><Name>Root</Name>
+      <CustomData><Item><Key>verify-keepassxc-merge</Key><Value>kdbx4</Value></Item></CustomData>
+      <Group>
+        <UUID>${services_id}</UUID><Name>services</Name>
+        <Entry>
+          <UUID>$(uuid Stripe)</UUID>
+          <Tags>env:billing</Tags>
+          <String><Key>Title</Key><Value>Stripe</Value></String>
+          <String><Key>STRIPE_KEY</Key><Value ProtectInMemory="True">sk-merge-g8</Value></String>
+        </Entry>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+v=$dir/g8.kdbx
+import_xml "$dir/g8.xml" "$v"
+token=$(printf '%s\n' "$pw" | "$kp" token create gate-merge --scope 'read:billing/dev/*' --vault "$(native "$v")" 2>"$dir/g8-token.err" | tr -d '\r') \
+  || die "keypaste token create failed: $(cat "$dir/g8-token.err")"
+[ -n "$token" ] || die "keypaste token create printed no token"
+token_id=$(xml token "$(exported "$v" g8-created)" gate-merge | jq -r '.id')
+
+# $1 names the case. With "runs" as $2 the token's run starts its child; otherwise it is refused, nothing starts, and the owner records why.
+token_run() {
+  local logged out status
+  logged=$(lines_in "$audit")
+  set +e
+  out=$(KEYPASTE_TOKEN="$token" "$kp" run --token env --vault "$(native "$v")" billing -- "$kp" --version 2>"$dir/g8-run.err" | tr -d '\r')
+  status=$?
+  set -e
+  if [ "${2:-}" = runs ]; then
+    if [ "$status" -ne 0 ] || [ -z "$out" ]; then die "$1: the token did not run: $(cat "$dir/g8-run.err")"; fi
+    return 0
+  fi
+  [ "$status" -ne 0 ] || die "$1: the revoked token ran: ${out}"
+  [ -z "$out" ] || die "$1: a child started for the revoked token: ${out}"
+  lines_after "$audit" "$logged" | jq -e -s 'any(.[]; .method == "token" and .decision == "denied" and (.reason | contains("not valid")))' >/dev/null \
+    || die "$1: the refusal was not recorded as a token the vault does not know: $(lines_after "$audit" "$logged")"
+}
+
+# That the token's record in the vault $1, as KeePassXC reads it, is the revoked version with the live one in its history.
+expect_revoked() {
+  local record
+  record=$(xml token "$(exported "$1" "$(basename "$1" .kdbx)-token")" gate-merge)
+  jq -e '.current.password == "" and (.current.notes | contains("\"revoked\"")) and any(.history[]; .password != "" and (.notes | contains("\"revoked\"") | not))' <<<"$record" >/dev/null \
+    || die "$2: the record in $(basename "$1") is not the revoked version with the live one in history: ${record}"
+}
+
+stale=$dir/g8-stale.kdbx
+hold "$v"
+token_run "before the revocation" runs
+release
+cp "$v" "$stale"
+printf '%s\n' "$pw" | "$kp" token revoke gate-merge --vault "$(native "$v")" >/dev/null 2>"$dir/g8-revoke.err" \
+  || die "keypaste token revoke failed: $(cat "$dir/g8-revoke.err")"
+hold "$v"
+# keepassxc-cli saves only when its merge changed something, and the file's history already holds this copy's version.
+cp "$v" "$dir/g8-before-merge.kdbx"
+merge_into "$v" "$stale"
+line=$(merge)
+case "$line" in
+  none) cmp -s "$v" "$dir/g8-before-merge.kdbx" || die "KeePassXC's merge changed the file and the app saw nothing to merge" ;;
+  'merged updated' | 'merged saved: '*) ;;
+  *) die "the app did not merge KeePassXC's merge of the copy still holding the token: ${line}" ;;
+esac
+echo "    measured: KeePassXC's merge into the file with the revocation newer: ${line}"
+expect_revoked "$v" "after KeePassXC merged the stale copy into the file"
+checked "$v"
+token_run "after KeePassXC merged in the copy still holding the token"
+
+step "G8: KeePassXC merges the revocation into the copy still holding the token"
+into_stale=$dir/g8-into-stale.kdbx
+cp "$stale" "$into_stale"
+merge_into "$into_stale" "$v"
+expect_revoked "$into_stale" "after KeePassXC merged the revocation into the stale copy"
+cp "$into_stale" "$v"
+line=$(merge)
+case "$line" in 'merged updated' | 'merged saved: '*) ;; *) die "the app did not merge KeePassXC's merge of the revocation: ${line}" ;; esac
+checked "$v"
+token_run "after the revocation was merged into the stale copy"
+
+step "G8: the copy still holding the token, moved over the file"
+cp "$stale" "$v"
+line=$(merge)
+case "$line" in 'merged saved: '*) ;; *) die "the app did not merge the copy still holding the token: ${line}" ;; esac
+expect_revoked "$v" "after the copy was moved over the file"
+checked "$v"
+token_run "after that copy was moved over the file"
+
+step "G8: a copy edited after the revocation holds a newer version than it, and the token works again (THREATS, T-32)"
+sleep 2.1
+kx edit "$stale" ".keypaste/tokens/${token_id}" --url https://edited.example/ >/dev/null || die "KeePassXC could not edit the token's record in its copy"
+merge_into "$v" "$stale"
+line=$(merge)
+case "$line" in 'merged updated' | 'merged saved: '*) ;; *) die "the app did not merge the copy edited after the revocation: ${line}" ;; esac
+limit=$(xml token "$(exported "$v" g8-limit)" gate-merge)
+jq -e '.current.password != "" and (.current.notes | contains("\"revoked\"") | not)' <<<"$limit" >/dev/null \
+  || die "the record edited after the revocation did not bring the live version back, which THREATS says it does: ${limit}"
+token_run "the copy edited after the revocation" runs
+echo "    measured: a record edited after the revocation carried the verifier back through KeePassXC's merge and the token ran, the limit THREATS names"
+release
+
+# ------------------------------------------------------------------------------------- G11
+step "G11: another vault is not merged and the notice says so"
+seed g11 10 root Alpha Beta
+seed g11-other 10 another-root Other
+v=$dir/g11.kdbx
+hold "$v"
+cp "$v" "$dir/g11-mine.kdbx"
+cp "$dir/g11-other.kdbx" "$v"
+[ "$(merge)" = 'merged refused AnotherVault: the file now holds another vault' ] || die "another vault was not refused: $(last_merge)"
+said=$(act notice '^notice ')
+[ "$said" = "notice Another program saved g11.kdbx, and keypaste could not merge it: the file now holds another vault. Agents are refused until you reload it." ] \
+  || die "the notice did not say the file holds another vault: ${said}"
+[ "$(merge)" = none ] || die "the app merged the same refused bytes again: $(last_merge)"
+cmp -s "$v" "$dir/g11-other.kdbx" || die "a refused merge wrote over the other vault"
+
+step "G11: a truncated file is refused, and the complete one then merged"
+kx edit "$dir/g11-mine.kdbx" services/Beta -u kpxc-g11 >/dev/null || die "KeePassXC could not edit the vault's own copy"
+size=$(wc -c <"$dir/g11-mine.kdbx" | tr -d ' ')
+head -c $((size / 2)) "$dir/g11-mine.kdbx" >"$v"
+case "$(merge)" in 'merged refused Unreadable: '*) ;; *) die "a truncated file was not refused: $(last_merge)" ;; esac
+cp "$dir/g11-mine.kdbx" "$v"
+case "$(merge)" in 'merged updated' | 'merged saved: '*) ;; *) die "the complete file was not merged after the truncated one: $(last_merge)" ;; esac
+[ "$(kx show "$v" services/Beta -a UserName)" = kpxc-g11 ] || die "KeePassXC's save is not in the merged file"
+checked "$v"
+
+step "G11: KeePassXC changes the password, and the app locks"
+kx export "$v" -f xml >"$dir/g11-rekeyed.xml" || die "KeePassXC cannot export the vault"
+import_xml "$dir/g11-rekeyed.xml" "$dir/g11-rekeyed.kdbx" "$pw-changed"
+cp "$dir/g11-rekeyed.kdbx" "$v"
+case "$(merge)" in 'merged refused KeyRefused: '*) ;; *) die "a file the unlock's key no longer opens was not refused: $(last_merge)" ;; esac
+# The lock may follow the merge on its own thread.
+locked=
+for _ in $(seq 1 25); do
+  if [ "$(act status '^status ')" = 'status locked' ]; then locked=1; break; fi
+  sleep 0.2
+done
+[ -n "$locked" ] || die "the app did not lock when another program changed the password: $(grep '^status ' "$hold_out" | tail -1)"
+release
+
 # ------------------------------------------------------------------------------------- G13
 step "G13: KeePassXC saves one item, and the items it only re-stamped keep their dates and history"
 entry_custom_data='<CustomData><Item><Key>KeePassXC-Browser Settings</Key><Value>{"Allow":[]}</Value></Item></CustomData>'
@@ -730,6 +938,7 @@ checked "$v"
 # ------------------------------------------------------------------------------------- NEGATIVE CONTROL
 step "NEGATIVE CONTROL: the readers and comparisons must be able to fail"
 entry_in "$r" Nobody | jq -e '. == null' >/dev/null || die "an item nothing made was found"
+if cmp -s "$dir/first.bin" "$dir/second.bin"; then die "the two attachments compare as the same bytes"; fi
 if entry_in "$r" Tie | jq -e '.current.password == "tie-kpxc"' >/dev/null; then die "a deliberately wrong expectation matched"; fi
 if jq -e '.tags == "kpxc-tag"' <<<"$group_r" >/dev/null; then die "the group comparison is not comparing"; fi
 
