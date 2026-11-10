@@ -1,5 +1,7 @@
 using System.IO.Pipes;
 using System.Net.Sockets;
+using System.Runtime.Versioning;
+using System.Threading.Channels;
 
 namespace Keypaste.Core.Ownership;
 
@@ -12,8 +14,8 @@ namespace Keypaste.Core.Ownership;
 /// is (THREATS.md T-10), and a peer gone before it was accepted are not answered, and the next is accepted.
 /// On Windows the pipe admits only this user, so a peer gone before it was accepted can still be told of.
 /// On Unix one instance answers connection after connection: the kernel queues connections behind the one answered,
-/// and making the instance anew closes its socket and drops them. Windows queues none, so a second instance always
-/// waits beside the one answered, and a peer connects to it however long this process takes to get a thread (F.70);
+/// and making the instance anew closes its socket and drops them. Windows queues none, so instances wait beside the
+/// one answered and a thread of its own replaces each as it is taken, however long the pool takes to answer (F.70, F.100);
 /// each is made anew, since disconnecting discards a reply its peer has not yet read.
 /// </remarks>
 internal sealed class KnockListener : IDisposable
@@ -22,6 +24,9 @@ internal sealed class KnockListener : IDisposable
 
     // ERROR_NO_DATA: the peer connected and closed before the pipe waited for it.
     private const int _goneBeforeAccepted = unchecked((int)0x800700E8);
+
+    // Peers connected and not yet answered, while the pool stands still; past this no instance is made until one has been.
+    private const int _unansweredBound = 1024;
 
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _accepting;
@@ -37,7 +42,7 @@ internal sealed class KnockListener : IDisposable
         Action<string> unreachable,
         Action? goneBeforeAccepted = null) =>
         _accepting = OperatingSystem.IsWindows()
-            ? AcceptOnWindowsAsync(endpoint, answer, unreachable, goneBeforeAccepted, _stop.Token)
+            ? AcceptOnWindows(endpoint, answer, unreachable, goneBeforeAccepted, _stop.Token)
             : AcceptAsync(endpoint, answer, unreachable, _stop.Token);
 
     public void Dispose()
@@ -58,7 +63,11 @@ internal sealed class KnockListener : IDisposable
             // Stopping is the answer either way.
         }
 
-        _stop.Dispose();
+        // A listener still on its way out needs the token.
+        if (_accepting.IsCompleted)
+        {
+            _stop.Dispose();
+        }
     }
 
     private static NamedPipeServerStream Create(string endpoint, int instances, PipeOptions options) =>
@@ -113,7 +122,8 @@ internal sealed class KnockListener : IDisposable
 
     // Only the first instance may be the pipe's first, so a pipe somebody else made under this name is refused rather than joined.
     // Every later one is made while an earlier one holds the name, so it can only join this pipe.
-    private static async Task AcceptOnWindowsAsync(
+    [SupportedOSPlatform("windows")]
+    private static Task AcceptOnWindows(
         string endpoint,
         Func<NamedPipeServerStream, CancellationToken, Task> answer,
         Action<string> unreachable,
@@ -125,20 +135,90 @@ internal sealed class KnockListener : IDisposable
 
         try
         {
+            // KeepListening owns both once it starts; CA2000 cannot see past the thread.
+#pragma warning disable CA2000
             next = CreateOnWindows(endpoint, PipeOptions.FirstPipeInstance);
             spare = CreateOnWindows(endpoint, PipeOptions.None);
+#pragma warning restore CA2000
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            next?.Dispose();
+            unreachable(ex.Message);
+            return Task.CompletedTask;
+        }
 
+        var (first, second) = (next, spare);
+        var arrivals = Channel.CreateBounded<NamedPipeServerStream>(new BoundedChannelOptions(_unansweredBound) { SingleReader = true, SingleWriter = true });
+        var listening = new TaskCompletionSource();
+        var keeper = new Thread(() =>
+        {
+            KeepListening(endpoint, first, second, arrivals.Writer, unreachable, stop);
+            listening.SetResult();
+        })
+        {
+            IsBackground = true,
+            Name = "keypaste knock listener",
+        };
+        keeper.Start();
+
+        return Task.WhenAll(listening.Task, AnswerArrivalsAsync(arrivals, answer, unreachable, goneBeforeAccepted, stop));
+    }
+
+    // A thread of its own, not the pool's: a peer must always find an instance listening, and the pool has stood still for longer than a peer waits (F.100).
+    [SupportedOSPlatform("windows")]
+    private static void KeepListening(
+        string endpoint,
+        NamedPipeServerStream first,
+        NamedPipeServerStream second,
+        ChannelWriter<NamedPipeServerStream> arrivals,
+        Action<string> unreachable,
+        CancellationToken stop)
+    {
+        var next = first;
+        NamedPipeServerStream? spare = second;
+
+        try
+        {
             while (true)
             {
-                var connected = await ConnectedAsync(next, goneBeforeAccepted, stop).ConfigureAwait(false);
-                var made = CreateOnWindows(endpoint, PipeOptions.None);
-                var pipe = next;
+                PipeArrival.Wait(next, stop);
+                arrivals.WriteAsync(next, stop).AsTask().GetAwaiter().GetResult();
                 next = spare;
-                spare = made;
+                spare = null;
+                spare = CreateOnWindows(endpoint, PipeOptions.None);
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ChannelClosedException)
+        {
+            // Stopping, or the answering stopped.
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            unreachable(ex.Message);
+        }
+        finally
+        {
+            arrivals.TryComplete();
+            next.Dispose();
+            spare?.Dispose();
+        }
+    }
 
+    private static async Task AnswerArrivalsAsync(
+        Channel<NamedPipeServerStream> arrivals,
+        Func<NamedPipeServerStream, CancellationToken, Task> answer,
+        Action<string> unreachable,
+        Action? goneBeforeAccepted,
+        CancellationToken stop)
+    {
+        try
+        {
+            await foreach (var pipe in arrivals.Reader.ReadAllAsync(stop).ConfigureAwait(false))
+            {
                 await using (pipe)
                 {
-                    if (connected)
+                    if (await ConnectedAsync(pipe, goneBeforeAccepted, stop).ConfigureAwait(false))
                     {
                         await answer(pipe, stop).ConfigureAwait(false);
                     }
@@ -155,8 +235,11 @@ internal sealed class KnockListener : IDisposable
         }
         finally
         {
-            next?.Dispose();
-            spare?.Dispose();
+            arrivals.Writer.TryComplete();
+            while (arrivals.Reader.TryRead(out var unanswered))
+            {
+                unanswered.Dispose();
+            }
         }
     }
 

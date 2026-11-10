@@ -29,24 +29,28 @@ public sealed class LockedAppStarvedPoolTests : IDisposable
         string? unreachable = null;
         using var endpoint = LockedAppEndpoint.Listen(_name, () => Interlocked.Increment(ref heard), why => unreachable = why);
 
-        // The first reaches the instance Listen made; before F.70 the second, on Windows, waited for a pool thread to make the next.
+        // Windows queues no connection, so before F.100 the third bridge timed out waiting for a pool thread to make it an instance.
+        const int bridges = 5;
         var reached = await Task.Factory.StartNew(
-            () => WhileNoPoolThreadIsFree(() => new[] { Knock(), Knock() }),
+            () => WhileNoPoolThreadIsFree(() => Enumerable.Range(0, bridges).Select(_ => Knock()).ToArray()),
             CancellationToken.None,
             TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
             TaskScheduler.Default);
 
-        Assert.True(reached[0], "the first bridge did not reach the app");
-        Assert.True(reached[1], "a bridge knocking while the app had no pool thread free did not reach it");
-        Assert.True(await HeardAsync(() => Volatile.Read(ref heard), 2), "the app did not hear both bridges once a pool thread was free");
+        for (var i = 0; i < bridges; i++)
+        {
+            Assert.True(reached[i], $"bridge {i}, knocking while the app had no pool thread free, did not reach it");
+        }
+
+        Assert.True(await HeardAsync(() => Volatile.Read(ref heard), bridges), "the app did not hear each bridge once a pool thread was free");
 
         for (var i = 0; i < 5; i++)
         {
             Assert.True(await LockedAppEndpoint.TellAsync(_name, Token), $"bridge {i} after the pool came free did not reach the app");
         }
 
-        Assert.True(await HeardAsync(() => Volatile.Read(ref heard), 7), "the app did not hear the bridges after the pool came free");
-        Assert.Equal(7, endpoint.Requests);
+        Assert.True(await HeardAsync(() => Volatile.Read(ref heard), bridges + 5), "the app did not hear the bridges after the pool came free");
+        Assert.Equal(bridges + 5, endpoint.Requests);
         Assert.Null(unreachable);
     }
 
