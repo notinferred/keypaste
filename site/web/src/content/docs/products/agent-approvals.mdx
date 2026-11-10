@@ -42,7 +42,7 @@ The bridge your AI tool starts holds no vault and can never ask for your master 
 ## What it does
 
 - `keypaste setup` connects Claude Code and Codex and prints the configuration for Cursor and Claude Desktop; connecting every common AI tool in one step is being built.
-- In the release being built, an agent sees each item's title, group, tags and URL, and its username unless you hide it. Each kind of value it asks for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is asked about, allowed or blocked for every agent, as you set it in Settings, asked by default. Allowing a kind of value takes effect only once you confirm it, and a passkey is never released.
+- In the release being built, an agent sees each item's title, group, tags and URL, and its username unless you hide it. Each kind of value it asks for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is asked about, allowed or blocked for every agent, as you set it in Agents, asked by default. Allowing a kind of value takes effect only once you confirm it, and a passkey is never released.
 - Commands an agent asks to run are asked about every time, and only for an agent you let run commands.
 - The rules are kept on your computer, sealed with a key your vault holds, so a synced vault or another program editing them gives an agent nothing more. The published `v0.3.0` instead reads standing rules you write in `policy.toml`.
 - `keypaste log` shows the record, and `keypaste log verify` checks that nobody edited it.

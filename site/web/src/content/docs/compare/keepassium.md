@@ -24,7 +24,7 @@ flowchart LR
 
 ## Using them together
 
-Keep logins on your phone with KeePassium and run projects and agents with keypaste on your desktop. Your file sync carries the vault between them. keypaste's projects are ordinary KeePass tags and fields; until keypaste can merge a synced copy's changes, let one device's save reach the other before editing there.
+Keep logins on your phone with KeePassium and run projects and agents with keypaste on your desktop. Your file sync carries the vault between them. keypaste's projects are ordinary KeePass tags and fields; until a keypaste release merges a synced copy's changes, let one device's save reach the other before editing there.
 
 ## Learn more
 
