@@ -35,6 +35,8 @@ internal static class Program
     /// <summary>How long a second start waits for the running app to answer, since it may still be starting.</summary>
     internal static readonly TimeSpan ReopenWait = TimeSpan.FromSeconds(10);
 
+    private static readonly TimeSpan _displayPoll = TimeSpan.FromSeconds(2);
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -53,7 +55,7 @@ internal static class Program
             args,
             home,
             CliLinks.ForThisProcess(),
-            claim =>
+            OnceADisplayIsAwake(claim =>
             {
                 var preferences = new DesktopPreferences(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
                 var hidden = App.StartsHidden(LoginItems.StartsInBackground(args), preferences);
@@ -69,10 +71,13 @@ internal static class Program
                         HandedPath = HandedFile.FromArguments(args, Environment.CurrentDirectory),
                     },
                     showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
-            },
+            }),
             Console.Error,
             ReopenWait);
     }
+
+    private static Func<AppClaim, int> OnceADisplayIsAwake(Func<AppClaim, int> start) =>
+        OperatingSystem.IsMacOS() ? new DisplayWait(new MacSession(), Console.Error, _displayPoll).Before(start) : start;
 
     /// <summary>
     /// Runs the app as the one process for this user and home, or hands a start to the process that already is.

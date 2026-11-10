@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+On a Mac whose every display is asleep, the desktop app now waits for a display and then starts, instead of crashing at launch ([F.96](docs/steps/F.96.md)).
+
 The desktop app's first-launch screen now says that continuing agrees to the terms of use for keypaste's online services and to sending crash reports, and that the software itself is under AGPL-3.0. The wording is a draft until the terms are approved ([F.95](docs/steps/F.95.md)).
 
 The first time you share from a keypaste home, `keypaste share` prints one line on stderr linking keypaste.com's terms of use. It asks nothing, and a share to another service with `--endpoint` doesn't print it ([F.93](docs/steps/F.93.md)).
