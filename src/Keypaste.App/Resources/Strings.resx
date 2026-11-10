@@ -626,6 +626,7 @@
   <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
   <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>
+  <data name="KeypasteCantWriteItsAuditLog" xml:space="preserve"><value>keypaste is refusing agent requests because it can't write its audit log. Free some disk space or close the other keypaste, and the next request tries again. Agents says why.</value></data>
   <data name="KeypasteIsRefusingEveryAgentRequest" xml:space="preserve"><value>keypaste is refusing every agent request because its audit log won't open. Fix the log file, and the next request opens it again. Agents says why.</value></data>
   <data name="AnotherDevicesChangesWerentMerged" xml:space="preserve"><value>Another device's changes weren't merged. Review them in Recommendations.</value></data>
   <data name="ChangesFromAnotherDevice" xml:space="preserve"><value>Changes from another device</value></data>

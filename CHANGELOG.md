@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+When the audit log has opened but can no longer be written, the desktop app now says so once in a pop-up with the fix and keeps a message on Agents until a line is written ([F.102](docs/steps/F.102.md)).
+
 A scoped token you have just created and not yet copied now stays on its screen when another device's changes are merged, and leaving the screen asks first ([F.101](docs/steps/F.101.md)).
 
 On a Mac whose every display is asleep, the desktop app now waits for a display and then starts, instead of crashing at launch ([F.96](docs/steps/F.96.md)).

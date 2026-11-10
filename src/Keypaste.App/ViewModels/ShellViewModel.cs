@@ -1399,13 +1399,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             AgentsRefusing = Authority.LastAuditFailure is not null;
             AgentsServing = true;
 
+            var unwritten = Authority.LastAuditFailureIsWrite;
+
             if (AgentsRefusing && Authority.ClaimAuditFailureNews())
             {
-                ShowToast(Resources.Strings.KeypasteIsRefusingEveryAgentRequest, ToastTone.Warning);
+                ShowToast(unwritten ? Resources.Strings.KeypasteCantWriteItsAuditLog : Resources.Strings.KeypasteIsRefusingEveryAgentRequest, ToastTone.Warning);
             }
 
             AgentsDetail = AgentsRefusing
-                ? "Refusing agents · the audit log won't open"
+                ? unwritten ? "Refusing agents · the audit log can't be written" : "Refusing agents · the audit log won't open"
                 : waiting > 0
                     ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
                     : "Answering agents · " + ClientCount(clients);

@@ -312,6 +312,136 @@ public sealed class SessionOwnershipTests
     }
 
     /// <summary>
+    /// A log that opened and later cannot be written refuses each release and tells the person once, with its own
+    /// reason, until a line is written (F.102).
+    /// </summary>
+    [Fact]
+    public async Task A_log_that_stops_being_written_pops_up_once_and_stays_on_Agents_until_a_write_succeeds()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var writeLock = KeypasteHome.AuditPath(fixture.Home) + ".lock";
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+        using var agents = new AgentActivityViewModel(authority, fixture.Home, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var dot = shell.MainNav.Single(item => item.HasDot);
+
+        await ListedRequestAsync(authority, fixture.Path_);
+        agents.Refresh();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Null(authority.LastAuditFailure);
+        Assert.Empty(shell.Toasts.Shown);
+
+        using (new FileStream(writeLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            for (var retry = 0; retry < 2; retry++)
+            {
+                await RefusedRequestAsync(authority, fixture.Path_);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                var shown = Assert.Single(shell.Toasts.Shown);
+                Assert.True(shown.IsWarning);
+                Assert.Contains("can't write its audit log", shown.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain(fixture.Home, shown.Message, StringComparison.Ordinal);
+            }
+
+            agents.Refresh();
+            clock.Advance(TimeSpan.FromSeconds(1));
+
+            var failure = authority.LastAuditFailure;
+            Assert.NotNull(failure);
+            Assert.Contains("locked by another keypaste process", failure, StringComparison.Ordinal);
+            Assert.Contains(failure, agents.AuditRefusal, StringComparison.Ordinal);
+            Assert.Contains("can't write its audit log", agents.AuditRefusal, StringComparison.Ordinal);
+            Assert.Equal("Refusing agents · the audit log can't be written", shell.AgentsDetail);
+            Assert.Equal((false, true), (dot.DotLive, dot.DotDanger));
+        }
+
+        await ListedRequestAsync(authority, fixture.Path_);
+        agents.Refresh();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Null(authority.LastAuditFailure);
+        Assert.Empty(agents.AuditRefusal);
+        Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
+        Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
+    }
+
+    /// <summary>A write that succeeded ends the failure, so the next failure is told again (F.102).</summary>
+    [Fact]
+    public async Task A_log_that_fails_to_write_again_after_a_write_succeeded_pops_up_again()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var writeLock = KeypasteHome.AuditPath(fixture.Home) + ".lock";
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        await ListedRequestAsync(authority, fixture.Path_);
+
+        using (new FileStream(writeLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            await RefusedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Single(shell.Toasts.Shown);
+        }
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Empty(shell.Toasts.Shown);
+        await ListedRequestAsync(authority, fixture.Path_);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Empty(shell.Toasts.Shown);
+
+        using (new FileStream(writeLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            await RefusedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            Assert.Contains("can't write its audit log", Assert.Single(shell.Toasts.Shown).Message, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>A lock and unlock while the log still cannot be written is the same failure, told once (F.102).</summary>
+    [Fact]
+    public async Task A_log_that_still_cannot_be_written_after_a_relock_does_not_pop_up_again()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var writeLock = KeypasteHome.AuditPath(fixture.Home) + ".lock";
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+        await ListedRequestAsync(authority, fixture.Path_);
+
+        using (new FileStream(writeLock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            using (var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock))
+            {
+                await RefusedRequestAsync(authority, fixture.Path_);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                Assert.Single(shell.Toasts.Shown);
+            }
+
+            authority.Session.Lock(VaultLockReason.Manual);
+            Unlock(authority.Session, fixture.Path_, TempVault.Password);
+
+            using var after = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+            await RefusedRequestAsync(authority, fixture.Path_);
+            clock.Advance(TimeSpan.FromSeconds(1));
+
+            Assert.NotNull(authority.LastAuditFailure);
+            Assert.Empty(after.Toasts.Shown);
+        }
+    }
+
+    /// <summary>
     /// Nothing unlocks across the endpoint: every byte of an attachment, a listing and a credential
     /// request, both ways, carries neither the master password nor the keyfile.
     /// </summary>

@@ -120,8 +120,9 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>
-    /// Why the audit log did not open when a request or a Run's check last tried it this unlock, or null
-    /// when it opened then or nothing has tried it; reading it opens nothing, so an unlock alone creates no log.
+    /// Why the audit log did not open when a request or a Run's check last tried it this unlock or, once open,
+    /// why its last line could not be written, or null when it opened and wrote or nothing has tried it; reading
+    /// it opens nothing, so an unlock alone creates no log.
     /// </summary>
     internal string? LastAuditFailure
     {
@@ -134,8 +135,20 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>Whether <see cref="LastAuditFailure"/> names a line that could not be written, not a log that will not open.</summary>
+    internal bool LastAuditFailureIsWrite
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.LastAuditFailureIsWrite ?? false;
+            }
+        }
+    }
+
     /// <summary>
-    /// Whether this failure of the audit log is yet to be told to the person, true once until a log opens,
+    /// Whether this failure of the audit log is yet to be told to the person, true once until a line is written,
     /// so agents retrying and a lock and unlock with the log still broken tell it no more.
     /// </summary>
     internal bool ClaimAuditFailureNews() => Interlocked.Exchange(ref _auditFailureTold, 1) == 0;
@@ -502,6 +515,8 @@ internal sealed class SessionHost : IDisposable
 
         internal string? LastAuditFailure => _audit.LastFailure;
 
+        internal bool LastAuditFailureIsWrite => _audit.LastFailureIsWrite;
+
         /// <summary>The session the authority answers agents under while the vault's endpoint still accepts, or null.</summary>
         internal string? Serving => AnswersAgents ? _server.Authority.Serving : null;
 
@@ -557,10 +572,10 @@ internal sealed class SessionHost : IDisposable
             string? approverOverride,
             string? launchName,
             Action<EditDone> edited,
-            Action auditOpened,
+            Action auditWritten,
             Action<Exception>? unexpected)
         {
-            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home), auditOpened);
+            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home), auditWritten);
             SessionServer? server = null;
             LaunchEndpoint? launches = null;
 
@@ -686,24 +701,37 @@ internal sealed class SessionHost : IDisposable
     /// The home's audit log, opened at the first request or a Run's check before its card, so an
     /// unlock alone creates no log, and tried again at the next after an open that failed.
     /// </summary>
-    private sealed class AuditOpener(string path, Action opened) : IDisposable
+    private sealed class AuditOpener(string path, Action written) : IDisposable
     {
         private readonly Lock _gate = new();
         private AuditLog? _log;
         private string? _lastFailure;
+        private string? _lastWriteFailure;
         private bool _disposed;
 
         /// <summary>Why the log does not open now, or null when it opens.</summary>
         internal string? Failure => TryOpen(out var failure) is null ? failure : null;
 
-        /// <summary>Why the log did not open when it was last tried, or null when it opened or has not been tried; reading it opens nothing.</summary>
+        /// <summary>Why the log did not open when it was last tried or, once open, why its last line was not written; null when neither failed; reading it opens nothing.</summary>
         internal string? LastFailure
         {
             get
             {
                 lock (_gate)
                 {
-                    return _lastFailure;
+                    return _lastFailure ?? _lastWriteFailure;
+                }
+            }
+        }
+
+        /// <summary>Whether <see cref="LastFailure"/> names a line not written, which a log that will not open comes before.</summary>
+        internal bool LastFailureIsWrite
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _lastFailure is null && _lastWriteFailure is not null;
                 }
             }
         }
@@ -722,7 +750,7 @@ internal sealed class SessionHost : IDisposable
                     if (AuditLog.TryOpen(path, TimeProvider.System, out var log, out var error))
                     {
                         _log = log;
-                        opened();
+                        log.AppendFinished += NoteAppend;
                     }
                     else
                     {
@@ -743,6 +771,19 @@ internal sealed class SessionHost : IDisposable
                 _disposed = true;
                 _log?.Dispose();
                 _log = null;
+            }
+        }
+
+        private void NoteAppend(string? failure)
+        {
+            lock (_gate)
+            {
+                _lastWriteFailure = failure;
+            }
+
+            if (failure is null)
+            {
+                written();
             }
         }
     }

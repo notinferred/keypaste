@@ -132,6 +132,9 @@ public sealed class AuditLog : IDisposable
     /// <summary>The file being appended to.</summary>
     public string Path { get; }
 
+    /// <summary>Raised after each append with why it failed, or null when the line was written.</summary>
+    public event Action<string?>? AppendFinished;
+
     /// <summary>
     /// Whether an existing log was found readable by more than its owner and was tightened.
     /// </summary>
@@ -240,6 +243,13 @@ public sealed class AuditLog : IDisposable
         ArgumentNullException.ThrowIfNull(record);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        var written = Append(record, out error);
+        AppendFinished?.Invoke(written ? null : error);
+        return written;
+    }
+
+    private bool Append(AuditRecord record, out string error)
+    {
         lock (_gate)
         {
             // Declared before the try and released unconditionally in the finally: the shape CA2000

@@ -396,8 +396,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             status is AuthorityStatus.Serving && rules is not null
                 ? [.. FieldCategories.Ruled.Where(category => rules.RuleFor(category) == CategoryRule.Allow).Select(FieldCategories.Shown)]
                 : []);
-        AuditRefusal = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
-            ? Unrecorded(unopened)
+        AuditRefusal = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } failure
+            ? _authority.LastAuditFailureIsWrite ? Unwritten(failure) : Unrecorded(failure)
             : string.Empty;
     }
 
@@ -407,6 +407,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// </summary>
     internal static string Unrecorded(string failure) =>
         $"keypaste refuses every agent request while its audit log won't open: {failure.TrimEnd('.')}. Fix the log file, and the next request opens it again.";
+
+    /// <summary>That agents are refused while the open audit log cannot be written, as the last line found it.</summary>
+    internal static string Unwritten(string failure) =>
+        $"keypaste refuses agent requests while it can't write its audit log: {failure.TrimEnd('.')}. Free some disk space or close the other keypaste, and the next request tries again.";
 
     /// <summary>
     /// Builds the rows from the tools found, who is attached, this vault's audit lines and <c>agents.toml</c>,

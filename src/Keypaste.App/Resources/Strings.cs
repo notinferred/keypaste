@@ -287,6 +287,7 @@ public static class Strings
     public static string KeyMenu => Manager.GetString("KeyMenu", CultureInfo.CurrentUICulture)!;
     public static string KeyName => Manager.GetString("KeyName", CultureInfo.CurrentUICulture)!;
     public static string KeyValue => Manager.GetString("KeyValue", CultureInfo.CurrentUICulture)!;
+    public static string KeypasteCantWriteItsAuditLog => Manager.GetString("KeypasteCantWriteItsAuditLog", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHasntOpenedThisFileBefore => Manager.GetString("KeypasteHasntOpenedThisFileBefore", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHelp => Manager.GetString("KeypasteHelp", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHome => Manager.GetString("KeypasteHome", CultureInfo.CurrentUICulture)!;
