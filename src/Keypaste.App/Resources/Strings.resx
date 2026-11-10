@@ -87,7 +87,6 @@
   <data name="NewItemAddsOneHere" xml:space="preserve"><value>New item adds one here.</value></data>
   <data name="ConnectValue" xml:space="preserve"><value>Connect {0}</value></data>
   <data name="ConnectValueAgain" xml:space="preserve"><value>Connect {0} again</value></data>
-  <data name="ConnectYourAIToolsAndChooseWhatXe237ce" xml:space="preserve"><value>Connect your AI tools and choose what each may see.</value></data>
   <data name="Continue" xml:space="preserve"><value>Continue</value></data>
   <data name="Copy" xml:space="preserve"><value>Copy</value></data>
   <data name="CopyIntoThisGroup" xml:space="preserve"><value>Copy into this group</value></data>
@@ -405,7 +404,6 @@
   <data name="Servers" xml:space="preserve"><value>servers</value></data>
   <data name="SetANewMasterPassword" xml:space="preserve"><value>Set a new master password</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
-  <data name="SettingsForValue" xml:space="preserve"><value>Settings for {0}</value></data>
   <data name="SettingsLabel" xml:space="preserve"><value>Settings…</value></data>
   <data name="Share" xml:space="preserve"><value>Share…</value></data>
   <data name="ShareALink" xml:space="preserve"><value>Share a link</value></data>

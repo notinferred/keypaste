@@ -115,7 +115,6 @@ public static class Strings
     public static string ConnectLabel => Manager.GetString("ConnectLabel", CultureInfo.CurrentUICulture)!;
     public static string ConnectValue => Manager.GetString("ConnectValue", CultureInfo.CurrentUICulture)!;
     public static string ConnectValueAgain => Manager.GetString("ConnectValueAgain", CultureInfo.CurrentUICulture)!;
-    public static string ConnectYourAIToolsAndChooseWhatXe237ce => Manager.GetString("ConnectYourAIToolsAndChooseWhatXe237ce", CultureInfo.CurrentUICulture)!;
     public static string Connection => Manager.GetString("Connection", CultureInfo.CurrentUICulture)!;
     public static string Continue => Manager.GetString("Continue", CultureInfo.CurrentUICulture)!;
     public static string ContinuingAgreesToTheTermsOfUse => Manager.GetString("ContinuingAgreesToTheTermsOfUse", CultureInfo.CurrentUICulture)!;
@@ -516,7 +515,6 @@ public static class Strings
     public static string SetANewMasterPassword => Manager.GetString("SetANewMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string Settings => Manager.GetString("Settings", CultureInfo.CurrentUICulture)!;
     public static string SettingsBrowserNote => Manager.GetString("SettingsBrowserNote", CultureInfo.CurrentUICulture)!;
-    public static string SettingsForValue => Manager.GetString("SettingsForValue", CultureInfo.CurrentUICulture)!;
     public static string SettingsGeneralNote => Manager.GetString("SettingsGeneralNote", CultureInfo.CurrentUICulture)!;
     public static string SettingsLabel => Manager.GetString("SettingsLabel", CultureInfo.CurrentUICulture)!;
     public static string SettingsScreens => Manager.GetString("SettingsScreens", CultureInfo.CurrentUICulture)!;
