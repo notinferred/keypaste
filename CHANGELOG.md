@@ -4,6 +4,10 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's Items, Agents and Trash are now a list on the left and the chosen thing on the right, in rows grouped by hairlines instead of boxes and cards. Pressing a value copies it, an item is edited where it is read, an explanation sits behind a tooltip, the vault's name, save state, Lock and idle countdown are at the foot of the sidebar, the password generator is a panel on the password field, a new item starts from a kind and the fields you add, Agents holds the connections, what each agent gets and Activity, and Settings has sections down the side ([F.110](docs/steps/F.110.md)).
+
+The desktop app now locks after 30 minutes without input instead of five. Settings still offers one minute to eight hours, and idle locking still cannot be turned off ([F.110](docs/steps/F.110.md)).
+
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).
 
 When the audit log has opened but can no longer be written, the desktop app now says so once in a pop-up with the fix and keeps a message on Agents until a line is written ([F.102](docs/steps/F.102.md)).
