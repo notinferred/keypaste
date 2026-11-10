@@ -1,6 +1,7 @@
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Totp;
 
 namespace Keypaste.App.ViewModels;
 
@@ -31,7 +32,7 @@ internal sealed record FolderChoice(string Path, string Label, int Depth)
 /// notes, created in one change with no history item (N.4, D-0379).
 /// </summary>
 /// <remarks>
-/// A secret it takes, a password or an API key's value, lives in a <see cref="SecretField"/> and is
+/// A secret it takes, a password, an API key's value or a one-time code's setup, lives in a <see cref="SecretField"/> and is
 /// read once, when Create is pressed. A database's or a server's host is a plain custom field named
 /// <see cref="HostField"/>, since KeePass has no standard field for one.
 /// </remarks>
@@ -72,6 +73,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         Password = new SecretField(clipboard);
         KeyValue = new SecretField(clipboard);
+        OneTimeCode = new SecretField(clipboard);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
         GenerateCommand = new RelayCommand(Generate);
 
@@ -112,7 +114,14 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowsKey));
                 OnPropertyChanged(nameof(ShowsPassword));
                 KeyValueProblem = null;
+                OneTimeCodeProblem = null;
                 Error = null;
+
+                // Create ignores a one-time code the template has no field for, so it must not stay as a draft.
+                if (!ShowsPassword)
+                {
+                    OneTimeCode.Clear();
+                }
             }
         }
     }
@@ -164,6 +173,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         new[] { Title, Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
         || Tags.Count > 0
         || KeyValue.HasValue
+        || OneTimeCode.HasValue
         || (Password.HasValue && !Password.IsGenerated)
             ? "this new item"
             : null;
@@ -247,6 +257,16 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal partial string? KeyValueProblem { get; private set; }
 
     internal bool HasKeyValueProblem => KeyValueProblem is not null;
+
+    /// <summary>A login's, database's or server's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
+    internal SecretField OneTimeCode { get; }
+
+    /// <summary>Why Create refused the one-time code, or null; it names no value.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOneTimeCodeProblem))]
+    internal partial string? OneTimeCodeProblem { get; private set; }
+
+    internal bool HasOneTimeCodeProblem => OneTimeCodeProblem is not null;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TagSuggestions), nameof(TagProblem), nameof(HasTagProblem))]
@@ -352,6 +372,21 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             return null;
         }
 
+        string? oneTimeCode = null;
+
+        if (ShowsPassword && OneTimeCode.HasValue)
+        {
+            oneTimeCode = OneTimeCode.Compose();
+
+            if (!TotpSetup.IsAccepted(oneTimeCode, out var refusal))
+            {
+                OneTimeCodeProblem = DisplayTextSanitizer.Sanitize(refusal).Text;
+                return null;
+            }
+        }
+
+        OneTimeCodeProblem = null;
+
         var write = _session.Write(
             vault =>
             {
@@ -366,7 +401,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                         Notes = Notes,
                     },
                     fields,
-                    [.. Tags.Select(chip => chip.Tag)]);
+                    [.. Tags.Select(chip => chip.Tag)],
+                    oneTimeCode);
                 return true;
             },
             created => created);
@@ -388,6 +424,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     {
         Password.Dispose();
         KeyValue.Dispose();
+        OneTimeCode.Dispose();
         _projectTags = [];
         OnPropertyChanged(nameof(TagSuggestions));
     }

@@ -292,6 +292,9 @@ internal sealed class AppCommands
         var openUrl = Routed(Strings.OpenUrl, Pane, detail => detail.OpenUrlCommand);
         var rotate = Routed(Strings.Rotate, Pane, detail => detail.RotateCommand);
         var generatePassword = Routed(Strings.GenerateANewPasswordLabel, Pane, detail => detail.GeneratePasswordCommand);
+        var addTotp = Routed(Strings.AddOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: true } detail ? detail : null, detail => detail.BeginSetTotpCommand);
+        var replaceTotp = Routed(Strings.ReplaceTheOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: false } detail ? detail : null, detail => detail.BeginSetTotpCommand);
+        var removeTotp = Routed(Strings.RemoveTheOneTimeCode, PaneOutOfEdit, detail => detail.BeginRemoveTotpCommand);
         var history = Routed(Strings.ShowHistory, PaneOutOfEdit, detail => detail.History.ToggleCommand) with { Says = () => PaneOutOfEdit()?.History.ToggleLabel ?? Strings.ShowHistory };
         var addField = Routed(Strings.AddFieldLabel, PaneOutOfEdit, detail => detail.BeginAddFieldCommand);
         var addAttachment = Routed(Strings.AddAttachmentLabel, PaneOutOfEdit, detail => detail.Attachments.AddCommand);
@@ -360,7 +363,7 @@ internal sealed class AppCommands
         var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
         var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
-        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, generatePassword, history, _line, _delete];
+        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line, _delete];
         _trashMenu = [restore, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
@@ -383,7 +386,7 @@ internal sealed class AppCommands
         var item = new AppMenuGroup(Strings.ItemMenu,
         [
             copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line,
-            editFields, organize, duplicate, share, rotate, generatePassword, history, _line,
+            editFields, organize, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line,
             addField, addAttachment, removeTag,
             Folder(Strings.Field, copyField, replaceField, generateField, renameField, protectField, _line, removeField),
             Folder(Strings.Attachment, saveAttachment, replaceAttachment, _line, removeAttachment),

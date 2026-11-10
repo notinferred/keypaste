@@ -83,29 +83,44 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
         Value.Dispose();
     }
 
-    [RelayCommand]
+    // Choices the generator refuses leave nothing to hand over, so no value made with earlier ones stays usable.
+    private bool CanGenerate() => Generator.Error is null;
+
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
     private void Regenerate()
     {
-        if (_disposed || Generator.Recipe is not { } recipe)
+        if (_disposed)
         {
             return;
         }
 
-        Value.Generate(recipe);
+        if (Generator.Recipe is { } recipe)
+        {
+            Value.Generate(recipe);
+        }
+        else
+        {
+            Value.Clear();
+        }
+
         OnPropertyChanged(nameof(MaskedLength));
         Changed?.Invoke(this, EventArgs.Empty);
+        RegenerateCommand.NotifyCanExecuteChanged();
+        CopyCommand.NotifyCanExecuteChanged();
+        NewItemCommand.NotifyCanExecuteChanged();
+        AddFieldCommand.NotifyCanExecuteChanged();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
     private Task CopyAsync() => _disposed || !Value.HasValue ? Task.CompletedTask : _clipboard.CopyAsync(Value.Compose(), "Generated password");
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
     private void NewItem()
     {
         _newItem(Value);
     }
 
-    private bool CanAdd() => _addField is not null && FieldName.Trim().Length > 0;
+    private bool CanAdd() => _addField is not null && FieldName.Trim().Length > 0 && CanGenerate();
 
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void AddField()

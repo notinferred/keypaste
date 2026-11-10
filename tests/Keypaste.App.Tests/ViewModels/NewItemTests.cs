@@ -220,6 +220,56 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
+    public void A_login_with_a_one_time_code_keeps_it_as_its_TOTP_in_the_same_write()
+    {
+        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq gezd gnbv gy3t qojq");
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.False(_entries.IsAdding);
+        var item = Reopened(new EntryName("Work", "gitlab"));
+        Assert.Equal([new EntryField("otp", true, true)], item.Fields);
+        Assert.Equal("otpauth://totp/gitlab?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&period=30&digits=6&issuer=gitlab", item.Read("otp"));
+        Assert.Equal(0, item.Revisions);
+    }
+
+    [Fact]
+    public void A_refused_one_time_code_says_why_writes_nothing_and_is_disposed_on_cancel()
+    {
+        var before = File.ReadAllBytes(_vaultPath);
+        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        Type(form.OneTimeCode, "otpauth://hotp/gitlab?secret=GEZDGNBVGY3TQOJQ&counter=1");
+        Assert.Equal("this new item", form.UnsavedDraft);
+
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.True(_entries.IsAdding);
+        Assert.True(form.HasOneTimeCodeProblem);
+        Assert.Equal("The link holds a counter-based HOTP, which keypaste does not compute.", form.OneTimeCodeProblem);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        _entries.CancelAddCommand.Press();
+
+        Assert.True(form.OneTimeCode.IsZeroed);
+    }
+
+    [Fact]
+    public void A_template_without_a_one_time_code_clears_the_one_typed()
+    {
+        var form = NewItemForm.Open(_entries);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq");
+
+        form.Template = ItemTemplate.Database;
+
+        Assert.True(form.OneTimeCode.HasValue);
+
+        form.Template = ItemTemplate.SecureNote;
+
+        Assert.False(form.OneTimeCode.HasValue);
+        Assert.Null(form.UnsavedDraft);
+    }
+
+    [Fact]
     public void Cancelling_or_locking_disposes_what_was_typed()
     {
         var form = NewItemForm.Open(_entries);

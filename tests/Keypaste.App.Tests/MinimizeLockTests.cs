@@ -62,7 +62,7 @@ public sealed class MinimizeLockTests
         Assert.True(app.Session.IsUnlocked);
         Assert.Null(app.Reason);
 
-        clock.Advance(TimeSpan.FromMinutes(5));
+        clock.Advance(app.Session.IdleTimeout + TimeSpan.FromSeconds(1));
 
         Assert.False(app.Session.IsUnlocked);
         Assert.Equal(VaultLockReason.Idle, app.Reason);

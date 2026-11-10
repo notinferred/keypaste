@@ -25,7 +25,7 @@ public enum AppTheme
 /// <para>
 /// <b>An unreadable file costs a preference and never costs a lock.</b> Every failure here — no
 /// file, no permission, a half-finished hand edit — produces <see cref="Default"/>, which locks
-/// after five minutes. That is the same direction <c>clients.toml</c> fails in (docs/PRODUCT.md law 3.7): the
+/// after thirty minutes. That is the same direction <c>clients.toml</c> fails in (docs/PRODUCT.md law 3.7): the
 /// fallback has to be the state that protects the vault, never the state the file happened to ask
 /// for.
 /// </para>
@@ -114,13 +114,11 @@ public sealed record AppSettings
 
     /// <summary>What the app runs as when there is nothing usable to read.</summary>
     /// <remarks>
-    /// Five minutes because it is the number a person who has never opened this file lives with,
-    /// and it has to be short enough to matter on an unattended screen and long enough that reading
-    /// a page of documentation does not cost a re-unlock.
+    /// Thirty minutes, as PRODUCT sets it (v1.25): it is the number a person who has never opened this file lives with.
     /// </remarks>
     public static AppSettings Default { get; } = new()
     {
-        IdleTimeoutSeconds = 300,
+        IdleTimeoutSeconds = 1800,
         Theme = AppTheme.System,
         LockWhenMinimized = false,
     };

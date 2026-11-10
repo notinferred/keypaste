@@ -710,7 +710,19 @@ public sealed class Vault : IDisposable
     /// may not be taken in its group, and neither may the path it joins to.
     /// </remarks>
     /// <exception cref="VaultException">Any of those is refused, or the group does not exist or names more than one. Nothing is changed.</exception>
-    public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
+    public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags) =>
+        CreateEntry(entry, fields, tags, totp: null);
+
+    /// <summary>
+    /// Creates an entry as <see cref="CreateEntry(VaultEntry, IReadOnlyList{FieldWrite}, IReadOnlyList{string})"/> does,
+    /// with its TOTP kept as <see cref="SetTotp"/> keeps one, in the same change.
+    /// </summary>
+    /// <param name="entry">The entry's standard fields and the group it goes in, which must exist.</param>
+    /// <param name="fields">Its custom fields, each named once and holding a value.</param>
+    /// <param name="tags">Its tags, each named once.</param>
+    /// <param name="totp">An <c>otpauth://totp/</c> URI or a base32 setup key, or null for none.</param>
+    /// <exception cref="VaultException">Anything the other overload refuses, or <see cref="TotpSpec"/> refuses the setup, naming no value. Nothing is changed.</exception>
+    public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags, string? totp)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entry);
@@ -723,7 +735,12 @@ public sealed class Vault : IDisposable
         }
 
         CheckNew(fields, tags);
-        Change(() => _interop.CreateEntry(entry, fields, tags), VaultEdit.Of(EntryName.Of(entry)));
+
+        IReadOnlyList<FieldWrite> written = totp is null
+            ? fields
+            : [.. fields, new FieldWrite(TotpSpec.OtpField, TotpSetup.Compose(totp, entry.Title, out var refusal) ?? throw new VaultException(refusal!), Protect: true)];
+
+        Change(() => _interop.CreateEntry(entry, written, tags), VaultEdit.Of(EntryName.Of(entry)));
     }
 
     /// <summary>
@@ -927,6 +944,47 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(name);
 
         return _interop.MayHoldTotp(name);
+    }
+
+    /// <summary>
+    /// Sets the item's TOTP as KeePassXC 2.8 sets one: a protected <c>otp</c> field holding an <c>otpauth://totp/</c>
+    /// URI, in place of any <c>otp</c>, <c>TOTP Seed</c> and <c>TOTP Settings</c> it had, as one edit with one history
+    /// revision. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="setup">An <c>otpauth://totp/</c> URI, kept as given, or a base32 setup key, kept as SHA-1, 6 digits every 30 seconds (<see cref="TotpSetup"/>).</param>
+    /// <returns><see langword="true"/> if the entry was found and written.</returns>
+    /// <remarks>
+    /// This is the one way keypaste writes <c>otp</c>; <see cref="FieldNameRules"/> still refuses it as a custom field.
+    /// KeePass 2's <c>TimeOtp-*</c> fields are left as KeePassXC leaves them; <c>otp</c> is read before them.
+    /// </remarks>
+    /// <exception cref="VaultException">
+    /// <see cref="TotpSpec"/> refuses the setup, naming no value, or more than one entry answers to that name. Nothing is changed.
+    /// </exception>
+    public bool SetTotp(EntryName name, string setup)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(setup);
+
+        var uri = TotpSetup.Compose(setup, name.Title, out var refusal) ?? throw new VaultException(refusal!);
+
+        return Change(() => _interop.SetTotp(name, uri) > 0, written => written ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>
+    /// Removes the item's TOTP as KeePassXC 2.8 removes one: its <c>otp</c>, <c>TOTP Seed</c> and <c>TOTP Settings</c>,
+    /// as one edit with one history revision that keeps them. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <returns><see langword="true"/> if the entry had one of those fields and they were removed; KeePass 2's <c>TimeOtp-*</c> fields are left.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public bool RemoveTotp(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return Change(() => _interop.SetTotp(name, uri: null) > 0, removed => removed ? VaultEdit.Of(name) : null);
     }
 
     /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>

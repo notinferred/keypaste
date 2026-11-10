@@ -4,6 +4,12 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+In the desktop app you can give an item a one-time code (TOTP) by pasting the setup key or `otpauth://` link a site shows, in New item or from the item's pane or the Item menu, which can also replace or remove it. keypaste keeps it in the protected `otp` field, where KeePassXC 2.8 reads it, and the item shows the live code and its countdown.
+
+The desktop app's password generator now lets you choose a character password's length, with a number or a slider, which kinds of character it uses (letters, digits, symbols), and whether to leave out lookalikes such as 0 and O.
+
+The desktop app locks after 30 minutes without input by default, where it locked after five. Settings still offers one minute to eight hours, and a saved choice is kept.
+
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).
 
 When the audit log has opened but can no longer be written, the desktop app now says so once in a pop-up with the fix and keeps a message on Agents until a line is written ([F.102](docs/steps/F.102.md)).

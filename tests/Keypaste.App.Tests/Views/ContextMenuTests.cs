@@ -37,9 +37,11 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Show history", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
             Headers(menu));
-        Assert.All(menu.Items.OfType<MenuItem>().Where(item => item.Header as string != "Copy the TOTP code"), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
+        string[] needATotp = ["Copy the TOTP code", "Replace the one-time code…", "Remove the one-time code"];
+        Assert.All(menu.Items.OfType<MenuItem>().Where(item => !needATotp.Contains(item.Header as string)), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
+        Assert.All(menu.Items.OfType<MenuItem>().Where(item => needATotp.Contains(item.Header as string)), item => Assert.False(item.IsEffectivelyEnabled, $"{item.Header} is on"));
         menu.Hide();
 
         menu = FromTheKeyboard(shell.Window, row, PhysicalKey.F10, RawInputModifiers.Shift);

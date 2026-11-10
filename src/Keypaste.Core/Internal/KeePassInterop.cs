@@ -1675,6 +1675,47 @@ internal sealed class KeePassInterop : IDisposable
         return 1;
     }
 
+    /// <summary>
+    /// Sets or removes the one entry's TOTP as KeePassXC 2.8's <c>Entry::setTotp</c> does, as one edit with one history
+    /// revision: its <c>otp</c>, <c>TOTP Seed</c> and <c>TOTP Settings</c> go, and a URI given is kept as a protected <c>otp</c>.
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="uri">The <c>otpauth://totp/</c> URI the caller has checked, or null to remove the TOTP.</param>
+    /// <returns>0 when there is no such entry, or nothing to remove; otherwise 1.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int SetTotp(EntryName name, string? uri)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return 0;
+        }
+
+        PwEntry entry = found.Entry;
+        string[] held = [.. Totp.TotpSpec.KeePassXcFields.Where(entry.Strings.Exists)];
+
+        if (uri is null && held.Length == 0)
+        {
+            return 0;
+        }
+
+        entry.CreateBackup(_database);
+
+        foreach (string field in held)
+        {
+            entry.Strings.Remove(field);
+        }
+
+        if (uri is not null)
+        {
+            entry.Strings.Set(Totp.TotpSpec.OtpField, new ProtectedString(true, uri));
+        }
+
+        MarkEdited(entry);
+        return 1;
+    }
+
     /// <summary>Removes one custom field as an edit with one history revision.</summary>
     /// <returns>0 when there is no such entry or field, otherwise 1.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
