@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Keypaste.App.Clipboard;
 
 namespace Keypaste.App.Controls;
 
@@ -21,12 +22,20 @@ internal sealed class PressToCopy : Button
     internal static readonly DirectProperty<PressToCopy, double> ValueWidthProperty =
         AvaloniaProperty.RegisterDirect<PressToCopy, double>(nameof(ValueWidth), control => control.ValueWidth);
 
+    /// <summary>The clipboard the press is judged by, inherited from the shell so a press shows its check only once a copy reached it.</summary>
+    internal static readonly AttachedProperty<ClipboardCountdown?> ClipboardProperty =
+        AvaloniaProperty.RegisterAttached<PressToCopy, Control, ClipboardCountdown?>("Clipboard", null, inherits: true);
+
     private const double _glyphAndGap = 22;
 
     private ITimer? _check;
     private double _valueWidth;
 
     public PressToCopy() => Classes.Add("press-to-copy");
+
+    public static ClipboardCountdown? GetClipboard(Control control) => control.GetValue(ClipboardProperty);
+
+    public static void SetClipboard(Control control, ClipboardCountdown? value) => control.SetValue(ClipboardProperty, value);
 
     internal double ValueWidth
     {
@@ -44,7 +53,25 @@ internal sealed class PressToCopy : Button
 
     protected override void OnClick()
     {
+        var clipboard = GetValue(ClipboardProperty);
+        var landedBefore = clipboard?.Landings;
         base.OnClick();
+
+        if (clipboard is not null && Command is IAsyncRelayCommand { ExecutionTask: { } copying })
+        {
+            _ = ShowCheckOnceCopiedAsync(copying, clipboard, landedBefore);
+        }
+    }
+
+    private async Task ShowCheckOnceCopiedAsync(Task copying, ClipboardCountdown clipboard, int? landedBefore)
+    {
+        await Task.WhenAny(copying).ConfigureAwait(true);
+
+        if (!copying.IsCompletedSuccessfully || clipboard.Landings == landedBefore)
+        {
+            return;
+        }
+
         PseudoClasses.Set(":copied", true);
         _check?.Dispose();
         _check = GetValue(RevealedValue.ClockProperty).CreateTimer(

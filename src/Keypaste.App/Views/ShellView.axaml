@@ -6,6 +6,7 @@
              xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.ShellView"
              x:DataType="vm:ShellViewModel"
+             ctl:PressToCopy.Clipboard="{Binding Clipboard}"
              Background="{DynamicResource KpBgApp}">
 
   <UserControl.Resources>
@@ -207,7 +208,8 @@
                           VerticalAlignment="Top"
                           Classes.ok="{Binding VaultStatusOk}"
                           Classes.idle="{Binding VaultStatusPending}"
-                          Classes.danger="{Binding VaultStatusDanger}" />
+                          Classes.danger="{Binding VaultStatusDanger}"
+                          Classes.refusing="{Binding VaultStatusDanger}" />
                 </Panel>
               </Button>
             </StackPanel>

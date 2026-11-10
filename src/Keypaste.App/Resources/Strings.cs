@@ -471,7 +471,7 @@ public static class Strings
     public static string ReplaceX64ca19 => Manager.GetString("ReplaceX64ca19", CultureInfo.CurrentUICulture)!;
     public static string ReportAProblem => Manager.GetString("ReportAProblem", CultureInfo.CurrentUICulture)!;
     public static string RequireAPassphraseSentSeparately => Manager.GetString("RequireAPassphraseSentSeparately", CultureInfo.CurrentUICulture)!;
-    public static string ResetTableOrderAndWidths => Manager.GetString("ResetTableOrderAndWidths", CultureInfo.CurrentUICulture)!;
+    public static string ResetListOrder => Manager.GetString("ResetListOrder", CultureInfo.CurrentUICulture)!;
     public static string Restore => Manager.GetString("Restore", CultureInfo.CurrentUICulture)!;
     public static string RestoreABackup => Manager.GetString("RestoreABackup", CultureInfo.CurrentUICulture)!;
     public static string RestoreABackupLabel => Manager.GetString("RestoreABackupLabel", CultureInfo.CurrentUICulture)!;

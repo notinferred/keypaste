@@ -420,11 +420,6 @@ public sealed record AppSettings
             .Text(WindowBoundsKey, layout.BoundsText, "left, top, width, height, at the window's own size")
             .Text(WindowStateKey, layout.ModeText);
 
-        if (layout.ListShare is { } share)
-        {
-            writer.Number(WindowListShareKey, share, "the list's thousandths of the height it shares with the preview");
-        }
-
         writer.Number(WindowSidebarHiddenKey, layout.SidebarHidden ? 1 : 0);
 
         if (layout.ZoomPercent != WindowLayout.ActualSizePercent)
@@ -483,7 +478,6 @@ public sealed record AppSettings
             ? WindowLayout.Read(
                 bounds.Value.Text,
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
-                table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
                 table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
                 ZoomText(table),
                 TextOf(table, WindowTableSortsKey),

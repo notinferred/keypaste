@@ -23,7 +23,7 @@ public sealed class WindowLayoutTests
     private static readonly ScreenArea _main = new(new PixelRect(0, 25, 1440, 875), 1);
     private static readonly ScreenArea _left = new(new PixelRect(-1920, 0, 1920, 1040), 1);
 
-    private static WindowLayout Saved(int x, int y, int width = 1000, int height = 680) => new(x, y, width, height, WindowMode.Normal, null, false);
+    private static WindowLayout Saved(int x, int y, int width = 1000, int height = 680) => new(x, y, width, height, WindowMode.Normal, false);
 
     [Fact]
     public void A_window_on_a_screen_stays_where_it_was()
@@ -85,7 +85,7 @@ public sealed class WindowLayoutTests
     {
         var window = new MainWindow();
         var area = window.Screens!.Primary!.WorkingArea;
-        var saved = new WindowLayout(area.X + 40, area.Y + 30, 800, 600, WindowMode.Normal, 400, false);
+        var saved = new WindowLayout(area.X + 40, area.Y + 30, 800, 600, WindowMode.Normal, false);
 
         window.Restore(saved);
         window.Show();
@@ -93,7 +93,7 @@ public sealed class WindowLayoutTests
 
         Assert.Equal(new PixelPoint(area.X + 40, area.Y + 30), window.Position);
         Assert.Equal(new Size(800, 600), window.ClientSize);
-        Assert.Equal(saved, window.Layout(400, false));
+        Assert.Equal(saved, window.Layout(false));
         window.Close();
     });
 
@@ -103,12 +103,12 @@ public sealed class WindowLayoutTests
         var window = new MainWindow();
         var area = window.Screens!.Primary!.WorkingArea;
 
-        window.Restore(new WindowLayout(area.Right + 4000, area.Bottom + 4000, 800, 600, WindowMode.Maximized, null, false));
+        window.Restore(new WindowLayout(area.Right + 4000, area.Bottom + 4000, 800, 600, WindowMode.Maximized, false));
         window.Show();
         WindowInput.Drain();
 
         Assert.Equal(WindowState.Maximized, window.WindowState);
-        var kept = window.Layout(null, false)!;
+        var kept = window.Layout(false)!;
         Assert.Equal(WindowMode.Maximized, kept.Mode);
         Assert.True(area.Contains(new PixelPoint(kept.X, kept.Y)), $"kept at {kept.X},{kept.Y}, outside {area}");
         Assert.Equal((800, 600), (kept.Width, kept.Height));
@@ -121,17 +121,17 @@ public sealed class WindowLayoutTests
         var window = new MainWindow { Width = 800, Height = 600 };
         window.Show();
         WindowInput.Drain();
-        var before = window.Layout(null, false)!;
+        var before = window.Layout(false)!;
 
         window.WindowState = WindowState.Maximized;
         WindowInput.Drain();
         window.Position = new PixelPoint(before.X + 300, before.Y + 300);
         WindowInput.Drain();
-        Assert.Equal(before with { Mode = WindowMode.Maximized }, window.Layout(null, false));
+        Assert.Equal(before with { Mode = WindowMode.Maximized }, window.Layout(false));
 
         window.WindowState = WindowState.Minimized;
         WindowInput.Drain();
-        Assert.Equal(before with { Mode = WindowMode.Maximized }, window.Layout(null, false));
+        Assert.Equal(before with { Mode = WindowMode.Maximized }, window.Layout(false));
         window.Close();
     });
 
@@ -140,7 +140,7 @@ public sealed class WindowLayoutTests
     {
         var window = new MainWindow();
 
-        Assert.Null(window.Layout(null, false));
+        Assert.Null(window.Layout(false));
     });
 
     [Fact]
@@ -387,7 +387,7 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_lock_keeps_a_tables_order_and_the_next_unlock_opens_with_it() => HeadlessSession.On(async () =>
+    public Task A_lock_keeps_each_tables_order_and_widths_and_the_next_unlock_opens_with_them() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "tables.kdbx");
@@ -396,6 +396,8 @@ public sealed class WindowLayoutTests
         {
             created.AddEntry(new VaultEntry { Title = "zeta", Password = "tables-secret" });
             created.AddEntry(new VaultEntry { Title = "alpha", Password = "tables-secret" });
+            created.AddEntry(new VaultEntry { Title = "binned", Password = "tables-secret" });
+            created.RemoveEntry(new EntryName(string.Empty, "binned"));
             created.Save();
         }
 
@@ -418,17 +420,28 @@ public sealed class WindowLayoutTests
 
         var shell = await Unlock(main, root, vault);
         shell.Tables.Items.Press(TableStates.Url);
+        shell.Current = Destinations.All.Single(destination => destination.Kind == DestinationKind.Trash);
+        WindowInput.Drain();
         DrawnFrame.Capture(main);
+        var columns = main.GetVisualDescendants().OfType<TrashColumns>().First();
+        shell.Tables.Trash.Resize(TableStates.Title, 40, columns.DrawnWidths);
+        DrawnFrame.Capture(main);
+        var drawnTitle = columns.DrawnWidths[0];
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
 
         Assert.True(AppSettings.TryLoad(settingsPath, out var kept));
         Assert.Equal("items:url:asc", kept.Window!.TableSorts);
+        Assert.Contains("trash:", kept.Window.TableWidths, StringComparison.Ordinal);
 
         var reopened = await Unlock(main, root, vault);
         Assert.NotSame(shell, reopened);
         Assert.Equal(new TableOrder(TableStates.Url, false), reopened.Tables.Items.Order);
+        reopened.Current = Destinations.All.Single(destination => destination.Kind == DestinationKind.Trash);
+        WindowInput.Drain();
+        DrawnFrame.Capture(main);
+        Assert.Equal(drawnTitle, main.GetVisualDescendants().OfType<TrashColumns>().First().DrawnWidths[0], 1.5);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);

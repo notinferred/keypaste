@@ -33,13 +33,14 @@ internal sealed partial class EntriesView : UserControl
     private EntriesViewModel? _entries;
     private EntryDetailViewModel? _detail;
     private (EntryRow Row, PointerPressedEventArgs Press, Point At)? _dragFrom;
+    private EntryRow? _opened;
 
     public EntriesView()
     {
         AvaloniaXamlLoader.Load(this);
 
         _split = this.FindControl<ListDetail>("Split")!;
-        _split.PropertyChanged += OnSplitChanged;
+        _split.HidKeyboardPane += OnKeyboardPaneHid;
 
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -47,29 +48,77 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;
+        _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
         _rows.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         _rows.AddHandler(PointerMovedEvent, OnRowDragged, RoutingStrategies.Tunnel, handledEventsToo: true);
         _rows.AddHandler(PointerReleasedEvent, (_, _) => _dragFrom = null, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
-    /// <summary>Where the detail takes the list's place, the keyboard goes with it, and back to the chosen row's list when it returns.</summary>
-    private void OnSplitChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    /// <summary>The keyboard goes with the pane it was in: from the list to the open item's Back, but not to a form that takes it itself, and from the detail back to the row it came from.</summary>
+    private void OnKeyboardPaneHid(ListDetail.Pane pane)
     {
-        if (e.Property != ListDetail.ShowsBackProperty)
+        if (pane == ListDetail.Pane.List)
         {
-            return;
+            _opened = _entries?.Selected;
         }
 
         Dispatcher.UIThread.Post(
             () =>
             {
-                if (TopLevel.GetTopLevel(this) is Window { IsVisible: true })
+                if (TopLevel.GetTopLevel(this) is not Window { IsVisible: true })
                 {
-                    Control? next = _split.ShowsBack ? this.FindControl<Button>("BackToList") : _rows;
-                    next?.Focus(NavigationMethod.Tab);
+                    return;
+                }
+
+                if (pane == ListDetail.Pane.Detail)
+                {
+                    FocusRow(_opened);
+                }
+                else if (_entries is { IsAdding: false })
+                {
+                    this.FindControl<Button>("BackToList")?.Focus(NavigationMethod.Tab);
                 }
             },
             DispatcherPriority.Loaded);
+    }
+
+    private void FocusRow(EntryRow? row)
+    {
+        var index = row is null ? -1 : _rows.Items.IndexOf(row);
+
+        if (index < 0)
+        {
+            _rows.Focus(NavigationMethod.Tab);
+            return;
+        }
+
+        _rows.ScrollIntoView(index);
+        (_rows.ContainerFromIndex(index) ?? _rows).Focus(NavigationMethod.Tab);
+    }
+
+    /// <summary>Where the detail would replace the list, a choice would hide it, so the arrows only move the keyboard and Enter or Space opens the row.</summary>
+    private void OnRowsKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!_split.ListStandsAlone || e.KeyModifiers != KeyModifiers.None || _entries is null)
+        {
+            return;
+        }
+
+        var focused = (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
+        var at = focused is null ? -1 : _rows.IndexFromContainer(focused);
+        var last = _rows.ItemCount - 1;
+
+        switch (e.Key)
+        {
+            case Key.Down or Key.Up or Key.Home or Key.End when last >= 0:
+                FocusRow(_rows.Items[Math.Clamp(e.Key switch { Key.Down => at + 1, Key.Up => at < 0 ? 0 : at - 1, Key.Home => 0, _ => last }, 0, last)] as EntryRow);
+                e.Handled = true;
+                break;
+            case Key.Enter or Key.Space when focused?.DataContext is EntryRow row:
+                _entries.Selected = row;
+                e.Handled = true;
+                break;
+        }
     }
 
     /// <summary>A mouse or a pen on a row may become a drag; a finger scrolls.</summary>

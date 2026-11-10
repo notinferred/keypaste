@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace Keypaste.App.Controls;
 
@@ -31,6 +32,16 @@ internal sealed class ListDetail : Panel
         AvaloniaProperty.RegisterDirect<ListDetail, bool>(nameof(ShowsBack), panel => panel.ShowsBack);
 
     private bool _showsBack;
+
+    /// <summary>Which of the two panes a width or a choice just hid while the keyboard was in it.</summary>
+    internal enum Pane
+    {
+        List,
+        Detail,
+    }
+
+    /// <summary>The keyboard was in a pane that has just hidden, so the screen decides where it goes.</summary>
+    internal event Action<Pane>? HidKeyboardPane;
 
     static ListDetail() => AffectsMeasure<ListDetail>(ShowsListProperty, ShowsDetailProperty);
 
@@ -74,6 +85,9 @@ internal sealed class ListDetail : Panel
         Dispatcher.UIThread.Post(ShowWhatFits, DispatcherPriority.Loaded);
     }
 
+    /// <summary>Whether the list shows and the width cannot also hold the detail.</summary>
+    internal bool ListStandsAlone => ShowsList && !Fits(Bounds.Width);
+
     private static bool Fits(double width) => width >= ListWidth + DetailLeast || double.IsInfinity(width);
 
     private void ShowWhatFits()
@@ -83,10 +97,23 @@ internal sealed class ListDetail : Panel
             return;
         }
 
+        var focused = (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual)?.GetSelfAndVisualAncestors().ToList();
+        var listHadKeyboard = list.IsVisible && focused?.Contains(list) == true;
+        var detailHadKeyboard = detail.IsVisible && focused?.Contains(detail) == true;
+
         var side = Fits(Bounds.Width);
         list.IsVisible = ShowsList && (side || !ShowsDetail);
         detail.IsVisible = !ShowsList || side || ShowsDetail;
         ShowsBack = ShowsList && !side && ShowsDetail;
+
+        if (listHadKeyboard && !list.IsVisible)
+        {
+            HidKeyboardPane?.Invoke(Pane.List);
+        }
+        else if (detailHadKeyboard && !detail.IsVisible)
+        {
+            HidKeyboardPane?.Invoke(Pane.Detail);
+        }
     }
 
     protected override Size MeasureOverride(Size availableSize)

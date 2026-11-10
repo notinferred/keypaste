@@ -112,7 +112,7 @@ public sealed class InterfaceZoomTests
         Assert.Equal(1040, window.MinHeight);
         Assert.Equal(new Size(1440, 1040), window.ClientSize);
         Assert.True(window.Screens!.Primary!.WorkingArea.Contains(new PixelRect(window.Position, new PixelSize(1440, 1040))), $"at {window.Position}");
-        Assert.Equal(200, window.Layout(null, false)!.ZoomPercent);
+        Assert.Equal(200, window.Layout(false)!.ZoomPercent);
 
         InterfaceZoom.ActualSize();
         WindowInput.Drain();
@@ -129,7 +129,7 @@ public sealed class InterfaceZoomTests
         var window = new MainWindow();
         var area = window.Screens!.Primary!.WorkingArea;
 
-        window.Restore(new WindowLayout(area.Right - 900, area.Bottom - 600, 800, 500, WindowMode.Normal, null, false, 200));
+        window.Restore(new WindowLayout(area.Right - 900, area.Bottom - 600, 800, 500, WindowMode.Normal, false, 200));
         window.Show();
         WindowInput.Drain();
 

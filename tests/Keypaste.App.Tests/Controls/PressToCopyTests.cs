@@ -45,6 +45,20 @@ public sealed class PressToCopyTests
         Assert.DoesNotContain(":copied", value.Classes);
     });
 
+    [Fact]
+    public Task A_copy_that_does_not_reach_the_clipboard_shows_no_check() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-press-failed-");
+        var value = Open(shell, new ManualClock(), "CopyPasswordValue");
+        shell.Clipboard.SetFails = true;
+
+        shell.Tap(value);
+        RenderedShell.Drain();
+
+        Assert.NotNull(shell.Shell.Clipboard.Failure);
+        Assert.DoesNotContain(":copied", value.Classes);
+    });
+
     [Theory]
     [InlineData(PhysicalKey.Enter)]
     [InlineData(PhysicalKey.Space)]

@@ -375,7 +375,7 @@
   <data name="ReplaceX64ca19" xml:space="preserve"><value>Replace…</value></data>
   <data name="ReportAProblem" xml:space="preserve"><value>Report a problem</value></data>
   <data name="RequireAPassphraseSentSeparately" xml:space="preserve"><value>Require a passphrase, sent separately</value></data>
-  <data name="ResetTableOrderAndWidths" xml:space="preserve"><value>Reset table order and widths</value></data>
+  <data name="ResetListOrder" xml:space="preserve"><value>Reset list order</value></data>
   <data name="Restore" xml:space="preserve"><value>Restore</value></data>
   <data name="RestoreABackup" xml:space="preserve"><value>Restore a backup</value></data>
   <data name="RestoreTag" xml:space="preserve"><value>Restore tag</value></data>

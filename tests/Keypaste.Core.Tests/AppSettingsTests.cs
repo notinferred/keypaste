@@ -265,7 +265,7 @@ public sealed class AppSettingsTests : IDisposable
     [Fact]
     public void The_window_round_trips_beside_every_preference_at_a_position_left_of_the_main_screen()
     {
-        var window = new WindowLayout(-1500, 40, 800, 600, WindowMode.FullScreen, 425, true);
+        var window = new WindowLayout(-1500, 40, 800, 600, WindowMode.FullScreen, true);
         var settings = AppSettings.Default with
         {
             Theme = AppTheme.Dark,
@@ -289,7 +289,7 @@ public sealed class AppSettingsTests : IDisposable
     [Fact]
     public void The_file_stays_inside_what_an_older_reader_takes_and_a_choice_of_vault_keeps_the_window()
     {
-        var window = new WindowLayout(-1500, -40, 800, 600, WindowMode.Maximized, 425, true);
+        var window = new WindowLayout(-1500, -40, 800, 600, WindowMode.Maximized, true);
         Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window, StayInTray = true, SendCrashReports = true, TermsAgreed = "2026-01-01" }));
         Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_directory, Path.Combine(_directory, "chosen.kdbx"), onlyIfNone: false));
 
@@ -304,11 +304,11 @@ public sealed class AppSettingsTests : IDisposable
     [Fact]
     public void A_table_nobody_touched_writes_no_key_and_one_touched_reads_back()
     {
-        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false) }));
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false) }));
         var text = File.ReadAllText(SettingsFile);
         Assert.DoesNotContain("table_", text, StringComparison.Ordinal);
 
-        var window = new WindowLayout(1, 2, 800, 600, WindowMode.Maximized, 425, true, 150, "items:title:desc,log:actor:asc", "items:300,100,100,88,120,104;trash:210,190,160");
+        var window = new WindowLayout(1, 2, 800, 600, WindowMode.Maximized, true, 150, "items:title:desc,log:actor:asc", "items:300,100,100,88,120,104;trash:210,190,160");
         Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window }));
 
         Assert.Equal(window, AppSettings.Load(SettingsFile).Window);
@@ -349,15 +349,16 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Contains($"bounds = \"{bounds}\"", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData("list_share = 0", null)]
-    [InlineData("list_share = 1000", null)]
-    [InlineData("list_share = 400", 400)]
-    public void A_share_of_nothing_or_of_everything_reads_as_none(string line, int? share)
+    [Fact]
+    public void A_list_share_an_older_version_wrote_loads_and_is_left_out_of_the_next_save()
     {
-        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\n{line}\n");
+        File.WriteAllText(SettingsFile, "[[window]]\nbounds = \"1,2,800,600\"\nlist_share = 400\n");
 
-        Assert.Equal(share, AppSettings.Load(SettingsFile).Window!.ListShare);
+        var read = AppSettings.Load(SettingsFile);
+        Assert.Equal(new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false), read.Window);
+
+        Assert.True(AppSettings.Save(SettingsFile, read));
+        Assert.DoesNotContain("list_share", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -383,7 +384,7 @@ public sealed class AppSettingsTests : IDisposable
     [Fact]
     public void A_zoom_round_trips_and_actual_size_writes_no_key()
     {
-        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false, 150);
+        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false, 150);
 
         Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = zoomed }));
         Assert.Contains("zoom = \"150%\"", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
@@ -396,7 +397,7 @@ public sealed class AppSettingsTests : IDisposable
     [Fact]
     public void A_zoom_written_here_reads_as_a_later_key_to_a_reader_that_does_not_know_it()
     {
-        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false, 200);
+        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false, 200);
         Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = zoomed }));
 
         Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var problem), problem);
@@ -412,7 +413,7 @@ public sealed class AppSettingsTests : IDisposable
 
         var read = AppSettings.Load(SettingsFile);
         Assert.Equal(AppSettings.Default.IdleTimeoutSeconds, read.IdleTimeoutSeconds);
-        Assert.Equal(new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false), read.Window);
+        Assert.Equal(new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false), read.Window);
 
         Assert.True(AppSettings.Save(SettingsFile, read with { Window = read.Window! with { X = 9 } }));
         Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);

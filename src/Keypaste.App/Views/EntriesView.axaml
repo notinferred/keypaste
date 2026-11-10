@@ -10,7 +10,6 @@
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
-    <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="14" /></DataTemplate>
     <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="14" /></DataTemplate>
     <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="14" /></DataTemplate>
     <DataTemplate x:Key="AttachmentSaveGlyph"><ctl:KpIcon Icon="download" Size="14" /></DataTemplate>
@@ -1274,6 +1273,7 @@
                                            AutomationProperties.Name="{x:Static res:Strings.ThePassword}"
                                            FontFamily="{DynamicResource KpMono}"
                                            Width="{Binding $parent[ctl:PressToCopy].ValueWidth}"
+                                           WrapsShownValue="True"
                                            HorizontalAlignment="Left"
                                            VerticalAlignment="Center"
                                            ClipToBounds="True"
@@ -1295,6 +1295,7 @@
                                            AutomationProperties.Name="{x:Static res:Strings.TheTOTPCode}"
                                            FontFamily="{DynamicResource KpMono}"
                                            Width="{Binding $parent[ctl:PressToCopy].ValueWidth}"
+                                           WrapsShownValue="True"
                                            HorizontalAlignment="Left"
                                            VerticalAlignment="Center"
                                            ClipToBounds="True"
@@ -1387,6 +1388,7 @@
                                                AutomationProperties.Name="{Binding DisplayName}"
                                                FontFamily="{DynamicResource KpMono}"
                                                Width="{Binding $parent[ctl:PressToCopy].ValueWidth}"
+                                           WrapsShownValue="True"
                                                HorizontalAlignment="Left"
                                                VerticalAlignment="Center"
                                                ClipToBounds="True"
@@ -1610,14 +1612,17 @@
                                      ctl:Announcer.Says="{Binding NewFieldNameProblem}" Text="{Binding NewFieldNameProblem}" />
                         </StackPanel>
                         <TextBlock Classes="label" Text="{x:Static res:Strings.FieldValue}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Grid ColumnSpacing="8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MaxWidth="420" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
                           <ctl:MaskedInput x:Name="NewFieldValue"
                                            AllowsPaste="True"
-                                           Width="420"
                                            Sink="{Binding NewFieldValue}"
                                            MaskedLength="{Binding NewFieldValue.MaskedLength}"
                                            AutomationProperties.Name="{x:Static res:Strings.FieldValue}" />
-                          <Button x:Name="NewFieldGenerate"
+                          <Button Grid.Column="1" x:Name="NewFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
                                 Command="{Binding GenerateIntoCommand}"
@@ -1626,7 +1631,7 @@
                                 AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
-                        </StackPanel>
+                        </Grid>
                         <Panel IsVisible="{Binding NewFieldValue.IsGenerated}">
                           <views:GeneratorOptions DataContext="{Binding Generator}" />
                         </Panel>
@@ -1648,14 +1653,17 @@
                       <StackPanel Spacing="8">
                         <TextBlock Classes="body primary" AutomationProperties.HeadingLevel="2" Text="{Binding ReplaceFieldPrompt}" ctl:MachineRuns.Words="{Binding ReplacingFieldName}" />
                         <TextBlock Classes="label" Text="{x:Static res:Strings.NewFieldValue}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Grid ColumnSpacing="8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MaxWidth="420" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
                           <ctl:MaskedInput x:Name="ReplacementFieldValue"
                                            AllowsPaste="True"
-                                           Width="420"
                                            Sink="{Binding ReplacementFieldValue}"
                                            MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
                                            AutomationProperties.Name="{x:Static res:Strings.NewFieldValue}" />
-                          <Button x:Name="ReplacementFieldGenerate"
+                          <Button Grid.Column="1" x:Name="ReplacementFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
                                 Command="{Binding GenerateIntoCommand}"
@@ -1664,7 +1672,7 @@
                                 AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
-                        </StackPanel>
+                        </Grid>
                         <Panel IsVisible="{Binding ReplacementFieldValue.IsGenerated}">
                           <views:GeneratorOptions DataContext="{Binding Generator}" />
                         </Panel>

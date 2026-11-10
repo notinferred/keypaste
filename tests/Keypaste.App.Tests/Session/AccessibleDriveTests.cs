@@ -136,9 +136,9 @@ public sealed class AccessibleDriveTests
         RenderedShell.Drain();
     }
 
-    /// <summary>The first field after the label, among the label's siblings.</summary>
     private static IEnumerable<AutomationPeer> Subtree(AutomationPeer peer) => [peer, .. peer.GetChildren().SelectMany(Subtree)];
 
+    /// <summary>The first field after the label, among the label's siblings and what they hold.</summary>
     private static IValueProvider After(RenderedShell shell, string label)
     {
         var text = Find(shell, label, AutomationControlType.Text);

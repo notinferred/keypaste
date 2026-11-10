@@ -110,7 +110,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
         SidebarHidden = Preferences.Current.Window?.SidebarHidden ?? false;
-        ListShare = Preferences.Current.Window?.ListShare;
         Tables = TableStates.Read(Preferences.Current.Window?.TableSorts, Preferences.Current.Window?.TableWidths);
         _clock = clock ?? TimeProvider.System;
         _post = post;
@@ -237,9 +236,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the sidebar lies over the content rather than beside it.</summary>
     internal bool SidebarOverlays => IsNarrow && SidebarOpenedOver;
-
-    /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
-    internal int? ListShare { get; set; }
 
     /// <summary>How each table was sorted and sized, which outlives the screens drawing them and is kept with the window.</summary>
     internal TableStates Tables { get; }

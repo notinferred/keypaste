@@ -138,7 +138,7 @@ internal sealed partial class ShellView : UserControl
     private void HandOnTheKeyboard()
     {
         // What holds the keyboard still shows, so nothing was lost; handing on again would focus it twice.
-        if (_lastFocused is Control { IsEffectivelyVisible: true })
+        if (_lastFocused is Control { IsFocused: true, IsEffectivelyVisible: true })
         {
             return;
         }

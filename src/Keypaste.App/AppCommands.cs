@@ -236,7 +236,7 @@ internal sealed class AppCommands
 
         var groupsAndProjects = new AppCommand(Strings.ShowGroupsAndProjects, [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
-        var resetTable = new AppCommand(Strings.ResetTableOrderAndWidths, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
+        var resetTable = new AppCommand(Strings.ResetListOrder, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
 
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =

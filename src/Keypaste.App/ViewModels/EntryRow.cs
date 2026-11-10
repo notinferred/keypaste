@@ -173,12 +173,6 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The row's second line: why it is in a result, its username, or where it lives; never a password or a field's value.</summary>
     internal string SecondLine => Why.Length > 0 ? Why : DisplayUsername.Length > 0 ? DisplayUsername : Where;
 
-    /// <summary>The username whole, for a cell that cuts it short; null with none, which a tooltip then does not open for.</summary>
-    internal string? UsernameTip => DisplayUsername.Length > 0 ? DisplayUsername : null;
-
-    /// <summary>The URL whole, as <see cref="UsernameTip"/>.</summary>
-    internal string? UrlTip => DisplayUrl.Length > 0 ? DisplayUrl : null;
-
     /// <summary>The entry's own tags the current query was in, or none when there is no query or it matched no tag.</summary>
     internal IReadOnlyList<string> Tags { get; init; } = [];
 

@@ -115,6 +115,55 @@
     <Setter Property="Opacity" Value="0.5" />
   </Style>
 
+  <!-- A horizontal slider whose track and thumb sit inside the 32px the control keeps, so nothing in it reaches past its own bounds. -->
+  <Style Selector="Slider">
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <DataValidationErrors>
+          <Track Name="PART_Track" Orientation="Horizontal" Height="20" VerticalAlignment="Center">
+            <Track.DecreaseButton>
+              <RepeatButton Name="PART_DecreaseButton" Classes="slider-track" Background="{DynamicResource SliderTrackValueFill}" />
+            </Track.DecreaseButton>
+            <Track.IncreaseButton>
+              <RepeatButton Name="PART_IncreaseButton" Classes="slider-track" Background="{DynamicResource SliderTrackFill}" />
+            </Track.IncreaseButton>
+            <Thumb Name="thumb" Width="20" Height="20">
+              <Thumb.Template>
+                <ControlTemplate>
+                  <Border Name="ThumbBorder" CornerRadius="10" BorderThickness="2" BorderBrush="Transparent" Background="{DynamicResource SliderThumbBackground}" />
+                </ControlTemplate>
+              </Thumb.Template>
+            </Thumb>
+          </Track>
+        </DataValidationErrors>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="RepeatButton.slider-track">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="Transparent" Height="20">
+          <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{TemplateBinding Background}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Slider /template/ Thumb:pointerover /template/ Border#ThumbBorder">
+    <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPointerOver}" />
+  </Style>
+  <Style Selector="Slider /template/ Thumb:pressed /template/ Border#ThumbBorder">
+    <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPressed}" />
+  </Style>
+  <Style Selector="Slider:focus-visible /template/ Thumb /template/ Border#ThumbBorder">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+  </Style>
+  <Style Selector="Slider:disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
   <!-- A choice between options: a 16px ring around a 6px dot, both in the text colour when picked. -->
   <Style Selector="RadioButton:not(.segment)">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />

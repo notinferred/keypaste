@@ -529,7 +529,7 @@ public sealed class SortAndSizeTablesTests
     {
         using var shell = ShellWith("keypaste-table-kept-", 1280, 800, "beta");
         var entries = Items(shell);
-        var tables = shell.Commands.All.Single(command => command.Header == "Reset table order and widths");
+        var tables = shell.Commands.All.Single(command => command.Header == "Reset list order");
 
         Assert.False(tables.CanRun());
         Assert.Null(shell.Shell.Tables.SortsText);
