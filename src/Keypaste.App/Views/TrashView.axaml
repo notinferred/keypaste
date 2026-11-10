@@ -193,8 +193,8 @@
                      VerticalAlignment="Center"
                      IsVisible="{Binding !HasSelection}" />
 
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasSelection}">
-            <StackPanel Margin="32,24" Spacing="16" MaxWidth="756" HorizontalAlignment="Stretch">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="32,24" Spacing="16" MaxWidth="756" HorizontalAlignment="Stretch" IsVisible="{Binding HasSelection}">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
                 <TextBlock Classes="list-title"
                            Text="{Binding DetailTitle}"

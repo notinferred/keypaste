@@ -236,36 +236,32 @@
               <ctl:GroupedRows>
                 <ctl:FieldRow Label="{x:Static res:Strings.KeyFile}">
                   <Panel>
-                    <TextBlock Classes="size-13 muted" Text="{x:Static res:Strings.NoKeyFile}" IsVisible="{Binding !HasKeyfile}" VerticalAlignment="Center" />
-                    <TextBlock Classes="mono secondary size-12"
-                               Text="{Binding KeyfileName}"
-                               ToolTip.Tip="{Binding KeyfilePath}"
-                               IsVisible="{Binding HasKeyfile}"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
-                  </Panel>
-                  <ctl:FieldRow.Actions>
-                    <Panel>
-                      <Button Classes="ghost sm size-12"
-                              IsVisible="{Binding !HasKeyfile}"
-                              Command="{Binding ChooseKeyfileCommand}"
-                              ToolTip.Tip="{x:Static res:Strings.UnlockWithAKeyFileTooLabel}"
-                              AutomationProperties.Name="{x:Static res:Strings.UnlockWithAKeyFileToo}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="file-key" Size="14" />
-                          <TextBlock Text="{x:Static res:Strings.ChooseKeyFile}" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Button>
-                      <Button Classes="icon ghost sm"
+                    <Button Classes="ghost sm size-12"
+                            HorizontalAlignment="Left"
+                            IsVisible="{Binding !HasKeyfile}"
+                            Command="{Binding ChooseKeyfileCommand}"
+                            ToolTip.Tip="{x:Static res:Strings.UnlockWithAKeyFileTooLabel}"
+                            AutomationProperties.Name="{x:Static res:Strings.UnlockWithAKeyFileToo}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ctl:KpIcon Icon="file-key" Size="14" />
+                        <TextBlock Text="{x:Static res:Strings.ChooseKeyFile}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasKeyfile}">
+                      <TextBlock Classes="mono secondary size-12"
+                                 Text="{Binding KeyfileName}"
+                                 ToolTip.Tip="{Binding KeyfilePath}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="icon ghost sm"
                               Width="22" Height="22"
-                              IsVisible="{Binding HasKeyfile}"
                               ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAKeyFile}"
                               Command="{Binding ClearKeyfileCommand}"
                               AutomationProperties.Name="{x:Static res:Strings.UnlockWithoutAKeyFile}">
                         <ctl:KpIcon Icon="x" Size="14" />
                       </Button>
-                    </Panel>
-                  </ctl:FieldRow.Actions>
+                    </Grid>
+                  </Panel>
                 </ctl:FieldRow>
               </ctl:GroupedRows>
             </Border>

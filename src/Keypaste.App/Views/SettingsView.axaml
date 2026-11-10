@@ -82,13 +82,13 @@
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <StackPanel Margin="32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Stretch">
 
-            <TextBlock Classes="list-title" Text="{Binding Section}" ToolTip.Tip="{Binding SectionNote}" />
+            <TextBlock Classes="dialog-title" Text="{Binding Section}" ToolTip.Tip="{Binding SectionNote}" />
 
             <StackPanel Spacing="16" IsVisible="{Binding ShowsGeneral}">
 
               <Border Classes="group">
                 <ctl:GroupedRows>
-                  <ctl:FieldRow Label="{x:Static res:Strings.LockAfter}">
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.LockAfter}">
                     <ComboBox ItemsSource="{Binding IdleChoices}"
                               AutomationProperties.Name="{x:Static res:Strings.LockAfter}"
                               AutomationProperties.HelpText="{x:Static app:ShortcutText.IdleLock}"

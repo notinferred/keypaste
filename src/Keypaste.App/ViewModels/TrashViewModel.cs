@@ -283,10 +283,10 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         _sorting = true;
         Rows = [.. Arranged(Rows)];
-        _sorting = false;
-
         SelectedRows.Clear();
         SelectedRows.AddRange(chosen);
+        _sorting = false;
+
         OnPropertyChanged(nameof(Selected));
         OnPropertyChanged(nameof(SortChoices));
     }

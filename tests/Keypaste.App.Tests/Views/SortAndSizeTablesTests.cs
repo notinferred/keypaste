@@ -403,7 +403,9 @@ public sealed class SortAndSizeTablesTests
         Assert.Equal(edge.X + by, InWindow(grip, shell.Window).X, 1d);
 
         var row = shell.Window.GetVisualDescendants().OfType<LogColumns>().First(columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
-        Assert.Equal(InWindow(Head(shell, TableStates.Action), shell.Window).X, InWindow(row.Children.First(child => Grid.GetColumn(child) == 2), shell.Window).X, 1d);
+        var cell = row.Children.First(child => Grid.GetColumn(child) == 2);
+        var text = cell as TextBlock ?? cell.GetVisualDescendants().OfType<TextBlock>().First();
+        Assert.Equal(InWindow(LabelOf(Head(shell, TableStates.Action)), shell.Window).X, InWindow(text, shell.Window).X, 1d);
     });
 
     [Theory]
@@ -421,7 +423,7 @@ public sealed class SortAndSizeTablesTests
         var columns = grip.FindAncestorOfType<LogColumns>()!;
         Assert.Equal(head.Bounds.Width, columns.DrawnWidths[1], 1d);
         var edge = InWindow(grip, shell.Window);
-        var by = -80d;
+        var by = -30d;
 
         shell.Window.MouseMove(edge.Center);
         shell.Window.MouseDown(edge.Center, MouseButton.Left);
