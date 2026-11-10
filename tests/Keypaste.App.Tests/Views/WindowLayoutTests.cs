@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -181,6 +180,8 @@ public sealed class WindowLayoutTests
         using var shell = new RenderedShell("keypaste-window-overlay-");
         shell.Window.Width = 720;
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows[0];
+        RenderedShell.Drain();
         shell.Frame();
         var sidebar = shell.Named<Border>("Sidebar");
         var pane = shell.Named<ContentControl>("EntryPane");
@@ -231,7 +232,7 @@ public sealed class WindowLayoutTests
         shell.Window.Width = 1280;
         shell.Show<EntriesViewModel>(DestinationKind.Entries);
         shell.Frame();
-        var head = shell.Named<ColumnHead>("UsernameHead");
+        var rows = shell.Named<ListBox>("Rows");
         var before = shell.Named<ContentControl>("EntryPane").Bounds.Width;
         var commands = shell.Commands;
         var hide = commands.All.Single(command => command.Header == "Hide sidebar");
@@ -243,7 +244,7 @@ public sealed class WindowLayoutTests
 
         Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
         Assert.True(shell.Named<ContentControl>("EntryPane").Bounds.Width > before);
-        Assert.True(head.IsEffectivelyVisible, "a wide window keeps the Username column with the sidebar hidden");
+        Assert.True(rows.IsEffectivelyVisible, "a wide window keeps the list beside the item with the sidebar hidden");
         Assert.Equal("Show sidebar", drawn.Header);
 
         hide.Run();
@@ -278,28 +279,6 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task The_split_is_held_across_a_trip_away_from_Items() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-window-split-");
-        shell.Window.Height = 800;
-        shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        shell.Frame();
-        var before = shell.Named<ListBox>("Rows").Bounds.Height;
-
-        DragDivider(shell.Window, shell.Named<GridSplitter>("PaneDivider"), 60);
-        var dragged = shell.Named<ListBox>("Rows").Bounds.Height;
-        Assert.InRange(dragged, before + 50, before + 70);
-        Assert.NotNull(shell.Shell.ListShare);
-
-        shell.Show<TrashViewModel>(DestinationKind.Trash);
-        shell.Frame();
-        shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        shell.Frame();
-
-        Assert.InRange(shell.Named<ListBox>("Rows").Bounds.Height, dragged - 2, dragged + 2);
-    });
-
-    [Fact]
     public Task A_lock_keeps_the_layout_and_the_next_unlock_opens_with_it() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
@@ -330,11 +309,6 @@ public sealed class WindowLayoutTests
         var root = main.FindControl<ContentControl>("Root")!;
 
         var shell = await Unlock(main, root, vault);
-        var split = Named<Grid>(main, "Split");
-        var before = ListShareOf(split);
-        DragDivider(main, Named<GridSplitter>(main, "PaneDivider"), 60);
-        var dragged = ListShareOf(split);
-        Assert.True(dragged > before, $"{dragged} after the drag, {before} before it");
         shell.ToggleSidebar();
         DrawnFrame.Capture(main);
 
@@ -346,7 +320,6 @@ public sealed class WindowLayoutTests
         Assert.Equal(137, kept.IdleTimeoutSeconds);
         Assert.Equal((1100, 800), (kept.Window!.Width, kept.Window.Height));
         Assert.True(kept.Window.SidebarHidden);
-        Assert.NotNull(kept.Window.ListShare);
 
         // A lock with nothing changed writes nothing.
         var written = File.ReadAllBytes(settingsPath);
@@ -354,7 +327,6 @@ public sealed class WindowLayoutTests
         var reopened = await Unlock(main, root, vault);
         Assert.True(reopened.SidebarHidden);
         Assert.DoesNotContain(main.GetVisualDescendants().OfType<Border>(), border => border.Name == "Sidebar" && border.IsEffectivelyVisible);
-        Assert.Equal(dragged, ListShareOf(Named<Grid>(main, "Split")), 0.01);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
@@ -415,7 +387,7 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_lock_keeps_each_tables_order_and_widths_and_the_next_unlock_opens_with_them() => HeadlessSession.On(async () =>
+    public Task A_lock_keeps_a_tables_order_and_the_next_unlock_opens_with_it() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "tables.kdbx");
@@ -445,23 +417,18 @@ public sealed class WindowLayoutTests
         var root = main.FindControl<ContentControl>("Root")!;
 
         var shell = await Unlock(main, root, vault);
-        var columns = main.GetVisualDescendants().OfType<EntryColumns>().First();
         shell.Tables.Items.Press(TableStates.Url);
-        shell.Tables.Items.Resize(TableStates.Title, 40, columns.DrawnWidths);
         DrawnFrame.Capture(main);
-        var drawnTitle = columns.DrawnWidths[0];
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
 
         Assert.True(AppSettings.TryLoad(settingsPath, out var kept));
         Assert.Equal("items:url:asc", kept.Window!.TableSorts);
-        Assert.StartsWith("items:", kept.Window.TableWidths, StringComparison.Ordinal);
 
         var reopened = await Unlock(main, root, vault);
         Assert.NotSame(shell, reopened);
         Assert.Equal(new TableOrder(TableStates.Url, false), reopened.Tables.Items.Order);
-        Assert.Equal(drawnTitle, main.GetVisualDescendants().OfType<EntryColumns>().First().DrawnWidths[0], 1.5);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
@@ -578,23 +545,6 @@ public sealed class WindowLayoutTests
         Assert.True(preferences.Update(preferences.Current with { Theme = AppTheme.Dark }));
         Assert.Equal(Saved(1, 2), AppSettings.Load(path).Window);
         Assert.Equal(Saved(1, 2), preferences.Current.Window);
-    }
-
-    private static double ListShareOf(Grid split) =>
-        split.RowDefinitions[0].ActualHeight / (split.RowDefinitions[0].ActualHeight + split.RowDefinitions[2].ActualHeight);
-
-    private static void DragDivider(TopLevel window, Control divider, int down)
-    {
-        DrawnFrame.Capture(window);
-        var from = divider.TranslatePoint(new Point(divider.Bounds.Width / 2, divider.Bounds.Height / 2), window)!.Value;
-        window.MouseMove(from);
-        window.MouseDown(from, MouseButton.Left);
-        WindowInput.Drain();
-        window.MouseMove(from + new Point(0, down));
-        WindowInput.Drain();
-        window.MouseUp(from + new Point(0, down), MouseButton.Left);
-        WindowInput.Drain();
-        DrawnFrame.Capture(window);
     }
 
     private static async Task<ShellViewModel> Unlock(Window main, ContentControl root, string vault)

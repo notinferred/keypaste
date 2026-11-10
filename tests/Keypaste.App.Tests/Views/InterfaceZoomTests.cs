@@ -168,7 +168,7 @@ public sealed class InterfaceZoomTests
         Assert.Equal(new Size(1440, 1040), scroller.Extent);
         Assert.Empty(ReachableControls.Problems(shell.Window));
 
-        var lockButton = shell.Window.GetVisualDescendants().OfType<Button>().First(button => button.Classes.Contains("titlebar-lock"));
+        var lockButton = shell.Window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "RailLock");
         lockButton.BringIntoView();
         WindowInput.Drain();
         shell.Frame();
@@ -319,31 +319,6 @@ public sealed class InterfaceZoomTests
 
         Assert.Equal(1, pressed);
         window.Close();
-    });
-
-    [Fact]
-    public Task The_list_divider_follows_the_pointer_at_200_percent() => HeadlessSession.On(() =>
-    {
-        InterfaceZoom.Set(200);
-        using var shell = new RenderedShell("keypaste-zoom-divider-");
-        shell.Window.Width = 1920;
-        shell.Window.Height = 1200;
-        shell.Show<EntriesViewModel>(Keypaste.App.Navigation.DestinationKind.Entries);
-        shell.Frame();
-        var divider = shell.Window.GetVisualDescendants().OfType<GridSplitter>().First();
-        var before = InWindow(divider, shell.Window);
-        var from = before.Center;
-        var to = from + new Point(0, 100);
-
-        shell.Window.MouseMove(from);
-        shell.Window.MouseDown(from, MouseButton.Left);
-        WindowInput.Drain();
-        shell.Window.MouseMove(to);
-        WindowInput.Drain();
-        shell.Window.MouseUp(to, MouseButton.Left);
-        shell.Frame();
-
-        Assert.Equal(before.Y + 100, InWindow(divider, shell.Window).Y, 6d);
     });
 
     [Fact]

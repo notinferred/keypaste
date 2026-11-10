@@ -41,7 +41,6 @@
   <data name="AskForIt" xml:space="preserve"><value>Ask for it</value></data>
   <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask keypaste.com how many views each link has left</value></data>
   <data name="AtLeast20CharactersSuchAsSixGeneratedWords" xml:space="preserve"><value>At least 20 characters, such as six generated words</value></data>
-  <data name="Attachments" xml:space="preserve"><value>Attachments</value></data>
   <data name="Back" xml:space="preserve"><value>Back</value></data>
   <data name="BackToValue" xml:space="preserve"><value>Back to {0}</value></data>
   <data name="Backups" xml:space="preserve"><value>Backups</value></data>
@@ -295,9 +294,7 @@
   <data name="NewValue" xml:space="preserve"><value>New value</value></data>
   <data name="NewVault" xml:space="preserve"><value>New vault</value></data>
   <data name="NoActivityYet" xml:space="preserve"><value>No activity yet</value></data>
-  <data name="NoAttachments" xml:space="preserve"><value>No attachments.</value></data>
   <data name="NoBrowserIsPairedWithThisVault" xml:space="preserve"><value>No browser is paired with this vault.</value></data>
-  <data name="NoCustomFields" xml:space="preserve"><value>No custom fields.</value></data>
   <data name="NoKeyFile" xml:space="preserve"><value>No key file</value></data>
   <data name="NoKeysFoundInNotesNoWeakX50d3ee" xml:space="preserve"><value>No keys found in notes, no weak, reused or expired passwords, and no project tags dropped.</value></data>
   <data name="NoKeysYetAddTheFirstOneX0cbcf7" xml:space="preserve"><value>No keys yet. Add the first one to {0}.</value></data>
@@ -373,7 +370,6 @@
   <data name="ReportAProblem" xml:space="preserve"><value>Report a problem</value></data>
   <data name="RequireAPassphraseSentSeparately" xml:space="preserve"><value>Require a passphrase, sent separately</value></data>
   <data name="ResetTableOrderAndWidths" xml:space="preserve"><value>Reset table order and widths</value></data>
-  <data name="ResizeTheListAndThePreview" xml:space="preserve"><value>Resize the list and the preview</value></data>
   <data name="Restore" xml:space="preserve"><value>Restore</value></data>
   <data name="RestoreABackup" xml:space="preserve"><value>Restore a backup</value></data>
   <data name="RestoreTag" xml:space="preserve"><value>Restore tag</value></data>
@@ -634,4 +630,10 @@
   <data name="ReviewAndMerge" xml:space="preserve"><value>Review and merge</value></data>
   <data name="Merge" xml:space="preserve"><value>Merge</value></data>
   <data name="SaveWhatsOpenHere" xml:space="preserve"><value>Save what's open here</value></data>
+  <data name="Sort" xml:space="preserve"><value>Sort</value></data>
+  <data name="SortThisList" xml:space="preserve"><value>Sort this list</value></data>
+  <data name="Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="EditingItem" xml:space="preserve"><value>Editing</value></data>
+  <data name="PressAValueToCopyIt" xml:space="preserve"><value>Press a value to copy it</value></data>
+  <data name="CopyThePassword" xml:space="preserve"><value>Copy the password</value></data>
 </root>

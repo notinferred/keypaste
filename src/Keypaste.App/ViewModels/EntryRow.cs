@@ -170,6 +170,9 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The URL column, scrubbed as the item's preview scrubs it.</summary>
     internal string DisplayUrl => DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
 
+    /// <summary>The row's second line: why it is in a result, its username, or where it lives; never a password or a field's value.</summary>
+    internal string SecondLine => Why.Length > 0 ? Why : DisplayUsername.Length > 0 ? DisplayUsername : Where;
+
     /// <summary>The username whole, for a cell that cuts it short; null with none, which a tooltip then does not open for.</summary>
     internal string? UsernameTip => DisplayUsername.Length > 0 ? DisplayUsername : null;
 

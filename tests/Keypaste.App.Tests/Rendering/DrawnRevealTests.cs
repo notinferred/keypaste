@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
+using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Tests;
@@ -38,6 +39,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_Reveal_draws_the_value_and_a_second_takes_it_off_the_frame(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
         var dots = new string('•', cell.MaskedLength);
@@ -85,6 +87,7 @@ public sealed class DrawnRevealTests
     public Task Locking_while_shown_takes_the_value_off_the_next_frame(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
@@ -110,6 +113,7 @@ public sealed class DrawnRevealTests
     public Task Space_on_an_env_values_Reveal_button_draws_it_until_Space_again() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open("env");
         var style = TextStyle.Of(cell);
         var button = shell.Window.GetVisualDescendants().OfType<RevealButton>().Single(candidate => candidate.DataContext is EnvVariableRow);
@@ -134,6 +138,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_a_masked_cell_leaves_it_masked(string surface) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, _) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
@@ -151,6 +156,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_another_environments_cell_selects_it_and_reveals_nothing() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => ProjectVariables.Set(vault, "billing", "staging", "STRIPE_KEY", "SENTINEL-STAGING-VALUE-c41d"));
+        shell.Window.Width = 1400;
         var project = shell.OpenProject();
         project.SelectedProfile = "dev";
         RenderedShell.Drain();
@@ -168,6 +174,7 @@ public sealed class DrawnRevealTests
     public Task On_Env_Tab_reaches_Reveal_and_its_Hide_stays_in_view_while_the_value_shows() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open("env");
         var style = TextStyle.Of(cell);
         var toggle = shell.ToggleOf(cell);
@@ -208,6 +215,7 @@ public sealed class DrawnRevealTests
     public Task A_long_value_on_Env_leaves_Hide_uncovered() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => ProjectVariables.Set(vault, "billing", "LONG_KEY", new string('x', 400)));
+        shell.Window.Width = 1400;
         shell.Window.Width = 720;
         shell.OpenProject();
         RenderedShell.Drain();
@@ -244,6 +252,7 @@ public sealed class DrawnRevealTests
     public Task Each_way_out_takes_the_value_off_the_frame_and_the_toggle_says_Reveal_again(string surface, string way) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var clock = new ManualClock();
         shell.Window.SetValue(RevealedValue.ClockProperty, clock);
         var (cell, value) = shell.Open(surface);
@@ -287,6 +296,7 @@ public sealed class DrawnRevealTests
     public Task Leaving_the_item_takes_its_value_off_the_frame(string how) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => vault.AddEntry(new Core.VaultEntry { GroupPath = "work", Title = "gitlab", Username = "me", Password = "other-password-of-gitlab" }));
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open("current");
         var style = TextStyle.Of(cell);
         var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
@@ -319,6 +329,7 @@ public sealed class DrawnRevealTests
     public Task The_edit_form_hides_the_value_and_cancelling_finds_dots() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, _) = shell.Open("current");
         var detail = Assert.IsType<EntriesViewModel>(shell.Shell.Content).Detail!;
         cell.BeginReveal();
@@ -339,6 +350,7 @@ public sealed class DrawnRevealTests
     {
         const string next = "SENTINEL-NEXT-CURRENT-b71e";
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, _) = shell.Open("current");
         cell.BeginReveal();
 
@@ -354,6 +366,7 @@ public sealed class DrawnRevealTests
     public Task An_idle_lock_takes_the_value_off_the_next_frame() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
+        shell.Window.Width = 1400;
         var (cell, value) = shell.Open("current");
         var style = TextStyle.Of(cell);
         cell.BeginReveal();
@@ -361,7 +374,7 @@ public sealed class DrawnRevealTests
         var shown = shell.Frame();
         Assert.True(shown.Shows(value, style, shown.Everywhere), "the value is not drawn before the lock");
 
-        ((ManualClock)shell.Session.Clock).Advance(TimeSpan.FromMinutes(5));
+        ((ManualClock)shell.Session.Clock).Advance(AppVaultSession.DefaultIdleTimeout);
         shell.UntilLocked();
 
         Assert.False(cell.IsRevealed);

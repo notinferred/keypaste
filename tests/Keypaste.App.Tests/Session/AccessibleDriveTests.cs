@@ -137,11 +137,14 @@ public sealed class AccessibleDriveTests
     }
 
     /// <summary>The first field after the label, among the label's siblings.</summary>
+    private static IEnumerable<AutomationPeer> Subtree(AutomationPeer peer) => [peer, .. peer.GetChildren().SelectMany(Subtree)];
+
     private static IValueProvider After(RenderedShell shell, string label)
     {
         var text = Find(shell, label, AutomationControlType.Text);
         var siblings = text.GetParent()!.GetChildren();
         var field = siblings.Skip(siblings.ToList().IndexOf(text) + 1)
+            .SelectMany(Subtree)
             .FirstOrDefault(peer => peer.GetAutomationControlType() == AutomationControlType.Edit);
 
         return field as IValueProvider ?? throw new Xunit.Sdk.XunitException($"no field after '{label}'");

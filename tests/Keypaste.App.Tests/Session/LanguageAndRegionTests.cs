@@ -333,11 +333,14 @@ public sealed partial class LanguageAndRegionTests
     {
         using var pseudo = PseudoLocale.RightToLeft();
         using var shell = new RenderedShell("keypaste-rtl-grip-");
-        shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        RenderedShell.Drain();
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows[0];
+        entries.DeleteCommand.Press();
+        shell.Show<TrashViewModel>(DestinationKind.Trash);
+        shell.Frame();
 
         var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Title);
-        var columns = grip.FindAncestorOfType<EntryColumns>()!;
+        var columns = grip.FindAncestorOfType<TrashColumns>()!;
         var before = columns.DrawnWidths[0];
         grip.Focus();
         shell.Window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.None);
@@ -351,11 +354,14 @@ public sealed partial class LanguageAndRegionTests
     {
         using var pseudo = PseudoLocale.RightToLeft();
         using var shell = new RenderedShell("keypaste-rtl-drag-");
-        shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        RenderedShell.Drain();
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows[0];
+        entries.DeleteCommand.Press();
+        shell.Show<TrashViewModel>(DestinationKind.Trash);
+        shell.Frame();
 
         var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Title);
-        var columns = grip.FindAncestorOfType<EntryColumns>()!;
+        var columns = grip.FindAncestorOfType<TrashColumns>()!;
         var before = columns.DrawnWidths[0];
         var at = grip.TranslatePoint(new Point(grip.Bounds.Width / 2, grip.Bounds.Height / 2), shell.Window)!.Value;
 

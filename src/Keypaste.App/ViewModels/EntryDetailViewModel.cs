@@ -274,7 +274,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField;
 
     /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
-    internal bool TakesWholeView => IsEditing || History.IsOpen;
+    internal bool TakesWholeView => History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 

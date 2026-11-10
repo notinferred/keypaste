@@ -108,7 +108,7 @@ public sealed class FourPlacesJourneyTests
             Assert.Equal("github", items.Selected?.Title);
             Press(main, Row(main, "Nav", row => row is GroupRow { Path: "Work" }));
             Assert.Equal("Work", Named<TextBlock>(main, "ListTitle").Text);
-            AmberElements.AssertOne(main, Named<ToggleButton>(main, "AddEntry"), "Items, an item open in a group");
+            AmberElements.AssertOne(main, Named<Button>(main, "CopyPassword"), "Items, an item open in a group");
 
             // A project's variables, from its row beneath Items; Back returns to Items.
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));

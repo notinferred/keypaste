@@ -56,6 +56,7 @@ public sealed class DrawnRevealWaysOutTests
     public Task Each_way_out_takes_the_value_off_the_frame_and_out_of_what_holds_it(string surface, string way) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-ways-out-", seed: SeedItems);
+        shell.Window.Width = 1400;
         var clock = new ManualClock();
         shell.Window.SetValue(RevealedValue.ClockProperty, clock);
         var opened = Open(shell, surface);
@@ -94,6 +95,7 @@ public sealed class DrawnRevealWaysOutTests
     public Task A_code_shown_as_its_period_ends_is_drawn_again_as_the_next_code() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-ways-out-", seed: SeedItems);
+        shell.Window.Width = 1400;
         var opened = Open(shell, "totp");
         var style = TextStyle.Of(opened.Cell);
         var row = Assert.IsType<EntriesViewModel>(shell.Shell.Content).Detail!.Totp!;
@@ -117,6 +119,7 @@ public sealed class DrawnRevealWaysOutTests
     public Task A_generated_value_shown_while_regenerated_is_drawn_again_as_the_new_value() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-ways-out-", seed: SeedItems);
+        shell.Window.Width = 1400;
         var opened = Open(shell, "generated");
         var style = TextStyle.Of(opened.Cell);
         var dialog = shell.Shell.GeneratorDialog!;
