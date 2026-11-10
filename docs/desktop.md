@@ -128,7 +128,7 @@ A new vault opens on an empty Items list, under New item, which offers Import fr
 
 ## Locking
 
-The default idle timeout is five minutes without keyboard or mouse input. Settings accepts one minute to eight hours and persists the choice across launches. Idle locking cannot be disabled.
+The default idle timeout is thirty minutes without keyboard or mouse input. Settings accepts one minute to eight hours and persists the choice across launches. Idle locking cannot be disabled.
 
 Thirty seconds before it locks, a quiet line appears in the header. Any key or click cancels it.
 

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app locks after 30 minutes without input by default, where it locked after five. Settings still offers one minute to eight hours, and a saved choice is kept.
+
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).
 
 When the audit log has opened but can no longer be written, the desktop app now says so once in a pop-up with the fix and keeps a message on Agents until a line is written ([F.102](docs/steps/F.102.md)).
