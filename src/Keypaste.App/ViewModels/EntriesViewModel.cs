@@ -44,6 +44,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
+    /// <summary>Starts a new item with a generated value, set by the shell; the second argument closes the generator the value came from.</summary>
+    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
+
     internal EntriesViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
@@ -993,7 +996,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange };
+        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange, StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close) };
         TellPaneAboutItsName(detail);
         return detail;
     }
@@ -1175,7 +1178,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Notice = null;
         Error = null;
-        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
+        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null)
+        {
+            StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close),
+        };
     }
 
     [RelayCommand(CanExecute = nameof(IsAdding))]

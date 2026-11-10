@@ -26,7 +26,7 @@ internal sealed partial class EntriesView : UserControl
     private const double _dragDistance = 6d;
 
     /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
-    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel")];
+    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel"), ("AddFieldMenu", "AddFieldMenuPanel")];
 
     private readonly ListDetail _split;
     private readonly ListBox _rows;
@@ -207,6 +207,12 @@ internal sealed partial class EntriesView : UserControl
     /// <summary>Escape closes an open menu and gives focus back to its button.</summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && CloseGeneratorPanel())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Escape || OpenMenus().FirstOrDefault() is not ({ } toggle, _))
         {
             return;
@@ -215,6 +221,30 @@ internal sealed partial class EntriesView : UserControl
         toggle.IsChecked = false;
         toggle.Focus(NavigationMethod.Tab);
         e.Handled = true;
+    }
+
+    /// <summary>Escape closes the generator anchored to a password field and gives focus back to the button that opened it.</summary>
+    private bool CloseGeneratorPanel()
+    {
+        string button;
+
+        if (_entries?.NewItem is { HasGeneratorPanel: true } form)
+        {
+            form.CloseGeneratorCommand.Execute(null);
+            button = "NewEntryGenerate";
+        }
+        else if (_entries?.Detail is { HasGeneratorPanel: true } detail)
+        {
+            detail.CloseGeneratorCommand.Execute(null);
+            button = "ReplacementPasswordGenerate";
+        }
+        else
+        {
+            return false;
+        }
+
+        this.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate => candidate.Name == button)?.Focus(NavigationMethod.Tab);
+        return true;
     }
 
     /// <summary>An opened menu takes focus on its first item, visibly so when it was opened from the keyboard.</summary>

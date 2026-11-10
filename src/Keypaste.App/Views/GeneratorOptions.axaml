@@ -17,6 +17,34 @@
         <RadioButton Classes="segment" Content="{x:Static res:Strings.Words}" IsChecked="{Binding UseWords}" />
       </StackPanel>
     </Border>
+    <StackPanel Spacing="8" IsVisible="{Binding UseCharacters}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" Text="{x:Static res:Strings.Length}" />
+        <NumericUpDown HorizontalAlignment="Left"
+                       Width="76"
+                       ShowButtonSpinner="False"
+                       Minimum="{Binding MinimumLength}"
+                       Maximum="{Binding MaximumLength}"
+                       Increment="1"
+                       FormatString="0"
+                       AutomationProperties.Name="{x:Static res:Strings.Length}"
+                       Value="{Binding Length}" />
+        <Slider Minimum="{Binding MinimumLength}"
+                Maximum="{Binding MaximumLength}"
+                TickFrequency="1"
+                IsSnapToTickEnabled="True"
+                AutomationProperties.Name="{x:Static res:Strings.Length}"
+                Value="{Binding Length}" />
+      </StackPanel>
+      <WrapPanel Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
+        <CheckBox Content="{x:Static res:Strings.Letters}" IsChecked="{Binding Letters}" />
+        <CheckBox Content="{x:Static res:Strings.Digits}" IsChecked="{Binding Digits}" />
+        <CheckBox Content="{x:Static res:Strings.Symbols}" IsChecked="{Binding Symbols}" />
+        <CheckBox Content="{x:Static res:Strings.LeaveOutLookalikes}"
+                  ToolTip.Tip="{x:Static res:Strings.LookalikesTip}"
+                  IsChecked="{Binding LeaveOutLookalikes}" />
+      </WrapPanel>
+    </StackPanel>
     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UseWords}">
       <StackPanel Spacing="6">
         <TextBlock Classes="label" Text="{x:Static res:Strings.Words}" />

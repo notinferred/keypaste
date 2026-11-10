@@ -28,6 +28,36 @@ public sealed class GeneratorViewModelTests
     }
 
     [Fact]
+    public void The_character_options_make_the_recipe_the_core_generates()
+    {
+        var generator = new GeneratorViewModel { Length = 32, Symbols = false, LeaveOutLookalikes = true };
+
+        Assert.Equal("32-character password", generator.Recipe?.Describe("password"));
+        Assert.Contains("32 characters", generator.Strength, StringComparison.Ordinal);
+        Assert.Null(generator.Error);
+    }
+
+    [Fact]
+    public void Turning_every_kind_of_character_off_refuses_the_recipe_and_says_why()
+    {
+        var generator = new GeneratorViewModel { Letters = false, Digits = false, Symbols = false };
+
+        Assert.Null(generator.Recipe);
+        Assert.Contains("at least one kind of character", generator.Error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(7)]
+    [InlineData(257)]
+    public void A_length_the_core_refuses_is_not_replaced_by_the_default(int length)
+    {
+        var generator = new GeneratorViewModel { Length = length };
+
+        Assert.Null(generator.Recipe);
+        Assert.NotNull(generator.Error);
+    }
+
+    [Fact]
     public void Choosing_words_gives_a_six_word_recipe()
     {
         var generator = new GeneratorViewModel { UseWords = true };

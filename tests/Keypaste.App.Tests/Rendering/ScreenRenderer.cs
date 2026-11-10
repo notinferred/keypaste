@@ -1033,6 +1033,17 @@ public sealed class ScreenRenderer
         window.Width = 720 * InterfaceZoom.Factor;
         Save(window, output, "13d-secrets-new-720");
         window.Width = newItemWidth;
+
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = true;
+        Save(window, output, "13e-secrets-new-field-options");
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = false;
+
+        entries.NewItem!.OpenGeneratorCommand.Execute(null);
+        Save(window, output, "13f-secrets-new-generator");
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "13g-secrets-new-generator-720");
+        window.Width = newItemWidth;
+        entries.NewItem.CloseGeneratorCommand.Execute(null);
         entries.CancelAddCommand.Press();
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
@@ -2048,7 +2059,7 @@ public sealed class ScreenRenderer
     /// <summary>A value shown in its cell, with the toggle saying Hide, then hidden again.</summary>
     private static void DrawRevealed(Window window, string output, string cellName, string frame)
     {
-        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == cellName);
+        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == cellName && value.IsEffectivelyVisible);
         cell.BeginReveal();
         Save(window, output, frame);
         cell.EndReveal();

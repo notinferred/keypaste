@@ -178,6 +178,7 @@ public static class Strings
     public static string DeletedItems => Manager.GetString("DeletedItems", CultureInfo.CurrentUICulture)!;
     public static string Denied => Manager.GetString("Denied", CultureInfo.CurrentUICulture)!;
     public static string Diagnostics => Manager.GetString("Diagnostics", CultureInfo.CurrentUICulture)!;
+    public static string Digits => Manager.GetString("Digits", CultureInfo.CurrentUICulture)!;
     public static string Discard => Manager.GetString("Discard", CultureInfo.CurrentUICulture)!;
     public static string DisconnectLabel => Manager.GetString("DisconnectLabel", CultureInfo.CurrentUICulture)!;
     public static string DisconnectValue => Manager.GetString("DisconnectValue", CultureInfo.CurrentUICulture)!;
@@ -305,8 +306,11 @@ public static class Strings
     public static string LastUsedValue => Manager.GetString("LastUsedValue", CultureInfo.CurrentUICulture)!;
     public static string LearnMore => Manager.GetString("LearnMore", CultureInfo.CurrentUICulture)!;
     public static string LearnMoreAboutTokenScopes => Manager.GetString("LearnMoreAboutTokenScopes", CultureInfo.CurrentUICulture)!;
+    public static string LeaveOutLookalikes => Manager.GetString("LeaveOutLookalikes", CultureInfo.CurrentUICulture)!;
     public static string LeaveThisEmptyToKeepTheCurrentX151c53 => Manager.GetString("LeaveThisEmptyToKeepTheCurrentX151c53", CultureInfo.CurrentUICulture)!;
+    public static string Length => Manager.GetString("Length", CultureInfo.CurrentUICulture)!;
     public static string LetAScriptOrCIJobRunX39c663 => Manager.GetString("LetAScriptOrCIJobRunX39c663", CultureInfo.CurrentUICulture)!;
+    public static string Letters => Manager.GetString("Letters", CultureInfo.CurrentUICulture)!;
     public static string Link => Manager.GetString("Link", CultureInfo.CurrentUICulture)!;
     public static string LinkTheKeypasteCommand => Manager.GetString("LinkTheKeypasteCommand", CultureInfo.CurrentUICulture)!;
     public static string LinksYouMadeFromAnItemsMenuXfaa446 => Manager.GetString("LinksYouMadeFromAnItemsMenuXfaa446", CultureInfo.CurrentUICulture)!;
@@ -321,6 +325,7 @@ public static class Strings
     public static string LogDayUndated => Manager.GetString("LogDayUndated", CultureInfo.CurrentUICulture)!;
     public static string LogDayYesterday => Manager.GetString("LogDayYesterday", CultureInfo.CurrentUICulture)!;
     public static string Login => Manager.GetString("Login", CultureInfo.CurrentUICulture)!;
+    public static string LookalikesTip => Manager.GetString("LookalikesTip", CultureInfo.CurrentUICulture)!;
     public static string LookingForAIToolsOnThisComputer => Manager.GetString("LookingForAIToolsOnThisComputer", CultureInfo.CurrentUICulture)!;
     public static string LowercaseLettersDigitsAndDashesSuchAsX8d843c => Manager.GetString("LowercaseLettersDigitsAndDashesSuchAsX8d843c", CultureInfo.CurrentUICulture)!;
     public static string MODECapitals => Manager.GetString("MODECapitals", CultureInfo.CurrentUICulture)!;
@@ -554,6 +559,7 @@ public static class Strings
     public static string StopUsingAKeyFile => Manager.GetString("StopUsingAKeyFile", CultureInfo.CurrentUICulture)!;
     public static string StopUsingTheYubiKey => Manager.GetString("StopUsingTheYubiKey", CultureInfo.CurrentUICulture)!;
     public static string StopWaitingForTheYubiKey => Manager.GetString("StopWaitingForTheYubiKey", CultureInfo.CurrentUICulture)!;
+    public static string Symbols => Manager.GetString("Symbols", CultureInfo.CurrentUICulture)!;
     public static string TOKEN => Manager.GetString("TOKEN", CultureInfo.CurrentUICulture)!;
     public static string TOTP => Manager.GetString("TOTP", CultureInfo.CurrentUICulture)!;
     public static string TagAnItemFromYourVaultIntoX85a64e => Manager.GetString("TagAnItemFromYourVaultIntoX85a64e", CultureInfo.CurrentUICulture)!;

@@ -981,7 +981,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke() };
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
@@ -1097,14 +1097,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         var detail = (Content as EntriesViewModel)?.Detail;
         GeneratorDialog = new GeneratePasswordViewModel(
             Clipboard,
-            NewItemWith,
+            value => NewItemWith(value, CloseGenerator),
             detail is null ? null : (value, name) => detail.AddGeneratedField(name, value),
             detail?.Name.Title,
             CloseGenerator);
     }
 
     // New item with the generated value as its password, taken character by character into the form's own field.
-    private void NewItemWith(SecretField value)
+    private void NewItemWith(SecretField value, Action close)
     {
         // The generator stays open behind "Discard …?", since closing it disposes the value.
         Leave(() =>
@@ -1117,7 +1117,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                 items.NewItem?.Password.TakeFrom(value);
             }
 
-            CloseGenerator();
+            close();
         });
     }
 

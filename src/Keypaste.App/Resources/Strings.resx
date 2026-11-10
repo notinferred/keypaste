@@ -51,6 +51,12 @@
   <data name="Change" xml:space="preserve"><value>Change</value></data>
   <data name="ChangeAccess" xml:space="preserve"><value>Change access</value></data>
   <data name="Changing" xml:space="preserve"><value>Changing…</value></data>
+  <data name="Letters" xml:space="preserve"><value>Letters</value></data>
+  <data name="Digits" xml:space="preserve"><value>Digits</value></data>
+  <data name="Symbols" xml:space="preserve"><value>Symbols</value></data>
+  <data name="Length" xml:space="preserve"><value>Length</value></data>
+  <data name="LeaveOutLookalikes" xml:space="preserve"><value>Leave out lookalikes</value></data>
+  <data name="LookalikesTip" xml:space="preserve"><value>Leaves out characters that look alike, such as 0 and O or 1 and l.</value></data>
   <data name="Characters" xml:space="preserve"><value>Characters</value></data>
   <data name="CheckStatus" xml:space="preserve"><value>Check status</value></data>
   <data name="CheckTheConnection" xml:space="preserve"><value>Check the connection</value></data>
