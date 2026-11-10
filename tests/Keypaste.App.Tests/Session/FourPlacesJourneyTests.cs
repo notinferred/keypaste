@@ -114,7 +114,7 @@ public sealed class FourPlacesJourneyTests
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));
             var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
             Assert.Equal(["STRIPE_KEY"], env.OpenProject!.Variables.Select(row => row.Key));
-            AmberElements.AssertOne(main, null, "a project's variables");
+            AmberElements.AssertOne(main, Named<Button>(main, "RunProject"), "a project's variables");
             var back = Named<Button>(main, "Back");
             Assert.Equal("Back to Items", AutomationProperties.GetName(back));
             Press(main, back);

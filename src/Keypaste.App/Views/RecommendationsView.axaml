@@ -87,7 +87,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RecommendationRow">
                 <ctl:FieldRow Classes="wide" AutomationProperties.Name="{Binding Description}">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Background="Transparent">
                     <CheckBox Grid.Column="0"
                               IsChecked="{Binding IsSelected}"
                               IsEnabled="{Binding NeedsReview}"
@@ -138,7 +138,7 @@
               <DataTemplate x:DataType="vm:LostTagRow">
                 <ctl:FieldRow Classes="wide">
                   <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
                           AutomationProperties.Name="{Binding Description}">
                       <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -202,7 +202,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PasswordRow">
                       <ctl:FieldRow Classes="wide" ToolTip.Tip="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
                               AutomationProperties.Name="{Binding Description}">
                           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock Name="PasswordItem" Classes="mono size-13" TextWrapping="Wrap" Text="{Binding Line}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />

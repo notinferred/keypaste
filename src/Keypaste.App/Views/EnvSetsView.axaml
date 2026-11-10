@@ -166,14 +166,12 @@
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="32,12,32,24">
+  <Grid RowDefinitions="Auto,*">
+    <Grid Margin="32,12,32,12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
         <ColumnDefinition Width="0" />
       </Grid.ColumnDefinitions>
-      <StackPanel Grid.Column="0" Spacing="24">
-
         <!-- Header: the project's name and picker, its file actions behind the menu, and Run, the one amber action. -->
         <StackPanel Spacing="12">
           <ctl:HeaderRow Spacing="12">
@@ -185,7 +183,7 @@
                         IsVisible="{Binding HasOpenProject}"
                         ItemsSource="{Binding ProjectChoices}"
                         SelectedItem="{Binding SelectedProject}"
-                        ToolTip.Tip="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}"
+                        ToolTip.Tip="{x:Static res:Strings.ChooseAProject}"
                         AutomationProperties.Name="{x:Static res:Strings.Project}">
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
@@ -231,7 +229,8 @@
             </StackPanel>
           </ctl:HeaderRow>
 
-          <Border Classes="segmented" HorizontalAlignment="Left" IsVisible="{Binding HasOpenProject}">
+          <Border Classes="segmented" HorizontalAlignment="Left" IsVisible="{Binding HasOpenProject}"
+                  ToolTip.Tip="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}">
             <StackPanel Orientation="Horizontal">
               <ctl:ChoiceSegment Name="ProjectKeysTab" Classes="segment"
                                  IsChecked="{Binding OpenProject.ShowingKeys, Mode=OneWay}"
@@ -248,6 +247,15 @@
             </StackPanel>
           </Border>
         </StackPanel>
+    </Grid>
+
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="32,0,32,24">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1080" />
+        <ColumnDefinition Width="0" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Spacing="24">
 
         <Border Classes="banner" IsVisible="{Binding HasError}" ctl:ShowInView.Scrolls="True" Background="{DynamicResource KpDangerTint}">
           <Grid ColumnDefinitions="Auto,*">
@@ -294,7 +302,7 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" AutomationProperties.Name="{x:Static res:Strings.ProjectName}" />
               <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-              <Button Classes="primary" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
+              <Button Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
             <TextBlock x:Name="NewProjectProblem" ctl:ShowInView.Scrolls="True"
                        Classes="caption danger"
@@ -333,7 +341,7 @@
                     <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Import.CancelCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
+                      <Button Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -363,7 +371,7 @@
                               <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
                               <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                                 <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
-                                <Button Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                                <Button Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
                               </StackPanel>
                             </StackPanel>
                           </Border>
@@ -546,7 +554,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" AutomationProperties.Name="{x:Static res:Strings.EnvironmentName}" />
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddProfileCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
+                      <Button Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
                     </StackPanel>
                     <TextBlock x:Name="NewProfileProblem" ctl:ShowInView.Scrolls="True"
                                Classes="caption danger"
@@ -612,7 +620,7 @@
                                Text="{Binding NewValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
+                      <Button Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -650,7 +658,7 @@
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
+                      <Button Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -764,7 +772,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="CancelTagChange" Classes="ghost" Content="{x:Static res:Strings.Cancel}"
                               Command="{Binding CancelTagChangeCommand}" />
-                      <Button Name="ConfirmTagChange" Classes.primary="{Binding TagChangeAdds}" Classes.danger="{Binding !TagChangeAdds}"
+                      <Button Name="ConfirmTagChange" Classes.danger="{Binding !TagChangeAdds}"
                               Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                     </StackPanel>
                   </StackPanel>
@@ -875,6 +883,7 @@
 
       </StackPanel>
     </Grid>
-  </ScrollViewer>
+    </ScrollViewer>
+  </Grid>
 
 </UserControl>
