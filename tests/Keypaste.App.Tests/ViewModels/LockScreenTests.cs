@@ -55,7 +55,7 @@ public sealed class LockScreenTests : IDisposable
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
-        Assert.Equal("Keep your keys in one place", model.Heading);
+        Assert.Equal("Start with a vault", model.Heading);
         Assert.True(model.Offer(_vault.Path_));
         Assert.Equal($"{Path.GetFileName(_vault.Path_)} is locked", model.Heading);
     }

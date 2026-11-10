@@ -270,17 +270,14 @@ public sealed class ContextMenuTests
     {
         await using var agents = await AgentsInShell.StartAsync();
         var claude = agents.Model.Rows.Single(row => row.Key == "claude-code");
-        agents.Model.Choose(agents.Model.Rows.Single(row => row.IsEveryOther));
-        WindowInput.Drain();
         var card = agents.Card(claude);
 
         var menu = RightClick(agents.Window, card);
         Assert.Equal(["Agent settings…", "Connect Claude Code…", "Connect Claude Code again…", "-", "Disconnect…"], Headers(menu));
         Choose(menu, "Agent settings…");
-        Assert.Same(claude, agents.Model.Selected);
-        WindowInput.Drain();
+        Assert.True(claude.IsOpen);
 
-        var inside = agents.Window.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConnectToolAgain", IsEffectivelyVisible: true });
+        var inside = card.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Focusable);
         inside.Focus(NavigationMethod.Tab);
         WindowInput.Drain();
         var open = FromTheKeyboard(agents.Window, inside, PhysicalKey.F10, RawInputModifiers.Shift);

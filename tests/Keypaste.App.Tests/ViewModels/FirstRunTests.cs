@@ -69,7 +69,7 @@ public sealed class FirstRunTests : IDisposable
         Assert.False(model.OffersKeePassXc);
         Assert.True(model.OffersCreateFirst);
         Assert.Empty(model.KeePassXc);
-        Assert.Equal("Keep your keys in one place", model.Heading);
+        Assert.Equal("Start with a vault", model.Heading);
         Assert.Contains("master password", model.WelcomeSubtitle, StringComparison.Ordinal);
     }
 

@@ -44,9 +44,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
-    /// <summary>Starts a new item with a generated value, set by the shell; the second argument closes the generator the value came from.</summary>
-    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
-
     internal EntriesViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
@@ -125,7 +122,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             {
                 OnPropertyChanged(nameof(CanRenameGroup));
                 OnPropertyChanged(nameof(ListTitle));
-                OnPropertyChanged(nameof(SortChoices));
                 OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyNote));
@@ -247,7 +243,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>A search asks for the list, so a form or a comparison holding nothing to lose gives way to it; the shell has already asked about one that does.</summary>
     private void ReturnToList()
     {
-        if ((IsAdding || !ShowsList) && PaneDraft is null)
+        if (!ShowsList && PaneDraft is null)
         {
             NewItem = null;
             Detail?.LeaveWholeView();
@@ -372,65 +368,26 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>Whether the open item's Copy password holds the view's amber: not while a form here shows a primary of its own, since a view has one amber element.</summary>
-    internal bool CopyPasswordIsPrimary =>
-        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
+    /// <summary>
+    /// Whether "+ New" is the screen's primary action: not while a form here shows a primary of its own
+    /// or the search beside it shows its focus, since a view has one amber element.
+    /// </summary>
+    internal bool AddIsPrimary =>
+        !SearchHasFocus && !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
 
-    /// <summary>Whether the pane says the item's group: the list's two-line rows do not, so unless the header already names it.</summary>
-    internal bool PaneNamesGroup => _detail is { GroupPath.Length: > 0 } detail && detail.GroupPath != SelectedGroup?.Path;
+    /// <summary>Whether the pane says the item's group: only while the list and its Group column are away, and the header does not already name it.</summary>
+    internal bool PaneNamesGroup => _detail is { GroupPath.Length: > 0 } detail && (ShowsList ? SelectedGroup is { IsEverything: false } && detail.GroupPath != SelectedGroup.Path : detail.GroupPath != SelectedGroup?.Path);
 
-    /// <summary>Whether the list shows beside the chosen item; a comparison of two revisions takes the whole view instead.</summary>
-    internal bool ShowsList => _detail is not { TakesWholeView: true };
+    /// <summary>Whether the search in the list header holds the keyboard.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    internal partial bool SearchHasFocus { get; set; }
 
-    /// <summary>The list's sorts: each of its columns, and which way the one in force runs. Group goes while the header names one.</summary>
-    internal IReadOnlyList<SortChoice> SortChoices =>
-    [
-        .. Table.Columns
-            .Where(column => column.Key != TableStates.Group || SelectedGroup is null or { IsEverything: true })
-            .Select(column => new SortChoice(
-                column.Key,
-                column.Name,
-                Table.HeadName(column.Key),
-                Table.Order is { AsRowsArrive: false } order && order.Column == column.Key ? (order.Descending ? "arrow-down" : "arrow-up") : null)),
-    ];
-
-    /// <summary>A sort's choice from the list's header: its column, and again to reverse.</summary>
-    [RelayCommand]
-    private void SortBy(string column) => Table.Press(column);
-
-    /// <summary>The way back from an item that stands in the list's place, asking first about a draft it would lose.</summary>
-    [RelayCommand]
-    private void CloseItem()
-    {
-        if (PaneDraft is { } draft && AskDiscard is { } ask)
-        {
-            ask(draft, DropPane, static () => { });
-            return;
-        }
-
-        DropPane();
-    }
-
-    private void DropPane()
-    {
-        NewItem = null;
-        Select(null);
-    }
-
-    /// <summary>Find asks for the search, so a comparison gives way and, where the detail stands in the list's place, the item closes too.</summary>
-    /// <param name="listIsHidden">Whether the view is showing the detail in the list's place.</param>
-    internal void MakeSearchReachable(bool listIsHidden)
-    {
-        if (listIsHidden)
-        {
-            CloseItem();
-        }
-
-        ReturnToList();
-    }
-
-    /// <summary>Whether an item or the new-item form stands in the detail's place, so a width that cannot hold both shows it instead of the list.</summary>
-    internal bool HasOpenPane => _detail is not null || IsAdding;
+    /// <summary>
+    /// Whether the list shows above the item's preview. A new item, an edit and a comparison of two
+    /// revisions take the whole view instead, as KeePassXC's editor does.
+    /// </summary>
+    internal bool ShowsList => !IsAdding && _detail is not { TakesWholeView: true };
 
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
     internal EntryDetailViewModel? Detail
@@ -452,9 +409,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
             if (SetProperty(ref _detail, value))
             {
-                OnPropertyChanged(nameof(CopyPasswordIsPrimary));
+                OnPropertyChanged(nameof(AddIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
-                OnPropertyChanged(nameof(HasOpenPane));
                 OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
@@ -520,9 +476,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
                 OnPropertyChanged(nameof(IsAdding));
                 OnPropertyChanged(nameof(Selected));
-                OnPropertyChanged(nameof(CopyPasswordIsPrimary));
+                OnPropertyChanged(nameof(AddIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
-                OnPropertyChanged(nameof(HasOpenPane));
                 OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
@@ -549,7 +504,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         if (e.PropertyName == nameof(EntryDetailViewModel.HasOwnPrimary))
         {
-            OnPropertyChanged(nameof(CopyPasswordIsPrimary));
+            OnPropertyChanged(nameof(AddIsPrimary));
         }
 
         if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
@@ -561,26 +516,26 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>Whether the organize form is showing for the selected entry.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
     [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem))]
     [NotifyCanExecuteChangedFor(nameof(OrganizeCommand), nameof(ConfirmOrganizeCommand), nameof(CancelOrganizeCommand))]
     internal partial bool IsOrganizing { get; private set; }
 
     /// <summary>Whether the new-group form is showing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
     [NotifyCanExecuteChangedFor(nameof(BeginCreateGroupCommand), nameof(ConfirmCreateGroupCommand), nameof(CancelGroupCommand))]
     internal partial bool IsCreatingGroup { get; private set; }
 
     /// <summary>Whether the rename-group form is showing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary), nameof(ShowsProjectRenameNote), nameof(ProjectRenameNote))]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary), nameof(ShowsProjectRenameNote), nameof(ProjectRenameNote))]
     [NotifyCanExecuteChangedFor(nameof(BeginRenameGroupCommand), nameof(ConfirmRenameGroupCommand), nameof(CancelGroupCommand))]
     internal partial bool IsRenamingGroup { get; private set; }
 
     /// <summary>Whether the move-group form is showing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
     [NotifyCanExecuteChangedFor(nameof(BeginMoveGroupCommand), nameof(ConfirmMoveGroupCommand), nameof(CancelGroupCommand))]
     internal partial bool IsMovingGroup { get; private set; }
 
@@ -915,11 +870,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     }
 
     // A sort is no question about the vault: the selection, the pane and whatever an edit is holding in the list stay.
-    private void OnOrderChanged()
-    {
-        Rows = Listed();
-        OnPropertyChanged(nameof(SortChoices));
-    }
+    private void OnOrderChanged() => Rows = Listed();
 
     /// <summary>
     /// Drops the query, the result and everything typed into a form.
@@ -996,7 +947,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange, StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close) };
+        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange };
         TellPaneAboutItsName(detail);
         return detail;
     }
@@ -1178,10 +1129,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Notice = null;
         Error = null;
-        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null)
-        {
-            StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close),
-        };
+        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
     }
 
     [RelayCommand(CanExecute = nameof(IsAdding))]

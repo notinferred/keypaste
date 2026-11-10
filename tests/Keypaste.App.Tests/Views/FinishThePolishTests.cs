@@ -43,7 +43,7 @@ public sealed class FinishThePolishTests
         Assert.Equal("Settings - keypaste", shell.Window.Title);
 
         shell.Show<LogViewModel>(DestinationKind.Log);
-        Assert.Equal("Activity - keypaste", shell.Window.Title);
+        Assert.Equal("Activity log - keypaste", shell.Window.Title);
 
         shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<ProjectRow>().First(row => row.Name == "secret-project");
         shell.Frame();
@@ -176,8 +176,7 @@ public sealed class FinishThePolishTests
         using var hidden = new RenderedShell("keypaste-theme-hidden-");
         hidden.Show<SettingsViewModel>(DestinationKind.Settings);
         hidden.Frame();
-        var themeChoice = hidden.Window.GetLogicalDescendants().OfType<ListBox>().Single(box => box.Name == "ThemeChoice");
-        Assert.False(themeChoice.IsVisible && themeChoice.GetLogicalAncestors().OfType<Control>().All(ancestor => ancestor.IsVisible));
+        Assert.False(hidden.Named<ListBox>("ThemeChoice").IsEffectivelyVisible);
 
         using var offered = new RenderedShell("keypaste-theme-offered-", offersTheme: true);
         offered.Show<SettingsViewModel>(DestinationKind.Settings);
@@ -234,7 +233,7 @@ public sealed class FinishThePolishTests
     [InlineData(999, 100, false)]
     [InlineData(1000, 100, false)]
     [InlineData(840, 200, false)]
-    public Task The_activitys_Result_reads_whole_between_840_and_1000(int width, int percent, bool barsHide) => HeadlessSession.On(() =>
+    public Task The_logs_Result_reads_whole_between_840_and_1000(int width, int percent, bool barsHide) => HeadlessSession.On(() =>
     {
         using var bars = new ScrollBarsSetting(barsHide);
         InterfaceZoom.Set(percent);
@@ -248,9 +247,10 @@ public sealed class FinishThePolishTests
         log.RefreshCommand.Press();
         shell.Frame();
 
-        var scroll = shell.Named<Grid>("LogPage").FindAncestorOfType<ScrollViewer>()!;
-        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, $"the log scrolls sideways at {width}");
-        var result = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.IsEffectivelyVisible && block.Text == log.Rows[0].Result);
+        var scroll = shell.Named<ScrollViewer>("TableScroll");
+        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, $"the table scrolls sideways at {width}");
+        var row = Assert.Single(shell.Window.GetVisualDescendants().OfType<LogColumns>(), columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
+        var result = row.GetVisualDescendants().OfType<TextBlock>().Last(block => block.IsEffectivelyVisible);
         Assert.All(result.TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"{result.Text} is cut at {width}"));
     });
 
@@ -286,11 +286,8 @@ public sealed class FinishThePolishTests
 
         var root = (Visual)ShellViewOf(shell);
         var newProject = BoundsIn(root, Named("New project"));
-        foreach (var action in new[] { Named("More actions"), Named("Run in a terminal") })
-        {
-            var actionBounds = BoundsIn(root, action);
-            Assert.False(newProject.Intersects(actionBounds), $"New project at {newProject} overlaps {AutomationProperties.GetName(action)} at {actionBounds} at {width}");
-        }
+        var import = BoundsIn(root, Named("Import .env"));
+        Assert.False(newProject.Intersects(import), $"New project at {newProject} overlaps Import at {import} at {width}");
 
         Button Named(string name) => shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);
     });

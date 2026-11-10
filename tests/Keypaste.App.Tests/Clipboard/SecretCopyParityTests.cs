@@ -6,7 +6,6 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Clipboard;
-using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
@@ -426,7 +425,7 @@ public sealed class SecretCopyParityTests
             OpenEntry(title);
 
             return Window.GetVisualDescendants().OfType<Button>()
-                .Single(button => button.DataContext is EntryFieldRow row && row.Name == field && button is PressToCopy);
+                .Single(button => button.DataContext is EntryFieldRow row && row.Name == field && Equals(button.Content, "Copy"));
         }
 
         private (string Subject, Button Button) RevisionCopy(string title)

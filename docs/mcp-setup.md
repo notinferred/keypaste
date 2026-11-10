@@ -69,7 +69,7 @@ In source, the Agents screen lists the AI tools it finds on this computer, looki
 
 The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start `~/.local/bin/keypaste` with `mcp`: the script that starts the image with `cli`, which Settings also makes for your terminal and which a newer AppImage re-points when it starts. Connect and `setup` create it first when it is absent; when that path holds a file keypaste did not write, the preview names it and the pane's Connect replaces it, keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once or Deny each end the check. A released password is discarded unread, and the audit record appears in Agents › Activity. A tool shown Connected, or whose configuration keypaste cannot read, has Disconnect under its row's Settings, and a Connected one also has Connect again, for a moved vault or app. Disconnect reads the tool's configuration first and says when keypaste is not connected there; otherwise its pane shows the removal, and its Disconnect takes keypaste out of the tool and leaves its other servers alone.
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once or Deny each end the check. A released password is discarded unread, and the audit record appears in the screen's History. A tool shown Connected, or whose configuration keypaste cannot read, has Disconnect under its row's Settings, and a Connected one also has Connect again, for a moved vault or app. Disconnect reads the tool's configuration first and says when keypaste is not connected there; otherwise its pane shows the removal, and its Disconnect takes keypaste out of the tool and leaves its other servers alone.
 
 No master password, keyfile or session identifier is written into a client's configuration.
 
@@ -318,7 +318,7 @@ The next record starts a new file with a chain of its own, and the archive still
 keypaste log verify --audit-log ~/.keypaste/audit-2026-10.jsonl --expect <hash>
 ```
 
-The app's Activity reads only `audit.jsonl`, so it stops showing what you archived; `keypaste log --audit-log <file>` still lists it.
+The app's History and activity log read only `audit.jsonl`, so they stop showing what you archived; `keypaste log --audit-log <file>` still lists it.
 
 ## Checking it works without a client
 

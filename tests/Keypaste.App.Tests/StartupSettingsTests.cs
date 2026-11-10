@@ -125,7 +125,7 @@ public sealed class StartupSettingsTests
 
         using var session = Compose(fixture, new ManualClock(AppClock.Start));
 
-        Assert.Equal(TimeSpan.FromMinutes(30), session.IdleTimeout);
+        Assert.Equal(TimeSpan.FromMinutes(5), session.IdleTimeout);
         Assert.False(File.Exists(path));
     });
 

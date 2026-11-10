@@ -166,27 +166,6 @@ public sealed class AgentActivityViewModelTests
         Assert.EndsWith("Install one, then open Agents again.", model.NoTools, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Pressing_the_chosen_row_opens_its_detail_again_after_Back()
-    {
-        await using var app = await App.StartAsync();
-        using var model = app.Model(app.Tools().Cursor(connected: false).Connector());
-        await model.Looking.WaitAsync(_connect, Token);
-
-        var chosen = model.Selected!;
-        Assert.False(model.ShowsDetail);
-
-        model.Open(chosen);
-        Assert.True(model.ShowsDetail);
-
-        model.CloseDetailCommand.Execute(null);
-        Assert.False(model.ShowsDetail);
-        Assert.Same(chosen, model.Selected);
-
-        model.Open(chosen);
-        Assert.True(model.ShowsDetail);
-    }
-
     /// <summary>
     /// The agents that asked come first, then the tools found, connected before not and in catalogue order,
     /// then Every other agent; each tool says whether it holds keypaste and offers what fits.

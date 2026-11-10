@@ -77,7 +77,7 @@ public sealed class ItemPaneJourneyTests
 
             // An https address opens through the launcher, and its Copy copies it.
             Select(main, items, "pane-login");
-            Assert.False(Named<FieldRow>(main, "AgentAccessCard").IsEffectivelyVisible, "the card showed with no agent able to see the item");
+            Assert.False(Named<Border>(main, "AgentAccessCard").IsEffectivelyVisible, "the card showed with no agent able to see the item");
             Press(main, Named<Button>(main, "OpenUrl"));
             Assert.Equal(["https://github.com/login"], launcher.Opened.Select(uri => uri.AbsoluteUri));
             Press(main, Named<Button>(main, "CopyUrl"));
@@ -124,14 +124,14 @@ public sealed class ItemPaneJourneyTests
             }
 
             Select(main, items, "pane-login");
-            await Until(() => Named<FieldRow>(main, "AgentAccessCard").IsEffectivelyVisible, () => "pane-login's card never showed after its release");
+            await Until(() => Named<Border>(main, "AgentAccessCard").IsEffectivelyVisible, () => "pane-login's card never showed after its release");
 
             // A bridge announcing an exposure that covers bank shows bank's card, with nothing released.
             Select(main, items, "pane-bank");
-            Assert.False(Named<FieldRow>(main, "AgentAccessCard").IsEffectivelyVisible);
+            Assert.False(Named<Border>(main, "AgentAccessCard").IsEffectivelyVisible);
             await using (await ConnectAsync(app.Authority, vault, exposure: ["Personal/*"]))
             {
-                await Until(() => Named<FieldRow>(main, "AgentAccessCard").IsEffectivelyVisible, () => "bank's card never showed for an attached exposure");
+                await Until(() => Named<Border>(main, "AgentAccessCard").IsEffectivelyVisible, () => "bank's card never showed for an attached exposure");
             }
 
             main.Close();

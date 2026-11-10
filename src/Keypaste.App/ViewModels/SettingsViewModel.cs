@@ -141,20 +141,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     [NotifyPropertyChangedFor(nameof(SectionNote), nameof(ShowsGeneral), nameof(ShowsThisVault), nameof(ShowsBrowser))]
     internal partial SettingsSectionChoice Section { get; set; } = SettingsSectionChoice.General;
 
-    partial void OnSectionChanged(SettingsSectionChoice value) => SectionIsOpen = true;
-
-#pragma warning disable CA1822
-    internal string ListTitle => Strings.Settings;
-#pragma warning restore CA1822
-
-    /// <summary>Whether the part in view stands where a narrow window would otherwise show the list of parts.</summary>
-    [ObservableProperty]
-    internal partial bool SectionIsOpen { get; set; } = true;
-
-    /// <summary>The way back from a part to the list of parts, where the window shows one at a time.</summary>
-    [RelayCommand]
-    private void CloseSection() => SectionIsOpen = false;
-
     internal string SectionNote => Section.Note;
 
     internal bool ShowsGeneral => Section == SettingsSectionChoice.General;
@@ -235,8 +221,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// <summary>The words for where the app stays: the menu bar on macOS, the tray elsewhere.</summary>
 #pragma warning disable CA1822
     internal string StayInTrayLabel => OperatingSystem.IsMacOS()
-        ? Strings.KeepInMenuBar
-        : Strings.KeepInTray;
+        ? "Keep keypaste in the menu bar when the window closes"
+        : "Keep keypaste in the tray when the window closes";
 #pragma warning restore CA1822
 
     /// <summary>Whether closing the window leaves the app, locked, in the menu bar or tray rather than quitting.</summary>

@@ -51,7 +51,7 @@ namespace Keypaste.App.Session;
 internal sealed class AppVaultSession : IDisposable
 {
     /// <summary>The shipped default, and what any unreadable setting falls back to.</summary>
-    internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(30);
+    internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(5);
 
     /// <summary>The shortest idle timeout the settings screen will accept.</summary>
     internal static readonly TimeSpan MinimumIdleTimeout = TimeSpan.FromMinutes(1);

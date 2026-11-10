@@ -9,33 +9,66 @@
              x:DataType="vm:AgentActivityViewModel"
              Background="{DynamicResource KpBgApp}">
 
-  <Grid RowDefinitions="Auto,*">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <!-- A capped star column keeps the page at the left gutter; a MaxWidth on a stretched panel centres it. -->
+    <Grid Margin="32,24">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1016" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Spacing="24">
 
-    <!-- What concerns every agent, above the list and the detail: refusals, and a request waiting for the person. -->
-    <StackPanel Grid.Row="0" Spacing="12" Margin="24,16,24,0" IsVisible="{Binding IsUnavailable}">
-      <Border Classes="group" Padding="16,12">
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-          <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
-          <TextBlock Grid.Column="1" Classes="body secondary" Text="{Binding Status}" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="h1" Text="{x:Static res:Strings.Agents}" />
+            <TextBlock Classes="subtitle" TextWrapping="Wrap"
+                       Text="{x:Static res:Strings.ConnectYourAIToolsAndChooseWhatXe237ce}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+          <Button Name="AddAnAgent" Height="30" Padding="12,0" AutomationProperties.Name="{x:Static res:Strings.AddAnAgent}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="plus" Size="14" />
+              <TextBlock Text="{x:Static res:Strings.AddAnAgent}" />
+              <ctl:KpIcon Icon="chevron-down" Size="14" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout>
+                <MenuItem Name="CopySetupPrompt" Header="{x:Static res:Strings.CopySetupPrompt}" Command="{Binding CopySetupPromptCommand}" />
+                <MenuItem Name="ConnectAnApp" Header="{x:Static res:Strings.ConnectAnApp}" Command="{Binding ConnectAnAppCommand}" />
+                <MenuItem Name="AddMcpManually" Header="{x:Static res:Strings.AddMcpManually}" Command="{Binding AddMcpManuallyCommand}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+          <!-- Agents › History, the one place on this screen for the log: what agents and tokens asked for. -->
+          <Button Name="AgentHistory"
+                  Classes="ghost"
+                  Padding="12,0"
+                  Height="30"
+                  IsVisible="{Binding OffersHistory}"
+                  Command="{Binding OpenHistoryCommand}"
+                  AutomationProperties.Name="{x:Static res:Strings.History}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="history" Size="14" />
+              <TextBlock Text="{x:Static res:Strings.History}" />
+            </StackPanel>
+          </Button>
+          </StackPanel>
         </Grid>
-      </Border>
-    </StackPanel>
 
-    <Grid Grid.Row="1" RowDefinitions="Auto,*">
+        <ListBox Name="AgentsTabs" Classes="segmented" HorizontalAlignment="Left"
+                 AutomationProperties.Name="{x:Static res:Strings.Agents}"
+                 ItemsSource="{Binding Tabs}" SelectedItem="{Binding Tab}" />
 
-      <ScrollViewer Grid.Row="0" MaxHeight="180" Margin="24,16,24,0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-      <StackPanel Spacing="12">
+        <Border Classes="card" IsVisible="{Binding IsUnavailable}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <TextBlock Grid.Column="1" Classes="body secondary" Text="{Binding Status}" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
+
         <Border IsVisible="{Binding HasAuditRefusal}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
             <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
             <TextBlock Grid.Column="1" Name="AuditRefusalText" Classes="body secondary" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding AuditRefusal}" Text="{Binding AuditRefusal}" VerticalAlignment="Center" TextWrapping="Wrap" />
-          </Grid>
-        </Border>
-
-        <Border IsVisible="{Binding HasClientsProblem}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
-            <TextBlock Grid.Column="1" Name="ClientsProblemText" Classes="body secondary" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
           </Grid>
         </Border>
 
@@ -47,306 +80,227 @@
             <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.WaitingForYou}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Classes="caption" Text="{x:Static res:Strings.AnswerInThePromptWindow}" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
-          <Border Classes="group">
+          <Border Classes="table">
             <ItemsControl ItemsSource="{Binding Waiting}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <ctl:GroupedRows />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ActivityRow">
-                  <ctl:FieldRow Classes="stacked" Label="{Binding Client}">
-                    <TextBlock Classes="mono secondary size-12" Text="{Binding Asked}" TextTrimming="CharacterEllipsis" />
-                    <ctl:FieldRow.Actions>
-                      <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock Classes="label amber" Text="{Binding LeftText}" VerticalAlignment="Center" />
-                        <Button Name="ShowPrompt" Classes="sm" Content="{x:Static res:Strings.ShowThePrompt}" VerticalAlignment="Center"
-                                Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).ShowPromptCommand}"
-                                AutomationProperties.Name="{Binding Client, StringFormat={x:Static res:Strings.ShowThePromptFromValue}}" />
+                  <Border Padding="16,12" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
+                      <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono secondary size-12" Text="{Binding Asked}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
-                    </ctl:FieldRow.Actions>
-                  </ctl:FieldRow>
+                      <TextBlock Grid.Column="1" Classes="label amber" Text="{Binding LeftText}" VerticalAlignment="Center" />
+                      <Button Grid.Column="2" Name="ShowPrompt" Classes="sm" Content="{x:Static res:Strings.ShowThePrompt}" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).ShowPromptCommand}"
+                              AutomationProperties.Name="{Binding Client, StringFormat={x:Static res:Strings.ShowThePromptFromValue}}" />
+                    </Grid>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </Border>
         </StackPanel>
-      </StackPanel>
-      </ScrollViewer>
 
-      <ctl:ListDetail x:Name="Split" Grid.Row="1" Margin="0,16,0,0" ShowsDetail="{Binding ShowsDetail}">
-
-        <!-- The AI tools found on this computer and the agents of this vault in one list. Names are what agents say about
-             themselves and the names their connections were given: display only (T-3, T-36). -->
-        <Border x:Name="ListColumn" ZIndex="1" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
-          <DockPanel>
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="12,0,12,8">
-              <TextBlock Classes="list-title" Text="{x:Static res:Strings.Agents}" VerticalAlignment="Center" />
-              <Button Grid.Column="1" Name="AddAnAgent" Classes="icon ghost sm"
-                      ToolTip.Tip="{x:Static res:Strings.AddAnAgent}"
-                      AutomationProperties.Name="{x:Static res:Strings.AddAnAgent}">
-                <ctl:KpIcon Icon="plus" Size="14" />
-                <Button.Flyout>
-                  <MenuFlyout>
-                    <MenuItem Name="CopySetupPrompt" Header="{x:Static res:Strings.CopySetupPrompt}" Command="{Binding CopySetupPromptCommand}" />
-                    <MenuItem Name="ConnectAnApp" Header="{x:Static res:Strings.ConnectAnApp}" Command="{Binding ConnectAnAppCommand}" />
-                    <MenuItem Name="AddMcpManually" Header="{x:Static res:Strings.AddMcpManually}" Command="{Binding AddMcpManuallyCommand}" />
-                  </MenuFlyout>
-                </Button.Flyout>
-              </Button>
+        <!-- The AI tools found on this computer and the agents of this vault, each with its settings.
+             Names are what agents say about themselves and the names their connections were given: display
+             only (T-3, T-36). -->
+        <StackPanel Spacing="8">
+          <TextBlock Name="NoAgentsYet" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasNoConnectedAgents}" Text="{x:Static res:Strings.NoAgentIsConnectedYet}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsConnections}">
+            <ctl:KpIcon Icon="plug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AITools}" />
+          </StackPanel>
+          <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding ShowsConnections}"
+                     Text="{x:Static res:Strings.FoundOnThisComputerAndAnyAgentX88444b}" />
+          <TextBlock Name="ConnectAdvice" Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.Words="keypaste mcp setup"
+                     IsVisible="{Binding HasUnnamedAgentsNote}"
+                     Text="{Binding UnnamedAgentsNote}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}">
+            <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
+            <TextBlock Classes="caption" Text="{x:Static res:Strings.LookingForAIToolsOnThisComputer}" />
+          </StackPanel>
+          <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
+          <Border IsVisible="{Binding HasClientsProblem}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+              <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
+              <TextBlock Grid.Column="1" Name="ClientsProblemText" Classes="body secondary" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
             </Grid>
-
-            <!-- Agents › Activity, the one place for the log: what agents and tokens asked for. -->
-            <Button DockPanel.Dock="Bottom" Name="OpenActivity" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                    Margin="8" IsVisible="{Binding OffersActivity}"
-                    Command="{Binding OpenActivityCommand}"
-                    AutomationProperties.Name="{x:Static res:Strings.Activity}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <ctl:KpIcon Icon="activity" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.Activity}" />
-              </StackPanel>
-            </Button>
-
-            <ScrollViewer DockPanel.Dock="Bottom" MaxHeight="140" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="6" Margin="12,8">
-              <TextBlock Name="NoAgentsYet" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasNoConnectedAgents}" Text="{x:Static res:Strings.NoAgentIsConnectedYet}" />
-              <TextBlock Name="ConnectAdvice" Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.Words="keypaste mcp setup"
-                         IsVisible="{Binding HasUnnamedAgentsNote}"
-                         Text="{Binding UnnamedAgentsNote}" />
-              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}">
-                <ctl:KpIcon Icon="refresh-cw" Size="14" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
-                <TextBlock Classes="caption" Text="{x:Static res:Strings.LookingForAIToolsOnThisComputer}" />
-              </StackPanel>
-              <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
-            </StackPanel>
-            </ScrollViewer>
-
-            <ListBox Name="AgentRows"
-                     AutomationProperties.Name="{x:Static res:Strings.Agents}"
-                     Classes="rows two-line"
-                     Padding="4,0,4,4"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     ItemsSource="{Binding Rows}"
-                     SelectedItem="{Binding Selected}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:AgentRow">
-                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" ToolTip.Tip="{Binding Status}">
-                    <Border Classes="row-tile">
-                      <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                 Classes="label" Foreground="{DynamicResource KpTextPrimary}" />
-                    </Border>
-                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                      <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-                        <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Status}" TextTrimming="CharacterEllipsis" ctl:MachineRuns.InText="True" />
-                      </Grid>
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </DockPanel>
-        </Border>
-
-        <!-- The chosen agent: its connection, what it can see and its rules; or, narrow, the Back that replaced the list. -->
-        <DockPanel>
-          <Border DockPanel.Dock="Top" IsVisible="{Binding #Split.ShowsBack}">
-            <Button Name="BackToList"
-                    Classes="ghost sm"
-                    HorizontalAlignment="Left"
-                    Margin="24,0,0,0"
-                    Command="{Binding CloseDetailCommand}"
-                    AutomationProperties.Name="{Binding Source={x:Static res:Strings.Agents}, StringFormat={x:Static res:Strings.BackToValue}}">
-              <StackPanel Orientation="Horizontal" Spacing="4">
-                <ctl:KpIcon Icon="chevron-left" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.Agents}" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
           </Border>
-
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <Grid Margin="24,0,24,24">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MaxWidth="756" />
-              </Grid.ColumnDefinitions>
-
-              <Panel IsVisible="{Binding ShowsAgentDetail}">
-              <StackPanel Spacing="16" DataContext="{Binding Selected}" x:DataType="vm:AgentRow">
-
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                  <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="list-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
-                  <Button Grid.Column="1" Name="ConnectTool" VerticalAlignment="Center" MaxWidth="260"
-                          IsVisible="{Binding ShowsConnect}"
-                          Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectCommand}"
-                          CommandParameter="{Binding}"
-                          AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}">
-                    <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding ConnectLabel}" />
-                  </Button>
-                </Grid>
-
-                <Border Classes="group">
-                  <ctl:GroupedRows>
-                    <ctl:FieldRow Label="{x:Static res:Strings.Connection}" Classes="top-label">
-                      <StackPanel Spacing="6">
+          <Border Classes="table">
+            <ItemsControl Name="AgentRows" ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AgentRow">
+                  <!-- Transparent, so a right-click anywhere on the row opens its menu. -->
+                  <Border IsVisible="{Binding IsShown}" Padding="16,12" Background="Transparent" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
+                      <Border Classes="tile" VerticalAlignment="Top">
+                        <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Classes="label" Foreground="{DynamicResource KpTextPrimary}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Classes="size-14" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                           <!-- Top, so a status that wraps keeps its dot on the first line. -->
                           <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Top" Margin="0,6,0,0" />
-                          <TextBlock Grid.Column="1" Name="AgentStatus" Text="{Binding Status}" Classes="size-13" TextWrapping="Wrap" ctl:MachineRuns.InText="True"
+                          <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="size-13" TextWrapping="Wrap" ctl:MachineRuns.InText="True"
                                      Classes.ok="{Binding IsLive}" Classes.muted="{Binding !IsLive}" />
                         </Grid>
                         <TextBlock Name="AgentSessions" Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.InText="True" IsVisible="{Binding HasSessions}"
                                    Text="{Binding Sessions, StringFormat={x:Static res:Strings.LiveInValue}}" />
-                        <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding ShowsToolActions}">
-                          <Button Name="ConnectToolAgain" Classes="ghost sm" MaxWidth="260"
-                                  IsVisible="{Binding OffersConnectAgain}"
-                                  Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectAgainCommand}"
-                                  CommandParameter="{Binding}"
-                                  AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}">
-                            <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding ConnectAgainLabel}" />
-                          </Button>
-                          <Button Name="DisconnectTool" Classes="ghost sm danger" Content="{x:Static res:Strings.DisconnectLabel}"
-                                  IsVisible="{Binding OffersDisconnect}"
-                                  Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).DisconnectCommand}"
-                                  CommandParameter="{Binding}"
-                                  AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.DisconnectValue}}" />
-                        </WrapPanel>
+                        <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding ShowsSummary}" TextWrapping="Wrap" />
                       </StackPanel>
-                    </ctl:FieldRow>
-                    <ctl:FieldRow Label="{x:Static res:Strings.CanSee}" Classes="top-label" IsVisible="{Binding HasSettings}">
-                      <StackPanel Spacing="2">
-                        <TextBlock Name="CanSeeUsernames" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeUsernames}"
-                                   IsVisible="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
-                        <TextBlock Name="CanSeeUsernamesOnRequest" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeUsernamesOnRequest}"
-                                   IsVisible="{Binding !$parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
-                        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ChangeUsernamesUnderEveryOtherAgent}" IsVisible="{Binding !IsEveryOther}" />
-                      </StackPanel>
-                    </ctl:FieldRow>
-                  </ctl:GroupedRows>
-                </Border>
-
-                <!-- The plan core composed, run only by its action, which the Connect button gives way to. -->
-                <Border Classes="group" Padding="16,12" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
-                  <StackPanel Spacing="12" DataContext="{Binding Connection}" x:DataType="vm:ConnectClientViewModel">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Classes="dialog-title" Text="{Binding Title}" VerticalAlignment="Center" />
-                      <Button Grid.Column="1" Name="CloseConnection" Classes="icon ghost sm" VerticalAlignment="Top"
-                              Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).CloseConnectionCommand}"
-                              AutomationProperties.Name="{x:Static res:Strings.Close}">
-                        <ctl:KpIcon Icon="x" Size="14" />
+                      <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top" MaxWidth="220"
+                              IsVisible="{Binding ShowsConnect}"
+                              Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectCommand}"
+                              CommandParameter="{Binding}"
+                              AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValue}}">
+                        <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding ConnectLabel}" />
                       </Button>
-                    </Grid>
-                    <StackPanel Spacing="8" IsVisible="{Binding HasPreview}">
-                      <Border Classes="terminal">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-                          <SelectableTextBlock Name="ConnectPlan"
-                                               Text="{Binding Preview}"
-                                               Margin="16,12"
-                                               FontFamily="{DynamicResource KpMono}"
-                                               Classes="size-12"
-                                               Foreground="{DynamicResource KpGrey3}" />
-                        </ScrollViewer>
-                      </Border>
-                      <TextBlock Classes="caption" ctl:MachineRuns.InText="True" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Name="CancelConnection" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
-                        <Button Name="RunConnection"
-                                Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}"
-                                AutomationProperties.Name="{Binding Title}"
-                                Command="{Binding ConfirmCommand}">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
-                            <TextBlock Text="{Binding Title}" IsVisible="{Binding !IsRunning}" />
-                            <TextBlock Text="{x:Static res:Strings.Running}" IsVisible="{Binding IsRunning}" />
+
+                      <!-- The plan core composed, run only by its action, which the row's button gives way to. -->
+                      <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
+                        <StackPanel Spacing="12" DataContext="{Binding Connection}" x:DataType="vm:ConnectClientViewModel">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="dialog-title" Text="{Binding Title}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Name="CloseConnection" Classes="icon ghost sm" VerticalAlignment="Top"
+                                    Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).CloseConnectionCommand}"
+                                    AutomationProperties.Name="{x:Static res:Strings.Close}">
+                              <ctl:KpIcon Icon="x" Size="14" />
+                            </Button>
+                          </Grid>
+                          <StackPanel Spacing="8" IsVisible="{Binding HasPreview}">
+                            <Border Classes="terminal">
+                              <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                                <SelectableTextBlock Name="ConnectPlan"
+                                                     Text="{Binding Preview}"
+                                                     Margin="16,12"
+                                                     FontFamily="{DynamicResource KpMono}"
+                                                     Classes="size-12"
+                                                     Foreground="{DynamicResource KpGrey3}" />
+                              </ScrollViewer>
+                            </Border>
+                            <TextBlock Classes="caption" ctl:MachineRuns.InText="True" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Name="CancelConnection" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+                              <Button Name="RunConnection"
+                                      Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}"
+                                      AutomationProperties.Name="{Binding Title}"
+                                      Command="{Binding ConfirmCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
+                                  <TextBlock Text="{Binding Title}" IsVisible="{Binding !IsRunning}" />
+                                  <TextBlock Text="{x:Static res:Strings.Running}" IsVisible="{Binding IsRunning}" />
+                                </StackPanel>
+                              </Button>
+                            </StackPanel>
                           </StackPanel>
-                        </Button>
-                      </StackPanel>
-                    </StackPanel>
-                    <TextBlock Classes="body" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
-                    <!-- Cursor and VS Code add keypaste themselves from a link holding the same entry (G.6e). -->
-                    <StackPanel Spacing="8" IsVisible="{Binding OffersInstallLink}">
-                      <TextBlock Classes="caption" Text="{Binding InstallLinkNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
-                      <Border Classes="terminal">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-                          <SelectableTextBlock Name="InstallLink"
-                                               Text="{Binding InstallLink}"
-                                               Margin="16,12"
-                                               FontFamily="{DynamicResource KpMono}"
-                                               Classes="size-12"
-                                               Foreground="{DynamicResource KpGrey3}" />
-                        </ScrollViewer>
-                      </Border>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Name="OpenInstallLink" Content="{Binding OpenInstallLinkLabel}" Command="{Binding OpenInstallLinkCommand}" />
-                        <Button Name="CopyInstallLink" Classes="ghost" Content="{x:Static res:Strings.CopyLink}" Command="{Binding CopyInstallLinkCommand}" />
-                      </StackPanel>
-                    </StackPanel>
-                    <StackPanel Spacing="8" IsVisible="{Binding OffersCheck}">
-                      <WrapPanel ItemSpacing="8" LineSpacing="8">
-                        <Button Name="CheckConnection" VerticalAlignment="Bottom" Command="{Binding CheckCommand}" AutomationProperties.Name="{x:Static res:Strings.CheckTheConnection}">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsCheckWorking}" Classes.spinning="{Binding IsCheckWorking}" />
-                            <TextBlock Text="{x:Static res:Strings.CheckTheConnection}" />
+                          <TextBlock Classes="body" ctl:MachineRuns.InText="True" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                          <!-- Cursor and VS Code add keypaste themselves from a link holding the same entry (G.6e). -->
+                          <StackPanel Spacing="8" IsVisible="{Binding OffersInstallLink}">
+                            <TextBlock Classes="caption" Text="{Binding InstallLinkNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                            <Border Classes="terminal">
+                              <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                                <SelectableTextBlock Name="InstallLink"
+                                                     Text="{Binding InstallLink}"
+                                                     Margin="16,12"
+                                                     FontFamily="{DynamicResource KpMono}"
+                                                     Classes="size-12"
+                                                     Foreground="{DynamicResource KpGrey3}" />
+                              </ScrollViewer>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Name="OpenInstallLink" Content="{Binding OpenInstallLinkLabel}" Command="{Binding OpenInstallLinkCommand}" />
+                              <Button Name="CopyInstallLink" Classes="ghost" Content="{x:Static res:Strings.CopyLink}" Command="{Binding CopyInstallLinkCommand}" />
+                            </StackPanel>
                           </StackPanel>
-                        </Button>
-                        <StackPanel Spacing="6" VerticalAlignment="Bottom">
-                          <TextBlock Classes="label" Text="{x:Static res:Strings.ItemToAskFor}" IsVisible="{Binding IsPicking}" />
-                          <ComboBox Name="CheckItem"
-                                    ItemsSource="{Binding CheckEntries}"
-                                    SelectedItem="{Binding SelectedCheckEntry}"
-                                    IsVisible="{Binding IsPicking}"
-                                    MinWidth="240"
-                                    AutomationProperties.Name="{x:Static res:Strings.ItemToAskFor}">
-                            <ComboBox.ItemTemplate>
-                              <DataTemplate x:DataType="clients:McpListedEntry">
-                                <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
-                              </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                          </ComboBox>
+                          <StackPanel Spacing="8" IsVisible="{Binding OffersCheck}">
+                            <WrapPanel ItemSpacing="8" LineSpacing="8">
+                              <Button Name="CheckConnection" VerticalAlignment="Bottom" Command="{Binding CheckCommand}" AutomationProperties.Name="{x:Static res:Strings.CheckTheConnection}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsCheckWorking}" Classes.spinning="{Binding IsCheckWorking}" />
+                                  <TextBlock Text="{x:Static res:Strings.CheckTheConnection}" />
+                                </StackPanel>
+                              </Button>
+                              <StackPanel Spacing="6" VerticalAlignment="Bottom">
+                                <TextBlock Classes="label" Text="{x:Static res:Strings.ItemToAskFor}" IsVisible="{Binding IsPicking}" />
+                                <ComboBox Name="CheckItem"
+                                          ItemsSource="{Binding CheckEntries}"
+                                          SelectedItem="{Binding SelectedCheckEntry}"
+                                          IsVisible="{Binding IsPicking}"
+                                          MinWidth="240"
+                                          AutomationProperties.Name="{x:Static res:Strings.ItemToAskFor}">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="clients:McpListedEntry">
+                                      <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
+                                    </DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
+                              <Button Name="AskCheckItem" VerticalAlignment="Bottom" Content="{x:Static res:Strings.AskForIt}" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
+                            </WrapPanel>
+                            <TextBlock Classes="body secondary" ctl:Announcer.Says="{Binding CheckMessage}" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
+                                       MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                          </StackPanel>
                         </StackPanel>
-                        <Button Name="AskCheckItem" VerticalAlignment="Bottom" Content="{x:Static res:Strings.AskForIt}" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
-                      </WrapPanel>
-                      <TextBlock Classes="body secondary" ctl:Announcer.Says="{Binding CheckMessage}" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
-                                 MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
+                      </Border>
 
-                <Panel IsVisible="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ShowsAgentRules}">
-                  <views:AgentRulesView DataContext="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent}" />
-                </Panel>
-
-                <Panel IsVisible="{Binding Settings, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <views:AgentSettingsView DataContext="{Binding Settings}" />
-                </Panel>
-
-              </StackPanel>
-              </Panel>
-
-              <!-- Add MCP manually: the server block for any MCP client keypaste does not know. -->
-              <StackPanel Name="ManualConfigCard" Spacing="12" IsVisible="{Binding ShowsManualConfig}">
-                <TextBlock Classes="list-title" Text="{x:Static res:Strings.AddMcpManually}" />
-                <Border Classes="group" Padding="16,12">
-                  <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.AddMcpManuallyHelp}" />
-                      <Button Grid.Column="1" Name="CopyManualConfig" Classes="sm" VerticalAlignment="Top" Content="{x:Static res:Strings.Copy}"
-                              AutomationProperties.Name="{x:Static res:Strings.CopyTheConfiguration}" Command="{Binding CopyManualConfigCommand}" />
+                      <!-- An Expander, so a screen reader hears it open or closed; the panel is G.8's, and its edits survive each refresh. -->
+                      <Expander Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Name="AgentSettings" Margin="0,6,0,0"
+                                Header="{x:Static res:Strings.Settings}"
+                                IsVisible="{Binding HasSettings}"
+                                IsExpanded="{Binding IsOpen, Mode=TwoWay}"
+                                AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.SettingsForValue}}">
+                        <StackPanel Spacing="12">
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowsToolActions}">
+                            <Button Name="ConnectToolAgain" MaxWidth="260"
+                                    IsVisible="{Binding OffersConnectAgain}"
+                                    Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ConnectAgainCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ConnectValueAgain}}">
+                              <TextBlock TextTrimming="CharacterEllipsis" Text="{Binding ConnectAgainLabel}" />
+                            </Button>
+                            <Button Name="DisconnectTool" Classes="danger" Content="{x:Static res:Strings.DisconnectLabel}"
+                                    IsVisible="{Binding OffersDisconnect}"
+                                    Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).DisconnectCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.DisconnectValue}}" />
+                          </StackPanel>
+                          <Panel IsVisible="{Binding Settings, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <views:AgentSettingsView DataContext="{Binding Settings}" />
+                          </Panel>
+                        </StackPanel>
+                      </Expander>
                     </Grid>
-                    <SelectableTextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Text="{Binding ManualConfigText}" />
-                  </StackPanel>
-                </Border>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+        </StackPanel>
+
+        <Border Name="ManualConfigCard" Classes="card filled" Padding="20,16" IsVisible="{Binding ShowsManualConfigCard}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AddMcpManually}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.AddMcpManuallyHelp}" />
               </StackPanel>
-
+              <Button Grid.Column="1" Name="CopyManualConfig" Classes="sm" VerticalAlignment="Top" Content="{x:Static res:Strings.Copy}"
+                      AutomationProperties.Name="{x:Static res:Strings.CopyTheConfiguration}" Command="{Binding CopyManualConfigCommand}" />
             </Grid>
-          </ScrollViewer>
-        </DockPanel>
+            <Border Classes="field" Padding="12,8">
+              <SelectableTextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Text="{Binding ManualConfigText}" />
+            </Border>
+          </StackPanel>
+        </Border>
 
-      </ctl:ListDetail>
+        <Panel IsVisible="{Binding ShowsAgentRules}">
+          <views:AgentRulesView DataContext="{Binding RulesForEveryAgent}" />
+        </Panel>
+
+      </StackPanel>
     </Grid>
-  </Grid>
+  </ScrollViewer>
 
 </UserControl>

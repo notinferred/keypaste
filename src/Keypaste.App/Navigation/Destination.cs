@@ -13,7 +13,7 @@ internal enum DestinationKind
     /// <summary>What agents are asking for and have been granted. The sidebar calls it Agents.</summary>
     AgentActivity = 2,
 
-    /// <summary>The audit log, under Agents.</summary>
+    /// <summary>The whole audit log, under Settings › Advanced.</summary>
     Log = 3,
 
     /// <summary>Settings.</summary>
@@ -24,6 +24,9 @@ internal enum DestinationKind
 
     /// <summary>The share links made from this vault, under Settings › Advanced.</summary>
     Sharing = 6,
+
+    /// <summary>What agents and tokens asked for, under Agents.</summary>
+    AgentHistory = 7,
 
     /// <summary>The vault's scoped tokens, minting and revoking one, under Settings › Advanced.</summary>
     Tokens = 8,
@@ -91,9 +94,10 @@ internal static class Destinations
         new(DestinationKind.Trash, () => Strings.Trash, "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
         new(DestinationKind.Settings, () => Strings.Settings, "settings", DestinationPlacement.Footer, OwnsHeader: true),
         new(DestinationKind.EnvSets, () => Strings.Projects, "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
+        new(DestinationKind.AgentHistory, () => Strings.History, "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
         new(DestinationKind.Advanced, () => Strings.Advanced, "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
         new(DestinationKind.Recommendations, () => Strings.Recommendations, "clipboard-check", OwnsHeader: true, Parent: DestinationKind.Entries),
-        new(DestinationKind.Log, () => Strings.Activity, "activity", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
+        new(DestinationKind.Log, () => Strings.ActivityLog, "activity", OwnsHeader: true, Parent: DestinationKind.Advanced),
         new(DestinationKind.Sharing, () => Strings.ShareLinks, "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
         new(DestinationKind.Tokens, () => Strings.ScopedTokens, "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),
         new(DestinationKind.Diagnostics, () => Strings.Diagnostics, "bug", OwnsHeader: true, Parent: DestinationKind.Advanced),

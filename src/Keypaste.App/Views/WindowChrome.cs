@@ -3,7 +3,7 @@ using Avalonia;
 namespace Keypaste.App.Views;
 
 /// <summary>
-/// The app keeps a 40px area in the window's title, empty but for the vault's foot while the sidebar is away, and keeps the platform's caption
+/// The app draws its own 40px titlebar in the window's title area and keeps the platform's caption
 /// buttons: on the right on Windows and Linux, the traffic lights on the left on macOS.
 /// </summary>
 internal static class WindowChrome
@@ -22,14 +22,14 @@ internal static class WindowChrome
     /// <inheritdoc cref="MinimumWidth"/>
     public const double MinimumHeight = 520;
 
-    /// <summary>Under this width the sidebar collapses to the rail.</summary>
+    /// <summary>Under this width the sidebar collapses to the rail and Items drops its Username and URL columns; from here up, beside the sidebar, those columns keep room for a few characters.</summary>
     public const double NarrowBelow = 840;
 
     /// <summary>Under this width the content is as tight as it is beside the rail: the log's table needs 744 to reach its Result, with a margin for a longer word.</summary>
     public const double ContentTightBelow = 768;
 
     /// <summary>Where toasts sit: under the titlebar and the row of Items' search and New.</summary>
-    public static Thickness ToastMargin { get; } = new(20, TitleBarHeight + 96, 20, 20);
+    public static Thickness ToastMargin { get; } = new(20, TitleBarHeight + 60, 20, 20);
 
     /// <summary>The sidebar's width, and the titlebar's first column while the sidebar shows.</summary>
     public const double SidebarWidth = 232;

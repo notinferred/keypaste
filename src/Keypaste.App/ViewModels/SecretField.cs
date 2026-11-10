@@ -87,7 +87,7 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        if (_disposed || source._disposed || ReferenceEquals(source, this))
+        if (_disposed || source._disposed)
         {
             return;
         }

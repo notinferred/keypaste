@@ -96,6 +96,10 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
 
     internal bool HasSessions => _card.Folders.Count > 0;
 
+    /// <summary>Whether the tab in view lists it.</summary>
+    [ObservableProperty]
+    internal partial bool IsShown { get; set; } = true;
+
     /// <summary>A found tool without keypaste, or one whose configuration keypaste cannot read, has Connect on its row.</summary>
     internal bool OffersConnect => Tool is not null && Presence?.State is McpToolState.NotConnected or McpToolState.CannotTell;
 
@@ -222,9 +226,6 @@ internal sealed partial class AgentRow : ObservableObject, IDisposable
         var initials = words.Length > 1 ? $"{words[0][0]}{words[1][0]}" : words.FirstOrDefault() ?? string.Empty;
         return new string([.. initials.Take(2)]).ToLowerInvariant();
     }
-
-    /// <summary>What a screen reader says for the row in the list: its name and what it is now.</summary>
-    public override string ToString() => $"{Title}, {Status}";
 
     public void Dispose()
     {

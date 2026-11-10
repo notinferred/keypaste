@@ -131,9 +131,6 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     /// <summary>The honest sentence when the copy did not happen, or null.</summary>
     internal string? Failure => _failure;
 
-    /// <summary>How many copies have reached the clipboard, so a caller can tell whether the one it started did.</summary>
-    internal int Landings { get; private set; }
-
     /// <summary>Clears the clipboard now.</summary>
     internal RelayCommand ClearNowCommand { get; }
 
@@ -329,8 +326,6 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
             return;
         }
 
-        Landings++;
-
         // The baseline is read straight after the copy, so whatever the platform's read-back does
         // to the bytes it does identically at both ends of the wait. Owning it is not conditional
         // on the read succeeding: a hash we could not take still has to be taken back.
@@ -377,8 +372,6 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
 
             return;
         }
-
-        Landings++;
 
         if (!Stale(epoch))
         {

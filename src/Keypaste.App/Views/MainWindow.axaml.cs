@@ -87,15 +87,17 @@ internal sealed partial class MainWindow : Window
     }
 
     /// <summary>How the window stands, at its own bounds under any maximize, or null before it has ever had bounds.</summary>
+    /// <param name="listShare">The list's share of the height, which the shell holds.</param>
     /// <param name="sidebarHidden">Whether the sidebar is hidden, which the shell holds.</param>
     /// <param name="tableSorts">Each table's order, which the shell holds.</param>
-    internal WindowLayout? Layout(bool sidebarHidden, string? tableSorts = null)
+    /// <param name="tableWidths">Each table's widths, which the shell holds.</param>
+    internal WindowLayout? Layout(int? listShare, bool sidebarHidden, string? tableSorts = null, string? tableWidths = null)
     {
         NoteBounds();
 
         return _normal is not var (position, size)
             ? null
-            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, sidebarHidden, InterfaceZoom.Percent, tableSorts);
+            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden, InterfaceZoom.Percent, tableSorts, tableWidths);
     }
 
     private ScreenArea? ScreenInUse() =>
@@ -122,7 +124,7 @@ internal sealed partial class MainWindow : Window
 
         if (IsVisible && ScreenInUse() is { } screen)
         {
-            var now = new WindowLayout(Position.X, Position.Y, (int)Math.Ceiling(Width), (int)Math.Ceiling(Height), WindowMode.Normal, false);
+            var now = new WindowLayout(Position.X, Position.Y, (int)Math.Ceiling(Width), (int)Math.Ceiling(Height), WindowMode.Normal, null, false);
             Position = WindowPlacement.Fit(now, minimum, [screen]).Position;
         }
 

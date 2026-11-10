@@ -61,7 +61,7 @@ public sealed class TokenContrastTests
         .. _controlEdges.Select(edge => (edge.PointerOver, _raisedAtMost, _edge)),
     ];
 
-    /// <summary>Decorative lines around cards, tables, dividers, chips and read-only values, which WCAG 1.4.11 exempts and the Delight principle keeps quiet.</summary>
+    /// <summary>Decorative lines around cards, tables, dividers, chips and read-only values, which WCAG 1.4.11 exempts and Principle 7 keeps quiet.</summary>
     private static readonly (string Token, string[] Grounds)[] _decorative =
     [
         ("KpBorderSubtle", _raisedAtMost),

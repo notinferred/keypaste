@@ -1480,8 +1480,8 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine($"waiting n={row.Number} {Describe(row)}");
         }
 
-        // What Agents › Activity draws, read by that screen's own view model, which shows the whole file.
-        var history = new LogViewModel(home);
+        // What Agents › History draws, read by that screen's own view model, which shows the whole file.
+        using var history = new LogViewModel(home, agentsOnly: true);
 
         if (history.HasMessage)
         {

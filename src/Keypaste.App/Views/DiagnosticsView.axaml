@@ -7,6 +7,9 @@
              x:DataType="vm:DiagnosticsViewModel">
 
   <UserControl.Styles>
+    <Style Selector="TextBlock.fact">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
     <Style Selector="SelectableTextBlock.fact-value">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
       <Setter Property="TextWrapping" Value="Wrap" />
@@ -15,33 +18,29 @@
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
-      <TextBlock Classes="h1"
-                 Text="{x:Static res:Strings.Diagnostics}"
-                 ToolTip.Tip="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXa37320}" />
+    <StackPanel Margin="32,12,32,24" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="h1" Text="{x:Static res:Strings.Diagnostics}" />
+        <TextBlock Classes="subtitle" Text="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXa37320}" />
+      </StackPanel>
 
-      <Border Classes="group">
-        <ctl:GroupedRows>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Vault}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding VaultPath}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.KeypasteHome}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding HomePath}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked mono-label" Label="{x:Static res:Strings.KEYPASTEHOMECapitals}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding HomeOverride}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Label="{x:Static res:Strings.Version}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding Version}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.AnsweringAgents}">
-            <SelectableTextBlock Name="AnsweringAgents" Classes="fact-value size-12" Text="{Binding AnsweringAgents}" />
-          </ctl:FieldRow>
-        </ctl:GroupedRows>
+      <Border Classes="card filled" Padding="20,16">
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.Vault}" />
+          <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value size-12" Text="{Binding VaultPath}" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.KeypasteHome}" />
+          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="fact-value size-12" Text="{Binding HomePath}" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Classes="mono muted size-12" Text="{x:Static res:Strings.KEYPASTEHOMECapitals}" />
+          <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value size-12" Text="{Binding HomeOverride}" />
+          <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact size-13" Text="{x:Static res:Strings.Version}" />
+          <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value size-12" Text="{Binding Version}" />
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="fact size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.AnsweringAgents}" />
+          <SelectableTextBlock Name="AnsweringAgents" Grid.Row="4" Grid.Column="1" Classes="fact-value size-12" Text="{Binding AnsweringAgents}" />
+        </Grid>
       </Border>
 
       <!-- The crash reports waiting, each as the exact JSON a request would carry, with Delete (D-0594). -->
-      <Border Name="CrashReportsCard" Classes="group" Padding="16,12" IsVisible="{Binding HasCrashReports}">
+      <Border Name="CrashReportsCard" Classes="card filled" Padding="20,16" IsVisible="{Binding HasCrashReports}">
         <StackPanel Spacing="12">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />

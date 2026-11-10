@@ -12,7 +12,7 @@ keypaste clients claude-code --remove # forget it, which turns its run off
 
 ## What an agent sees
 
-An agent sees each item its bridge's `--expose` reaches ([mcp-setup](mcp-setup.md#what-the-agent-may-see)): its title, group, tags and URL, and its username unless Agents see usernames is turned off on Agents' Every other agent row, which hides the username alone, so the agent then asks for it. Listing works either way.
+An agent sees each item its bridge's `--expose` reaches ([mcp-setup](mcp-setup.md#what-the-agent-may-see)): its title, group, tags and URL, and its username unless Agents › What agents get turns Agents see usernames off, which hides the username alone, so the agent then asks for it. Listing works either way.
 
 ## How each value is answered
 

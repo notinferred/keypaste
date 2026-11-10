@@ -133,7 +133,7 @@ public sealed class AssistiveTechnologyTests
         using var shell = new RenderedShell("keypaste-heading-");
         shell.Show<SettingsViewModel>(DestinationKind.Settings);
 
-        var heading = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("list-title") && text.Text == "Settings");
+        var heading = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("h1") && text.Text == "Settings");
         var section = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("dialog-title") && text.IsEffectivelyVisible);
 
         Assert.Equal(1, ControlAutomationPeer.CreatePeerForElement(heading).GetHeadingLevel());

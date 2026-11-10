@@ -97,8 +97,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
         ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
         CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
-        ShowKeysCommand = new RelayCommand(ShowKeys);
-        ShowItemsCommand = new RelayCommand(ShowItems);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
 
@@ -126,17 +124,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>Where this project runs on this machine, and its Run and Open terminal.</summary>
     internal ProjectLaunchViewModel Launch { get; }
-
-    /// <summary>Whether the project shows its items rather than its keys.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowingKeys))]
-    internal partial bool ShowingItems { get; private set; }
-
-    internal bool ShowingKeys => !ShowingItems;
-
-    internal RelayCommand ShowKeysCommand { get; }
-
-    internal RelayCommand ShowItemsCommand { get; }
 
     /// <summary>The clipboard a row copies through.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -407,7 +394,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <param name="row">The variable whose value is being replaced.</param>
     internal void BeginReplace(EnvVariableRow row)
     {
-        ShowingItems = false;
         CloseEntryForms();
         ReplacementValue.Clear();
         Replacing = row;
@@ -771,7 +757,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private void BeginAddProfile()
     {
-        ShowingItems = false;
         CloseEntryForms();
         NewProfile = string.Empty;
         _emptyProfileRefused = false;
@@ -903,7 +888,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <summary>Asks to remove a variable.</summary>
     internal void BeginRemove(EnvVariableRow row)
     {
-        ShowingItems = false;
         CloseEntryForms();
         Removing = row;
     }
@@ -940,7 +924,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private void BeginAdd()
     {
-        ShowingItems = false;
         CloseEntryForms();
         NewKey = string.Empty;
         RefuseNewKey(null);
@@ -1133,8 +1116,10 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             return;
         }
 
-        ShowingItems = true;
-        CloseKeyForms();
+        IsAdding = false;
+        IsAddingProfile = false;
+        Removing = null;
+        CancelReplaceQuietly();
         PendingTagChange = null;
 
         var members = MembersOf(environment).ToHashSet();
@@ -1158,26 +1143,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         CloseEntryForms();
         _report(null);
-    }
-
-    private void ShowKeys()
-    {
-        CloseEntryForms();
-        ShowingItems = false;
-    }
-
-    private void ShowItems()
-    {
-        CloseKeyForms();
-        ShowingItems = true;
-    }
-
-    private void CloseKeyForms()
-    {
-        IsAdding = false;
-        IsAddingProfile = false;
-        Removing = null;
-        CancelReplaceQuietly();
     }
 
     private void CloseEntryForms()

@@ -48,9 +48,11 @@
         <!-- The links this vault made: what, to whom and on what terms, and whether each still opens. -->
         <StackPanel Grid.Column="0" Spacing="16" MinWidth="296">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Grid.Column="0" Classes="h1"
-                       Text="{x:Static res:Strings.ShareLinks}"
-                       ToolTip.Tip="{x:Static res:Strings.LinksYouMadeFromAnItemsMenuXfaa446}" />
+            <StackPanel Grid.Column="0" Spacing="6">
+              <TextBlock Classes="h1" Text="{x:Static res:Strings.ShareLinks}" />
+              <TextBlock Classes="subtitle"
+                         Text="{x:Static res:Strings.LinksYouMadeFromAnItemsMenuXfaa446}" />
+            </StackPanel>
             <Button Grid.Column="1"
                     x:Name="CheckStatus"
                     Classes="ghost sm"
@@ -68,13 +70,15 @@
             </Button>
           </Grid>
 
-          <Border Classes="group" IsVisible="{Binding IsEmpty}" Padding="16,12">
+          <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,12">
             <TextBlock Classes="caption"
                        Text="{x:Static res:Strings.NoLinksYetChooseShareInAnX8aa94b}" />
           </Border>
 
           <Border x:Name="Shares"
-                  Classes="group"
+                  CornerRadius="{DynamicResource KpRadiusCard}"
+                  BorderBrush="{DynamicResource KpBorderSubtle}"
+                  BorderThickness="1"
                   ClipToBounds="True"
                   IsVisible="{Binding !IsEmpty}">
             <ItemsControl ItemsSource="{Binding Rows}">

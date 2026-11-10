@@ -170,89 +170,6 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void A_kind_starts_with_its_fields_added_and_the_list_offers_the_rest()
-    {
-        var form = NewItemForm.Open(_entries);
-
-        Assert.True(form.ShowsUsername && form.ShowsPassword && form.ShowsUrl && !form.ShowsNotes);
-        Assert.DoesNotContain(form.FieldOptions, option => option.Field is NewItemField.Username or NewItemField.Password or NewItemField.Url);
-        Assert.Contains(form.FieldOptions, option => option.Field == NewItemField.Notes);
-
-        form.RemoveFieldCommand.Execute(NewItemField.Url);
-        form.AddFieldCommand.Execute(NewItemField.Notes);
-
-        Assert.False(form.ShowsUrl);
-        Assert.True(form.ShowsNotes);
-        Assert.Contains(form.FieldOptions, option => option.Field == NewItemField.Url);
-        Assert.DoesNotContain(form.FieldOptions, option => option.Field == NewItemField.Notes);
-    }
-
-    [Fact]
-    public void A_custom_and_a_protected_field_are_written_with_the_item()
-    {
-        var form = NewItemForm.Open(_entries, "Work/extras");
-        form.AddFieldCommand.Execute(NewItemField.CustomField);
-        form.AddFieldCommand.Execute(NewItemField.ProtectedField);
-        form.CustomFields[0].Name = "Region";
-        form.CustomFields[0].Value = "eu";
-        form.CustomFields[1].Name = "RECOVERY_CODE";
-        Type(form.CustomFields[1].Secret, "1234");
-        _entries.ConfirmAddCommand.Press();
-
-        var item = Reopened(new EntryName("Work", "extras"));
-        Assert.Equal([new EntryField("RECOVERY_CODE", true, false), new EntryField("Region", false, false)], item.Fields);
-        Assert.Equal("eu", item.Read("Region"));
-        Assert.Equal("1234", item.Read("RECOVERY_CODE"));
-    }
-
-    [Fact]
-    public void A_field_name_keypaste_will_not_write_refuses_the_item_and_names_the_field()
-    {
-        var form = NewItemForm.Open(_entries, "Work/refused");
-        form.AddFieldCommand.Execute(NewItemField.CustomField);
-        form.CustomFields[0].Name = "Password";
-        _entries.ConfirmAddCommand.Press();
-
-        Assert.True(form.CustomFields[0].HasNameProblem);
-        Assert.NotNull(_entries.NewItem);
-        Assert.Null(_session.Unlocked!.Find(new EntryName("Work", "refused")));
-    }
-
-    [Fact]
-    public void A_typed_custom_field_is_a_draft_to_keep()
-    {
-        var form = NewItemForm.Open(_entries);
-        Assert.Null(form.UnsavedDraft);
-
-        form.AddFieldCommand.Execute(NewItemField.CustomField);
-        Assert.Null(form.UnsavedDraft);
-
-        form.CustomFields[0].Value = "typed";
-        Assert.NotNull(form.UnsavedDraft);
-    }
-
-    [Fact]
-    public void The_generator_panel_opens_on_a_generated_password_and_acts_on_the_field_it_is_anchored_to()
-    {
-        var form = NewItemForm.Open(_entries);
-        form.OpenGeneratorCommand.Execute(null);
-
-        var panel = form.GeneratorPanel!;
-        Assert.True(form.HasGeneratorPanel);
-        Assert.False(panel.ShowsValue);
-        Assert.Same(form.Password, panel.Value);
-
-        form.Generator.Length = 12;
-        Assert.Equal(12, form.Password.MaskedLength);
-
-        panel.AddFieldCommand.Execute(null);
-        form.CloseGeneratorCommand.Execute(null);
-
-        Assert.False(form.HasGeneratorPanel);
-        Assert.True(form.Password.HasValue);
-    }
-
-    [Fact]
     public void A_choice_announces_the_fields_and_the_button_that_read_it()
     {
         var form = NewItemForm.Open(_entries);
@@ -272,12 +189,6 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.ShowsUrl),
             nameof(NewItemViewModel.ShowsHost),
             nameof(NewItemViewModel.ShowsKey),
-            nameof(NewItemViewModel.ShowsNotes),
-            nameof(NewItemViewModel.ShowsGroup),
-            nameof(NewItemViewModel.ShowsTags),
-            nameof(NewItemViewModel.ShowsGoesIn),
-            nameof(NewItemViewModel.FieldOptions),
-            nameof(NewItemViewModel.HasFieldOptions),
         ];
         Assert.Equal(shown.Order(StringComparer.Ordinal), raised.Order(StringComparer.Ordinal));
 

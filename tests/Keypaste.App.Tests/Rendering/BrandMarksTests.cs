@@ -19,13 +19,14 @@ public sealed class BrandMarksTests
 
     [Theory]
     [MemberData(nameof(Palettes))]
-    public Task The_unlocked_app_shows_no_mark_and_the_lock_screen_the_icon(string palette) => HeadlessSession.On(() =>
+    public Task The_sidebar_shows_the_wordmark_and_the_lock_screen_the_icon(string palette) => HeadlessSession.On(() =>
     {
         PlatformTheme.Set(palette == "light" ? PlatformThemeVariant.Light : PlatformThemeVariant.Dark);
         using var shell = new RenderedShell("keypaste-marks-");
 
-        Assert.Empty(Visible<BrandWordmark>(shell.Window));
+        var wordmark = Assert.Single(Visible<BrandWordmark>(shell.Window));
         Assert.Empty(Visible<BrandMark>(shell.Window));
+        AssertDrawn(shell.Window, wordmark);
 
         shell.PressLock();
         Assert.True(shell.IsLocked);

@@ -35,16 +35,16 @@ public sealed class TitleTypographyTests
     });
 
     [Fact]
-    public Task The_sidebars_foot_sets_only_the_file_name_in_mono_and_says_Lock() => HeadlessSession.On(() =>
+    public Task The_title_bar_sets_only_the_file_name_in_mono_and_says_Lock() => HeadlessSession.On(() =>
     {
         using var shell = Open("github");
         var frame = shell.Frame();
-        var foot = frame.Of(shell.Named<Border>("VaultFoot"), shell.Window);
+        var titleBar = frame.Of(shell.Named<Border>("TitleBar"), shell.Window);
 
-        Assert.True(frame.Shows("vault.kdbx", new TextStyle(new Typeface(Mono), 12), foot), "the vault's file name is not drawn in mono");
-        Assert.True(frame.Shows("saved", new TextStyle(new Typeface(Sans), 13), foot), "the save state is not drawn in sans");
-        Assert.False(frame.Shows("saved", new TextStyle(new Typeface(Mono), 12), foot), "the save state is drawn in mono");
-        Assert.True(frame.Shows("Lock", new TextStyle(new Typeface(Sans, weight: FontWeight.Medium), 12), foot), "Lock is not drawn in sans");
+        Assert.True(frame.Shows("vault.kdbx", new TextStyle(new Typeface(Mono), 12), titleBar), "the vault's file name is not drawn in mono");
+        Assert.True(frame.Shows("saved", new TextStyle(new Typeface(Sans), 13), titleBar), "the save state is not drawn in sans");
+        Assert.False(frame.Shows("saved", new TextStyle(new Typeface(Mono), 12), titleBar), "the save state is drawn in mono");
+        Assert.True(frame.Shows("Lock", new TextStyle(new Typeface(Sans, weight: FontWeight.Medium), 12), titleBar), "Lock is not drawn in sans");
     });
 
     private static FontFamily Sans => (FontFamily)Avalonia.Application.Current!.FindResource("KpSans")!;

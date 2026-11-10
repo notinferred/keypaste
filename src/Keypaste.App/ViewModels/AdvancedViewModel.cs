@@ -14,11 +14,15 @@ internal sealed class AdvancedViewModel
     {
         ArgumentNullException.ThrowIfNull(session);
 
+        OpenActivityLogCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Log), () => open is not null);
         OpenShareLinksCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Sharing), () => open is not null);
         OpenScopedTokensCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Tokens), () => open is not null);
         OpenDiagnosticsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Diagnostics), () => open is not null);
         ShareLinksNote = ShareLinksNoteOf(session);
     }
+
+    /// <summary>The whole activity log, with its hash check.</summary>
+    internal RelayCommand OpenActivityLogCommand { get; }
 
     /// <summary>The share links made from this vault.</summary>
     internal RelayCommand OpenShareLinksCommand { get; }

@@ -57,7 +57,7 @@ public sealed class AccessibleDriveTests
         shell.Named<ToggleButton>("AddEntry").IsChecked = true;
         AssertNamedByText(shell, "Items");
 
-        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.AgentHistory, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             AssertNamedByText(shell, kind.ToString());
@@ -136,15 +136,12 @@ public sealed class AccessibleDriveTests
         RenderedShell.Drain();
     }
 
-    private static IEnumerable<AutomationPeer> Subtree(AutomationPeer peer) => [peer, .. peer.GetChildren().SelectMany(Subtree)];
-
-    /// <summary>The first field after the label, among the label's siblings and what they hold.</summary>
+    /// <summary>The first field after the label, among the label's siblings.</summary>
     private static IValueProvider After(RenderedShell shell, string label)
     {
         var text = Find(shell, label, AutomationControlType.Text);
         var siblings = text.GetParent()!.GetChildren();
         var field = siblings.Skip(siblings.ToList().IndexOf(text) + 1)
-            .SelectMany(Subtree)
             .FirstOrDefault(peer => peer.GetAutomationControlType() == AutomationControlType.Edit);
 
         return field as IValueProvider ?? throw new Xunit.Sdk.XunitException($"no field after '{label}'");

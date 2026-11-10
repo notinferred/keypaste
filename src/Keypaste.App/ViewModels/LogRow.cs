@@ -65,13 +65,8 @@ internal sealed record LogRow
 
     internal string Where { get; private init; } = string.Empty;
 
-    /// <summary>What the line was about: the secrets and where they live, or empty when it names neither.</summary>
-    internal string Subject => string.Join(" · ", new[] { UnlessNone(Secrets), UnlessNone(Where) }.OfType<string>());
-
-    internal bool HasSubject => Subject.Length > 0;
-
-    /// <summary>The action as the rest of the sentence after its actor, or empty when the record names none.</summary>
-    internal string ActionWords => Action == _none ? string.Empty : char.ToLowerInvariant(Action[0]) + Action[1..];
+    /// <summary>The Secrets cell's tooltip where the table has no Where column.</summary>
+    internal string SecretsAndWhere => string.Join(" · ", new[] { Secrets, Where }.Where(part => part.Length > 0));
 
     internal string Result { get; private init; } = string.Empty;
 
@@ -100,9 +95,6 @@ internal sealed record LogRow
     internal bool ByYou { get; private init; }
 
     internal bool Denied => !Source.Granted;
-
-    /// <summary>What a screen reader says for the row in the list.</summary>
-    public override string ToString() => RowName;
 
     internal static LogRow From(AuditEntry entry, bool verified, TimeProvider clock)
     {

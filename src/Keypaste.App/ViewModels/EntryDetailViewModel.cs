@@ -36,7 +36,6 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
     private SecretField? _generatedInto;
-    private GeneratePasswordViewModel? _generatorPanel;
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
     private readonly Action<EntryName> _restored;
@@ -98,8 +97,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             },
             () => ReplacingField is not null);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
-        OpenGeneratorCommand = new RelayCommand(OpenGenerator, () => IsEditing);
-        CloseGeneratorCommand = new RelayCommand(CloseGenerator);
         GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => HasPassword && !IsEditing);
         Generator.PropertyChanged += (_, _) =>
         {
@@ -276,8 +273,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding, replacing or renaming a field.</summary>
     internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField;
 
-    /// <summary>Whether the item takes the whole of Items rather than sharing it with the list: while two revisions are compared.</summary>
-    internal bool TakesWholeView => History.IsOpen;
+    /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
+    internal bool TakesWholeView => IsEditing || History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 
@@ -554,75 +551,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     private void GeneratePassword()
     {
         BeginEdit();
-        OpenGenerator();
-    }
-
-    /// <summary>Generate, beside the new password: draws a value into the field and opens the generator anchored to it.</summary>
-    internal RelayCommand OpenGeneratorCommand { get; }
-
-    internal RelayCommand CloseGeneratorCommand { get; }
-
-    /// <summary>Starts a new item with a generated value, set by the screen that holds this pane; the second argument closes the panel.</summary>
-    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
-
-    /// <summary>The generator anchored to the new password field, or null while it is closed.</summary>
-    internal GeneratePasswordViewModel? GeneratorPanel
-    {
-        get => _generatorPanel;
-        private set
-        {
-            if (SetProperty(ref _generatorPanel, value))
-            {
-                OnPropertyChanged(nameof(HasGeneratorPanel));
-            }
-        }
-    }
-
-    internal bool HasGeneratorPanel
-    {
-        get => _generatorPanel is not null;
-        set
-        {
-            if (!value)
-            {
-                CloseGenerator();
-            }
-        }
-    }
-
-    private void OpenGenerator()
-    {
         GenerateInto(NewPassword);
-
-        if (GeneratorPanel is not null)
-        {
-            return;
-        }
-
-        GeneratorPanel = new GeneratePasswordViewModel(
-            _clipboard,
-            Generator,
-            NewPassword,
-            () => GenerateInto(NewPassword),
-            value => StartNewItemWith?.Invoke(value, CloseGenerator),
-            (value, name) => AddGeneratedField(name, value),
-            Name.Title,
-            CloseGenerator);
-    }
-
-    private void CloseGenerator()
-    {
-        var panel = GeneratorPanel;
-        GeneratorPanel = null;
-        panel?.Dispose();
-    }
-
-    partial void OnIsEditingChanged(bool value)
-    {
-        if (!value)
-        {
-            CloseGenerator();
-        }
     }
 
     private void GenerateInto(SecretField? field)
@@ -1029,7 +958,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
-    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(OpenGeneratorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand))]
     internal partial bool IsEditing { get; private set; }
 
     [ObservableProperty]
@@ -1132,7 +1061,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     public void Dispose()
     {
-        CloseGenerator();
         FormClosed = null;
         _editOpenedWith = (string.Empty, string.Empty, string.Empty);
         _entryPath = string.Empty;

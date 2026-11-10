@@ -131,16 +131,15 @@ public sealed class ProjectsJourneyTests
                 Assert.Contains("billing", names);
                 Assert.Contains("services/Stripe · also staging", names);
                 Assert.Contains("services/Mail", names);
+                Assert.Contains("also dev", names);
                 Assert.Contains("Add environment", names);
                 Assert.Contains("Run with this environment", names);
                 Assert.Contains(names, name => name.StartsWith("services/Odd has the tag env:billing:Prod, which puts it in no project", StringComparison.Ordinal));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "a project's keys and entries");
+                AmberElements.AssertOne(main, null, "a project's keys and entries");
 
-                // An entry added to staging, on the Items tab: asked first, nothing written when declined.
-                Press(main, Named<ChoiceSegment>(main, "ProjectItemsTab"));
-                Assert.Contains("also dev", AutomationNames(main));
+                // An entry added to staging: asked first, nothing written when declined.
                 Press(main, ByName<Button>(main, "Add an item to staging"));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "the add-entry form");
+                AmberElements.AssertOne(main, null, "the add-entry form");
                 Fill(main, "Find an item", "Queue");
                 Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "services/Queue" }));
                 Assert.Contains("env:billing:staging puts services/Queue in billing/staging.", AutomationNames(main));
@@ -155,7 +154,7 @@ public sealed class ProjectsJourneyTests
                 // Mail taken out of dev, kept with its field; declined first.
                 Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
                 Assert.Contains("Leaving billing/dev: MAIL_KEY.", AutomationNames(main));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "taking an entry out, asked");
+                AmberElements.AssertOne(main, null, "taking an entry out, asked");
                 Unchanged(vault, () => Press(main, Named<Button>(main, "CancelTagChange")));
                 Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
                 Press(main, Named<Button>(main, "ConfirmTagChange"));
@@ -164,7 +163,6 @@ public sealed class ProjectsJourneyTests
                 Assert.NotNull(unlocked.ReadField(mail, "MAIL_KEY"));
 
                 // The shared value replaced, its form naming both environments; cancelled first.
-                Press(main, Named<ChoiceSegment>(main, "ProjectKeysTab"));
                 var project = screen.OpenProject!;
                 Press(main, RowAction(main, "STRIPE_KEY", "Replace"));
                 Assert.Contains(
@@ -194,7 +192,7 @@ public sealed class ProjectsJourneyTests
                 Assert.True(unlocked.Fields(home)!.Single(field => field.Name == "NEW_KEY").IsProtected);
 
                 // A .env imported, previewed first.
-                ChooseFromMore(main, "ProjectImportEnv");
+                Press(main, ByName<Button>(main, "Import .env"));
                 await Until(() => project.Import.IsPreviewing, () => screen.Error ?? "no preview");
                 AssertOneRevealed(main, ByCommand(main, project.Import.ConfirmCommand), "the import preview");
                 Press(main, ByCommand(main, project.Import.ConfirmCommand));
@@ -202,7 +200,7 @@ public sealed class ProjectsJourneyTests
                 Assert.Equal(_imported, unlocked.ReadField(home, "IMPORTED_KEY"));
 
                 // References only, for keypaste run to resolve.
-                ChooseFromMore(main, "ProjectExportEnv");
+                Press(main, ByName<Button>(main, "Export .env.keypaste"));
                 await Until(() => File.Exists(references));
                 Assert.EndsWith(
                     "IMPORTED_KEY=kp://billing/dev/IMPORTED_KEY\nNEW_KEY=kp://billing/dev/NEW_KEY\nSTRIPE_KEY=kp://billing/dev/STRIPE_KEY\n",
@@ -387,16 +385,7 @@ public sealed class ProjectsJourneyTests
     private static void AssertOneRevealed(Window window, Control primary, string at)
     {
         WindowInput.Reveal(window, primary);
-        AmberElements.AssertOne(window, ByName<Button>(window, "Run in a terminal"), at);
-    }
-
-    private static void ChooseFromMore(Window window, string item)
-    {
-        Press(window, Named<Button>(window, "ProjectMore"));
-        var menu = Assert.IsType<MenuFlyout>(Named<Button>(window, "ProjectMore").Flyout);
-        menu.Items.OfType<MenuItem>().Single(entry => entry.Name == item).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
-        menu.Hide();
-        WindowInput.Drain();
+        AmberElements.AssertOne(window, primary, at);
     }
 
     private static void Fill(Window window, string field, string text)

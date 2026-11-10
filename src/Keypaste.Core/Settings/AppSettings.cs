@@ -25,7 +25,7 @@ public enum AppTheme
 /// <para>
 /// <b>An unreadable file costs a preference and never costs a lock.</b> Every failure here — no
 /// file, no permission, a half-finished hand edit — produces <see cref="Default"/>, which locks
-/// after thirty minutes. That is the same direction <c>clients.toml</c> fails in (docs/PRODUCT.md law 3.7): the
+/// after five minutes. That is the same direction <c>clients.toml</c> fails in (docs/PRODUCT.md law 3.7): the
 /// fallback has to be the state that protects the vault, never the state the file happened to ask
 /// for.
 /// </para>
@@ -120,7 +120,7 @@ public sealed record AppSettings
     /// </remarks>
     public static AppSettings Default { get; } = new()
     {
-        IdleTimeoutSeconds = 1800,
+        IdleTimeoutSeconds = 300,
         Theme = AppTheme.System,
         LockWhenMinimized = false,
     };
@@ -420,6 +420,11 @@ public sealed record AppSettings
             .Text(WindowBoundsKey, layout.BoundsText, "left, top, width, height, at the window's own size")
             .Text(WindowStateKey, layout.ModeText);
 
+        if (layout.ListShare is { } share)
+        {
+            writer.Number(WindowListShareKey, share, "the list's thousandths of the height it shares with the preview");
+        }
+
         writer.Number(WindowSidebarHiddenKey, layout.SidebarHidden ? 1 : 0);
 
         if (layout.ZoomPercent != WindowLayout.ActualSizePercent)
@@ -430,6 +435,11 @@ public sealed record AppSettings
         if (layout.TableSorts is { } sorts)
         {
             writer.Text(WindowTableSortsKey, sorts, "the column each sorted table runs by");
+        }
+
+        if (layout.TableWidths is { } widths)
+        {
+            writer.Text(WindowTableWidthsKey, widths, "each resized table's column shares");
         }
     }
 
@@ -473,9 +483,11 @@ public sealed record AppSettings
             ? WindowLayout.Read(
                 bounds.Value.Text,
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
+                table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
                 table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
                 ZoomText(table),
-                TextOf(table, WindowTableSortsKey))
+                TextOf(table, WindowTableSortsKey),
+                TextOf(table, WindowTableWidthsKey))
             : null;
 
     // Written as a string, as the bounds are, so a hand edit such as "-50" stays this key's own problem: the file's reader refuses a bare negative number, and with it the whole file.

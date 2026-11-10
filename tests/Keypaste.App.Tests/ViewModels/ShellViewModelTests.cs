@@ -138,24 +138,26 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.Current = Destinations.Of(DestinationKind.Advanced);
+        shell.Current = Destinations.Of(DestinationKind.Log);
         Assert.Equal("Settings", shell.SelectedFooter?.Title);
         Assert.True(shell.HasBack);
+        Assert.Equal("Advanced", shell.BackTitle);
+        Assert.False(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
+
+        shell.BackCommand.Press();
+        Assert.IsType<AdvancedViewModel>(shell.Content);
+        Assert.Equal("Settings", shell.SelectedFooter?.Title);
         Assert.Equal("Settings", shell.BackTitle);
 
         shell.BackCommand.Press();
         Assert.IsType<SettingsViewModel>(shell.Content);
         Assert.False(shell.HasBack);
 
-        shell.Current = Destinations.Of(DestinationKind.Log);
+        shell.Current = Destinations.Of(DestinationKind.AgentHistory);
         Assert.Equal("Agents", shell.SelectedMain?.Title);
-        Assert.Equal("Agents", shell.BackTitle);
-        Assert.Equal("Activity", shell.CurrentTitle);
-        Assert.IsType<LogViewModel>(shell.Content);
-
-        shell.BackCommand.Press();
-        Assert.IsType<AgentActivityViewModel>(shell.Content);
-        Assert.False(shell.HasBack);
+        var history = Assert.IsType<LogViewModel>(shell.Content);
+        Assert.True(history.IsAgentHistory);
+        Assert.Equal("History", history.Title);
     }
 
     [Fact]
@@ -178,12 +180,16 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Settings_advanced_opens_the_share_links()
+    public void Settings_advanced_opens_the_activity_log_and_the_share_links()
     {
         using var shell = Shell();
         shell.GoTo(4);
         Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
 
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenActivityLogCommand.Press();
+        Assert.IsType<LogViewModel>(shell.Content);
+
+        shell.BackCommand.Press();
         Assert.IsType<AdvancedViewModel>(shell.Content).OpenShareLinksCommand.Press();
         Assert.IsType<SharingViewModel>(shell.Content);
         Assert.Equal("Share links", shell.CurrentTitle);
@@ -208,14 +214,14 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Agents_opens_its_activity()
+    public void Agents_opens_its_history()
     {
         using var shell = Shell();
         shell.GoTo(2);
 
-        Assert.IsType<AgentActivityViewModel>(shell.Content).OpenActivityCommand.Press();
+        Assert.IsType<AgentActivityViewModel>(shell.Content).OpenHistoryCommand.Press();
 
-        Assert.IsType<LogViewModel>(shell.Content);
+        Assert.True(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
     }
 
     [Fact]

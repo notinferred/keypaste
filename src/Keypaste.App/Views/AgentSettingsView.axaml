@@ -20,10 +20,6 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
     <!-- Tighter than the log's filter, so three modes stay on one line beside the sidebar in the narrowest column the panel gets. -->
-    <Style Selector="ContentPresenter:nth-child(n+2) > Border.remembered">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-      <Setter Property="BorderThickness" Value="0,1,0,0" />
-    </Style>
     <Style Selector="ToggleButton.segment">
       <Setter Property="Padding" Value="6,2" />
     </Style>
@@ -32,7 +28,7 @@
   <UserControl.Resources>
     <!-- One of several, as the log's filter draws it. Its check says which holds without relying on colour. -->
     <DataTemplate x:Key="Segment" x:DataType="vm:SettingChoice">
-      <ctl:ChoiceSegment Name="RunChoice" Classes="segment"
+      <ctl:ChoiceSegment Classes="segment"
                          IsChecked="{Binding IsChosen, Mode=OneWay}"
                          Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).ChooseCommand}"
                          CommandParameter="{Binding}"
@@ -48,57 +44,48 @@
     </ItemsPanelTemplate>
   </UserControl.Resources>
 
-  <StackPanel Spacing="12">
+  <StackPanel Spacing="16">
 
     <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
 
     <TextBlock Name="SettingsProblem" Classes="body danger" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
 
-    <Border Classes="group">
-      <ctl:GroupedRows>
-        <ctl:FieldRow Label="{x:Static res:Strings.MayRunCommands}">
-          <Border Classes="segmented" HorizontalAlignment="Left">
-            <ItemsControl Name="RunChoices" ItemsSource="{Binding RunChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
-          </Border>
-        </ctl:FieldRow>
-      </ctl:GroupedRows>
-    </Border>
-
-    <StackPanel Spacing="6">
-      <TextBlock Classes="label" Text="{x:Static res:Strings.WhenItAsks}" />
-      <Border Classes="group">
-        <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <ctl:GroupedRows />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:AgentCategoryRow">
-              <ctl:FieldRow Classes="stacked" Label="{Binding Name}">
-                <Border Classes="segmented" HorizontalAlignment="Left">
-                  <ItemsControl ItemsSource="{Binding Choices}" ItemsPanel="{StaticResource Segments}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:AgentCategoryChoice">
-                        <ctl:ChoiceSegment Name="CategoryChoice" Classes="segment"
-                                           IsChecked="{Binding IsChosen, Mode=OneWay}"
-                                           Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).ChooseCategoryCommand}"
-                                           CommandParameter="{Binding}"
-                                           AutomationProperties.Name="{Binding Words}">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
-                            <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
-                          </StackPanel>
-                        </ctl:ChoiceSegment>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </Border>
-              </ctl:FieldRow>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+    <Grid ColumnDefinitions="120,*" ColumnSpacing="16">
+      <TextBlock Classes="label" Text="{x:Static res:Strings.MayRunCommands}" Margin="0,6,0,0" />
+      <Border Grid.Column="1" Classes="segmented">
+        <ItemsControl Name="RunChoices" ItemsSource="{Binding RunChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
       </Border>
+    </Grid>
+
+    <StackPanel Spacing="8">
+      <TextBlock Classes="label" Text="{x:Static res:Strings.WhatItGets}" />
+      <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AgentCategoryRow">
+            <StackPanel Spacing="4" Margin="0,0,0,8">
+              <TextBlock Classes="caption" Text="{Binding Name}" />
+              <Border Classes="segmented" HorizontalAlignment="Left">
+                <ItemsControl ItemsSource="{Binding Choices}" ItemsPanel="{StaticResource Segments}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AgentCategoryChoice">
+                      <ctl:ChoiceSegment Classes="segment"
+                                         IsChecked="{Binding IsChosen, Mode=OneWay}"
+                                         Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).ChooseCategoryCommand}"
+                                         CommandParameter="{Binding}"
+                                         AutomationProperties.Name="{Binding Words}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
+                          <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </ctl:ChoiceSegment>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
       <Border Name="AgentAllowConfirmation" Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True"
               ctl:FormKeys.Cancel="{Binding CancelAllowCommand}">
         <StackPanel Spacing="8">
@@ -112,27 +99,23 @@
       </Border>
     </StackPanel>
 
-    <StackPanel Spacing="6">
+    <StackPanel Spacing="8">
       <TextBlock Classes="label" Text="{x:Static res:Strings.AlwaysAnswers}" />
       <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !HasRemembered}"
                  Text="{x:Static res:Strings.NoAlwaysAnswersYet}" />
-      <Border Classes="group" IsVisible="{Binding HasRemembered}">
-        <ItemsControl Name="RememberedAnswers" ItemsSource="{Binding Remembered}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:RememberedRow">
-              <Border Classes="remembered" Padding="16,8">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                  <TextBlock Classes="body" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                  <Button Grid.Column="1" Name="RemoveAnswer" Classes="ghost sm" Content="{x:Static res:Strings.Remove}"
-                          Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).RemoveCommand}"
-                          CommandParameter="{Binding}"
-                          AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}" />
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </Border>
+      <ItemsControl Name="RememberedAnswers" ItemsSource="{Binding Remembered}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RememberedRow">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+              <TextBlock Classes="body" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Remove}"
+                      Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).RemoveCommand}"
+                      CommandParameter="{Binding}"
+                      AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
 
     <TextBlock Name="SettingsMessage" Classes="body" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />

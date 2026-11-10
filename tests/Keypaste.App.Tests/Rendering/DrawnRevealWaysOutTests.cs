@@ -220,7 +220,7 @@ public sealed class DrawnRevealWaysOutTests
                 Assert.True(shell.IsLocked);
                 break;
             case "cancel":
-                shell.Tap(shell.Named<Button>("CloseGenerator"));
+                shell.Tap(shell.Named<Button>("CancelGenerator"));
                 break;
             case "escape":
                 shell.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);

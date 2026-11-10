@@ -10,8 +10,8 @@ using Keypaste.Core.Clients;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Agents: the request waiting for the person, and one list of the AI tools on this computer and the agents that
-/// asked, whose chosen row's detail holds its connection, what it can see and its rules.
+/// Agents: the request waiting for the person, the AI tools on this computer
+/// and the agents that asked, each with its settings, and what was recorded since the app was unlocked.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -29,7 +29,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// It re-reads the authority every second so the lifetimes count down, and re-reads the audit file, which says
-/// when each agent last asked, only when its length or write time has moved. The log itself is Agents › Activity.
+/// when each agent last asked, only when its length or write time has moved. The log itself is Agents › History.
 /// </para>
 /// </remarks>
 internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable, IHoldsDraft
@@ -45,7 +45,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private readonly TimeProvider _clock;
     private readonly Dictionary<string, AgentRow> _byKey = new(StringComparer.Ordinal);
     private readonly HashSet<string> _opened = new(StringComparer.Ordinal);
-    private bool _choosing;
     private IReadOnlyList<AuditEntry> _auditEntries = [];
     private (long Length, DateTime Written)? _auditRead;
     private readonly ObservableCollection<AgentRow> _rows = [];
@@ -61,6 +60,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
     private readonly ObservableCollection<ActivityRow> _waiting = [];
     private bool _disposed;
+    private bool _tabChosen;
+    private bool _applyingDefaultTab;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
     /// <param name="home">The keypaste home whose audit log and <c>agents.toml</c> are read.</param>
@@ -68,7 +69,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <param name="post">Runs a tick or a finished look on the UI thread.</param>
     /// <param name="connector">What finding and connecting AI tools reaches, or null to look for none.</param>
     /// <param name="toast">Says what a press did.</param>
-    /// <param name="openActivity">Opens Agents › Activity.</param>
+    /// <param name="openHistory">Opens Agents › History.</param>
     /// <param name="clipboard">Where a Connect pane copies a tool's install link.</param>
     /// <param name="web">What opens a tool's install link.</param>
     internal AgentActivityViewModel(
@@ -78,7 +79,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         Action<Action>? post = null,
         ClientConnector? connector = null,
         Action<string, ToastTone>? toast = null,
-        Action? openActivity = null,
+        Action? openHistory = null,
         ClipboardCountdown? clipboard = null,
         IWebLauncher? web = null)
     {
@@ -86,9 +87,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         _connector = authority is null ? null : connector;
         _clipboard = clipboard;
         _web = web;
-        OpenActivityCommand = new RelayCommand(() => openActivity?.Invoke(), () => openActivity is not null);
+        OpenHistoryCommand = new RelayCommand(() => openHistory?.Invoke(), () => openHistory is not null);
         _toast = toast ?? ((_, _) => { });
-        OffersActivity = openActivity is not null;
+        OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
         _rules = new AgentRulesFile(KeypasteHome.AgentsPath(home));
         _clock = clock ?? TimeProvider.System;
@@ -105,85 +106,29 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
     }
 
-    /// <summary>The agent whose detail is drawn, or null while the manual configuration is.</summary>
+    /// <summary>The two halves of this screen: who is connected, and what can be connected.</summary>
+    internal IReadOnlyList<string> Tabs { get; } = [Resources.Strings.Agents, Resources.Strings.Connections];
+
+    /// <summary>The tab in view, which opens on Agents once anything is connected and until the person chooses one.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelected))]
-    internal partial AgentRow? Selected { get; set; }
+    [NotifyPropertyChangedFor(nameof(ShowsAgents), nameof(ShowsConnections), nameof(ShowsAgentRules), nameof(HasNoConnectedAgents), nameof(ShowsManualConfigCard))]
+    internal partial string Tab { get; set; } = Resources.Strings.Connections;
 
-    internal bool HasSelected => Selected is not null;
+    internal bool ShowsAgents => Tab == Resources.Strings.Agents;
 
-    /// <summary>Whether the person chose something to read, so a width that holds only one pane shows the detail rather than the list.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsDetail))]
-    internal partial bool IsOpened { get; private set; }
+    internal bool ShowsConnections => !ShowsAgents;
 
-    /// <summary>Whether the detail shows an agent, rather than the manual configuration.</summary>
-    internal bool ShowsAgentDetail => HasSelected && !ShowsManualConfig;
+    internal bool ShowsAgentRules => ShowsAgents && HasAgentRules;
 
-    /// <summary>Whether the detail replaces the list when both cannot fit: something was chosen, or the manual configuration was asked for.</summary>
-    internal bool ShowsDetail => IsOpened || ShowsManualConfig;
-
-    /// <summary>Whether Every other agent is the chosen row, whose detail holds the rules every agent is decided by.</summary>
-    internal bool ShowsAgentRules => HasAgentRules && Selected is { IsEveryOther: true } && !ShowsManualConfig;
-
-    /// <summary>Whether the list has no connected agent to show but Every other agent.</summary>
-    internal bool HasNoConnectedAgents => !_rows.Any(row => row.Tool is not null && !row.OffersConnect) && (_authority?.Clients.Count ?? 0) == 0;
-
-    partial void OnSelectedChanged(AgentRow? value)
-    {
-        if (value is not null)
-        {
-            value.IsOpen = true;
-            ShowsManualConfig = false;
-        }
-
-        if (!_choosing)
-        {
-            IsOpened = value is not null;
-        }
-
-        OnPropertyChanged(nameof(ShowsAgentDetail));
-        OnPropertyChanged(nameof(ShowsAgentRules));
-        OnPropertyChanged(nameof(ShowsDetail));
-    }
-
-    /// <summary>Shows one agent's detail, as pressing its row does.</summary>
-    internal void Choose(AgentRow row) => Selected = row;
-
-    /// <summary>Pressing a row opens its detail over the list, also when it is the row already chosen.</summary>
-    internal void Open(AgentRow row)
-    {
-        Selected = row;
-        IsOpened = true;
-    }
-
-    /// <summary>Leaves the detail for the list, where a width holds only one of them.</summary>
-    [RelayCommand]
-    private void CloseDetail()
-    {
-        IsOpened = false;
-        ShowsManualConfig = false;
-        Settle();
-    }
-
-    /// <summary>With nothing chosen the first row stands in, shown beside the list but not opened over it.</summary>
-    private void Settle()
-    {
-        if (ShowsManualConfig || (Selected is not null && _rows.Contains(Selected)))
-        {
-            return;
-        }
-
-        _choosing = true;
-        Selected = _rows.FirstOrDefault(row => row.HasSettings) ?? _rows.FirstOrDefault();
-        _choosing = false;
-        IsOpened = false;
-    }
+    /// <summary>Whether the Agents tab has nothing to list but Every other agent.</summary>
+    internal bool HasNoConnectedAgents => ShowsAgents && !_rows.Any(row => row.Tool is not null && !row.OffersConnect) && (_authority?.Clients.Count ?? 0) == 0;
 
     /// <summary>What Add MCP manually offers, for an MCP client keypaste does not know.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsAgentDetail), nameof(ShowsAgentRules), nameof(ShowsDetail))]
+    [NotifyPropertyChangedFor(nameof(ShowsManualConfigCard))]
     internal partial bool ShowsManualConfig { get; private set; }
+
+    internal bool ShowsManualConfigCard => ShowsConnections && ShowsManualConfig;
 
     /// <summary>What Copy setup prompt puts on the clipboard, for an agent to connect itself.</summary>
     internal static string SetupPrompt => Resources.Strings.SetupPromptText;
@@ -219,26 +164,39 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     }
 
     [RelayCommand]
-    private void ConnectAnApp()
-    {
-        if (_rows.FirstOrDefault(row => row.OffersConnect) is { } tool)
-        {
-            Open(tool);
-        }
-        else
-        {
-            _toast(IsLooking ? Resources.Strings.LookingForAIToolsOnThisComputer : HasNoTools ? NoTools : Resources.Strings.EveryAIToolFoundIsConnected, ToastTone.Information);
-        }
-    }
+    private void ConnectAnApp() => ChooseTab(manual: false);
 
     [RelayCommand]
-    private void AddMcpManually()
+    private void AddMcpManually() => ChooseTab(manual: true);
+
+    private void ChooseTab(bool manual)
     {
-        _choosing = true;
-        Selected = null;
-        _choosing = false;
-        ShowsManualConfig = true;
-        IsOpened = true;
+        _tabChosen = true;
+        Tab = Resources.Strings.Connections;
+        ShowsManualConfig = manual;
+    }
+
+    partial void OnTabChanged(string value)
+    {
+        _tabChosen |= !_applyingDefaultTab;
+        ShowRows();
+    }
+
+    private void ShowRows()
+    {
+        if (!_tabChosen && _looked && (_authority?.Clients.Count > 0 || _rows.Any(row => row.Tool is not null && !row.OffersConnect)))
+        {
+            _applyingDefaultTab = true;
+            Tab = Resources.Strings.Agents;
+            _applyingDefaultTab = false;
+        }
+
+        foreach (var row in _rows)
+        {
+            row.IsShown = ShowsConnections || !row.OffersConnect;
+        }
+
+        OnPropertyChanged(nameof(HasNoConnectedAgents));
     }
 
     /// <summary>The AI tools found and the agents of this vault, Every other agent last; a row stays where it was first listed while the screen is open.</summary>
@@ -295,10 +253,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>Whether a pane's own action may be primary: not while a request waits, whose countdown is the live signal (D-0375).</summary>
     internal bool FormsArePrimary => !HasWaiting;
 
-    /// <summary>Agents › Activity: what agents and tokens asked for, and what came of it.</summary>
-    internal RelayCommand OpenActivityCommand { get; }
+    /// <summary>Agents › History: what agents and tokens asked for, and what came of it.</summary>
+    internal RelayCommand OpenHistoryCommand { get; }
 
-    internal bool OffersActivity { get; }
+    internal bool OffersHistory { get; }
 
     /// <summary>The rules every agent's request is decided by on this computer; none without an owner to apply them.</summary>
     internal AgentRulesViewModel? RulesForEveryAgent { get; init; }
@@ -366,7 +324,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <inheritdoc/>
     public string? UnsavedDraft => null;
 
-    /// <summary>Shows the named agent's detail, listing it first when no row shows it yet.</summary>
+    /// <summary>Opens the named agent's settings on its row, listing it first when no row shows it yet.</summary>
     /// <param name="agent">The agent's name, or <c>*</c>.</param>
     internal void OpenSettings(string agent)
     {
@@ -384,7 +342,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         if (_byKey.TryGetValue(agent, out var row))
         {
-            Choose(row);
+            row.IsOpen = true;
         }
     }
 
@@ -512,15 +470,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         Place(listed);
-        OnPropertyChanged(nameof(HasNoConnectedAgents));
+        ShowRows();
 
         foreach (var (key, row) in _byKey.Where(pair => !listed.Contains(pair.Value)).ToList())
         {
             _byKey.Remove(key);
             row.Dispose();
         }
-
-        Settle();
 
         // What each summary is read from: each card and the file beneath them.
         var signature = string.Join(
@@ -700,7 +656,6 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         CloseConnection();
-        Choose(row);
 
         var pane = new ConnectClientViewModel(_authority.Session, _connector, tool, removes, ran: Look, cancelled: Cancelled, clipboard: _clipboard, web: _web);
         pane.PropertyChanged += OnConnectionChanged;

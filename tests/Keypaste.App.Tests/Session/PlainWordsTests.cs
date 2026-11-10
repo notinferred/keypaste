@@ -98,7 +98,7 @@ public sealed partial class PlainWordsTests
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "an item's history"));
 
-        foreach (var kind in new[] { DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var kind in new[] { DestinationKind.AgentHistory, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             RenderedShell.Drain();
@@ -138,12 +138,14 @@ public sealed partial class PlainWordsTests
         await agents.RequestAsync("password");
         var model = agents.Model;
 
-        foreach (var row in model.Rows.Where(row => row.HasSettings).ToList())
+        foreach (var disclosure in agents.Window.GetVisualDescendants().OfType<Expander>().ToList())
         {
-            model.Choose(row);
-            agents.Settle();
-            said.AddRange(Shown(agents.Window, $"Agents, {row.Key}'s settings"));
+            disclosure.IsExpanded = true;
         }
+
+        agents.Settle();
+
+        said.AddRange(Shown(agents.Window, "Agents, every Settings open"));
 
         foreach (var (open, key) in new (IRelayCommand Open, string Key)[] { (model.ConnectCommand, "cursor"), (model.DisconnectCommand, "gemini-cli"), (model.ConnectAgainCommand, "claude-code") })
         {
