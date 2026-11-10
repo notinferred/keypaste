@@ -247,7 +247,6 @@
   <data name="LockAndOpen" xml:space="preserve"><value>Lock and open</value></data>
   <data name="LockLabel" xml:space="preserve"><value>Lock</value></data>
   <data name="LockNow" xml:space="preserve"><value>Lock now</value></data>
-  <data name="LockWhenTheWindowIsMinimized" xml:space="preserve"><value>Lock when the window is minimized</value></data>
   <data name="LockAfter" xml:space="preserve"><value>Lock after</value></data>
   <data name="LockWhenMinimized" xml:space="preserve"><value>Lock when minimized</value></data>
   <data name="KeepInMenuBar" xml:space="preserve"><value>Keep in menu bar</value></data>
@@ -322,7 +321,6 @@
   <data name="OpenDiagnostics" xml:space="preserve"><value>Open diagnostics</value></data>
   <data name="OpenInYourBrowser" xml:space="preserve"><value>Open in your browser</value></data>
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
-  <data name="OpenKeypasteAtLogin" xml:space="preserve"><value>Open keypaste at login</value></data>
   <data name="OpenAtLogin" xml:space="preserve"><value>Open at login</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
   <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>

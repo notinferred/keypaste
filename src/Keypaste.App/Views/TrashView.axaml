@@ -162,7 +162,7 @@
                       <TextBlock Classes="row-title" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
                       <TextBlock Classes="mono muted size-12" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Summary}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2" Classes="muted size-12" Text="{Binding When}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="caption" Text="{Binding When}" VerticalAlignment="Center" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>

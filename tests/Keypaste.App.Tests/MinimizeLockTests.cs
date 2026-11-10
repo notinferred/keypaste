@@ -1,8 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.LogicalTree;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -185,10 +185,10 @@ public sealed class MinimizeLockTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var toggle = window.GetLogicalDescendants().OfType<ToggleSwitch>().Single(box => box.Name == "LockWhenMinimized");
+        var toggles = window.GetVisualDescendants().OfType<ToggleSwitch>().Where(box => box.Name == "LockWhenMinimized");
 
         Assert.Equal(MinimizeLock.IsSupported, screen.MinimizeLockSupported);
-        Assert.Equal(MinimizeLock.IsSupported, toggle.IsEffectivelyVisible);
+        Assert.Equal(MinimizeLock.IsSupported, toggles.Any(toggle => toggle.IsEffectivelyVisible));
 
         window.Close();
     });

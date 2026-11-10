@@ -317,7 +317,6 @@ public static class Strings
     public static string LockLabel => Manager.GetString("LockLabel", CultureInfo.CurrentUICulture)!;
     public static string LockNow => Manager.GetString("LockNow", CultureInfo.CurrentUICulture)!;
     public static string LockWhenMinimized => Manager.GetString("LockWhenMinimized", CultureInfo.CurrentUICulture)!;
-    public static string LockWhenTheWindowIsMinimized => Manager.GetString("LockWhenTheWindowIsMinimized", CultureInfo.CurrentUICulture)!;
     public static string Locked => Manager.GetString("Locked", CultureInfo.CurrentUICulture)!;
     public static string LogDayToday => Manager.GetString("LogDayToday", CultureInfo.CurrentUICulture)!;
     public static string LogDayUndated => Manager.GetString("LogDayUndated", CultureInfo.CurrentUICulture)!;
@@ -403,7 +402,6 @@ public static class Strings
     public static string OpenDiagnostics => Manager.GetString("OpenDiagnostics", CultureInfo.CurrentUICulture)!;
     public static string OpenInYourBrowser => Manager.GetString("OpenInYourBrowser", CultureInfo.CurrentUICulture)!;
     public static string OpenItem => Manager.GetString("OpenItem", CultureInfo.CurrentUICulture)!;
-    public static string OpenKeypasteAtLogin => Manager.GetString("OpenKeypasteAtLogin", CultureInfo.CurrentUICulture)!;
     public static string OpenProject => Manager.GetString("OpenProject", CultureInfo.CurrentUICulture)!;
     public static string OpenRecent => Manager.GetString("OpenRecent", CultureInfo.CurrentUICulture)!;
     public static string OpenTerminal => Manager.GetString("OpenTerminal", CultureInfo.CurrentUICulture)!;

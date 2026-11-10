@@ -37,7 +37,7 @@ internal sealed partial class TrashView : UserControl
                 Dispatcher.UIThread.Post(
                     () =>
                     {
-                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true })
+                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true } window && KeyboardIsHere(window))
                         {
                             Control? next = split.ShowsBack ? this.FindControl<Button>("BackToList") : this.FindControl<ListBox>("TrashRows");
                             next?.Focus(NavigationMethod.Tab);
@@ -49,6 +49,8 @@ internal sealed partial class TrashView : UserControl
     }
 
     private ToggleButton? OpenSortMenu => this.FindControl<ToggleButton>("SortMenu") is { IsChecked: true } toggle ? toggle : null;
+
+    private bool KeyboardIsHere(Window window) => window.FocusManager?.GetFocusedElement() is not Visual focused || this.IsVisualAncestorOf(focused);
 
     private void OnClick(object? sender, RoutedEventArgs e)
     {

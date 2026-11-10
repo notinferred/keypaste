@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
 
@@ -33,7 +34,7 @@ internal sealed partial class SettingsView : UserControl
                 Dispatcher.UIThread.Post(
                     () =>
                     {
-                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true })
+                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true } window && KeyboardIsHere(window))
                         {
                             Control next = split.ShowsBack ? this.FindControl<Button>("BackToSections")! : sections;
                             next.Focus(NavigationMethod.Tab);
@@ -74,6 +75,8 @@ internal sealed partial class SettingsView : UserControl
         confirm.ClearRequested += (_, _) => Access?.ClearConfirm();
         confirm.Pasting = () => Access?.PasteConfirmAsync() ?? Task.CompletedTask;
     }
+
+    private bool KeyboardIsHere(Window window) => window.FocusManager?.GetFocusedElement() is not Visual focused || this.IsVisualAncestorOf(focused);
 
     private void OpenSection()
     {
