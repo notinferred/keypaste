@@ -456,6 +456,28 @@ public sealed class EnvProfilesTests : IDisposable
     }
 
     [Fact]
+    public void A_form_opens_on_its_own_tab_and_a_tab_change_closes_the_other_tab_forms()
+    {
+        TaggedStripe();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        project.ShowItemsCommand.Press();
+        project.BeginAddCommand.Press();
+        Assert.True(project.IsAdding);
+        Assert.True(project.ShowingKeys);
+
+        project.Environments[0].AddEntry.Press();
+        Assert.True(project.IsAddingEntry);
+        Assert.False(project.IsAdding);
+        Assert.True(project.ShowingItems);
+
+        project.ShowKeysCommand.Press();
+        Assert.False(project.IsAddingEntry);
+        Assert.True(project.ShowingKeys);
+    }
+
+    [Fact]
     public void Add_entry_says_what_it_reaches_and_writes_the_tag_only_when_confirmed()
     {
         var stripe = TaggedStripe();

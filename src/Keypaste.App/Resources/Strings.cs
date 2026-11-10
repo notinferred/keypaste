@@ -304,7 +304,11 @@ public static class Strings
     public static string LastUsed => Manager.GetString("LastUsed", CultureInfo.CurrentUICulture)!;
     public static string LastUsedValue => Manager.GetString("LastUsedValue", CultureInfo.CurrentUICulture)!;
     public static string LearnMore => Manager.GetString("LearnMore", CultureInfo.CurrentUICulture)!;
+    public static string LearnMoreAboutAProject => Manager.GetString("LearnMoreAboutAProject", CultureInfo.CurrentUICulture)!;
+    public static string LearnMoreAboutKeysLeftInNotes => Manager.GetString("LearnMoreAboutKeysLeftInNotes", CultureInfo.CurrentUICulture)!;
+    public static string LearnMoreAboutRecommendations => Manager.GetString("LearnMoreAboutRecommendations", CultureInfo.CurrentUICulture)!;
     public static string LearnMoreAboutTokenScopes => Manager.GetString("LearnMoreAboutTokenScopes", CultureInfo.CurrentUICulture)!;
+    public static string LearnMoreAboutValue => Manager.GetString("LearnMoreAboutValue", CultureInfo.CurrentUICulture)!;
     public static string LeaveThisEmptyToKeepTheCurrentX151c53 => Manager.GetString("LeaveThisEmptyToKeepTheCurrentX151c53", CultureInfo.CurrentUICulture)!;
     public static string LetAScriptOrCIJobRunX39c663 => Manager.GetString("LetAScriptOrCIJobRunX39c663", CultureInfo.CurrentUICulture)!;
     public static string Link => Manager.GetString("Link", CultureInfo.CurrentUICulture)!;
@@ -388,7 +392,6 @@ public static class Strings
     public static string Now => Manager.GetString("Now", CultureInfo.CurrentUICulture)!;
     public static string OnThisMachine => Manager.GetString("OnThisMachine", CultureInfo.CurrentUICulture)!;
     public static string OneSetOfKeysAValuePerX101ace => Manager.GetString("OneSetOfKeysAValuePerX101ace", CultureInfo.CurrentUICulture)!;
-    public static string OneSetOfKeysPerProjectAXb4239d => Manager.GetString("OneSetOfKeysPerProjectAXb4239d", CultureInfo.CurrentUICulture)!;
     public static string Open => Manager.GetString("Open", CultureInfo.CurrentUICulture)!;
     public static string OpenAKeypasteVault => Manager.GetString("OpenAKeypasteVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAVault => Manager.GetString("OpenAVault", CultureInfo.CurrentUICulture)!;
@@ -491,6 +494,7 @@ public static class Strings
     public static string Rotate => Manager.GetString("Rotate", CultureInfo.CurrentUICulture)!;
     public static string Rotated => Manager.GetString("Rotated", CultureInfo.CurrentUICulture)!;
     public static string RunInATerminal => Manager.GetString("RunInATerminal", CultureInfo.CurrentUICulture)!;
+    public static string RunNeedsADirectoryAndCommandSetThemOnTheKeysTab => Manager.GetString("RunNeedsADirectoryAndCommandSetThemOnTheKeysTab", CultureInfo.CurrentUICulture)!;
     public static string RunProject => Manager.GetString("RunProject", CultureInfo.CurrentUICulture)!;
     public static string RunWithThisEnvironment => Manager.GetString("RunWithThisEnvironment", CultureInfo.CurrentUICulture)!;
     public static string Running => Manager.GetString("Running", CultureInfo.CurrentUICulture)!;

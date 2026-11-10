@@ -66,6 +66,7 @@ public sealed class DrawnRecommendationsTests
         var caption = TextStyle.Of(where);
 
         Assert.True(frame.Shows("Weak passwords", label, frame.Of(problem, shell.Window)), "the problem is not drawn");
+        Assert.Equal(2, Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(problem).GetHeadingLevel());
         Assert.True(frame.Shows("services/Shop", caption, frame.Of(where, shell.Window)), "the item is not drawn");
 
         foreach (var value in new[] { _weak, RenderedShell.Current })

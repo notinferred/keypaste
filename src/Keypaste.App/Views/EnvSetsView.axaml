@@ -176,8 +176,7 @@
         <StackPanel Spacing="12">
           <ctl:HeaderRow Spacing="12">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
-              <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}"
-                         ToolTip.Tip="{x:Static res:Strings.OneSetOfKeysPerProjectAXb4239d}" />
+              <TextBlock Classes="h1" Text="{x:Static res:Strings.Projects}" IsVisible="{Binding !HasOpenProject}" />
               <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
               <ComboBox Classes="project title size-24" Margin="0,0,-32,0" HorizontalAlignment="Left"
                         IsVisible="{Binding HasOpenProject}"
@@ -229,8 +228,8 @@
             </StackPanel>
           </ctl:HeaderRow>
 
-          <Border Classes="segmented" HorizontalAlignment="Left" IsVisible="{Binding HasOpenProject}"
-                  ToolTip.Tip="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}">
+          <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasOpenProject}">
+          <Border Classes="segmented" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal">
               <ctl:ChoiceSegment Name="ProjectKeysTab" Classes="segment"
                                  IsChecked="{Binding OpenProject.ShowingKeys, Mode=OneWay}"
@@ -246,6 +245,22 @@
               </ctl:ChoiceSegment>
             </StackPanel>
           </Border>
+          <Button Name="LearnMoreProject" Classes="link" VerticalAlignment="Center" Content="{x:Static res:Strings.LearnMore}"
+                  AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutAProject}">
+            <Button.Flyout>
+              <Flyout Placement="Bottom">
+                <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.OneSetOfKeysAValuePerX101ace}" />
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          </StackPanel>
+
+          <StackPanel Spacing="4" IsVisible="{Binding OpenProject.ShowingItems}">
+            <TextBlock Name="RunNeedsDirectory" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !OpenProject.Launch.IsMapped}"
+                       Text="{x:Static res:Strings.RunNeedsADirectoryAndCommandSetThemOnTheKeysTab}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !OpenProject.Launch.IsSupported}"
+                       Text="{Binding OpenProject.Launch.UnsupportedReason}" />
+          </StackPanel>
         </StackPanel>
     </Grid>
 
@@ -302,7 +317,7 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" AutomationProperties.Name="{x:Static res:Strings.ProjectName}" />
               <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-              <Button Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
+              <Button Classes.primary="{Binding !HasOpenProject}" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
             <TextBlock x:Name="NewProjectProblem" ctl:ShowInView.Scrolls="True"
                        Classes="caption danger"
@@ -318,7 +333,7 @@
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="keypaste env set billing-api STRIPE_KEY"
                        Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
             <Button Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
-                    HorizontalAlignment="Left" />
+                    Classes="primary" HorizontalAlignment="Left" />
           </StackPanel>
         </Border>
 
@@ -381,7 +396,8 @@
                      environment's cells reveal theirs through a control that publishes nothing to
                      the accessibility bus (THREATS.md T-22). -->
                 <StackPanel Spacing="8">
-                  <Border Classes="table" ToolTip.Tip="{x:Static res:Strings.ARowsEyeButtonShowsItsValueXc068c4}">
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ARowsEyeButtonShowsItsValueXc068c4}" />
+                  <Border Classes="table">
                     <StackPanel>
                       <Border Classes="table-head top">
                         <Grid ColumnDefinitions="1.6*,3*,120">
@@ -831,8 +847,7 @@
                         <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RunWithThisEnvironment}" VerticalAlignment="Center" />
                       </StackPanel>
 
-                      <Border Classes="terminal" CornerRadius="6" Padding="12,4,4,4" IsVisible="{Binding HasRunCommand}"
-                              ToolTip.Tip="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}">
+                      <Border Classes="terminal" CornerRadius="6" Padding="12,4,4,4" IsVisible="{Binding HasRunCommand}">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                           <TextBlock Text="›" Classes="size-13" Margin="0,0,8,0" VerticalAlignment="Center"
                                      Foreground="{DynamicResource KpAmber}" />
@@ -847,6 +862,8 @@
                         </Grid>
                       </Border>
                       <TextBlock Classes="caption" Text="{Binding RunCommandNote}" IsVisible="{Binding !HasRunCommand}" />
+                      <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasRunCommand}"
+                                 Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
 
                       <TextBlock Classes="caption"
                                  Text="{x:Static res:Strings.ThroughAnAgentOrATokenAXbc5a7a}" />
