@@ -255,7 +255,7 @@ internal sealed class RevealedValue : Control
     {
         var text = Layout();
 
-        if (_shown is not null && WrapsShownValue && availableSize.Width is > 0 and < double.PositiveInfinity)
+        if (_shown is not null && WrapsShownValue && availableSize.Width is > 0 and < double.PositiveInfinity && text.Width > availableSize.Width)
         {
             text.MaxTextWidth = availableSize.Width;
         }
@@ -285,7 +285,10 @@ internal sealed class RevealedValue : Control
 
         if (WrapsShownValue)
         {
-            text.MaxTextWidth = Math.Max(1, bounds.Width);
+            if (text.WidthIncludingTrailingWhitespace > bounds.Width + 1)
+            {
+                text.MaxTextWidth = Math.Max(1, bounds.Width);
+            }
         }
         else if (text.WidthIncludingTrailingWhitespace > room + 1)
         {

@@ -121,7 +121,7 @@
     <Setter Property="Template">
       <ControlTemplate>
         <DataValidationErrors>
-          <Track Name="PART_Track" Orientation="Horizontal" Height="20" VerticalAlignment="Center">
+          <Track Name="PART_Track" Orientation="Horizontal" Height="20" Margin="0,0,2,0" VerticalAlignment="Center">
             <Track.DecreaseButton>
               <RepeatButton Name="PART_DecreaseButton" Classes="slider-track" Background="{DynamicResource SliderTrackValueFill}" />
             </Track.DecreaseButton>
@@ -146,7 +146,7 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Border Background="Transparent" Height="20">
-          <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{TemplateBinding Background}" />
+          <Border Height="4" CornerRadius="4" VerticalAlignment="Center" Background="{TemplateBinding Background}" />
         </Border>
       </ControlTemplate>
     </Setter>
