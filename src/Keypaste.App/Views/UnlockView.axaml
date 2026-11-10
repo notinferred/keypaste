@@ -19,6 +19,7 @@
     <ControlTheme x:Key="LockField" TargetType="ctl:MaskedInput">
       <Setter Property="Focusable" Value="True" />
       <Setter Property="Height" Value="40" />
+      <Setter Property="Padding" Value="12,0" />
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
       <Setter Property="Template">
         <ControlTemplate>
@@ -27,7 +28,7 @@
                   BorderBrush="{DynamicResource KpBorderControl}"
                   BorderThickness="1"
                   CornerRadius="{DynamicResource KpRadiusButton}"
-                  Padding="12,0"
+                  Padding="{TemplateBinding Padding}"
                   ClipToBounds="True">
             <Panel VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -171,7 +172,7 @@
                        IsVisible="{Binding HasSelection}" />
             <TextBlock Classes="lock-subtitle size-13"
                        Text="{Binding WelcomeSubtitle}"
-                       IsVisible="{Binding OffersKeePassXc}" />
+                       IsVisible="{Binding !HasSelection}" />
             <StackPanel Spacing="2"
                         Margin="0,4,0,0"
                         IsVisible="{Binding HasNewFileLocation}"
@@ -210,11 +211,13 @@
                 <ctl:MaskedInput x:Name="Password"
                                  Theme="{StaticResource LockField}"
                                  Classes="size-14"
+                                 Padding="12,0,112,0"
                                  AllowsPaste="True"
                                  MaskedLength="{Binding MaskedLength}"
                                  AutomationProperties.Name="{x:Static res:Strings.MasterPassword}"
                                  IsEnabled="{Binding CanTypePassword}" />
                 <Button Classes="ghost sm size-12"
+                        Classes.primary="{Binding UnlockIsPrimary}"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
                         Margin="0,0,6,0"

@@ -82,7 +82,7 @@
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <StackPanel Margin="32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Stretch">
 
-            <TextBlock Classes="dialog-title" Text="{Binding Section}" ToolTip.Tip="{Binding SectionNote}" />
+            <TextBlock Classes="dialog-title" Text="{Binding Section}" ToolTip.Tip="{Binding SectionNote}" AutomationProperties.HelpText="{Binding SectionNote}" />
 
             <StackPanel Spacing="16" IsVisible="{Binding ShowsGeneral}">
 
@@ -106,7 +106,7 @@
                   <ctl:FieldRow Label="{x:Static res:Strings.LockWhenMinimized}" IsVisible="{Binding MinimizeLockSupported}">
                     <ctl:FieldRow.Actions>
                       <ToggleSwitch Name="LockWhenMinimized"
-                                    AutomationProperties.Name="{x:Static res:Strings.LockWhenTheWindowIsMinimized}"
+                                    AutomationProperties.Name="{x:Static res:Strings.LockWhenMinimized}"
                                     AutomationProperties.HelpText="{Binding MinimizeHelp}"
                                     ToolTip.Tip="{Binding MinimizeHelp}"
                                     IsChecked="{Binding LockWhenMinimized}" />
@@ -124,7 +124,7 @@
                   <ctl:FieldRow Label="{x:Static res:Strings.OpenAtLogin}" IsVisible="{Binding OpenAtLoginSupported}">
                     <ctl:FieldRow.Actions>
                       <ToggleSwitch Name="OpenAtLogin"
-                                    AutomationProperties.Name="{x:Static res:Strings.OpenKeypasteAtLogin}"
+                                    AutomationProperties.Name="{x:Static res:Strings.OpenAtLogin}"
                                     AutomationProperties.HelpText="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}"
                                     ToolTip.Tip="{x:Static res:Strings.ItStartsLockedAndWithNoWindowX07ac3e}"
                                     IsChecked="{Binding OpenAtLogin}" />
@@ -221,6 +221,7 @@
                     <ctl:FieldRow Label="{x:Static res:Strings.VaultAccess}">
                       <TextBlock Name="AccessFactors" Classes="size-13" Text="{Binding Factors}" TextWrapping="Wrap"
                                  ToolTip.Tip="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}"
+                                 AutomationProperties.HelpText="{x:Static res:Strings.MasterPasswordKeyFileAndYubiKey}"
                                  Foreground="{DynamicResource KpTextSecondary}" />
                       <ctl:FieldRow.Actions>
                         <Button Name="OpenAccessForm" Classes="ghost sm" Content="{x:Static res:Strings.ChangeEllipsis}"
@@ -357,17 +358,17 @@
                       <TextBlock ctl:MachineRuns.InText="True" Name="BackupsSummary"
                                  Classes="size-13"
                                  TextWrapping="Wrap"
-                                 ToolTip.Tip="{Binding BackupsRule}"
                                  Foreground="{DynamicResource KpTextPrimary}"
                                  Text="{Binding BackupsSummary}" />
                       <SelectableTextBlock Classes="fact-value size-12" Text="{Binding BackupsPath}" />
+                      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding BackupsRule}" />
                       <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding RestoreHint}" IsVisible="{Binding HasBackupCopies}" />
                     </StackPanel>
                   </ctl:FieldRow>
-                  <ctl:FieldRow Label="{x:Static res:Strings.Export}">
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Export}">
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding ElsewhereAdvice}" />
                     <ctl:FieldRow.Actions>
                       <Button Classes="ghost sm" Command="{Binding ExportCommand}"
-                              ToolTip.Tip="{Binding ElsewhereAdvice}"
                               AutomationProperties.Name="{x:Static res:Strings.ExportAnEncryptedCopy}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="file-lock-2" Size="14" />
@@ -379,6 +380,8 @@
                   <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.AgentsAndTheCLI}">
                     <TextBlock ctl:MachineRuns.InText="True" Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap"
                                ToolTip.Tip="{Binding ChosenVaultRule}"
+                               AutomationProperties.HelpText="{Binding ChosenVaultRule}"
+                               Focusable="True"
                                Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
                     <ctl:FieldRow.Actions>
                       <Button Classes="ghost sm" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="{x:Static res:Strings.UseThisVaultForAgentsAndTheXb47c9a}">

@@ -74,7 +74,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>What is in the bin, most recently deleted first until another order is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(EmptyPrompt))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(EmptyPrompt), nameof(OffersChoice))]
     [NotifyCanExecuteChangedFor(nameof(EmptyCommand))]
     internal partial IReadOnlyList<TrashRow> Rows { get; private set; } = [];
 
@@ -93,6 +93,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selected, value))
             {
                 OnPropertyChanged(nameof(HasSelection));
+                OnPropertyChanged(nameof(OffersChoice));
                 OnPropertyChanged(nameof(DetailTitle));
                 OnPropertyChanged(nameof(PurgePrompt));
                 RestoreCommand.NotifyCanExecuteChanged();
@@ -107,6 +108,9 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the bin holds entries but none is picked, so Restore and Delete wait on one.</summary>
     internal bool HasSelection => _selected is not null;
+
+    /// <summary>Whether the detail invites a choice: something is in the bin and nothing is picked.</summary>
+    internal bool OffersChoice => !IsEmpty && !HasSelection;
 
 #pragma warning disable CA1822
     internal string ListTitle => Strings.Trash;

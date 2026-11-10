@@ -176,7 +176,7 @@ public sealed class FinishThePolishTests
         using var hidden = new RenderedShell("keypaste-theme-hidden-");
         hidden.Show<SettingsViewModel>(DestinationKind.Settings);
         hidden.Frame();
-        Assert.DoesNotContain(hidden.Window.GetVisualDescendants().OfType<ListBox>(), box => box.Name == "ThemeChoice" && box.IsEffectivelyVisible);
+        Assert.False(hidden.Window.GetLogicalDescendants().OfType<ListBox>().Single(box => box.Name == "ThemeChoice").IsEffectivelyVisible);
 
         using var offered = new RenderedShell("keypaste-theme-offered-", offersTheme: true);
         offered.Show<SettingsViewModel>(DestinationKind.Settings);

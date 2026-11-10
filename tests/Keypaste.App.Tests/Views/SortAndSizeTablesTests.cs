@@ -390,7 +390,7 @@ public sealed class SortAndSizeTablesTests
         shell.Frame();
         var grip = Grip(shell, TableStates.Actor);
         var edge = InWindow(grip, shell.Window);
-        var by = 60d;
+        var by = 40d;
 
         shell.Window.MouseMove(edge.Center);
         shell.Window.MouseDown(edge.Center, MouseButton.Left);

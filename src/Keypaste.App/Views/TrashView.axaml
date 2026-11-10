@@ -143,7 +143,7 @@
                          Classes="size-13" Foreground="{DynamicResource KpTextMuted}" />
             </StackPanel>
 
-            <ListBox AutomationProperties.Name="{x:Static res:Strings.DeletedItems}"
+            <ListBox Name="TrashRows" AutomationProperties.Name="{x:Static res:Strings.DeletedItems}"
                      Classes="rows two-line"
                      Padding="4,0,4,4"
                      IsVisible="{Binding !IsEmpty}"
@@ -154,14 +154,15 @@
                      SelectedItem="{Binding Selected}">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TrashRow">
-                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border Classes="row-tile">
                       <ctl:KpIcon Icon="key-round" Size="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                       <TextBlock Classes="row-title" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="mono muted size-12" Text="{Binding Where}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Summary}" />
+                      <TextBlock Classes="mono muted size-12" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Summary}" />
                     </StackPanel>
+                    <TextBlock Grid.Column="2" Classes="muted size-12" Text="{Binding When}" VerticalAlignment="Center" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -191,7 +192,7 @@
                      Text="{x:Static res:Strings.ChooseAnItemToSeeItHere}"
                      HorizontalAlignment="Center"
                      VerticalAlignment="Center"
-                     IsVisible="{Binding !HasSelection}" />
+                     IsVisible="{Binding OffersChoice}" />
 
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="32,24" Spacing="16" MaxWidth="756" HorizontalAlignment="Stretch" IsVisible="{Binding HasSelection}">

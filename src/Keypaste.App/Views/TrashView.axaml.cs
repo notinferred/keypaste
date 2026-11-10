@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 
 namespace Keypaste.App.Views;
 
@@ -27,6 +28,24 @@ internal sealed partial class TrashView : UserControl
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
+
+        this.FindControl<ListDetail>("Split")!.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ListDetail.ShowsBackProperty)
+            {
+                var split = this.FindControl<ListDetail>("Split")!;
+                Dispatcher.UIThread.Post(
+                    () =>
+                    {
+                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true })
+                        {
+                            Control? next = split.ShowsBack ? this.FindControl<Button>("BackToList") : this.FindControl<ListBox>("TrashRows");
+                            next?.Focus(NavigationMethod.Tab);
+                        }
+                    },
+                    DispatcherPriority.Loaded);
+            }
+        };
     }
 
     private ToggleButton? OpenSortMenu => this.FindControl<ToggleButton>("SortMenu") is { IsChecked: true } toggle ? toggle : null;
