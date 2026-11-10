@@ -1,6 +1,6 @@
 # F.108 — Limit keypaste.com's signups to 10 a minute per address
 
-Completed 2026-11-10 on `backlog-subscribe`, site only.
+Completed 2026-11-10 on `main` at `75de787d`, with ci 42826638069 and app 42826638096 green. Not live yet: production last deployed on 2026-11-03, as BACKLOG records.
 
 ## Amendments
 No STEPS row: it closes BACKLOG's `/subscribe` investigation candidate by the founder's decision of 2026-11-09, 10 a minute per address, matching share creation, verified on a preview before `main`.
