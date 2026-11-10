@@ -387,7 +387,7 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_lock_keeps_each_tables_order_and_widths_and_the_next_unlock_opens_with_them() => HeadlessSession.On(async () =>
+    public Task A_lock_keeps_each_tables_order_and_the_next_unlock_opens_with_it() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "tables.kdbx");
@@ -420,28 +420,16 @@ public sealed class WindowLayoutTests
 
         var shell = await Unlock(main, root, vault);
         shell.Tables.Items.Press(TableStates.Url);
-        shell.Current = Destinations.All.Single(destination => destination.Kind == DestinationKind.Trash);
-        WindowInput.Drain();
-        DrawnFrame.Capture(main);
-        var columns = main.GetVisualDescendants().OfType<TrashColumns>().First();
-        shell.Tables.Trash.Resize(TableStates.Title, 40, columns.DrawnWidths);
-        DrawnFrame.Capture(main);
-        var drawnTitle = columns.DrawnWidths[0];
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
 
         Assert.True(AppSettings.TryLoad(settingsPath, out var kept));
         Assert.Equal("items:url:asc", kept.Window!.TableSorts);
-        Assert.Contains("trash:", kept.Window.TableWidths, StringComparison.Ordinal);
 
         var reopened = await Unlock(main, root, vault);
         Assert.NotSame(shell, reopened);
         Assert.Equal(new TableOrder(TableStates.Url, false), reopened.Tables.Items.Order);
-        reopened.Current = Destinations.All.Single(destination => destination.Kind == DestinationKind.Trash);
-        WindowInput.Drain();
-        DrawnFrame.Capture(main);
-        Assert.Equal(drawnTitle, main.GetVisualDescendants().OfType<TrashColumns>().First().DrawnWidths[0], 1.5);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);

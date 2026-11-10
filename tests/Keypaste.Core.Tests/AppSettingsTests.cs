@@ -308,7 +308,7 @@ public sealed class AppSettingsTests : IDisposable
         var text = File.ReadAllText(SettingsFile);
         Assert.DoesNotContain("table_", text, StringComparison.Ordinal);
 
-        var window = new WindowLayout(1, 2, 800, 600, WindowMode.Maximized, true, 150, "items:title:desc,log:actor:asc", "items:300,100,100,88,120,104;trash:210,190,160");
+        var window = new WindowLayout(1, 2, 800, 600, WindowMode.Maximized, true, 150, "items:title:desc,trash:title:asc");
         Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window }));
 
         Assert.Equal(window, AppSettings.Load(SettingsFile).Window);
@@ -322,13 +322,12 @@ public sealed class AppSettingsTests : IDisposable
     [InlineData("")]
     public void A_tables_hand_edited_text_reads_as_its_own_way_and_costs_nothing_else(string text)
     {
-        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\ntable_sorts = \"{text}\"\ntable_widths = \"{text}\"\n");
+        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\ntable_sorts = \"{text}\"\n");
 
         var window = AppSettings.Load(SettingsFile).Window;
 
         Assert.NotNull(window);
         Assert.Null(window.TableSorts);
-        Assert.Null(window.TableWidths);
     }
 
     [Theory]
@@ -359,6 +358,20 @@ public sealed class AppSettingsTests : IDisposable
 
         Assert.True(AppSettings.Save(SettingsFile, read));
         Assert.DoesNotContain("list_share", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Table_widths_an_older_version_wrote_load_and_are_left_out_of_the_next_save()
+    {
+        File.WriteAllText(SettingsFile, "[[window]]\nbounds = \"1,2,800,600\"\ntable_sorts = \"items:url:asc\"\ntable_widths = \"trash:210,190,160\"\n");
+
+        var read = AppSettings.Load(SettingsFile);
+        Assert.Equal(new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false, TableSorts: "items:url:asc"), read.Window);
+
+        Assert.True(AppSettings.Save(SettingsFile, read));
+        var saved = File.ReadAllText(SettingsFile);
+        Assert.DoesNotContain("table_widths", saved, StringComparison.Ordinal);
+        Assert.Contains("table_sorts = \"items:url:asc\"", saved, StringComparison.Ordinal);
     }
 
     [Theory]

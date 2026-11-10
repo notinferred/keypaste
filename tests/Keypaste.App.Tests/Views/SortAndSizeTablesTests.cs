@@ -1,18 +1,10 @@
 using Avalonia;
 using Avalonia.Automation;
-using Avalonia.Automation.Peers;
-using Avalonia.Automation.Provider;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Headless;
-using Avalonia.Input;
-using Avalonia.Media;
 using Avalonia.VisualTree;
-using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
-using Keypaste.App.Views;
 using Keypaste.Core;
 using Xunit;
 
@@ -117,58 +109,21 @@ public sealed class SortAndSizeTablesTests
     }
 
     [Fact]
-    public void Resizing_moves_one_edge_and_stops_at_each_columns_least()
-    {
-        var table = TableStates.NewTrash();
-        double[] drawn = [200, 200, 160];
-
-        table.Resize(TableStates.Title, 0, drawn);
-        Assert.Null(table.Widths);
-
-        table.Resize(TableStates.Title, 30, drawn);
-        Assert.Equal([230d, 170d, 160d], table.Widths!);
-
-        table.Resize(TableStates.Title, -1000, drawn);
-        Assert.Equal([96d, 304d, 160d], table.Widths!);
-
-        table.Resize(TableStates.Title, 1000, drawn);
-        Assert.Equal([304d, 96d, 160d], table.Widths!);
-    }
-
-    [Fact]
-    public void An_edge_beside_a_dropped_column_moves_the_next_column_showing()
-    {
-        var table = TableStates.NewItems();
-        double[] drawn = [200, 0, 0, 88, 120, 104];
-
-        table.Resize(TableStates.Title, 20, drawn);
-
-        Assert.Equal(220, table.Widths![0]);
-        Assert.Equal(68, table.Widths![3]);
-        Assert.True(table.Widths![1] > 0, "the username column comes back with a width");
-    }
-
-    [Fact]
     public void Each_table_reads_back_what_it_kept_and_leaves_anything_else_as_its_own()
     {
         var states = new TableStates();
         Assert.Null(states.SortsText);
-        Assert.Null(states.WidthsText);
 
         states.Items.Press(TableStates.Url);
-        states.Trash.Resize(TableStates.Title, 10, [200, 200, 160]);
 
-        var read = TableStates.Read(states.SortsText, states.WidthsText);
+        var read = TableStates.Read(states.SortsText);
 
         Assert.Equal("items:url:asc", states.SortsText);
-        Assert.Equal("trash:210,190,160", states.WidthsText);
         Assert.Equal(states.Items.Order, read.Items.Order);
-        Assert.Equal([210d, 190d, 160d], read.Trash.Widths!);
 
-        var odd = TableStates.Read("items:password:asc,trash:title:up,nothing", "items:1,2;log:1,2,3,4,5,x");
+        var odd = TableStates.Read("items:password:asc,trash:title:up,nothing");
 
         Assert.Null(odd.Items.Order);
-        Assert.Null(odd.Items.Widths);
         Assert.Equal(TableStates.Deleted, odd.Trash.Order!.Value.Column);
     }
 
@@ -221,7 +176,6 @@ public sealed class SortAndSizeTablesTests
 
         Assert.False(tables.CanRun());
         Assert.Null(shell.Shell.Tables.SortsText);
-        Assert.Null(shell.Shell.Tables.WidthsText);
 
         entries.SortByCommand.Press(TableStates.Group);
         Assert.True(tables.CanRun());

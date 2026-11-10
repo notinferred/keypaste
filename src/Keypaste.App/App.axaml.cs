@@ -412,7 +412,7 @@ internal sealed partial class App : Application, IDisposable
 
         var tables = _shell?.Tables;
 
-        if (_window.Layout(_shell?.SidebarHidden ?? left?.SidebarHidden ?? false, tables is null ? left?.TableSorts : tables.SortsText, tables is null ? left?.TableWidths : tables.WidthsText) is { } layout
+        if (_window.Layout(_shell?.SidebarHidden ?? left?.SidebarHidden ?? false, tables is null ? left?.TableSorts : tables.SortsText) is { } layout
             && (left is not null || layout != _untouchedLayout))
         {
             _preferences.KeepWindow(layout);

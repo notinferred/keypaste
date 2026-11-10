@@ -24,8 +24,7 @@ public enum WindowMode
 /// <param name="SidebarHidden">Whether View › Hide sidebar is in force.</param>
 /// <param name="ZoomPercent">How large the interface is drawn, from <see cref="ActualSizePercent"/> to <see cref="LargestZoomPercent"/>.</param>
 /// <param name="TableSorts">The order each table the person sorted was left in, as the desktop app writes it, or null while every table keeps its own.</param>
-/// <param name="TableWidths">The widths of each table the person resized, likewise.</param>
-public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, bool SidebarHidden, int ZoomPercent = WindowLayout.ActualSizePercent, string? TableSorts = null, string? TableWidths = null)
+public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, bool SidebarHidden, int ZoomPercent = WindowLayout.ActualSizePercent, string? TableSorts = null)
 {
     /// <summary>The interface as it was designed, and the smallest it goes: a masked field stays at 14px or larger.</summary>
     public const int ActualSizePercent = 100;
@@ -50,7 +49,7 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
     internal string ZoomText => string.Create(CultureInfo.InvariantCulture, $"{ZoomPercent}%");
 
     /// <summary>Reads what the file holds; bounds that make no window read as none, and the app opens where it would with no file.</summary>
-    internal static WindowLayout? Read(string bounds, string? mode, bool sidebarHidden, string? zoom, string? tableSorts, string? tableWidths)
+    internal static WindowLayout? Read(string bounds, string? mode, bool sidebarHidden, string? zoom, string? tableSorts)
     {
         var parts = bounds.Split(',');
 
@@ -63,10 +62,10 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
             return null;
         }
 
-        return new WindowLayout(x, y, width, height, ModeOf(mode), sidebarHidden, ZoomOf(zoom), TableText(tableSorts), TableText(tableWidths));
+        return new WindowLayout(x, y, width, height, ModeOf(mode), sidebarHidden, ZoomOf(zoom), TableText(tableSorts));
     }
 
-    /// <summary>A table's order or widths names columns and sizes, so anything else is a hand edit that reads as the table's own.</summary>
+    /// <summary>A table's order names its columns, so anything else is a hand edit that reads as the table's own.</summary>
     private static string? TableText(string? text) =>
         text is { Length: > 0 and <= _longestTableText } && text.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c is ':' or ',' or ';' or '-')
             ? text

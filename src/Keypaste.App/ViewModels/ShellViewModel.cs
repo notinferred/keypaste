@@ -110,7 +110,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
         SidebarHidden = Preferences.Current.Window?.SidebarHidden ?? false;
-        Tables = TableStates.Read(Preferences.Current.Window?.TableSorts, Preferences.Current.Window?.TableWidths);
+        Tables = TableStates.Read(Preferences.Current.Window?.TableSorts);
         _clock = clock ?? TimeProvider.System;
         _post = post;
 
