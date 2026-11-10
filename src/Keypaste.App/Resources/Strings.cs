@@ -17,9 +17,7 @@ public static class Strings
     public static string ATokenLetsAScriptOrCIX41bca7 => Manager.GetString("ATokenLetsAScriptOrCIX41bca7", CultureInfo.CurrentUICulture)!;
     public static string AboutKeypaste => Manager.GetString("AboutKeypaste", CultureInfo.CurrentUICulture)!;
     public static string AboutWindowTitle => Manager.GetString("AboutWindowTitle", CultureInfo.CurrentUICulture)!;
-    public static string Action => Manager.GetString("Action", CultureInfo.CurrentUICulture)!;
     public static string Activity => Manager.GetString("Activity", CultureInfo.CurrentUICulture)!;
-    public static string Actor => Manager.GetString("Actor", CultureInfo.CurrentUICulture)!;
     public static string ActualSize => Manager.GetString("ActualSize", CultureInfo.CurrentUICulture)!;
     public static string Add => Manager.GetString("Add", CultureInfo.CurrentUICulture)!;
     public static string AddAField => Manager.GetString("AddAField", CultureInfo.CurrentUICulture)!;
@@ -71,11 +69,14 @@ public static class Strings
     public static string Browser => Manager.GetString("Browser", CultureInfo.CurrentUICulture)!;
     public static string BrowserFill => Manager.GetString("BrowserFill", CultureInfo.CurrentUICulture)!;
     public static string CanSee => Manager.GetString("CanSee", CultureInfo.CurrentUICulture)!;
+    public static string CanSeeUsernames => Manager.GetString("CanSeeUsernames", CultureInfo.CurrentUICulture)!;
+    public static string CanSeeUsernamesOnRequest => Manager.GetString("CanSeeUsernamesOnRequest", CultureInfo.CurrentUICulture)!;
     public static string Cancel => Manager.GetString("Cancel", CultureInfo.CurrentUICulture)!;
     public static string CantRead => Manager.GetString("CantRead", CultureInfo.CurrentUICulture)!;
     public static string Change => Manager.GetString("Change", CultureInfo.CurrentUICulture)!;
     public static string ChangeAccess => Manager.GetString("ChangeAccess", CultureInfo.CurrentUICulture)!;
     public static string ChangeEllipsis => Manager.GetString("ChangeEllipsis", CultureInfo.CurrentUICulture)!;
+    public static string ChangeUsernamesUnderEveryOtherAgent => Manager.GetString("ChangeUsernamesUnderEveryOtherAgent", CultureInfo.CurrentUICulture)!;
     public static string ChangeWhatUnlocksThisVault => Manager.GetString("ChangeWhatUnlocksThisVault", CultureInfo.CurrentUICulture)!;
     public static string ChangesFromAnotherDevice => Manager.GetString("ChangesFromAnotherDevice", CultureInfo.CurrentUICulture)!;
     public static string Changing => Manager.GetString("Changing", CultureInfo.CurrentUICulture)!;
@@ -203,6 +204,8 @@ public static class Strings
     public static string EnvKeypaste => Manager.GetString("EnvKeypaste", CultureInfo.CurrentUICulture)!;
     public static string EnvironmentName => Manager.GetString("EnvironmentName", CultureInfo.CurrentUICulture)!;
     public static string Environments => Manager.GetString("Environments", CultureInfo.CurrentUICulture)!;
+    public static string EveryAIToolFoundIsConnected => Manager.GetString("EveryAIToolFoundIsConnected", CultureInfo.CurrentUICulture)!;
+    public static string EveryAgentOnThisComputer => Manager.GetString("EveryAgentOnThisComputer", CultureInfo.CurrentUICulture)!;
     public static string EverythingRunInThatTerminalCanReadX8c42c2 => Manager.GetString("EverythingRunInThatTerminalCanReadX8c42c2", CultureInfo.CurrentUICulture)!;
     public static string ExampleItemPath => Manager.GetString("ExampleItemPath", CultureInfo.CurrentUICulture)!;
     public static string ExampleProjectDirectory => Manager.GetString("ExampleProjectDirectory", CultureInfo.CurrentUICulture)!;
@@ -471,7 +474,6 @@ public static class Strings
     public static string RestoreValue => Manager.GetString("RestoreValue", CultureInfo.CurrentUICulture)!;
     public static string RestoreWindowSize => Manager.GetString("RestoreWindowSize", CultureInfo.CurrentUICulture)!;
     public static string RestoringMakesTheseTheItemsValuesAndX0e783d => Manager.GetString("RestoringMakesTheseTheItemsValuesAndX0e783d", CultureInfo.CurrentUICulture)!;
-    public static string Result => Manager.GetString("Result", CultureInfo.CurrentUICulture)!;
     public static string Reveal => Manager.GetString("Reveal", CultureInfo.CurrentUICulture)!;
     public static string RevealForSeconds => Manager.GetString("RevealForSeconds", CultureInfo.CurrentUICulture)!;
     public static string ReviewAgain => Manager.GetString("ReviewAgain", CultureInfo.CurrentUICulture)!;
@@ -504,7 +506,6 @@ public static class Strings
     public static string Search => Manager.GetString("Search", CultureInfo.CurrentUICulture)!;
     public static string SearchAllItems => Manager.GetString("SearchAllItems", CultureInfo.CurrentUICulture)!;
     public static string SecondsUntilTheNextCode => Manager.GetString("SecondsUntilTheNextCode", CultureInfo.CurrentUICulture)!;
-    public static string Secrets => Manager.GetString("Secrets", CultureInfo.CurrentUICulture)!;
     public static string Security => Manager.GetString("Security", CultureInfo.CurrentUICulture)!;
     public static string SelectAll => Manager.GetString("SelectAll", CultureInfo.CurrentUICulture)!;
     public static string SelectValue => Manager.GetString("SelectValue", CultureInfo.CurrentUICulture)!;
@@ -581,7 +582,6 @@ public static class Strings
     public static string ThisVault => Manager.GetString("ThisVault", CultureInfo.CurrentUICulture)!;
     public static string ThisVaultIsNowSavedInFormat41 => Manager.GetString("ThisVaultIsNowSavedInFormat41", CultureInfo.CurrentUICulture)!;
     public static string ThroughAnAgentOrATokenAXbc5a7a => Manager.GetString("ThroughAnAgentOrATokenAXbc5a7a", CultureInfo.CurrentUICulture)!;
-    public static string Time => Manager.GetString("Time", CultureInfo.CurrentUICulture)!;
     public static string TimeDaysAgoShort => Manager.GetString("TimeDaysAgoShort", CultureInfo.CurrentUICulture)!;
     public static string TimeHoursAgoShort => Manager.GetString("TimeHoursAgoShort", CultureInfo.CurrentUICulture)!;
     public static string TimeInUse => Manager.GetString("TimeInUse", CultureInfo.CurrentUICulture)!;
@@ -622,11 +622,9 @@ public static class Strings
     public static string WaitingForYou => Manager.GetString("WaitingForYou", CultureInfo.CurrentUICulture)!;
     public static string What => Manager.GetString("What", CultureInfo.CurrentUICulture)!;
     public static string WhatFailedAndWhereInKeypastesCodeX12c043 => Manager.GetString("WhatFailedAndWhereInKeypastesCodeX12c043", CultureInfo.CurrentUICulture)!;
-    public static string WhatItGets => Manager.GetString("WhatItGets", CultureInfo.CurrentUICulture)!;
     public static string WhatTheEverydayScreensLeaveOutEachX739fe5 => Manager.GetString("WhatTheEverydayScreensLeaveOutEachX739fe5", CultureInfo.CurrentUICulture)!;
     public static string WhatYouTypedHasNotBeenSaved => Manager.GetString("WhatYouTypedHasNotBeenSaved", CultureInfo.CurrentUICulture)!;
     public static string WhenItAsks => Manager.GetString("WhenItAsks", CultureInfo.CurrentUICulture)!;
-    public static string Where => Manager.GetString("Where", CultureInfo.CurrentUICulture)!;
     public static string WhereEachItemLands => Manager.GetString("WhereEachItemLands", CultureInfo.CurrentUICulture)!;
     public static string WhereValueGoes => Manager.GetString("WhereValueGoes", CultureInfo.CurrentUICulture)!;
     public static string WindowMenu => Manager.GetString("WindowMenu", CultureInfo.CurrentUICulture)!;

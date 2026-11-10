@@ -14,7 +14,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -208,22 +207,19 @@ public sealed class SortAndSizeTablesTests
         Assert.Null(states.WidthsText);
 
         states.Items.Press(TableStates.Url);
-        states.Log.Press(TableStates.Time);
         states.Trash.Resize(TableStates.Title, 10, [200, 200, 160]);
 
         var read = TableStates.Read(states.SortsText, states.WidthsText);
 
-        Assert.Equal("items:url:asc,log:time:asc", states.SortsText);
+        Assert.Equal("items:url:asc", states.SortsText);
         Assert.Equal("trash:210,190,160", states.WidthsText);
         Assert.Equal(states.Items.Order, read.Items.Order);
-        Assert.Equal(states.Log.Order, read.Log.Order);
         Assert.Equal([210d, 190d, 160d], read.Trash.Widths!);
 
         var odd = TableStates.Read("items:password:asc,trash:title:up,nothing", "items:1,2;log:1,2,3,4,5,x");
 
         Assert.Null(odd.Items.Order);
         Assert.Null(odd.Items.Widths);
-        Assert.Null(odd.Log.Widths);
         Assert.Equal(TableStates.Deleted, odd.Trash.Order!.Value.Column);
     }
 
@@ -537,70 +533,18 @@ public sealed class SortAndSizeTablesTests
     });
 
     [Fact]
-    public void Sorting_the_log_changes_only_its_rows_and_never_the_chain_or_its_verdict()
-    {
-        using var home = new TempAuditHome();
-        home.Append("env/dev/ZETA", "env/dev/ALPHA", "env/dev/MID");
-        var path = KeypasteHome.AuditPath(home.Home);
-        var before = File.ReadAllBytes(path);
-
-        using var screen = new LogViewModel(home.Home);
-        var verdict = screen.Verdict;
-        var summary = screen.Summary;
-        var newestFirst = screen.Rows.Select(row => row.Source.Line).ToList();
-
-        Assert.Equal(TableStates.Time, screen.Table.Order!.Value.Column);
-        Assert.True(screen.Table.Order.Value.Descending);
-        Assert.Equal(newestFirst.OrderDescending(), newestFirst);
-
-        screen.Table.Press(TableStates.Time);
-        Assert.Equal(newestFirst.Order(), screen.Rows.Select(row => row.Source.Line));
-
-        screen.Table.Press(TableStates.Secrets);
-        var secrets = screen.Rows.Select(row => row.Secrets).ToList();
-        Assert.Equal(secrets.OrderBy(name => name, StringComparer.OrdinalIgnoreCase), secrets);
-
-        Assert.Same(verdict, screen.Verdict);
-        Assert.Equal(summary, screen.Summary);
-        Assert.Equal(before, File.ReadAllBytes(path));
-
-        home.Append("env/dev/BETA");
-        screen.Refresh();
-        secrets = [.. screen.Rows.Select(row => row.Secrets)];
-        Assert.Equal(4, secrets.Count);
-        Assert.Equal(secrets.OrderBy(name => name, StringComparer.OrdinalIgnoreCase), secrets);
-        Assert.True(screen.Verdict!.IsOk);
-    }
-
-    [Fact]
-    public void A_log_whose_clock_stepped_back_keeps_the_files_order_until_the_time_head_is_pressed()
+    public void A_log_whose_clock_stepped_back_keeps_the_files_order_newest_first()
     {
         using var home = new TempAuditHome();
         home.AppendAt(AppClock.Start, "env/dev/FIRST");
         home.AppendAt(AppClock.Start.AddMinutes(60), "env/dev/SECOND");
         home.AppendAt(AppClock.Start.AddMinutes(-60), "env/dev/THIRD");
 
-        using var screen = new LogViewModel(home.Home);
-        List<string> Secrets() => [.. screen.Rows.Select(row => row.Secrets)];
-        var written = Secrets();
+        var screen = new LogViewModel(home.Home);
+        var written = screen.Rows.Select(row => row.Secrets).ToList();
+
         Assert.Equal(3, written.Count);
         Assert.Contains("THIRD", written[0], StringComparison.Ordinal);
         Assert.Contains("FIRST", written[2], StringComparison.Ordinal);
-
-        var head = TableStates.Time;
-        screen.Table.Press(head);
-        Assert.Contains("THIRD", Secrets()[0], StringComparison.Ordinal);
-        Assert.Contains("SECOND", Secrets()[2], StringComparison.Ordinal);
-        Assert.False(screen.Table.IsOwnWay);
-
-        screen.Table.Press(head);
-        Assert.Equal("Time, sorted newest first", screen.Table.HeadName(head));
-        Assert.Contains("SECOND", Secrets()[0], StringComparison.Ordinal);
-        Assert.Contains("THIRD", Secrets()[2], StringComparison.Ordinal);
-        Assert.False(screen.Table.IsOwnWay);
-
-        screen.Table.Reset();
-        Assert.Equal(written, Secrets());
-        Assert.Equal("Time, sorted newest first", screen.Table.HeadName(head));
     }
 }

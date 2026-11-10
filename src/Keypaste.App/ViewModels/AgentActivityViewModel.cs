@@ -150,6 +150,13 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     /// <summary>Shows one agent's detail, as pressing its row does.</summary>
     internal void Choose(AgentRow row) => Selected = row;
 
+    /// <summary>Pressing a row opens its detail over the list, also when it is the row already chosen.</summary>
+    internal void Open(AgentRow row)
+    {
+        Selected = row;
+        IsOpened = true;
+    }
+
     /// <summary>Leaves the detail for the list, where a width holds only one of them.</summary>
     [RelayCommand]
     private void CloseDetail()
@@ -216,7 +223,11 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         if (_rows.FirstOrDefault(row => row.OffersConnect) is { } tool)
         {
-            Selected = tool;
+            Open(tool);
+        }
+        else
+        {
+            _toast(IsLooking ? Resources.Strings.LookingForAIToolsOnThisComputer : HasNoTools ? NoTools : Resources.Strings.EveryAIToolFoundIsConnected, ToastTone.Information);
         }
     }
 

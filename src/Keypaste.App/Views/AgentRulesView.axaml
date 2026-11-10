@@ -31,7 +31,8 @@
     </Border>
 
     <StackPanel Spacing="6" IsVisible="{Binding !HasProblem}">
-      <TextBlock Classes="label" Text="{x:Static res:Strings.WhenItAsks}" ToolTip.Tip="{x:Static res:Strings.EachKindOfValueIsAskedAllowedOrBlocked}" />
+      <TextBlock Classes="label" Text="{x:Static res:Strings.EveryAgentOnThisComputer}" />
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachKindOfValueIsAskedAllowedOrBlocked}" />
       <Border Classes="group">
         <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>

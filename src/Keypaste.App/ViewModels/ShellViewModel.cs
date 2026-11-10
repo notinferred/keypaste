@@ -249,7 +249,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         EntriesViewModel => Tables.Items,
         TrashViewModel => Tables.Trash,
-        LogViewModel => Tables.Log,
         _ => null,
     };
 
@@ -956,7 +955,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log, openAgents: OpenAgents),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, openAgents: OpenAgents),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),

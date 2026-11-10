@@ -10,9 +10,7 @@
   <data name="ARowsEyeButtonShowsItsValueXc068c4" xml:space="preserve"><value>A row's eye button shows its value for 30 seconds. Click another environment's cell or header to work in that environment.</value></data>
   <data name="ATokenLetsAScriptOrCIX41bca7" xml:space="preserve"><value>A token lets a script or CI job run with a scoped set, without you or the vault's password. It only feeds keypaste run and never prints a value.</value></data>
   <data name="AboutKeypaste" xml:space="preserve"><value>About keypaste…</value></data>
-  <data name="Action" xml:space="preserve"><value>Action</value></data>
   <data name="Activity" xml:space="preserve"><value>Activity</value></data>
-  <data name="Actor" xml:space="preserve"><value>Actor</value></data>
   <data name="ActualSize" xml:space="preserve"><value>Actual size</value></data>
   <data name="Add" xml:space="preserve"><value>Add</value></data>
   <data name="AddAField" xml:space="preserve"><value>Add a field</value></data>
@@ -371,7 +369,6 @@
   <data name="RestoreThisBackup" xml:space="preserve"><value>Restore this backup</value></data>
   <data name="RestoreValue" xml:space="preserve"><value>Restore {0}</value></data>
   <data name="RestoringMakesTheseTheItemsValuesAndX0e783d" xml:space="preserve"><value>Restoring makes these the item's values and drops any attachments, custom fields and custom data added since. The ones it replaces are kept here.</value></data>
-  <data name="Result" xml:space="preserve"><value>Result</value></data>
   <data name="Reveal" xml:space="preserve"><value>Reveal</value></data>
   <data name="RevealForSeconds" xml:space="preserve"><value>Reveal for {0:0} seconds</value></data>
   <data name="ReviewAgain" xml:space="preserve"><value>Review again</value></data>
@@ -394,7 +391,6 @@
   <data name="Search" xml:space="preserve"><value>Search</value></data>
   <data name="SearchAllItems" xml:space="preserve"><value>Search all items</value></data>
   <data name="SecondsUntilTheNextCode" xml:space="preserve"><value>Seconds until the next code</value></data>
-  <data name="Secrets" xml:space="preserve"><value>Secrets</value></data>
   <data name="Security" xml:space="preserve"><value>Security</value></data>
   <data name="SelectAll" xml:space="preserve"><value>Select all</value></data>
   <data name="SelectValue" xml:space="preserve"><value>Select {0}</value></data>
@@ -449,7 +445,6 @@
   <data name="Theme" xml:space="preserve"><value>Theme</value></data>
   <data name="Then" xml:space="preserve"><value>Then</value></data>
   <data name="ThroughAnAgentOrATokenAXbc5a7a" xml:space="preserve"><value>Through an agent or a token, a prod environment is asked about live every time, whatever is always allowed.</value></data>
-  <data name="Time" xml:space="preserve"><value>Time</value></data>
   <data name="TimeDaysAgoShort" xml:space="preserve"><value>{0}d ago</value></data>
   <data name="TimeHoursAgoShort" xml:space="preserve"><value>{0}h ago</value></data>
   <data name="TimeInUse" xml:space="preserve"><value>in use</value></data>
@@ -488,7 +483,6 @@
   <data name="WhatFailedAndWhereInKeypastesCodeX12c043" xml:space="preserve"><value>What failed and where in keypaste's code. Never anything from your vault, a path or who you are. Turning it off deletes the reports waiting to be sent, which Diagnostics lists.</value></data>
   <data name="WhatTheEverydayScreensLeaveOutEachX739fe5" xml:space="preserve"><value>What the everyday screens leave out, each on a screen of its own.</value></data>
   <data name="WhatYouTypedHasNotBeenSaved" xml:space="preserve"><value>What you typed has not been saved.</value></data>
-  <data name="Where" xml:space="preserve"><value>Where</value></data>
   <data name="WhereEachItemLands" xml:space="preserve"><value>Where each item lands</value></data>
   <data name="WhereValueGoes" xml:space="preserve"><value>Where {0} goes</value></data>
   <data name="Words" xml:space="preserve"><value>Words</value></data>
@@ -588,7 +582,6 @@
   <data name="AgentsSeeUsernames" xml:space="preserve"><value>Agents see usernames</value></data>
   <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
   <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
-  <data name="WhatItGets" xml:space="preserve"><value>What it gets</value></data>
   <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
   <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
   <data name="TheValueToSave" xml:space="preserve"><value>The value to save</value></data>
@@ -614,6 +607,11 @@
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
   <data name="Usernames" xml:space="preserve"><value>Usernames</value></data>
   <data name="Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="EveryAIToolFoundIsConnected" xml:space="preserve"><value>Every AI tool found on this computer is already connected.</value></data>
+  <data name="EveryAgentOnThisComputer" xml:space="preserve"><value>Every agent on this computer</value></data>
+  <data name="CanSeeUsernames" xml:space="preserve"><value>Titles, groups, tags, URLs and usernames.</value></data>
+  <data name="CanSeeUsernamesOnRequest" xml:space="preserve"><value>Titles, groups, tags and URLs. Usernames only when it asks.</value></data>
+  <data name="ChangeUsernamesUnderEveryOtherAgent" xml:space="preserve"><value>Change this under Every other agent.</value></data>
   <data name="CanSee" xml:space="preserve"><value>Can see</value></data>
   <data name="WhenItAsks" xml:space="preserve"><value>When it asks</value></data>
   <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>

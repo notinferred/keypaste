@@ -23,7 +23,8 @@
 
     <Grid Grid.Row="1" RowDefinitions="Auto,*">
 
-      <StackPanel Grid.Row="0" Spacing="12" Margin="24,16,24,0">
+      <ScrollViewer Grid.Row="0" MaxHeight="180" Margin="24,16,24,0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="12">
         <Border IsVisible="{Binding HasAuditRefusal}" CornerRadius="{DynamicResource KpRadiusCard}" Background="{DynamicResource KpDangerTint}" Padding="12,8">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
             <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
@@ -72,6 +73,7 @@
           </Border>
         </StackPanel>
       </StackPanel>
+      </ScrollViewer>
 
       <ctl:ListDetail x:Name="Split" Grid.Row="1" Margin="0,16,0,0" ShowsDetail="{Binding ShowsDetail}">
 
@@ -106,7 +108,8 @@
               </StackPanel>
             </Button>
 
-            <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="12,8">
+            <ScrollViewer DockPanel.Dock="Bottom" MaxHeight="140" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="6" Margin="12,8">
               <TextBlock Name="NoAgentsYet" Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasNoConnectedAgents}" Text="{x:Static res:Strings.NoAgentIsConnectedYet}" />
               <TextBlock Name="ConnectAdvice" Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.Words="keypaste mcp setup"
                          IsVisible="{Binding HasUnnamedAgentsNote}"
@@ -117,6 +120,7 @@
               </StackPanel>
               <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
             </StackPanel>
+            </ScrollViewer>
 
             <ListBox Name="AgentRows"
                      AutomationProperties.Name="{x:Static res:Strings.Agents}"
@@ -213,7 +217,13 @@
                       </StackPanel>
                     </ctl:FieldRow>
                     <ctl:FieldRow Label="{x:Static res:Strings.CanSee}" Classes="top-label" IsVisible="{Binding HasSettings}">
-                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL}" />
+                      <StackPanel Spacing="2">
+                        <TextBlock Name="CanSeeUsernames" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeUsernames}"
+                                   IsVisible="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
+                        <TextBlock Name="CanSeeUsernamesOnRequest" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeUsernamesOnRequest}"
+                                   IsVisible="{Binding !$parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
+                        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ChangeUsernamesUnderEveryOtherAgent}" IsVisible="{Binding !IsEveryOther}" />
+                      </StackPanel>
                     </ctl:FieldRow>
                   </ctl:GroupedRows>
                 </Border>

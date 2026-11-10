@@ -65,7 +65,7 @@
     </Border>
 
     <StackPanel Spacing="6">
-      <TextBlock Classes="label" Text="{x:Static res:Strings.WhenItAsks}" ToolTip.Tip="{x:Static res:Strings.WhatItGets}" />
+      <TextBlock Classes="label" Text="{x:Static res:Strings.WhenItAsks}" />
       <Border Classes="group">
         <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>

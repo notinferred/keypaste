@@ -215,12 +215,6 @@ internal sealed class TableStates
     internal const string LastUsed = "last-used";
     internal const string DeletedFrom = "deleted-from";
     internal const string Deleted = "deleted";
-    internal const string Time = "time";
-    internal const string Actor = "actor";
-    internal const string Action = "action";
-    internal const string Secrets = "secrets";
-    internal const string Where = "where";
-    internal const string Result = "result";
 
     internal static readonly IReadOnlyList<TableColumn> ItemColumns =
     [
@@ -238,35 +232,20 @@ internal sealed class TableStates
         new(Deleted, () => Strings.Deleted, 160, IsShare: false, Least: 124, IsTime: true),
     ];
 
-    internal static readonly IReadOnlyList<TableColumn> LogColumns =
-    [
-        new(Time, () => Strings.Time, 84, IsShare: false, Least: 84, IsTime: true),
-        new(Actor, () => Strings.Actor, 110, IsShare: false, Least: 56),
-        new(Action, () => Strings.Action, 100, IsShare: false, Least: 56),
-        new(Secrets, () => Strings.Secrets, 1.6, IsShare: true, Least: 64),
-        new(Where, () => Strings.Where, 1, IsShare: true, Least: 56),
-        new(Result, () => Strings.Result, 100, IsShare: false, Least: 64),
-    ];
-
     internal TableState Items { get; } = NewItems();
 
     internal TableState Trash { get; } = NewTrash();
-
-    internal TableState Log { get; } = NewLog();
 
     internal string? SortsText => Joined(',', All.Select(table => table.SortText));
 
     internal string? WidthsText => Joined(';', All.Select(table => table.WidthsText));
 
-    private IEnumerable<TableState> All => [Items, Trash, Log];
+    private IEnumerable<TableState> All => [Items, Trash];
 
     /// <summary>Items run in the vault's order until a head is pressed.</summary>
     internal static TableState NewItems() => new("items", ItemColumns, null);
 
     internal static TableState NewTrash() => new("trash", TrashColumns, new TableOrder(Deleted, Descending: true));
-
-    /// <summary>The log runs in the file's order until a head is pressed, since only the chain vouches for it and a record's clock can be wrong.</summary>
-    internal static TableState NewLog() => new("log", LogColumns, new TableOrder(Time, Descending: true, AsRowsArrive: true));
 
     /// <summary>Reads what <c>app.toml</c> kept; what does not read leaves its table as it is.</summary>
     internal static TableStates Read(string? sorts, string? widths)
