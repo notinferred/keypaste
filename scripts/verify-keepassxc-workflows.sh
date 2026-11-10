@@ -683,9 +683,10 @@ kpxc_pairing() (
   kpxc_flags=()
   if [ "$(uname -s)" = Linux ]; then
     ini="$home/config/keepassxc/keepassxc.ini"
-    export XDG_CONFIG_HOME="$home/config" XDG_CACHE_HOME="$home/cache" XDG_RUNTIME_DIR="$home/run"
-    mkdir -p "$home/run"
-    chmod 700 "$home/run"
+    # Its socket lives under XDG_RUNTIME_DIR, and a path under the checkout overruns a Unix socket's 107 bytes: no server listens and keepassxc-proxy drops every message.
+    runtime=$(mktemp -d /tmp/kpxc.XXXXXX)
+    trap 'rm -rf "$runtime"' EXIT
+    export XDG_CONFIG_HOME="$home/config" XDG_CACHE_HOME="$home/cache" XDG_RUNTIME_DIR="$runtime"
   else
     ini="$home/keepassxc.ini"
     kpxc_flags=(--config "$(native "$ini")" --localconfig "$(native "$home/keepassxc_local.ini")")
@@ -695,29 +696,37 @@ kpxc_pairing() (
   mkdir -p "$(dirname "$ini")"
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n\n[Browser]\nEnabled=true\nUpdateBinaryPath=false\n' >"$ini"
 
-  printf '%s\n' "$cur_pw" | "$gui" ${kpxc_flags[@]+"${kpxc_flags[@]}"} --pw-stdin "$(native "$vault")" >"$answers.gui" 2>&1 &
-  gui_pid=$!
-  answered= exited=
-  for _ in $(seq 1 15); do
-    kill -0 "$gui_pid" 2>/dev/null || { exited=yes; break; }
-    if "$fake" "$(native "$proxy")" chrome --id-key "$kpxc_key" --within 8 get-databasehash test-associate=kp81d-keepassxc >"$answers" 2>&1 \
-      && sed -n 3p "$answers" | jq -e '.success == "true" and .id == "kp81d-keepassxc"' >/dev/null 2>&1; then
-      answered=yes
-      "$fake" "$(native "$proxy")" chrome --id-key "$other_key" --within 8 test-associate=kp81d-keepassxc >"$answers.refused" 2>&1 || true
-      break
-    fi
-    sleep 2
-  done
+  # 2.7.6 with browser integration on segfaults in some starts, showing its window before it reads any message (F.98), so only that exit starts it again.
+  for attempt in 1 2 3 4 5; do
+    printf '%s\n' "$cur_pw" | "$gui" ${kpxc_flags[@]+"${kpxc_flags[@]}"} --pw-stdin "$(native "$vault")" >"$answers.gui" 2>&1 &
+    gui_pid=$!
+    answered= exited=
+    for _ in $(seq 1 15); do
+      kill -0 "$gui_pid" 2>/dev/null || { exited=yes; break; }
+      # The database may finish opening between the hash and the pairing check, so a good pairing without a hash is asked again.
+      if "$fake" "$(native "$proxy")" chrome --id-key "$kpxc_key" --within 8 get-databasehash test-associate=kp81d-keepassxc >"$answers" 2>&1 \
+        && sed -n 2p "$answers" | jq -e '.hash' >/dev/null 2>&1 \
+        && sed -n 3p "$answers" | jq -e '.success == "true" and .id == "kp81d-keepassxc"' >/dev/null 2>&1; then
+        answered=yes
+        "$fake" "$(native "$proxy")" chrome --id-key "$other_key" --within 8 test-associate=kp81d-keepassxc >"$answers.refused" 2>&1 || true
+        break
+      fi
+      sleep 2
+    done
 
-  if [ -r "/proc/$gui_pid/winpid" ]; then
-    taskkill //F //T //PID "$(cat "/proc/$gui_pid/winpid")" >/dev/null 2>&1 || true
-  else
-    kill -TERM "$gui_pid" 2>/dev/null || true
-  fi
-  for _ in $(seq 1 60); do kill -0 "$gui_pid" 2>/dev/null || break; sleep 0.5; done
-  kill -9 "$gui_pid" 2>/dev/null || true
-  rc=0
-  wait "$gui_pid" 2>/dev/null || rc=$?
+    if [ -r "/proc/$gui_pid/winpid" ]; then
+      taskkill //F //T //PID "$(cat "/proc/$gui_pid/winpid")" >/dev/null 2>&1 || true
+    else
+      kill -TERM "$gui_pid" 2>/dev/null || true
+    fi
+    for _ in $(seq 1 60); do kill -0 "$gui_pid" 2>/dev/null || break; sleep 0.5; done
+    kill -9 "$gui_pid" 2>/dev/null || true
+    rc=0
+    wait "$gui_pid" 2>/dev/null || rc=$?
+
+    [ -n "$exited" ] && [ "$rc" -eq 139 ] || break
+    echo "    KeePassXC segfaulted starting on the $name vault, attempt $attempt" >&2
+  done
 
   if [ -n "$exited" ]; then echo "KeePassXC exited with $rc before answering: $(cat "$answers.gui")"; exit 1; fi
   if [ -z "$answered" ]; then echo "KeePassXC did not answer the pairing: $(cat "$answers" 2>/dev/null) KeePassXC said: $(cat "$answers.gui")"; exit 1; fi
@@ -732,7 +741,7 @@ case "$(uname -s)" in
   Darwin) proxy="$(dirname "$gui")/keepassxc-proxy" ;;
   *)
     proxy=$(command -v keepassxc-proxy || true)
-    [ -n "${DISPLAY:-}" ] || die "no X display: KeePassXC's browser server is checked on a real one (Xvfb on a runner), as KeePassXC 2.7.6 segfaulted with it under Qt's offscreen platform"
+    [ -n "${DISPLAY:-}" ] || die "no X display: KeePassXC's browser server is checked on a real one (Xvfb on a runner)"
     ;;
 esac
 [ -n "$proxy" ] && [ -x "$proxy" ] || die "keepassxc-proxy was not found beside KeePassXC; this gate must never be skipped"
