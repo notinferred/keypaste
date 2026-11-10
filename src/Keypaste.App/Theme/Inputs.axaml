@@ -115,8 +115,8 @@
     <Setter Property="Opacity" Value="0.5" />
   </Style>
 
-  <!-- A horizontal slider whose track and thumb sit inside the 32px the control keeps, with no validation adorner, whose clip cut the track by the 1px it overshoots. -->
-  <Style Selector="Slider">
+  <!-- A horizontal slider whose track and thumb sit inside the 32px the control keeps, with no validation adorner, whose clip cut the track by the 1px it overshoots; :horizontal matches Fluent's own template selector, which a plain Slider selector does not outrank. -->
+  <Style Selector="Slider:horizontal">
     <Setter Property="MinHeight" Value="32" />
     <Setter Property="Template">
       <ControlTemplate>
