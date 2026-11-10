@@ -28,7 +28,7 @@ public sealed class DrawnRecommendationsTests
 
         shell.Show<RecommendationsViewModel>(DestinationKind.Recommendations);
         var key = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.Name == "RecommendationKey" && block.Text == "STRIPE_SECRET_KEY");
-        var where = shell.Named<Border>("NoteKeysCard").GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "in the notes of services/Stripe");
+        var where = shell.Named<StackPanel>("NoteKeysCard").GetVisualDescendants().OfType<TextBlock>().First(block => block.Text == "in the notes of services/Stripe");
         var frame = shell.Frame();
         var mono = TextStyle.Of(key);
         var sans = TextStyle.Of(where);

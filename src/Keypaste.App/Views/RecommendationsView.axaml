@@ -7,28 +7,25 @@
              x:DataType="vm:RecommendationsViewModel">
 
   <UserControl.Styles>
-    <!-- Settings' card: rows split by hairlines. -->
-    <Style Selector="Border.settings">
-      <Setter Property="Padding" Value="0" />
+    <!-- A recommendation is a FieldRow whose content spans the row: the issue, then its actions. -->
+    <Style Selector="ctl|FieldRow.wide /template/ TextBlock#Label">
+      <Setter Property="IsVisible" Value="False" />
     </Style>
-    <Style Selector="Border.settings-head">
-      <Setter Property="Padding" Value="20,16,20,12" />
+    <Style Selector="ctl|FieldRow.wide /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
     </Style>
-    <Style Selector="Border.settings-row">
-      <Setter Property="Padding" Value="20,12" />
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Style Selector=":is(Control).kind-head">
+      <Setter Property="Margin" Value="4,0" />
     </Style>
   </UserControl.Styles>
 
   <!-- Keys left in notes, named by entry and key, never by value (C.2); project tags another app dropped (V.11); weak,
-       reused or expired passwords, named by item and problem, never by value (V.9). No amber here. -->
+       reused or expired passwords, named by item and problem, never by value (V.9). One list of grouped rows by kind; each issue carries its action and Dismiss. No amber here. -->
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,24" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
-      <StackPanel Spacing="6">
-        <TextBlock Classes="h1" Text="{x:Static res:Strings.Recommendations}" />
-        <TextBlock Classes="subtitle" TextWrapping="Wrap" Text="{x:Static res:Strings.KeysLeftInNotesPasswordsThatAreXc4a5b0}" />
-      </StackPanel>
+    <StackPanel Margin="32,12,32,24" Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+      <TextBlock Classes="h1" Text="{x:Static res:Strings.Recommendations}"
+                 ToolTip.Tip="{x:Static res:Strings.KeysLeftInNotesPasswordsThatAreXc4a5b0}" />
 
       <TextBlock Name="RecommendationsEmpty" Classes="caption" IsVisible="{Binding IsEmpty}" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
 
@@ -73,26 +70,24 @@
                  ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                  Foreground="{DynamicResource KpTextSecondary}" />
 
-      <Border Name="NoteKeysCard" Classes="card filled settings" IsVisible="{Binding HasNoteKeys}">
-        <StackPanel>
-          <Border Classes="settings-head">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-              <StackPanel Spacing="4">
-                <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.KeysLeftInNotes}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
-              </StackPanel>
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-                <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="{x:Static res:Strings.SelectAll}" Command="{Binding SelectAllCommand}" />
-                <Button Name="MoveSelected" Classes="sm" Content="{x:Static res:Strings.MoveSelected}" Command="{Binding MoveSelectedCommand}" />
-              </StackPanel>
-            </Grid>
-          </Border>
+      <StackPanel Name="NoteKeysCard" Spacing="6" IsVisible="{Binding HasNoteKeys}">
+        <Grid ColumnDefinitions="*,Auto" Classes="kind-head">
+          <TextBlock Classes="label" VerticalAlignment="Center" Text="{x:Static res:Strings.KeysLeftInNotes}"
+                     ToolTip.Tip="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="{x:Static res:Strings.SelectAll}" Command="{Binding SelectAllCommand}" />
+            <Button Name="MoveSelected" Classes="sm" Content="{x:Static res:Strings.MoveSelected}" Command="{Binding MoveSelectedCommand}" />
+          </StackPanel>
+        </Grid>
+        <Border Classes="group">
           <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RecommendationRow">
-                <Border Classes="settings-row" Background="Transparent">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12"
-                        AutomationProperties.Name="{Binding Description}">
+                <ctl:FieldRow Classes="wide" AutomationProperties.Name="{Binding Description}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <CheckBox Grid.Column="0"
                               IsChecked="{Binding IsSelected}"
                               IsEnabled="{Binding NeedsReview}"
@@ -124,23 +119,24 @@
                       <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                     </StackPanel>
                   </Grid>
-                </Border>
+                </ctl:FieldRow>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </StackPanel>
-      </Border>
+        </Border>
+      </StackPanel>
 
       <!-- V.11: a tag goes back only after the person has seen the environment and fields it reaches. -->
-      <Border Name="LostTagsCard" Classes="card filled settings" IsVisible="{Binding HasLostTags}">
-        <StackPanel>
-          <Border Classes="settings-head">
-            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.ProjectTagsDropped}" />
-          </Border>
+      <StackPanel Name="LostTagsCard" Spacing="6" IsVisible="{Binding HasLostTags}">
+        <TextBlock Classes="label kind-head" Text="{x:Static res:Strings.ProjectTagsDropped}" />
+        <Border Classes="group">
           <ItemsControl Name="LostTagRows" ItemsSource="{Binding LostTags}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LostTagRow">
-                <Border Classes="settings-row" Background="Transparent">
+                <ctl:FieldRow Classes="wide">
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
                           AutomationProperties.Name="{Binding Description}">
@@ -179,34 +175,33 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
-                </Border>
+                </ctl:FieldRow>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </StackPanel>
-      </Border>
+        </Border>
+      </StackPanel>
 
-      <!-- V.9: each problem says its reason once, as its card's heading; a row names the item and what is its own. -->
+      <!-- V.9: each problem says its reason once, in a tooltip on its heading; a row names the item and what is its own. -->
       <ItemsControl Name="PasswordGroups" ItemsSource="{Binding PasswordGroups}" IsVisible="{Binding HasPasswords}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <StackPanel Spacing="20" />
+            <StackPanel Spacing="12" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PasswordGroup">
-            <Border Classes="card filled settings">
-              <StackPanel>
-                <Border Classes="settings-head">
-                  <StackPanel Spacing="4">
-                    <TextBlock Name="PasswordProblem" Classes="dialog-title" Text="{Binding Heading}" />
-                    <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Reason}" />
-                  </StackPanel>
-                </Border>
+            <StackPanel Spacing="6">
+              <TextBlock Name="PasswordProblem" Classes="label kind-head" Text="{Binding Heading}"
+                         ToolTip.Tip="{Binding Reason}" />
+              <Border Classes="group">
                 <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PasswordRow">
-                      <Border Classes="settings-row" Background="Transparent">
+                      <ctl:FieldRow Classes="wide" ToolTip.Tip="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
                               AutomationProperties.Name="{Binding Description}">
                           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -222,17 +217,15 @@
                             <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                           </StackPanel>
                         </Grid>
-                      </Border>
+                      </ctl:FieldRow>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-              </StackPanel>
-            </Border>
+              </Border>
+            </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding HasPasswords}"
-                 Text="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}" />
     </StackPanel>
   </ScrollViewer>
 

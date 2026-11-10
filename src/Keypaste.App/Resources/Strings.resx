@@ -636,4 +636,6 @@
   <data name="EditingItem" xml:space="preserve"><value>Editing</value></data>
   <data name="PressAValueToCopyIt" xml:space="preserve"><value>Press a value to copy it</value></data>
   <data name="CopyThePassword" xml:space="preserve"><value>Copy the password</value></data>
+  <data name="ProjectKeys" xml:space="preserve"><value>Keys</value></data>
+  <data name="RunProject" xml:space="preserve"><value>Run</value></data>
 </root>

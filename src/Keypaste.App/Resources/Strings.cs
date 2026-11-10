@@ -423,6 +423,7 @@ public static class Strings
     public static string PressAValueToCopyIt => Manager.GetString("PressAValueToCopyIt", CultureInfo.CurrentUICulture)!;
     public static string Project => Manager.GetString("Project", CultureInfo.CurrentUICulture)!;
     public static string ProjectDirectory => Manager.GetString("ProjectDirectory", CultureInfo.CurrentUICulture)!;
+    public static string ProjectKeys => Manager.GetString("ProjectKeys", CultureInfo.CurrentUICulture)!;
     public static string ProjectName => Manager.GetString("ProjectName", CultureInfo.CurrentUICulture)!;
     public static string ProjectTagsDropped => Manager.GetString("ProjectTagsDropped", CultureInfo.CurrentUICulture)!;
     public static string Projects => Manager.GetString("Projects", CultureInfo.CurrentUICulture)!;
@@ -490,6 +491,7 @@ public static class Strings
     public static string Rotate => Manager.GetString("Rotate", CultureInfo.CurrentUICulture)!;
     public static string Rotated => Manager.GetString("Rotated", CultureInfo.CurrentUICulture)!;
     public static string RunInATerminal => Manager.GetString("RunInATerminal", CultureInfo.CurrentUICulture)!;
+    public static string RunProject => Manager.GetString("RunProject", CultureInfo.CurrentUICulture)!;
     public static string RunWithThisEnvironment => Manager.GetString("RunWithThisEnvironment", CultureInfo.CurrentUICulture)!;
     public static string Running => Manager.GetString("Running", CultureInfo.CurrentUICulture)!;
     public static string SCOPECapitals => Manager.GetString("SCOPECapitals", CultureInfo.CurrentUICulture)!;

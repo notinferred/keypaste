@@ -97,6 +97,8 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
         ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
         CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
+        ShowKeysCommand = new RelayCommand(() => ShowingItems = false);
+        ShowItemsCommand = new RelayCommand(() => ShowingItems = true);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
 
@@ -124,6 +126,17 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>Where this project runs on this machine, and its Run and Open terminal.</summary>
     internal ProjectLaunchViewModel Launch { get; }
+
+    /// <summary>Whether the project shows its items rather than its keys.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowingKeys))]
+    internal partial bool ShowingItems { get; private set; }
+
+    internal bool ShowingKeys => !ShowingItems;
+
+    internal RelayCommand ShowKeysCommand { get; }
+
+    internal RelayCommand ShowItemsCommand { get; }
 
     /// <summary>The clipboard a row copies through.</summary>
     internal ClipboardCountdown Clipboard { get; }
