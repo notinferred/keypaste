@@ -147,6 +147,20 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
         Changed();
     }
 
+    /// <summary>Empties a generated value the generator's choices no longer make, keeping it generated so those choices stay shown and fill it again.</summary>
+    internal void Withdraw()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _buffer.Clear();
+        Note = string.Empty;
+        IsGenerated = true;
+        Changed();
+    }
+
     /// <inheritdoc/>
     public async Task Paste()
     {

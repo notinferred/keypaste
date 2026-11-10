@@ -129,6 +129,88 @@ public sealed class GeneratePasswordTests : IDisposable
     }
 
     [Fact]
+    public void Choices_the_generator_refuses_empty_a_generated_field_and_its_form_writes_nothing_until_they_change()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var pin = detail.Fields.Single(field => field.Name == "PIN");
+
+        pin.GenerateCommand.Execute(null);
+        detail.Generator.Letters = false;
+        detail.Generator.Digits = false;
+        detail.Generator.Symbols = false;
+
+        Assert.True(detail.ReplacementFieldValue.IsGenerated);
+        Assert.False(detail.ReplacementFieldValue.HasValue);
+
+        detail.ConfirmReplaceFieldCommand.Execute(null);
+
+        Assert.Same(pin, detail.ReplacingField);
+        Assert.Equal("4321", context.Vault.ReadField(_checking, "PIN"));
+
+        detail.Generator.Digits = true;
+        detail.ConfirmReplaceFieldCommand.Execute(null);
+
+        var written = context.Vault.ReadField(_checking, "PIN")!;
+        Assert.Null(detail.ReplacingField);
+        Assert.Equal(PasswordGenerator.DefaultLength, written.Length);
+        Assert.All(written, character => Assert.True(char.IsAsciiDigit(character)));
+    }
+
+    [Fact]
+    public void Choices_the_generator_refuses_keep_Save_from_writing_the_password_generated_before_them()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var before = context.Vault.Find(_checking)!.Password;
+
+        detail.GeneratePasswordCommand.Execute(null);
+        detail.Generator.Letters = false;
+        detail.Generator.Digits = false;
+        detail.Generator.Symbols = false;
+
+        Assert.False(detail.NewPassword.HasValue);
+
+        detail.SaveCommand.Execute(null);
+
+        Assert.True(detail.IsEditing);
+        Assert.Equal(before, context.Vault.Find(_checking)!.Password);
+    }
+
+    [Fact]
+    public Task Generate_password_offers_nothing_to_hand_over_while_its_choices_are_refused() => HeadlessSession.On(() =>
+    {
+        using var vault = new TempVault();
+        using var session = Unlocked(vault);
+        using var shell = new ShellViewModel(session, vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker());
+        var items = Assert.IsType<EntriesViewModel>(shell.Content);
+        items.Selected = items.Rows.Single();
+
+        shell.OpenGeneratorCommand.Execute(null);
+        var dialog = shell.GeneratorDialog!;
+        dialog.FieldName = "API_TOKEN";
+        dialog.Generator.Letters = false;
+        dialog.Generator.Digits = false;
+        dialog.Generator.Symbols = false;
+
+        Assert.NotNull(dialog.Generator.Error);
+        Assert.False(dialog.Value.HasValue);
+        Assert.Null(dialog.Reveal());
+        Assert.False(dialog.CopyCommand.CanExecute(null));
+        Assert.False(dialog.NewItemCommand.CanExecute(null));
+        Assert.False(dialog.AddFieldCommand.CanExecute(null));
+        Assert.False(dialog.RegenerateCommand.CanExecute(null));
+
+        dialog.Generator.Symbols = true;
+
+        Assert.True(dialog.Value.HasValue);
+        Assert.True(dialog.CopyCommand.CanExecute(null));
+        Assert.True(dialog.NewItemCommand.CanExecute(null));
+        Assert.True(dialog.AddFieldCommand.CanExecute(null));
+        Assert.True(dialog.RegenerateCommand.CanExecute(null));
+    });
+
+    [Fact]
     public Task Generate_password_copies_through_the_countdown_and_starts_a_new_item_with_it() => HeadlessSession.On(async () =>
     {
         using var vault = new TempVault();

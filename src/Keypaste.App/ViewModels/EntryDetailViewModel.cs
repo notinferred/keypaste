@@ -123,7 +123,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         BeginSetTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenSetTotp), () => !IsSettingTotp && !IsEditing);
         ConfirmSetTotpCommand = new RelayCommand(ConfirmSetTotp, () => IsSettingTotp);
         CancelSetTotpCommand = new RelayCommand(CancelSetTotp, () => IsSettingTotp);
-        BeginRemoveTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenRemoveTotp), () => !IsRemovingTotp && !IsEditing);
+        BeginRemoveTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenRemoveTotp), () => !IsRemovingTotp && CanRemoveTotp);
         ConfirmRemoveTotpCommand = new RelayCommand(ConfirmRemoveTotp, () => IsRemovingTotp);
         CancelRemoveTotpCommand = new RelayCommand(() => IsRemovingTotp = false, () => IsRemovingTotp);
 
@@ -164,7 +164,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>The entry's custom fields, by name, in ordinal order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasFields), nameof(FieldsSummary))]
+    [NotifyPropertyChangedFor(nameof(HasFields), nameof(FieldsSummary), nameof(CanRemoveTotp))]
+    [NotifyCanExecuteChangedFor(nameof(BeginRemoveTotpCommand))]
     internal partial IReadOnlyList<EntryFieldRow> Fields { get; private set; } = [];
 
     internal bool HasFields => Fields.Count > 0;
@@ -198,6 +199,9 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Whether Add one-time code is offered: the item has no TOTP, readable or refused.</summary>
     internal bool CanAddTotp => !IsEditing && _totp is null && TotpProblem is null;
+
+    /// <summary>Whether Remove one-time code is offered: the item has the <c>otp</c>, <c>TOTP Seed</c> or <c>TOTP Settings</c> it removes, not only KeePass 2's <c>TimeOtp-*</c>.</summary>
+    internal bool CanRemoveTotp => !IsEditing && Fields.Any(row => TotpSetup.Removes(row.Name));
 
     /// <summary>A one-time code's setup key or <c>otpauth://totp/</c> link, while the form that adds or replaces it is open.</summary>
     internal SecretField NewTotp { get; }
@@ -611,15 +615,37 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             return;
         }
 
+        var wasWithdrawn = IsWithdrawn(field);
+        _generatedInto = field;
+
         if (Generator.Recipe is { } recipe)
         {
             field.Generate(recipe);
-            _generatedInto = field;
+
+            if (wasWithdrawn)
+            {
+                Report(null);
+            }
         }
         else
         {
+            field.Withdraw();
             Report(Generator.Error);
         }
+    }
+
+    private static bool IsWithdrawn(SecretField field) => field.IsGenerated && !field.HasValue;
+
+    // A form whose generated value the generator's choices no longer make writes nothing until they make one again.
+    private bool RefusesWithdrawn(SecretField field)
+    {
+        if (!IsWithdrawn(field))
+        {
+            return false;
+        }
+
+        Report(Generator.Error);
+        return true;
     }
 
     /// <summary>Opens the form that writes a new value over one field's.</summary>
@@ -1010,7 +1036,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal EntryAttachmentsViewModel Attachments { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
+    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(CanRemoveTotp), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(BeginSetTotpCommand), nameof(BeginRemoveTotpCommand))]
     internal partial bool IsEditing { get; private set; }
 
@@ -1380,7 +1406,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     {
         var name = DraftFieldName.Trim();
 
-        if (HasNewFieldNameProblem)
+        if (HasNewFieldNameProblem || RefusesWithdrawn(NewFieldValue))
         {
             return;
         }
@@ -1396,7 +1422,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private void ConfirmReplaceField()
     {
-        if (ReplacingField is not { } row)
+        if (ReplacingField is not { } row || RefusesWithdrawn(ReplacementFieldValue))
         {
             return;
         }
@@ -1653,6 +1679,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private void SaveEdit()
     {
+        if (RefusesWithdrawn(NewPassword))
+        {
+            return;
+        }
+
         var write = _session.Write(
             vault =>
             {

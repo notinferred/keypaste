@@ -116,6 +116,12 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 KeyValueProblem = null;
                 OneTimeCodeProblem = null;
                 Error = null;
+
+                // Create ignores a one-time code the template has no field for, so it must not stay as a draft.
+                if (!ShowsPassword)
+                {
+                    OneTimeCode.Clear();
+                }
             }
         }
     }

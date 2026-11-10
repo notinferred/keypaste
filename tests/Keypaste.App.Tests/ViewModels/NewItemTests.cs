@@ -245,12 +245,28 @@ public sealed class NewItemTests : IDisposable
 
         Assert.True(_entries.IsAdding);
         Assert.True(form.HasOneTimeCodeProblem);
-        Assert.Equal("The otp field holds a counter-based HOTP, which keypaste does not compute.", form.OneTimeCodeProblem);
+        Assert.Equal("The link holds a counter-based HOTP, which keypaste does not compute.", form.OneTimeCodeProblem);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
         _entries.CancelAddCommand.Press();
 
         Assert.True(form.OneTimeCode.IsZeroed);
+    }
+
+    [Fact]
+    public void A_template_without_a_one_time_code_clears_the_one_typed()
+    {
+        var form = NewItemForm.Open(_entries);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq");
+
+        form.Template = ItemTemplate.Database;
+
+        Assert.True(form.OneTimeCode.HasValue);
+
+        form.Template = ItemTemplate.SecureNote;
+
+        Assert.False(form.OneTimeCode.HasValue);
+        Assert.Null(form.UnsavedDraft);
     }
 
     [Fact]

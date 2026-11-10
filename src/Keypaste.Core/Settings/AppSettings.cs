@@ -114,9 +114,7 @@ public sealed record AppSettings
 
     /// <summary>What the app runs as when there is nothing usable to read.</summary>
     /// <remarks>
-    /// Five minutes because it is the number a person who has never opened this file lives with,
-    /// and it has to be short enough to matter on an unattended screen and long enough that reading
-    /// a page of documentation does not cost a re-unlock.
+    /// Thirty minutes, as PRODUCT sets it (v1.25): it is the number a person who has never opened this file lives with.
     /// </remarks>
     public static AppSettings Default { get; } = new()
     {

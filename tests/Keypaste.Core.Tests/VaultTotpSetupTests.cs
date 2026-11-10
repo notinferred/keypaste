@@ -25,7 +25,7 @@ public sealed class VaultTotpSetupTests : IDisposable
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public void A_setup_key_is_kept_as_the_protected_otp_URI_KeePassXC_writes_with_its_defaults()
+    public void A_setup_key_is_kept_as_a_protected_otp_URI_KeePassXC_reads_with_its_defaults()
     {
         var path = NewVaultPath();
 
@@ -43,6 +43,20 @@ public sealed class VaultTotpSetupTests : IDisposable
         Assert.Null(refusal);
         Assert.Equal((TotpAlgorithm.Sha1, 6, TimeSpan.FromSeconds(30)), (spec!.Algorithm, spec.Digits, spec.Period));
         Assert.Equal("287082", spec.Code(_at).Value);
+    }
+
+    [Fact]
+    public void A_setup_key_in_hyphenated_groups_is_read_as_one_with_spaces()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.True(TotpSetup.IsAccepted("gezd-gnbv-gy3t-qojq gezd-gnbv-gy3t-qojq", out _));
+        Assert.True(vault.SetTotp(_github, "GEZD-GNBV-GY3T-QOJQ-GEZD-GNBV-GY3T-QOJQ"));
+
+        using var spec = vault.ReadTotp(_github, out _);
+
+        Assert.Equal($"otpauth://totp/GitHub?secret={_sha1Base32}&period=30&digits=6&issuer=GitHub", vault.ReadField(_github, TotpSpec.OtpField));
+        Assert.Equal("287082", spec!.Code(_at).Value);
     }
 
     [Fact]
@@ -113,11 +127,11 @@ public sealed class VaultTotpSetupTests : IDisposable
 
     [Theory]
     [InlineData("", "Type or paste the setup key or otpauth://totp/ link the site gave you.")]
-    [InlineData("GEZDGNBV!Y3TQOJQ", "The otp field's secret is not base32.")]
-    [InlineData("otpauth://hotp/GitHub?secret=GEZDGNBVGY3TQOJQ&counter=1", "The otp field holds a counter-based HOTP, which keypaste does not compute.")]
-    [InlineData("otpauth://totp/GitHub?secret=GEZDGNBVGY3TQOJQ&digits=10", "The otp field's digits must be 6, 7 or 8.")]
-    [InlineData("otpauth://totp/GitHub?issuer=GitHub", "The otp field has no secret.")]
-    [InlineData("https://example.com/?secret=GEZDGNBVGY3TQOJQ", "The otp field's secret is not base32.")]
+    [InlineData("GEZDGNBV!Y3TQOJQ", "The setup key must be base32, the letters A to Z and the digits 2 to 7, or an otpauth://totp/ link.")]
+    [InlineData("otpauth://hotp/GitHub?secret=GEZDGNBVGY3TQOJQ&counter=1", "The link holds a counter-based HOTP, which keypaste does not compute.")]
+    [InlineData("otpauth://totp/GitHub?secret=GEZDGNBVGY3TQOJQ&digits=10", "The link's digits must be 6, 7 or 8.")]
+    [InlineData("otpauth://totp/GitHub?issuer=GitHub", "The link has no secret.")]
+    [InlineData("https://example.com/?secret=GEZDGNBVGY3TQOJQ", "The setup key must be base32, the letters A to Z and the digits 2 to 7, or an otpauth://totp/ link.")]
     public void A_setup_TotpSpec_refuses_is_refused_in_its_words_changing_nothing(string setup, string says)
     {
         var path = NewVaultPath();
@@ -194,7 +208,7 @@ public sealed class VaultTotpSetupTests : IDisposable
 
         var refused = Assert.Throws<VaultException>(() => vault.CreateEntry(new VaultEntry { Title = created.Title, GroupPath = created.GroupPath }, [], [], "otpauth://totp/x?secret=GEZDGNBV&digits=9"));
 
-        Assert.Equal("The otp field's digits must be 6, 7 or 8.", refused.Message);
+        Assert.Equal("The link's digits must be 6, 7 or 8.", refused.Message);
         Assert.Null(vault.Find(created));
         Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
     }

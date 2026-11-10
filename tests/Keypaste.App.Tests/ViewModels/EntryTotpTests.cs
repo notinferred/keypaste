@@ -235,7 +235,7 @@ public sealed class EntryTotpTests : IDisposable
 
         Assert.True(detail.IsSettingTotp);
         Assert.True(detail.HasTotpSetupProblem);
-        Assert.Equal("The otp field holds a counter-based HOTP, which keypaste does not compute.", detail.TotpSetupProblem);
+        Assert.Equal("The link holds a counter-based HOTP, which keypaste does not compute.", detail.TotpSetupProblem);
         Assert.Null(detail.Totp);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
@@ -269,6 +269,32 @@ public sealed class EntryTotpTests : IDisposable
         using var vault = Vault.Open(_vaultPath, _master);
         Assert.Null(vault.ReadField(_broken, TotpSpec.OtpField));
         Assert.Contains(vault.ReadHistory(_broken)!, revision => revision.CustomFields.Any(field => field.Name == TotpSpec.OtpField));
+    }
+
+    [Fact]
+    public void Remove_is_offered_only_for_the_otp_fields_it_removes_and_not_for_KeePass_2s_alone()
+    {
+        using var context = new Context(_vaultPath);
+        var keePass2 = context.Open(_github);
+
+        Assert.True(keePass2.ShowsTotp);
+        Assert.False(keePass2.CanRemoveTotp);
+        Assert.False(keePass2.BeginRemoveTotpCommand.CanExecute(null));
+        Assert.True(keePass2.BeginSetTotpCommand.CanExecute(null));
+
+        var keePassXc = context.Open(_broken);
+
+        Assert.True(keePassXc.CanRemoveTotp);
+        Assert.True(keePassXc.BeginRemoveTotpCommand.CanExecute(null));
+
+        var plain = context.Open(_plain);
+
+        Assert.False(plain.CanRemoveTotp);
+        plain.BeginSetTotpCommand.Press();
+        Typed(plain, _seedBase32);
+        plain.ConfirmSetTotpCommand.Press();
+
+        Assert.True(plain.CanRemoveTotp);
     }
 
     [Fact]

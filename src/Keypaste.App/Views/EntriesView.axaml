@@ -1308,6 +1308,7 @@
                           <Button Grid.Column="5"
                                   x:Name="RemoveTotp"
                                   Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                  IsVisible="{Binding CanRemoveTotp}"
                                   Command="{Binding BeginRemoveTotpCommand}"
                                   ToolTip.Tip="{x:Static res:Strings.RemoveTheOneTimeCode}"
                                   AutomationProperties.Name="{x:Static res:Strings.RemoveTheOneTimeCode}" />
@@ -1330,6 +1331,7 @@
                                 AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOneTimeCode}" />
                         <Button Grid.Column="2"
                                 Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                IsVisible="{Binding CanRemoveTotp}"
                                 Command="{Binding BeginRemoveTotpCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.RemoveTheOneTimeCode}"
                                 AutomationProperties.Name="{x:Static res:Strings.RemoveTheOneTimeCode}" />

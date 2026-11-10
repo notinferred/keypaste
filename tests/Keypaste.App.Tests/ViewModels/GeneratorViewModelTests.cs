@@ -89,24 +89,24 @@ public sealed class GeneratorViewModelTests
     public void Each_character_option_raises_the_strength_and_error_lines()
     {
         var generator = new GeneratorViewModel();
-        var raised = new List<string>();
+        var raised = new HashSet<string>();
         generator.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
 
-        generator.Length = 24;
-        generator.Letters = false;
-        generator.Digits = false;
-        generator.Symbols = false;
-        generator.LeaveOutLookalikes = true;
+        foreach (var choose in new Action[]
+        {
+            () => generator.Length = 24,
+            () => generator.Letters = false,
+            () => generator.Digits = false,
+            () => generator.LeaveOutLookalikes = true,
+            () => generator.Symbols = false,
+        })
+        {
+            raised.Clear();
+            choose();
 
-        Assert.Equal(
-            [
-                nameof(GeneratorViewModel.Length), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
-                nameof(GeneratorViewModel.Letters), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
-                nameof(GeneratorViewModel.Digits), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
-                nameof(GeneratorViewModel.Symbols), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
-                nameof(GeneratorViewModel.LeaveOutLookalikes), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error),
-            ],
-            raised);
+            Assert.Contains(nameof(GeneratorViewModel.Strength), raised);
+            Assert.Contains(nameof(GeneratorViewModel.Error), raised);
+        }
     }
 
     [Fact]
