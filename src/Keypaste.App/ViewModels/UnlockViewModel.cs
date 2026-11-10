@@ -131,7 +131,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>The screen's heading: which vault is locked, or an invitation to create or open one.</summary>
     internal string Heading => _selectedPath is null
-        ? OffersCreateFirst ? "Start with a vault" : "Open a vault"
+        ? OffersCreateFirst ? "Keep your keys in one place" : "Open a vault"
         : IsRestoreOnly ? $"{SelectedName} can't be opened"
         : IsHandOff ? $"Open {SelectedName}"
         : $"{SelectedName} is locked";

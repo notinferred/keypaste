@@ -445,7 +445,7 @@ public sealed class EachFactOnceTests
         var trash = shell.Show<TrashViewModel>(DestinationKind.Trash);
         trash.Selected = null;
         RenderedShell.Drain();
-        var rows = Shown<ListBox>(shell).Single(list => list.Classes.Contains("table-body"));
+        var rows = Shown<ListBox>(shell).Single(list => AutomationProperties.GetName(list) == "Deleted items");
         var before = rows.TranslatePoint(default, shell.Window);
 
         trash.Selected = Assert.Single(trash.Rows);

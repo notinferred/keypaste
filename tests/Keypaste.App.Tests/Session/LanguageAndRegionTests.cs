@@ -18,6 +18,7 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Xunit;
 using static System.FormattableString;
 
@@ -328,25 +329,31 @@ public sealed partial class LanguageAndRegionTests
         Assert.Equal(mirrors, !icon.HasMirrorTransform);
     });
 
+    private static void ShowLog(RenderedShell shell)
+    {
+        using var audit = new TempAuditHome();
+        audit.Append("env/dev/STRIPE_KEY");
+        Directory.CreateDirectory(Path.GetDirectoryName(KeypasteHome.AuditPath(shell.Home))!);
+        File.Copy(audit.LogPath, KeypasteHome.AuditPath(shell.Home), overwrite: true);
+        shell.Show<LogViewModel>(DestinationKind.Log).RefreshCommand.Press();
+        shell.Frame();
+    }
+
     [Fact]
     public Task The_grips_arrow_keys_follow_the_screen_under_right_to_left() => HeadlessSession.On(() =>
     {
         using var pseudo = PseudoLocale.RightToLeft();
         using var shell = new RenderedShell("keypaste-rtl-grip-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.Selected = entries.Rows[0];
-        entries.DeleteCommand.Press();
-        shell.Show<TrashViewModel>(DestinationKind.Trash);
-        shell.Frame();
+        ShowLog(shell);
 
-        var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Title);
-        var columns = grip.FindAncestorOfType<TrashColumns>()!;
-        var before = columns.DrawnWidths[0];
+        var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Actor);
+        var columns = grip.FindAncestorOfType<LogColumns>()!;
+        var before = columns.DrawnWidths[1];
         grip.Focus();
         shell.Window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.None);
         RenderedShell.Drain();
 
-        Assert.True(columns.DrawnWidths[0] > before, "Left moves the edge to the left, which widens a column drawn from the right");
+        Assert.True(columns.DrawnWidths[1] > before, "Left moves the edge to the left, which widens a column drawn from the right");
     });
 
     [Fact]
@@ -354,15 +361,11 @@ public sealed partial class LanguageAndRegionTests
     {
         using var pseudo = PseudoLocale.RightToLeft();
         using var shell = new RenderedShell("keypaste-rtl-drag-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.Selected = entries.Rows[0];
-        entries.DeleteCommand.Press();
-        shell.Show<TrashViewModel>(DestinationKind.Trash);
-        shell.Frame();
+        ShowLog(shell);
 
-        var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Title);
-        var columns = grip.FindAncestorOfType<TrashColumns>()!;
-        var before = columns.DrawnWidths[0];
+        var grip = shell.Window.GetVisualDescendants().OfType<ColumnGrip>().Single(grip => grip.Column == TableStates.Actor);
+        var columns = grip.FindAncestorOfType<LogColumns>()!;
+        var before = columns.DrawnWidths[1];
         var at = grip.TranslatePoint(new Point(grip.Bounds.Width / 2, grip.Bounds.Height / 2), shell.Window)!.Value;
 
         shell.Frame();
@@ -372,7 +375,7 @@ public sealed partial class LanguageAndRegionTests
         shell.Window.MouseUp(at + new Point(-40, 0), MouseButton.Left);
         RenderedShell.Drain();
 
-        Assert.True(columns.DrawnWidths[0] > before + 30, Invariant($"{before} became {columns.DrawnWidths[0]}"));
+        Assert.True(columns.DrawnWidths[1] > before + 30, Invariant($"{before} became {columns.DrawnWidths[1]}"));
     });
 
     [Fact]

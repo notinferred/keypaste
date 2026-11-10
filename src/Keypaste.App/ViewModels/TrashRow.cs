@@ -71,7 +71,8 @@ internal sealed class TrashRow
         PersonTime.Moment(new DateTimeOffset(DateTime.SpecifyKind(DeletedUtc, DateTimeKind.Utc)).ToLocalTime());
 
     /// <summary>What the row says under its name.</summary>
-    internal string Summary => CameFromALiveGroup
-        ? $"from {Where} · {When}"
-        : $"from {Where}, so it comes back at the top level · {When}";
+    internal string Summary => $"{Origin} · {When}";
+
+    /// <summary>Where it came from, and that it returns to the top level when its group is gone.</summary>
+    internal string Origin => CameFromALiveGroup ? $"from {Where}" : $"from {Where}, comes back at the top level";
 }

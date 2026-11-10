@@ -37,7 +37,6 @@
   <data name="AllItems" xml:space="preserve"><value>All items</value></data>
   <data name="AnsweringAgents" xml:space="preserve"><value>Answering agents</value></data>
   <data name="AnswerInThePromptWindow" xml:space="preserve"><value>Answer in the prompt window</value></data>
-  <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="AskForIt" xml:space="preserve"><value>Ask for it</value></data>
   <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask keypaste.com how many views each link has left</value></data>
   <data name="AtLeast20CharactersSuchAsSixGeneratedWords" xml:space="preserve"><value>At least 20 characters, such as six generated words</value></data>
@@ -254,8 +253,10 @@
   <data name="LockAndOpen" xml:space="preserve"><value>Lock and open</value></data>
   <data name="LockLabel" xml:space="preserve"><value>Lock</value></data>
   <data name="LockNow" xml:space="preserve"><value>Lock now</value></data>
-  <data name="LockTheVaultAfter" xml:space="preserve"><value>Lock the vault after</value></data>
-  <data name="LockWhenTheWindowIsMinimized" xml:space="preserve"><value>Lock when the window is minimized</value></data>
+  <data name="LockAfter" xml:space="preserve"><value>Lock after</value></data>
+  <data name="LockWhenMinimized" xml:space="preserve"><value>Lock when minimized</value></data>
+  <data name="KeepInMenuBar" xml:space="preserve"><value>Keep in menu bar</value></data>
+  <data name="KeepInTray" xml:space="preserve"><value>Keep in tray</value></data>
   <data name="Locked" xml:space="preserve"><value>Locked</value></data>
   <data name="LogDayToday" xml:space="preserve"><value>Today</value></data>
   <data name="LogDayUndated" xml:space="preserve"><value>Undated</value></data>
@@ -326,7 +327,7 @@
   <data name="OpenDiagnostics" xml:space="preserve"><value>Open diagnostics</value></data>
   <data name="OpenInYourBrowser" xml:space="preserve"><value>Open in your browser</value></data>
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
-  <data name="OpenKeypasteAtLogin" xml:space="preserve"><value>Open keypaste at login</value></data>
+  <data name="OpenAtLogin" xml:space="preserve"><value>Open at login</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
   <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>
   <data name="OpenTheScopedTokens" xml:space="preserve"><value>Open the scoped tokens</value></data>
@@ -406,7 +407,6 @@
   <data name="SearchAllItems" xml:space="preserve"><value>Search all items</value></data>
   <data name="SecondsUntilTheNextCode" xml:space="preserve"><value>Seconds until the next code</value></data>
   <data name="Secrets" xml:space="preserve"><value>Secrets</value></data>
-  <data name="Security" xml:space="preserve"><value>Security</value></data>
   <data name="SelectAll" xml:space="preserve"><value>Select all</value></data>
   <data name="SelectValue" xml:space="preserve"><value>Select {0}</value></data>
   <data name="SendCrashReports" xml:space="preserve"><value>Send crash reports</value></data>
@@ -430,7 +430,6 @@
   <data name="Slot2" xml:space="preserve"><value>Slot 2</value></data>
   <data name="SomeTagsPutTheirItemInNoXd8ea51" xml:space="preserve"><value>Some tags put their item in no project</value></data>
   <data name="Start" xml:space="preserve"><value>Start</value></data>
-  <data name="Startup" xml:space="preserve"><value>Startup</value></data>
   <data name="StopPairing" xml:space="preserve"><value>Stop pairing</value></data>
   <data name="StopUsingAKeyFile" xml:space="preserve"><value>Stop using a key file</value></data>
   <data name="StopUsingTheYubiKey" xml:space="preserve"><value>Stop using the YubiKey</value></data>
