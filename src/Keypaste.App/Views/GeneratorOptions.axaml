@@ -29,7 +29,9 @@
                        FormatString="0"
                        AutomationProperties.Name="{x:Static res:Strings.Length}"
                        Value="{Binding Length}" />
-        <Slider Minimum="{Binding MinimumLength}"
+        <Slider HorizontalAlignment="Left"
+                Width="240"
+                Minimum="{Binding MinimumLength}"
                 Maximum="{Binding MaximumLength}"
                 TickFrequency="1"
                 IsSnapToTickEnabled="True"
