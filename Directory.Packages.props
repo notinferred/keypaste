@@ -83,6 +83,8 @@
        OpenSSL and, on Linux, require libpcsclite at start-up for every user. -->
   <ItemGroup Label="Desktop hardware keys">
     <PackageVersion Include="Yubico.YubiKey" Version="1.18.0" />
+    <!-- Pinned past Yubico's 10.0.12 for CVE-2026-118747 (GHSA-vmv3-wvjp-wqpj), patched in 10.0.15. -->
+    <PackageVersion Include="System.Formats.Cbor" Version="10.0.15" />
   </ItemGroup>
 
   <!-- Avalonia.Headless only, not Avalonia.Headless.XUnit: a spike proved HeadlessUnitTestSession
