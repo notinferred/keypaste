@@ -431,7 +431,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     }
 
     /// <summary>Whether an item or the new-item form stands in the detail's place, so a width that cannot hold both shows it instead of the list.</summary>
-    internal bool HasOpenPane => _detail is not null || IsAdding;
+    internal bool HasOpenPane => _detail is not null;
 
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
     internal EntryDetailViewModel? Detail

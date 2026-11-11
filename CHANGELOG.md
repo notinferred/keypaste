@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+New item and the password generator open as sheets over the window, the sidebar's Groups and Projects headings each add their own, Import sits at the sidebar's foot, an open item has a share button, and a username box completes a username the vault already uses ([F.110](docs/steps/F.110.md)).
+
 The desktop app shows Items, Agents and Trash as a list beside the chosen item, with an item's fields in grouped rows you press to copy. The keypaste wordmark leaves the unlocked window, and the vault's name, save state and Lock sit at the foot of the sidebar ([F.110](docs/steps/F.110.md)).
 
 History and the activity log are one Activity screen under Agents, which keeps sortable, resizable columns ([F.110](docs/steps/F.110.md)).

@@ -382,7 +382,8 @@ public sealed class SecretFieldAutomationTests
         internal EntriesScreen()
         {
             Model = new EntriesViewModel(Session, Countdown);
-            Show(new EntriesView { DataContext = Model });
+            // New item is a sheet the shell draws over the window, so the screen draws it over Items as the shell does.
+            Show(new Panel { Children = { new EntriesView { DataContext = Model }, new NewItemSheet { DataContext = Model } } });
         }
 
         internal EntriesViewModel Model { get; }

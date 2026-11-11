@@ -7,12 +7,33 @@ using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
-/// <summary>Generate password…: the dialog over the screen it was opened from, which Escape cancels wherever focus sits.</summary>
+/// <summary>The generator's sheet, which Escape cancels wherever focus sits and which gives the keyboard back to where it was when it closes.</summary>
 internal sealed partial class GeneratePasswordView : UserControl
 {
     private TopLevel? _root;
+    private IInputElement? _returnTo;
 
     public GeneratePasswordView() => AvaloniaXamlLoader.Load(this);
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        IsVisible = DataContext is GeneratePasswordViewModel;
+
+        if (IsVisible)
+        {
+            _returnTo = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+        }
+        else
+        {
+            if (_returnTo is InputElement { IsEffectivelyVisible: true } returnTo)
+            {
+                returnTo.Focus(NavigationMethod.Tab);
+            }
+
+            _returnTo = null;
+        }
+    }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {

@@ -32,16 +32,14 @@ public sealed class SidebarTreeKeyboardTests
     });
 
     [Fact]
-    public Task The_projects_heading_cannot_be_chosen() => HeadlessSession.On(() =>
+    public Task The_headings_cannot_be_chosen_and_the_keyboard_passes_them() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-tree-heading-");
         var nav = shell.Named<ListBox>("Nav");
-        var heading = Assert.Single(shell.Shell.SidebarRows.OfType<SidebarHeading>());
-        var container = Assert.IsType<ListBoxItem>(nav.ContainerFromItem(heading));
+        var headings = shell.Shell.SidebarRows.OfType<SidebarHeading>().ToList();
 
-        Assert.False(container.IsEnabled);
-        Assert.False(container.Focusable);
-        Assert.Equal("Projects", heading.Title);
+        Assert.Equal(["Groups", "Projects"], headings.Select(heading => heading.Title));
+        Assert.All(headings, heading => Assert.False(Assert.IsType<ListBoxItem>(nav.ContainerFromItem(heading)).Focusable));
     });
 
     private static GroupRow Row(ShellViewModel shell, string path) =>

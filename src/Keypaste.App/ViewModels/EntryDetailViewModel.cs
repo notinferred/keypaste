@@ -1177,7 +1177,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     private IReadOnlyList<string> SuggestedFor(string typed) => IsEditing && typed != _editOpenedWith.Username ? _usernames.Matching(typed) : [];
 
-    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
+    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(DraftUsername, SuggestedUsernames);
 
     /// <summary>Every username this vault uses, Edit's username box's items, which it narrows as one is typed.</summary>
     internal IReadOnlyList<string> UsedUsernames => _usernames.Used;

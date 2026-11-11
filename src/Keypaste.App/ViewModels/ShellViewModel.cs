@@ -62,7 +62,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private long _warnedStamp;
     private Destination _current;
     private string _search = string.Empty;
-    private static readonly SidebarHeading _projectsHeading = new("Projects");
+    private static readonly SidebarHeading _groupsHeading = new("Groups", SidebarAddition.Group);
+    private static readonly SidebarHeading _projectsHeading = new("Projects", SidebarAddition.Project);
 
     private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
     private IReadOnlyList<ProjectRow> _projects = [];
@@ -883,7 +884,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Whatever the current destination shows.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EntriesInView), nameof(ProjectsInView))]
     internal partial object? Content { get; private set; }
+
+    /// <summary>Items, while it is the screen in view, whose New item and generator are sheets over the window.</summary>
+    internal EntriesViewModel? EntriesInView => Content as EntriesViewModel;
+
+    /// <summary>Projects, while it is the screen in view, whose generator is a sheet over the window.</summary>
+    internal EnvSetsViewModel? ProjectsInView => Content as EnvSetsViewModel;
 
     /// <summary>
     /// A quiet line that appears shortly before the vault locks, counts the whole seconds left, rounded
@@ -1260,13 +1268,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The sidebar's main list: Items, the groups whose parents are all open when Items is, the
-    /// projects under their heading, then Agents.
+    /// The sidebar's main list: Items, the groups whose parents are all open when Items is under their
+    /// heading, the projects under theirs, then Agents; each heading stays, for its +, while nothing is under it.
     /// </summary>
     private List<object> SidebarOf()
     {
         var items = MainNav[0];
-        List<object> rows = [items];
+        List<object> rows = [items, _groupsHeading];
 
         if (items.IsExpanded)
         {
@@ -1276,11 +1284,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             }
         }
 
-        if (_projects.Count > 0)
-        {
-            rows.Add(_projectsHeading);
-            rows.AddRange(_projects);
-        }
+        rows.Add(_projectsHeading);
+        rows.AddRange(_projects);
 
         if (Recommendations is { IsEmpty: false })
         {

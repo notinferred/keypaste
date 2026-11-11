@@ -310,26 +310,12 @@
               </Decorator>
             </StackPanel>
 
-            <!-- The sidebar's own add: what belongs to the navigation, from the same commands as the menus. -->
-            <Button Name="SidebarAdd"
-                    DockPanel.Dock="Top"
-                    Classes="ghost sm"
-                    HorizontalAlignment="Left"
-                    Margin="0,0,0,4"
-                    ToolTip.Tip="{x:Static res:Strings.NewGroupProjectImportOrShare}"
-                    AutomationProperties.Name="{x:Static res:Strings.NewGroupProjectImportOrShare}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="plus" Size="14" />
-                <TextBlock Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
 
             <!-- Trash and Settings, quieter, at the bottom. -->
             <ListBox Name="FooterNav"
                      AutomationProperties.Name="{x:Static res:Strings.MorePlaces}"
                      DockPanel.Dock="Bottom"
                      Classes="nav quiet"
-                     Margin="0,12,0,0"
                      ItemsSource="{Binding FooterNav}"
                      SelectedItem="{Binding SelectedFooter}">
               <ListBox.ItemTemplate>
@@ -345,6 +331,19 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
+
+            <!-- Import, above Trash and Settings: the File menu's two imports, from the same commands. -->
+            <Button Name="SidebarImport"
+                    DockPanel.Dock="Bottom"
+                    Classes="sidebar-row"
+                    Margin="0,12,0,0"
+                    ToolTip.Tip="{x:Static res:Strings.ImportFromAnotherAppOrEnv}"
+                    AutomationProperties.Name="{x:Static res:Strings.ImportLabel}">
+              <StackPanel Orientation="Horizontal">
+                <ctl:KpIcon Icon="import" Size="16" Margin="0,0,8,0" />
+                <TextBlock Text="{x:Static res:Strings.ImportLabel}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
 
             <!-- Items with the vault's group tree under it, the projects, then Agents: one list, so the
                  arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
@@ -416,7 +415,17 @@
                   </Grid>
                 </DataTemplate>
                 <DataTemplate DataType="vm:SidebarHeading">
-                  <TextBlock Classes="th" Text="{Binding Label}" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="th" Text="{Binding Label}" VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Name="HeadingAdd"
+                            Classes="icon ghost fold"
+                            Margin="2,-2,-8,-2"
+                            ToolTip.Tip="{Binding AddLabel}"
+                            AutomationProperties.Name="{Binding AddLabel}">
+                      <ctl:KpIcon Icon="plus" Size="14" />
+                    </Button>
+                  </Grid>
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProjectRow">
                   <Grid ColumnDefinitions="Auto,*,Auto"
@@ -535,9 +544,21 @@
       <views:ShareDialogView DataContext="{Binding Share}" />
     </Border>
 
-    <Border Classes="backdrop" IsVisible="{Binding HasGeneratorDialog}" Padding="24">
-      <views:GeneratePasswordView DataContext="{Binding GeneratorDialog}" />
-    </Border>
+    <!-- New item, from the list's add, the File menu, its chord or a generator, as a sheet over the window. -->
+    <views:NewItemSheet DataContext="{Binding EntriesInView}" />
+
+    <!-- The one generator's sheet: on its own, or opened from a field of New item, the open item or a project. -->
+    <!-- Its DataContext is its own choice of the four, so each reads the shell's. -->
+    <views:GeneratePasswordView>
+      <views:GeneratePasswordView.DataContext>
+        <MultiBinding Converter="{x:Static views:FirstOpen.Generator}">
+          <Binding Path="$parent[views:ShellView].((vm:ShellViewModel)DataContext).GeneratorDialog" />
+          <Binding Path="$parent[views:ShellView].((vm:ShellViewModel)DataContext).EntriesInView.NewItem.GeneratorPanel" />
+          <Binding Path="$parent[views:ShellView].((vm:ShellViewModel)DataContext).EntriesInView.Detail.GeneratorPanel" />
+          <Binding Path="$parent[views:ShellView].((vm:ShellViewModel)DataContext).ProjectsInView.OpenProject.GeneratorPanel" />
+        </MultiBinding>
+      </views:GeneratePasswordView.DataContext>
+    </views:GeneratePasswordView>
 
     <!-- The import dialogs, modal over the whole window: a KeePass database's, or another app's export's. -->
     <Border Classes="backdrop" IsVisible="{Binding HasKdbxImport}" Padding="24">

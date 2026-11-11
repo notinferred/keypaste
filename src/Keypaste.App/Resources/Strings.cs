@@ -266,6 +266,8 @@ public static class Strings
     public static string ImportEnvLabel => Manager.GetString("ImportEnvLabel", CultureInfo.CurrentUICulture)!;
     public static string ImportFromAnotherApp => Manager.GetString("ImportFromAnotherApp", CultureInfo.CurrentUICulture)!;
     public static string ImportFromAnotherAppLabel => Manager.GetString("ImportFromAnotherAppLabel", CultureInfo.CurrentUICulture)!;
+    public static string ImportFromAnotherAppOrEnv => Manager.GetString("ImportFromAnotherAppOrEnv", CultureInfo.CurrentUICulture)!;
+    public static string ImportLabel => Manager.GetString("ImportLabel", CultureInfo.CurrentUICulture)!;
     public static string ImportValue => Manager.GetString("ImportValue", CultureInfo.CurrentUICulture)!;
     public static string Imported => Manager.GetString("Imported", CultureInfo.CurrentUICulture)!;
     public static string InValue => Manager.GetString("InValue", CultureInfo.CurrentUICulture)!;
@@ -367,7 +369,6 @@ public static class Strings
     public static string NewFieldValue => Manager.GetString("NewFieldValue", CultureInfo.CurrentUICulture)!;
     public static string NewGroup => Manager.GetString("NewGroup", CultureInfo.CurrentUICulture)!;
     public static string NewGroupLabel => Manager.GetString("NewGroupLabel", CultureInfo.CurrentUICulture)!;
-    public static string NewGroupProjectImportOrShare => Manager.GetString("NewGroupProjectImportOrShare", CultureInfo.CurrentUICulture)!;
     public static string NewItem => Manager.GetString("NewItem", CultureInfo.CurrentUICulture)!;
     public static string NewItemAddsOneHere => Manager.GetString("NewItemAddsOneHere", CultureInfo.CurrentUICulture)!;
     public static string NewItemByType => Manager.GetString("NewItemByType", CultureInfo.CurrentUICulture)!;

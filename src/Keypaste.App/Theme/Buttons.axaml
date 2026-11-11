@@ -5,7 +5,7 @@
   <!--
     Buttons. With no class a button is the design's secondary button (#2A2C30). Classes:
       primary (or Fluent's accent)  amber, ink text; the one primary action in a view
-      ghost                         no fill until hovered: Deny, Cancel
+      ghost                         no fill until hovered: Deny, Cancel; on a ToggleButton, the same while its menu is open
       danger                        danger tint: Revoke, Delete
       icon                          a 30px square for an icon alone; add ghost for no fill
       link                          text colour, no box: "Choose…"
@@ -25,7 +25,7 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
 
-  <Style Selector="Button.sm">
+  <Style Selector="Button.sm, ToggleButton.sm">
     <Setter Property="MinHeight" Value="28" />
     <Setter Property="Padding" Value="12,4" />
   </Style>
@@ -78,18 +78,23 @@
   </Style>
 
   <!-- ghost -->
-  <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.ghost /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
-  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.ghost:checked /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
-  <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
-  <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
   </Style>

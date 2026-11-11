@@ -1028,11 +1028,13 @@ public sealed class ScreenRenderer
         Save(window, output, "13i-items-add-menu");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
 
-        var sidebarAdd = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarAdd");
-        sidebarAdd.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Save(window, output, "16f-sidebar-add-menu");
-        var sidebarMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarAdd)!;
-        Save(TopLevel.GetTopLevel(sidebarMenu.Items.OfType<MenuItem>().First())!, output, "16f-sidebar-add-menu-popup");
+        // The sidebar's adds: a + on the Groups and Projects headings, and Import above Trash and Settings.
+        Save(window, output, "16f-sidebar-headings-and-import");
+        var sidebarImport = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarImport");
+        sidebarImport.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Save(window, output, "16g-sidebar-import-menu");
+        var sidebarMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarImport)!;
+        Save(TopLevel.GetTopLevel(sidebarMenu.Items.OfType<MenuItem>().First())!, output, "16g-sidebar-import-menu-popup");
         sidebarMenu.Hide();
         WindowInput.Drain();
 
@@ -1048,10 +1050,13 @@ public sealed class ScreenRenderer
         Save(window, output, "13e-secrets-new-field-options");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = false;
 
-        // The username box offers the usernames the vault already uses.
-        var usernameBox = window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(box => box.Name == "NewEntryUsername");
-        entries.NewItem!.Username = authority.Session.Unlocked!.ReadUsernames()[0][..1];
-        usernameBox.IsDropDownOpen = true;
+        // The username box completes the best username the vault already uses in grey, and Down lists the others.
+        var usernameBox = window.GetVisualDescendants().OfType<UsernameBox>().Single(box => box.Name == "NewEntryUsername");
+        usernameBox.GetVisualDescendants().OfType<TextBox>().First().Focus(NavigationMethod.Tab);
+        var used = authority.Session.Unlocked!.ReadUsernames()[0];
+        entries.NewItem!.Username = used[..Math.Min(3, used.Length - 1)];
+        Save(window, output, "13h-secrets-new-username-typeahead");
+        usernameBox.GetVisualDescendants().OfType<TextBox>().First().RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
         Save(window, output, "13h-secrets-new-username-suggestions");
         if (usernameBox.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is { } suggestions && TopLevel.GetTopLevel(suggestions) is { } suggestionsPopup)
         {

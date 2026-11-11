@@ -286,7 +286,6 @@
   <data name="NewFieldValue" xml:space="preserve"><value>New field value</value></data>
   <data name="NewGroup" xml:space="preserve"><value>New group</value></data>
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
-  <data name="NewGroupProjectImportOrShare" xml:space="preserve"><value>New group, project, import or share</value></data>
   <data name="NewItemByType" xml:space="preserve"><value>New item by type</value></data>
   <data name="NewItemOrPassword" xml:space="preserve"><value>New item or password</value></data>
   <data name="NewKey" xml:space="preserve"><value>New key</value></data>
@@ -508,6 +507,8 @@
   <data name="SharedNameActivity" xml:space="preserve"><value>Another item has this title, so this shows only what keypaste recorded for this item. When an agent asks for the title, you pick which item it gets.</value></data>
   <data name="RenameOrMoveLabel" xml:space="preserve"><value>Rename or move…</value></data>
   <data name="AddFieldLabel" xml:space="preserve"><value>Add field…</value></data>
+  <data name="ImportLabel" xml:space="preserve"><value>Import…</value></data>
+  <data name="ImportFromAnotherAppOrEnv" xml:space="preserve"><value>Import from another app or a .env file</value></data>
   <data name="AddAttachmentLabel" xml:space="preserve"><value>Add attachment…</value></data>
   <data name="ExportEnvKeypasteLabel" xml:space="preserve"><value>Export .env.keypaste…</value></data>
   <data name="AddAKeyToValueLabel" xml:space="preserve"><value>Add a key to {0}…</value></data>

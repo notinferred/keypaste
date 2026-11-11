@@ -37,7 +37,9 @@ internal sealed partial class ShellView : UserControl
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
         this.FindControl<ListBox>("RailNav")!.AddHandler(TappedEvent, OnRailPlaceTapped);
-        this.FindControl<Button>("SidebarAdd")!.Click += OnSidebarAdd;
+        this.FindControl<Button>("SidebarImport")!.Click += OnSidebarImport;
+        nav.AddHandler(Button.ClickEvent, OnHeadingAdd);
+        nav.AddHandler(PointerPressedEvent, OnHeadingPressed, RoutingStrategies.Tunnel);
 
         AddHandler(GotFocusEvent, (_, e) => _lastFocused = e.Source as Visual);
         AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Bubble);
@@ -223,11 +225,10 @@ internal sealed partial class ShellView : UserControl
     /// <summary>The commands a row's context menu offers; the running app's, or a test's.</summary>
     internal AppCommands? Commands { get; init; }
 
-    /// <summary>A heading names the rows under it and cannot be chosen; a group's row is a denser tree row.</summary>
+    /// <summary>A heading names the rows under it and cannot be chosen, though its + can be pressed; a group's row is a denser tree row.</summary>
     private static void OnSidebarRowPrepared(object? sender, ContainerPreparedEventArgs e)
     {
         var heading = e.Container.DataContext is SidebarHeading;
-        e.Container.IsEnabled = !heading;
         e.Container.Focusable = !heading;
         e.Container.Classes.Set("heading", heading);
         e.Container.Classes.Set("group", e.Container.DataContext is GroupRow);
@@ -259,17 +260,46 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>The sidebar's add menu, at its button.</summary>
-    private void OnSidebarAdd(object? sender, RoutedEventArgs e)
+    /// <summary>The sidebar's Import menu, at its row.</summary>
+    private void OnSidebarImport(object? sender, RoutedEventArgs e)
     {
         if (Commands is null || sender is not Button button)
         {
             return;
         }
 
-        var menu = AppMenu.Context(Commands.SidebarAdd);
+        var menu = AppMenu.Context(Commands.SidebarImport);
         FlyoutBase.SetAttachedFlyout(button, menu);
         menu.ShowAt(button);
+    }
+
+    /// <summary>A heading's +: New group… in the group chosen, or New project….</summary>
+    private void OnHeadingAdd(object? sender, RoutedEventArgs e)
+    {
+        if (Commands is null || e.Source is not Button { Name: "HeadingAdd", DataContext: SidebarHeading heading })
+        {
+            return;
+        }
+
+        var command = heading.Adds == SidebarAddition.Group ? Commands.NewGroup : Commands.NewProject;
+
+        if (command.CanRun())
+        {
+            command.Run();
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>A heading cannot be chosen, so a press on it, but not on its +, selects nothing.</summary>
+    private static void OnHeadingPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var ancestors = (e.Source as Visual)?.GetSelfAndVisualAncestors().ToList() ?? [];
+
+        if (ancestors.OfType<ListBoxItem>().FirstOrDefault() is { DataContext: SidebarHeading } && !ancestors.OfType<Button>().Any())
+        {
+            e.Handled = true;
+        }
     }
 
     /// <summary>
