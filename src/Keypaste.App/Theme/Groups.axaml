@@ -101,6 +101,10 @@
   <Style Selector="Button.press-to-copy:pointerover /template/ Border#Surface">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
   </Style>
+  <!-- Fluent's Button shrinks on a press, which would resample the value drawn in it; the pressed surface is feedback enough. -->
+  <Style Selector="Button.press-to-copy:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
   <Style Selector="Button.press-to-copy:pressed /template/ Border#Surface">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
