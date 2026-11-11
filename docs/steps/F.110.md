@@ -13,3 +13,5 @@ Built in stages with a review after each; the review findings were fixed, includ
 ## Limits and follow-ups
 
 The design of New item, the generator, the add buttons and the suggestions is not yet cohesive with the rest, by the founder's review of 2026-11-11; the options sketched that day are for a later choice. Changing an item's kind is open.
+
+Main's runs: ci 43022862058 green at `d499355b`; app 43025440381 at `540aa47f` green on its second attempt. Its first attempt failed `LockedNoticeTests.A_vault_chosen_while_the_app_stays_locked_is_listened_for_in_place_of_the_one_before` on macOS, which then hung until the job's time limit; that test covers the locked-app notice, which this work did not touch, and the rerun of the failed job alone passed. First occurrence, recorded here. The same push pinned `System.Formats.Cbor` to 10.0.15 for CVE-2026-118747, published overnight against 10.0.12, which reached the desktop through Yubico's SDK and failed every desktop restore.
