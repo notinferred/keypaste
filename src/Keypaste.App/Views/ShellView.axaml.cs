@@ -37,6 +37,7 @@ internal sealed partial class ShellView : UserControl
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
         this.FindControl<ListBox>("RailNav")!.AddHandler(TappedEvent, OnRailPlaceTapped);
+        this.FindControl<Button>("SidebarAdd")!.Click += OnSidebarAdd;
 
         AddHandler(GotFocusEvent, (_, e) => _lastFocused = e.Source as Visual);
         AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Bubble);
@@ -88,11 +89,30 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as the rail does.</summary>
+    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as the rail does, and with neither the foot moves up to the titlebar.</summary>
     private void PlaceSidebar()
     {
         var beside = _shell is { ShowsSidebar: true, SidebarOverlays: false };
         var title = this.FindControl<Grid>("TitleColumns")!;
+        this.FindControl<Border>("TitleBar")!.Classes.Set("beside-sidebar", beside);
+        this.FindControl<Border>("TitleOverSidebar")!.IsVisible = beside;
+        var foot = this.FindControl<Border>("VaultFoot")!;
+        var sidebarSlot = this.FindControl<Decorator>("SidebarFootSlot")!;
+        var titleSlot = this.FindControl<Decorator>("TitleFootSlot")!;
+        var noRoomBelow = _shell is { ShowsSidebar: false, ShowsRail: false };
+        foot.Classes.Set("in-titlebar", noRoomBelow);
+
+        if (noRoomBelow && titleSlot.Child != foot)
+        {
+            sidebarSlot.Child = null;
+            titleSlot.Child = foot;
+        }
+        else if (!noRoomBelow && sidebarSlot.Child != foot)
+        {
+            titleSlot.Child = null;
+            sidebarSlot.Child = foot;
+        }
+
         title.Margin = WindowChrome.CaptionInset(InterfaceZoom.Factor);
         title.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset(InterfaceZoom.Factor));
         var collapsed = _shell is { ShowsRail: true } or { SidebarOverlays: true } ? WindowChrome.RailWidth : 0;
@@ -118,6 +138,12 @@ internal sealed partial class ShellView : UserControl
 
     private void HandOnTheKeyboard()
     {
+        // What holds the keyboard still shows, so nothing was lost; handing on again would focus it twice.
+        if (_lastFocused is Control { IsFocused: true, IsEffectivelyVisible: true })
+        {
+            return;
+        }
+
         var showSidebar = this.FindControl<Button>("ShowSidebar")!;
 
         // At 840 and wider the button's hand-off stays as Q.18 left it.
@@ -132,11 +158,11 @@ internal sealed partial class ShellView : UserControl
         {
             if (fromButton && shell.SelectedRailPlace is { } place)
             {
-                this.FindControl<ListBox>("RailNav")!.ContainerFromItem(place)?.Focus(NavigationMethod.Directional);
+                GiveFocus(this.FindControl<ListBox>("RailNav")!.ContainerFromItem(place), NavigationMethod.Directional);
             }
             else
             {
-                this.FindControl<Button>("RailGroups")!.Focus(NavigationMethod.Tab);
+                GiveFocus(this.FindControl<Button>("RailGroups"), NavigationMethod.Tab);
             }
         }
         else if (_shell is { ShowsSidebar: true })
@@ -145,7 +171,16 @@ internal sealed partial class ShellView : UserControl
         }
         else
         {
-            showSidebar.Focus(NavigationMethod.Tab);
+            GiveFocus(showSidebar, NavigationMethod.Tab);
+        }
+    }
+
+    // Focusing a control that already holds focus adds its focus adorner a second time and throws.
+    private static void GiveFocus(Control? control, NavigationMethod method)
+    {
+        if (control is { IsFocused: false })
+        {
+            control.Focus(method);
         }
     }
 
@@ -224,6 +259,19 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
+    /// <summary>The sidebar's add menu, at its button.</summary>
+    private void OnSidebarAdd(object? sender, RoutedEventArgs e)
+    {
+        if (Commands is null || sender is not Button button)
+        {
+            return;
+        }
+
+        var menu = AppMenu.Context(Commands.SidebarAdd);
+        FlyoutBase.SetAttachedFlyout(button, menu);
+        menu.ShowAt(button);
+    }
+
     /// <summary>
     /// A row's context menu, from a right-click, the menu key or Shift+F10, which Avalonia raises as one request,
     /// and from a Control-click on macOS: the row's commands from the menus, at the pointer or at the row.
@@ -295,7 +343,7 @@ internal sealed partial class ShellView : UserControl
         var chosen = _shell?.SelectedFooter is { } footer
             ? this.FindControl<ListBox>("FooterNav")!.ContainerFromItem(footer)
             : _shell?.SelectedSidebarRow is { } row ? this.FindControl<ListBox>("Nav")!.ContainerFromItem(row) : null;
-        chosen?.Focus(NavigationMethod.Directional);
+        GiveFocus(chosen, NavigationMethod.Directional);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -436,15 +484,19 @@ internal sealed partial class ShellView : UserControl
     }
 
     /// <summary>Find from another place has only just asked for Items, so the field is there once it has been drawn.</summary>
-    private void OnSearchFocusRequested(object? sender, EventArgs e) =>
+    private void OnSearchFocusRequested(object? sender, EventArgs e)
+    {
+        this.GetVisualDescendants().OfType<EntriesView>().FirstOrDefault()?.MakeSearchReachable();
+
         Dispatcher.UIThread.Post(
             () =>
             {
-                if (this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "ShellSearch") is { } search)
+                if (this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "ShellSearch" && box.IsEffectivelyVisible) is { } search)
                 {
                     search.Focus();
                     search.SelectAll();
                 }
             },
             DispatcherPriority.Loaded);
+    }
 }

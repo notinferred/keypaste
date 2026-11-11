@@ -397,7 +397,7 @@ internal sealed partial class App : Application, IDisposable
     private void NoteUntouchedLayout(object? sender, EventArgs e)
     {
         _window!.Opened -= NoteUntouchedLayout;
-        _untouchedLayout = _window.Layout(null, false);
+        _untouchedLayout = _window.Layout(false);
     }
 
     /// <summary>Keeps how the window stands in <c>app.toml</c>, on close, lock and quit; with no shell, what the last one left. A window nobody has touched since its first opening has nothing to keep, so the file stays as it was.</summary>
@@ -412,7 +412,7 @@ internal sealed partial class App : Application, IDisposable
 
         var tables = _shell?.Tables;
 
-        if (_window.Layout(_shell is { } shell ? shell.ListShare : left?.ListShare, _shell?.SidebarHidden ?? left?.SidebarHidden ?? false, tables is null ? left?.TableSorts : tables.SortsText, tables is null ? left?.TableWidths : tables.WidthsText) is { } layout
+        if (_window.Layout(_shell?.SidebarHidden ?? left?.SidebarHidden ?? false, tables is null ? left?.TableSorts : tables.SortsText, tables is null ? left?.TableWidths : tables.WidthsText) is { } layout
             && (left is not null || layout != _untouchedLayout))
         {
             _preferences.KeepWindow(layout);

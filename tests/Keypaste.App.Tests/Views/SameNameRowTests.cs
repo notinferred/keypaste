@@ -3,7 +3,6 @@ using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
-using Keypaste.App.Views;
 using Keypaste.Core;
 using Xunit;
 
@@ -13,25 +12,14 @@ namespace Keypaste.App.Tests.Views;
 public sealed class SameNameRowTests
 {
     [Fact]
-    public Task The_tell_shows_after_the_title_only_while_the_contact_columns_are_away() => HeadlessSession.On(() =>
+    public Task The_tell_shows_after_the_title_of_each_item_sharing_a_name() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: Seed);
         shell.Show<EntriesViewModel>(DestinationKind.Entries);
         RenderedShell.Drain();
 
-        Assert.Empty(Tells(shell));
-
-        var width = shell.Window.Width;
-        shell.Window.Width = 720 * InterfaceZoom.Factor;
-        RenderedShell.Drain();
-
         Assert.Equal(["alice@example.test", "bob@example.test"], Tells(shell).Select(tell => tell.Text).Order());
         Assert.All(Tells(shell), tell => Assert.Equal(tell.Text, ToolTip.GetTip(tell)));
-
-        shell.Window.Width = width;
-        RenderedShell.Drain();
-
-        Assert.Empty(Tells(shell));
     });
 
     [Fact]

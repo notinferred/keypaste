@@ -1,0 +1,164 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:Keypaste.App.Controls">
+
+  <!--
+    Grouped rows, the design's replacement for boxes and per-field cards.
+      Border.group           a group's surface, holding a ctl:GroupedRows of rows with hairlines between them
+      ctl:FieldRow           a row: label, value, quiet actions; add stacked for a field a person types in, mono-label for a machine name
+      ctl:PressToCopy        a value that copies when pressed, on Button
+  -->
+
+  <Style Selector="Border.group">
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+  </Style>
+
+  <Style Selector="ctl|FieldRow">
+    <Setter Property="Margin" Value="16,0" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+        <Border Name="Rule" Height="1" VerticalAlignment="Top" Background="{DynamicResource KpBorderSubtle}" IsVisible="False" />
+        <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,6">
+          <TextBlock Name="Label"
+                     Classes="label"
+                     Text="{TemplateBinding Label}"
+                     ToolTip.Tip="{TemplateBinding Label}"
+                     TextTrimming="CharacterEllipsis"
+                     VerticalAlignment="Center" />
+          <ContentPresenter Name="PART_ContentPresenter"
+                            Grid.Column="1"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          <ContentPresenter Name="Actions"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Content="{TemplateBinding Actions}" />
+        </Grid>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ctl|FieldRow:follows /template/ Border#Rule">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="ctl|FieldRow.stacked /template/ TextBlock#Label">
+    <Setter Property="Grid.ColumnSpan" Value="3" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+  </Style>
+  <Style Selector="ctl|FieldRow.stacked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Grid.Row" Value="1" />
+    <Setter Property="Grid.Column" Value="0" />
+    <Setter Property="Grid.ColumnSpan" Value="2" />
+  </Style>
+  <Style Selector="ctl|FieldRow.stacked /template/ ContentPresenter#Actions">
+    <Setter Property="Grid.Row" Value="1" />
+  </Style>
+  <Style Selector="ctl|FieldRow.mono-label /template/ TextBlock#Label">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="ctl|FieldRow.top-label /template/ TextBlock#Label">
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+
+  <Style Selector="Button.press-to-copy">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Padding" Value="6,4" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Surface" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource KpRadiusField}" Padding="{TemplateBinding Padding}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <ContentPresenter Name="Value"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="Center" />
+            <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center">
+              <ctl:KpIcon Name="CopyGlyph" Icon="copy" Size="14" Foreground="{DynamicResource KpTextMuted}" Opacity="0" />
+              <ctl:KpIcon Name="CheckGlyph" Icon="check" Size="14" Foreground="{DynamicResource KpOk}" Opacity="0" />
+            </Panel>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.press-to-copy:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+  </Style>
+  <!-- Fluent's Button shrinks on a press, which would resample the value drawn in it; the pressed surface is feedback enough. -->
+  <Style Selector="Button.press-to-copy:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <Style Selector="Button.press-to-copy:pressed /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+  <Style Selector="Button.press-to-copy:pointerover /template/ ctl|KpIcon#CopyGlyph, Button.press-to-copy:focus-visible /template/ ctl|KpIcon#CopyGlyph">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.press-to-copy:copied /template/ ctl|KpIcon#CopyGlyph">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="Button.press-to-copy:copied /template/ ctl|KpIcon#CheckGlyph">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.press-to-copy:disabled">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <!-- A row of the two-line list: a tile, title and one secondary line, and an optional time. -->
+  <Style Selector="ListBox.two-line > ListBoxItem">
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Border.row-tile">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+
+  <Style Selector="Border.vault-foot">
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="Padding" Value="8,8,0,0" />
+    <Setter Property="Margin" Value="0,8,0,0" />
+  </Style>
+  <Style Selector="Border.vault-foot.in-titlebar">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="8,0,0,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+
+  <Style Selector="Button.foot-lock">
+    <Setter Property="Height" Value="26" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="8,0" />
+  </Style>
+  <Style Selector="Button.foot-lock /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="Button.foot-lock:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+</Styles>

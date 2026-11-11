@@ -63,7 +63,7 @@ public sealed class GeneratePasswordTests : IDisposable
     }
 
     [Fact]
-    public void Generate_on_the_saved_password_opens_Edit_with_one_and_Save_keeps_the_old_in_history()
+    public void Generate_on_the_saved_password_opens_Edit_with_the_generator_and_Save_keeps_the_old_in_history()
     {
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
@@ -73,6 +73,9 @@ public sealed class GeneratePasswordTests : IDisposable
         detail.GeneratePasswordCommand.Execute(null);
 
         Assert.True(detail.IsEditing);
+        Assert.False(detail.NewPassword.HasValue);
+        detail.NewPasswordGenerator!.ApplyCommand.Execute(null);
+
         Assert.True(detail.NewPassword.IsGenerated);
         Assert.Equal(PasswordGenerator.DefaultLength, detail.NewPassword.MaskedLength);
 
@@ -87,7 +90,48 @@ public sealed class GeneratePasswordTests : IDisposable
     }
 
     [Fact]
-    public void Generate_on_a_protected_field_fills_its_replace_form_follows_the_choices_and_writes_on_Replace()
+    public void Cancel_on_the_saved_passwords_generator_leaves_nothing_for_Save_to_write()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var before = context.Vault.Find(_checking)!.Password;
+
+        detail.GeneratePasswordCommand.Execute(null);
+        detail.NewPasswordGenerator!.CancelCommand.Execute(null);
+
+        Assert.True(detail.IsEditing);
+        Assert.False(detail.HasGeneratorPanel);
+        Assert.False(detail.NewPassword.HasValue);
+
+        detail.SaveCommand.Execute(null);
+
+        Assert.Equal(before, context.Vault.Find(_checking)!.Password);
+    }
+
+    [Fact]
+    public void Applying_the_new_passwords_choices_leaves_a_value_generated_in_another_field_as_it_was()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.BeginAddFieldCommand.Execute(null);
+        detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
+        detail.NewFieldGenerator!.ApplyCommand.Execute(null);
+        var field = detail.NewFieldValue.Compose();
+
+        detail.EditCommand.Execute(null);
+        detail.OpenGeneratorCommand.Execute(null);
+        var panel = detail.NewPasswordGenerator!;
+        panel.Generator.UseWords = true;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+
+        Assert.Equal(chosen, detail.NewPassword.Compose());
+        Assert.Equal(field, detail.NewFieldValue.Compose());
+        Assert.True(detail.Generator.UseWords);
+    }
+
+    [Fact]
+    public void Generate_on_a_protected_field_opens_its_replace_form_with_the_generator_and_writes_on_Replace()
     {
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
@@ -99,13 +143,14 @@ public sealed class GeneratePasswordTests : IDisposable
         pin.GenerateCommand.Execute(null);
 
         Assert.Same(pin, detail.ReplacingField);
-        Assert.True(detail.ReplacementFieldValue.IsGenerated);
-        var characters = detail.ReplacementFieldValue.MaskedLength;
+        Assert.False(detail.ReplacementFieldValue.HasValue);
+        var panel = detail.ReplacementFieldGenerator!;
+        panel.Generator.UseWords = true;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
 
-        detail.Generator.UseWords = true;
-
         Assert.True(detail.ReplacementFieldValue.IsGenerated);
-        Assert.NotEqual(characters, detail.ReplacementFieldValue.MaskedLength);
+        Assert.Equal(chosen, detail.ReplacementFieldValue.Compose());
 
         detail.ConfirmReplaceFieldCommand.Execute(null);
 
@@ -122,6 +167,7 @@ public sealed class GeneratePasswordTests : IDisposable
         var pin = detail.Fields.Single(field => field.Name == "PIN");
 
         pin.GenerateCommand.Execute(null);
+        detail.ReplacementFieldGenerator!.ApplyCommand.Execute(null);
         detail.Generator.Length = 32;
 
         Assert.True(detail.ReplacementFieldValue.IsGenerated);
@@ -136,6 +182,7 @@ public sealed class GeneratePasswordTests : IDisposable
         var pin = detail.Fields.Single(field => field.Name == "PIN");
 
         pin.GenerateCommand.Execute(null);
+        detail.ReplacementFieldGenerator!.ApplyCommand.Execute(null);
         detail.Generator.Letters = false;
         detail.Generator.Digits = false;
         detail.Generator.Symbols = false;
@@ -165,6 +212,7 @@ public sealed class GeneratePasswordTests : IDisposable
         var before = context.Vault.Find(_checking)!.Password;
 
         detail.GeneratePasswordCommand.Execute(null);
+        detail.NewPasswordGenerator!.ApplyCommand.Execute(null);
         detail.Generator.Letters = false;
         detail.Generator.Digits = false;
         detail.Generator.Symbols = false;
@@ -175,6 +223,83 @@ public sealed class GeneratePasswordTests : IDisposable
 
         Assert.True(detail.IsEditing);
         Assert.Equal(before, context.Vault.Find(_checking)!.Password);
+    }
+
+    [Fact]
+    public void A_field_forms_generator_fills_only_its_field_and_only_on_Apply()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.BeginAddFieldCommand.Execute(null);
+
+        detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
+        var panel = detail.NewFieldGenerator!;
+
+        Assert.True(panel.Applies);
+        Assert.Null(detail.NewPasswordGenerator);
+        Assert.False(detail.NewFieldValue.HasValue);
+
+        panel.CancelCommand.Execute(null);
+        Assert.Null(detail.NewFieldGenerator);
+        Assert.False(detail.NewFieldValue.HasValue);
+
+        detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
+        panel = detail.NewFieldGenerator!;
+        panel.Generator.UseWords = true;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+
+        Assert.Null(detail.NewFieldGenerator);
+        Assert.Equal(chosen, detail.NewFieldValue.Compose());
+        Assert.True(detail.NewFieldValue.IsGenerated);
+        Assert.True(detail.Generator.UseWords);
+
+        detail.CancelAddFieldCommand.Execute(null);
+        Assert.False(detail.HasGeneratorPanel);
+    }
+
+    [Fact]
+    public void Edits_generator_puts_its_value_in_the_new_password_on_Apply_and_closes_with_the_edit()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.EditCommand.Execute(null);
+
+        detail.OpenGeneratorCommand.Execute(null);
+        var panel = detail.NewPasswordGenerator!;
+        Assert.True(panel.OffersNewItem);
+        Assert.False(detail.NewPassword.HasValue);
+
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+        Assert.Equal(chosen, detail.NewPassword.Compose());
+
+        detail.OpenGeneratorCommand.Execute(null);
+        Assert.Equal(chosen, detail.NewPasswordGenerator!.Reveal());
+        detail.CancelCommand.Execute(null);
+
+        Assert.False(detail.IsEditing);
+        Assert.False(detail.HasGeneratorPanel);
+    }
+
+    [Fact]
+    public void Edits_username_box_suggests_the_vaults_usernames_once_something_is_typed()
+    {
+        using var context = new Context(_vaultPath);
+        context.Vault.AddEntry(new VaultEntry { Title = "mail", Username = "dan@example.com", Password = "dan-secret-password" });
+        var detail = context.Open(_checking);
+
+        detail.EditCommand.Execute(null);
+        Assert.Empty(detail.SuggestedUsernames);
+
+        detail.DraftUsername = "example";
+
+        Assert.Contains("dan@example.com", detail.SuggestedUsernames);
+        Assert.DoesNotContain(detail.SuggestedUsernames, username => username.Contains("secret", StringComparison.Ordinal));
+        Assert.NotNull(detail.SuggestedUsernamesSpoken);
+
+        detail.CancelCommand.Execute(null);
+        Assert.Empty(detail.SuggestedUsernames);
     }
 
     [Fact]

@@ -83,6 +83,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private Action? _discard;
     private Action? _keep;
     private bool _disposed;
+    private SecretField? _newItemPassword;
 
     internal ShellViewModel(
         AppVaultSession session,
@@ -110,7 +111,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
         SidebarHidden = Preferences.Current.Window?.SidebarHidden ?? false;
-        ListShare = Preferences.Current.Window?.ListShare;
         Tables = TableStates.Read(Preferences.Current.Window?.TableSorts, Preferences.Current.Window?.TableWidths);
         _clock = clock ?? TimeProvider.System;
         _post = post;
@@ -237,9 +237,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the sidebar lies over the content rather than beside it.</summary>
     internal bool SidebarOverlays => IsNarrow && SidebarOpenedOver;
-
-    /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
-    internal int? ListShare { get; set; }
 
     /// <summary>How each table was sorted and sized, which outlives the screens drawing them and is kept with the window.</summary>
     internal TableStates Tables { get; }
@@ -956,8 +953,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, table: Tables.Log, openAgents: OpenAgents),
-            DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true, table: Tables.Log),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
@@ -981,7 +977,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke() };
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
@@ -1003,7 +999,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     });
 
     private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory), Clipboard, _web) { RulesForEveryAgent = Authority is null ? null : new AgentRulesViewModel(Authority) };
+        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.Log), Clipboard, _web) { RulesForEveryAgent = Authority is null ? null : new AgentRulesViewModel(Authority) };
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -1097,28 +1093,43 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         var detail = (Content as EntriesViewModel)?.Detail;
         GeneratorDialog = new GeneratePasswordViewModel(
             Clipboard,
-            NewItemWith,
+            value => NewItemWith(value, CloseGenerator),
             detail is null ? null : (value, name) => detail.AddGeneratedField(name, value),
             detail?.Name.Title,
             CloseGenerator);
     }
 
     // New item with the generated value as its password, taken character by character into the form's own field.
-    private void NewItemWith(SecretField value)
+    private void NewItemWith(SecretField value, Action close)
     {
-        // The generator stays open behind "Discard …?", since closing it disposes the value.
-        Leave(() =>
-        {
-            MoveTo(Destinations.Of(DestinationKind.Entries));
+        // Discarding the form a pane's generator belongs to disposes that generator's value, so the shell holds a copy.
+        DropNewItemPassword();
+        var password = new SecretField(Clipboard);
+        password.TakeFrom(value);
+        _newItemPassword = password;
 
-            if (Content is EntriesViewModel items)
+        // The generator stays open behind "Discard …?", so keeping the draft leaves the panel as it was.
+        Leave(
+            () =>
             {
-                items.BeginAddCommand.Press();
-                items.NewItem?.Password.TakeFrom(value);
-            }
+                MoveTo(Destinations.Of(DestinationKind.Entries));
 
-            CloseGenerator();
-        });
+                if (Content is EntriesViewModel items)
+                {
+                    items.BeginAddCommand.Press();
+                    items.NewItem?.Password.TakeFrom(password);
+                }
+
+                DropNewItemPassword();
+                close();
+            },
+            DropNewItemPassword);
+    }
+
+    private void DropNewItemPassword()
+    {
+        _newItemPassword?.Dispose();
+        _newItemPassword = null;
     }
 
     [RelayCommand]
@@ -1899,6 +1910,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         Recommendations.Dispose();
         CloseDiscardPrompt();
+        DropNewItemPassword();
         CloseShare();
         CloseGenerator();
 

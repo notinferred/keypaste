@@ -251,8 +251,6 @@ public sealed class ScreenRenderer
         Save(window, output, "60-empty-projects");
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         Save(window, output, "60-agents-unavailable");
-        shell.Current = Destinations.Of(DestinationKind.AgentHistory);
-        Save(window, output, "60-empty-agent-history");
         shell.Current = Destinations.Of(DestinationKind.Log);
         Save(window, output, "60-empty-log");
         shell.Current = Destinations.Of(DestinationKind.Settings);
@@ -895,11 +893,11 @@ public sealed class ScreenRenderer
         agentsScreen.AddMcpManuallyCommand.Execute(null);
         WindowInput.Drain();
         Save(window, output, "02-agents-connections-manual");
-        agentsScreen.Tab = Keypaste.App.Resources.Strings.Agents;
+        agentsScreen.Choose(agentsScreen.Rows.Single(row => row.IsEveryOther));
         WindowInput.Drain();
         Save(window, output, "02-agents-tab");
         var rules = agentsScreen.RulesForEveryAgent!;
-        var card = window.GetVisualDescendants().OfType<Border>().First(border => border.Name == "AgentRulesCard");
+        var card = window.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Name == "AgentRulesCard");
         scroller = card.GetVisualAncestors().OfType<ScrollViewer>().First();
         scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);
         WindowInput.Drain();
@@ -1026,6 +1024,18 @@ public sealed class ScreenRenderer
         Save(window, output, "12-secrets-menu");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = false;
 
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = true;
+        Save(window, output, "13i-items-add-menu");
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
+
+        var sidebarAdd = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarAdd");
+        sidebarAdd.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Save(window, output, "16f-sidebar-add-menu");
+        var sidebarMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarAdd)!;
+        Save(TopLevel.GetTopLevel(sidebarMenu.Items.OfType<MenuItem>().First())!, output, "16f-sidebar-add-menu-popup");
+        sidebarMenu.Hide();
+        WindowInput.Drain();
+
         entries.SelectedGroup = entries.Groups[0];
         entries.BeginAddCommand.Press();
         Save(window, output, "13-secrets-new");
@@ -1033,6 +1043,30 @@ public sealed class ScreenRenderer
         window.Width = 720 * InterfaceZoom.Factor;
         Save(window, output, "13d-secrets-new-720");
         window.Width = newItemWidth;
+
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = true;
+        Save(window, output, "13e-secrets-new-field-options");
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = false;
+
+        // The username box offers the usernames the vault already uses.
+        var usernameBox = window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(box => box.Name == "NewEntryUsername");
+        entries.NewItem!.Username = authority.Session.Unlocked!.ReadUsernames()[0][..1];
+        usernameBox.IsDropDownOpen = true;
+        Save(window, output, "13h-secrets-new-username-suggestions");
+        if (usernameBox.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is { } suggestions && TopLevel.GetTopLevel(suggestions) is { } suggestionsPopup)
+        {
+            Save(suggestionsPopup, output, "13h-secrets-new-username-suggestions-popup");
+        }
+
+        usernameBox.IsDropDownOpen = false;
+        entries.NewItem.Username = string.Empty;
+
+        entries.NewItem!.OpenGeneratorCommand.Execute(null);
+        Save(window, output, "13f-secrets-new-generator");
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "13g-secrets-new-generator-720");
+        window.Width = newItemWidth;
+        entries.NewItem.CloseGeneratorCommand.Execute(null);
         entries.CancelAddCommand.Press();
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
@@ -1136,6 +1170,11 @@ public sealed class ScreenRenderer
         entries.Detail.GeneratePasswordCommand.Press();
         Save(window, output, "20b-secrets-edit-generated");
         entries.Detail.CancelCommand.Press();
+
+        entries.Detail.BeginAddFieldCommand.Press();
+        entries.Detail.OpenFieldGeneratorCommand.Press(entries.Detail.NewFieldValue);
+        Save(window, output, "20e-secrets-add-field-generator");
+        entries.Detail.CancelAddFieldCommand.Press();
 
         shell.OpenGeneratorCommand.Press();
         Save(window, output, "13b-secrets-generate");
@@ -1705,7 +1744,6 @@ public sealed class ScreenRenderer
         Save(window, output, "93a-trash-no-selection");
         trash.Selected = trash.Rows[0];
         Save(window, output, "93-trash-rows");
-        SaveSorted(window, shell, "93-trash-rows", output);
 
         trash.PurgeCommand.Press();
         Save(window, output, "94-trash-confirm");
@@ -1994,6 +2032,9 @@ public sealed class ScreenRenderer
 
         project.BeginAddCommand.Press();
         Save(window, output, "41-env-add");
+        project.OpenGeneratorCommand.Press(project.NewValue);
+        Save(window, output, "41d-env-add-generator");
+        project.NewValueGenerator!.CancelCommand.Press();
         project.ConfirmAddCommand.Press();
         Save(window, output, "41c-env-key-needs-a-name");
         window.Width = 720 * InterfaceZoom.Factor;
@@ -2048,7 +2089,7 @@ public sealed class ScreenRenderer
     /// <summary>A value shown in its cell, with the toggle saying Hide, then hidden again.</summary>
     private static void DrawRevealed(Window window, string output, string cellName, string frame)
     {
-        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == cellName);
+        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == cellName && value.IsEffectivelyVisible);
         cell.BeginReveal();
         Save(window, output, frame);
         cell.EndReveal();

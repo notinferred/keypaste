@@ -164,11 +164,15 @@ internal sealed class AppCommands
         _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var removePairing = Routed(Strings.RemovePairing, () => Settings()?.BrowserFill, browser => browser.AskRemoveCommand, _ => Target<PairingItem>());
         var exportReferences = Routed(Strings.ExportEnvKeypasteLabel, Project, project => project.ExportReferencesCommand);
+        var newProject = Routed(Strings.NewProjectLabel, Unmodal, shell => shell.NewProjectCommand);
+        var importFromAnotherApp = new AppCommand(ImportHeader, [], CanImport, () => Unmodal()?.ImportCommand.Press());
+        var importEnv = new AppCommand(Strings.ImportEnvLabel, [], () => Unmodal() is not null, () => Unmodal()?.ImportEnvCommand.Press());
         var file = new AppMenuGroup(Strings.FileMenu,
         [
             new AppCommand(Strings.NewItemLabel, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
+            Folder(Strings.NewItemByType, [.. TemplateChoice.All.Select(kind => new AppCommand(kind.MenuLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginAddOfKindCommand.Press(kind.Template))))]),
             _newGroup,
-            Routed(Strings.NewProjectLabel, Unmodal, shell => shell.NewProjectCommand),
+            newProject,
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,
             _openVault,
@@ -180,8 +184,8 @@ internal sealed class AppCommands
             new AppCommand(Strings.CloseWindow, Chord(Key.W), () => host.Window() is { IsVisible: true }, () => host.Window()?.Close()),
             lockNow,
             _line,
-            new AppCommand(ImportHeader, [], CanImport, () => Unmodal()?.ImportCommand.Press()),
-            new AppCommand(Strings.ImportEnvLabel, [], () => Unmodal() is not null, () => Unmodal()?.ImportEnvCommand.Press()),
+            importFromAnotherApp,
+            importEnv,
             new AppCommand(Strings.ExportLabel, [], () => Unmodal() is not null, Export),
             exportReferences,
             _line,
@@ -236,7 +240,7 @@ internal sealed class AppCommands
 
         var groupsAndProjects = new AppCommand(Strings.ShowGroupsAndProjects, [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
-        var resetTable = new AppCommand(Strings.ResetTableOrderAndWidths, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
+        var resetTable = new AppCommand(Strings.ResetListOrder, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
 
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =
@@ -338,13 +342,13 @@ internal sealed class AppCommands
         var agentSettings = new AppCommand(
             Strings.AgentSettingsLabel,
             [],
-            () => Agents() is not null && Target<AgentRow>() is { HasSettings: true, IsOpen: false },
+            () => Agents() is { } agents && Target<AgentRow>() is { HasSettings: true } row && (!agents.IsOpened || agents.Selected != row),
             OpenAgentSettings);
         var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
         var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
         var disconnect = Routed(Strings.DisconnectLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
         var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
-        var agentHistory = Routed(Strings.AgentHistory, Agents, agents => agents.OpenHistoryCommand);
+        var openActivity = Routed(Strings.Activity, Agents, agents => agents.OpenActivityCommand);
         var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
         var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
         var verifyChain = Routed(Strings.VerifyChain, Log, log => log.VerifyCommand) with { Says = () => Log()?.VerifyLabel ?? Strings.VerifyChain };
@@ -381,6 +385,7 @@ internal sealed class AppCommands
         _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
         _weakPasswordMenu = [openWeakPassword, _line, dismissFinding, reviewFindingAgain];
         _pairingMenu = [removePairing];
+        SidebarAdd = [_newGroup, newProject, _line, importFromAnotherApp, importEnv, _line, share];
 
         // Edit has Delete, and File has New group, so the item menu leaves them out. What acts on one row sits in its own submenu.
         var item = new AppMenuGroup(Strings.ItemMenu,
@@ -415,7 +420,7 @@ internal sealed class AppCommands
             agentSettings, connect, connectAgain, disconnect, _line,
             copySetupPrompt, connectAnApp, addMcpManually, _line,
             showPrompt, _line,
-            agentHistory, verifyChain, copyHash, refreshLog, showWholeLog, _line,
+            openActivity, verifyChain, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,
             deleteReport,
         ]);
@@ -435,6 +440,9 @@ internal sealed class AppCommands
 
     /// <summary>File, Edit, Item, Project, Agents, View, Window and Help.</summary>
     internal IReadOnlyList<AppMenuGroup> Menus { get; }
+
+    /// <summary>The sidebar's add menu: what belongs to the navigation, each the same command as the menus'.</summary>
+    internal IReadOnlyList<AppMenuEntry> SidebarAdd { get; }
 
     /// <summary>The macOS Dock icon's menu.</summary>
     internal IReadOnlyList<AppMenuEntry> Dock { get; }
@@ -774,9 +782,9 @@ internal sealed class AppCommands
 
     private void OpenAgentSettings()
     {
-        if (Agents() is not null && Target<AgentRow>() is { } agent)
+        if (Agents() is { } agents && Target<AgentRow>() is { } agent)
         {
-            agent.IsOpen = true;
+            agents.Open(agent);
         }
     }
 

@@ -141,7 +141,7 @@ public sealed class AppCommandsTests : IDisposable
         foreach (var header in new[]
         {
             "Rotate", "Show history", "Copy the reference", "Add field…", "New project…", "Export .env.keypaste…", "Run in a terminal", "Empty Trash",
-            "New token…", "Revoke token", "Revoke link", "Agent history", "Copy the TOTP code", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
+            "New token…", "Revoke token", "Revoke link", "Activity", "Copy the TOTP code", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
             "Add one-time code…", "Replace the one-time code…", "Remove the one-time code",
         })
         {

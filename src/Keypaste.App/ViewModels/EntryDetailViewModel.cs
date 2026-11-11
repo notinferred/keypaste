@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -38,7 +39,9 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
     private SecretField? _generatedInto;
+    private GeneratePasswordViewModel? _generatorPanel;
     private readonly AppVaultSession _session;
+    private UsernameSuggestions _usernames = new(null);
     private readonly ClipboardCountdown _clipboard;
     private readonly Action<EntryName> _restored;
     private readonly IWebLauncher? _web;
@@ -99,10 +102,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             },
             () => ReplacingField is not null);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
+        OpenGeneratorCommand = new RelayCommand(() => OpenGeneratorFor(NewPassword), () => IsEditing);
+        OpenFieldGeneratorCommand = new RelayCommand<SecretField>(field => OpenGeneratorFor(field));
+        CloseGeneratorCommand = new RelayCommand(CloseGenerator);
         GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => HasPassword && !IsEditing);
+        // While the panel is open, its Apply is what changes these choices, and the value it hands over is the one shown.
         Generator.PropertyChanged += (_, _) =>
         {
-            if (_generatedInto is { IsGenerated: true } field)
+            if (_generatorPanel is null && _generatedInto is { IsGenerated: true } field)
             {
                 GenerateInto(field);
             }
@@ -325,6 +332,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
                 OnPropertyChanged(nameof(HasOwnPrimary));
                 ConfirmReplaceFieldCommand.NotifyCanExecuteChanged();
                 CancelReplaceFieldCommand.NotifyCanExecuteChanged();
+                CloseGeneratorFor(ReplacementFieldValue);
                 ReplacementFieldValue.Clear();
             }
         }
@@ -335,8 +343,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding, replacing or renaming a field.</summary>
     internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField || IsSettingTotp;
 
-    /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
-    internal bool TakesWholeView => IsEditing || History.IsOpen;
+    /// <summary>Whether the item takes the whole of Items rather than sharing it with the list: while two revisions are compared.</summary>
+    internal bool TakesWholeView => History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 
@@ -587,7 +595,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Generate, beside a form's secret field: a generated value in place of what the field holds.</summary>
     internal RelayCommand<SecretField> GenerateIntoCommand { get; }
 
-    /// <summary>Generate, on the saved password: Edit fields with a generated password, which Save writes and history keeps the old one of.</summary>
+    /// <summary>Generate, on the saved password: Edit fields with the generator open, whose Apply fills the new password that Save writes and history keeps the old one of.</summary>
     internal RelayCommand GeneratePasswordCommand { get; }
 
     /// <summary>Adds a generated value as a new protected field, as Generate password's Add as a field asks, through Add a field's own write.</summary>
@@ -602,18 +610,127 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ConfirmAddFieldCommand.Press();
     }
 
-    /// <summary>Generate, on a protected field: its replace form with a generated value, which Save writes and history keeps the old one of.</summary>
+    /// <summary>Generate, on a protected field: its replace form with the generator open, whose Apply fills the value Replace writes and history keeps the old one of.</summary>
     internal void GenerateField(EntryFieldRow row) =>
         LeavingFieldForm(() =>
         {
             OpenReplaceField(row);
-            GenerateInto(ReplacementFieldValue);
+            OpenGeneratorFor(ReplacementFieldValue);
         });
 
     private void GeneratePassword()
     {
         BeginEdit();
-        GenerateInto(NewPassword);
+        OpenGeneratorFor(NewPassword);
+    }
+
+    /// <summary>Generate, beside the new password: the generator, whose Apply puts its value in the field.</summary>
+    internal RelayCommand OpenGeneratorCommand { get; }
+
+    /// <summary>Generate, beside a field form's value: the generator, whose Apply puts its value in that field.</summary>
+    internal RelayCommand<SecretField> OpenFieldGeneratorCommand { get; }
+
+    /// <summary>The generator while it is open for the new password, else null.</summary>
+    internal GeneratePasswordViewModel? NewPasswordGenerator => GeneratorFor(NewPassword);
+
+    /// <summary>The generator while it is open for a new field's value, else null.</summary>
+    internal GeneratePasswordViewModel? NewFieldGenerator => GeneratorFor(NewFieldValue);
+
+    /// <summary>The generator while it is open for a replacement value, else null.</summary>
+    internal GeneratePasswordViewModel? ReplacementFieldGenerator => GeneratorFor(ReplacementFieldValue);
+
+    private GeneratePasswordViewModel? GeneratorFor(SecretField field) =>
+        _generatorPanel is { } panel && ReferenceEquals(panel.Target, field) ? panel : null;
+
+    internal RelayCommand CloseGeneratorCommand { get; }
+
+    /// <summary>Starts a new item with a generated value, set by the screen that holds this pane; the second argument closes the panel.</summary>
+    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
+
+    /// <summary>The generator open for one of the pane's fields, or null while it is closed.</summary>
+    internal GeneratePasswordViewModel? GeneratorPanel
+    {
+        get => _generatorPanel;
+        private set
+        {
+            if (SetProperty(ref _generatorPanel, value))
+            {
+                OnPropertyChanged(nameof(HasGeneratorPanel));
+                OnPropertyChanged(nameof(NewPasswordGenerator));
+                OnPropertyChanged(nameof(NewFieldGenerator));
+                OnPropertyChanged(nameof(ReplacementFieldGenerator));
+            }
+        }
+    }
+
+    internal bool HasGeneratorPanel
+    {
+        get => _generatorPanel is not null;
+        set
+        {
+            if (!value)
+            {
+                CloseGenerator();
+            }
+        }
+    }
+
+    private void OpenGeneratorFor(SecretField? field)
+    {
+        if (field is null || GeneratorFor(field) is not null)
+        {
+            return;
+        }
+
+        CloseGenerator();
+        var forPassword = ReferenceEquals(field, NewPassword);
+        GeneratorPanel = new GeneratePasswordViewModel(
+            _clipboard,
+            Generator,
+            field,
+            value => ApplyGenerated(field, value),
+            forPassword ? value => StartNewItemWith?.Invoke(value, CloseGenerator) : null,
+            forPassword ? (value, name) => AddGeneratedField(name, value) : null,
+            Name.Title,
+            CloseGenerator);
+    }
+
+    private void ApplyGenerated(SecretField field, SecretField value)
+    {
+        field.TakeFrom(value);
+        _generatedInto = field;
+        Report(null);
+    }
+
+    private void CloseGeneratorFor(SecretField field)
+    {
+        if (GeneratorFor(field) is not null)
+        {
+            CloseGenerator();
+        }
+    }
+
+    private void CloseGenerator()
+    {
+        var panel = GeneratorPanel;
+        GeneratorPanel = null;
+        panel?.Dispose();
+    }
+
+    partial void OnIsEditingChanged(bool value)
+    {
+        if (!value)
+        {
+            CloseGeneratorFor(NewPassword);
+        }
+    }
+
+    partial void OnIsAddingFieldChanged(bool value)
+    {
+        if (!value)
+        {
+            CloseGeneratorFor(NewFieldValue);
+        }
     }
 
     private void GenerateInto(SecretField? field)
@@ -1045,11 +1162,25 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(CanRemoveTotp), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
-    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(BeginSetTotpCommand), nameof(BeginRemoveTotpCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(OpenGeneratorCommand), nameof(BeginSetTotpCommand), nameof(BeginRemoveTotpCommand))]
     internal partial bool IsEditing { get; private set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SuggestedUsernames), nameof(SuggestedUsernamesSpoken))]
     internal partial string DraftUsername { get; set; } = string.Empty;
+
+    /// <summary>The usernames this vault already uses that hold what is typed, which Edit's username box offers; choosing one fills it.</summary>
+    internal IReadOnlyList<string> SuggestedUsernames => SuggestedFor(DraftUsername);
+
+    /// <summary>Edit's username box's filter, by the same rule as <see cref="SuggestedUsernames"/>.</summary>
+    internal AutoCompleteFilterPredicate<object?> UsernameFilter => UsernameSuggestions.Filter(SuggestedFor);
+
+    private IReadOnlyList<string> SuggestedFor(string typed) => IsEditing && typed != _editOpenedWith.Username ? _usernames.Matching(typed) : [];
+
+    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
+
+    /// <summary>Every username this vault uses, Edit's username box's items, which it narrows as one is typed.</summary>
+    internal IReadOnlyList<string> UsedUsernames => _usernames.Used;
 
     [ObservableProperty]
     internal partial string DraftUrl { get; set; } = string.Empty;
@@ -1148,8 +1279,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     public void Dispose()
     {
+        CloseGenerator();
         FormClosed = null;
         _editOpenedWith = (string.Empty, string.Empty, string.Empty);
+        _usernames = new UsernameSuggestions(null);
+        OnPropertyChanged(nameof(UsedUsernames));
         _entryPath = string.Empty;
         _title = string.Empty;
         _groupPath = string.Empty;
@@ -1665,6 +1799,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     private void BeginEdit()
     {
         _editOpenedWith = (Username, Url, Notes);
+        _usernames = new UsernameSuggestions(_session.Unlocked);
+        OnPropertyChanged(nameof(UsedUsernames));
         DraftUsername = Username;
         DraftUrl = Url;
         DraftNotes = Notes;

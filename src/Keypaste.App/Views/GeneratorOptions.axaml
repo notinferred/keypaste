@@ -20,23 +20,23 @@
     <StackPanel Spacing="8" IsVisible="{Binding UseCharacters}">
       <StackPanel Spacing="6">
         <TextBlock Classes="label" Text="{x:Static res:Strings.Length}" />
-        <StackPanel Orientation="Horizontal" Spacing="12">
-          <NumericUpDown Width="136"
-                         Minimum="{Binding MinimumLength}"
-                         Maximum="{Binding MaximumLength}"
-                         Increment="1"
-                         FormatString="0"
-                         AutomationProperties.Name="{x:Static res:Strings.Length}"
-                         Value="{Binding Length}" />
-          <Slider Width="200"
-                  VerticalAlignment="Center"
-                  Minimum="{Binding MinimumLength}"
-                  Maximum="{Binding MaximumLength}"
-                  TickFrequency="1"
-                  IsSnapToTickEnabled="True"
-                  AutomationProperties.Name="{x:Static res:Strings.Length}"
-                  Value="{Binding Length}" />
-        </StackPanel>
+        <NumericUpDown HorizontalAlignment="Left"
+                       Width="76"
+                       ShowButtonSpinner="False"
+                       Minimum="{Binding MinimumLength}"
+                       Maximum="{Binding MaximumLength}"
+                       Increment="1"
+                       FormatString="0"
+                       AutomationProperties.Name="{x:Static res:Strings.Length}"
+                       Value="{Binding Length}" />
+        <Slider HorizontalAlignment="Left"
+                Width="240"
+                Minimum="{Binding MinimumLength}"
+                Maximum="{Binding MaximumLength}"
+                TickFrequency="1"
+                IsSnapToTickEnabled="True"
+                AutomationProperties.Name="{x:Static res:Strings.Length}"
+                Value="{Binding Length}" />
       </StackPanel>
       <WrapPanel Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
         <CheckBox Content="{x:Static res:Strings.Letters}" IsChecked="{Binding Letters}" />

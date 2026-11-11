@@ -36,6 +36,21 @@ internal sealed partial class GeneratorViewModel : ObservableObject
     {
     }
 
+    /// <summary>Takes every choice <paramref name="other"/> holds, as Apply carries a generator's choices back to its form.</summary>
+    internal void TakeChoicesFrom(GeneratorViewModel other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        UseWords = other.UseWords;
+        Length = other.Length;
+        Letters = other.Letters;
+        Digits = other.Digits;
+        Symbols = other.Symbols;
+        LeaveOutLookalikes = other.LeaveOutLookalikes;
+        WordCount = other.WordCount;
+        Separator = other.Separator;
+    }
+
     /// <summary>Whether to draw words from the list rather than characters from an alphabet.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UseCharacters), nameof(Strength), nameof(Error))]

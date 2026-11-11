@@ -43,6 +43,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     private IReadOnlyList<string> _referenceKeys = [];
     private string _selectedProfile = EnvProfileNames.Default;
     private bool _generateValue = true;
+    private GeneratePasswordViewModel? _generatorPanel;
 
     internal EnvProjectViewModel(
         AppVaultSession session,
@@ -77,11 +78,18 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         ReplacementValue = new SecretField(clipboard);
         GenerateCommand = new RelayCommand(() => GenerateValue = true);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
+        OpenGeneratorCommand = new RelayCommand<SecretField>(OpenGeneratorFor);
 
         // A generated value is in its field, where it can be seen and replaced, and follows the choices (V.12).
         NewValue.GeneratedValueReplaced += (_, _) => SetProperty(ref _generateValue, false, nameof(GenerateValue));
+        // While the panel is open, its Apply is what changes these choices, and the value it hands over is the one shown.
         Generator.PropertyChanged += (_, _) =>
         {
+            if (_generatorPanel is not null)
+            {
+                return;
+            }
+
             if (_generateValue && IsAdding)
             {
                 GenerateInto(NewValue);
@@ -97,6 +105,8 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
         ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
         CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
+        ShowKeysCommand = new RelayCommand(ShowKeys);
+        ShowItemsCommand = new RelayCommand(ShowItems);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
 
@@ -124,6 +134,17 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>Where this project runs on this machine, and its Run and Open terminal.</summary>
     internal ProjectLaunchViewModel Launch { get; }
+
+    /// <summary>Whether the project shows its items rather than its keys.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowingKeys))]
+    internal partial bool ShowingItems { get; private set; }
+
+    internal bool ShowingKeys => !ShowingItems;
+
+    internal RelayCommand ShowKeysCommand { get; }
+
+    internal RelayCommand ShowItemsCommand { get; }
 
     /// <summary>The clipboard a row copies through.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -378,6 +399,74 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <summary>What to generate, while <see cref="GenerateValue"/> is on.</summary>
     internal GeneratorViewModel Generator { get; } = new();
 
+    /// <summary>Generate, beside a form's value: the generator, whose Apply puts its value in that field.</summary>
+    internal RelayCommand<SecretField> OpenGeneratorCommand { get; }
+
+    /// <summary>The generator while it is open for the new key's value, else null.</summary>
+    internal GeneratePasswordViewModel? NewValueGenerator => GeneratorFor(NewValue);
+
+    /// <summary>The generator while it is open for a replacement value, else null.</summary>
+    internal GeneratePasswordViewModel? ReplacementGenerator => GeneratorFor(ReplacementValue);
+
+    private GeneratePasswordViewModel? GeneratorFor(SecretField field) =>
+        _generatorPanel is { } panel && ReferenceEquals(panel.Target, field) ? panel : null;
+
+    private void OpenGeneratorFor(SecretField? field)
+    {
+        if (field is null || GeneratorFor(field) is not null)
+        {
+            return;
+        }
+
+        CloseGenerator();
+        GeneratorPanel = new GeneratePasswordViewModel(Clipboard, Generator, field, value => ApplyGenerated(field, value), null, null, null, CloseGenerator);
+    }
+
+    private void ApplyGenerated(SecretField field, SecretField value)
+    {
+        if (ReferenceEquals(field, NewValue))
+        {
+            SetProperty(ref _generateValue, true, nameof(GenerateValue));
+        }
+
+        field.TakeFrom(value);
+        ReplaceProblem = null;
+    }
+
+    private void CloseGenerator()
+    {
+        var panel = GeneratorPanel;
+        GeneratorPanel = null;
+        panel?.Dispose();
+    }
+
+    private GeneratePasswordViewModel? GeneratorPanel
+    {
+        get => _generatorPanel;
+        set
+        {
+            _generatorPanel = value;
+            OnPropertyChanged(nameof(NewValueGenerator));
+            OnPropertyChanged(nameof(ReplacementGenerator));
+        }
+    }
+
+    partial void OnIsAddingChanged(bool value)
+    {
+        if (!value && GeneratorFor(NewValue) is not null)
+        {
+            CloseGenerator();
+        }
+    }
+
+    partial void OnReplacingChanged(EnvVariableRow? value)
+    {
+        if (GeneratorFor(ReplacementValue) is not null)
+        {
+            CloseGenerator();
+        }
+    }
+
     /// <summary>Replaces the value, having been given one.</summary>
     internal RelayCommand ConfirmReplaceCommand { get; }
 
@@ -394,6 +483,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <param name="row">The variable whose value is being replaced.</param>
     internal void BeginReplace(EnvVariableRow row)
     {
+        ShowingItems = false;
         CloseEntryForms();
         ReplacementValue.Clear();
         Replacing = row;
@@ -757,6 +847,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private void BeginAddProfile()
     {
+        ShowingItems = false;
         CloseEntryForms();
         NewProfile = string.Empty;
         _emptyProfileRefused = false;
@@ -888,6 +979,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <summary>Asks to remove a variable.</summary>
     internal void BeginRemove(EnvVariableRow row)
     {
+        ShowingItems = false;
         CloseEntryForms();
         Removing = row;
     }
@@ -907,6 +999,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         Environments = [];
         _catalog = null;
         Launch.PropertyChanged -= OnLaunchChanged;
+        CloseGenerator();
         NewValue.Dispose();
         ReplacementValue.Dispose();
         Import.Dispose();
@@ -924,6 +1017,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private void BeginAdd()
     {
+        ShowingItems = false;
         CloseEntryForms();
         NewKey = string.Empty;
         RefuseNewKey(null);
@@ -1116,10 +1210,8 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             return;
         }
 
-        IsAdding = false;
-        IsAddingProfile = false;
-        Removing = null;
-        CancelReplaceQuietly();
+        ShowingItems = true;
+        CloseKeyForms();
         PendingTagChange = null;
 
         var members = MembersOf(environment).ToHashSet();
@@ -1143,6 +1235,26 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         CloseEntryForms();
         _report(null);
+    }
+
+    private void ShowKeys()
+    {
+        CloseEntryForms();
+        ShowingItems = false;
+    }
+
+    private void ShowItems()
+    {
+        CloseKeyForms();
+        ShowingItems = true;
+    }
+
+    private void CloseKeyForms()
+    {
+        IsAdding = false;
+        IsAddingProfile = false;
+        Removing = null;
+        CancelReplaceQuietly();
     }
 
     private void CloseEntryForms()

@@ -170,6 +170,175 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
+    public void A_kind_starts_with_its_fields_added_and_the_list_offers_the_rest()
+    {
+        var form = NewItemForm.Open(_entries);
+
+        Assert.True(form.ShowsUsername && form.ShowsPassword && form.ShowsUrl && !form.ShowsNotes);
+        Assert.DoesNotContain(form.FieldOptions, option => option.Field is NewItemField.Username or NewItemField.Password or NewItemField.Url);
+        Assert.Contains(form.FieldOptions, option => option.Field == NewItemField.Notes);
+
+        form.RemoveFieldCommand.Execute(NewItemField.Url);
+        form.AddFieldCommand.Execute(NewItemField.Notes);
+
+        Assert.False(form.ShowsUrl);
+        Assert.True(form.ShowsNotes);
+        Assert.Contains(form.FieldOptions, option => option.Field == NewItemField.Url);
+        Assert.DoesNotContain(form.FieldOptions, option => option.Field == NewItemField.Notes);
+    }
+
+    [Fact]
+    public void A_custom_and_a_protected_field_are_written_with_the_item()
+    {
+        var form = NewItemForm.Open(_entries, "Work/extras");
+        form.AddFieldCommand.Execute(NewItemField.CustomField);
+        form.AddFieldCommand.Execute(NewItemField.ProtectedField);
+        form.CustomFields[0].Name = "Region";
+        form.CustomFields[0].Value = "eu";
+        form.CustomFields[1].Name = "RECOVERY_CODE";
+        Type(form.CustomFields[1].Secret, "1234");
+        _entries.ConfirmAddCommand.Press();
+
+        var item = Reopened(new EntryName("Work", "extras"));
+        Assert.Equal([new EntryField("RECOVERY_CODE", true, false), new EntryField("Region", false, false)], item.Fields);
+        Assert.Equal("eu", item.Read("Region"));
+        Assert.Equal("1234", item.Read("RECOVERY_CODE"));
+    }
+
+    [Fact]
+    public void A_field_name_keypaste_will_not_write_refuses_the_item_and_names_the_field()
+    {
+        var form = NewItemForm.Open(_entries, "Work/refused");
+        form.AddFieldCommand.Execute(NewItemField.CustomField);
+        form.CustomFields[0].Name = "Password";
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.True(form.CustomFields[0].HasNameProblem);
+        Assert.NotNull(_entries.NewItem);
+        Assert.Null(_session.Unlocked!.Find(new EntryName("Work", "refused")));
+    }
+
+    [Fact]
+    public void A_typed_custom_field_is_a_draft_to_keep()
+    {
+        var form = NewItemForm.Open(_entries);
+        Assert.Null(form.UnsavedDraft);
+
+        form.AddFieldCommand.Execute(NewItemField.CustomField);
+        Assert.Null(form.UnsavedDraft);
+
+        form.CustomFields[0].Value = "typed";
+        Assert.NotNull(form.UnsavedDraft);
+    }
+
+    [Fact]
+    public void The_generator_starts_from_the_password_and_changes_it_only_on_Apply()
+    {
+        var form = NewItemForm.Open(_entries);
+        var before = form.Password.Compose();
+        form.OpenGeneratorCommand.Execute(null);
+
+        var panel = form.GeneratorPanel!;
+        Assert.True(panel.Applies);
+        Assert.Same(form.Password, panel.Target);
+        Assert.Equal(before, panel.Reveal());
+
+        panel.Generator.Length = 12;
+        Assert.Equal(before, form.Password.Compose());
+        Assert.Equal(12, panel.MaskedLength);
+
+        panel.CancelCommand.Execute(null);
+        Assert.False(form.HasGeneratorPanel);
+        Assert.Equal(before, form.Password.Compose());
+        Assert.NotEqual(12, form.Generator.Length);
+
+        form.OpenGeneratorCommand.Execute(null);
+        panel = form.GeneratorPanel!;
+        panel.Generator.Length = 12;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+
+        Assert.False(form.HasGeneratorPanel);
+        Assert.Equal(chosen, form.Password.Compose());
+        Assert.True(form.Password.IsGenerated);
+        Assert.Equal(12, form.Generator.Length);
+        Assert.True(panel.Value.IsZeroed);
+    }
+
+    [Fact]
+    public void Choices_the_generator_refuses_disable_Apply()
+    {
+        var form = NewItemForm.Open(_entries);
+        form.OpenGeneratorCommand.Execute(null);
+        var panel = form.GeneratorPanel!;
+
+        panel.Generator.Letters = false;
+        panel.Generator.Digits = false;
+        panel.Generator.Symbols = false;
+
+        Assert.False(panel.ApplyCommand.CanExecute(null));
+
+        panel.Generator.Digits = true;
+
+        Assert.True(panel.ApplyCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void The_username_box_suggests_the_usernames_the_vault_uses_and_never_another_field()
+    {
+        _session.Unlocked!.AddEntry(new VaultEntry { Title = "mail", Username = "dan@example.com", Password = "dan-secret-password", Notes = "dan-recovery-code" });
+        _session.Unlocked.AddEntry(new VaultEntry { Title = "chat", Username = "Dan", Password = "p" });
+        var form = NewItemForm.Open(_entries);
+
+        Assert.Empty(form.SuggestedUsernames);
+        Assert.Null(form.SuggestedUsernamesSpoken);
+
+        form.Username = "dan";
+
+        Assert.Equal(["Dan", "dan@example.com"], form.SuggestedUsernames);
+        Assert.Contains("2 usernames", form.SuggestedUsernamesSpoken, StringComparison.Ordinal);
+
+        form.Username = "dan@example.com";
+
+        Assert.Empty(form.SuggestedUsernames);
+
+        form.Username = "secret";
+
+        Assert.Empty(form.SuggestedUsernames);
+    }
+
+    [Fact]
+    public void The_username_boxs_list_and_its_spoken_count_offer_at_most_eight_and_nothing_once_disposed()
+    {
+        for (var index = 0; index < 10; index++)
+        {
+            _session.Unlocked!.AddEntry(new VaultEntry { Title = $"mail {index}", Username = $"dan{index}@example.com", Password = "p" });
+        }
+
+        var form = NewItemForm.Open(_entries);
+        form.Username = "example";
+
+        Assert.Equal(8, form.SuggestedUsernames.Count);
+        Assert.Contains("8 usernames", form.SuggestedUsernamesSpoken, StringComparison.Ordinal);
+        Assert.Equal(8, form.UsedUsernames.Count(username => form.UsernameFilter("example", username)));
+
+        form.Dispose();
+
+        Assert.Empty(form.UsedUsernames);
+        Assert.Empty(form.SuggestedUsernames);
+    }
+
+    [Fact]
+    public void New_items_own_generator_does_not_offer_another_new_item()
+    {
+        var form = NewItemForm.Open(_entries);
+        form.OpenGeneratorCommand.Execute(null);
+
+        Assert.False(form.GeneratorPanel!.OffersNewItem);
+        Assert.False(form.GeneratorPanel.NewItemCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void A_choice_announces_the_fields_and_the_button_that_read_it()
     {
         var form = NewItemForm.Open(_entries);
@@ -187,8 +356,15 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.ShowsUsername),
             nameof(NewItemViewModel.ShowsPassword),
             nameof(NewItemViewModel.ShowsUrl),
+            nameof(NewItemViewModel.ShowsOneTimeCode),
             nameof(NewItemViewModel.ShowsHost),
             nameof(NewItemViewModel.ShowsKey),
+            nameof(NewItemViewModel.ShowsNotes),
+            nameof(NewItemViewModel.ShowsGroup),
+            nameof(NewItemViewModel.ShowsTags),
+            nameof(NewItemViewModel.ShowsGoesIn),
+            nameof(NewItemViewModel.FieldOptions),
+            nameof(NewItemViewModel.HasFieldOptions),
         ];
         Assert.Equal(shown.Order(StringComparer.Ordinal), raised.Order(StringComparer.Ordinal));
 
@@ -267,6 +443,29 @@ public sealed class NewItemTests : IDisposable
 
         Assert.False(form.OneTimeCode.HasValue);
         Assert.Null(form.UnsavedDraft);
+    }
+
+    [Fact]
+    public void A_one_time_code_is_a_field_any_kind_can_add_and_removing_it_clears_what_was_typed()
+    {
+        var form = NewItemForm.Open(_entries, "Work/recovery");
+        form.Template = ItemTemplate.SecureNote;
+        Assert.False(form.ShowsOneTimeCode);
+
+        form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
+        Assert.DoesNotContain(form.FieldOptions, option => option.Field == NewItemField.OneTimeCode);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq");
+        form.RemoveFieldCommand.Execute(NewItemField.OneTimeCode);
+
+        Assert.False(form.ShowsOneTimeCode);
+        Assert.False(form.OneTimeCode.HasValue);
+
+        form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq gezd gnbv gy3t qojq");
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.False(_entries.IsAdding);
+        Assert.Equal([new EntryField("otp", true, true)], Reopened(new EntryName("Work", "recovery")).Fields);
     }
 
     [Fact]

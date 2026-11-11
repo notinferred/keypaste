@@ -196,32 +196,21 @@ public sealed class LogViewModelTests : IDisposable
         Assert.True(model.HasNotice);
     }
 
-    /// <summary>
-    /// Agents › History shows the records without the hash check, which lives on the activity log only, and
-    /// still marks what the chain does not vouch for, sending the person to the log to learn why.
-    /// </summary>
+    /// <summary>The one Activity screen marks what the chain does not vouch for, and sends the person to Verify chain to learn why.</summary>
     [Fact]
-    public void History_marks_an_unverified_record_but_leaves_the_check_to_the_activity_log()
+    public void Activity_marks_an_unverified_record_and_offers_the_check()
     {
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
         _home.Alter();
-
-        using var history = new LogViewModel(_home.Home, clipboard: null, agentsOnly: true);
-
-        Assert.False(history.OffersChainCheck);
-        Assert.False(history.OffersVerify);
-        Assert.False(history.VerifyCommand.CanExecute(null));
-        Assert.False(history.CopyHashCommand.CanExecute(null));
-        Assert.True(history.Rows[^1].Unverified);
-        Assert.True(history.HasUnverifiedNote);
-        Assert.EndsWith("The activity log in Settings › Advanced says why.", history.UnverifiedLegend, StringComparison.Ordinal);
-        Assert.EndsWith("The activity log in Settings › Advanced says where.", history.Message, StringComparison.Ordinal);
 
         using var log = new LogViewModel(_home.Home);
 
         Assert.True(log.OffersVerify);
         Assert.True(log.VerifyCommand.CanExecute(null));
-        Assert.EndsWith("Verify chain says why.", log.UnverifiedLegend, StringComparison.Ordinal);
+        Assert.True(log.Rows[^1].Unverified);
+        Assert.True(log.HasUnverifiedNote);
+        Assert.EndsWith("Verify chain says why.", LogViewModel.UnverifiedLegend, StringComparison.Ordinal);
+        Assert.EndsWith("Verify chain says where.", log.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

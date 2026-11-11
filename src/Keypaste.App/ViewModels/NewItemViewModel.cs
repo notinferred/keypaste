@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -18,7 +20,79 @@ internal enum ItemTemplate
 /// <summary>One template as the form's choice shows it.</summary>
 internal sealed record TemplateChoice(ItemTemplate Template, string Label, string Icon)
 {
+    /// <summary>The five things a new item can be.</summary>
+    internal static IReadOnlyList<TemplateChoice> All { get; } =
+    [
+        new(ItemTemplate.Login, "Login", "globe"),
+        new(ItemTemplate.ApiKey, "API key", "key-round"),
+        new(ItemTemplate.Database, "Database", "database"),
+        new(ItemTemplate.Server, "Server", "server"),
+        new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
+    ];
+
+    /// <summary>How the add menus name it: the form it opens, so with an ellipsis.</summary>
+    internal string MenuLabel => $"{Label}…";
+
     public override string ToString() => Label;
+}
+
+/// <summary>A field the New item form can hold; the button on its left offers the ones not yet added.</summary>
+internal enum NewItemField
+{
+    Username,
+    Password,
+    Url,
+    OneTimeCode,
+    Notes,
+    Group,
+    Tags,
+    CustomField,
+    ProtectedField,
+}
+
+/// <summary>One field option as the add button's list shows it, with its icon.</summary>
+internal sealed record NewItemFieldOption(NewItemField Field, string Label, string Icon);
+
+/// <summary>A field the person named, added from the list; protected, its value is masked and read once, at Create.</summary>
+internal sealed partial class NewItemCustomField : ObservableObject, IDisposable
+{
+    private readonly Action<NewItemCustomField> _remove;
+
+    internal NewItemCustomField(bool isProtected, Action<NewItemCustomField> remove, ClipboardCountdown clipboard)
+    {
+        IsProtected = isProtected;
+        _remove = remove;
+        Secret = new SecretField(clipboard);
+        RemoveCommand = new RelayCommand(() => _remove(this));
+    }
+
+    internal bool IsProtected { get; }
+
+    internal string Kind => IsProtected ? "Protected field" : "Custom field";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNameProblem))]
+    internal partial string Name { get; set; } = string.Empty;
+
+    /// <summary>The value of a plain field.</summary>
+    [ObservableProperty]
+    internal partial string Value { get; set; } = string.Empty;
+
+    internal SecretField Secret { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNameProblem))]
+    internal partial string? NameProblem { get; set; }
+
+    internal bool HasNameProblem => NameProblem is not null;
+
+    internal RelayCommand RemoveCommand { get; }
+
+    internal bool HoldsDraft => Name.Trim().Length > 0 || (IsProtected ? Secret.HasValue && !Secret.IsGenerated : Value.Length > 0);
+
+    partial void OnNameChanged(string value) => NameProblem = null;
+
+    public void Dispose() => Secret.Dispose();
 }
 
 /// <summary>A group a new item can go in, as the folder picker lists it.</summary>
@@ -50,6 +124,16 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _keyNameRefused;
     private FolderChoice _folder;
     private bool _generatePassword = true;
+    private readonly ClipboardCountdown _clipboard;
+    private readonly HashSet<NewItemField> _added = [];
+    private bool _hasUsername;
+    private bool _hasPassword;
+    private bool _hasUrl;
+    private bool _hasOneTimeCode;
+    private bool _hasHost;
+    private bool _hasKey;
+    private GeneratePasswordViewModel? _generatorPanel;
+    private UsernameSuggestions _usernames;
 
     /// <param name="session">The unlocked vault the item is made in.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
@@ -62,7 +146,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(groupPaths);
 
         _session = session;
+        _clipboard = clipboard;
         _projectTags = session.Unlocked is { } vault ? ProjectCatalog.MemberTags(vault) : [];
+        _usernames = new UsernameSuggestions(session.Unlocked);
 
         Folders =
         [
@@ -76,12 +162,17 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         OneTimeCode = new SecretField(clipboard);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
         GenerateCommand = new RelayCommand(Generate);
+        OpenGeneratorCommand = new RelayCommand(OpenGenerator, () => ShowsPassword);
+        CloseGeneratorCommand = new RelayCommand(CloseGenerator);
+        AddFieldCommand = new RelayCommand<NewItemField>(AddField);
+        RemoveFieldCommand = new RelayCommand<NewItemField>(RemoveField);
+        ApplyTemplate();
 
         // A new item starts with a generated password in its field, where it can be copied before Create (V.12).
         Password.GeneratedValueReplaced += (_, _) => SetProperty(ref _generatePassword, false, nameof(GeneratePassword));
         Generator.PropertyChanged += (_, _) =>
         {
-            if (_generatePassword)
+            if (_generatePassword && ShowsPassword)
             {
                 FillPassword();
             }
@@ -89,15 +180,253 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         FillPassword();
     }
 
-    /// <summary>The five things a new item can be.</summary>
-    internal IReadOnlyList<TemplateChoice> Templates { get; } =
+    /// <summary>The options the add button lists, those not yet in the form; a custom or protected field can be added again.</summary>
+    internal IReadOnlyList<NewItemFieldOption> FieldOptions { get; private set; } = [];
+
+    private static readonly string[] _fieldProperties =
     [
-        new(ItemTemplate.Login, "Login", "globe"),
-        new(ItemTemplate.ApiKey, "API key", "key-round"),
-        new(ItemTemplate.Database, "Database", "database"),
-        new(ItemTemplate.Server, "Server", "server"),
-        new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
+        nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsOneTimeCode), nameof(ShowsHost), nameof(ShowsKey),
+        nameof(ShowsNotes), nameof(ShowsGroup), nameof(ShowsTags), nameof(ShowsGoesIn), nameof(FieldOptions), nameof(HasFieldOptions),
     ];
+
+    private static readonly NewItemFieldOption[] _allOptions =
+    [
+        new(NewItemField.Username, "Username", "user"),
+        new(NewItemField.Password, "Password", "key-round"),
+        new(NewItemField.Url, "URL", "link"),
+        new(NewItemField.OneTimeCode, "One-time code", "clock"),
+        new(NewItemField.Notes, "Notes", "sticky-note"),
+        new(NewItemField.Group, "Group", "folder"),
+        new(NewItemField.Tags, "Tags and project", "layers"),
+        new(NewItemField.CustomField, "Custom field", "plus"),
+        new(NewItemField.ProtectedField, "Protected field", "shield-check"),
+    ];
+
+    internal RelayCommand<NewItemField> AddFieldCommand { get; }
+
+    internal RelayCommand<NewItemField> RemoveFieldCommand { get; }
+
+    /// <summary>The fields the person added, in the order they were added.</summary>
+    internal ObservableCollection<NewItemCustomField> CustomFields { get; } = [];
+
+    internal bool ShowsNotes => _added.Contains(NewItemField.Notes);
+
+    internal bool ShowsGroup => _added.Contains(NewItemField.Group);
+
+    internal bool ShowsTags => _added.Contains(NewItemField.Tags);
+
+    internal bool HasFieldOptions => FieldOptions.Count > 0;
+
+    /// <summary>Where the item goes while Group is not in the form.</summary>
+    internal string GoesIn => $"In {Folder.Label}";
+
+    internal bool ShowsGoesIn => !ShowsGroup;
+
+    private void ApplyTemplate()
+    {
+        _hasUsername = _template is ItemTemplate.Login or ItemTemplate.Database or ItemTemplate.Server;
+        _hasPassword = _hasUsername;
+        _hasUrl = _template == ItemTemplate.Login;
+        _hasOneTimeCode = _hasPassword;
+        _hasHost = _template is ItemTemplate.Database or ItemTemplate.Server;
+        _hasKey = _template == ItemTemplate.ApiKey;
+
+        if (_template == ItemTemplate.SecureNote)
+        {
+            _added.Add(NewItemField.Notes);
+        }
+
+        FieldsChanged();
+    }
+
+    private void FieldsChanged()
+    {
+        FieldOptions = [.. _allOptions.Where(option => option.Field is NewItemField.CustomField or NewItemField.ProtectedField || !Has(option.Field))];
+
+        foreach (var name in _fieldProperties)
+        {
+            OnPropertyChanged(name);
+        }
+
+        OpenGeneratorCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool Has(NewItemField field) => field switch
+    {
+        NewItemField.Username => _hasUsername,
+        NewItemField.Password => _hasPassword,
+        NewItemField.Url => _hasUrl,
+        NewItemField.OneTimeCode => _hasOneTimeCode,
+        _ => _added.Contains(field),
+    };
+
+    private void AddField(NewItemField field)
+    {
+        switch (field)
+        {
+            case NewItemField.Username:
+                _hasUsername = true;
+                break;
+            case NewItemField.Password:
+                _hasPassword = true;
+                if (_generatePassword)
+                {
+                    FillPassword();
+                }
+
+                break;
+            case NewItemField.Url:
+                _hasUrl = true;
+                break;
+            case NewItemField.OneTimeCode:
+                _hasOneTimeCode = true;
+                break;
+            case NewItemField.CustomField:
+            case NewItemField.ProtectedField:
+                CustomFields.Add(new NewItemCustomField(field == NewItemField.ProtectedField, RemoveCustomField, _clipboard));
+                break;
+            default:
+                _added.Add(field);
+                break;
+        }
+
+        FieldsChanged();
+    }
+
+    private void RemoveField(NewItemField field)
+    {
+        switch (field)
+        {
+            case NewItemField.Username:
+                _hasUsername = false;
+                Username = string.Empty;
+                break;
+            case NewItemField.Password:
+                CloseGenerator();
+                _hasPassword = false;
+                Password.Clear();
+                break;
+            case NewItemField.Url:
+                _hasUrl = false;
+                Url = string.Empty;
+                break;
+            case NewItemField.OneTimeCode:
+                _hasOneTimeCode = false;
+                OneTimeCode.Clear();
+                OneTimeCodeProblem = null;
+                break;
+            case NewItemField.Notes:
+                _added.Remove(field);
+                Notes = string.Empty;
+                break;
+            case NewItemField.Tags:
+                _added.Remove(field);
+                Tags = [];
+                DraftTag = string.Empty;
+                break;
+            default:
+                _added.Remove(field);
+                break;
+        }
+
+        FieldsChanged();
+    }
+
+    [RelayCommand]
+    private void RemoveHost()
+    {
+        _hasHost = false;
+        Host = string.Empty;
+        FieldsChanged();
+    }
+
+    [RelayCommand]
+    private void RemoveKey()
+    {
+        _hasKey = false;
+        KeyName = string.Empty;
+        KeyValue.Clear();
+        KeyValueProblem = null;
+        FieldsChanged();
+    }
+
+    private void RemoveCustomField(NewItemCustomField field)
+    {
+        CustomFields.Remove(field);
+        field.Dispose();
+        FieldsChanged();
+    }
+
+    internal RelayCommand OpenGeneratorCommand { get; }
+
+    internal RelayCommand CloseGeneratorCommand { get; }
+
+    /// <summary>The generator opened from the password field, or null while it is closed.</summary>
+    internal GeneratePasswordViewModel? GeneratorPanel
+    {
+        get => _generatorPanel;
+        private set
+        {
+            if (SetProperty(ref _generatorPanel, value))
+            {
+                OnPropertyChanged(nameof(HasGeneratorPanel));
+            }
+        }
+    }
+
+    internal bool HasGeneratorPanel
+    {
+        get => _generatorPanel is not null;
+        set
+        {
+            if (!value)
+            {
+                CloseGenerator();
+            }
+        }
+    }
+
+    private void OpenGenerator()
+    {
+        if (GeneratorPanel is not null)
+        {
+            return;
+        }
+
+        GeneratorPanel = new GeneratePasswordViewModel(
+            _clipboard,
+            Generator,
+            Password,
+            ApplyGenerated,
+            null,
+            AddGeneratedField,
+            Title.Trim().Length > 0 ? Title.Trim() : "this new item",
+            CloseGenerator);
+    }
+
+    private void ApplyGenerated(SecretField value)
+    {
+        SetProperty(ref _generatePassword, true, nameof(GeneratePassword));
+        Password.TakeFrom(value);
+        Error = null;
+    }
+
+    private void CloseGenerator()
+    {
+        var panel = GeneratorPanel;
+        GeneratorPanel = null;
+        panel?.Dispose();
+    }
+
+    private void AddGeneratedField(SecretField value, string name)
+    {
+        var field = new NewItemCustomField(true, RemoveCustomField, _clipboard) { Name = name };
+        field.Secret.TakeFrom(value);
+        CustomFields.Add(field);
+        FieldsChanged();
+    }
+
+    internal IReadOnlyList<TemplateChoice> Templates { get; } = TemplateChoice.All;
 
     /// <summary>The template the form shows. Changing it keeps the title, folder, tags and notes.</summary>
     internal ItemTemplate Template
@@ -108,17 +437,19 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _template, value))
             {
                 OnPropertyChanged(nameof(SelectedTemplate));
-                OnPropertyChanged(nameof(ShowsUsername));
-                OnPropertyChanged(nameof(ShowsUrl));
-                OnPropertyChanged(nameof(ShowsHost));
-                OnPropertyChanged(nameof(ShowsKey));
-                OnPropertyChanged(nameof(ShowsPassword));
+                CloseGenerator();
+                ApplyTemplate();
+                if (_hasPassword && _generatePassword)
+                {
+                    FillPassword();
+                }
+
                 KeyValueProblem = null;
                 OneTimeCodeProblem = null;
                 Error = null;
 
-                // Create ignores a one-time code the template has no field for, so it must not stay as a draft.
-                if (!ShowsPassword)
+                // Create ignores a one-time code the form has no field for, so it must not stay as a draft.
+                if (!ShowsOneTimeCode)
                 {
                     OneTimeCode.Clear();
                 }
@@ -139,15 +470,17 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         }
     }
 
-    internal bool ShowsUsername => _template is ItemTemplate.Login or ItemTemplate.Database or ItemTemplate.Server;
+    internal bool ShowsUsername => _hasUsername;
 
-    internal bool ShowsPassword => ShowsUsername;
+    internal bool ShowsPassword => _hasPassword;
 
-    internal bool ShowsUrl => _template == ItemTemplate.Login;
+    internal bool ShowsUrl => _hasUrl;
 
-    internal bool ShowsHost => _template is ItemTemplate.Database or ItemTemplate.Server;
+    internal bool ShowsOneTimeCode => _hasOneTimeCode;
 
-    internal bool ShowsKey => _template == ItemTemplate.ApiKey;
+    internal bool ShowsHost => _hasHost;
+
+    internal bool ShowsKey => _hasKey;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TitleProblem), nameof(HasTitleProblem))]
@@ -172,6 +505,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal string? UnsavedDraft =>
         new[] { Title, Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
         || Tags.Count > 0
+        || CustomFields.Any(custom => custom.HoldsDraft)
         || KeyValue.HasValue
         || OneTimeCode.HasValue
         || (Password.HasValue && !Password.IsGenerated)
@@ -186,15 +520,27 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         get => _folder;
         set
         {
-            if (value is not null)
+            if (value is not null && SetProperty(ref _folder, value))
             {
-                SetProperty(ref _folder, value);
+                OnPropertyChanged(nameof(GoesIn));
             }
         }
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SuggestedUsernames), nameof(SuggestedUsernamesSpoken))]
     internal partial string Username { get; set; } = string.Empty;
+
+    /// <summary>The usernames this vault already uses that hold what is typed, which the username box offers; choosing one fills it.</summary>
+    internal IReadOnlyList<string> SuggestedUsernames => _usernames.Matching(Username);
+
+    /// <summary>The username box's filter, by the same rule as <see cref="SuggestedUsernames"/>.</summary>
+    internal AutoCompleteFilterPredicate<object?> UsernameFilter => UsernameSuggestions.Filter(typed => _usernames.Matching(typed));
+
+    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
+
+    /// <summary>Every username this vault uses, the username box's items, which it narrows as one is typed.</summary>
+    internal IReadOnlyList<string> UsedUsernames => _usernames.Used;
 
     [ObservableProperty]
     internal partial string Url { get; set; } = string.Empty;
@@ -258,7 +604,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal bool HasKeyValueProblem => KeyValueProblem is not null;
 
-    /// <summary>A login's, database's or server's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
+    /// <summary>The item's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
     internal SecretField OneTimeCode { get; }
 
     /// <summary>Why Create refused the one-time code, or null; it names no value.</summary>
@@ -365,6 +711,11 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             fields.Add(new FieldWrite(HostField, Host.Trim(), Protect: false));
         }
 
+        if (!TryCustomFields(fields))
+        {
+            return null;
+        }
+
         var password = string.Empty;
 
         if (ShowsPassword && !TryNewPassword(out password))
@@ -374,7 +725,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         string? oneTimeCode = null;
 
-        if (ShowsPassword && OneTimeCode.HasValue)
+        if (ShowsOneTimeCode && OneTimeCode.HasValue)
         {
             oneTimeCode = OneTimeCode.Compose();
 
@@ -422,11 +773,47 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        CloseGenerator();
         Password.Dispose();
         KeyValue.Dispose();
         OneTimeCode.Dispose();
+
+        foreach (var field in CustomFields)
+        {
+            field.Dispose();
+        }
+
         _projectTags = [];
         OnPropertyChanged(nameof(TagSuggestions));
+        _usernames = new UsernameSuggestions(null);
+        OnPropertyChanged(nameof(UsedUsernames));
+    }
+
+    private bool TryCustomFields(List<FieldWrite> fields)
+    {
+        var taken = fields.Select(field => field.Name).ToHashSet(StringComparer.Ordinal);
+        var refused = false;
+
+        foreach (var field in CustomFields)
+        {
+            var name = field.Name.Trim();
+
+            field.NameProblem =
+                name.Length == 0 ? "Name this field." :
+                !FieldNameRules.IsWritable(name, out var error) ? string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), ".") :
+                !taken.Add(name) ? $"The item already has a field named {EntryNameSanitizer.Sanitize(name).Text}." :
+                null;
+
+            if (field.HasNameProblem)
+            {
+                refused = true;
+                continue;
+            }
+
+            fields.Add(new FieldWrite(name, field.IsProtected ? field.Secret.Compose() : field.Value, field.IsProtected));
+        }
+
+        return !refused;
     }
 
     private bool TryNewPassword(out string password)

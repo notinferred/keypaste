@@ -75,7 +75,8 @@ public sealed class IconRailTests
         }
 
         // The sidebar keeps Trash and Settings at its foot, so the rail does too.
-        Assert.True(Bounds(shell, Row(shell, DestinationKind.Settings)).Bottom > shell.Root.Bounds.Height - 16);
+        Assert.True(Bounds(shell, Row(shell, DestinationKind.Settings)).Bottom <= Bounds(shell, shell.Named<Button>("RailLock")).Y);
+        Assert.True(Bounds(shell, shell.Named<Button>("RailLock")).Bottom > shell.Root.Bounds.Height - 16);
         Assert.True(Bounds(shell, Row(shell, DestinationKind.Trash)).Y > Bounds(shell, Row(shell, DestinationKind.AgentActivity)).Bottom);
     });
 
@@ -316,17 +317,20 @@ public sealed class IconRailTests
     public Task A_press_on_a_field_outside_the_overlay_keeps_the_keyboard_in_the_field() => HeadlessSession.On(() =>
     {
         using var shell = Narrow("keypaste-rail-overlay-press-field-");
-        shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.Selected = entries.Rows[0];
+        entries.Detail!.EditCommand.Press();
+        RenderedShell.Drain();
         shell.Shell.OpenSidebarOverlay();
         shell.Frame();
         RenderedShell.Drain();
-        var search = shell.Named<TextBox>("ShellSearch");
+        var field = shell.Window.GetVisualDescendants().OfType<TextBox>().First(box => box.IsEffectivelyVisible && box.Name != "ShellSearch");
 
-        shell.Tap(search);
+        shell.Tap(field);
         RenderedShell.Drain();
 
         Assert.False(shell.Shell.SidebarOverlays);
-        Assert.True(search.IsFocused);
+        Assert.True(field.IsFocused);
     });
 
     [Fact]
@@ -471,7 +475,7 @@ public sealed class IconRailTests
     [Theory]
     [InlineData(100)]
     [InlineData(200)]
-    public Task The_logs_Result_reads_whole_beside_the_rail(int percent) => HeadlessSession.On(() =>
+    public Task The_activitys_Result_reads_whole_beside_the_rail(int percent) => HeadlessSession.On(() =>
     {
         InterfaceZoom.Set(percent);
         using var shell = new RenderedShell("keypaste-rail-log-");
