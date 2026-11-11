@@ -143,12 +143,50 @@ public sealed class DrawnRevealTests
         var (cell, _) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
-        shell.Tap(cell);
+        var dotsProbe = new string('•', cell.MaskedLength);
+        var probe = new System.Text.StringBuilder();
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        void Note(string stage)
+        {
+            var f = shell.Frame();
+            var region = f.Of(cell, shell.Window);
+            var origin = cell.TranslatePoint(default, shell.Window);
+            var centre = cell.TranslatePoint(new Point(cell.Bounds.Width / 2, cell.Bounds.Height / 2), shell.Window)!.Value;
+            var hit = shell.Window.InputHitTest(centre) as Visual;
+            var chain = hit is null ? "null" : string.Join(" < ", new[] { hit }.Concat(hit.GetVisualAncestors()).Take(6).Select(v => $"{v.GetType().Name}#{(v as Control)?.Name}[{string.Join(",", (v as StyledElement)?.Classes ?? [])}]"));
+            var copy = cell.FindAncestorOfType<PressToCopy>();
+            var overlay = Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(cell);
+            var overlayKids = overlay is null ? "none" : string.Join(",", overlay.Children.Select(c => $"{c.GetType().Name}@{c.Bounds} vis={c.IsVisible}"));
+            var tipsOpen = string.Join(",", shell.Window.GetVisualDescendants().OfType<Control>().Where(ToolTip.GetIsOpen).Select(c => $"{c.GetType().Name}#{c.Name}"));
+            probe.AppendLine($"[{stage} t={started.ElapsedMilliseconds}ms] scoreCell={f.Score(dotsProbe, style, region):F3} scoreAll={f.Score(dotsProbe, style, f.Everywhere):F3} region={region} origin={origin} bounds={cell.Bounds} desired={cell.DesiredSize} width={cell.Width} valueWidth={copy?.ValueWidth} copyBounds={copy?.Bounds} copyClasses=[{string.Join(",", copy?.Classes ?? [])}] revealed={cell.IsRevealed} scaling={f.Scaling} focus={shell.Window.FocusManager?.GetFocusedElement()?.GetType().Name}");
+            probe.AppendLine($"  hit={chain}");
+            probe.AppendLine($"  overlay={overlayKids} tipsOpen=[{tipsOpen}] topLevels={string.Join(",", shell.Window.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Select(p => $"{p.Name}:{p.IsOpen}"))}");
+            var shape = f.Shape(region);
+            for (var y = 0; y < region.Height; y++)
+            {
+                probe.Append("  |");
+                for (var x = 0; x < region.Width; x++)
+                {
+                    probe.Append(shape[(y * region.Width) + x] ? '#' : '.');
+                }
+
+                probe.AppendLine();
+            }
+        }
+
+        Note("rest");
+        shell.Hover(cell);
+        Note("hover");
+        shell.Press(cell);
+        Note("pressed");
+        shell.Release(cell);
+        Note("released");
 
         var frame = shell.Frame();
+        Console.WriteLine($"PROBE {surface}\n{probe}");
         Assert.False(cell.IsRevealed);
         Assert.Null(RevealedValue.Shown);
-        Assert.True(frame.Shows(new string('•', cell.MaskedLength), style, frame.Of(cell, shell.Window)), "the cell's dots are not drawn after a click on it");
+        Assert.True(frame.Shows(new string('•', cell.MaskedLength), style, frame.Of(cell, shell.Window)), $"the cell's dots are not drawn after a click on it\nPROBE {surface}\n{probe}");
         AssertNoSecretIn(frame, style);
     });
 
