@@ -46,6 +46,9 @@ public sealed record VaultEntry
     /// <summary>The KDBX UUID as hex, on an entry read from a vault; null on one being written, whose UUID the vault mints.</summary>
     public string? Uuid { get; init; }
 
+    /// <summary>The kind its standard icon keeps; <see cref="ItemKind.None"/> for the default icon, another icon or a custom one, and on a write, for the default icon.</summary>
+    public ItemKind Kind { get; init; }
+
     /// <summary>
     /// The entry's full path, as accepted by <see cref="Vault.Find(string)"/> and by
     /// <c>keepassxc-cli show</c>.

@@ -287,6 +287,7 @@
   <data name="NewGroup" xml:space="preserve"><value>New group</value></data>
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
   <data name="NewItemByType" xml:space="preserve"><value>New item by type</value></data>
+  <data name="ChangeKind" xml:space="preserve"><value>Change kind</value></data>
   <data name="NewItemOrPassword" xml:space="preserve"><value>New item or password</value></data>
   <data name="NewKey" xml:space="preserve"><value>New key</value></data>
   <data name="NewMasterPassword" xml:space="preserve"><value>New master password</value></data>

@@ -90,7 +90,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         LastUsedTicks = use.State == EntryUseState.InUse ? long.MaxValue : use.LastUsed?.UtcTicks;
     }
 
-    /// <summary>Rows are the same row when they are the same item, show the same fields and are found for the same reason; their use is not identity.</summary>
+    /// <summary>Rows are the same row when they are the same item of the same kind, show the same fields and are found for the same reason; their use is not identity.</summary>
     /// <param name="other">The other row.</param>
     /// <returns>Whether they are equal.</returns>
     public bool Equals(EntryRow? other) =>
@@ -100,6 +100,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
         && string.Equals(Username, other.Username, StringComparison.Ordinal)
         && string.Equals(Url, other.Url, StringComparison.Ordinal)
+        && Kind == other.Kind
         && string.Equals(SharedNameTell, other.SharedNameTell, StringComparison.Ordinal)
         && Fields == other.Fields
         && Tags.SequenceEqual(other.Tags, StringComparer.Ordinal);

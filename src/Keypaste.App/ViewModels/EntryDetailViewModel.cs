@@ -133,6 +133,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         BeginRemoveTotpCommand = new RelayCommand(() => LeavingFieldForm(OpenRemoveTotp), () => !IsRemovingTotp && CanRemoveTotp);
         ConfirmRemoveTotpCommand = new RelayCommand(ConfirmRemoveTotp, () => IsRemovingTotp);
         CancelRemoveTotpCommand = new RelayCommand(() => IsRemovingTotp = false, () => IsRemovingTotp);
+        ChangeKindCommand = new RelayCommand<TemplateChoice>(ChangeKind, choice => choice is not null && !IsEditing);
 
         _title = entry.Title;
         _groupPath = entry.GroupPath;
@@ -248,6 +249,9 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Asks whether to remove the item's one-time code.</summary>
     internal RelayCommand BeginRemoveTotpCommand { get; }
+
+    /// <summary>Changes what the item is for, kept as its icon; its fields are untouched.</summary>
+    internal RelayCommand<TemplateChoice> ChangeKindCommand { get; }
 
     internal RelayCommand ConfirmRemoveTotpCommand { get; }
 
@@ -1728,6 +1732,17 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             FormClosed?.Invoke();
         }
     }
+
+    private void ChangeKind(TemplateChoice? choice)
+    {
+        if (choice is not null && Write(vault => vault.SetKind(Name, choice.Kind), $"This item is already a {choice.Label}."))
+        {
+            KindChanged?.Invoke(Name);
+        }
+    }
+
+    /// <summary>Raised once this pane has changed its item's kind, which the list draws as the row's icon.</summary>
+    internal event Action<EntryName>? KindChanged;
 
     private void ConfirmRemoveTotp()
     {

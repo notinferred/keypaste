@@ -79,6 +79,7 @@ public static class Strings
     public static string Change => Manager.GetString("Change", CultureInfo.CurrentUICulture)!;
     public static string ChangeAccess => Manager.GetString("ChangeAccess", CultureInfo.CurrentUICulture)!;
     public static string ChangeEllipsis => Manager.GetString("ChangeEllipsis", CultureInfo.CurrentUICulture)!;
+    public static string ChangeKind => Manager.GetString("ChangeKind", CultureInfo.CurrentUICulture)!;
     public static string ChangeUsernamesUnderEveryOtherAgent => Manager.GetString("ChangeUsernamesUnderEveryOtherAgent", CultureInfo.CurrentUICulture)!;
     public static string ChangeWhatUnlocksThisVault => Manager.GetString("ChangeWhatUnlocksThisVault", CultureInfo.CurrentUICulture)!;
     public static string ChangesFromAnotherDevice => Manager.GetString("ChangesFromAnotherDevice", CultureInfo.CurrentUICulture)!;

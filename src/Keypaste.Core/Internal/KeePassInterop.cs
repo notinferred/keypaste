@@ -654,6 +654,11 @@ internal sealed class KeePassInterop : IDisposable
         SetField(pwEntry, PwDefs.UrlField, entry.Url);
         SetField(pwEntry, PwDefs.NotesField, entry.Notes);
 
+        if (entry.Kind != ItemKind.None)
+        {
+            pwEntry.IconId = IconOf(entry.Kind);
+        }
+
         foreach (FieldWrite write in fields)
         {
             pwEntry.Strings.Set(write.Name, new ProtectedString(write.Protect ?? true, write.Value!));
@@ -3864,7 +3869,56 @@ internal sealed class KeePassInterop : IDisposable
                 ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true))
                 : null,
             Uuid = entry.Uuid.ToHexString(),
+            Kind = KindOf(entry),
         };
+    }
+
+    private static readonly (ItemKind Kind, PwIcon Icon)[] _kindIcons =
+    [
+        (ItemKind.Login, PwIcon.World),
+        (ItemKind.ApiKey, PwIcon.MultiKeys),
+        (ItemKind.Database, PwIcon.Disk),
+        (ItemKind.Server, PwIcon.NetworkServer),
+        (ItemKind.SecureNote, PwIcon.Notepad),
+    ];
+
+    private static ItemKind KindOf(PwEntry entry) =>
+        entry.CustomIconUuid.Equals(PwUuid.Zero)
+            ? _kindIcons.FirstOrDefault(pair => pair.Icon == entry.IconId).Kind
+            : ItemKind.None;
+
+    private static PwIcon IconOf(ItemKind kind) => _kindIcons.First(pair => pair.Kind == kind).Icon;
+
+    /// <summary>Keeps the entry's kind as its standard icon, as an edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry or it already has that kind, otherwise 1.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name, or the entry has a custom icon, which is kept.</exception>
+    internal int SetKind(EntryName name, ItemKind kind)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return 0;
+        }
+
+        PwEntry entry = found.Entry;
+
+        if (!entry.CustomIconUuid.Equals(PwUuid.Zero))
+        {
+            throw new VaultException("This item has its own icon from another app, which keypaste keeps. Change its icon there.");
+        }
+
+        PwIcon icon = IconOf(kind);
+
+        if (entry.IconId == icon)
+        {
+            return 0;
+        }
+
+        entry.CreateBackup(_database);
+        entry.IconId = icon;
+        MarkEdited(entry);
+        return 1;
     }
 
     private static string ReadField(PwEntry entry, string field)

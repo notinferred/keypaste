@@ -444,11 +444,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             if (previous is not null)
             {
                 previous.PropertyChanged -= OnDetailChanged;
+                previous.KindChanged -= OnKindChanged;
             }
 
             if (value is not null)
             {
                 value.PropertyChanged += OnDetailChanged;
+                value.KindChanged += OnKindChanged;
             }
 
             if (SetProperty(ref _detail, value))
@@ -1022,6 +1024,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <remarks>
     /// An <see cref="EntryRow"/> is a record, so reselecting an equal row changes nothing.
     /// </remarks>
+    private void OnKindChanged(EntryName name) => Reselect(name);
+
     private void Reselect(EntryName name)
     {
         Reload();
