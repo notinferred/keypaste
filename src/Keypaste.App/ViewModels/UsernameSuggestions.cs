@@ -15,21 +15,35 @@ internal sealed class UsernameSuggestions
     internal UsernameSuggestions(Vault? vault) =>
         _used = vault is null ? [] : [.. vault.ReadUsernames().Where(username => !DisplayTextSanitizer.Sanitize(username).WasAltered)];
 
-    /// <summary>Every username the vault uses, which a username box holds as its items and narrows with <see cref="Offers"/>.</summary>
+    private string? _matchedText;
+    private IReadOnlyList<string> _matched = [];
+
+    /// <summary>Every username the vault uses, which a username box holds as its items and narrows with a <see cref="Filter"/>.</summary>
     internal IReadOnlyList<string> Used => _used;
 
-    /// <summary>A username box's filter, public for XAML: the same rule as <see cref="Matching"/>, so the box keeps one list while its text changes.</summary>
-    public static AutoCompleteFilterPredicate<object?> Offers { get; } =
-        (typed, item) => item is string username && Holds(username, typed?.Trim() ?? string.Empty);
+    /// <summary>A username box's filter, which shows exactly what <paramref name="suggested"/> offers for its text, so the list and its spoken count follow one rule.</summary>
+    internal static AutoCompleteFilterPredicate<object?> Filter(Func<string, IReadOnlyList<string>> suggested)
+    {
+        ArgumentNullException.ThrowIfNull(suggested);
 
-    /// <summary>The used usernames holding what is typed, whatever its case, leaving out the one typed exactly.</summary>
+        return (typed, item) => item is string username && suggested(typed ?? string.Empty).Contains(username, StringComparer.Ordinal);
+    }
+
+    /// <summary>At most eight used usernames holding what is typed, whatever its case, leaving out the one typed exactly.</summary>
     internal IReadOnlyList<string> Matching(string typed)
     {
         ArgumentNullException.ThrowIfNull(typed);
 
         var text = typed.Trim();
 
-        return [.. _used.Where(username => Holds(username, text)).Take(_most)];
+        // A box's filter asks once per used username, so one text's matches are found once.
+        if (text != _matchedText)
+        {
+            _matchedText = text;
+            _matched = [.. _used.Where(username => Holds(username, text)).Take(_most)];
+        }
+
+        return _matched;
     }
 
     private static bool Holds(string username, string text) =>

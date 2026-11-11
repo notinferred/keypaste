@@ -308,6 +308,37 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
+    public void The_username_boxs_list_and_its_spoken_count_offer_at_most_eight_and_nothing_once_disposed()
+    {
+        for (var index = 0; index < 10; index++)
+        {
+            _session.Unlocked!.AddEntry(new VaultEntry { Title = $"mail {index}", Username = $"dan{index}@example.com", Password = "p" });
+        }
+
+        var form = NewItemForm.Open(_entries);
+        form.Username = "example";
+
+        Assert.Equal(8, form.SuggestedUsernames.Count);
+        Assert.Contains("8 usernames", form.SuggestedUsernamesSpoken, StringComparison.Ordinal);
+        Assert.Equal(8, form.UsedUsernames.Count(username => form.UsernameFilter("example", username)));
+
+        form.Dispose();
+
+        Assert.Empty(form.UsedUsernames);
+        Assert.Empty(form.SuggestedUsernames);
+    }
+
+    [Fact]
+    public void New_items_own_generator_does_not_offer_another_new_item()
+    {
+        var form = NewItemForm.Open(_entries);
+        form.OpenGeneratorCommand.Execute(null);
+
+        Assert.False(form.GeneratorPanel!.OffersNewItem);
+        Assert.False(form.GeneratorPanel.NewItemCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void A_choice_announces_the_fields_and_the_button_that_read_it()
     {
         var form = NewItemForm.Open(_entries);

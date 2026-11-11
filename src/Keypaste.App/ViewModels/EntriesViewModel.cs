@@ -1178,10 +1178,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Notice = null;
         Error = null;
-        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null)
-        {
-            StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close),
-        };
+        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
     }
 
     [RelayCommand(CanExecute = nameof(IsAdding))]

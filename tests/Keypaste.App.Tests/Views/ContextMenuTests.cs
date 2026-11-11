@@ -282,6 +282,13 @@ public sealed class ContextMenuTests
         Assert.Same(claude, agents.Model.Selected);
         WindowInput.Drain();
 
+        agents.Model.CloseDetailCommand.Press();
+        WindowInput.Drain();
+        Assert.Same(claude, agents.Model.Selected);
+        Choose(RightClick(agents.Window, agents.Card(claude)), "Agent settings…");
+        Assert.True(agents.Model.IsOpened);
+        WindowInput.Drain();
+
         var inside = agents.Window.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConnectToolAgain", IsEffectivelyVisible: true });
         inside.Focus(NavigationMethod.Tab);
         WindowInput.Drain();

@@ -610,7 +610,7 @@
                                      MinHeight="40"
                                      Text="{Binding Username, Mode=TwoWay}"
                                      ItemsSource="{Binding UsedUsernames}"
-                                     ItemFilter="{x:Static vm:UsernameSuggestions.Offers}"
+                                     ItemFilter="{Binding UsernameFilter}"
                                      ctl:Announcer.Says="{Binding SuggestedUsernamesSpoken}" />
                   </ctl:FieldRow>
 
@@ -1825,7 +1825,7 @@
                                        Classes="mono"
                                        Text="{Binding DraftUsername, Mode=TwoWay}"
                                        ItemsSource="{Binding UsedUsernames}"
-                                       ItemFilter="{x:Static vm:UsernameSuggestions.Offers}"
+                                       ItemFilter="{Binding UsernameFilter}"
                                        ctl:Announcer.Says="{Binding SuggestedUsernamesSpoken}"
                                        AutomationProperties.Name="{x:Static res:Strings.Username}" />
                     </ctl:FieldRow>

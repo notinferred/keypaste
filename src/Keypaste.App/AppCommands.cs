@@ -341,7 +341,7 @@ internal sealed class AppCommands
         var agentSettings = new AppCommand(
             Strings.AgentSettingsLabel,
             [],
-            () => Agents() is { } agents && Target<AgentRow>() is { HasSettings: true } row && agents.Selected != row,
+            () => Agents() is { } agents && Target<AgentRow>() is { HasSettings: true } row && (!agents.IsOpened || agents.Selected != row),
             OpenAgentSettings);
         var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
         var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
@@ -783,7 +783,7 @@ internal sealed class AppCommands
     {
         if (Agents() is { } agents && Target<AgentRow>() is { } agent)
         {
-            agents.Choose(agent);
+            agents.Open(agent);
         }
     }
 

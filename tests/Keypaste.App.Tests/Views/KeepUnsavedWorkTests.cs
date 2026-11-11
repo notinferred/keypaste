@@ -629,6 +629,24 @@ public sealed class KeepUnsavedWorkTests
         Assert.Equal(generated, Assert.IsType<EntriesViewModel>(shell.Shell.Content).NewItem!.Password.MaskedLength);
     });
 
+    [Fact]
+    public Task New_item_from_an_edits_generator_starts_with_the_value_it_showed_after_the_edit_is_discarded() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell();
+        var pane = shell.OpenPane();
+        pane.EditCommand.Press();
+        pane.DraftUsername = "half typed";
+        pane.OpenGeneratorCommand.Press();
+        var panel = pane.NewPasswordGenerator!;
+        var shown = panel.Reveal();
+
+        panel.NewItemCommand.Press();
+        Assert.True(shell.Shell.HasDiscardPrompt);
+
+        shell.Shell.ConfirmDiscardCommand.Press();
+        Assert.Equal(shown, Assert.IsType<EntriesViewModel>(shell.Shell.Content).NewItem!.Password.Compose());
+    });
+
     [Theory]
     [InlineData("NewItemTitleProblem", "That is not a name")]
     [InlineData("NewItemKeyNameProblem", "Name the key as a project reads it")]

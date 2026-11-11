@@ -29,6 +29,16 @@ internal sealed partial class GeneratorPanel : UserControl
             panel.CancelCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == Key.Enter && e.Source is TextBox { Name: "GeneratedFieldName" })
+        {
+            // Return in the field's name adds the field it names rather than applying the value elsewhere.
+            if (panel.AddFieldCommand.CanExecute(null))
+            {
+                panel.AddFieldCommand.Execute(null);
+            }
+
+            e.Handled = true;
+        }
         else if (e.Key == Key.Enter && panel.Applies && e.Source is not Button)
         {
             // Return applies, so the form around the panel never confirms with the value still in it.

@@ -82,8 +82,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         // A generated value is in its field, where it can be seen and replaced, and follows the choices (V.12).
         NewValue.GeneratedValueReplaced += (_, _) => SetProperty(ref _generateValue, false, nameof(GenerateValue));
+        // While the panel is open, its Apply is what changes these choices, and the value it hands over is the one shown.
         Generator.PropertyChanged += (_, _) =>
         {
+            if (_generatorPanel is not null)
+            {
+                return;
+            }
+
             if (_generateValue && IsAdding)
             {
                 GenerateInto(NewValue);

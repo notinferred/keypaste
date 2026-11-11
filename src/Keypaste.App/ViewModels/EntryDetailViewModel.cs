@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -105,9 +106,10 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         OpenFieldGeneratorCommand = new RelayCommand<SecretField>(field => OpenGeneratorFor(field));
         CloseGeneratorCommand = new RelayCommand(CloseGenerator);
         GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => HasPassword && !IsEditing);
+        // While the panel is open, its Apply is what changes these choices, and the value it hands over is the one shown.
         Generator.PropertyChanged += (_, _) =>
         {
-            if (_generatedInto is { IsGenerated: true } field)
+            if (_generatorPanel is null && _generatedInto is { IsGenerated: true } field)
             {
                 GenerateInto(field);
             }
@@ -593,7 +595,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Generate, beside a form's secret field: a generated value in place of what the field holds.</summary>
     internal RelayCommand<SecretField> GenerateIntoCommand { get; }
 
-    /// <summary>Generate, on the saved password: Edit fields with a generated password, which Save writes and history keeps the old one of.</summary>
+    /// <summary>Generate, on the saved password: Edit fields with the generator open, whose Apply fills the new password that Save writes and history keeps the old one of.</summary>
     internal RelayCommand GeneratePasswordCommand { get; }
 
     /// <summary>Adds a generated value as a new protected field, as Generate password's Add as a field asks, through Add a field's own write.</summary>
@@ -608,18 +610,17 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ConfirmAddFieldCommand.Press();
     }
 
-    /// <summary>Generate, on a protected field: its replace form with a generated value, which Save writes and history keeps the old one of.</summary>
+    /// <summary>Generate, on a protected field: its replace form with the generator open, whose Apply fills the value Replace writes and history keeps the old one of.</summary>
     internal void GenerateField(EntryFieldRow row) =>
         LeavingFieldForm(() =>
         {
             OpenReplaceField(row);
-            GenerateInto(ReplacementFieldValue);
+            OpenGeneratorFor(ReplacementFieldValue);
         });
 
     private void GeneratePassword()
     {
         BeginEdit();
-        GenerateInto(NewPassword);
         OpenGeneratorFor(NewPassword);
     }
 
@@ -1169,7 +1170,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal partial string DraftUsername { get; set; } = string.Empty;
 
     /// <summary>The usernames this vault already uses that hold what is typed, which Edit's username box offers; choosing one fills it.</summary>
-    internal IReadOnlyList<string> SuggestedUsernames => IsEditing && DraftUsername != _editOpenedWith.Username ? _usernames.Matching(DraftUsername) : [];
+    internal IReadOnlyList<string> SuggestedUsernames => SuggestedFor(DraftUsername);
+
+    /// <summary>Edit's username box's filter, by the same rule as <see cref="SuggestedUsernames"/>.</summary>
+    internal AutoCompleteFilterPredicate<object?> UsernameFilter => UsernameSuggestions.Filter(SuggestedFor);
+
+    private IReadOnlyList<string> SuggestedFor(string typed) => IsEditing && typed != _editOpenedWith.Username ? _usernames.Matching(typed) : [];
 
     internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
 

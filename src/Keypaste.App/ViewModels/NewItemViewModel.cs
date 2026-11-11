@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -119,7 +120,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _hasHost;
     private bool _hasKey;
     private GeneratePasswordViewModel? _generatorPanel;
-    private readonly UsernameSuggestions _usernames;
+    private UsernameSuggestions _usernames;
 
     /// <param name="session">The unlocked vault the item is made in.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
@@ -347,9 +348,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal RelayCommand CloseGeneratorCommand { get; }
 
-    /// <summary>Starts a new item with a generated value, set by the screen that holds this form; the second argument closes the panel.</summary>
-    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
-
     /// <summary>The generator opened from the password field, or null while it is closed.</summary>
     internal GeneratePasswordViewModel? GeneratorPanel
     {
@@ -387,7 +385,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             Generator,
             Password,
             ApplyGenerated,
-            value => StartNewItemWith?.Invoke(value, CloseGenerator),
+            null,
             AddGeneratedField,
             Title.Trim().Length > 0 ? Title.Trim() : "this new item",
             CloseGenerator);
@@ -530,6 +528,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     /// <summary>The usernames this vault already uses that hold what is typed, which the username box offers; choosing one fills it.</summary>
     internal IReadOnlyList<string> SuggestedUsernames => _usernames.Matching(Username);
+
+    /// <summary>The username box's filter, by the same rule as <see cref="SuggestedUsernames"/>.</summary>
+    internal AutoCompleteFilterPredicate<object?> UsernameFilter => UsernameSuggestions.Filter(typed => _usernames.Matching(typed));
 
     internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
 
@@ -779,6 +780,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         _projectTags = [];
         OnPropertyChanged(nameof(TagSuggestions));
+        _usernames = new UsernameSuggestions(null);
+        OnPropertyChanged(nameof(UsedUsernames));
     }
 
     private bool TryCustomFields(List<FieldWrite> fields)

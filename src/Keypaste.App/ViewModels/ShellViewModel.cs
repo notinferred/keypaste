@@ -83,6 +83,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private Action? _discard;
     private Action? _keep;
     private bool _disposed;
+    private SecretField? _newItemPassword;
 
     internal ShellViewModel(
         AppVaultSession session,
@@ -1101,19 +1102,34 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     // New item with the generated value as its password, taken character by character into the form's own field.
     private void NewItemWith(SecretField value, Action close)
     {
-        // The generator stays open behind "Discard …?", since closing it disposes the value.
-        Leave(() =>
-        {
-            MoveTo(Destinations.Of(DestinationKind.Entries));
+        // Discarding the form a pane's generator belongs to disposes that generator's value, so the shell holds a copy.
+        DropNewItemPassword();
+        var password = new SecretField(Clipboard);
+        password.TakeFrom(value);
+        _newItemPassword = password;
 
-            if (Content is EntriesViewModel items)
+        // The generator stays open behind "Discard …?", so keeping the draft leaves the panel as it was.
+        Leave(
+            () =>
             {
-                items.BeginAddCommand.Press();
-                items.NewItem?.Password.TakeFrom(value);
-            }
+                MoveTo(Destinations.Of(DestinationKind.Entries));
 
-            close();
-        });
+                if (Content is EntriesViewModel items)
+                {
+                    items.BeginAddCommand.Press();
+                    items.NewItem?.Password.TakeFrom(password);
+                }
+
+                DropNewItemPassword();
+                close();
+            },
+            DropNewItemPassword);
+    }
+
+    private void DropNewItemPassword()
+    {
+        _newItemPassword?.Dispose();
+        _newItemPassword = null;
     }
 
     [RelayCommand]
@@ -1894,6 +1910,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         Recommendations.Dispose();
         CloseDiscardPrompt();
+        DropNewItemPassword();
         CloseShare();
         CloseGenerator();
 
