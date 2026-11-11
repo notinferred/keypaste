@@ -8,6 +8,8 @@ In the desktop app you can give an item a one-time code (TOTP) by pasting the se
 
 The desktop app's password generator now lets you choose a character password's length, with a number or a slider, which kinds of character it uses (letters, digits, symbols), and whether to leave out lookalikes such as 0 and O.
 
+In the desktop app, an item with a one-time code no longer lists its `otp` field (or `TOTP Seed`, `TOTP Settings` or KeePass 2's `TimeOtp-*` fields) among its custom fields, so the pane no longer offers to reveal the seed. The fields stay in the vault, the export and the history.
+
 The desktop app locks after 30 minutes without input by default, where it locked after five. Settings still offers one minute to eight hours, and a saved choice is kept.
 
 `keypaste share revoke --expired` now writes one audit line for each link it forgets, as a single revoke does, naming the link's item. If a line can't be written the links stay forgotten and the command says so ([F.103](docs/steps/F.103.md)).
