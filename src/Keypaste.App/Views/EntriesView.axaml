@@ -330,12 +330,27 @@
                   MinWidth="200"
                   IsVisible="{Binding #AddEntry.IsChecked}">
             <StackPanel Spacing="2">
-              <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="{x:Static res:Strings.NewItem}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="key-round" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
+              <ItemsControl x:Name="NewItemKinds" ItemsSource="{Binding Kinds}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="2" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TemplateChoice">
+                    <Button Classes="ghost menu-item"
+                            Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).BeginAddOfKindCommand}"
+                            CommandParameter="{Binding Template}"
+                            AutomationProperties.Name="{Binding Label}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
+                        <TextBlock Text="{Binding MenuLabel}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border Classes="divider" Margin="6,2" />
               <Button x:Name="NewGeneratedPassword"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"

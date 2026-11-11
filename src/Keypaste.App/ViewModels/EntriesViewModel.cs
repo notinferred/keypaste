@@ -71,6 +71,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Table.OrderChanged += OnOrderChanged;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
+        BeginAddOfKindCommand = new RelayCommand<ItemTemplate>(BeginAddOfKind, _ => !IsAdding);
         DeleteCommand = new RelayCommand(
             DeleteOrAsk,
             () => Selected is not null && !IsConfirmingDelete);
@@ -527,6 +528,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
                 BeginAddCommand.NotifyCanExecuteChanged();
+                BeginAddOfKindCommand.NotifyCanExecuteChanged();
                 CancelAddCommand.NotifyCanExecuteChanged();
                 ConfirmAddCommand.NotifyCanExecuteChanged();
                 DeleteCommand.NotifyCanExecuteChanged();
@@ -777,6 +779,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal RelayCommand CancelGroupCommand { get; }
 
     internal RelayCommand BeginAddCommand { get; }
+
+    /// <summary>Opens New item with the kind it is given already chosen.</summary>
+    internal RelayCommand<ItemTemplate> BeginAddOfKindCommand { get; }
+
+    /// <summary>The kinds the add menu offers, as New item's kind choice shows them.</summary>
+    internal IReadOnlyList<TemplateChoice> Kinds { get; } = TemplateChoice.All;
 
     /// <summary>Asks for confirmation. It does not delete.</summary>
     internal RelayCommand DeleteCommand { get; }
@@ -1179,6 +1187,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Notice = null;
         Error = null;
         NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
+    }
+
+    private void BeginAddOfKind(ItemTemplate kind)
+    {
+        BeginAdd();
+
+        if (NewItem is { } form)
+        {
+            form.Template = kind;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(IsAdding))]

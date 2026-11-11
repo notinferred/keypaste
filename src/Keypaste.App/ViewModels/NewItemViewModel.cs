@@ -20,6 +20,19 @@ internal enum ItemTemplate
 /// <summary>One template as the form's choice shows it.</summary>
 internal sealed record TemplateChoice(ItemTemplate Template, string Label, string Icon)
 {
+    /// <summary>The five things a new item can be.</summary>
+    internal static IReadOnlyList<TemplateChoice> All { get; } =
+    [
+        new(ItemTemplate.Login, "Login", "globe"),
+        new(ItemTemplate.ApiKey, "API key", "key-round"),
+        new(ItemTemplate.Database, "Database", "database"),
+        new(ItemTemplate.Server, "Server", "server"),
+        new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
+    ];
+
+    /// <summary>How the add menus name it: the form it opens, so with an ellipsis.</summary>
+    internal string MenuLabel => $"{Label}…";
+
     public override string ToString() => Label;
 }
 
@@ -413,15 +426,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         FieldsChanged();
     }
 
-    /// <summary>The five things a new item can be.</summary>
-    internal IReadOnlyList<TemplateChoice> Templates { get; } =
-    [
-        new(ItemTemplate.Login, "Login", "globe"),
-        new(ItemTemplate.ApiKey, "API key", "key-round"),
-        new(ItemTemplate.Database, "Database", "database"),
-        new(ItemTemplate.Server, "Server", "server"),
-        new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
-    ];
+    internal IReadOnlyList<TemplateChoice> Templates { get; } = TemplateChoice.All;
 
     /// <summary>The template the form shows. Changing it keeps the title, folder, tags and notes.</summary>
     internal ItemTemplate Template

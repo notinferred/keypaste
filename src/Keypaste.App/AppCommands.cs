@@ -170,6 +170,7 @@ internal sealed class AppCommands
         var file = new AppMenuGroup(Strings.FileMenu,
         [
             new AppCommand(Strings.NewItemLabel, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
+            Folder(Strings.NewItemByType, [.. TemplateChoice.All.Select(kind => new AppCommand(kind.MenuLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginAddOfKindCommand.Press(kind.Template))))]),
             _newGroup,
             newProject,
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),

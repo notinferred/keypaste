@@ -370,6 +370,7 @@ public static class Strings
     public static string NewGroupProjectImportOrShare => Manager.GetString("NewGroupProjectImportOrShare", CultureInfo.CurrentUICulture)!;
     public static string NewItem => Manager.GetString("NewItem", CultureInfo.CurrentUICulture)!;
     public static string NewItemAddsOneHere => Manager.GetString("NewItemAddsOneHere", CultureInfo.CurrentUICulture)!;
+    public static string NewItemByType => Manager.GetString("NewItemByType", CultureInfo.CurrentUICulture)!;
     public static string NewItemLabel => Manager.GetString("NewItemLabel", CultureInfo.CurrentUICulture)!;
     public static string NewItemOrPassword => Manager.GetString("NewItemOrPassword", CultureInfo.CurrentUICulture)!;
     public static string NewItemProjectOrImport => Manager.GetString("NewItemProjectOrImport", CultureInfo.CurrentUICulture)!;

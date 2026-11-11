@@ -288,6 +288,7 @@
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
   <data name="NewItemProjectOrImport" xml:space="preserve"><value>New item, project or import</value></data>
   <data name="NewGroupProjectImportOrShare" xml:space="preserve"><value>New group, project, import or share</value></data>
+  <data name="NewItemByType" xml:space="preserve"><value>New item by type</value></data>
   <data name="NewItemOrPassword" xml:space="preserve"><value>New item or password</value></data>
   <data name="NewKey" xml:space="preserve"><value>New key</value></data>
   <data name="NewMasterPassword" xml:space="preserve"><value>New master password</value></data>
