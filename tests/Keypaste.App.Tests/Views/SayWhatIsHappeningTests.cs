@@ -257,7 +257,7 @@ public sealed class SayWhatIsHappeningTests
     {
         using var home = new TempAuditHome();
         home.Append("env/dev/STRIPE_KEY");
-        var model = new LogViewModel(home.Home) { ShowDenied = true };
+        using var model = new LogViewModel(home.Home) { ShowDenied = true };
 
         Assert.True(model.OffersShowAll);
 

@@ -387,7 +387,7 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_lock_keeps_each_tables_order_and_the_next_unlock_opens_with_it() => HeadlessSession.On(async () =>
+    public Task A_lock_keeps_each_tables_order_and_widths_and_the_next_unlock_opens_with_them() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "tables.kdbx");
@@ -420,16 +420,19 @@ public sealed class WindowLayoutTests
 
         var shell = await Unlock(main, root, vault);
         shell.Tables.Items.Press(TableStates.Url);
+        shell.Tables.Log.Resize(TableStates.Actor, 40, [84, 110, 100, 300, 200, 100]);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);
 
         Assert.True(AppSettings.TryLoad(settingsPath, out var kept));
         Assert.Equal("items:url:asc", kept.Window!.TableSorts);
+        Assert.Equal("log:84,150,60,300,200,100", kept.Window.TableWidths);
 
         var reopened = await Unlock(main, root, vault);
         Assert.NotSame(shell, reopened);
         Assert.Equal(new TableOrder(TableStates.Url, false), reopened.Tables.Items.Order);
+        Assert.Equal([84d, 150d, 60d, 300d, 200d, 100d], reopened.Tables.Log.Widths!);
 
         app.Menus!.All.Single(command => command.Header == "Lock").Run();
         await Until(() => root.Content is UnlockView);

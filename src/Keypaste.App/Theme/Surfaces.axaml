@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Keypaste.App.Views">
 
   <!--
     Surfaces, as classes on Border. Depth is lightness; only overlays (dialog, toast) cast shadows.
@@ -88,6 +89,13 @@
   <!-- A table's top head takes its card's curve, or its fill runs through the card's line at the corners. -->
   <Style Selector="Border.table-head.top, Border.table ItemsControl > ContentPresenter:nth-child(1) Border.table-head">
     <Setter Property="CornerRadius" Value="10,10,0,0" />
+  </Style>
+  <!-- The edge between two heads is a control, so it draws the control edge and changes as one does. -->
+  <Style Selector="Border.column-grip-line">
+    <Setter Property="Background" Value="{DynamicResource KpBorderControl}" />
+  </Style>
+  <Style Selector="views|ColumnGrip:pointerover Border.column-grip-line">
+    <Setter Property="Background" Value="{DynamicResource TextControlBorderBrushPointerOver}" />
   </Style>
   <Style Selector="Border.table-row">
     <Setter Property="Padding" Value="16,12" />

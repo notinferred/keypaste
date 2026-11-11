@@ -1481,7 +1481,7 @@ internal sealed class Driver(string home)
         }
 
         // What Agents › Activity draws, read by that screen's own view model, which shows the whole file.
-        var history = new LogViewModel(home);
+        using var history = new LogViewModel(home);
 
         if (history.HasMessage)
         {

@@ -648,4 +648,10 @@
   <data name="LearnMoreAboutRecommendations" xml:space="preserve"><value>Learn more about recommendations</value></data>
   <data name="LearnMoreAboutKeysLeftInNotes" xml:space="preserve"><value>Learn more about keys left in notes</value></data>
   <data name="LearnMoreAboutValue" xml:space="preserve"><value>Learn more about {0}</value></data>
+  <data name="Time" xml:space="preserve"><value>Time</value></data>
+  <data name="Actor" xml:space="preserve"><value>Actor</value></data>
+  <data name="Action" xml:space="preserve"><value>Action</value></data>
+  <data name="Secrets" xml:space="preserve"><value>Secrets</value></data>
+  <data name="Where" xml:space="preserve"><value>Where</value></data>
+  <data name="Result" xml:space="preserve"><value>Result</value></data>
 </root>

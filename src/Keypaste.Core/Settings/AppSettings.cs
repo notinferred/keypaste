@@ -429,6 +429,11 @@ public sealed record AppSettings
         {
             writer.Text(WindowTableSortsKey, sorts, "the column each sorted table runs by");
         }
+
+        if (layout.TableWidths is { } widths)
+        {
+            writer.Text(WindowTableWidthsKey, widths, "each resized table's column shares");
+        }
     }
 
     private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
@@ -473,7 +478,8 @@ public sealed record AppSettings
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
                 table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
                 ZoomText(table),
-                TextOf(table, WindowTableSortsKey))
+                TextOf(table, WindowTableSortsKey),
+                TextOf(table, WindowTableWidthsKey))
             : null;
 
     // Written as a string, as the bounds are, so a hand edit such as "-50" stays this key's own problem: the file's reader refuses a bare negative number, and with it the whole file.

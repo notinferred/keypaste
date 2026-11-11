@@ -488,12 +488,18 @@ public sealed class IconRailTests
         log.RefreshCommand.Press();
         shell.Frame();
 
-        var scroll = shell.Named<Grid>("LogPage").FindAncestorOfType<ScrollViewer>()!;
-        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, "the log scrolls sideways to its Result");
-        var result = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.IsEffectivelyVisible && block.Text == log.Rows[0].Result);
+        var scroll = shell.Named<ScrollViewer>("TableScroll");
+        Assert.True(scroll.Extent.Width <= scroll.Viewport.Width, "the table scrolls sideways to its Result");
+        var row = Assert.Single(shell.Window.GetVisualDescendants().OfType<LogColumns>(), columns => columns.Parent is Border { Classes: var classes } && classes.Contains("table-row"));
+        var result = row.GetVisualDescendants().OfType<TextBlock>().Last(block => block.IsEffectivelyVisible);
         Assert.All(result.TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"{result.Text} is cut"));
-        var subject = log.Rows.First(entry => entry.Where.Length > 0).Subject;
-        Assert.Contains(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text == subject);
+        Assert.DoesNotContain(row.GetVisualDescendants().OfType<TextBlock>(), block => block.Classes.Contains("where") && block.IsEffectivelyVisible);
+        Assert.True(row.DrawnWidths[3] > 100, $"Secrets is {row.DrawnWidths[3]} wide with Where's room to take");
+        Assert.Equal(log.Rows.First(entry => entry.Where.Length > 0).SecretsAndWhere, ToolTip.GetTip(row.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Classes.Contains("secrets"))));
+
+        shell.Window.Width = 1000 * percent / 100d;
+        shell.Frame();
+        Assert.Contains(row.GetVisualDescendants().OfType<TextBlock>(), block => block.Classes.Contains("where") && block.IsEffectivelyVisible);
     });
 
     [Theory]

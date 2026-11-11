@@ -65,6 +65,9 @@ internal sealed record LogRow
 
     internal string Where { get; private init; } = string.Empty;
 
+    /// <summary>The Secrets cell's tooltip where the table has no Where column.</summary>
+    internal string SecretsAndWhere => string.Join(" · ", new[] { Secrets, Where }.Where(part => part.Length > 0));
+
     /// <summary>What the line was about: the secrets and where they live, or empty when it names neither.</summary>
     internal string Subject => string.Join(" · ", new[] { UnlessNone(Secrets), UnlessNone(Where) }.OfType<string>());
 
