@@ -373,7 +373,6 @@ public static class Strings
     public static string NewItemByType => Manager.GetString("NewItemByType", CultureInfo.CurrentUICulture)!;
     public static string NewItemLabel => Manager.GetString("NewItemLabel", CultureInfo.CurrentUICulture)!;
     public static string NewItemOrPassword => Manager.GetString("NewItemOrPassword", CultureInfo.CurrentUICulture)!;
-    public static string NewItemProjectOrImport => Manager.GetString("NewItemProjectOrImport", CultureInfo.CurrentUICulture)!;
     public static string NewKey => Manager.GetString("NewKey", CultureInfo.CurrentUICulture)!;
     public static string NewMasterPassword => Manager.GetString("NewMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string NewPassword => Manager.GetString("NewPassword", CultureInfo.CurrentUICulture)!;

@@ -286,7 +286,6 @@
   <data name="NewFieldValue" xml:space="preserve"><value>New field value</value></data>
   <data name="NewGroup" xml:space="preserve"><value>New group</value></data>
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
-  <data name="NewItemProjectOrImport" xml:space="preserve"><value>New item, project or import</value></data>
   <data name="NewGroupProjectImportOrShare" xml:space="preserve"><value>New group, project, import or share</value></data>
   <data name="NewItemByType" xml:space="preserve"><value>New item by type</value></data>
   <data name="NewItemOrPassword" xml:space="preserve"><value>New item or password</value></data>
