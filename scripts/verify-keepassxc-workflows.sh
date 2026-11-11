@@ -485,6 +485,20 @@ exercise() {
   [ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the app's field and tag edits moved the vault off KDBX 4.0"
   intact "$db" servers/database
 
+  step "[$kind] one-time code: the app sets one, and KeePassXC computes the code keypaste does"
+  did "the app's one-time code" app totp-set "$db" servers/database JBSWY3DPEHPK3PXP
+  for attempt in 1 2; do
+    start=$(date +%s)
+    ours=$(kp_cli "$db" get servers/database totp --reveal 2>"$dir/totp.err" | tr -d '\r') || die "keypaste get servers/database totp failed: $(cat "$dir/totp.err")"
+    theirs=$(kx show "$db" servers/database -t) || die "keepassxc-cli show --totp cannot read the code the app set"
+    if [ $((start / 30)) -eq $(($(date +%s) / 30)) ]; then
+      [ -n "$ours" ] && [ "$ours" = "$theirs" ] || die "keypaste gives the code '${ours}' where KeePassXC gives '${theirs}' for the one the app set"
+      break
+    fi
+    [ "$attempt" -eq 2 ] && die "keypaste's and KeePassXC's codes could not be read within one period twice running"
+  done
+  [ "$(protection otp "$db")" = protected ] || die "KeePassXC does not read the otp the app set as protected"
+
   step "[$kind] notes: the app flags keys left in notes, remembers a dismissal, refuses a clash and moves them into fields"
   review() {
     app notes-review "$db" >"$dir/review.out" 2>&1 || die "the app's notes review failed: $(cat "$dir/review.out")"

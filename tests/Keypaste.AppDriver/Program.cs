@@ -90,6 +90,7 @@ internal static class Program
         "       edit <vault> <entry-path> <notes> <url>\n" +
         "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
+        "       totp-set <vault> <entry-path> <setup key or otpauth:// link>\n" +
         "       field-set <vault> <entry-path> <name>\n" +
         "       field-protect <vault> <entry-path> <name>\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
@@ -176,6 +177,7 @@ internal static class Program
                 ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-protect", var vault, var entry, var name] => await driver.ToggleProtectionAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
+                ["totp-set", var vault, var entry, var setup] => await driver.SetTotpAsync(vault, entry, setup).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag, "--decline"] => await driver.AddTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
                 ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
@@ -523,6 +525,21 @@ internal sealed class Driver(string home)
 
             Press(detail.ConfirmAddFieldCommand, "Add");
             return detail.IsAddingField || entries.Error is not null ? Refused(entries.Error) : Did($"added {name} to {entry}");
+        });
+
+    internal Task<int> SetTotpAsync(string vault, string entry, string setup) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(detail.BeginSetTotpCommand, "Add one-time code");
+            foreach (var c in setup)
+            {
+                detail.NewTotp.Type(c);
+            }
+
+            Press(detail.ConfirmSetTotpCommand, "Add");
+            return detail.IsSettingTotp || entries.Error is not null ? Refused(entries.Error) : Did($"set the one-time code of {entry}");
         });
 
     internal Task<int> ReplaceFieldAsync(string vault, string entry, string name) =>
