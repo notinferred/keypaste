@@ -4,6 +4,16 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app shows Items, Agents and Trash as a list beside the chosen item, with an item's fields in grouped rows you press to copy. The keypaste wordmark leaves the unlocked window, and the vault's name, save state and Lock sit at the foot of the sidebar ([F.110](docs/steps/F.110.md)).
+
+History and the activity log are one Activity screen under Agents, which keeps sortable, resizable columns ([F.110](docs/steps/F.110.md)).
+
+The sidebar has its own + for a new group, a new project, imports and sharing, and the item list's + adds an item by its kind ([F.110](docs/steps/F.110.md)).
+
+A username box suggests the usernames and email addresses the vault already uses ([F.110](docs/steps/F.110.md)).
+
+Every place that makes a password uses one generator, which changes the field only when you press Apply ([F.111](docs/steps/F.111.md)).
+
 In the desktop app you can give an item a one-time code (TOTP) by pasting the setup key or `otpauth://` link a site shows, in New item or from the item's pane or the Item menu, which can also replace or remove it. keypaste keeps it in the protected `otp` field, where KeePassXC 2.8 reads it, and the item shows the live code and its countdown.
 
 The desktop app's password generator now lets you choose a character password's length, with a number or a slider, which kinds of character it uses (letters, digits, symbols), and whether to leave out lookalikes such as 0 and O.
