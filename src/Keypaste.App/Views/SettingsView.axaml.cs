@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
 
@@ -23,6 +25,37 @@ internal sealed partial class SettingsView : UserControl
             }
         };
 
+        var split = this.FindControl<ListDetail>("Split")!;
+        var sections = this.FindControl<ListBox>("SettingsSections")!;
+        split.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ListDetail.ShowsBackProperty)
+            {
+                Dispatcher.UIThread.Post(
+                    () =>
+                    {
+                        if (TopLevel.GetTopLevel(this) is Window { IsVisible: true } window && KeyboardIsHere(window))
+                        {
+                            Control next = split.ShowsBack ? this.FindControl<Button>("BackToSections")! : sections;
+                            next.Focus(NavigationMethod.Tab);
+                        }
+                    },
+                    DispatcherPriority.Loaded);
+            }
+        };
+
+        // Choosing the part already selected is no change, so a press or Return on a row reopens it.
+        sections.AddHandler(TappedEvent, (_, _) => OpenSection());
+        sections.AddHandler(
+            KeyUpEvent,
+            (_, e) =>
+            {
+                if (e.Key is Key.Enter or Key.Space)
+                {
+                    OpenSection();
+                }
+            });
+
         var current = this.FindControl<MaskedInput>("CurrentPassword")!;
         current.CharacterTyped += (_, c) => Access?.TypeCurrent(c);
         current.BackspacePressed += (_, _) => Access?.BackspaceCurrent();
@@ -41,6 +74,16 @@ internal sealed partial class SettingsView : UserControl
         confirm.BackspacePressed += (_, _) => Access?.BackspaceConfirm();
         confirm.ClearRequested += (_, _) => Access?.ClearConfirm();
         confirm.Pasting = () => Access?.PasteConfirmAsync() ?? Task.CompletedTask;
+    }
+
+    private bool KeyboardIsHere(Window window) => window.FocusManager?.GetFocusedElement() is not Visual focused || this.IsVisualAncestorOf(focused);
+
+    private void OpenSection()
+    {
+        if (DataContext is SettingsViewModel settings)
+        {
+            settings.SectionIsOpen = true;
+        }
     }
 
     private void AskTerms(FirstLaunchViewModel terms)

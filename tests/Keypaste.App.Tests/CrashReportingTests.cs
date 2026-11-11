@@ -199,7 +199,7 @@ public sealed partial class CrashReportingTests : IDisposable
         var preferences = new DesktopPreferences(_home.Path);
         var older = preferences.Current;
 
-        preferences.Record(settings => settings with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false) });
+        preferences.Record(settings => settings with { Window = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, false) });
         preferences.Update(older with { LockWhenMinimized = true });
 
         var saved = AppSettings.Load(SettingsFile);

@@ -418,11 +418,6 @@ public sealed record AppSettings
             .Text(WindowBoundsKey, layout.BoundsText, "left, top, width, height, at the window's own size")
             .Text(WindowStateKey, layout.ModeText);
 
-        if (layout.ListShare is { } share)
-        {
-            writer.Number(WindowListShareKey, share, "the list's thousandths of the height it shares with the preview");
-        }
-
         writer.Number(WindowSidebarHiddenKey, layout.SidebarHidden ? 1 : 0);
 
         if (layout.ZoomPercent != WindowLayout.ActualSizePercent)
@@ -433,11 +428,6 @@ public sealed record AppSettings
         if (layout.TableSorts is { } sorts)
         {
             writer.Text(WindowTableSortsKey, sorts, "the column each sorted table runs by");
-        }
-
-        if (layout.TableWidths is { } widths)
-        {
-            writer.Text(WindowTableWidthsKey, widths, "each resized table's column shares");
         }
     }
 
@@ -481,11 +471,9 @@ public sealed record AppSettings
             ? WindowLayout.Read(
                 bounds.Value.Text,
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
-                table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
                 table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
                 ZoomText(table),
-                TextOf(table, WindowTableSortsKey),
-                TextOf(table, WindowTableWidthsKey))
+                TextOf(table, WindowTableSortsKey))
             : null;
 
     // Written as a string, as the bounds are, so a hand edit such as "-50" stays this key's own problem: the file's reader refuses a bare negative number, and with it the whole file.

@@ -3,52 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
-             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.LogView"
              x:DataType="vm:LogViewModel"
-             views:TableColumns.Table="{Binding Table}"
              Background="{DynamicResource KpBgApp}">
 
-  <!-- With the content tight the table has no room to scroll to its Result, so Where gives way to it and moves to the Secrets cell's tooltip. -->
   <UserControl.Styles>
-    <Style Selector="StackPanel#LogTable">
-      <Setter Property="MinWidth" Value="680" />
-    </Style>
-    <Style Selector="Grid#LogPage">
-      <Setter Property="Margin" Value="32,12,32,24" />
-    </Style>
-    <Style Selector="Grid.tight-content Grid#LogPage">
-      <Setter Property="Margin" Value="16,12,16,24" />
-    </Style>
-    <Style Selector="Grid.tight-content StackPanel#LogTable">
-      <Setter Property="MinWidth" Value="0" />
-    </Style>
-    <Style Selector="Grid.tight-content views|LogColumns">
-      <Setter Property="ShowsWhere" Value="False" />
-    </Style>
-    <Style Selector="Grid.tight-content TextBlock.where, Grid.tight-content Button.where, Grid.tight-content views|ColumnGrip.where">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-    <Style Selector="Grid.tight-content TextBlock.secrets">
-      <Setter Property="ToolTip.Tip" Value="{ReflectionBinding SecretsAndWhere}" />
+    <Style Selector="ListBox#Rows > ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
   </UserControl.Styles>
 
-  <!-- The design's page: padding 28/32, content at most 1080 wide and left-aligned. -->
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid Name="LogPage">
+    <Grid Name="LogPage" Margin="24,16,24,24">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" MaxWidth="1080" />
+        <ColumnDefinition Width="*" MaxWidth="880" />
       </Grid.ColumnDefinitions>
-      <StackPanel Spacing="20">
+      <StackPanel Spacing="16">
 
-        <!-- The actions go on a line of their own under the subtitle when the two do not fit side by side. -->
+        <!-- The actions go on a line of their own under the title when the two do not fit side by side. -->
         <ctl:HeaderRow Spacing="16">
-          <StackPanel Spacing="6" VerticalAlignment="Bottom">
-            <TextBlock Classes="h1" Text="{Binding Title}" />
-            <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
-            <TextBlock Classes="subtitle" Text="{Binding Subtitle}" />
-          </StackPanel>
+          <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
+          <TextBlock Classes="list-title" Text="{x:Static res:Strings.Activity}" ToolTip.Tip="{x:Static vm:LogViewModel.Subtitle}" VerticalAlignment="Bottom" />
 
           <StackPanel Orientation="Horizontal"
                       Spacing="8"
@@ -65,18 +42,17 @@
                     Command="{Binding RefreshCommand}">
               <ctl:KpIcon Icon="refresh-cw" Size="14" />
             </Button>
-            <Panel IsVisible="{Binding ShowsFilters}">
-              <Border Classes="segmented" Name="Filter" IsVisible="{Binding HasTable}">
-                <StackPanel Orientation="Horizontal">
-                  <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.All}" IsChecked="{Binding ShowAll}" />
-                  <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Agents}" IsChecked="{Binding ShowAgents}" />
-                  <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.You}" IsChecked="{Binding ShowYou}" />
-                  <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Denied}" IsChecked="{Binding ShowDenied}" />
-                </StackPanel>
-              </Border>
-            </Panel>
           </StackPanel>
         </ctl:HeaderRow>
+
+        <Border Classes="segmented" Name="Filter" HorizontalAlignment="Left" IsVisible="{Binding HasTable}">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.All}" IsChecked="{Binding ShowAll}" />
+            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Agents}" IsChecked="{Binding ShowAgents}" />
+            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.You}" IsChecked="{Binding ShowYou}" />
+            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Denied}" IsChecked="{Binding ShowDenied}" />
+          </StackPanel>
+        </Border>
 
         <!-- One sentence about a file that is unreadable, unchecked or edited. A log never written to is the empty state below. -->
         <Border Classes="card filled"
@@ -230,157 +206,116 @@
         </StackPanel>
 
         <StackPanel Spacing="12">
-        <Border Classes="table" IsVisible="{Binding HasTable}">
-          <ScrollViewer Name="TableScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-            <!-- As wide as the table when it fits, so its star columns trim; at most 680 narrower, where it scrolls. -->
-            <StackPanel Name="LogTable" Width="{Binding #TableScroll.Viewport.Width}">
+        <Border Classes="group" IsVisible="{Binding HasTable}">
+          <StackPanel>
+            <ListBox Name="Rows"
+                     AutomationProperties.Name="{x:Static res:Strings.Activity}"
+                     Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     ItemsSource="{Binding Rows}"
+                     SelectedItem="{Binding Chosen}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LogRow">
+                  <StackPanel>
 
-              <Border Classes="table-head top" Padding="16,6">
-                <views:LogColumns>
-                  <views:ColumnHead Grid.Column="0" Column="time" />
-                  <views:ColumnGrip Grid.Column="0" Column="time" />
-                  <views:ColumnHead Grid.Column="1" Column="actor" />
-                  <views:ColumnGrip Grid.Column="1" Column="actor" />
-                  <views:ColumnHead Grid.Column="2" Column="action" />
-                  <views:ColumnGrip Grid.Column="2" Column="action" />
-                  <views:ColumnHead Grid.Column="3" Column="secrets" />
-                  <views:ColumnGrip Grid.Column="3" Column="secrets" />
-                  <views:ColumnHead Grid.Column="4" Classes="where" Column="where" />
-                  <views:ColumnGrip Grid.Column="4" Classes="where" Column="where" />
-                  <views:ColumnHead Grid.Column="5" Column="result" />
-                </views:LogColumns>
-              </Border>
+                    <!-- The first row of a day carries the day. -->
+                    <Border IsVisible="{Binding StartsDay}"
+                            Padding="16,6"
+                            BorderThickness="0,1,0,0"
+                            BorderBrush="{DynamicResource KpBorderSubtle}"
+                            Background="{DynamicResource KpBgApp}">
+                      <TextBlock Text="{Binding Day}"
+                                 Classes="size-13"
+                                 FontWeight="Medium"
+                                 Foreground="{DynamicResource KpTextMuted}" />
+                    </Border>
 
-              <ItemsControl Name="Rows" ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <VirtualizingStackPanel />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:LogRow">
-                    <StackPanel>
-
-                      <!-- The first row of a day carries the day, so the TIME column can stay a clock. -->
-                      <Border IsVisible="{Binding StartsDay}"
-                              Padding="16,6"
-                              BorderThickness="0,1,0,0"
-                              BorderBrush="{DynamicResource KpBorderSubtle}"
-                              Background="{DynamicResource KpBgPanel}">
-                        <TextBlock Text="{Binding Day}"
-                                   Classes="size-13"
-                                   FontWeight="Medium"
+                    <Panel>
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="16,8" ToolTip.Tip="{Binding Detail}">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Name="Sentence" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}">
+                            <Run Text="{Binding Actor}" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" /><Run Text=" " /><Run Text="{Binding ActionWords}" />
+                          </TextBlock>
+                          <TextBlock Name="Subject"
+                                     Text="{Binding Subject}"
+                                     IsVisible="{Binding HasSubject}"
+                                     FontFamily="{DynamicResource KpMono}"
+                                     Classes="size-12"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource KpTextMuted}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <Border Classes="dot"
+                                  Classes.ok="{Binding IsOk}"
+                                  Classes.danger="{Binding IsDanger}"
+                                  Classes.info="{Binding IsInfo}" />
+                          <TextBlock Text="{Binding Result}"
+                                     Classes="size-13"
+                                     FontWeight="Medium"
+                                     Classes.ok="{Binding IsOk}"
+                                     Classes.danger="{Binding IsDanger}"
+                                     Classes.info="{Binding IsInfo}"
+                                     Classes.muted="{Binding IsMuted}" />
+                          <Border Background="Transparent"
+                                  IsVisible="{Binding ReasonUnread}"
+                                  ToolTip.Tip="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}">
+                            <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Time}"
+                                   ToolTip.Tip="{Binding When}"
+                                   FontFamily="{DynamicResource KpMono}"
+                                   Classes="size-12"
+                                   MinWidth="56"
+                                   TextAlignment="Right"
+                                   VerticalAlignment="Center"
                                    Foreground="{DynamicResource KpTextMuted}" />
-                      </Border>
+                      </Grid>
 
-                      <Panel>
-                        <Border Classes="table-row" ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding RowName}">
-                          <views:LogColumns>
+                      <!-- A row the chain cannot vouch for is marked at its edge. Red, not amber: several rows can be marked. -->
+                      <Border IsVisible="{Binding Unverified}"
+                              Width="2"
+                              Margin="0,2,0,0"
+                              HorizontalAlignment="Left"
+                              Background="{DynamicResource KpDanger}" />
+                    </Panel>
 
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding Time}"
-                                       ToolTip.Tip="{Binding When}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       Classes="size-12"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextMuted}" />
+                    <!-- A chosen line opens to keypaste's account of it and the full time. -->
+                    <Border IsVisible="{Binding $parent[ListBoxItem].IsSelected}" Padding="16,0,16,12">
+                      <StackPanel Spacing="4">
+                        <TextBlock ctl:MachineRuns.InText="True" Text="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Classes="caption" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" />
+                        <TextBlock Name="SubjectInFull" Text="{Binding Subject}" IsVisible="{Binding HasSubject}" TextWrapping="Wrap"
+                                   FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" />
+                        <TextBlock Text="{Binding When}" FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextMuted}" />
+                      </StackPanel>
+                    </Border>
 
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding Actor}"
-                                       Classes="size-13"
-                                       FontWeight="Medium"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextPrimary}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
 
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding Action}"
-                                       Classes="size-13"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextSecondary}" />
-
-                            <TextBlock Grid.Column="3"
-                                       Text="{Binding Secrets}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       Classes="size-12 secrets"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextPrimary}" />
-
-                            <TextBlock Grid.Column="4"
-                                       Text="{Binding Where}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       Classes="size-12 where"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextMuted}" />
-
-                            <Grid Grid.Column="5" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                              <Border Grid.Column="0"
-                                      Classes="dot"
-                                      Margin="0,0,6,0"
-                                      Classes.ok="{Binding IsOk}"
-                                      Classes.danger="{Binding IsDanger}"
-                                      Classes.info="{Binding IsInfo}" />
-                              <!-- It may run into the row's end padding, as the design's unclipped cell does, before it trims. -->
-                              <TextBlock Grid.Column="1"
-                                         Text="{Binding Result}"
-                                         Margin="0,0,-12,0"
-                                         Classes="size-13"
-                                         FontWeight="Medium"
-                                         TextTrimming="CharacterEllipsis"
-                                         VerticalAlignment="Center"
-                                         Classes.ok="{Binding IsOk}"
-                                         Classes.danger="{Binding IsDanger}"
-                                         Classes.info="{Binding IsInfo}"
-                                         Classes.muted="{Binding IsMuted}" />
-                              <Border Grid.Column="2"
-                                      Margin="4,0,0,0"
-                                      Background="Transparent"
-                                      IsVisible="{Binding ReasonUnread}"
-                                      ToolTip.Tip="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}">
-                                <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" />
-                              </Border>
-                            </Grid>
-
-                          </views:LogColumns>
-                        </Border>
-
-                        <!-- A row the chain cannot vouch for is marked at its edge, so the TIME column stays aligned.
-                             Red, not amber: several rows can be marked, and the view's one amber element is the notice above. -->
-                        <Border IsVisible="{Binding Unverified}"
-                                Width="2"
-                                Margin="0,2,0,0"
-                                HorizontalAlignment="Left"
-                                Background="{DynamicResource KpDanger}" />
-                      </Panel>
-
-                    </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <Border Classes="table-row" IsVisible="{Binding FilterEmpty}">
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <TextBlock Text="{x:Static res:Strings.NothingInThisLogMatchesThisFilter}"
-                             Classes="size-13"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource KpTextMuted}" />
-                  <Button Classes="sm"
-                          Name="ShowWholeLog"
-                          Content="{x:Static res:Strings.ShowAll}"
-                          IsVisible="{Binding OffersShowAll}"
-                          Command="{Binding ShowWholeLogCommand}"
-                          AutomationProperties.Name="{x:Static res:Strings.ShowAll}" />
-                </StackPanel>
-              </Border>
-
-            </StackPanel>
-          </ScrollViewer>
+            <Border Padding="16,12" IsVisible="{Binding FilterEmpty}">
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{x:Static res:Strings.NothingInThisLogMatchesThisFilter}"
+                           Classes="size-13"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource KpTextMuted}" />
+                <Button Classes="sm"
+                        Name="ShowWholeLog"
+                        Content="{x:Static res:Strings.ShowAll}"
+                        IsVisible="{Binding OffersShowAll}"
+                        Command="{Binding ShowWholeLogCommand}"
+                        AutomationProperties.Name="{x:Static res:Strings.ShowAll}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
         </Border>
 
-        <!-- What the table's marks mean, and how much of the log it shows. -->
+        <!-- What the marks mean, and how much of the log is shown. -->
         <StackPanel Spacing="6" IsVisible="{Binding HasTable}">
           <StackPanel Name="Notes" Spacing="4" IsVisible="{Binding HasNotes}">
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnverifiedNote}">
@@ -388,7 +323,7 @@
               <TextBlock Classes="size-13"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
-                         Text="{Binding UnverifiedLegend}" />
+                         Text="{x:Static vm:LogViewModel.UnverifiedLegend}" />
             </StackPanel>
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasUnreadNote}">
               <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />

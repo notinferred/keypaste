@@ -17,42 +17,30 @@ namespace Keypaste.App.Views;
 /// <remarks>
 /// Everything this screen does — searching, building the group tree, reading and writing the vault —
 /// belongs to <see cref="ViewModels.EntriesViewModel"/>, which names no Avalonia type and is
-/// therefore assertable with no application and no display. What is here is layout: the screen's two
-/// menus, the list's "+" and the pane's ⋯, each of which opens with focus on its first item and closes
-/// on a choice, Escape or a press elsewhere; and the list's row, which folds away while the item takes
-/// the whole view and comes back at the height it was dragged to.
+/// therefore assertable with no application and no display. What is here is layout: the screen's
+/// menus, the list's sort and "+" and the pane's ⋯, each of which opens with focus on its first item and closes
+/// on a choice, Escape or a press elsewhere; and the keyboard's place when a narrow width swaps the list for the detail.
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
-    /// <summary>The list's least height beside the preview.</summary>
-    internal const double ListMinHeight = 100d;
-
-    private const int _shareOfWhole = 1000;
     private const double _dragDistance = 6d;
 
     /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
-    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel")];
+    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel"), ("AddFieldMenu", "AddFieldMenuPanel")];
 
-    private readonly RowDefinition _listRow;
-    private readonly RowDefinition _previewRow;
-    private readonly TextBox _search;
+    private readonly ListDetail _split;
     private readonly ListBox _rows;
-    private GridLength _listHeight;
     private EntriesViewModel? _entries;
     private EntryDetailViewModel? _detail;
-    private ShellViewModel? _shell;
     private (EntryRow Row, PointerPressedEventArgs Press, Point At)? _dragFrom;
+    private EntryRow? _opened;
 
     public EntriesView()
     {
         AvaloniaXamlLoader.Load(this);
 
-        var split = this.FindControl<Grid>("Split")!;
-        _listRow = split.RowDefinitions[0];
-        _previewRow = split.RowDefinitions[2];
-        _listHeight = _listRow.Height;
-        _listRow.PropertyChanged += OnRowChanged;
-        _previewRow.PropertyChanged += OnRowChanged;
+        _split = this.FindControl<ListDetail>("Split")!;
+        _split.HidKeyboardPane += OnKeyboardPaneHid;
 
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -60,12 +48,77 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;
+        _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
         _rows.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         _rows.AddHandler(PointerMovedEvent, OnRowDragged, RoutingStrategies.Tunnel, handledEventsToo: true);
         _rows.AddHandler(PointerReleasedEvent, (_, _) => _dragFrom = null, RoutingStrategies.Tunnel, handledEventsToo: true);
-        _search = this.FindControl<TextBox>("ShellSearch")!;
-        _search.GotFocus += (_, _) => TellEntriesAboutSearchFocus();
-        _search.LostFocus += (_, _) => TellEntriesAboutSearchFocus();
+    }
+
+    /// <summary>The keyboard goes with the pane it was in: from the list to the open item's Back, but not to a form that takes it itself, and from the detail back to the row it came from.</summary>
+    private void OnKeyboardPaneHid(ListDetail.Pane pane)
+    {
+        if (pane == ListDetail.Pane.List)
+        {
+            _opened = _entries?.Selected;
+        }
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (TopLevel.GetTopLevel(this) is not Window { IsVisible: true })
+                {
+                    return;
+                }
+
+                if (pane == ListDetail.Pane.Detail)
+                {
+                    FocusRow(_opened);
+                }
+                else if (_entries is { IsAdding: false })
+                {
+                    this.FindControl<Button>("BackToList")?.Focus(NavigationMethod.Tab);
+                }
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    private void FocusRow(EntryRow? row)
+    {
+        var index = row is null ? -1 : _rows.Items.IndexOf(row);
+
+        if (index < 0)
+        {
+            _rows.Focus(NavigationMethod.Tab);
+            return;
+        }
+
+        _rows.ScrollIntoView(index);
+        (_rows.ContainerFromIndex(index) ?? _rows).Focus(NavigationMethod.Tab);
+    }
+
+    /// <summary>Where the detail would replace the list, a choice would hide it, so the arrows only move the keyboard and Enter or Space opens the row.</summary>
+    private void OnRowsKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!_split.ListStandsAlone || e.KeyModifiers != KeyModifiers.None || _entries is null)
+        {
+            return;
+        }
+
+        var focused = (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
+        var at = focused is null ? -1 : _rows.IndexFromContainer(focused);
+        var last = _rows.ItemCount - 1;
+
+        switch (e.Key)
+        {
+            case Key.Down or Key.Up or Key.Home or Key.End when last >= 0:
+                FocusRow(_rows.Items[Math.Clamp(e.Key switch { Key.Down => at + 1, Key.Up => at < 0 ? 0 : at - 1, Key.Home => 0, _ => last }, 0, last)] as EntryRow);
+                e.Handled = true;
+                break;
+            case Key.Enter or Key.Space when focused?.DataContext is EntryRow row:
+                _entries.Selected = row;
+                e.Handled = true;
+                break;
+        }
     }
 
     /// <summary>A mouse or a pen on a row may become a drag; a finger scrolls.</summary>
@@ -93,81 +146,12 @@ internal sealed partial class EntriesView : UserControl
         }
     }
 
-    private void TellEntriesAboutSearchFocus()
-    {
-        if (_entries is not null)
-        {
-            _entries.SearchHasFocus = _search.IsFocused;
-        }
-    }
+    /// <summary>Find asks for the search, so it comes into reach first; the shell focuses it after the next layout.</summary>
+    internal void MakeSearchReachable() => _entries?.MakeSearchReachable(_split.ShowsBack);
 
-    // The shell holds the split and the width, because this view is built again at every return to Items.
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-
-        if (this.FindAncestorOfType<ShellView>()?.DataContext is not ShellViewModel shell)
-        {
-            return;
-        }
-
-        ShowContactColumns(!shell.IsNarrow);
-
-        // Before the rows are watched, so setting them one at a time cannot read as a move of the divider.
-        if (shell.ListShare is { } share)
-        {
-            _listHeight = new GridLength(share, GridUnitType.Star);
-            _previewRow.Height = new GridLength(_shareOfWhole - share, GridUnitType.Star);
-            PlaceList();
-        }
-
-        _shell = shell;
-        _shell.PropertyChanged += OnShellChanged;
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        if (_shell is not null)
-        {
-            _shell.PropertyChanged -= OnShellChanged;
-            _shell = null;
-        }
-
-        base.OnDetachedFromVisualTree(e);
-    }
-
-    private void OnShellChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(ShellViewModel.IsNarrow) && _shell is not null)
-        {
-            ShowContactColumns(!_shell.IsNarrow);
-        }
-    }
-
-    // The list's header names a chosen group, so its column would only repeat it.
-    private void ShowGroupColumn()
-    {
-        var shows = _entries?.SelectedGroup is null or { IsEverything: true };
-        EntryColumns.SetShowsGroup(this, shows);
-        _entries?.Table.Show(TableStates.Group, shows);
-    }
-
-    private void ShowContactColumns(bool shows)
-    {
-        EntryColumns.SetShowsContact(this, shows);
-        _entries?.Table.Show(TableStates.Username, shows);
-        _entries?.Table.Show(TableStates.Url, shows);
-    }
-
-    /// <summary>The divider, dragged or moved from the keyboard, gives each row a star length; the shell keeps their proportion.</summary>
-    private void OnRowChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property == RowDefinition.HeightProperty && _shell is not null && _listRow.Height.IsStar && _previewRow.Height.IsStar)
-        {
-            var whole = _listRow.Height.Value + _previewRow.Height.Value;
-            _shell.ListShare = Math.Clamp((int)Math.Round(_shareOfWhole * _listRow.Height.Value / whole), 1, _shareOfWhole - 1);
-        }
-    }
+    // The list's header names a chosen group, so a sort by group would only repeat it.
+    private void ApplyGroupSort() =>
+        _entries?.Table.Show(TableStates.Group, _entries.SelectedGroup is null or { IsEverything: true });
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -186,14 +170,7 @@ internal sealed partial class EntriesView : UserControl
         }
 
         WatchDetail();
-        TellEntriesAboutSearchFocus();
-        PlaceList();
-        ShowGroupColumn();
-
-        if (_shell is not null)
-        {
-            ShowContactColumns(!_shell.IsNarrow);
-        }
+        ApplyGroupSort();
     }
 
     private void WatchDetail()
@@ -223,7 +200,7 @@ internal sealed partial class EntriesView : UserControl
     {
         if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
         {
-            ShowGroupColumn();
+            ApplyGroupSort();
         }
 
         if (e.PropertyName == nameof(EntriesViewModel.Detail))
@@ -231,35 +208,11 @@ internal sealed partial class EntriesView : UserControl
             WatchDetail();
         }
 
-        if (e.PropertyName == nameof(EntriesViewModel.ShowsList))
-        {
-            PlaceList();
-        }
-
         // A new list of rows clears the ListBox's selection, and its binding re-reads Selected inside that change, where the value is lost and then counts as already published.
         if (e.PropertyName == nameof(EntriesViewModel.Selected) && !ReferenceEquals(_rows.SelectedItem, _entries?.Selected))
         {
             _rows.SelectedItem = _entries?.Selected;
         }
-    }
-
-    /// <summary>A star row keeps its share of the height with nothing in it, so the list's row goes to zero while the item takes the whole view.</summary>
-    private void PlaceList()
-    {
-        if (_entries is null || _entries.ShowsList)
-        {
-            _listRow.MinHeight = ListMinHeight;
-            _listRow.Height = _listHeight;
-            return;
-        }
-
-        if (_listRow.Height.Value > 0)
-        {
-            _listHeight = _listRow.Height;
-        }
-
-        _listRow.MinHeight = 0;
-        _listRow.Height = new GridLength(0);
     }
 
     /// <summary>A choice in a menu closes it, and a field's ⋯ asks for that row's menu as the menu key does.</summary>
@@ -303,6 +256,12 @@ internal sealed partial class EntriesView : UserControl
     /// <summary>Escape closes an open menu and gives focus back to its button.</summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && CloseGeneratorPanel())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key != Key.Escape || OpenMenus().FirstOrDefault() is not ({ } toggle, _))
         {
             return;
@@ -311,6 +270,30 @@ internal sealed partial class EntriesView : UserControl
         toggle.IsChecked = false;
         toggle.Focus(NavigationMethod.Tab);
         e.Handled = true;
+    }
+
+    /// <summary>Escape closes the generator anchored to a password field and gives focus back to the button that opened it.</summary>
+    private bool CloseGeneratorPanel()
+    {
+        string button;
+
+        if (_entries?.NewItem is { HasGeneratorPanel: true } form)
+        {
+            form.CloseGeneratorCommand.Execute(null);
+            button = "NewEntryGenerate";
+        }
+        else if (_entries?.Detail is { HasGeneratorPanel: true } detail)
+        {
+            detail.CloseGeneratorCommand.Execute(null);
+            button = "ReplacementPasswordGenerate";
+        }
+        else
+        {
+            return false;
+        }
+
+        this.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate => candidate.Name == button)?.Focus(NavigationMethod.Tab);
+        return true;
     }
 
     /// <summary>An opened menu takes focus on its first item, visibly so when it was opened from the keyboard.</summary>

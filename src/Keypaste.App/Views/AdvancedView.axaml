@@ -2,84 +2,49 @@
   xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.AdvancedView"
              x:DataType="vm:AdvancedViewModel">
 
-  <UserControl.Styles>
-    <!-- Settings' card: rows split by hairlines. -->
-    <Style Selector="Border.settings">
-      <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="Border.settings-row">
-      <Setter Property="Padding" Value="20,12" />
-    </Style>
-    <Style Selector="Border.settings-row:nth-child(n+2)">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-      <Setter Property="BorderThickness" Value="0,1,0,0" />
-    </Style>
-    <Style Selector="TextBlock.row-label">
-      <Setter Property="FontWeight" Value="Medium" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
-  </UserControl.Styles>
-
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,24" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
-      <StackPanel Spacing="6">
-        <TextBlock Classes="h1" Text="{x:Static res:Strings.Advanced}" />
-        <TextBlock Classes="subtitle" Text="{x:Static res:Strings.WhatTheEverydayScreensLeaveOutEachX739fe5}" />
-      </StackPanel>
+    <StackPanel Margin="32,12,32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
+      <TextBlock Classes="h1"
+                 Text="{x:Static res:Strings.Advanced}"
+                 ToolTip.Tip="{x:Static res:Strings.WhatTheEverydayScreensLeaveOutEachX739fe5}" />
 
-      <Border Classes="card filled settings">
-        <StackPanel>
-          <Border Classes="settings-row">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-              <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ActivityLog}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.EveryAgentRequestTokenRunAndShareOnThisMachine}" />
-              </StackPanel>
-              <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
-                      AutomationProperties.Name="{x:Static res:Strings.OpenTheActivityLog}"
-                      Command="{Binding OpenActivityLogCommand}" />
-            </Grid>
-          </Border>
-          <Border Classes="settings-row">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-              <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ShareLinks}" />
-                <TextBlock Name="ShareLinksNote" Classes="caption" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
-              </StackPanel>
-              <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+      <Border Classes="group">
+        <ctl:GroupedRows>
+          <ctl:FieldRow Label="{x:Static res:Strings.ShareLinks}">
+            <TextBlock Name="ShareLinksNote" Classes="size-13" Foreground="{DynamicResource KpTextSecondary}" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
+            <ctl:FieldRow.Actions>
+              <Button Name="OpenShareLinks" Classes="ghost sm"
                       AutomationProperties.Name="{x:Static res:Strings.OpenTheShareLinks}"
-                      Command="{Binding OpenShareLinksCommand}" />
-            </Grid>
-          </Border>
-          <Border Classes="settings-row">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-              <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.ScopedTokens}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.LetAScriptOrCIJobRunX39c663}" />
-              </StackPanel>
-              <Button Grid.Column="1" Name="OpenScopedTokens" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      Command="{Binding OpenShareLinksCommand}">
+                <ctl:KpIcon Icon="chevron-right" Size="14" />
+              </Button>
+            </ctl:FieldRow.Actions>
+          </ctl:FieldRow>
+          <ctl:FieldRow Label="{x:Static res:Strings.ScopedTokens}">
+            <ctl:FieldRow.Actions>
+              <Button Name="OpenScopedTokens" Classes="ghost sm"
+                      ToolTip.Tip="{x:Static res:Strings.LetAScriptOrCIJobRunX39c663}"
                       AutomationProperties.Name="{x:Static res:Strings.OpenTheScopedTokens}"
-                      Command="{Binding OpenScopedTokensCommand}" />
-            </Grid>
-          </Border>
-          <Border Classes="settings-row">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-              <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Classes="row-label size-13-5" Text="{x:Static res:Strings.Diagnostics}" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXee7732}" />
-              </StackPanel>
-              <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="{x:Static res:Strings.Open}" VerticalAlignment="Center"
+                      Command="{Binding OpenScopedTokensCommand}">
+                <ctl:KpIcon Icon="chevron-right" Size="14" />
+              </Button>
+            </ctl:FieldRow.Actions>
+          </ctl:FieldRow>
+          <ctl:FieldRow Label="{x:Static res:Strings.Diagnostics}">
+            <ctl:FieldRow.Actions>
+              <Button Name="OpenDiagnostics" Classes="ghost sm"
+                      ToolTip.Tip="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXee7732}"
                       AutomationProperties.Name="{x:Static res:Strings.OpenDiagnostics}"
-                      Command="{Binding OpenDiagnosticsCommand}" />
-            </Grid>
-          </Border>
-        </StackPanel>
+                      Command="{Binding OpenDiagnosticsCommand}">
+                <ctl:KpIcon Icon="chevron-right" Size="14" />
+              </Button>
+            </ctl:FieldRow.Actions>
+          </ctl:FieldRow>
+        </ctl:GroupedRows>
       </Border>
     </StackPanel>
   </ScrollViewer>

@@ -75,7 +75,7 @@ The desktop app's window title now names the screen you are on, the pointing han
 
 Dates, times and table sorting in the desktop app now follow your language and region. The words are still English, no language has been added, and windows run left to right until a translation exists. A Linux machine with no ICU starts as before, in plain ISO dates and code point order ([Q.16](docs/steps/Q.16.md)).
 
-The desktop app's Items, Trash and activity log tables now sort by a column's head, again to reverse, and their columns size by a drag or the arrow keys. Both last across runs, View › Reset table order and widths undoes them, and neither touches the vault or the audit log ([Q.15](docs/steps/Q.15.md)).
+The desktop app's Items and Trash lists sort from a menu in the list's header. The order lasts across runs, View › Reset list order undoes it, and it never touches the vault or the audit log ([Q.15](docs/steps/Q.15.md), [F.110](docs/steps/F.110.md)).
 
 In source, the desktop app can use the system's notifications; no person has seen one, and macOS posts them only from a signed build, which does not exist yet. A request that arrives while keypaste is in the background still opens its prompt, and also posts a notification, naming no item, vault or agent, whose Show the prompt brings the prompt forward with focus on Deny; a notification never answers a request and is gone once the request is. On macOS and Linux the notice that an agent found the app locked is to be an ordinary notification with Open keypaste; on Windows, and wherever the system cannot post one, it stays keypaste's own notice window. keypaste cannot see Focus or do-not-disturb, so the system may hold a notice with no window appearing ([Q.14](docs/steps/Q.14.md)).
 

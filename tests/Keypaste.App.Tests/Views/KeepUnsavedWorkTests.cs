@@ -666,6 +666,7 @@ public sealed class KeepUnsavedWorkTests
                 entries.BeginAddCommand.Press();
                 var form = entries.NewItem!;
                 form.Template = ItemTemplate.ApiKey;
+                form.AddFieldCommand.Execute(NewItemField.Tags);
                 RenderedShell.Drain();
                 Assert.False(shell.Named<TextBlock>(error).IsEffectivelyVisible);
                 field = error switch { "NewItemTitleProblem" => "NewItemTitle", "NewItemKeyNameProblem" => "NewItemKeyName", _ => "NewItemTag" };

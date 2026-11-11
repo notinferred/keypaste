@@ -4,16 +4,13 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
-  <data name="AITools" xml:space="preserve"><value>AI tools</value></data>
   <data name="AProjectIsTheItemsInYourX4fbb7f" xml:space="preserve"><value>A project is the items in your vault tagged with its name, such as env:billing-api, with a value per environment. Tag an item in Items, run keypaste env set billing-api STRIPE_KEY, or choose New project.</value></data>
   <data name="AProjectIsTheItemsInYourX9f49b8" xml:space="preserve"><value>A project is the items in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first item or key.</value></data>
   <data name="AReportHoldsTheVersionSystemScreenX3de709" xml:space="preserve"><value>A report holds the version, system, screen and where the code failed, never your vault, a path or who you are.</value></data>
   <data name="ARowsEyeButtonShowsItsValueXc068c4" xml:space="preserve"><value>A row's eye button shows its value for 30 seconds. Click another environment's cell or header to work in that environment.</value></data>
   <data name="ATokenLetsAScriptOrCIX41bca7" xml:space="preserve"><value>A token lets a script or CI job run with a scoped set, without you or the vault's password. It only feeds keypaste run and never prints a value.</value></data>
   <data name="AboutKeypaste" xml:space="preserve"><value>About keypaste…</value></data>
-  <data name="Action" xml:space="preserve"><value>Action</value></data>
-  <data name="ActivityLog" xml:space="preserve"><value>Activity log</value></data>
-  <data name="Actor" xml:space="preserve"><value>Actor</value></data>
+  <data name="Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="ActualSize" xml:space="preserve"><value>Actual size</value></data>
   <data name="Add" xml:space="preserve"><value>Add</value></data>
   <data name="AddAField" xml:space="preserve"><value>Add a field</value></data>
@@ -37,11 +34,9 @@
   <data name="AllItems" xml:space="preserve"><value>All items</value></data>
   <data name="AnsweringAgents" xml:space="preserve"><value>Answering agents</value></data>
   <data name="AnswerInThePromptWindow" xml:space="preserve"><value>Answer in the prompt window</value></data>
-  <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
   <data name="AskForIt" xml:space="preserve"><value>Ask for it</value></data>
   <data name="AskTheShareServerHowManyViewsXbaa6a2" xml:space="preserve"><value>Ask keypaste.com how many views each link has left</value></data>
   <data name="AtLeast20CharactersSuchAsSixGeneratedWords" xml:space="preserve"><value>At least 20 characters, such as six generated words</value></data>
-  <data name="Attachments" xml:space="preserve"><value>Attachments</value></data>
   <data name="Back" xml:space="preserve"><value>Back</value></data>
   <data name="BackToValue" xml:space="preserve"><value>Back to {0}</value></data>
   <data name="Backups" xml:space="preserve"><value>Backups</value></data>
@@ -89,7 +84,6 @@
   <data name="NewItemAddsOneHere" xml:space="preserve"><value>New item adds one here.</value></data>
   <data name="ConnectValue" xml:space="preserve"><value>Connect {0}</value></data>
   <data name="ConnectValueAgain" xml:space="preserve"><value>Connect {0} again</value></data>
-  <data name="ConnectYourAIToolsAndChooseWhatXe237ce" xml:space="preserve"><value>Connect your AI tools and choose what each may see.</value></data>
   <data name="Continue" xml:space="preserve"><value>Continue</value></data>
   <data name="Copy" xml:space="preserve"><value>Copy</value></data>
   <data name="CopyIntoThisGroup" xml:space="preserve"><value>Copy into this group</value></data>
@@ -163,7 +157,6 @@
   <data name="EnvKeypaste" xml:space="preserve"><value>.env.keypaste</value></data>
   <data name="EnvironmentName" xml:space="preserve"><value>Environment name</value></data>
   <data name="Environments" xml:space="preserve"><value>Environments</value></data>
-  <data name="EveryAgentRequestTokenRunAndShareOnThisMachine" xml:space="preserve"><value>Every agent request, token run and share on this machine, with a check that none was changed.</value></data>
   <data name="EverythingRunInThatTerminalCanReadX8c42c2" xml:space="preserve"><value>Everything run in that terminal can read these values.</value></data>
   <data name="Expires" xml:space="preserve"><value>Expires</value></data>
   <data name="Export" xml:space="preserve"><value>Export</value></data>
@@ -178,7 +171,6 @@
   <data name="ForYourListOnlyNeverSent" xml:space="preserve"><value>For your list only; never sent</value></data>
   <data name="ForgetEveryRecentVaultTheVaultsThemselvesX0c96fb" xml:space="preserve"><value>Forget every recent vault? The vaults themselves are not touched.</value></data>
   <data name="ForgetThemAll" xml:space="preserve"><value>Forget them all</value></data>
-  <data name="FoundOnThisComputerAndAnyAgentX88444b" xml:space="preserve"><value>Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's label.</value></data>
   <data name="FreeSoftwareUnderTheGNUAfferoGeneralXba93e5" xml:space="preserve"><value>Free software under the GNU Affero General Public License, version 3.</value></data>
   <data name="Generate" xml:space="preserve"><value>Generate…</value></data>
   <data name="GenerateANewPassword" xml:space="preserve"><value>Generate a new password</value></data>
@@ -253,8 +245,10 @@
   <data name="LockAndOpen" xml:space="preserve"><value>Lock and open</value></data>
   <data name="LockLabel" xml:space="preserve"><value>Lock</value></data>
   <data name="LockNow" xml:space="preserve"><value>Lock now</value></data>
-  <data name="LockTheVaultAfter" xml:space="preserve"><value>Lock the vault after</value></data>
-  <data name="LockWhenTheWindowIsMinimized" xml:space="preserve"><value>Lock when the window is minimized</value></data>
+  <data name="LockAfter" xml:space="preserve"><value>Lock after</value></data>
+  <data name="LockWhenMinimized" xml:space="preserve"><value>Lock when minimized</value></data>
+  <data name="KeepInMenuBar" xml:space="preserve"><value>Keep in menu bar</value></data>
+  <data name="KeepInTray" xml:space="preserve"><value>Keep in tray</value></data>
   <data name="Locked" xml:space="preserve"><value>Locked</value></data>
   <data name="LogDayToday" xml:space="preserve"><value>Today</value></data>
   <data name="LogDayUndated" xml:space="preserve"><value>Undated</value></data>
@@ -300,9 +294,7 @@
   <data name="NewValue" xml:space="preserve"><value>New value</value></data>
   <data name="NewVault" xml:space="preserve"><value>New vault</value></data>
   <data name="NoActivityYet" xml:space="preserve"><value>No activity yet</value></data>
-  <data name="NoAttachments" xml:space="preserve"><value>No attachments.</value></data>
   <data name="NoBrowserIsPairedWithThisVault" xml:space="preserve"><value>No browser is paired with this vault.</value></data>
-  <data name="NoCustomFields" xml:space="preserve"><value>No custom fields.</value></data>
   <data name="NoKeyFile" xml:space="preserve"><value>No key file</value></data>
   <data name="NoKeysFoundInNotesNoWeakX50d3ee" xml:space="preserve"><value>No keys found in notes, no weak, reused or expired passwords, and no project tags dropped.</value></data>
   <data name="NoKeysYetAddTheFirstOneX0cbcf7" xml:space="preserve"><value>No keys yet. Add the first one to {0}.</value></data>
@@ -318,7 +310,6 @@
   <data name="Now" xml:space="preserve"><value>Now</value></data>
   <data name="OnThisMachine" xml:space="preserve"><value>On this machine</value></data>
   <data name="OneSetOfKeysAValuePerX101ace" xml:space="preserve"><value>One set of keys, a value per environment</value></data>
-  <data name="OneSetOfKeysPerProjectAXb4239d" xml:space="preserve"><value>One set of keys per project, a value per environment.</value></data>
   <data name="Open" xml:space="preserve"><value>Open</value></data>
   <data name="OpenAKeypasteVault" xml:space="preserve"><value>Open a keypaste vault</value></data>
   <data name="OpenAVault" xml:space="preserve"><value>Open a vault…</value></data>
@@ -328,9 +319,8 @@
   <data name="OpenDiagnostics" xml:space="preserve"><value>Open diagnostics</value></data>
   <data name="OpenInYourBrowser" xml:space="preserve"><value>Open in your browser</value></data>
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
-  <data name="OpenKeypasteAtLogin" xml:space="preserve"><value>Open keypaste at login</value></data>
+  <data name="OpenAtLogin" xml:space="preserve"><value>Open at login</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
-  <data name="OpenTheActivityLog" xml:space="preserve"><value>Open the activity log</value></data>
   <data name="OpenTheScopedTokens" xml:space="preserve"><value>Open the scoped tokens</value></data>
   <data name="OpenTheShareLinks" xml:space="preserve"><value>Open the share links</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
@@ -377,15 +367,13 @@
   <data name="ReplaceX64ca19" xml:space="preserve"><value>Replace…</value></data>
   <data name="ReportAProblem" xml:space="preserve"><value>Report a problem</value></data>
   <data name="RequireAPassphraseSentSeparately" xml:space="preserve"><value>Require a passphrase, sent separately</value></data>
-  <data name="ResetTableOrderAndWidths" xml:space="preserve"><value>Reset table order and widths</value></data>
-  <data name="ResizeTheListAndThePreview" xml:space="preserve"><value>Resize the list and the preview</value></data>
+  <data name="ResetListOrder" xml:space="preserve"><value>Reset list order</value></data>
   <data name="Restore" xml:space="preserve"><value>Restore</value></data>
   <data name="RestoreABackup" xml:space="preserve"><value>Restore a backup</value></data>
   <data name="RestoreTag" xml:space="preserve"><value>Restore tag</value></data>
   <data name="RestoreThisBackup" xml:space="preserve"><value>Restore this backup</value></data>
   <data name="RestoreValue" xml:space="preserve"><value>Restore {0}</value></data>
   <data name="RestoringMakesTheseTheItemsValuesAndX0e783d" xml:space="preserve"><value>Restoring makes these the item's values and drops any attachments, custom fields and custom data added since. The ones it replaces are kept here.</value></data>
-  <data name="Result" xml:space="preserve"><value>Result</value></data>
   <data name="Reveal" xml:space="preserve"><value>Reveal</value></data>
   <data name="RevealForSeconds" xml:space="preserve"><value>Reveal for {0:0} seconds</value></data>
   <data name="ReviewAgain" xml:space="preserve"><value>Review again</value></data>
@@ -408,8 +396,6 @@
   <data name="Search" xml:space="preserve"><value>Search</value></data>
   <data name="SearchAllItems" xml:space="preserve"><value>Search all items</value></data>
   <data name="SecondsUntilTheNextCode" xml:space="preserve"><value>Seconds until the next code</value></data>
-  <data name="Secrets" xml:space="preserve"><value>Secrets</value></data>
-  <data name="Security" xml:space="preserve"><value>Security</value></data>
   <data name="SelectAll" xml:space="preserve"><value>Select all</value></data>
   <data name="SelectValue" xml:space="preserve"><value>Select {0}</value></data>
   <data name="SendCrashReports" xml:space="preserve"><value>Send crash reports</value></data>
@@ -418,7 +404,6 @@
   <data name="Servers" xml:space="preserve"><value>servers</value></data>
   <data name="SetANewMasterPassword" xml:space="preserve"><value>Set a new master password</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
-  <data name="SettingsForValue" xml:space="preserve"><value>Settings for {0}</value></data>
   <data name="SettingsLabel" xml:space="preserve"><value>Settings…</value></data>
   <data name="Share" xml:space="preserve"><value>Share…</value></data>
   <data name="ShareALink" xml:space="preserve"><value>Share a link</value></data>
@@ -433,7 +418,6 @@
   <data name="Slot2" xml:space="preserve"><value>Slot 2</value></data>
   <data name="SomeTagsPutTheirItemInNoXd8ea51" xml:space="preserve"><value>Some tags put their item in no project</value></data>
   <data name="Start" xml:space="preserve"><value>Start</value></data>
-  <data name="Startup" xml:space="preserve"><value>Startup</value></data>
   <data name="StopPairing" xml:space="preserve"><value>Stop pairing</value></data>
   <data name="StopUsingAKeyFile" xml:space="preserve"><value>Stop using a key file</value></data>
   <data name="StopUsingTheYubiKey" xml:space="preserve"><value>Stop using the YubiKey</value></data>
@@ -448,7 +432,7 @@
   <data name="TermsOfUse" xml:space="preserve"><value>Terms of use</value></data>
   <data name="ThatBackupsKeyFile" xml:space="preserve"><value>That backup's key file</value></data>
   <data name="ThatBackupsMasterPassword" xml:space="preserve"><value>That backup's master password</value></data>
-  <data name="TheActivityLogShareLinksScopedTokensX927922" xml:space="preserve"><value>The activity log, share links, scoped tokens and diagnostics.</value></data>
+  <data name="TheActivityLogShareLinksScopedTokensX927922" xml:space="preserve"><value>Share links, scoped tokens and diagnostics.</value></data>
   <data name="TheCheckAsksTheYubiKeyTheUnlockX4a39c1" xml:space="preserve"><value>The check asks the YubiKey the unlock screen chose.</value></data>
   <data name="TheGroupsNewName" xml:space="preserve"><value>The group's new name</value></data>
   <data name="TheNameAProjectReadsItUnderX9a2ebe" xml:space="preserve"><value>The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment.</value></data>
@@ -465,7 +449,6 @@
   <data name="Theme" xml:space="preserve"><value>Theme</value></data>
   <data name="Then" xml:space="preserve"><value>Then</value></data>
   <data name="ThroughAnAgentOrATokenAXbc5a7a" xml:space="preserve"><value>Through an agent or a token, a prod environment is asked about live every time, whatever is always allowed.</value></data>
-  <data name="Time" xml:space="preserve"><value>Time</value></data>
   <data name="TimeDaysAgoShort" xml:space="preserve"><value>{0}d ago</value></data>
   <data name="TimeHoursAgoShort" xml:space="preserve"><value>{0}h ago</value></data>
   <data name="TimeInUse" xml:space="preserve"><value>in use</value></data>
@@ -504,7 +487,6 @@
   <data name="WhatFailedAndWhereInKeypastesCodeX12c043" xml:space="preserve"><value>What failed and where in keypaste's code. Never anything from your vault, a path or who you are. Turning it off deletes the reports waiting to be sent, which Diagnostics lists.</value></data>
   <data name="WhatTheEverydayScreensLeaveOutEachX739fe5" xml:space="preserve"><value>What the everyday screens leave out, each on a screen of its own.</value></data>
   <data name="WhatYouTypedHasNotBeenSaved" xml:space="preserve"><value>What you typed has not been saved.</value></data>
-  <data name="Where" xml:space="preserve"><value>Where</value></data>
   <data name="WhereEachItemLands" xml:space="preserve"><value>Where each item lands</value></data>
   <data name="WhereValueGoes" xml:space="preserve"><value>Where {0} goes</value></data>
   <data name="Words" xml:space="preserve"><value>Words</value></data>
@@ -589,7 +571,6 @@
   <data name="ViewMenu" xml:space="preserve"><value>View</value></data>
   <data name="WindowMenu" xml:space="preserve"><value>Window</value></data>
   <data name="RevokeToken" xml:space="preserve"><value>Revoke token</value></data>
-  <data name="AgentHistory" xml:space="preserve"><value>Agent history</value></data>
   <data name="ExampleItemPath" xml:space="preserve"><value>Work/github</value></data>
   <data name="ExampleProjectDirectory" xml:space="preserve"><value>~/code/acme-api</value></data>
   <data name="ExampleWebAddress" xml:space="preserve"><value>https://example.com</value></data>
@@ -605,8 +586,6 @@
   <data name="AgentsSeeUsernames" xml:space="preserve"><value>Agents see usernames</value></data>
   <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
   <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
-  <data name="WhatAgentsGet" xml:space="preserve"><value>What agents get</value></data>
-  <data name="WhatItGets" xml:space="preserve"><value>What it gets</value></data>
   <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
   <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
   <data name="TheValueToSave" xml:space="preserve"><value>The value to save</value></data>
@@ -620,7 +599,6 @@
   <data name="ThisVault" xml:space="preserve"><value>This vault</value></data>
   <data name="Browser" xml:space="preserve"><value>Browser</value></data>
   <data name="FragileKeyFileWarningValue" xml:space="preserve"><value>If {0} is changed or lost, this vault can't be opened. Keep an exact copy somewhere safe, and don't open it in an editor. A KeePass key file can be re-saved safely: choose one under Settings, This vault, Vault access.</value></data>
-  <data name="Connections" xml:space="preserve"><value>Connections</value></data>
   <data name="AddAnAgent" xml:space="preserve"><value>Add an agent</value></data>
   <data name="CopySetupPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
   <data name="ConnectAnApp" xml:space="preserve"><value>Connect an app</value></data>
@@ -631,6 +609,15 @@
   <data name="ConfigurationCopied" xml:space="preserve"><value>Configuration copied.</value></data>
   <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
+  <data name="Usernames" xml:space="preserve"><value>Usernames</value></data>
+  <data name="Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="EveryAIToolFoundIsConnected" xml:space="preserve"><value>Every AI tool found on this computer is already connected.</value></data>
+  <data name="EveryAgentOnThisComputer" xml:space="preserve"><value>Every agent on this computer</value></data>
+  <data name="CanSeeUsernames" xml:space="preserve"><value>Titles, groups, tags, URLs and usernames.</value></data>
+  <data name="CanSeeUsernamesOnRequest" xml:space="preserve"><value>Titles, groups, tags and URLs. Usernames only when it asks.</value></data>
+  <data name="ChangeUsernamesUnderEveryOtherAgent" xml:space="preserve"><value>Change this under Every other agent.</value></data>
+  <data name="CanSee" xml:space="preserve"><value>Can see</value></data>
+  <data name="WhenItAsks" xml:space="preserve"><value>When it asks</value></data>
   <data name="LiveInValue" xml:space="preserve"><value>Live in {0}</value></data>
   <data name="KeypasteCantWriteItsAuditLog" xml:space="preserve"><value>keypaste is refusing agent requests because it can't write its audit log. Free some disk space or close the other keypaste, and the next request tries again. Agents says why.</value></data>
   <data name="KeypasteIsRefusingEveryAgentRequest" xml:space="preserve"><value>keypaste is refusing every agent request because its audit log won't open. Fix the log file, and the next request opens it again. Agents says why.</value></data>
@@ -648,4 +635,17 @@
   <data name="ReplaceTheOneTimeCode" xml:space="preserve"><value>Replace the one-time code…</value></data>
   <data name="SetupKeyOrOtpauthLink" xml:space="preserve"><value>Setup key or otpauth:// link</value></data>
   <data name="TheSetupKeyOrOtpauthLinkASiteShows" xml:space="preserve"><value>The setup key or otpauth:// link a site shows beside its QR code. A setup it replaces stays in the item's history.</value></data>
+  <data name="Sort" xml:space="preserve"><value>Sort</value></data>
+  <data name="SortThisList" xml:space="preserve"><value>Sort this list</value></data>
+  <data name="Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="EditingItem" xml:space="preserve"><value>Editing</value></data>
+  <data name="PressAValueToCopyIt" xml:space="preserve"><value>Press a value to copy it</value></data>
+  <data name="CopyThePassword" xml:space="preserve"><value>Copy the password</value></data>
+  <data name="ProjectKeys" xml:space="preserve"><value>Keys</value></data>
+  <data name="RunProject" xml:space="preserve"><value>Run</value></data>
+  <data name="LearnMoreAboutAProject" xml:space="preserve"><value>Learn more about a project's keys and environments</value></data>
+  <data name="RunNeedsADirectoryAndCommandSetThemOnTheKeysTab" xml:space="preserve"><value>Run needs a directory and a command. Set them on the Keys tab.</value></data>
+  <data name="LearnMoreAboutRecommendations" xml:space="preserve"><value>Learn more about recommendations</value></data>
+  <data name="LearnMoreAboutKeysLeftInNotes" xml:space="preserve"><value>Learn more about keys left in notes</value></data>
+  <data name="LearnMoreAboutValue" xml:space="preserve"><value>Learn more about {0}</value></data>
 </root>

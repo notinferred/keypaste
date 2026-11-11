@@ -306,7 +306,7 @@ public sealed class CultureAgreementTests : IDisposable
         Assert.SkipUnless(HasIcu, "needs ICU");
 
         var path = Path.Combine(_directory, "app.toml");
-        var settings = AppSettings.Default with { Window = new WindowLayout(-12, -7, 1280, 800, WindowMode.Normal, 40, SidebarHidden: false, ZoomPercent: 150) };
+        var settings = AppSettings.Default with { Window = new WindowLayout(-12, -7, 1280, 800, WindowMode.Normal, SidebarHidden: false, ZoomPercent: 150) };
 
         var written = Under(writer, () =>
         {
