@@ -85,6 +85,7 @@ These observations are not completed fixes or established causes. Only the found
 
 | Observation | What must be established |
 |---|---|
+| macOS app jobs cancelled at 15 minutes without running | Twice on 2026-11-11 (app 43065414064 and 43071522969, first attempts) macOS jobs ended cancelled at exactly 15 minutes, apparently with no runner acquired, and passed on rerun. Whether a queue or job timeout cancels them, and whether `app ok` should fail a job no runner acquired as it does. |
 | KeePassXC reading a one-time code keypaste wrote | keypaste writes a protected `otp` URI labelled by the item's title; no gate yet has KeePassXC compute a code from it. The KeePassXC gates drive the CLI, which cannot set a code. |
 | An attachment crosses the owner's pipe in one reply of at most 8 MiB, base64 of the 5 MiB cap, held whole in both processes' memory and in the MCP result (F.78a, 2026-11-08). | Whether a streamed or chunked reply is worth its protocol cost for attachments near the cap. |
 | An agent's run whose set holds a variable from a path two items answer to is refused, as a `keypaste run` is ([F.76](steps/F.76.md)); the picker answers credential requests only. | Whether a run should offer the picker per variable, which a run's prompt of many variables would have to fit. |
