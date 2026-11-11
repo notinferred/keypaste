@@ -28,6 +28,7 @@ internal enum NewItemField
     Username,
     Password,
     Url,
+    OneTimeCode,
     Notes,
     Group,
     Tags,
@@ -114,6 +115,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _hasUsername;
     private bool _hasPassword;
     private bool _hasUrl;
+    private bool _hasOneTimeCode;
     private bool _hasHost;
     private bool _hasKey;
     private GeneratePasswordViewModel? _generatorPanel;
@@ -167,7 +169,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     private static readonly string[] _fieldProperties =
     [
-        nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsHost), nameof(ShowsKey),
+        nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsOneTimeCode), nameof(ShowsHost), nameof(ShowsKey),
         nameof(ShowsNotes), nameof(ShowsGroup), nameof(ShowsTags), nameof(ShowsGoesIn), nameof(FieldOptions), nameof(HasFieldOptions),
     ];
 
@@ -176,6 +178,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         new(NewItemField.Username, "Username", "user"),
         new(NewItemField.Password, "Password", "key-round"),
         new(NewItemField.Url, "URL", "link"),
+        new(NewItemField.OneTimeCode, "One-time code", "clock"),
         new(NewItemField.Notes, "Notes", "sticky-note"),
         new(NewItemField.Group, "Group", "folder"),
         new(NewItemField.Tags, "Tags and project", "layers"),
@@ -208,6 +211,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         _hasUsername = _template is ItemTemplate.Login or ItemTemplate.Database or ItemTemplate.Server;
         _hasPassword = _hasUsername;
         _hasUrl = _template == ItemTemplate.Login;
+        _hasOneTimeCode = _hasPassword;
         _hasHost = _template is ItemTemplate.Database or ItemTemplate.Server;
         _hasKey = _template == ItemTemplate.ApiKey;
 
@@ -236,6 +240,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         NewItemField.Username => _hasUsername,
         NewItemField.Password => _hasPassword,
         NewItemField.Url => _hasUrl,
+        NewItemField.OneTimeCode => _hasOneTimeCode,
         _ => _added.Contains(field),
     };
 
@@ -256,6 +261,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 break;
             case NewItemField.Url:
                 _hasUrl = true;
+                break;
+            case NewItemField.OneTimeCode:
+                _hasOneTimeCode = true;
                 break;
             case NewItemField.CustomField:
             case NewItemField.ProtectedField:
@@ -285,6 +293,11 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             case NewItemField.Url:
                 _hasUrl = false;
                 Url = string.Empty;
+                break;
+            case NewItemField.OneTimeCode:
+                _hasOneTimeCode = false;
+                OneTimeCode.Clear();
+                OneTimeCodeProblem = null;
                 break;
             case NewItemField.Notes:
                 _added.Remove(field);
@@ -424,8 +437,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 OneTimeCodeProblem = null;
                 Error = null;
 
-                // Create ignores a one-time code the template has no field for, so it must not stay as a draft.
-                if (!ShowsPassword)
+                // Create ignores a one-time code the form has no field for, so it must not stay as a draft.
+                if (!ShowsOneTimeCode)
                 {
                     OneTimeCode.Clear();
                 }
@@ -451,6 +464,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal bool ShowsPassword => _hasPassword;
 
     internal bool ShowsUrl => _hasUrl;
+
+    internal bool ShowsOneTimeCode => _hasOneTimeCode;
 
     internal bool ShowsHost => _hasHost;
 
@@ -566,7 +581,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal bool HasKeyValueProblem => KeyValueProblem is not null;
 
-    /// <summary>A login's, database's or server's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
+    /// <summary>The item's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
     internal SecretField OneTimeCode { get; }
 
     /// <summary>Why Create refused the one-time code, or null; it names no value.</summary>
@@ -687,7 +702,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         string? oneTimeCode = null;
 
-        if (ShowsPassword && OneTimeCode.HasValue)
+        if (ShowsOneTimeCode && OneTimeCode.HasValue)
         {
             oneTimeCode = OneTimeCode.Compose();
 

@@ -690,6 +690,31 @@
                     <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="{x:Static res:Strings.URL}" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="{x:Static res:Strings.ExampleWebAddress}" />
                   </ctl:FieldRow>
 
+                  <!-- Masked as the password is: a setup key is the seed every code is computed from. -->
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.OneTimeCode}" IsVisible="{Binding ShowsOneTimeCode}">
+                    <ctl:FieldRow.Actions>
+                      <Button Classes="icon ghost sm" VerticalAlignment="Top" Command="{Binding RemoveFieldCommand}" CommandParameter="{x:Static vm:NewItemField.OneTimeCode}" ToolTip.Tip="{Binding Source={x:Static res:Strings.OneTimeCode}, StringFormat={x:Static res:Strings.RemoveValue}}" AutomationProperties.Name="{Binding Source={x:Static res:Strings.OneTimeCode}, StringFormat={x:Static res:Strings.RemoveValue}}">
+                        <ctl:KpIcon Icon="x" Size="14" />
+                      </Button>
+                    </ctl:FieldRow.Actions>
+                    <StackPanel Spacing="6">
+                      <ctl:MaskedInput x:Name="NewItemOneTimeCode"
+                                       AllowsPaste="True"
+                                       Sink="{Binding OneTimeCode}"
+                                       MaskedLength="{Binding OneTimeCode.MaskedLength}"
+                                       AutomationProperties.Name="{x:Static res:Strings.OneTimeCode}" />
+                      <TextBlock x:Name="NewItemOneTimeCodeProblem" ctl:ShowInView.Scrolls="True"
+                                 Classes="caption danger"
+                                 TextWrapping="Wrap"
+                                 IsVisible="{Binding HasOneTimeCodeProblem}"
+                                 ctl:Announcer.Says="{Binding OneTimeCodeProblem}" Text="{Binding OneTimeCodeProblem}" />
+                      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.OptionalTheSetupKeyOrOtpauthLink}" />
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding OneTimeCode.Note.Length}"
+                                 Text="{Binding OneTimeCode.Note}" />
+                    </StackPanel>
+                  </ctl:FieldRow>
+
                   <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Group}" IsVisible="{Binding ShowsGroup}">
                     <ctl:FieldRow.Actions>
                       <Button Classes="icon ghost sm" VerticalAlignment="Top" Command="{Binding RemoveFieldCommand}" CommandParameter="{x:Static vm:NewItemField.Group}" ToolTip.Tip="{Binding Source={x:Static res:Strings.Group}, StringFormat={x:Static res:Strings.RemoveValue}}" AutomationProperties.Name="{Binding Source={x:Static res:Strings.Group}, StringFormat={x:Static res:Strings.RemoveValue}}">
@@ -1311,6 +1336,17 @@
                           <ctl:RevealButton Classes="ghost row-action"
                                             Target="{Binding #CurrentTotp}"
                                             Subject="{x:Static res:Strings.TheTotpCodeAsAnObject}" />
+                          <Button x:Name="ReplaceTotp"
+                                  Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                  Command="{Binding BeginSetTotpCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ReplaceTheOneTimeCode}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOneTimeCode}" />
+                          <Button x:Name="RemoveTotp"
+                                  Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                  IsVisible="{Binding CanRemoveTotp}"
+                                  Command="{Binding BeginRemoveTotpCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.RemoveTheOneTimeCode}"
+                                  AutomationProperties.Name="{x:Static res:Strings.RemoveTheOneTimeCode}" />
                         </StackPanel>
                       </ctl:FieldRow.Actions>
                     </ctl:FieldRow>
@@ -1320,6 +1356,19 @@
                                  Classes="caption"
                                  TextWrapping="Wrap"
                                  ctl:Announcer.Says="{Binding TotpProblem}" Text="{Binding TotpProblem}" />
+                      <ctl:FieldRow.Actions>
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                          <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                  Command="{Binding BeginSetTotpCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.ReplaceTheOneTimeCode}"
+                                  AutomationProperties.Name="{x:Static res:Strings.ReplaceTheOneTimeCode}" />
+                          <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                  IsVisible="{Binding CanRemoveTotp}"
+                                  Command="{Binding BeginRemoveTotpCommand}"
+                                  ToolTip.Tip="{x:Static res:Strings.RemoveTheOneTimeCode}"
+                                  AutomationProperties.Name="{x:Static res:Strings.RemoveTheOneTimeCode}" />
+                        </StackPanel>
+                      </ctl:FieldRow.Actions>
                     </ctl:FieldRow>
 
                     <!-- A web address opens in the browser from the row's action; anything else is text and says why. -->
@@ -1367,10 +1416,10 @@
                     <Border.IsVisible>
                       <MultiBinding Converter="{x:Static BoolConverters.And}">
                         <Binding Path="!IsEditing" />
-                        <Binding Path="HasFields" />
+                        <Binding Path="HasListedFields" />
                       </MultiBinding>
                     </Border.IsVisible>
-                    <ItemsControl x:Name="CustomFields" ItemsSource="{Binding Fields}">
+                    <ItemsControl x:Name="CustomFields" ItemsSource="{Binding ListedFields}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -1574,6 +1623,16 @@
                       </StackPanel>
                     </Border>
                     <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button x:Name="AddTotp"
+                              Classes="ghost sm"
+                              IsVisible="{Binding CanAddTotp}"
+                              Command="{Binding BeginSetTotpCommand}"
+                              AutomationProperties.Name="{x:Static res:Strings.AddOneTimeCode}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="plus" Size="14" />
+                          <TextBlock Text="{x:Static res:Strings.AddOneTimeCode}" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
                       <Button x:Name="AddField"
                               Classes="ghost sm"
                               Command="{Binding BeginAddFieldCommand}"
@@ -1724,6 +1783,42 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button x:Name="KeepField" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveFieldCommand}" />
                           <Button Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveFieldCommand}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <!-- Core keeps the setup as KeePassXC 2.8 keeps a TOTP, and refuses one it cannot compute, naming no value. -->
+                    <Border Classes="form" IsVisible="{Binding IsSettingTotp}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmSetTotpCommand}" ctl:FormKeys.Cancel="{Binding CancelSetTotpCommand}" ctl:FormKeys.Draft="{Binding SetTotpDraft}">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.OneTimeCode}" />
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.SetupKeyOrOtpauthLink}" />
+                        <ctl:MaskedInput x:Name="NewTotp"
+                                         AllowsPaste="True"
+                                         Width="420"
+                                         HorizontalAlignment="Left"
+                                         Sink="{Binding NewTotp}"
+                                         MaskedLength="{Binding NewTotp.MaskedLength}"
+                                         AutomationProperties.Name="{x:Static res:Strings.SetupKeyOrOtpauthLink}" />
+                        <TextBlock x:Name="TotpSetupProblem"
+                                   Classes="caption danger"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding HasTotpSetupProblem}"
+                                   ctl:Announcer.Says="{Binding TotpSetupProblem}" Text="{Binding TotpSetupProblem}" />
+                        <TextBlock Classes="caption" IsVisible="{Binding NewTotp.Note.Length}" Text="{Binding NewTotp.Note}" />
+                        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.TheSetupKeyOrOtpauthLinkASiteShows}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelSetTotpCommand}" />
+                          <Button x:Name="SaveTotp" Classes="primary" Content="{x:Static res:Strings.Save}" Command="{Binding ConfirmSetTotpCommand}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="form danger" IsVisible="{Binding IsRemovingTotp}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveTotpCommand}">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="{x:Static res:Strings.RemoveTheOneTimeCodeFromThisItem}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button x:Name="KeepTotp" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveTotpCommand}" />
+                          <Button x:Name="ConfirmRemoveTotp" Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveTotpCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>

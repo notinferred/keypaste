@@ -359,6 +359,29 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
+    public void A_one_time_code_is_a_field_any_kind_can_add_and_removing_it_clears_what_was_typed()
+    {
+        var form = NewItemForm.Open(_entries, "Work/recovery");
+        form.Template = ItemTemplate.SecureNote;
+        Assert.False(form.ShowsOneTimeCode);
+
+        form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
+        Assert.DoesNotContain(form.FieldOptions, option => option.Field == NewItemField.OneTimeCode);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq");
+        form.RemoveFieldCommand.Execute(NewItemField.OneTimeCode);
+
+        Assert.False(form.ShowsOneTimeCode);
+        Assert.False(form.OneTimeCode.HasValue);
+
+        form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
+        Type(form.OneTimeCode, "gezd gnbv gy3t qojq gezd gnbv gy3t qojq");
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.False(_entries.IsAdding);
+        Assert.Equal([new EntryField("otp", true, true)], Reopened(new EntryName("Work", "recovery")).Fields);
+    }
+
+    [Fact]
     public void Cancelling_or_locking_disposes_what_was_typed()
     {
         var form = NewItemForm.Open(_entries);
