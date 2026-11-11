@@ -385,7 +385,8 @@ internal sealed class AppCommands
         _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
         _weakPasswordMenu = [openWeakPassword, _line, dismissFinding, reviewFindingAgain];
         _pairingMenu = [removePairing];
-        SidebarAdd = [_newGroup, newProject, _line, importFromAnotherApp, importEnv, _line, share];
+        NewProject = newProject;
+        SidebarImport = [importFromAnotherApp, importEnv];
 
         // Edit has Delete, and File has New group, so the item menu leaves them out. What acts on one row sits in its own submenu.
         var item = new AppMenuGroup(Strings.ItemMenu,
@@ -441,8 +442,14 @@ internal sealed class AppCommands
     /// <summary>File, Edit, Item, Project, Agents, View, Window and Help.</summary>
     internal IReadOnlyList<AppMenuGroup> Menus { get; }
 
-    /// <summary>The sidebar's add menu: what belongs to the navigation, each the same command as the menus'.</summary>
-    internal IReadOnlyList<AppMenuEntry> SidebarAdd { get; }
+    /// <summary>New group…, which the sidebar's Groups heading runs, making the group in the one chosen.</summary>
+    internal AppCommand NewGroup => _newGroup;
+
+    /// <summary>New project…, which the sidebar's Projects heading runs.</summary>
+    internal AppCommand NewProject { get; }
+
+    /// <summary>The sidebar's Import menu: the File menu's two imports.</summary>
+    internal IReadOnlyList<AppMenuEntry> SidebarImport { get; }
 
     /// <summary>The macOS Dock icon's menu.</summary>
     internal IReadOnlyList<AppMenuEntry> Dock { get; }

@@ -537,7 +537,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>The username box's filter, by the same rule as <see cref="SuggestedUsernames"/>.</summary>
     internal AutoCompleteFilterPredicate<object?> UsernameFilter => UsernameSuggestions.Filter(typed => _usernames.Matching(typed));
 
-    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
+    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(Username, SuggestedUsernames);
 
     /// <summary>Every username this vault uses, the username box's items, which it narrows as one is typed.</summary>
     internal IReadOnlyList<string> UsedUsernames => _usernames.Used;

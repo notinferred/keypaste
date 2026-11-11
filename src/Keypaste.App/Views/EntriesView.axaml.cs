@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -25,9 +24,6 @@ internal sealed partial class EntriesView : UserControl
 {
     private const double _dragDistance = 6d;
 
-    /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
-    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel"), ("AddFieldMenu", "AddFieldMenuPanel")];
-
     private readonly ListDetail _split;
     private readonly ListBox _rows;
     private EntriesViewModel? _entries;
@@ -42,10 +38,8 @@ internal sealed partial class EntriesView : UserControl
         _split = this.FindControl<ListDetail>("Split")!;
         _split.HidKeyboardPane += OnKeyboardPaneHid;
 
+        ToggleMenus.Attach(this, ("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel"));
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
-        AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
-        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
-        AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;
         _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
@@ -215,126 +209,12 @@ internal sealed partial class EntriesView : UserControl
         }
     }
 
-    /// <summary>A choice in a menu closes it, and a field's ⋯ asks for that row's menu as the menu key does.</summary>
+    /// <summary>A field's ⋯ asks for that row's menu as the menu key does.</summary>
     private void OnClick(object? sender, RoutedEventArgs e)
     {
         if (e.Source is Button { Name: "FieldMenu" } fieldMenu)
         {
             fieldMenu.RaiseEvent(new ContextRequestedEventArgs());
-            return;
-        }
-
-        if (e.Source is Button { Classes: var classes } && classes.Contains("menu-item"))
-        {
-            foreach (var (toggle, _) in OpenMenus())
-            {
-                toggle.IsChecked = false;
-            }
-        }
-    }
-
-    /// <summary>A press anywhere but a menu or its button closes it.</summary>
-    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.Source is not Visual source)
-        {
-            return;
-        }
-
-        foreach (var (toggle, panel) in OpenMenus())
-        {
-            var inside = source.GetSelfAndVisualAncestors().Any(visual =>
-                ReferenceEquals(visual, toggle) || visual is Control control && control.Name == panel);
-
-            if (!inside)
-            {
-                toggle.IsChecked = false;
-            }
-        }
-    }
-
-    /// <summary>Escape closes an open menu and gives focus back to its button.</summary>
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape && CloseGeneratorPanel())
-        {
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key != Key.Escape || OpenMenus().FirstOrDefault() is not ({ } toggle, _))
-        {
-            return;
-        }
-
-        toggle.IsChecked = false;
-        toggle.Focus(NavigationMethod.Tab);
-        e.Handled = true;
-    }
-
-    /// <summary>Escape closes the generator open for a field and gives focus back to the button that opened it.</summary>
-    private bool CloseGeneratorPanel()
-    {
-        string button;
-
-        if (_entries?.NewItem is { HasGeneratorPanel: true } form)
-        {
-            form.CloseGeneratorCommand.Execute(null);
-            button = "NewEntryGenerate";
-        }
-        else if (_entries?.Detail is { HasGeneratorPanel: true } detail)
-        {
-            button = detail.NewFieldGenerator is not null ? "NewFieldGenerate"
-                : detail.ReplacementFieldGenerator is not null ? "ReplacementFieldGenerate"
-                : "ReplacementPasswordGenerate";
-            detail.CloseGeneratorCommand.Execute(null);
-        }
-        else
-        {
-            return false;
-        }
-
-        this.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate => candidate.Name == button)?.Focus(NavigationMethod.Tab);
-        return true;
-    }
-
-    /// <summary>An opened menu takes focus on its first item, visibly so when it was opened from the keyboard.</summary>
-    private void OnMenuToggled(object? sender, RoutedEventArgs e)
-    {
-        if (e.Source is not ToggleButton { IsChecked: true } toggle
-            || _menus.FirstOrDefault(menu => menu.Toggle == toggle.Name).Panel is not { } name)
-        {
-            return;
-        }
-
-        RevealedValue.HideShown();
-
-        var method = toggle.Classes.Contains(":focus-visible") ? NavigationMethod.Tab : NavigationMethod.Pointer;
-
-        Dispatcher.UIThread.Post(
-            () =>
-            {
-                if (toggle.IsChecked == true
-                    && this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == name) is { } panel
-                    && panel.GetVisualDescendants().OfType<Button>().FirstOrDefault(button => button.IsEffectivelyEnabled) is { } first)
-                {
-                    first.Focus(method);
-                }
-            },
-            DispatcherPriority.Loaded);
-    }
-
-    /// <summary>Each menu that is open, with the name of its panel.</summary>
-    private IEnumerable<(ToggleButton Toggle, string Panel)> OpenMenus()
-    {
-        var toggles = this.GetVisualDescendants().OfType<ToggleButton>().ToList();
-
-        foreach (var (name, panel) in _menus)
-        {
-            if (toggles.FirstOrDefault(toggle => toggle.Name == name) is { IsChecked: true } toggle)
-            {
-                yield return (toggle, panel);
-            }
         }
     }
 }

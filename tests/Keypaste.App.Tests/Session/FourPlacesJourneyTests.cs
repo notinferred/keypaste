@@ -95,7 +95,7 @@ public sealed class FourPlacesJourneyTests
 
             // The sidebar lists the four places, the vault's group tree under Items and the project
             // under its heading, and there is one search.
-            Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Recommendations", "Agents"], Names(Named<ListBox>(main, "Nav")));
+            Assert.Equal(["Items", "Groups", "Work", "env", "Projects", "billing", "Recommendations", "Agents"], Names(Named<ListBox>(main, "Nav")));
             Assert.Equal(["Trash", "Settings"], Names(Named<ListBox>(main, "FooterNav")));
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
             Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
@@ -121,10 +121,10 @@ public sealed class FourPlacesJourneyTests
             Press(main, back);
             Assert.IsType<EntriesViewModel>(shell.Content);
 
-            // A KDBX import, from the sidebar's "+".
-            var sidebarAdd = Named<Button>(main, "SidebarAdd");
-            Press(main, sidebarAdd);
-            var addMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarAdd)!;
+            // A KDBX import, from the sidebar's Import.
+            var sidebarImport = Named<Button>(main, "SidebarImport");
+            Press(main, sidebarImport);
+            var addMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarImport)!;
             addMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, AppCommands.ImportHeader)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             addMenu.Hide();
             WindowInput.Drain();

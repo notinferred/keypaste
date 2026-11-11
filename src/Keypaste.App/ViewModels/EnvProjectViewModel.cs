@@ -440,12 +440,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         panel?.Dispose();
     }
 
-    private GeneratePasswordViewModel? GeneratorPanel
+    /// <summary>The generator open for one of the project's fields, or null while it is closed.</summary>
+    internal GeneratePasswordViewModel? GeneratorPanel
     {
         get => _generatorPanel;
-        set
+        private set
         {
             _generatorPanel = value;
+            OnPropertyChanged(nameof(GeneratorPanel));
             OnPropertyChanged(nameof(NewValueGenerator));
             OnPropertyChanged(nameof(ReplacementGenerator));
         }

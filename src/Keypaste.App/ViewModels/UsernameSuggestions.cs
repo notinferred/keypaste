@@ -49,16 +49,32 @@ internal sealed class UsernameSuggestions
     private static bool Holds(string username, string text) =>
         text.Length > 0 && username.Contains(text, StringComparison.OrdinalIgnoreCase) && !string.Equals(username, text, StringComparison.Ordinal);
 
-    /// <summary>What a screen reader is told as the list changes, or null while it offers nothing.</summary>
-    internal static string? Spoken(IReadOnlyList<string> matching)
+    /// <summary>The match a username box completes what is typed with, in grey inside the field: the first that starts with it, whatever its case, or null.</summary>
+    internal static string? Completion(string typed, IReadOnlyList<string> matching)
+    {
+        ArgumentNullException.ThrowIfNull(typed);
+        ArgumentNullException.ThrowIfNull(matching);
+
+        return typed.Length == 0 ? null : matching.FirstOrDefault(username => username.Length > typed.Length && username.StartsWith(typed, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>What a screen reader is told as the box completes or offers matches, or null while it offers nothing.</summary>
+    internal static string? Spoken(string typed, IReadOnlyList<string> matching)
     {
         ArgumentNullException.ThrowIfNull(matching);
+
+        if (Completion(typed ?? string.Empty, matching) is { } completion)
+        {
+            return matching.Count == 1
+                ? string.Format(CultureInfo.CurrentCulture, "Completes to {0}, used in this vault. Tab accepts it; Escape dismisses it.", completion)
+                : string.Format(CultureInfo.CurrentCulture, "Completes to {0}, used in this vault. Tab accepts it; Down arrow lists all {1} matches; Escape dismisses it.", completion, matching.Count);
+        }
 
         return matching.Count switch
         {
             0 => null,
-            1 => "1 username used in this vault matches. Down arrow chooses it; Escape closes the list.",
-            var count => string.Format(CultureInfo.CurrentCulture, "{0} usernames used in this vault match. Down arrow chooses one; Escape closes the list.", count),
+            1 => "1 username used in this vault matches. Down arrow lists it; Escape closes the list.",
+            var count => string.Format(CultureInfo.CurrentCulture, "{0} usernames used in this vault match. Down arrow lists them; Escape closes the list.", count),
         };
     }
 }

@@ -296,7 +296,7 @@ public sealed class NewItemTests : IDisposable
         form.Username = "dan";
 
         Assert.Equal(["Dan", "dan@example.com"], form.SuggestedUsernames);
-        Assert.Contains("2 usernames", form.SuggestedUsernamesSpoken, StringComparison.Ordinal);
+        Assert.Equal("Completes to dan@example.com, used in this vault. Tab accepts it; Down arrow lists all 2 matches; Escape dismisses it.", form.SuggestedUsernamesSpoken);
 
         form.Username = "dan@example.com";
 

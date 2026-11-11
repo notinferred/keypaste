@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Resources;
 
 namespace Keypaste.App.ViewModels;
 
@@ -20,12 +21,23 @@ internal sealed record GroupRow(string Path, string Title, int Depth, bool HasCh
     public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{Title}, level {Depth + 1}");
 }
 
-/// <summary>A label in the sidebar's list that names the rows under it and cannot be chosen.</summary>
+/// <summary>What a sidebar heading's + makes.</summary>
+internal enum SidebarAddition
+{
+    Group,
+    Project,
+}
+
+/// <summary>A label in the sidebar's list that names the rows under it and cannot be chosen; its + makes one more of them.</summary>
 /// <param name="Title">What it says.</param>
-internal sealed record SidebarHeading(string Title)
+/// <param name="Adds">What its + makes.</param>
+internal sealed record SidebarHeading(string Title, SidebarAddition Adds)
 {
     /// <summary>What the list draws: a table heading, in capitals.</summary>
     internal string Label => Title.ToUpperInvariant();
+
+    /// <summary>The + button's name and tooltip, the menu command it runs.</summary>
+    internal string AddLabel => Adds == SidebarAddition.Group ? Strings.NewGroupLabel : Strings.NewProjectLabel;
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     public override string ToString() => Title;

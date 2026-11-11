@@ -8,6 +8,7 @@
     colour: an icon is amber only while its object is live (DESIGN), and a view has one amber element.
     Classes:
       ListBox.nav   the sidebar: 34px rows, selected is #2A2C30 with no bar
+      Button.sidebar-row   a sidebar footer row that runs a command, such as Import
       ListBox.rows  a tall list such as Secrets (52px rows); the default look, named for intent
       ListBox.segmented  the items of the segmented list in Inputs.axaml: selected is #2A2C30
                     with no bar in every state; here so it follows the rules above
@@ -119,6 +120,27 @@
     <Setter Property="Height" Value="30" />
     <Setter Property="MinHeight" Value="30" />
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <!-- A sidebar row that runs a command rather than going to a place, such as Import: a footer row's size and colours. -->
+  <Style Selector="Button.sidebar-row">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Button.sidebar-row /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="Button.sidebar-row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="Button.sidebar-row ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
