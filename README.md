@@ -6,45 +6,34 @@
   </picture>
 </h1>
 
-<p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it.</p>
+<p align="center">One vault for your passwords and your projects' secrets. Your AI agents get a secret only when you say yes.</p>
 
 <p align="center">
-  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on Items, laid out as KeePassXC: the vault's groups and projects in the sidebar, a table of logins and env variables, and the chosen github login's username, masked password, URL, notes and custom fields previewed below it.">
+  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app: the vault's groups and projects in the sidebar, the list of items beside the open github login, whose username, masked password, URL and custom fields sit in grouped rows.">
 </p>
 
-<p align="center"><sub>The desktop app, built from source. It has no public release yet.</sub></p>
+<p align="center"><sub>The desktop app, built from source. It is not released yet.</sub></p>
 
-## What it does
+## What keypaste does
 
-The published `v0.3.0` CLI stores logins and environment variables in a local KDBX vault, runs commands with them, and asks you before an agent receives one. Everything else below is in source until the next release, and the desktop app has no public release; [FEATURES](docs/FEATURES.md) records what exists where.
+**Keeps your passwords.** Everything lives in one encrypted file on your computer, in the KeePass format, so KeePassXC and other KeePass apps open the same file. There is no account and nothing leaves your machine. Logins, notes, custom fields, one-time codes and attachments sit in groups, with history for every change and backups beside the vault.
 
-**As a password manager**
+**Keeps your projects' secrets.** Each project gets one set of keys with a value for dev, staging and prod. `keypaste run` hands them to a command through its environment and writes nothing to disk, and a `.env.keypaste` file of references, with no values in it, is safe to commit.
 
-- One KDBX 4 file on your disk, with no account and no network. KeePassXC opens and edits the same file, and CI checks both directions against `keepassxc-cli` on Linux, macOS and Windows.
-- Logins with a title, username, password, URL and notes, in groups. Search covers titles, usernames and URLs and never reads a password.
-- A generator for 8 to 256 characters from a shell-safe alphabet, or passphrases of 6 to 32 words from the EFF list. `keypaste rotate` replaces a password with a generated one and never prints it.
-- History for every change, restored in one step, and rolling encrypted backups beside the vault.
-- `keypaste import` copies another KDBX file in, or keeps editing it in place.
+**Asks you before an agent gets anything.** An AI agent asks for one field of one item and says why. You answer Deny, Allow once, or Always allow or Always block for that agent and item. Every request is recorded in a local log, each line chained to the one before it.
 
-**For developers and their agents**
-
-- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once, or Always allow or Always block for that agent and item, or allow a kind of value for every agent in Settings or for one on its page, and every request lands in a hash-chained audit log.
-- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). [PRODUCT §2](docs/PRODUCT.md) bounds it: no shell, and you approve the exact command.
-- Projects: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
-- `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
-- Scoped tokens for CI, such as `read:acme-api/staging/*`: inject-only, and expiring after 30 days by default.
-- Share links: one field, or an entry's login (username, password and URL), encrypted on your machine, opened 1 to 10 times (once by default) before it expires. keypaste.com serves the links; the command is in source until the next release.
+**Makes strong passwords.** Choose a length and which characters to use, or a passphrase from the EFF word list.
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code wants 1 secret, the DATABASE_URL field of env/acme-api/.env, with the agent's reason and the choices Deny, Allow once and Allow for 1 hour."></td>
-    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="The acme-api project: its keys across dev, staging and prod with masked values and the item each comes from, Import .env and Export .env.keypaste."></td>
-    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: a request waiting for you with Show the prompt, allowances with the time left and End, and the AI tools found on this computer with each agent's settings."></td>
+    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code asks for the DATABASE_URL field of env/acme-api/.env, with the agent's reason, what allowing means, and the choices Deny and Allow once."></td>
+    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="The acme-api project: its keys across dev, staging and prod with masked values, and Run as its one action."></td>
+    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: the AI tools found on this computer beside the chosen agent's settings for what it may see and what it is asked about."></td>
   </tr>
   <tr>
-    <td>An agent's request, in the app</td>
-    <td>A project and its <code>.env.keypaste</code></td>
-    <td>Requests and AI tools</td>
+    <td>An agent's request</td>
+    <td>A project's keys</td>
+    <td>Your agents</td>
   </tr>
 </table>
 
@@ -70,13 +59,15 @@ keypaste: an agent is asking for a credential.
 [d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
-[The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
+[The demo](docs/demo.md) walks through a request, an approval and a deploy in about sixty seconds.
 
-You can transport the encrypted file with your existing file-sync service; keypaste has no merge or managed-sync workflow. KDBX compatibility does not mean complete KeePassXC feature coverage. The code is open source under AGPL-3.0.
+## Where it stands
 
-The published download is pre-1.0 CLI/MCP `v0.3.0`. Replace `v0.2.0`: a save racing another program's save could undo it without keeping the lost change in history. Replace `v0.1.0`: it could also delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` repairs. Published versions are immutable, so both remain available with those defects.
+You can download the command-line tool and the agent bridge today, as `v0.3.0`. The desktop app, and much of what this page describes, is in the source and comes with the next release; [FEATURES](docs/FEATURES.md) lists what works where. keypaste is open source under AGPL-3.0.
 
-The [desktop app](docs/desktop.md) holds the vault unlocked for one session: it answers agents in its own prompt window, launches projects with their variables and locks everything at once. [RELEASE](docs/RELEASE.md) defines distribution status, [ROADMAP](ROADMAP.md) what comes next, and [PRODUCT](docs/PRODUCT.md) product commitments. Broader ideas are in [BACKLOG](docs/BACKLOG.md).
+If you have `v0.1.0` or `v0.2.0`, replace it. `v0.2.0` could undo a save that raced another program's save, without keeping the lost change in history. `v0.1.0` could also delete a vault through `env export`, change the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` fixes. Published versions never change, so both remain available with those defects.
+
+You can carry the vault between computers with any file-sync service. keypaste opens KeePassXC's files but does not do everything KeePassXC does.
 
 ## Install
 
@@ -306,7 +297,7 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Settings and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Settings hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
+In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Agents and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Agents hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
 
 ```sh
 keypaste clients
