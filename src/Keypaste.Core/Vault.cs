@@ -1522,6 +1522,14 @@ public sealed class Vault : IDisposable
         return includeReserved ? entries : [.. entries.Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))];
     }
 
+    /// <summary>Each distinct username an entry outside the recycle bin and keypaste's own groups holds, in ordinal order, for a username box to suggest; no other field is read.</summary>
+    public IReadOnlyList<string> ReadUsernames()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.ReadUsernames();
+    }
+
     /// <summary>Every entry, keypaste's own records included, but only while this vault holds exactly what its file holds.</summary>
     /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
     /// <returns>Whether the vault matches its file, and if not, why.</returns>

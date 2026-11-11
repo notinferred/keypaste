@@ -1935,6 +1935,16 @@ internal sealed class KeePassInterop : IDisposable
         return tagged;
     }
 
+    /// <summary>Each distinct username a live entry outside keypaste's own groups holds, ordinal order, by the traversal <see cref="Collect"/> uses; no other field is read.</summary>
+    internal IReadOnlyList<string> ReadUsernames()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        SortedSet<string> usernames = new(StringComparer.Ordinal);
+        CollectUsernames(_database.RootGroup, string.Empty, usernames, Bin());
+        return [.. usernames];
+    }
+
     /// <summary>Every live entry as a listing names it, by the traversal <see cref="Collect"/> uses; no value is read.</summary>
     internal IReadOnlyList<ListedEntry> ReadListing()
     {
@@ -3658,6 +3668,30 @@ internal sealed class KeePassInterop : IDisposable
             if (!ReferenceEquals(child, bin))
             {
                 CollectTags(child, ChildPath(groupPath, child.Name), tagged, bin);
+            }
+        }
+    }
+
+    private static void CollectUsernames(PwGroup group, string groupPath, SortedSet<string> usernames, PwGroup? bin)
+    {
+        if (ReservedGroups.IsReserved(groupPath))
+        {
+            return;
+        }
+
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (ReadField(entry, PwDefs.UserNameField).Trim() is { Length: > 0 } username)
+            {
+                usernames.Add(username);
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectUsernames(child, ChildPath(groupPath, child.Name), usernames, bin);
             }
         }
     }
