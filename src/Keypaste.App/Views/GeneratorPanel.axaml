@@ -47,7 +47,7 @@
 
     <views:GeneratorOptions DataContext="{Binding Generator}" />
 
-    <StackPanel Spacing="8" IsVisible="{Binding CanAddField}">
+    <StackPanel Spacing="8" IsVisible="{Binding OffersAddField}">
       <TextBlock Classes="label" Text="{Binding Item, StringFormat={x:Static res:Strings.AddToValueAsAField}}" />
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
         <TextBox Name="GeneratedFieldName"
@@ -59,13 +59,13 @@
       </Grid>
     </StackPanel>
 
-    <TextBlock Classes="caption" TextWrapping="Wrap"
+    <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding KeepsElsewhere}"
                Text="{x:Static res:Strings.CopyPutsItOnTheClipboardWhichX66e478}" />
 
     <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" HorizontalAlignment="Right">
       <Button Name="CloseGenerator" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
       <Button Name="GeneratedNewItem" Content="{x:Static res:Strings.NewItemLabel}" AutomationProperties.Name="{x:Static res:Strings.NewItem}" IsVisible="{Binding OffersNewItem}" Command="{Binding NewItemCommand}" />
-      <Button Name="CopyGenerated" Classes.primary="{Binding !Applies}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
+      <Button Name="CopyGenerated" Classes="primary" IsVisible="{Binding KeepsElsewhere}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
       <!-- Not amber: the form it applies to keeps its own confirm as the screen's one. -->
       <Button Name="ApplyGenerated" Content="{x:Static res:Strings.Apply}" IsVisible="{Binding Applies}" Command="{Binding ApplyCommand}" />
     </WrapPanel>

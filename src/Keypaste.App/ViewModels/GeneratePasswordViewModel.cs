@@ -110,7 +110,13 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     /// <summary>Whether Apply hands the value to a form's field; on its own, the panel copies it instead.</summary>
     internal bool Applies => _apply is not null;
 
-    internal bool OffersNewItem => _newItem is not null;
+    internal bool OffersNewItem => _newItem is not null && !Applies;
+
+    /// <summary>Whether the sheet stands alone and so offers Copy and its other ways to keep the value; a form's sheet offers only Cancel and Apply.</summary>
+    internal bool KeepsElsewhere => !Applies;
+
+    /// <summary>Whether Add as a field shows: on the generator standing alone, never on a form's.</summary>
+    internal bool OffersAddField => CanAddField && !Applies;
 
     /// <summary>The chosen item's title, which Add as a field adds to.</summary>
     internal string? Item { get; }

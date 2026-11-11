@@ -233,7 +233,10 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
 
         Find(commands, "New item…").Run();
-        Assert.NotNull(Assert.IsType<EntriesViewModel>(shell.Content).NewItem);
+        var adding = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.NotNull(adding.NewItem);
+        Assert.False(Find(commands, "Agents").CanRun(), "a menu command waits behind the New item sheet");
+        adding.CancelAddCommand.Execute(null);
 
         Find(commands, "Agents").Run();
         Assert.Equal(DestinationKind.AgentActivity, shell.Current.Kind);

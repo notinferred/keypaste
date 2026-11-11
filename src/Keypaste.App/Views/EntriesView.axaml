@@ -522,7 +522,7 @@
                                 CommandParameter="{Binding Name}"
                                 ToolTip.Tip="{x:Static res:Strings.Share}"
                                 AutomationProperties.Name="{x:Static res:Strings.Share}">
-                          <ctl:KpIcon Icon="share-2" Size="14" />
+                          <ctl:KpIcon Icon="share-2" Size="16" />
                         </Button>
                         <ToggleButton x:Name="EntryMenu"
                                       Classes="more"
@@ -605,7 +605,7 @@
                                   CommandParameter="{Binding Name}"
                                   AutomationProperties.Name="{x:Static res:Strings.Share}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <ctl:KpIcon Icon="share-2" Size="14" />
+                              <ctl:KpIcon Icon="share-2" Size="16" />
                               <TextBlock Text="{x:Static res:Strings.Share}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>

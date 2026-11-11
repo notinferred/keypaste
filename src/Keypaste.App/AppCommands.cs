@@ -475,7 +475,7 @@ internal sealed class AppCommands
 
     // The import, share, discard, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
-        _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
+        _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasSheet: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
 
     private EntriesViewModel? Items() => Unmodal()?.Content as EntriesViewModel;
 
