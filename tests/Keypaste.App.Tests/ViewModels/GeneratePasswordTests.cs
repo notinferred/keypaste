@@ -178,6 +178,83 @@ public sealed class GeneratePasswordTests : IDisposable
     }
 
     [Fact]
+    public void A_field_forms_generator_fills_only_its_field_and_only_on_Apply()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.BeginAddFieldCommand.Execute(null);
+
+        detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
+        var panel = detail.NewFieldGenerator!;
+
+        Assert.True(panel.Applies);
+        Assert.Null(detail.NewPasswordGenerator);
+        Assert.False(detail.NewFieldValue.HasValue);
+
+        panel.CancelCommand.Execute(null);
+        Assert.Null(detail.NewFieldGenerator);
+        Assert.False(detail.NewFieldValue.HasValue);
+
+        detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
+        panel = detail.NewFieldGenerator!;
+        panel.Generator.UseWords = true;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+
+        Assert.Null(detail.NewFieldGenerator);
+        Assert.Equal(chosen, detail.NewFieldValue.Compose());
+        Assert.True(detail.NewFieldValue.IsGenerated);
+        Assert.True(detail.Generator.UseWords);
+
+        detail.CancelAddFieldCommand.Execute(null);
+        Assert.False(detail.HasGeneratorPanel);
+    }
+
+    [Fact]
+    public void Edits_generator_puts_its_value_in_the_new_password_on_Apply_and_closes_with_the_edit()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.EditCommand.Execute(null);
+
+        detail.OpenGeneratorCommand.Execute(null);
+        var panel = detail.NewPasswordGenerator!;
+        Assert.True(panel.OffersNewItem);
+        Assert.False(detail.NewPassword.HasValue);
+
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
+        Assert.Equal(chosen, detail.NewPassword.Compose());
+
+        detail.OpenGeneratorCommand.Execute(null);
+        Assert.Equal(chosen, detail.NewPasswordGenerator!.Reveal());
+        detail.CancelCommand.Execute(null);
+
+        Assert.False(detail.IsEditing);
+        Assert.False(detail.HasGeneratorPanel);
+    }
+
+    [Fact]
+    public void Edits_username_box_suggests_the_vaults_usernames_once_something_is_typed()
+    {
+        using var context = new Context(_vaultPath);
+        context.Vault.AddEntry(new VaultEntry { Title = "mail", Username = "dan@example.com", Password = "dan-secret-password" });
+        var detail = context.Open(_checking);
+
+        detail.EditCommand.Execute(null);
+        Assert.Empty(detail.SuggestedUsernames);
+
+        detail.DraftUsername = "example";
+
+        Assert.Contains("dan@example.com", detail.SuggestedUsernames);
+        Assert.DoesNotContain(detail.SuggestedUsernames, username => username.Contains("secret", StringComparison.Ordinal));
+        Assert.NotNull(detail.SuggestedUsernamesSpoken);
+
+        detail.CancelCommand.Execute(null);
+        Assert.Empty(detail.SuggestedUsernames);
+    }
+
+    [Fact]
     public Task Generate_password_offers_nothing_to_hand_over_while_its_choices_are_refused() => HeadlessSession.On(() =>
     {
         using var vault = new TempVault();

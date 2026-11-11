@@ -119,6 +119,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _hasHost;
     private bool _hasKey;
     private GeneratePasswordViewModel? _generatorPanel;
+    private readonly UsernameSuggestions _usernames;
 
     /// <param name="session">The unlocked vault the item is made in.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
@@ -133,6 +134,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         _session = session;
         _clipboard = clipboard;
         _projectTags = session.Unlocked is { } vault ? ProjectCatalog.MemberTags(vault) : [];
+        _usernames = new UsernameSuggestions(session.Unlocked);
 
         Folders =
         [
@@ -348,7 +350,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>Starts a new item with a generated value, set by the screen that holds this form; the second argument closes the panel.</summary>
     internal Action<SecretField, Action>? StartNewItemWith { get; set; }
 
-    /// <summary>The generator anchored to the password field, or null while it is closed.</summary>
+    /// <summary>The generator opened from the password field, or null while it is closed.</summary>
     internal GeneratePasswordViewModel? GeneratorPanel
     {
         get => _generatorPanel;
@@ -380,16 +382,22 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             return;
         }
 
-        Generate();
         GeneratorPanel = new GeneratePasswordViewModel(
             _clipboard,
             Generator,
             Password,
-            Generate,
+            ApplyGenerated,
             value => StartNewItemWith?.Invoke(value, CloseGenerator),
             AddGeneratedField,
             Title.Trim().Length > 0 ? Title.Trim() : "this new item",
             CloseGenerator);
+    }
+
+    private void ApplyGenerated(SecretField value)
+    {
+        SetProperty(ref _generatePassword, true, nameof(GeneratePassword));
+        Password.TakeFrom(value);
+        Error = null;
     }
 
     private void CloseGenerator()
@@ -517,7 +525,16 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SuggestedUsernames), nameof(SuggestedUsernamesSpoken))]
     internal partial string Username { get; set; } = string.Empty;
+
+    /// <summary>The usernames this vault already uses that hold what is typed, which the username box offers; choosing one fills it.</summary>
+    internal IReadOnlyList<string> SuggestedUsernames => _usernames.Matching(Username);
+
+    internal string? SuggestedUsernamesSpoken => UsernameSuggestions.Spoken(SuggestedUsernames);
+
+    /// <summary>Every username this vault uses, the username box's items, which it narrows as one is typed.</summary>
+    internal IReadOnlyList<string> UsedUsernames => _usernames.Used;
 
     [ObservableProperty]
     internal partial string Url { get; set; } = string.Empty;

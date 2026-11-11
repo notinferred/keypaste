@@ -1024,6 +1024,18 @@ public sealed class ScreenRenderer
         Save(window, output, "12-secrets-menu");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = false;
 
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = true;
+        Save(window, output, "13i-items-add-menu");
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
+
+        var sidebarAdd = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarAdd");
+        sidebarAdd.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Save(window, output, "16f-sidebar-add-menu");
+        var sidebarMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarAdd)!;
+        Save(TopLevel.GetTopLevel(sidebarMenu.Items.OfType<MenuItem>().First())!, output, "16f-sidebar-add-menu-popup");
+        sidebarMenu.Hide();
+        WindowInput.Drain();
+
         entries.SelectedGroup = entries.Groups[0];
         entries.BeginAddCommand.Press();
         Save(window, output, "13-secrets-new");
@@ -1035,6 +1047,19 @@ public sealed class ScreenRenderer
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = true;
         Save(window, output, "13e-secrets-new-field-options");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = false;
+
+        // The username box offers the usernames the vault already uses.
+        var usernameBox = window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(box => box.Name == "NewEntryUsername");
+        entries.NewItem!.Username = authority.Session.Unlocked!.ReadUsernames()[0][..1];
+        usernameBox.IsDropDownOpen = true;
+        Save(window, output, "13h-secrets-new-username-suggestions");
+        if (usernameBox.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is { } suggestions && TopLevel.GetTopLevel(suggestions) is { } suggestionsPopup)
+        {
+            Save(suggestionsPopup, output, "13h-secrets-new-username-suggestions-popup");
+        }
+
+        usernameBox.IsDropDownOpen = false;
+        entries.NewItem.Username = string.Empty;
 
         entries.NewItem!.OpenGeneratorCommand.Execute(null);
         Save(window, output, "13f-secrets-new-generator");
@@ -1145,6 +1170,11 @@ public sealed class ScreenRenderer
         entries.Detail.GeneratePasswordCommand.Press();
         Save(window, output, "20b-secrets-edit-generated");
         entries.Detail.CancelCommand.Press();
+
+        entries.Detail.BeginAddFieldCommand.Press();
+        entries.Detail.OpenFieldGeneratorCommand.Press(entries.Detail.NewFieldValue);
+        Save(window, output, "20e-secrets-add-field-generator");
+        entries.Detail.CancelAddFieldCommand.Press();
 
         shell.OpenGeneratorCommand.Press();
         Save(window, output, "13b-secrets-generate");
@@ -2002,6 +2032,9 @@ public sealed class ScreenRenderer
 
         project.BeginAddCommand.Press();
         Save(window, output, "41-env-add");
+        project.OpenGeneratorCommand.Press(project.NewValue);
+        Save(window, output, "41d-env-add-generator");
+        project.NewValueGenerator!.CancelCommand.Press();
         project.ConfirmAddCommand.Press();
         Save(window, output, "41c-env-key-needs-a-name");
         window.Width = 720 * InterfaceZoom.Factor;

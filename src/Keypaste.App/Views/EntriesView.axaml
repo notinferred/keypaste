@@ -276,7 +276,7 @@
                 </ToggleButton>
                 <ToggleButton x:Name="AddEntry"
                               Classes="more"
-                              ToolTip.Tip="{x:Static res:Strings.NewItemProjectOrImport}"
+                              ToolTip.Tip="{x:Static res:Strings.NewItemOrPassword}"
                               AutomationProperties.Name="{x:Static res:Strings.New}">
                   <ctl:KpIcon Icon="plus" Size="14" />
                 </ToggleButton>
@@ -336,15 +336,6 @@
                   <TextBlock Text="{x:Static res:Strings.NewItemLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
-              <Button x:Name="NewGroup"
-                      Classes="ghost menu-item"
-                      Command="{Binding BeginCreateGroupCommand}"
-                      AutomationProperties.Name="{x:Static res:Strings.NewGroup}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="folder-plus" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewGroupLabel}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
               <Button x:Name="NewGeneratedPassword"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"
@@ -352,33 +343,6 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="wand-2" Size="14" />
                   <TextBlock Text="{x:Static res:Strings.GeneratePasswordXf22f07}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
-              <Button x:Name="NewProject"
-                      Classes="ghost menu-item"
-                      Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="{x:Static res:Strings.NewProject}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="folder-git-2" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.NewProjectLabel}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
-              <Button x:Name="ImportEnv"
-                      Classes="ghost menu-item"
-                      Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="{x:Static res:Strings.ImportEnv}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="file-code" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.ImportEnvLabel}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
-              <Button x:Name="ImportKdbx"
-                      Classes="ghost menu-item"
-                      Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="{x:Static res:Strings.ImportFromAnotherApp}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="file-input" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.ImportFromAnotherAppLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -639,7 +603,15 @@
                         <ctl:KpIcon Icon="x" Size="14" />
                       </Button>
                     </ctl:FieldRow.Actions>
-                    <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="{x:Static res:Strings.Username}" Classes="mono" MinHeight="40" Text="{Binding Username}" />
+                    <!-- Offers the usernames this vault already uses as one is typed; choosing one fills the box. -->
+                    <AutoCompleteBox x:Name="NewEntryUsername"
+                                     AutomationProperties.Name="{x:Static res:Strings.Username}"
+                                     Classes="mono"
+                                     MinHeight="40"
+                                     Text="{Binding Username, Mode=TwoWay}"
+                                     ItemsSource="{Binding UsedUsernames}"
+                                     ItemFilter="{x:Static vm:UsernameSuggestions.Offers}"
+                                     ctl:Announcer.Says="{Binding SuggestedUsernamesSpoken}" />
                   </ctl:FieldRow>
 
                   <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Password}" IsVisible="{Binding ShowsPassword}">
@@ -1684,16 +1656,16 @@
                           <Button Grid.Column="1" x:Name="NewFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
-                                Command="{Binding GenerateIntoCommand}"
+                                Command="{Binding OpenFieldGeneratorCommand}"
                                 CommandParameter="{Binding NewFieldValue}"
                                 ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
                                 AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
                         </Grid>
-                        <Panel IsVisible="{Binding NewFieldValue.IsGenerated}">
-                          <views:GeneratorOptions DataContext="{Binding Generator}" />
-                        </Panel>
+                        <Border x:Name="NewFieldGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding NewFieldGenerator, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <views:GeneratorPanel DataContext="{Binding NewFieldGenerator}" />
+                        </Border>
                         <TextBlock Classes="caption" IsVisible="{Binding NewFieldValue.Note.Length}" Text="{Binding NewFieldValue.Note}" />
                         <ToggleSwitch x:Name="NewFieldProtected"
                                       AutomationProperties.Name="{x:Static res:Strings.ProtectThisField}"
@@ -1725,16 +1697,16 @@
                           <Button Grid.Column="1" x:Name="ReplacementFieldGenerate"
                                 Classes="icon ghost"
                                 VerticalAlignment="Center"
-                                Command="{Binding GenerateIntoCommand}"
+                                Command="{Binding OpenFieldGeneratorCommand}"
                                 CommandParameter="{Binding ReplacementFieldValue}"
                                 ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
                                 AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                           <ctl:KpIcon Icon="wand-2" Size="16" />
                         </Button>
                         </Grid>
-                        <Panel IsVisible="{Binding ReplacementFieldValue.IsGenerated}">
-                          <views:GeneratorOptions DataContext="{Binding Generator}" />
-                        </Panel>
+                        <Border x:Name="ReplacementFieldGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding ReplacementFieldGenerator, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <views:GeneratorPanel DataContext="{Binding ReplacementFieldGenerator}" />
+                        </Border>
                         <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
                         <TextBlock Classes="caption" Text="{x:Static res:Strings.TheOldValueStaysInTheItemsX346d21}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1849,7 +1821,13 @@
                   <Border Classes="group" x:Name="ItemEdit" IsVisible="{Binding IsEditing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding SaveCommand}" ctl:FormKeys.Cancel="{Binding CancelCommand}" ctl:FormKeys.Draft="{Binding EditDraft}">
                     <ctl:GroupedRows>
                     <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Username}">
-                      <TextBox Classes="mono" Text="{Binding DraftUsername}" AutomationProperties.Name="{x:Static res:Strings.Username}" />
+                      <AutoCompleteBox x:Name="DraftUsername"
+                                       Classes="mono"
+                                       Text="{Binding DraftUsername, Mode=TwoWay}"
+                                       ItemsSource="{Binding UsedUsernames}"
+                                       ItemFilter="{x:Static vm:UsernameSuggestions.Offers}"
+                                       ctl:Announcer.Says="{Binding SuggestedUsernamesSpoken}"
+                                       AutomationProperties.Name="{x:Static res:Strings.Username}" />
                     </ctl:FieldRow>
                     <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.NewPassword}">
                       <StackPanel Spacing="6">
@@ -1870,8 +1848,8 @@
                             <ctl:KpIcon Icon="wand-2" Size="16" />
                           </Button>
                         </Grid>
-                        <Border x:Name="ReplacementPasswordGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding HasGeneratorPanel}">
-                          <views:GeneratorPanel DataContext="{Binding GeneratorPanel}" />
+                        <Border x:Name="ReplacementPasswordGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding NewPasswordGenerator, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <views:GeneratorPanel DataContext="{Binding NewPasswordGenerator}" />
                         </Border>
                         <TextBlock Classes="caption" IsVisible="{Binding !NewPassword.IsGenerated}" Text="{x:Static res:Strings.LeaveThisEmptyToKeepTheCurrentX151c53}" TextWrapping="Wrap" />
                         <TextBlock Classes="caption" IsVisible="{Binding NewPassword.IsGenerated}" Text="{x:Static res:Strings.GeneratedSavePutsItInPlaceOfXefb5c1}" TextWrapping="Wrap" />

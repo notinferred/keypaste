@@ -37,6 +37,7 @@ internal sealed partial class ShellView : UserControl
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
         this.FindControl<ListBox>("RailNav")!.AddHandler(TappedEvent, OnRailPlaceTapped);
+        this.FindControl<Button>("SidebarAdd")!.Click += OnSidebarAdd;
 
         AddHandler(GotFocusEvent, (_, e) => _lastFocused = e.Source as Visual);
         AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Bubble);
@@ -256,6 +257,19 @@ internal sealed partial class ShellView : UserControl
             e.Handled = true;
             Dispatcher.UIThread.Post(FocusChosenRow, DispatcherPriority.Loaded);
         }
+    }
+
+    /// <summary>The sidebar's add menu, at its button.</summary>
+    private void OnSidebarAdd(object? sender, RoutedEventArgs e)
+    {
+        if (Commands is null || sender is not Button button)
+        {
+            return;
+        }
+
+        var menu = AppMenu.Context(Commands.SidebarAdd);
+        FlyoutBase.SetAttachedFlyout(button, menu);
+        menu.ShowAt(button);
     }
 
     /// <summary>

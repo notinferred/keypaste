@@ -619,15 +619,16 @@
                       <Button x:Name="NewEnvGenerate"
                               Classes="icon ghost"
                               VerticalAlignment="Center"
-                              Command="{Binding GenerateCommand}"
+                              Command="{Binding OpenGeneratorCommand}"
+                              CommandParameter="{Binding NewValue}"
                               ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
                               AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
                         <ctl:KpIcon Icon="wand-2" Size="16" />
                       </Button>
                     </StackPanel>
-                    <Panel IsVisible="{Binding GenerateValue}">
-                      <views:GeneratorOptions DataContext="{Binding Generator}" />
-                    </Panel>
+                    <Border x:Name="NewEnvGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding NewValueGenerator, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <views:GeneratorPanel DataContext="{Binding NewValueGenerator}" />
+                    </Border>
                     <TextBlock Classes="caption" IsVisible="{Binding GenerateValue}"
                                Text="{x:Static res:Strings.GeneratedTypeOrPasteToUseYourX7a2ef9}" />
                     <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
@@ -655,7 +656,7 @@
                       <Button x:Name="ReplacementEnvGenerate"
                               Classes="icon ghost"
                               VerticalAlignment="Center"
-                              Command="{Binding GenerateIntoCommand}"
+                              Command="{Binding OpenGeneratorCommand}"
                               CommandParameter="{Binding ReplacementValue}"
                               ToolTip.Tip="{x:Static res:Strings.GenerateAValue}"
                               AutomationProperties.Name="{x:Static res:Strings.GenerateAValue}">
@@ -667,9 +668,9 @@
                                TextWrapping="Wrap"
                                IsVisible="{Binding HasReplaceProblem}"
                                ctl:Announcer.Says="{Binding ReplaceProblem}" Text="{Binding ReplaceProblem}" />
-                    <Panel IsVisible="{Binding ReplacementValue.IsGenerated}">
-                      <views:GeneratorOptions DataContext="{Binding Generator}" />
-                    </Panel>
+                    <Border x:Name="ReplacementEnvGeneratorPanel" Classes="menu" Padding="12" IsVisible="{Binding ReplacementGenerator, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <views:GeneratorPanel DataContext="{Binding ReplacementGenerator}" />
+                    </Border>
                     <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">

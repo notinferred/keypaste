@@ -232,24 +232,79 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void The_generator_panel_opens_on_a_generated_password_and_acts_on_the_field_it_is_anchored_to()
+    public void The_generator_starts_from_the_password_and_changes_it_only_on_Apply()
     {
         var form = NewItemForm.Open(_entries);
+        var before = form.Password.Compose();
         form.OpenGeneratorCommand.Execute(null);
 
         var panel = form.GeneratorPanel!;
-        Assert.True(form.HasGeneratorPanel);
-        Assert.False(panel.ShowsValue);
-        Assert.Same(form.Password, panel.Value);
+        Assert.True(panel.Applies);
+        Assert.Same(form.Password, panel.Target);
+        Assert.Equal(before, panel.Reveal());
 
-        form.Generator.Length = 12;
-        Assert.Equal(12, form.Password.MaskedLength);
+        panel.Generator.Length = 12;
+        Assert.Equal(before, form.Password.Compose());
+        Assert.Equal(12, panel.MaskedLength);
 
-        panel.AddFieldCommand.Execute(null);
-        form.CloseGeneratorCommand.Execute(null);
+        panel.CancelCommand.Execute(null);
+        Assert.False(form.HasGeneratorPanel);
+        Assert.Equal(before, form.Password.Compose());
+        Assert.NotEqual(12, form.Generator.Length);
+
+        form.OpenGeneratorCommand.Execute(null);
+        panel = form.GeneratorPanel!;
+        panel.Generator.Length = 12;
+        var chosen = panel.Reveal();
+        panel.ApplyCommand.Execute(null);
 
         Assert.False(form.HasGeneratorPanel);
-        Assert.True(form.Password.HasValue);
+        Assert.Equal(chosen, form.Password.Compose());
+        Assert.True(form.Password.IsGenerated);
+        Assert.Equal(12, form.Generator.Length);
+        Assert.True(panel.Value.IsZeroed);
+    }
+
+    [Fact]
+    public void Choices_the_generator_refuses_disable_Apply()
+    {
+        var form = NewItemForm.Open(_entries);
+        form.OpenGeneratorCommand.Execute(null);
+        var panel = form.GeneratorPanel!;
+
+        panel.Generator.Letters = false;
+        panel.Generator.Digits = false;
+        panel.Generator.Symbols = false;
+
+        Assert.False(panel.ApplyCommand.CanExecute(null));
+
+        panel.Generator.Digits = true;
+
+        Assert.True(panel.ApplyCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void The_username_box_suggests_the_usernames_the_vault_uses_and_never_another_field()
+    {
+        _session.Unlocked!.AddEntry(new VaultEntry { Title = "mail", Username = "dan@example.com", Password = "dan-secret-password", Notes = "dan-recovery-code" });
+        _session.Unlocked.AddEntry(new VaultEntry { Title = "chat", Username = "Dan", Password = "p" });
+        var form = NewItemForm.Open(_entries);
+
+        Assert.Empty(form.SuggestedUsernames);
+        Assert.Null(form.SuggestedUsernamesSpoken);
+
+        form.Username = "dan";
+
+        Assert.Equal(["Dan", "dan@example.com"], form.SuggestedUsernames);
+        Assert.Contains("2 usernames", form.SuggestedUsernamesSpoken, StringComparison.Ordinal);
+
+        form.Username = "dan@example.com";
+
+        Assert.Empty(form.SuggestedUsernames);
+
+        form.Username = "secret";
+
+        Assert.Empty(form.SuggestedUsernames);
     }
 
     [Fact]

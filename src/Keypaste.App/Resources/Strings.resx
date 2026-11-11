@@ -12,6 +12,7 @@
   <data name="AboutKeypaste" xml:space="preserve"><value>About keypaste…</value></data>
   <data name="Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="ActualSize" xml:space="preserve"><value>Actual size</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
   <data name="Add" xml:space="preserve"><value>Add</value></data>
   <data name="AddAField" xml:space="preserve"><value>Add a field</value></data>
   <data name="AddAKeyFile" xml:space="preserve"><value>Add a key file</value></data>
@@ -286,6 +287,8 @@
   <data name="NewGroup" xml:space="preserve"><value>New group</value></data>
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
   <data name="NewItemProjectOrImport" xml:space="preserve"><value>New item, project or import</value></data>
+  <data name="NewGroupProjectImportOrShare" xml:space="preserve"><value>New group, project, import or share</value></data>
+  <data name="NewItemOrPassword" xml:space="preserve"><value>New item or password</value></data>
   <data name="NewKey" xml:space="preserve"><value>New key</value></data>
   <data name="NewMasterPassword" xml:space="preserve"><value>New master password</value></data>
   <data name="NewPassword" xml:space="preserve"><value>New password</value></data>

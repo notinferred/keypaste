@@ -60,6 +60,7 @@ public static class Strings
     public static string AnotherDevicesChangesWerentMerged => Manager.GetString("AnotherDevicesChangesWerentMerged", CultureInfo.CurrentUICulture)!;
     public static string AnswerInThePromptWindow => Manager.GetString("AnswerInThePromptWindow", CultureInfo.CurrentUICulture)!;
     public static string AnsweringAgents => Manager.GetString("AnsweringAgents", CultureInfo.CurrentUICulture)!;
+    public static string Apply => Manager.GetString("Apply", CultureInfo.CurrentUICulture)!;
     public static string AskForIt => Manager.GetString("AskForIt", CultureInfo.CurrentUICulture)!;
     public static string AskTheShareServerHowManyViewsXbaa6a2 => Manager.GetString("AskTheShareServerHowManyViewsXbaa6a2", CultureInfo.CurrentUICulture)!;
     public static string AtLeast20CharactersSuchAsSixGeneratedWords => Manager.GetString("AtLeast20CharactersSuchAsSixGeneratedWords", CultureInfo.CurrentUICulture)!;
@@ -366,9 +367,11 @@ public static class Strings
     public static string NewFieldValue => Manager.GetString("NewFieldValue", CultureInfo.CurrentUICulture)!;
     public static string NewGroup => Manager.GetString("NewGroup", CultureInfo.CurrentUICulture)!;
     public static string NewGroupLabel => Manager.GetString("NewGroupLabel", CultureInfo.CurrentUICulture)!;
+    public static string NewGroupProjectImportOrShare => Manager.GetString("NewGroupProjectImportOrShare", CultureInfo.CurrentUICulture)!;
     public static string NewItem => Manager.GetString("NewItem", CultureInfo.CurrentUICulture)!;
     public static string NewItemAddsOneHere => Manager.GetString("NewItemAddsOneHere", CultureInfo.CurrentUICulture)!;
     public static string NewItemLabel => Manager.GetString("NewItemLabel", CultureInfo.CurrentUICulture)!;
+    public static string NewItemOrPassword => Manager.GetString("NewItemOrPassword", CultureInfo.CurrentUICulture)!;
     public static string NewItemProjectOrImport => Manager.GetString("NewItemProjectOrImport", CultureInfo.CurrentUICulture)!;
     public static string NewKey => Manager.GetString("NewKey", CultureInfo.CurrentUICulture)!;
     public static string NewMasterPassword => Manager.GetString("NewMasterPassword", CultureInfo.CurrentUICulture)!;

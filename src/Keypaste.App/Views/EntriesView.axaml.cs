@@ -272,7 +272,7 @@ internal sealed partial class EntriesView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>Escape closes the generator anchored to a password field and gives focus back to the button that opened it.</summary>
+    /// <summary>Escape closes the generator open for a field and gives focus back to the button that opened it.</summary>
     private bool CloseGeneratorPanel()
     {
         string button;
@@ -284,8 +284,10 @@ internal sealed partial class EntriesView : UserControl
         }
         else if (_entries?.Detail is { HasGeneratorPanel: true } detail)
         {
+            button = detail.NewFieldGenerator is not null ? "NewFieldGenerate"
+                : detail.ReplacementFieldGenerator is not null ? "ReplacementFieldGenerate"
+                : "ReplacementPasswordGenerate";
             detail.CloseGeneratorCommand.Execute(null);
-            button = "ReplacementPasswordGenerate";
         }
         else
         {

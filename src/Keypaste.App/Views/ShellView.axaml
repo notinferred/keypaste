@@ -310,6 +310,20 @@
               </Decorator>
             </StackPanel>
 
+            <!-- The sidebar's own add: what belongs to the navigation, from the same commands as the menus. -->
+            <Button Name="SidebarAdd"
+                    DockPanel.Dock="Top"
+                    Classes="ghost sm"
+                    HorizontalAlignment="Left"
+                    Margin="0,0,0,4"
+                    ToolTip.Tip="{x:Static res:Strings.NewGroupProjectImportOrShare}"
+                    AutomationProperties.Name="{x:Static res:Strings.NewGroupProjectImportOrShare}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="plus" Size="14" />
+                <TextBlock Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+
             <!-- Trash and Settings, quieter, at the bottom. -->
             <ListBox Name="FooterNav"
                      AutomationProperties.Name="{x:Static res:Strings.MorePlaces}"

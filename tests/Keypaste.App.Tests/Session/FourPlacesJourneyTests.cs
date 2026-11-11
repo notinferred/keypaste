@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
@@ -120,9 +121,13 @@ public sealed class FourPlacesJourneyTests
             Press(main, back);
             Assert.IsType<EntriesViewModel>(shell.Content);
 
-            // A KDBX import, from Items' "+".
-            Press(main, Named<ToggleButton>(main, "AddEntry"));
-            Press(main, Named<Button>(main, "ImportKdbx"));
+            // A KDBX import, from the sidebar's "+".
+            var sidebarAdd = Named<Button>(main, "SidebarAdd");
+            Press(main, sidebarAdd);
+            var addMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarAdd)!;
+            addMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, AppCommands.ImportHeader)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            addMenu.Hide();
+            WindowInput.Drain();
             await Until(() => shell.HasImport);
             WindowInput.Click(main, Named<MaskedInput>(main, "ImportPassword"));
             WindowInput.Type(main, _sourcePassword);

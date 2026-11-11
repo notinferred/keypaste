@@ -7,11 +7,11 @@
              x:Class="Keypaste.App.Views.GeneratorPanel"
              x:DataType="vm:GeneratePasswordViewModel">
 
-  <!-- The one generator panel: anchored to a form's password field, or shown by Generate password… on its own.
-       The value is drawn only while revealed, as every secret is; a form's own field is its value. -->
+  <!-- The one generator: opened from a form's field, where Apply puts its value in that field and Cancel leaves the field as it was,
+       or shown by Generate password… on its own. The value is drawn only while revealed, as every secret is. -->
   <StackPanel Name="GeneratorBody" Spacing="12" KeyboardNavigation.TabNavigation="Cycle">
 
-    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+    <Grid ColumnDefinitions="Auto,*,Auto">
       <ctl:KpIcon Grid.Column="0" Icon="wand-2" Size="16" Margin="0,0,8,0" Foreground="{DynamicResource KpTextMuted}" />
       <TextBlock Grid.Column="1" Classes="dialog-title" Text="{x:Static res:Strings.GenerateAPassword}" VerticalAlignment="Center" />
       <Button Grid.Column="2"
@@ -22,17 +22,9 @@
               Command="{Binding RegenerateCommand}">
         <ctl:KpIcon Icon="refresh-cw" Size="14" />
       </Button>
-      <Button Grid.Column="3"
-              Name="CloseGenerator"
-              Classes="icon ghost sm"
-              ToolTip.Tip="{x:Static res:Strings.Close}"
-              AutomationProperties.Name="{x:Static res:Strings.Close}"
-              Command="{Binding CancelCommand}">
-        <ctl:KpIcon Icon="x" Size="16" />
-      </Button>
     </Grid>
 
-    <Border Classes="group" IsVisible="{Binding ShowsValue}">
+    <Border Classes="group">
       <Grid ColumnDefinitions="*,Auto" Margin="12,4,4,4" MinHeight="36">
         <ctl:RevealedValue Grid.Column="0"
                            Name="GeneratedValue"
@@ -70,10 +62,13 @@
     <TextBlock Classes="caption" TextWrapping="Wrap"
                Text="{x:Static res:Strings.CopyPutsItOnTheClipboardWhichX66e478}" />
 
-    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-      <Button Name="GeneratedNewItem" Content="{x:Static res:Strings.NewItemLabel}" AutomationProperties.Name="{x:Static res:Strings.NewItem}" Command="{Binding NewItemCommand}" />
-      <Button Name="CopyGenerated" Classes.primary="{Binding ShowsValue}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
-    </StackPanel>
+    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" HorizontalAlignment="Right">
+      <Button Name="CloseGenerator" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+      <Button Name="GeneratedNewItem" Content="{x:Static res:Strings.NewItemLabel}" AutomationProperties.Name="{x:Static res:Strings.NewItem}" IsVisible="{Binding OffersNewItem}" Command="{Binding NewItemCommand}" />
+      <Button Name="CopyGenerated" Classes.primary="{Binding !Applies}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
+      <!-- Not amber: the form it applies to keeps its own confirm as the screen's one. -->
+      <Button Name="ApplyGenerated" Content="{x:Static res:Strings.Apply}" IsVisible="{Binding Applies}" Command="{Binding ApplyCommand}" />
+    </WrapPanel>
 
   </StackPanel>
 </UserControl>

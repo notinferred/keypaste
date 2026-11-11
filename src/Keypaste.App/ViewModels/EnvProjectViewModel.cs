@@ -43,6 +43,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     private IReadOnlyList<string> _referenceKeys = [];
     private string _selectedProfile = EnvProfileNames.Default;
     private bool _generateValue = true;
+    private GeneratePasswordViewModel? _generatorPanel;
 
     internal EnvProjectViewModel(
         AppVaultSession session,
@@ -77,6 +78,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         ReplacementValue = new SecretField(clipboard);
         GenerateCommand = new RelayCommand(() => GenerateValue = true);
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
+        OpenGeneratorCommand = new RelayCommand<SecretField>(OpenGeneratorFor);
 
         // A generated value is in its field, where it can be seen and replaced, and follows the choices (V.12).
         NewValue.GeneratedValueReplaced += (_, _) => SetProperty(ref _generateValue, false, nameof(GenerateValue));
@@ -390,6 +392,74 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>What to generate, while <see cref="GenerateValue"/> is on.</summary>
     internal GeneratorViewModel Generator { get; } = new();
+
+    /// <summary>Generate, beside a form's value: the generator, whose Apply puts its value in that field.</summary>
+    internal RelayCommand<SecretField> OpenGeneratorCommand { get; }
+
+    /// <summary>The generator while it is open for the new key's value, else null.</summary>
+    internal GeneratePasswordViewModel? NewValueGenerator => GeneratorFor(NewValue);
+
+    /// <summary>The generator while it is open for a replacement value, else null.</summary>
+    internal GeneratePasswordViewModel? ReplacementGenerator => GeneratorFor(ReplacementValue);
+
+    private GeneratePasswordViewModel? GeneratorFor(SecretField field) =>
+        _generatorPanel is { } panel && ReferenceEquals(panel.Target, field) ? panel : null;
+
+    private void OpenGeneratorFor(SecretField? field)
+    {
+        if (field is null || GeneratorFor(field) is not null)
+        {
+            return;
+        }
+
+        CloseGenerator();
+        GeneratorPanel = new GeneratePasswordViewModel(Clipboard, Generator, field, value => ApplyGenerated(field, value), null, null, null, CloseGenerator);
+    }
+
+    private void ApplyGenerated(SecretField field, SecretField value)
+    {
+        if (ReferenceEquals(field, NewValue))
+        {
+            SetProperty(ref _generateValue, true, nameof(GenerateValue));
+        }
+
+        field.TakeFrom(value);
+        ReplaceProblem = null;
+    }
+
+    private void CloseGenerator()
+    {
+        var panel = GeneratorPanel;
+        GeneratorPanel = null;
+        panel?.Dispose();
+    }
+
+    private GeneratePasswordViewModel? GeneratorPanel
+    {
+        get => _generatorPanel;
+        set
+        {
+            _generatorPanel = value;
+            OnPropertyChanged(nameof(NewValueGenerator));
+            OnPropertyChanged(nameof(ReplacementGenerator));
+        }
+    }
+
+    partial void OnIsAddingChanged(bool value)
+    {
+        if (!value && GeneratorFor(NewValue) is not null)
+        {
+            CloseGenerator();
+        }
+    }
+
+    partial void OnReplacingChanged(EnvVariableRow? value)
+    {
+        if (GeneratorFor(ReplacementValue) is not null)
+        {
+            CloseGenerator();
+        }
+    }
 
     /// <summary>Replaces the value, having been given one.</summary>
     internal RelayCommand ConfirmReplaceCommand { get; }
@@ -923,6 +993,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         Environments = [];
         _catalog = null;
         Launch.PropertyChanged -= OnLaunchChanged;
+        CloseGenerator();
         NewValue.Dispose();
         ReplacementValue.Dispose();
         Import.Dispose();
