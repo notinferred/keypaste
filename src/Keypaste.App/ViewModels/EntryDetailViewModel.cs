@@ -164,11 +164,17 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>The entry's custom fields, by name, in ordinal order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasFields), nameof(FieldsSummary), nameof(CanRemoveTotp))]
+    [NotifyPropertyChangedFor(nameof(HasFields), nameof(ListedFields), nameof(HasListedFields), nameof(FieldsSummary), nameof(CanRemoveTotp))]
     [NotifyCanExecuteChangedFor(nameof(BeginRemoveTotpCommand))]
     internal partial IReadOnlyList<EntryFieldRow> Fields { get; private set; } = [];
 
     internal bool HasFields => Fields.Count > 0;
+
+    /// <summary>The custom fields the pane lists: <see cref="Fields"/> without the ones the one-time code row already shows a code from.</summary>
+    internal IReadOnlyList<EntryFieldRow> ListedFields =>
+        _totp is null ? Fields : [.. Fields.Where(row => !TotpSpec.IsSourceField(row.Name))];
+
+    internal bool HasListedFields => ListedFields.Count > 0;
 
     /// <summary>The item's TOTP, when keypaste can compute one; null otherwise.</summary>
     internal EntryTotpRow? Totp
@@ -181,6 +187,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             if (SetProperty(ref _totp, value))
             {
                 OnPropertyChanged(nameof(ShowsTotp));
+                OnPropertyChanged(nameof(ListedFields));
+                OnPropertyChanged(nameof(HasListedFields));
                 OnPropertyChanged(nameof(HasStandardRows));
                 OnPropertyChanged(nameof(CanAddTotp));
                 previous?.Dispose();

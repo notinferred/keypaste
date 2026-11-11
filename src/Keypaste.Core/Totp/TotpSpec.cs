@@ -179,7 +179,7 @@ public sealed class TotpSpec : IDisposable
     /// </summary>
     /// <param name="name">The field's name.</param>
     /// <returns><see langword="true"/> when <see cref="Read"/> reads it.</returns>
-    internal static bool IsSourceField(string name) =>
+    public static bool IsSourceField(string name) =>
         string.Equals(name, OtpField, StringComparison.Ordinal)
         || string.Equals(name, _legacySeed, StringComparison.Ordinal)
         || string.Equals(name, _legacySettings, StringComparison.Ordinal)

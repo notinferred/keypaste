@@ -29,6 +29,7 @@ public sealed class EntryTotpTests : IDisposable
     private static readonly EntryName _github = new("Work", "GitHub");
     private static readonly EntryName _broken = new("Work", "Broken");
     private static readonly EntryName _plain = new("Work", "Plain");
+    private static readonly EntryName _keePassXc = new("Work", "KeePassXC");
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-entry-totp-").FullName;
     private readonly string _vaultPath;
@@ -39,13 +40,15 @@ public sealed class EntryTotpTests : IDisposable
 
         using var vault = Vault.Create(_vaultPath, _master);
 
-        foreach (var name in new[] { _github, _broken, _plain })
+        foreach (var name in new[] { _github, _broken, _plain, _keePassXc })
         {
             vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = "SENTINEL-9-2B-APP-PASSWORD" });
         }
 
         Assert.True(vault.SetFields(_github, [new FieldWrite("TimeOtp-Secret", _seed), new FieldWrite("TimeOtp-Length", "8")]));
         vault.SetFieldsUnchecked(_broken, [new FieldWrite(TotpSpec.OtpField, "otpauth://hotp/Broken?secret=GEZDGNBVGY3TQOJQ&counter=1")]);
+        Assert.True(vault.SetTotp(_keePassXc, _seedBase32));
+        vault.SetFields(_keePassXc, [new FieldWrite("PIN", "4321")]);
         vault.Save();
     }
 
@@ -154,6 +157,36 @@ public sealed class EntryTotpTests : IDisposable
         Assert.Equal(
             "keypaste can't show this item's TOTP code. The otp field holds a counter-based HOTP, which keypaste does not compute. Correct that field to see the code here.",
             detail.TotpProblem);
+    }
+
+    [Fact]
+    public void An_item_with_a_readable_otp_lists_no_otp_custom_field_and_keeps_its_other_fields()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_keePassXc);
+
+        Assert.True(detail.ShowsTotp);
+        Assert.Equal(["PIN"], detail.ListedFields.Select(row => row.Name));
+        Assert.True(detail.HasListedFields);
+        Assert.Contains(detail.Fields, row => row.Name == TotpSpec.OtpField);
+        Assert.Contains(context.Session.Unlocked!.Fields(_keePassXc)!, field => field.Name == TotpSpec.OtpField);
+        Assert.True(detail.CanRemoveTotp);
+
+        var keePass2 = context.Open(_github);
+
+        Assert.True(keePass2.ShowsTotp);
+        Assert.Empty(keePass2.ListedFields);
+        Assert.False(keePass2.HasListedFields);
+    }
+
+    [Fact]
+    public void An_item_whose_otp_cannot_be_read_keeps_the_explanation_and_lists_its_otp_field()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_broken);
+
+        Assert.True(detail.ShowsTotpProblem);
+        Assert.Equal([TotpSpec.OtpField], detail.ListedFields.Select(row => row.Name));
     }
 
     [Fact]

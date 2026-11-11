@@ -1437,8 +1437,8 @@
                         </StackPanel>
                       </Button>
                     </Grid>
-                    <TextBlock Classes="caption" IsVisible="{Binding !HasFields}" Text="{x:Static res:Strings.NoCustomFields}" />
-                    <ItemsControl ItemsSource="{Binding Fields}">
+                    <TextBlock Classes="caption" IsVisible="{Binding !HasListedFields}" Text="{x:Static res:Strings.NoCustomFields}" />
+                    <ItemsControl ItemsSource="{Binding ListedFields}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryFieldRow">
                           <Border Classes="value" Margin="0,0,0,6" Padding="12,6,4,8">
