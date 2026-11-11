@@ -1622,7 +1622,7 @@
                         </StackPanel>
                       </StackPanel>
                     </Border>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
                       <Button x:Name="AddTotp"
                               Classes="ghost sm"
                               IsVisible="{Binding CanAddTotp}"
@@ -1651,7 +1651,7 @@
                           <TextBlock Text="{x:Static res:Strings.AddAttachmentLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
-                    </StackPanel>
+                    </WrapPanel>
 
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="8">

@@ -270,6 +270,7 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.ShowsUsername),
             nameof(NewItemViewModel.ShowsPassword),
             nameof(NewItemViewModel.ShowsUrl),
+            nameof(NewItemViewModel.ShowsOneTimeCode),
             nameof(NewItemViewModel.ShowsHost),
             nameof(NewItemViewModel.ShowsKey),
             nameof(NewItemViewModel.ShowsNotes),
