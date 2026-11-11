@@ -31,6 +31,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 
 | Idea | Boundary for reconsideration |
 |---|---|
+| A customer-facing README | The founder asked on 2026-11-10 for a clean README in keypaste's voice, with stale statements corrected and `verify-demo.sh`'s transcripts kept exact. Taken up in a session with its own budget. |
 | Show on Agents what waits behind the prompt on screen: a save request is not listed while it waits ([F.79](steps/F.79.md)), and the screen shows the one prompt, not how many requests wait their turn behind it ([F.80](steps/F.80.md)). | When the Agents screen is next changed, or a person cannot tell why an agent's call is taking long. |
 | A request queued behind other agents' prompts can reach the bridge's 235 seconds and be withdrawn, which the agent reads as a failed exchange ([F.80](steps/F.80.md)). | If agents report failed exchanges where a person was simply answering others. |
 | LastPass's Social Security, passport and address notes are not identities, since LastPass names no type Identity and only an item tagged `Identity` is one ([F.78c](steps/F.78c.md)). | If people importing from LastPass expect those values decided as identity values. |
@@ -84,6 +85,7 @@ These observations are not completed fixes or established causes. Only the found
 
 | Observation | What must be established |
 |---|---|
+| KeePassXC reading a one-time code keypaste wrote | keypaste writes a protected `otp` URI labelled by the item's title; no gate yet has KeePassXC compute a code from it. The KeePassXC gates drive the CLI, which cannot set a code. |
 | An attachment crosses the owner's pipe in one reply of at most 8 MiB, base64 of the 5 MiB cap, held whole in both processes' memory and in the MCP result (F.78a, 2026-11-08). | Whether a streamed or chunked reply is worth its protocol cost for attachments near the cap. |
 | An agent's run whose set holds a variable from a path two items answer to is refused, as a `keypaste run` is ([F.76](steps/F.76.md)); the picker answers credential requests only. | Whether a run should offer the picker per variable, which a run's prompt of many variables would have to fit. |
 | A project's member rows carry a bare name, so on one of two items sharing a name, removing the row reports core's "names 2 items" sentence and its keys draw blank ([F.75](steps/F.75.md)); it fails closed. | Whether a project should hold its members by UUID, which a project's tag-based membership may not need. |
