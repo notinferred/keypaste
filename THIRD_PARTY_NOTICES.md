@@ -186,7 +186,7 @@ Licence texts and any third-party notices a package bundles follow the table, ea
 | SkiaSharp.NativeAssets.macOS | 3.119.4 | Desktop (osx-arm64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.Win32 | 3.119.4 | Desktop (win-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | System.CommandLine | 2.0.14 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://github.com/dotnet/command-line-api |
-| System.Formats.Cbor | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| System.Formats.Cbor | 10.0.15 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Tmds.DBus.Protocol | 0.94.1 | Desktop | no | MIT | Tom Deseyn | https://github.com/tmds/Tmds.DBus.git |
 | Yubico.Core | 1.18.0 | Desktop | no | See its text below | Copyright (c) Yubico 2026 | https://github.com/Yubico/Yubico.NET.SDK |
 | Yubico.NativeShims | 1.18.0 | Desktop | yes | Not stated by the package | Not stated by the package | https://github.com/Yubico/Yubico.NET.SDK |
