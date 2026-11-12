@@ -14,6 +14,9 @@ public sealed class MergeTests
     private static readonly EntryName _github = new("work", "github");
     private static readonly TimeSpan _pastAStamp = TimeSpan.FromMilliseconds(1100);
 
+    // keypaste stamps an edit up to a second past its clock, after every version it keeps, so two stamps are ordered past two seconds.
+    private static readonly TimeSpan _pastAnEditsStamp = TimeSpan.FromMilliseconds(2200);
+
     [Fact]
     public void KeePassXCs_save_to_one_item_and_the_apps_edit_of_another_are_both_kept()
     {
@@ -29,36 +32,38 @@ public sealed class MergeTests
         AssertReads(file, "work/github", "UserName", "kpxc-user");
     }
 
-    [Fact]
-    public void One_item_changed_by_both_keeps_the_newer_current_and_the_older_in_its_history_in_either_order()
+    // Which version is newer is read from the stamp KeePassXC wrote, since not every KeePassXC moves it on a CLI edit; a tie keeps the open copy's.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void One_item_both_changed_keeps_the_version_stamped_later_current_and_the_other_in_its_history(bool keePassXcFirst)
     {
-        using (var file = Seeded())
-        using (var open = file.Open())
+        using var file = Seeded();
+        using var open = file.Open();
+        DateTime edited;
+        if (keePassXcFirst)
         {
-            EditPassword(file, "work/stripe", "kpxc-older");
-            Thread.Sleep(_pastAStamp);
-            Update(open, _stripe, "app-newer");
-
-            var merged = Merge(open);
-
-            Assert.Contains(merged.Report!.Conflicts, conflict => conflict.Item == _stripe && conflict.OpenCopyCurrent);
-            AssertReads(file, "work/stripe", "Password", "app-newer");
-            Assert.Contains("kpxc-older", HistoryValues(file, "stripe"));
+            EditPassword(file, "work/stripe", "kpxc-value");
+            Thread.Sleep(_pastAnEditsStamp);
+            edited = WholeSecond(DateTime.UtcNow);
+            Update(open, _stripe, "app-value");
+        }
+        else
+        {
+            edited = WholeSecond(DateTime.UtcNow);
+            Update(open, _stripe, "app-value");
+            Thread.Sleep(_pastAnEditsStamp);
+            EditPassword(file, "work/stripe", "kpxc-value");
         }
 
-        using (var file = Seeded())
-        using (var open = file.Open())
-        {
-            Update(open, _stripe, "app-older");
-            Thread.Sleep(_pastAStamp);
-            EditPassword(file, "work/stripe", "kpxc-newer");
+        var keePassXc = Stamp(file, "stripe");
+        var appIsNewer = keePassXc <= edited.AddSeconds(1);
 
-            var merged = Merge(open);
+        var merged = Merge(open);
 
-            Assert.Contains(merged.Report!.Conflicts, conflict => conflict.Item == _stripe && !conflict.OpenCopyCurrent);
-            AssertReads(file, "work/stripe", "Password", "kpxc-newer");
-            Assert.Contains("app-older", HistoryValues(file, "stripe"));
-        }
+        Assert.Contains(merged.Report!.Conflicts, conflict => conflict.Item == _stripe && conflict.OpenCopyCurrent == appIsNewer);
+        AssertReads(file, "work/stripe", "Password", appIsNewer ? "app-value" : "kpxc-value");
+        Assert.Contains(appIsNewer ? "kpxc-value" : "app-value", HistoryValues(file, "stripe"));
     }
 
     [Fact]
@@ -205,6 +210,22 @@ public sealed class MergeTests
     {
         file.AssertKdbx4();
         Assert.Equal([value], KeePassXcCli.Show(file.Path_, entry, attribute));
+    }
+
+    private static DateTime WholeSecond(DateTime at) => new(at.Ticks - (at.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+
+    /// <summary>When KeePassXC's file says the item was last changed, outside its history.</summary>
+    /// <remarks>A KDBX 4 export writes a time as base64 of its seconds since 0001-01-01; an older one as ISO 8601.</remarks>
+    private static DateTime Stamp(KeePassXcVault file, string title)
+    {
+        var written = KeePassXcVault.Entry(file.Current(), title).Element("Times")!.Element("LastModificationTime")!.Value;
+        Span<byte> seconds = stackalloc byte[8];
+        return Convert.TryFromBase64String(written, seconds, out var length) && length == 8
+            ? DateTime.SpecifyKind(DateTime.MinValue.AddSeconds(BitConverter.ToInt64(seconds)), DateTimeKind.Utc)
+            : DateTime.Parse(
+                written,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal);
     }
 
     private static HashSet<string> HistoryValues(KeePassXcVault file, string title)
