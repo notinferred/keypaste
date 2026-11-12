@@ -26,7 +26,7 @@ internal sealed class McpBridge : IDisposable
         {
             ["protocolVersion"] = "2025-11-25",
             ["capabilities"] = new JsonObject(),
-            ["clientInfo"] = new JsonObject { ["name"] = label, ["version"] = "1.0.0" },
+            ["clientInfo"] = new JsonObject { ["name"] = "ci-probe", ["version"] = "1.0.0" },
         });
         bridge._bridge.Send("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
         return bridge;
