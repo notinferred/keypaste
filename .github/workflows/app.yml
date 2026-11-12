@@ -133,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 24
     steps:
@@ -155,13 +155,12 @@ jobs:
         run: bash scripts/verify.sh desktop
 
   # The app, the CLI and an agent as real processes: approvals, locks, saves and the session's lifecycle.
-  # macOS runs them under its stock bash 3.2 (D-0398).
   desktop-gates:
     name: desktop gates (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -178,13 +177,6 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      - name: Install GNU timeout (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: command -v gtimeout >/dev/null || brew install coreutils
-
       - name: Restore, build and drive the desktop gates
         shell: bash
         run: bash scripts/verify.sh desktop-gates
@@ -193,12 +185,8 @@ jobs:
   # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
   # the log, since nothing in this workflow uploads before the installer is signed.
   clipboard-markers:
-    name: clipboard markers (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04"]' || '["ubuntu-24.04", "macos-15"]') }}
-    runs-on: ${{ matrix.os }}
+    name: clipboard markers (ubuntu-24.04)
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -222,7 +210,6 @@ jobs:
           dotnet build tests/Keypaste.MinimizeObserver -c Release --no-restore -warnaserror
 
       - name: Start Xvfb
-        if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
@@ -230,6 +217,49 @@ jobs:
           Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
           sleep 2
+
+      - name: Read the clipboard's markers
+        shell: bash
+        run: bash scripts/verify-clipboard-markers.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" clipboard-markers
+
+  # Hosted macOS runners are scarce and a job left queued is cancelled, so the desktop's macOS checks share one job.
+  # The gates' scripts run under macOS's stock bash 3.2 (D-0398).
+  macos:
+    name: desktop tests, gates and clipboard markers (macos-15)
+    if: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
+      - name: Install GNU timeout
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
+      - name: Restore, build and test desktop and consistency
+        shell: bash
+        run: bash scripts/verify.sh desktop
+
+      - name: Drive the desktop gates
+        shell: bash
+        run: bash scripts/verify.sh desktop-gates
+
+      - name: Build the observer
+        shell: bash
+        run: dotnet build tests/Keypaste.MinimizeObserver -c Release --no-restore -warnaserror
 
       - name: Read the clipboard's markers
         shell: bash
@@ -606,7 +636,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [targets, desktop, desktop-gates, clipboard-markers, package]
+    needs: [targets, desktop, desktop-gates, clipboard-markers, macos, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

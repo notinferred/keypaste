@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((github.event_name != 'push' || github.ref == 'refs/heads/main') && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -190,7 +190,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((github.event_name != 'push' || github.ref == 'refs/heads/main') && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -207,13 +207,6 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      - name: Install GNU timeout (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: command -v gtimeout >/dev/null || brew install coreutils
-
       - name: Run the integration gate
         shell: bash
         run: bash scripts/verify.sh integration
@@ -224,12 +217,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 21
-    env:
-      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
-      KP_COMPAT_PASSWORD: ci-master-pw
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -244,54 +234,65 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      - name: Restore and build the backend solution
-        shell: bash
-        run: bash scripts/verify.sh backend --prepare-only
-
       # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
       # A stalled apt mirror otherwise holds the job for its whole limit.
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         timeout-minutes: 10
-        run: |
-          bash scripts/apt-install.sh --no-install-recommends keepassxc
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
 
-      - name: Install keepassxc-cli (Windows and macOS)
-        if: runner.os == 'Windows' || runner.os == 'macOS'
+      - name: Install keepassxc-cli (Windows)
+        if: runner.os == 'Windows'
         shell: bash
+        run: echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
+
+      - name: Verify what keypaste writes against real KeePassXC
+        shell: bash
+        run: bash scripts/verify.sh compat
+
+  # Hosted macOS runners are scarce and a job left queued is cancelled, so each workflow keeps its macOS work in one job.
+  macos:
+    name: backend, integration and compat (macos-15)
+    if: ${{ !inputs.only_tools && github.event_name != 'push' }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
+      - name: Install GNU timeout and keepassxc-cli
+        shell: bash
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: |
           set -euo pipefail
+          command -v gtimeout >/dev/null || brew install coreutils
           echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
 
-      - name: Generate the fixture vault with the keypaste binary
-        shell: bash
-        run: scripts/make-compat-fixture.sh artifacts/compat/gen.kdbx
-
-      - name: Verify it opens in real KeePassXC
-        shell: bash
-        run: scripts/verify-keepassxc-compat.sh artifacts/compat/gen.kdbx
-
-      - name: Verify the write-back round trip through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
-
-      - name: Test history, the recycle bin, backups, organizing, imports and env sets through real KeePassXC
+      - name: Build and test the backend solution
         shell: bash
         env:
           KEYPASTE_KEEPASSXC: required
-        run: dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
+        run: bash scripts/verify.sh backend
 
-      # The fields and projects gates ask the app's own prompt window, held by the app driver.
-      - name: Restore (locked) and build the app driver
+      - name: Run the integration gate
         shell: bash
-        run: |
-          set -euo pipefail
-          dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
-          dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
+        run: bash scripts/verify.sh integration --test-only
 
-      - name: Verify opening a keyfile-protected vault through real KeePassXC
+      - name: Verify what keypaste writes against real KeePassXC
         shell: bash
-        run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
+        run: bash scripts/verify.sh compat
 
   aot:
     name: aot publish (linux-x64)
@@ -449,7 +450,7 @@ jobs:
   ok:
     name: ci ok
     if: always()
-    needs: [checks, format, test, integration, compat, aot, tools]
+    needs: [checks, format, test, integration, compat, macos, aot, tools]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
