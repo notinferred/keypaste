@@ -23,6 +23,8 @@ internal static class Built
 
     internal static string AppDriver => Program("Keypaste.AppDriver", "Keypaste.AppDriver");
 
+    internal static string FakeBrowser => Program("Keypaste.FakeBrowser", "Keypaste.FakeBrowser");
+
     /// <summary>tests/Keypaste.FakeMcpClient, built under the name <c>claude</c> so a tool's lookup on PATH finds it.</summary>
     internal static string FakeClaude => Program("Keypaste.FakeMcpClient", "claude");
 

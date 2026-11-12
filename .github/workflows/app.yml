@@ -15,7 +15,6 @@ on:
       - 'tests/Keypaste.Processes.Tests/**'
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
-      - 'scripts/verify-browser-host.sh'
       - 'tests/Keypaste.FakeBrowser/**'
       - 'scripts/verify-clipboard-markers.sh'
       - 'scripts/exercise-desktop-install.sh'
