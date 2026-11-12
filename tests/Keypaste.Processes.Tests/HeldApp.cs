@@ -28,6 +28,13 @@ internal sealed class HeldApp : IDisposable
     /// <summary>Holds the vault with <paramref name="newPassword"/> as the value the app's <c>edit</c> types.</summary>
     internal static HeldApp HoldEditing(Workspace workspace, string newPassword, params string[] options) => Holding(workspace, newPassword, options);
 
+    /// <summary>Holds <paramref name="vault"/> in an environment of the test's own, such as a home with tools in it.</summary>
+    internal static HeldApp Hold(string vault, Dictionary<string, string> environment, params string[] options)
+    {
+        environment["KEYPASTE_DRIVER_PASSWORD"] = Workspace.Master;
+        return Started(RunningProcess.Start(Built.AppDriver, environment, ["hold", vault, .. options]));
+    }
+
     private static HeldApp Holding(Workspace workspace, string? newPassword, string[] options)
     {
         var environment = workspace.Environment;
@@ -37,7 +44,12 @@ internal sealed class HeldApp : IDisposable
             environment["KEYPASTE_DRIVER_NEW_PASSWORD"] = newPassword;
         }
 
-        var held = new HeldApp(RunningProcess.Start(Built.AppDriver, environment, ["hold", workspace.Vault, .. options]));
+        return Started(RunningProcess.Start(Built.AppDriver, environment, ["hold", workspace.Vault, .. options]));
+    }
+
+    private static HeldApp Started(RunningProcess driver)
+    {
+        var held = new HeldApp(driver);
         Assert.DoesNotContain(held._driver.Output, line => line.Contains("not served", StringComparison.Ordinal));
         return held;
     }

@@ -8,7 +8,7 @@ namespace Keypaste.FakeMcpClient;
 /// does, keeping its servers in the file <c>KEYPASTE_FAKE_CLIENT_CONFIG</c> names.
 /// </summary>
 /// <remarks>
-/// <c>scripts/verify-connect-client.sh</c> puts it on PATH so the desktop's Connect registers with a
+/// <c>Keypaste.Processes.Tests.ConnectClientTests</c> puts it on PATH so the desktop's Connect registers with a
 /// client whose configuration the gate can read afterwards, and never with a real one. It refuses to
 /// run without that variable, so finding it on PATH by accident changes nothing. Adding a name that
 /// exists is refused and removing one that does not is refused, as Claude Code refuses them.

@@ -23,6 +23,9 @@ internal static class Built
 
     internal static string AppDriver => Program("Keypaste.AppDriver", "Keypaste.AppDriver");
 
+    /// <summary>tests/Keypaste.FakeMcpClient, built under the name <c>claude</c> so a tool's lookup on PATH finds it.</summary>
+    internal static string FakeClaude => Program("Keypaste.FakeMcpClient", "claude");
+
     /// <summary>keypaste-app itself, its Windows target on Windows, as the package carries it there.</summary>
     internal static string App => Program("Keypaste.App", "keypaste-app", OperatingSystem.IsWindows() ? "release_net10.0-windows10.0.19041.0" : "release_net10.0");
 

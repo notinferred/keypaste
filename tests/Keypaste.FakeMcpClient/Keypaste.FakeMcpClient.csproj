@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Keypaste.FakeMcpClient</RootNamespace>
     <!-- Named as Claude Code's command, because the catalogue launches `claude`; only
-         verify-connect-client.sh puts its directory on PATH (2.6a). -->
+         Keypaste.Processes.Tests.ConnectClientTests puts its directory on PATH (2.6a). -->
     <AssemblyName>claude</AssemblyName>
 
     <!-- Not a test project: a stand-in client the desktop's Connect registers with, so no gate ever
