@@ -16,7 +16,6 @@ on:
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
       - 'scripts/verify-connect-client.sh'
-      - 'scripts/verify-run-session.sh'
       - 'scripts/verify-crash-report.sh'
       - 'scripts/verify-browser-host.sh'
       - 'tests/Keypaste.FakeBrowser/**'

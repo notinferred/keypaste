@@ -29,10 +29,14 @@ internal sealed class RunningProcess : IDisposable
 
     internal IReadOnlyList<string> Error => [.. _error];
 
-    internal static RunningProcess Start(string program, IReadOnlyDictionary<string, string> environment, params string[] arguments)
+    internal static RunningProcess Start(string program, IReadOnlyDictionary<string, string> environment, params string[] arguments) =>
+        Start(program, environment, Environment.CurrentDirectory, arguments);
+
+    internal static RunningProcess Start(string program, IReadOnlyDictionary<string, string> environment, string directory, string[] arguments)
     {
         var start = new ProcessStartInfo(program)
         {
+            WorkingDirectory = directory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

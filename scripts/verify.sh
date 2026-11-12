@@ -245,7 +245,6 @@ test_desktop() {
 check_desktop_gates() {
   run_tests dotnet test tests/Keypaste.Processes.Tests/Keypaste.Processes.Tests.csproj --no-build -c Release
   integration_script scripts/verify-connect-client.sh
-  integration_script scripts/verify-run-session.sh
   integration_script scripts/verify-crash-report.sh
   integration_script scripts/verify-browser-host.sh
   # A machine with no ICU is a Linux machine; .NET on Windows and macOS uses the system's own.

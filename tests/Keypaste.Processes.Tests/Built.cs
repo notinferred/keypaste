@@ -14,6 +14,9 @@ internal static class Built
         return directory?.FullName ?? throw new InvalidOperationException("no keypaste.slnx above the test's directory");
     });
 
+    /// <summary>The repository the tests were built from.</summary>
+    internal static string Repository => _root.Value;
+
     internal static string Keypaste => Environment.GetEnvironmentVariable("KEYPASTE_BIN") is { Length: > 0 } configured
         ? configured
         : Program("Keypaste.Cli", "keypaste");

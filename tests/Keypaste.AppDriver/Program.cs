@@ -49,7 +49,7 @@ namespace Keypaste.AppDriver;
 /// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
 /// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in
 /// a terminal or Open terminal and then Start, so Terminal opens that <c>keypaste.app</c>'s launcher
-/// and the run it starts asks this hold for the set, which <c>scripts/verify-run-session.sh</c>
+/// and the run it starts asks this hold for the set, which <c>MacTerminalRunTests</c>
 /// watches (E.1d).
 /// </para>
 /// <para>
