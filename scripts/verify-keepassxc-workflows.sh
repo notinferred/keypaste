@@ -133,11 +133,15 @@ check_intact() {
 
 intact() { local why; why=$(check_intact "$@") || die "$why"; }
 
-# "protected" or "plain" for the custom string called $1 on the entry, outside <History>, in the vault $2.
+# "protected" or "plain" for the custom string called $1, outside <History>, in the vault $2: on the entry at the path $3
+# when one is given, else on the first entry that has it.
 protection() {
+  local id=
+  [ -n "${3:-}" ] && { id=$(uuid_at "$2" "$3") || die "KeePassXC cannot read the UUID of '$3'"; }
   kx export "$2" -f xml | awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}' >"$dir/protection.xml"
-  awk -v key="<Key>$1</Key>" '
-    !want && (p = index($0, key)) { want = 1; $0 = substr($0, p + length(key)) }
+  awk -v key="<Key>$1</Key>" -v id="$id" '
+    id != "" && /<UUID>/ { mine = index($0, id) > 0 }
+    (id == "" || mine) && !want && (p = index($0, key)) { want = 1; $0 = substr($0, p + length(key)) }
     want && (v = index($0, "<Value")) {
       tag = substr($0, v); tag = substr(tag, 1, index(tag, ">"))
       print (index(tag, "ProtectInMemory=\"True\"") ? "protected" : "plain"); exit
@@ -486,18 +490,18 @@ exercise() {
   intact "$db" servers/database
 
   step "[$kind] one-time code: the app sets one, and KeePassXC computes the code keypaste does"
-  did "the app's one-time code" app totp-set "$db" servers/database JBSWY3DPEHPK3PXP
+  did "the app's one-time code" app totp-set "$db" servers/cache JBSWY3DPEHPK3PXP
   for attempt in 1 2; do
     start=$(date +%s)
-    ours=$(kp_cli "$db" get servers/database totp --reveal 2>"$dir/totp.err" | tr -d '\r') || die "keypaste get servers/database totp failed: $(cat "$dir/totp.err")"
-    theirs=$(kx show "$db" servers/database -t) || die "keepassxc-cli show --totp cannot read the code the app set"
+    ours=$(kp_cli "$db" get servers/cache totp --reveal 2>"$dir/totp.err" | tr -d '\r') || die "keypaste get servers/cache totp failed: $(cat "$dir/totp.err")"
+    theirs=$(kx show "$db" servers/cache -t) || die "keepassxc-cli show --totp cannot read the code the app set"
     if [ $((start / 30)) -eq $(($(date +%s) / 30)) ]; then
       [ -n "$ours" ] && [ "$ours" = "$theirs" ] || die "keypaste gives the code '${ours}' where KeePassXC gives '${theirs}' for the one the app set"
       break
     fi
     [ "$attempt" -eq 2 ] && die "keypaste's and KeePassXC's codes could not be read within one period twice running"
   done
-  [ "$(protection otp "$db")" = protected ] || die "KeePassXC does not read the otp the app set as protected"
+  [ "$(protection otp "$db" servers/cache)" = protected ] || die "KeePassXC does not read the otp the app set as protected"
 
   step "[$kind] notes: the app flags keys left in notes, remembers a dismissal, refuses a clash and moves them into fields"
   review() {
