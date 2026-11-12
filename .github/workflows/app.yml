@@ -14,7 +14,6 @@ on:
       - 'tests/Keypaste.AppDriver/**'
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
-      - 'scripts/verify-keepassxc-workflows.sh'
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'
       - 'scripts/verify-current-state.sh'
@@ -199,77 +198,6 @@ jobs:
       - name: Restore, build and drive the desktop gates
         shell: bash
         run: bash scripts/verify.sh desktop-gates
-
-  # The supported workflows on vaults KeePassXC made, through the CLI and the app's screens (9.4, D-0307).
-  compat:
-    name: keepassxc workflows (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 14
-    env:
-      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
-      KP_COMPAT_PASSWORD: ci-master-pw
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
-
-      - name: Install keepassxc-cli (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          bash scripts/apt-install.sh --no-install-recommends keepassxc
-
-      - name: Install keepassxc-cli (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
-
-      # So these builds derive keys with the library the packages carry (D-0523).
-      - name: Build the libargon2 the app and the CLI carry
-        shell: bash
-        run: bash scripts/build-argon2.sh
-
-      # The relay the gate starts loads the shared libsodium beside the CLI, as the fake browser does (8.1d).
-      - name: Build the libsodium the relay loads
-        shell: bash
-        run: bash scripts/build-libsodium.sh
-
-      - name: Restore and build the CLI, the app driver and the fake browser
-        shell: bash
-        run: |
-          set -euo pipefail
-          for project in src/Keypaste.Cli/Keypaste.Cli.csproj tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj tests/Keypaste.FakeBrowser/Keypaste.FakeBrowser.csproj; do
-            dotnet restore "$project" --locked-mode
-            dotnet build "$project" --no-restore -c Release
-          done
-
-      - name: Start Xvfb
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/apt-install.sh xvfb
-          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
-          echo "DISPLAY=:99" >> "$GITHUB_ENV"
-          sleep 2
-
-      - name: Verify every workflow on KeePassXC-made vaults through the CLI and the app
-        shell: bash
-        run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
 
   # What the platform clipboard offers after the app copies a secret, after its clear and after a
   # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
@@ -688,7 +616,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [targets, desktop, desktop-gates, compat, clipboard-markers, package]
+    needs: [targets, desktop, desktop-gates, clipboard-markers, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

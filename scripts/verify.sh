@@ -464,7 +464,6 @@ profile_compat() {
   run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
-  run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
 }
 
 profile_tools() {

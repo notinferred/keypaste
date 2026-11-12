@@ -39,9 +39,13 @@ internal static class KeePassXcCli
 
     /// <summary>Runs one command on <paramref name="vault"/> with <see cref="Password"/>, failing the test unless it exits 0.</summary>
     /// <returns>What it printed, without Qt's carriage returns.</returns>
-    internal static string Run(string command, string vault, params string[] arguments)
+    internal static string Run(string command, string vault, params string[] arguments) =>
+        Run(new KeePassXcKey(Password, null), command, vault, arguments);
+
+    /// <summary>Runs one command on <paramref name="vault"/> opened with <paramref name="key"/>, failing the test unless it exits 0.</summary>
+    internal static string Run(KeePassXcKey key, string command, string vault, params string[] arguments)
     {
-        var (exit, output, error) = Try(Password, [command, "-q", vault, .. arguments]);
+        var (exit, output, error) = Try(key.Password ?? "", [command, "-q", .. key.Arguments, vault, .. arguments]);
         Assert.True(exit == 0, $"keepassxc-cli {command} exited {exit}: {error}");
         return output;
     }
@@ -104,4 +108,11 @@ internal static class KeePassXcCli
         const string macApp = "/Applications/KeePassXC.app/Contents/MacOS/keepassxc-cli";
         return OperatingSystem.IsMacOS() && File.Exists(macApp) ? macApp : null;
     }
+}
+
+/// <summary>What opens a vault in keepassxc-cli: a password, a keyfile, or both.</summary>
+internal sealed record KeePassXcKey(string? Password, string? Keyfile)
+{
+    internal string[] Arguments =>
+        [.. Keyfile is null ? [] : new[] { "-k", Keyfile }, .. Password is null ? new[] { "--no-password" } : []];
 }

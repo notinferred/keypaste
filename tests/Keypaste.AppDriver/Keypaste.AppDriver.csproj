@@ -6,7 +6,7 @@
     <RootNamespace>Keypaste.AppDriver</RootNamespace>
     <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
 
-    <!-- Not a test project: a process verify-keepassxc-workflows.sh runs between KeePassXC's writes and reads (9.4). -->
+    <!-- Not a test project: a process the cross-process gates start, acting as the desktop app does. -->
     <IsTestProject>false</IsTestProject>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
