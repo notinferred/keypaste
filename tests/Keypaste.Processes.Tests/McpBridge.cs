@@ -16,12 +16,14 @@ internal sealed class McpBridge : IDisposable
     internal RunningProcess Process => _bridge;
 
     /// <summary>Starts the bridge for <paramref name="vault"/>, else <paramref name="workspace"/>'s vault, exposing <paramref name="exposure"/>, and initializes it.</summary>
-    internal static McpBridge Start(Workspace workspace, string exposure = "env/**", string label = "ci-probe", string? vault = null, params string[] options)
+    /// <remarks>A null <paramref name="exposure"/> passes none, leaving what the agent sees to the owner's rules.</remarks>
+    internal static McpBridge Start(Workspace workspace, string? exposure = "env/**", string label = "ci-probe", string? vault = null, params string[] options)
     {
+        string[] expose = exposure is null ? [] : ["--expose", exposure];
         var bridge = new McpBridge(RunningProcess.Start(
             Built.Keypaste,
             workspace.Environment,
-            ["mcp", "--vault", vault ?? workspace.Vault, "--expose", exposure, "--audit-log", workspace.BridgeLog, "--client-label", label, .. options]));
+            ["mcp", "--vault", vault ?? workspace.Vault, .. expose, "--audit-log", workspace.BridgeLog, "--client-label", label, .. options]));
         bridge.Ask("initialize", new JsonObject
         {
             ["protocolVersion"] = "2025-11-25",

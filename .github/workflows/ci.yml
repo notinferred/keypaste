@@ -391,6 +391,10 @@ jobs:
         shell: bash
         run: scripts/verify-approval-e2e.sh
 
+      - name: Verify agent rules hold across processes only as the owner sealed them
+        shell: bash
+        run: scripts/verify-policy-e2e.sh
+
       - name: Verify the audit chain catches tampering and forgives a crash
         shell: bash
         run: scripts/verify-log-chain.sh

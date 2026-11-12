@@ -379,17 +379,9 @@ profile_compile() {
   profile_format
 }
 
+# The shipped binaries' own checks (run injection and signals, MCP over stdio, approval, policy, the log chain) run against
+# the AOT build in ci's aot job and against each published binary in release.yml.
 check_integration() {
-  integration_script scripts/verify-run-injection.sh
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) echo 'Signal forwarding has no Windows local verifier; see SECURITY.md.' ;;
-    *) integration_script scripts/verify-run-signals.sh ;;
-  esac
-  integration_script scripts/verify-mcp-stdio.sh
-  integration_script scripts/verify-approval-e2e.sh
-  integration_script scripts/verify-mcp-run.sh
-  integration_script scripts/verify-policy-e2e.sh
-  integration_script scripts/verify-log-chain.sh
   integration_script scripts/verify-demo.sh
 }
 
