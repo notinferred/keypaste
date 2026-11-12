@@ -9,13 +9,13 @@ Records begin with V.3a; earlier steps' history is in Git. The [rescope of 2026-
 ```md
 # <ID> — <outcome>
 
-Completed <date> in `<sha>`, source only; runs <ci id>, <app id>.
+Completed <date> in `<sha>`, source only.
 
 ## Amendments
 Changes to the row as selected, with the founder's direction that made each; the row itself is in Git at the selecting commit.
 
 ## Evidence
-Tests and gates by name, counts, runs and source SHAs.
+The tests and gates that hold the outcome, by name.
 
 ## Limits and follow-ups
 Gaps, defects found and their STEPS rows, BACKLOG options.
