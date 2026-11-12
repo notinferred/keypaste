@@ -28,7 +28,7 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **1.4b4 — `keypaste approve` merges another program's save.** Needs: 1.4b2.
   - The folder watch and poll moved into Core for both owners, and `keypaste approve`'s terminal line, hardware-key touch and refusal text (D-0546).
-  - Accepted when `ApproveCommandTests` shows another program's save merged without a restart, and `verify-keepassxc-merge.sh` gains, passing on the three runners, G9: `keypaste approve` narrows an agent and an older KeePassXC copy is moved over the file, and the narrowing holds with the older record in history; and G10: KeePassXC saves while `keypaste approve` serves a bridge, and the next request is refused as `vault-changed` and then served from the merged copy in the same session, with no restart.
+  - Accepted when `ApproveCommandTests` shows another program's save merged without a restart, and `Keypaste.Core.Tests.KeePassXC.MergeTests` gains, passing on the three runners, G9: `keypaste approve` narrows an agent and an older KeePassXC copy is moved over the file, and the narrowing holds with the older record in history; and G10: KeePassXC saves while `keypaste approve` serves a bridge, and the next request is refused as `vault-changed` and then served from the merged copy in the same session, with no restart.
 
 ## T5 — Desktop delivery
 

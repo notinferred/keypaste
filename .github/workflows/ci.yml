@@ -309,12 +309,6 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
 
-      # The app driver holds each vault while KeePassXC saves it, and keypaste merges every save (1.4b3).
-      - name: Verify the app merges KeePassXC's saves through real KeePassXC
-        shell: bash
-        timeout-minutes: 2
-        run: bash scripts/verify-keepassxc-merge.sh artifacts/compat/merge
-
   aot:
     name: aot publish (linux-x64)
     if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}

@@ -55,11 +55,9 @@ namespace Keypaste.AppDriver;
 /// watches (E.1d).
 /// </para>
 /// <para>
-/// For <c>scripts/verify-keepassxc-merge.sh</c> (1.4b3) a hold prints a <c>merged</c> line for each merge of another
-/// program's save the session makes, the notice's own words included. <c>merge</c> has the app's shell compare the file
-/// and merge as its folder watch does, then prints <c>merge end</c>; <c>restore</c> presses Restore on Trash; the
-/// <c>unsaved-</c> lines change the open copy through core without saving it, the state a save refused by another
-/// program's leaves, and <c>write-open</c> writes that copy to a file, so KeePassXC can merge the copy keypaste merges.
+/// A hold prints a <c>merged</c> line for each merge of another program's save the session makes, the notice's own words
+/// included. <c>merge</c> has the app's shell compare the file and merge as its folder watch does, then prints
+/// <c>merge end</c>; <c>restore</c> presses Restore on Trash.
 /// </para>
 /// <para>
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
@@ -125,8 +123,7 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, status, edit <entry-path> [password], delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
-        "             unsaved-edit <entry-path> <password>, unsaved-move <entry-path> <group-path>, unsaved-delete <entry-path>,\n" +
-        "             unsaved-rename <group-path> <name>, write-open <file>, and with the app's own\n" +
+        "             and with the app's own\n" +
         "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
@@ -869,19 +866,6 @@ internal sealed class Driver(string home)
         return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
     }
 
-    /// <summary>Changes the open copy through core and leaves the change unsaved, as a save another program's refused leaves it.</summary>
-    private static void Unsaved(AppVaultSession session, string done, Func<Vault, bool> change)
-    {
-        var vault = session.Unlocked ?? throw new DriverException("an unsaved change needs an unlocked vault");
-
-        if (!change(vault))
-        {
-            throw new DriverException($"core refused the change that would have {done}");
-        }
-
-        Console.Out.WriteLine(done);
-    }
-
     /// <summary>The line a hold prints for a merge, with the words the shell's notice or banner says.</summary>
     private static string Merged(AppVaultSession session, MergeResult merged)
     {
@@ -1310,31 +1294,6 @@ internal sealed class Driver(string home)
                     }
 
                     Console.Out.WriteLine("merge end");
-                    break;
-
-                case ["unsaved-edit", var entry, var password]:
-                    Unsaved(session, $"changed {entry}, unsaved", vault =>
-                        vault.Find(entry) is { } found && vault.UpdateEntry(found with { Password = password }));
-                    break;
-
-                case ["unsaved-move", var entry, var group]:
-                    Unsaved(session, $"moved {entry} to {group}, unsaved", vault =>
-                        vault.MoveEntry(EntryName.Parse(entry), group, out _) == OrganizeOutcome.Moved);
-                    break;
-
-                case ["unsaved-delete", var entry]:
-                    Unsaved(session, $"deleted {entry}, unsaved", vault =>
-                        vault.RemoveEntry(entry) is DeletionOutcome.Recycled or DeletionOutcome.DeletedPermanently);
-                    break;
-
-                case ["unsaved-rename", var group, var name]:
-                    Unsaved(session, $"renamed {group} to {name}, unsaved", vault =>
-                        vault.RenameGroup(group, name, out _) == GroupOutcome.Renamed);
-                    break;
-
-                case ["write-open", var file]:
-                    (session.Unlocked ?? throw new DriverException("write-open needs an unlocked vault")).WriteCopyTo(Path.GetFullPath(file));
-                    Console.Out.WriteLine($"wrote the open copy to {file}");
                     break;
 
                 case ["delete", var entry]:
