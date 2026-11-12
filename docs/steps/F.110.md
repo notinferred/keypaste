@@ -14,7 +14,7 @@ On 2026-11-12 the founder directed that finishing F.110 include cutting CI to fa
 
 App.Tests holds the layout, its screen renderer at each reach. On macOS a masked value scored under the match threshold for 75 ms after a click, because the Fluent theme scales a pressed button to 98%; press-to-copy no longer scales. `KeePassXC.FieldsTests` compares the code keypaste gives for every one-time code form with `keepassxc-cli show --totp`.
 
-Moving the gates found a crash on quit: work a window move posted ran after the window closed and threw in `ScreenFromWindow`. `WindowLayoutTests.A_move_whose_posted_work_runs_after_the_window_closed_does_nothing` failed before the fix. `MergeTests` orders a conflict by the stamps KeePassXC and keypaste actually wrote, since keypaste stamps an edit up to a second ahead and not every KeePassXC moves its stamp on a CLI edit.
+Moving the gates found a crash on quit: work a window move posted ran after the window closed and threw in `ScreenFromWindow`. `WindowLayoutTests.A_move_whose_posted_work_runs_after_the_window_closed_does_nothing` failed before the fix. `MergeTests` orders a conflict by the stamps KeePassXC and keypaste actually wrote, since keypaste stamps an edit up to a second ahead and not every KeePassXC moves its stamp on a CLI edit. `main`'s first run after the merge failed `SystemNotificationTests.A_notice_raised_before_the_display_is_up_still_reaches_it_when_pressed` on Windows: it waited for a notice off the UI thread by draining the dispatcher, which ran a job another test had queued on the wrong thread; it and its sibling now wait without the dispatcher.
 
 ## Limits and follow-ups
 

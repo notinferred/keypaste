@@ -49,7 +49,8 @@ public sealed class SystemNotificationTests
         using var system = new FakeNotifications();
         var pressed = false;
         _ = await Task.Run(() => RaisedNotice.Raise(system, SystemNotice.RequestWaiting, () => pressed = true), Token);
-        await PromptedApp.UntilAsync(() => system.Posts.Count > 0);
+        // Off the UI thread, so the wait must not drain the dispatcher, whose jobs other tests queue.
+        Assert.True(SpinWait.SpinUntil(() => system.Posts.Count > 0, TimeSpan.FromSeconds(10)), "the notice was never posted");
 
         await HeadlessSession.On(async () =>
         {
@@ -261,7 +262,7 @@ public sealed class SystemNotificationTests
     {
         using var system = new FakeNotifications { Answers = SystemAnswer.Held };
         var raised = RaisedNotice.Raise(system, SystemNotice.VaultLocked, () => { });
-        await PromptedApp.UntilAsync(() => system.Posts.Count > 0);
+        Assert.True(SpinWait.SpinUntil(() => system.Posts.Count > 0, TimeSpan.FromSeconds(10)), "the notice was never posted");
 
         raised.Remove();
         Assert.False(system.Posts[0].Removed);
