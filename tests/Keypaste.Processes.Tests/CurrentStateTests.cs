@@ -21,7 +21,7 @@ public sealed class CurrentStateTests
         using var workspace = new Workspace();
         workspace.Add(_entry, _first);
         workspace.Keypaste("add", Workspace.Master, "keep-value", "personal/KEEP", "--vault", workspace.Vault);
-        using var app = HeldApp.Hold(workspace, newPassword: "keep-edited", "--approving-prompt");
+        using var app = HeldApp.HoldEditing(workspace, "keep-edited", "--approving-prompt");
         using var bridge = McpBridge.Start(workspace);
         Assert.Contains(_first, bridge.Call("request_credential", Request()).ToString(), StringComparison.Ordinal);
 

@@ -23,10 +23,12 @@ internal sealed class HeldApp : IDisposable
 
     internal RunningProcess Driver => _driver;
 
-    internal static HeldApp Hold(Workspace workspace, params string[] options) => Hold(workspace, newPassword: null, options);
+    internal static HeldApp Hold(Workspace workspace, params string[] options) => Holding(workspace, newPassword: null, options);
 
-    /// <summary>Holds the vault, with <paramref name="newPassword"/> as the value an <c>edit</c> types, when one is given.</summary>
-    internal static HeldApp Hold(Workspace workspace, string? newPassword, params string[] options)
+    /// <summary>Holds the vault with <paramref name="newPassword"/> as the value the app's <c>edit</c> types.</summary>
+    internal static HeldApp HoldEditing(Workspace workspace, string newPassword, params string[] options) => Holding(workspace, newPassword, options);
+
+    private static HeldApp Holding(Workspace workspace, string? newPassword, string[] options)
     {
         var environment = workspace.Environment;
         environment["KEYPASTE_DRIVER_PASSWORD"] = Workspace.Master;

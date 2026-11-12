@@ -36,9 +36,25 @@ internal sealed class Workspace : IDisposable
 
     /// <summary>The owner's or bridge's log lines from <paramref name="after"/> on.</summary>
     internal static IReadOnlyList<JsonElement> Lines(string log, int after = 0) =>
-        File.Exists(log) ? [.. File.ReadAllLines(log).Skip(after).Select(line => JsonDocument.Parse(line).RootElement.Clone())] : [];
+        [.. Read(log).Skip(after).Select(line => JsonDocument.Parse(line).RootElement.Clone())];
 
-    internal static int Count(string log) => File.Exists(log) ? File.ReadAllLines(log).Length : 0;
+    internal static int Count(string log) => Read(log).Count;
+
+    /// <summary>The whole log, to show a value never reached it.</summary>
+    internal static string Text(string log) => string.Join('\n', Read(log));
+
+    // The process that writes a log keeps it open, which Windows lets another read only when that read shares writing.
+    private static List<string> Read(string log)
+    {
+        if (!File.Exists(log))
+        {
+            return [];
+        }
+
+        using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return [.. reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.TrimEnd('\r'))];
+    }
 
     /// <summary>Runs the built keypaste with <paramref name="first"/> and <paramref name="second"/> as its two lines of standard input, which must succeed.</summary>
     internal void Keypaste(string verb, string first, string second, params string[] arguments)

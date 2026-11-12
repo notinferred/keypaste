@@ -62,6 +62,15 @@ internal sealed class McpBridge : IDisposable
         return default;
     }
 
+    /// <summary>Tells the bridge the client gave up on the call <paramref name="id"/>, as MCP's cancellation does.</summary>
+    internal void Cancel(int id) =>
+        _bridge.Send(new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["method"] = "notifications/cancelled",
+            ["params"] = new JsonObject { ["requestId"] = id, ["reason"] = "the client gave up" },
+        }.ToJsonString());
+
     /// <summary>Whether a tool call's reply is an error, which no released value is part of.</summary>
     internal static bool IsError(JsonElement reply) => reply.GetProperty("result").GetProperty("isError").GetBoolean();
 
