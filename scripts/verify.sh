@@ -217,8 +217,29 @@ test_backend() {
   run_tests dotnet test keypaste.slnx --no-build -c Release
   test_cultures
 }
+# One process drives one headless UI thread, so App.Tests runs as three processes split by measured time: the screen
+# renderer, the rest of rendering and everything else.
+app_test_shards=(
+  "--filter-class Keypaste.App.Tests.Rendering.ScreenRenderer"
+  "--filter-namespace Keypaste.App.Tests.Rendering --filter-not-class Keypaste.App.Tests.Rendering.ScreenRenderer"
+  "--filter-not-namespace Keypaste.App.Tests.Rendering"
+)
 test_desktop() {
-  run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
+  local shard i code=0 pids=()
+  run_tests dotnet test tests/Keypaste.App.Windows.Tests/Keypaste.App.Windows.Tests.csproj --no-build -c Release
+  mkdir -p artifacts/test-logs
+  for i in "${!app_test_shards[@]}"; do
+    read -r -a shard <<<"${app_test_shards[$i]}"
+    run_tests dotnet test tests/Keypaste.App.Tests/Keypaste.App.Tests.csproj --no-build -c Release -- \
+      "${shard[@]}" --hangdump --hangdump-timeout 10m --results-directory "$PWD/artifacts/test-logs/app-$i" \
+      >"artifacts/test-logs/app-$i.log" 2>&1 &
+    pids+=("$!")
+  done
+  for i in "${!pids[@]}"; do
+    wait "${pids[$i]}" || code=$?
+    cat "artifacts/test-logs/app-$i.log"
+  done
+  [ "$code" = 0 ] || return "$code"
   run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
 }
 check_desktop_gates() {

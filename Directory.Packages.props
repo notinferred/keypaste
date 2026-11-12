@@ -12,6 +12,8 @@
 
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <!-- Names the test a hung desktop run is stuck in, at the testing platform's version. -->
+    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="1.9.1" />
   </ItemGroup>
 
   <!-- Keypaste.Core.Tests' properties over the parsers and the merge (D-0679). -->
