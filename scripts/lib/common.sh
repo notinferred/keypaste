@@ -139,7 +139,6 @@ resolve() {
 }
 keypaste_bin() { resolve KEYPASTE_BIN artifacts/bin/Keypaste.Cli/release/keypaste; }
 app_driver() { resolve KEYPASTE_APP_DRIVER artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver; }
-vault_restorer() { resolve KEYPASTE_RESTORER artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer; }
 
 # A project variable as `env set` writes it: a protected field of the environment's home entry,
 # env/<project>/.env or .env.<environment>, created tagged.

@@ -1,7 +1,7 @@
 name: ci
 
 on:
-  # A branch push runs the fast tier, Linux only; main's push runs every job.
+  # A branch push runs the fast tier, Linux only; main's push adds Windows; every other run adds macOS.
   push:
     branches: ['**']
     # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
@@ -75,8 +75,8 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
-  # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
+  # Every run but a push runs every job on every runner but tools, which runs on the schedule and on a dispatch that asks
+  # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0438).
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
   checks:
     name: scripts + workflows
@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -166,8 +166,16 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
+      # Every branch push checks what KeePassXC reads of what keypaste writes (PRODUCT law 4.6).
+      - name: Install keepassxc-cli (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
+
       - name: Build and test the backend solution
         shell: bash
+        env:
+          KEYPASTE_KEEPASSXC: ${{ runner.os == 'Linux' && 'required' || '' }}
         run: bash scripts/verify.sh backend
 
       - name: Verify the Windows PowerShell launcher selects Git Bash
@@ -182,7 +190,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -216,7 +224,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 21
     env:
@@ -267,29 +275,11 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
 
-      - name: Verify a restored revision and its history through real KeePassXC
+      - name: Test history, the recycle bin, backups, organizing, imports and env sets through real KeePassXC
         shell: bash
-        run: bash scripts/verify-keepassxc-history.sh artifacts/compat/history.kdbx
-
-      - name: Verify reversible deletion and recovery through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
-
-      - name: Verify run refuses an expired or misnamed entry KeePassXC made
-        shell: bash
-        run: bash scripts/verify-keepassxc-run.sh artifacts/compat/run
-
-      - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx
-
-      - name: Verify renaming and moving through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
-
-      - name: Verify importing a KeePassXC vault through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-import.sh artifacts/compat/import
+        env:
+          KEYPASTE_KEEPASSXC: required
+        run: dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
 
       # The fields and projects gates ask the app's own prompt window, held by the app driver.
       - name: Restore (locked) and build the app driver

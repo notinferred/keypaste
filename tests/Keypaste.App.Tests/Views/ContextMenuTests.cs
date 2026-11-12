@@ -37,7 +37,7 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Change kind", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
             Headers(menu));
         string[] needATotp = ["Copy the TOTP code", "Replace the one-time code…", "Remove the one-time code"];
         Assert.All(menu.Items.OfType<MenuItem>().Where(item => !needATotp.Contains(item.Header as string)), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
@@ -48,6 +48,26 @@ public sealed class ContextMenuTests
         Choose(menu, "Duplicate");
 
         Assert.Equal(2, entries.Rows.Count(entry => entry.Title.StartsWith("github", StringComparison.Ordinal)));
+    });
+
+    [Fact]
+    public Task Change_kind_offers_the_five_kinds_and_keeps_the_chosen_one_as_the_items_icon() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-context-kind-");
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        var row = Container(shell.Named<ListBox>("Rows"), entries.Rows.Single(entry => entry.Title == "github"));
+
+        var menu = RightClick(shell.Window, row);
+        var kinds = Item(menu, "Change kind").Items.OfType<MenuItem>().ToList();
+
+        Assert.Equal(["Login", "API key", "Database", "Server", "Secure note"], kinds.Select(item => item.Header as string));
+        kinds.Single(item => item.Header as string == "API key").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        menu.Hide();
+        RenderedShell.Drain();
+
+        var github = entries.Rows.Single(entry => entry.Title == "github");
+        Assert.Equal(EntryKind.ApiKey, github.Kind);
+        Assert.Equal("key-round", github.Icon);
     });
 
     [Fact]

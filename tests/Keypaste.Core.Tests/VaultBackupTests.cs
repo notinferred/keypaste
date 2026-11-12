@@ -648,7 +648,7 @@ public sealed class VaultBackupTests : IDisposable
     /// The stamp lives in the name, so this is a rename and not a touch — which is the point of
     /// keeping it there: a modification time does not survive a copy, a restore or a folder sync.
     /// </remarks>
-    private static void Age(string vaultPath, TimeSpan by)
+    internal static void Age(string vaultPath, TimeSpan by)
     {
         var stem = Path.GetFileNameWithoutExtension(vaultPath) + ".";
         var extension = Path.GetExtension(vaultPath);

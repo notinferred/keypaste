@@ -1090,6 +1090,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasGeneratorDialog => GeneratorDialog is not null;
 
+    /// <summary>Whether New item or a form's generator covers the window as a sheet, which the menus wait behind as they do behind a dialog.</summary>
+    internal bool HasSheet =>
+        EntriesInView is { IsAdding: true }
+        || EntriesInView?.NewItem?.GeneratorPanel is not null
+        || EntriesInView?.Detail?.GeneratorPanel is not null
+        || ProjectsInView?.OpenProject?.GeneratorPanel is not null;
+
     [RelayCommand]
     private void OpenGenerator()
     {

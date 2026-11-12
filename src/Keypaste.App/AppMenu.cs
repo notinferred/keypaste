@@ -85,7 +85,12 @@ internal static class AppMenu
 
         foreach (var entry in entries)
         {
-            flyout.Items.Add(entry is AppCommand command ? Item(command, made) : new Separator());
+            flyout.Items.Add(entry switch
+            {
+                AppCommand command => Item(command, made),
+                AppSubmenu submenu => Submenu(submenu, made),
+                _ => new Separator(),
+            });
         }
 
         flyout.Opening += (_, _) => made.ForEach(refresh => refresh());

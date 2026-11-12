@@ -394,7 +394,7 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.Empty(reopened.ReadRecycled());
     }
 
-    // RestoredToRoot needs another program to remove the group, so verify-keepassxc-recyclebin.sh proves it with keepassxc-cli rmdir.
+    // RestoredToRoot needs another program to remove the group, so KeePassXC.RecycleBinTests proves it with keepassxc-cli rmdir.
 
     [Fact]
     public void RestoreRecycled_OnAnIdNothingAnswersTo_IsRefusedAndWritesNothing()

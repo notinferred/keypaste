@@ -267,7 +267,8 @@ public sealed class GeneratePasswordTests : IDisposable
 
         detail.OpenGeneratorCommand.Execute(null);
         var panel = detail.NewPasswordGenerator!;
-        Assert.True(panel.OffersNewItem);
+        Assert.False(panel.OffersNewItem);
+        Assert.False(panel.KeepsElsewhere);
         Assert.False(detail.NewPassword.HasValue);
 
         var chosen = panel.Reveal();

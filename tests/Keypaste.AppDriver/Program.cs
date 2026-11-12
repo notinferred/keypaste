@@ -22,12 +22,12 @@ namespace Keypaste.AppDriver;
 /// The app half of <c>scripts/verify-keepassxc-workflows.sh</c> (9.4). KeePassXC makes the vault and
 /// reads it back; between the two, this presses the same commands the views bind to, on the same view
 /// models, so a refusal a screen makes before core is reached is the app's refusal too. It never calls
-/// core for the act under test: <c>Keypaste.VaultRestorer</c> does that for the per-feature gates.
+/// core for the act under test.
 /// </para>
 /// <para>
 /// A command that is disabled is a refusal, not a silent no-op, so a greyed-out button cannot pass
 /// for a save. Output is the screen's own sentence and never a value. Secrets arrive in the
-/// environment, as they do for the restorer. Exit 0 did it, 1 the screen refused, 2 usage, 3 the
+/// environment. Exit 0 did it, 1 the screen refused, 2 usage, 3 the
 /// driver could not arrange the act.
 /// </para>
 /// <para>
@@ -90,6 +90,7 @@ internal static class Program
         "       edit <vault> <entry-path> <notes> <url>\n" +
         "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
+        "       totp-set <vault> <entry-path> <setup key or otpauth:// link>\n" +
         "       field-set <vault> <entry-path> <name>\n" +
         "       field-protect <vault> <entry-path> <name>\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
@@ -176,6 +177,7 @@ internal static class Program
                 ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-protect", var vault, var entry, var name] => await driver.ToggleProtectionAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
+                ["totp-set", var vault, var entry, var setup] => await driver.SetTotpAsync(vault, entry, setup).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag, "--decline"] => await driver.AddTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
                 ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
@@ -523,6 +525,21 @@ internal sealed class Driver(string home)
 
             Press(detail.ConfirmAddFieldCommand, "Add");
             return detail.IsAddingField || entries.Error is not null ? Refused(entries.Error) : Did($"added {name} to {entry}");
+        });
+
+    internal Task<int> SetTotpAsync(string vault, string entry, string setup) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(detail.BeginSetTotpCommand, "Add one-time code");
+            foreach (var c in setup)
+            {
+                detail.NewTotp.Type(c);
+            }
+
+            Press(detail.ConfirmSetTotpCommand, "Add");
+            return detail.IsSettingTotp || entries.Error is not null ? Refused(entries.Error) : Did($"set the one-time code of {entry}");
         });
 
     internal Task<int> ReplaceFieldAsync(string vault, string entry, string name) =>

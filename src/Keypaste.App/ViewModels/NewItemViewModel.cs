@@ -30,6 +30,16 @@ internal sealed record TemplateChoice(ItemTemplate Template, string Label, strin
         new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
     ];
 
+    /// <summary>The kind the item keeps once created, as its icon.</summary>
+    internal ItemKind Kind => Template switch
+    {
+        ItemTemplate.ApiKey => ItemKind.ApiKey,
+        ItemTemplate.Database => ItemKind.Database,
+        ItemTemplate.Server => ItemKind.Server,
+        ItemTemplate.SecureNote => ItemKind.SecureNote,
+        _ => ItemKind.Login,
+    };
+
     /// <summary>How the add menus name it: the form it opens, so with an ellipsis.</summary>
     internal string MenuLabel => $"{Label}…";
 
@@ -750,6 +760,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                         Password = password,
                         Url = ShowsUrl ? Url.Trim() : string.Empty,
                         Notes = Notes,
+                        Kind = SelectedTemplate.Kind,
                     },
                     fields,
                     [.. Tags.Select(chip => chip.Tag)],

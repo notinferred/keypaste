@@ -15,7 +15,6 @@ on:
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
       - 'scripts/verify-keepassxc-workflows.sh'
-      - 'scripts/verify-keepassxc-first-run.sh'
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'
       - 'scripts/verify-current-state.sh'
@@ -105,7 +104,8 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  # Every run runs every job; a dispatch or a tag's own run counts toward a release (D-0403, D-0423).
+  # main's push runs every job on Linux and Windows and every other run adds macOS; a dispatch or a tag's own run counts
+  # toward a release (D-0403).
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; package restores fresh (B.5).
   targets:
     runs-on: ubuntu-24.04
@@ -130,6 +130,11 @@ jobs:
           targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0), dmg: ([.packages[]? | select(.kind == "dmg")] | length > 0)}]' release-targets.json)"
           kept="$(jq length <<< "$targets")"
           [ "$kept" = "$n" ] || { echo "::error::only $kept of $n app targets reached the package matrix"; exit 1; }
+          # main's push packages on Linux and Windows; every other run packages every target.
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            targets="$(jq -c '[.[] | select(.os != "macos-15")]' <<< "$targets")"
+            kept="$(jq length <<< "$targets")"
+          fi
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$kept of $n targets: $targets"
 
@@ -139,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 24
     steps:
@@ -167,7 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -266,58 +271,6 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
 
-  # The first run offers the databases real KeePassXC last opened, found where KeePassXC keeps them (N.2).
-  first-run:
-    name: keepassxc first run (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 9
-    env:
-      KP_COMPAT_PASSWORD: ci-master-pw
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
-
-      - name: Install KeePassXC (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          bash scripts/apt-install.sh --no-install-recommends keepassxc
-
-      - name: Install KeePassXC (Windows and macOS)
-        if: runner.os == 'Windows' || runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
-
-      - name: Build the libargon2 the app carries
-        shell: bash
-        run: bash scripts/build-argon2.sh
-
-      - name: Restore and build the app driver
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
-          dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
-
-      - name: Verify the first run offers the databases KeePassXC last opened
-        shell: bash
-        run: bash scripts/verify-keepassxc-first-run.sh artifacts/compat/first-run
-
   # What the platform clipboard offers after the app copies a secret, after its clear and after a
   # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
   # the log, since nothing in this workflow uploads before the installer is signed.
@@ -326,7 +279,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: ${{ fromJSON(github.event_name == 'push' && github.ref == 'refs/heads/main' && '["ubuntu-24.04"]' || '["ubuntu-24.04", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
@@ -735,7 +688,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [targets, desktop, desktop-gates, compat, first-run, clipboard-markers, package]
+    needs: [targets, desktop, desktop-gates, compat, clipboard-markers, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

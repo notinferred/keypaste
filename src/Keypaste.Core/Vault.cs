@@ -987,6 +987,23 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.SetTotp(name, uri: null) > 0, removed => removed ? VaultEdit.Of(name) : null);
     }
 
+    /// <summary>
+    /// Changes what the item is for, keeping the kind as the standard KeePass icon it sets, as one edit with one history revision.
+    /// Its fields are untouched. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="kind">The kind to keep; not <see cref="ItemKind.None"/>.</param>
+    /// <returns><see langword="true"/> if the entry was found and its kind changed.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name, or it has a custom icon, which is kept. Nothing is changed.</exception>
+    public bool SetKind(EntryName name, ItemKind kind)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentOutOfRangeException.ThrowIfEqual(kind, ItemKind.None);
+
+        return Change(() => _interop.SetKind(name, kind) > 0, changed => changed ? VaultEdit.Of(name) : null);
+    }
+
     /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>
     /// <param name="name">The item the value belongs to.</param>
     /// <param name="value">The value as the vault holds it.</param>

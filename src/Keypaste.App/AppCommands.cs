@@ -299,6 +299,7 @@ internal sealed class AppCommands
         var addTotp = Routed(Strings.AddOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: true } detail ? detail : null, detail => detail.BeginSetTotpCommand);
         var replaceTotp = Routed(Strings.ReplaceTheOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: false } detail ? detail : null, detail => detail.BeginSetTotpCommand);
         var removeTotp = Routed(Strings.RemoveTheOneTimeCode, PaneOutOfEdit, detail => detail.BeginRemoveTotpCommand);
+        var changeKind = Folder(Strings.ChangeKind, [.. TemplateChoice.All.Select(kind => Routed(kind.Label, PaneOutOfEdit, detail => detail.ChangeKindCommand, _ => kind))]);
         var history = Routed(Strings.ShowHistory, PaneOutOfEdit, detail => detail.History.ToggleCommand) with { Says = () => PaneOutOfEdit()?.History.ToggleLabel ?? Strings.ShowHistory };
         var addField = Routed(Strings.AddFieldLabel, PaneOutOfEdit, detail => detail.BeginAddFieldCommand);
         var addAttachment = Routed(Strings.AddAttachmentLabel, PaneOutOfEdit, detail => detail.Attachments.AddCommand);
@@ -367,7 +368,7 @@ internal sealed class AppCommands
         var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
         var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
-        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line, _delete];
+        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, changeKind, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line, _delete];
         _trashMenu = [restore, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
@@ -392,7 +393,7 @@ internal sealed class AppCommands
         var item = new AppMenuGroup(Strings.ItemMenu,
         [
             copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line,
-            editFields, organize, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line,
+            editFields, organize, changeKind, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line,
             addField, addAttachment, removeTag,
             Folder(Strings.Field, copyField, replaceField, generateField, renameField, protectField, _line, removeField),
             Folder(Strings.Attachment, saveAttachment, replaceAttachment, _line, removeAttachment),
@@ -474,7 +475,7 @@ internal sealed class AppCommands
 
     // The import, share, discard, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
-        _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
+        _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasSheet: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
 
     private EntriesViewModel? Items() => Unmodal()?.Content as EntriesViewModel;
 

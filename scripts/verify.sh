@@ -204,8 +204,10 @@ prepare_desktop() {
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
 # Core and Infrastructure also run in the desktop's process, which has ICU and a person's culture, so their tests answer under cultures that differ in casing, numbers and calendar (Q.16).
+# .NET reads culture data from ICU on every platform, so Linux's answers stand for Windows' and macOS'.
 test_cultures() {
   local culture
+  [ "$(uname -s)" = Linux ] || return 0
   for culture in tr-TR de-DE ar-SA; do
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 KEYPASTE_TEST_CULTURE="$culture" \
       run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release
@@ -215,8 +217,29 @@ test_backend() {
   run_tests dotnet test keypaste.slnx --no-build -c Release
   test_cultures
 }
+# One process drives one headless UI thread, so App.Tests runs as three processes split by measured time: the screen
+# renderer, the rest of rendering and everything else.
+app_test_shards=(
+  "--filter-class Keypaste.App.Tests.Rendering.ScreenRenderer"
+  "--filter-namespace Keypaste.App.Tests.Rendering --filter-not-class Keypaste.App.Tests.Rendering.ScreenRenderer"
+  "--filter-not-namespace Keypaste.App.Tests.Rendering"
+)
 test_desktop() {
-  run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
+  local shard i code=0 pids=()
+  run_tests dotnet test tests/Keypaste.App.Windows.Tests/Keypaste.App.Windows.Tests.csproj --no-build -c Release
+  mkdir -p artifacts/test-logs
+  for i in "${!app_test_shards[@]}"; do
+    read -r -a shard <<<"${app_test_shards[$i]}"
+    run_tests dotnet test tests/Keypaste.App.Tests/Keypaste.App.Tests.csproj --no-build -c Release -- \
+      "${shard[@]}" --hangdump --hangdump-timeout 10m --results-directory "$PWD/artifacts/test-logs/app-$i" \
+      >"artifacts/test-logs/app-$i.log" 2>&1 &
+    pids+=("$!")
+  done
+  for i in "${!pids[@]}"; do
+    wait "${pids[$i]}" || code=$?
+    cat "artifacts/test-logs/app-$i.log"
+  done
+  [ "$code" = 0 ] || return "$code"
   run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
 }
 check_desktop_gates() {
@@ -434,12 +457,7 @@ profile_compat() {
   run bash scripts/make-compat-fixture.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
-  run bash scripts/verify-keepassxc-history.sh artifacts/compat/local-history.kdbx
-  run bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/local-recyclebin.kdbx
-  run bash scripts/verify-keepassxc-run.sh artifacts/compat/local-run
-  run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
-  run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
-  run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
+  KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run npm ci --prefix site --no-audit --no-fund
   run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
@@ -448,7 +466,6 @@ profile_compat() {
   run bash scripts/verify-keepassxc-merge.sh artifacts/compat/local-merge
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
   run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
-  run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }
 
 profile_tools() {
