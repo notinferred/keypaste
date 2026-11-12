@@ -18,7 +18,7 @@ internal static class KeePassXcCli
     private static readonly Lazy<string?> _path = new(Find);
 
     private static readonly Lazy<Version> _version = new(() =>
-        Version.Parse(System.Text.RegularExpressions.Regex.Match(Try("", ["--version"]).Output, @"\d+\.\d+\.\d+").Value));
+        Version.Parse(System.Text.RegularExpressions.Regex.Match(Try(null, ["--version"]).Output, @"\d+\.\d+\.\d+").Value));
 
     /// <summary>The CLI's version, for behaviour KeePassXC changed between releases.</summary>
     internal static Version Version => _version.Value;
@@ -51,13 +51,13 @@ internal static class KeePassXcCli
     /// <summary>Runs one command on <paramref name="vault"/> opened with <paramref name="key"/>, failing the test unless it exits 0.</summary>
     internal static string Run(KeePassXcKey key, string command, string vault, params string[] arguments)
     {
-        var (exit, output, error) = Try(key.Password ?? "", [command, "-q", .. key.Arguments, vault, .. arguments]);
+        var (exit, output, error) = Try(key.Password, [command, "-q", .. key.Arguments, vault, .. arguments]);
         Assert.True(exit == 0, $"keepassxc-cli {command} exited {exit}: {error}");
         return output;
     }
 
-    /// <summary>Runs keepassxc-cli with <paramref name="stdin"/> as its input, whatever it exits with.</summary>
-    internal static (int Exit, string Output, string Error) Try(string stdin, IEnumerable<string> arguments)
+    /// <summary>Runs keepassxc-cli with <paramref name="stdin"/> as its input, or none when null, whatever it exits with.</summary>
+    internal static (int Exit, string Output, string Error) Try(string? stdin, IEnumerable<string> arguments)
     {
         var start = new ProcessStartInfo(Path_)
         {
@@ -74,7 +74,12 @@ internal static class KeePassXcCli
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
-        process.StandardInput.WriteLine(stdin);
+        // A command given no password never reads its input and may exit before a write could reach it.
+        if (stdin is not null)
+        {
+            process.StandardInput.WriteLine(stdin);
+        }
+
         process.StandardInput.Close();
 
         if (!process.WaitForExit(TimeSpan.FromMinutes(1)))

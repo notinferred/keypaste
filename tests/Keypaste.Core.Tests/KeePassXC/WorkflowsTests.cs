@@ -134,7 +134,7 @@ public sealed class WorkflowsTests
         var changed = key with { Keyfile = next };
         fixture.Key = changed;
         fixture.AssertIntact("servers/database");
-        Assert.NotEqual(0, KeePassXcCli.Try(key.Password ?? "", ["ls", "-q", .. key.Arguments, file.Path_]).Exit);
+        Assert.NotEqual(0, KeePassXcCli.Try(key.Password, ["ls", "-q", .. key.Arguments, file.Path_]).Exit);
     }
 
     [Fact]

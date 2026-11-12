@@ -127,7 +127,7 @@ ERR="$WORK/run-on.txt"
 clients "$LABEL" --run on 2>"$ERR" || die "keypaste clients could not turn run on through the owner: $(cat "$ERR")"
 grep -q 'sealed by the process holding the vault' "$ERR" || die "turning run on did not say the owner sealed it"
 grep -q '^\[\[seal\]\]' "$RULES" || die "the owner wrote agents.toml without its seal"
-jq -se --arg label "$LABEL" 'any(.[]; .tool == "access_change" and .method == "rules-changed" and .client.label == $label)' <"$AUDIT" >/dev/null \
+jq -se --arg name "$LABEL" 'any(.[]; .tool == "access_change" and .method == "rules-changed" and .client.label == $name)' <"$AUDIT" >/dev/null \
   || die "the owner did not record the rules change"
 
 # ===================================== C: a hand-edited Allow is ignored, though the old seal stays
