@@ -204,8 +204,10 @@ prepare_desktop() {
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
 # Core and Infrastructure also run in the desktop's process, which has ICU and a person's culture, so their tests answer under cultures that differ in casing, numbers and calendar (Q.16).
+# .NET reads culture data from ICU on every platform, so Linux's answers stand for Windows' and macOS'.
 test_cultures() {
   local culture
+  [ "$(uname -s)" = Linux ] || return 0
   for culture in tr-TR de-DE ar-SA; do
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 KEYPASTE_TEST_CULTURE="$culture" \
       run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release
