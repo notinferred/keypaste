@@ -17,6 +17,12 @@ internal static class KeePassXcCli
 
     private static readonly Lazy<string?> _path = new(Find);
 
+    private static readonly Lazy<Version> _version = new(() =>
+        Version.Parse(System.Text.RegularExpressions.Regex.Match(Try("", ["--version"]).Output, @"\d+\.\d+\.\d+").Value));
+
+    /// <summary>The CLI's version, for behaviour KeePassXC changed between releases.</summary>
+    internal static Version Version => _version.Value;
+
     /// <summary>The CLI's path, skipping or failing the test as the class remarks say when there is none.</summary>
     internal static string Path_
     {
