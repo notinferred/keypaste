@@ -15,8 +15,6 @@ on:
       - 'tests/Keypaste.Processes.Tests/**'
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
-      - 'scripts/verify-current-state.sh'
-      - 'scripts/verify-session-lifecycle.sh'
       - 'scripts/verify-desktop-approval.sh'
       - 'scripts/verify-agent-activity.sh'
       - 'scripts/verify-connect-client.sh'

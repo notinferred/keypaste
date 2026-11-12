@@ -20,9 +20,12 @@ internal static class Built
 
     internal static string AppDriver => Program("Keypaste.AppDriver", "Keypaste.AppDriver");
 
-    private static string Program(string project, string name)
+    /// <summary>keypaste-app itself, its Windows target on Windows, as the package carries it there.</summary>
+    internal static string App => Program("Keypaste.App", "keypaste-app", OperatingSystem.IsWindows() ? "release_net10.0-windows10.0.19041.0" : "release_net10.0");
+
+    private static string Program(string project, string name, string configuration = "release")
     {
-        var path = Path.Combine(_root.Value, "artifacts", "bin", project, "release", OperatingSystem.IsWindows() ? $"{name}.exe" : name);
+        var path = Path.Combine(_root.Value, "artifacts", "bin", project, configuration, OperatingSystem.IsWindows() ? $"{name}.exe" : name);
         return File.Exists(path) ? path : throw new FileNotFoundException($"build {project} first", path);
     }
 }

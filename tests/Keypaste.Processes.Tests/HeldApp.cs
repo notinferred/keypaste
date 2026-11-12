@@ -23,10 +23,18 @@ internal sealed class HeldApp : IDisposable
 
     internal RunningProcess Driver => _driver;
 
-    internal static HeldApp Hold(Workspace workspace, params string[] options)
+    internal static HeldApp Hold(Workspace workspace, params string[] options) => Hold(workspace, newPassword: null, options);
+
+    /// <summary>Holds the vault, with <paramref name="newPassword"/> as the value an <c>edit</c> types, when one is given.</summary>
+    internal static HeldApp Hold(Workspace workspace, string? newPassword, params string[] options)
     {
         var environment = workspace.Environment;
         environment["KEYPASTE_DRIVER_PASSWORD"] = Workspace.Master;
+        if (newPassword is not null)
+        {
+            environment["KEYPASTE_DRIVER_NEW_PASSWORD"] = newPassword;
+        }
+
         var held = new HeldApp(RunningProcess.Start(Built.AppDriver, environment, ["hold", workspace.Vault, .. options]));
         Assert.DoesNotContain(held._driver.Output, line => line.Contains("not served", StringComparison.Ordinal));
         return held;
@@ -34,6 +42,26 @@ internal sealed class HeldApp : IDisposable
 
     /// <summary>Sends one of hold's commands, such as lock, unlock or deny.</summary>
     internal void Send(string command) => _driver.Send(command);
+
+    /// <summary>Sends a command and returns the first line the app prints after it.</summary>
+    internal string Act(string command)
+    {
+        var before = _driver.Output.Count;
+        Send(command);
+        var deadline = System.Diagnostics.Stopwatch.StartNew();
+        while (deadline.Elapsed < RunningProcess.Wait)
+        {
+            if (_driver.Output.Count > before)
+            {
+                return _driver.Output[before];
+            }
+
+            Thread.Sleep(50);
+        }
+
+        Assert.Fail($"the app never answered '{command}'");
+        return "";
+    }
 
     internal string WaitFor(string pattern, int count = 1) => _driver.WaitForOutput(pattern, count);
 

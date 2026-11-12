@@ -20,7 +20,7 @@ namespace Keypaste.AppDriver;
 
 /// <summary>
 /// Starts the app through <c>keypaste-app</c>'s own <c>Program.Run</c>, crash reports composed as its start composes them,
-/// on a headless display in place of the platform's, so <c>scripts/verify-session-lifecycle.sh</c> can count the app's
+/// on a headless display in place of the platform's, so <c>SessionLifecycleTests</c> can count the app's
 /// processes in a home and watch its window (F.38) and <c>scripts/verify-crash-report.sh</c> can crash it (4.11c).
 /// </summary>
 /// <remarks>

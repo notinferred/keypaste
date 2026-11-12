@@ -244,8 +244,6 @@ test_desktop() {
 }
 check_desktop_gates() {
   run_tests dotnet test tests/Keypaste.Processes.Tests/Keypaste.Processes.Tests.csproj --no-build -c Release
-  integration_script scripts/verify-current-state.sh
-  integration_script scripts/verify-session-lifecycle.sh
   integration_script scripts/verify-desktop-approval.sh
   integration_script scripts/verify-agent-activity.sh
   integration_script scripts/verify-connect-client.sh

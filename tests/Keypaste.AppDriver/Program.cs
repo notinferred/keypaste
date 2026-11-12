@@ -35,13 +35,13 @@ namespace Keypaste.AppDriver;
 /// those prints a <c>status</c> line as the authority reports it.
 /// <c>Keypaste.Processes.Tests</c> drives it (U.1). With <c>--locked</c> it starts at the
 /// unlock screen, as a launch does, and waits for <c>unlock</c>, so
-/// <c>scripts/verify-session-lifecycle.sh</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
+/// <c>SessionLifecycleTests</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
 /// <c>withdrawn</c>, so <c>LockBoundaryTests</c> can lock the app with a real request
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
 /// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
 /// <c>relocate</c> act on the held vault through the entries screen, so
-/// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
+/// <c>CurrentStateTests</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
 /// comes down, and the lines <c>once</c>, <c>always</c>, <c>allow</c>, <c>deny</c> and <c>close</c> click its buttons through
