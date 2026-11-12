@@ -448,7 +448,6 @@ profile_compat() {
   run bash scripts/verify-keepassxc-merge.sh artifacts/compat/local-merge
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
   run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
-  run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }
 
 profile_tools() {

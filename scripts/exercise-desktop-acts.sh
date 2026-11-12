@@ -10,7 +10,7 @@
 #
 # The acts run in the default home, ~/.keypaste, as a person's first run does: the first unlock chooses the vault,
 # so Agents' Connect registers the bridge without a vault path. KeePassXC makes the vault and opens it
-# once, as verify-keepassxc-first-run.sh has it do, so the first run offers it from KeePassXC's recent databases.
+# once, so the first run offers it from KeePassXC's recent databases.
 #
 # The acts, in order, and the acts each needs:
 #   first-run      Continue on the first-launch screen, then KeePassXC's database offered on the first run, chosen and
@@ -741,7 +741,7 @@ keepassxc_new_database() {
 }
 
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
-# always keeps them (src/core/Config.cpp), as verify-keepassxc-first-run.sh has it do on a runner.
+# always keeps them (src/core/Config.cpp).
 keepassxc_recent() {
   local gui roaming local_ini pid code
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }

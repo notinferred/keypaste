@@ -1,7 +1,7 @@
 name: ci
 
 on:
-  # A branch push runs the fast tier, Linux only; main's push runs every job.
+  # A branch push runs the fast tier, Linux only; main's push adds Windows; every other run adds macOS.
   push:
     branches: ['**']
     # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
@@ -75,8 +75,8 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
-  # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
+  # Every run but a push runs every job on every runner but tools, which runs on the schedule and on a dispatch that asks
+  # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0438).
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
   checks:
     name: scripts + workflows
@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -182,7 +182,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
+        os: ${{ fromJSON(github.event_name != 'push' && '["ubuntu-24.04", "windows-2025", "macos-15"]' || github.ref == 'refs/heads/main' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -216,7 +216,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 21
     env:
