@@ -23,11 +23,9 @@ backend        Locked restore, Release build and backend tests, and Core's again
 integration    Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop        Prepare the desktop solution and the consistency project, and run their tests.
 desktop-gates  Prepare as desktop does, and drive the app, the CLI and an agent as real processes.
-compat         Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
-               keyfiles, custom fields, project tags, merges and every workflow on vaults KeePassXC made, through the CLI, the app and
-               the site's Worker on loopback, and
-               the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
-               Never run without being named.
+compat         Prepare the backend and the app driver, and verify what the built CLI and app write against installed
+               KeePassXC: the fixture vault, write-back, keyfiles and XML attachments, and Core.Tests' KeePassXC
+               namespace. Never run without being named.
 compile        Locked restore and Release build of both solutions and the consistency project, and dotnet format;
                no tests, and the build servers stop when it ends. A development machine runs it before each push
                (D-0468). Never run without being named.
@@ -47,9 +45,8 @@ On Windows and macOS each profile that builds, but compile, first builds the lib
 CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
 backend, and test for a Keypaste.Browser.Tests class, first build the libsodium those tests load with
 scripts/build-libsodium.sh, which needs curl, OpenSSL 3, and make with a C compiler or Visual Studio's.
-macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
-(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), on Linux an X display (Xvfb is enough), and Node 22 with npm and
-curl for the site's Worker. Native AOT, packaging, other operating systems and live install checks stay in CI.
+macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli (or KPXC_CLI).
+Native AOT, packaging, other operating systems and live install checks stay in CI.
 USAGE
 }
 
@@ -210,7 +207,7 @@ test_cultures() {
   [ "$(uname -s)" = Linux ] || return 0
   for culture in tr-TR de-DE ar-SA; do
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 KEYPASTE_TEST_CULTURE="$culture" \
-      run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release
+      run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-not-namespace Keypaste.Core.Tests.KeePassXC
   done
 }
 test_backend() {
@@ -243,17 +240,7 @@ test_desktop() {
   run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
 }
 check_desktop_gates() {
-  integration_script scripts/verify-session-authority.sh
-  integration_script scripts/verify-lock-boundary.sh
-  integration_script scripts/verify-current-state.sh
-  integration_script scripts/verify-session-lifecycle.sh
-  integration_script scripts/verify-desktop-approval.sh
-  integration_script scripts/verify-agent-activity.sh
-  integration_script scripts/verify-connect-client.sh
-  integration_script scripts/verify-run-session.sh
-  integration_script scripts/verify-held-saves.sh
-  integration_script scripts/verify-crash-report.sh
-  integration_script scripts/verify-browser-host.sh
+  run_tests dotnet test tests/Keypaste.Processes.Tests/Keypaste.Processes.Tests.csproj --no-build -c Release
   # A machine with no ICU is a Linux machine; .NET on Windows and macOS uses the system's own.
   if [ "$(uname -s)" = Linux ]; then integration_script scripts/verify-no-icu.sh --unlock-and-save; fi
   # The macOS install and upgrade legs run under the stock bash 3.2 (D-0398).
@@ -355,7 +342,7 @@ profile_workflows() {
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh scripts/exercise-desktop-acts.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh scripts/build-libsodium.sh \
     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh scripts/crash-reports.sh \
-    scripts/verify-keepassxc-merge.sh scripts/lib/*.sh packaging/macos/keypaste-launch.command
+    scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
 
 # A gate writes to a file, so a process it leaves running on Windows cannot hold the step open past its timeout.
@@ -389,17 +376,9 @@ profile_compile() {
   profile_format
 }
 
+# The shipped binaries' own checks (run injection and signals, MCP over stdio, approval, policy, the log chain) run against
+# the AOT build in ci's aot job and against each published binary in release.yml.
 check_integration() {
-  integration_script scripts/verify-run-injection.sh
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) echo 'Signal forwarding has no Windows local verifier; see SECURITY.md.' ;;
-    *) integration_script scripts/verify-run-signals.sh ;;
-  esac
-  integration_script scripts/verify-mcp-stdio.sh
-  integration_script scripts/verify-approval-e2e.sh
-  integration_script scripts/verify-mcp-run.sh
-  integration_script scripts/verify-policy-e2e.sh
-  integration_script scripts/verify-log-chain.sh
   integration_script scripts/verify-demo.sh
 }
 
@@ -452,20 +431,15 @@ profile_integration() {
   if [ "$phase" != prepare-only ]; then check_integration; fi
 }
 profile_compat() {
-  prepare_backend with-libsodium
+  prepare_backend
   export KP_COMPAT_PASSWORD=keypaste-local-compat-fixture
   run bash scripts/make-compat-fixture.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
   KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
-  run npm ci --prefix site --no-audit --no-fund
-  run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
-  run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
-  run bash scripts/verify-keepassxc-merge.sh artifacts/compat/local-merge
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
-  run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
 }
 
 profile_tools() {

@@ -97,6 +97,21 @@ public sealed class WindowLayoutTests
         window.Close();
     });
 
+    // A move posts its minimum and bounds to run after the platform settles, which a quit can come before (seen on Windows).
+    [Fact]
+    public Task A_move_whose_posted_work_runs_after_the_window_closed_does_nothing() => HeadlessSession.On(() =>
+    {
+        var window = new MainWindow();
+        window.Show();
+        WindowInput.Drain();
+
+        window.Position = new PixelPoint(window.Position.X + 20, window.Position.Y + 10);
+        window.Close();
+        WindowInput.Drain();
+
+        Assert.False(window.IsVisible);
+    });
+
     [Fact]
     public Task Bounds_off_the_screen_come_back_onto_it_and_a_maximized_window_opens_maximized() => HeadlessSession.On(() =>
     {

@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests;
 /// and while the switch is on, deleted when it is turned off, the run marker turned into a report at the next start, and the
 /// sender started only while on and only where an endpoint is named.
 /// </summary>
-/// <remarks>None of these sets the process's hooks, which <c>scripts/verify-crash-report.sh</c> drives in a process of its own.</remarks>
+/// <remarks>None of these sets the process's hooks, which <c>Keypaste.Processes.Tests.CrashReportTests</c> drives in a process of its own.</remarks>
 public sealed partial class CrashReportingTests : IDisposable
 {
     private readonly TempHome _home = new();

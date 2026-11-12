@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// <c>run</c>, <c>env export</c> and <c>env diff</c> on a project whose variables are tagged entries'
 /// fields (C.1b), beside an untagged <c>env/&lt;project&gt;/OLD_KEY</c> as 0.3.0 wrote a variable, which
-/// is no variable (D-0416). Against KeePassXC by <c>verify-keepassxc-projects.sh</c>.
+/// is no variable (D-0416). Against KeePassXC by <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>.
 /// </summary>
 public sealed class TaggedProjectRunTests : IDisposable
 {

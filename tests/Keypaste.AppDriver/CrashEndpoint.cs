@@ -6,7 +6,7 @@ using System.Text;
 namespace Keypaste.AppDriver;
 
 /// <summary>
-/// A stand-in for keypaste.com's <c>/api/crash</c> on loopback, which <c>scripts/verify-crash-report.sh</c> points
+/// A stand-in for keypaste.com's <c>/api/crash</c> on loopback, which <c>CrashReportTests</c> points
 /// <c>KEYPASTE_CRASH_URL</c> at (4.11c): it answers each request 204 and keeps its request line and headers as
 /// <c>&lt;n&gt;.head</c> and its body as <c>&lt;n&gt;.json</c> in a folder, or, with <c>--silent</c>, takes each
 /// connection and never answers, as an unreachable server that holds the line open would.

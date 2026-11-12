@@ -9,7 +9,6 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.AutoType;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
@@ -19,9 +18,8 @@ namespace Keypaste.AppDriver;
 /// <summary>Performs one desktop act on one vault through the screen a person uses, and exits.</summary>
 /// <remarks>
 /// <para>
-/// The app half of <c>scripts/verify-keepassxc-workflows.sh</c> (9.4). KeePassXC makes the vault and
-/// reads it back; between the two, this presses the same commands the views bind to, on the same view
-/// models, so a refusal a screen makes before core is reached is the app's refusal too. It never calls
+/// The app half of the cross-process gates. This presses the same commands the views bind to, on the same
+/// view models, so a refusal a screen makes before core is reached is the app's refusal too. It never calls
 /// core for the act under test.
 /// </para>
 /// <para>
@@ -35,46 +33,35 @@ namespace Keypaste.AppDriver;
 /// launch does, unlocks, prints the session it holds, and then locks or unlocks again on each line
 /// read from standard input until it closes, which it answers as the app answers quitting. Each of
 /// those prints a <c>status</c> line as the authority reports it.
-/// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--locked</c> it starts at the
+/// <c>Keypaste.Processes.Tests</c> drives it (U.1). With <c>--locked</c> it starts at the
 /// unlock screen, as a launch does, and waits for <c>unlock</c>, so
-/// <c>scripts/verify-session-lifecycle.sh</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
+/// <c>SessionLifecycleTests</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
-/// <c>withdrawn</c>, so <c>scripts/verify-lock-boundary.sh</c> can lock the app with a real request
+/// <c>withdrawn</c>, so <c>LockBoundaryTests</c> can lock the app with a real request
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
 /// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
 /// <c>relocate</c> act on the held vault through the entries screen, so
-/// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
+/// <c>CurrentStateTests</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
 /// comes down, and the lines <c>once</c>, <c>always</c>, <c>allow</c>, <c>deny</c> and <c>close</c> click its buttons through
-/// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
+/// the display's hit-testing or close it, so <c>DesktopApprovalTests</c> can answer a
 /// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
 /// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in
 /// a terminal or Open terminal and then Start, so Terminal opens that <c>keypaste.app</c>'s launcher
-/// and the run it starts asks this hold for the set, which <c>scripts/verify-run-session.sh</c>
+/// and the run it starts asks this hold for the set, which <c>MacTerminalRunTests</c>
 /// watches (E.1d).
 /// </para>
 /// <para>
-/// For <c>scripts/verify-keepassxc-merge.sh</c> (1.4b3) a hold prints a <c>merged</c> line for each merge of another
-/// program's save the session makes, the notice's own words included. <c>merge</c> has the app's shell compare the file
-/// and merge as its folder watch does, then prints <c>merge end</c>; <c>restore</c> presses Restore on Trash; the
-/// <c>unsaved-</c> lines change the open copy through core without saving it, the state a save refused by another
-/// program's leaves, and <c>write-open</c> writes that copy to a file, so KeePassXC can merge the copy keypaste merges.
+/// A hold prints a <c>merged</c> line for each merge of another program's save the session makes, the notice's own words
+/// included. <c>merge</c> has the app's shell compare the file and merge as its folder watch does, then prints
+/// <c>merge end</c>; <c>restore</c> presses Restore on Trash.
 /// </para>
 /// <para>
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
 /// </para>
 /// <para>
-/// <c>autotype</c> unlocks as the unlock screen does and prints, for each item and window title, the sequence the
-/// unlocked session's Auto-Type plan would type and where it comes from, or why it types nothing; it types nothing
-/// and prints no value (P.4a1).
-/// </para>
-/// <para>
-/// <c>twofish-create</c> is no act of the app's: it writes the Twofish vault the workflows gate starts from, which
-/// <c>keepassxc-cli</c> cannot make, as <see cref="TwofishVault"/> says.
-/// </para>
-/// <para>
-/// <c>crash-endpoint</c> is no act of the app's either: it stands in for keypaste.com's crash route on loopback, as
+/// <c>crash-endpoint</c> is no act of the app's: it stands in for keypaste.com's crash route on loopback, as
 /// <see cref="CrashEndpoint"/> says.
 /// </para>
 /// </remarks>
@@ -85,14 +72,9 @@ internal static class Program
         "            (prints whether this process can load ICU and how it compares text)\n" +
         "       open <vault>\n" +
         "       welcome [--keepassxc-config <ini>]\n" +
-        "       open-offered <n> [--keepassxc-config <ini>]\n" +
         "       create <vault> [--new-keyfile <keyfile>]\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
         "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
-        "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
-        "       totp-set <vault> <entry-path> <setup key or otpauth:// link>\n" +
-        "       field-set <vault> <entry-path> <name>\n" +
-        "       field-protect <vault> <entry-path> <name>\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
         "       tag-add <vault> <entry-path> <tag> [--decline]\n" +
         "       tag-rm <vault> <entry-path> <tag> [--decline]\n" +
@@ -104,36 +86,24 @@ internal static class Program
         "       env-entry-add <vault> <project> <environment> <entry-path> [--decline]\n" +
         "       env-entry-rm <vault> <project> <environment> <entry-path> [--decline]\n" +
         "       projects <vault>\n" +
-        "       group-rename <vault> <group-path> <new-name>\n" +
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
-        "       trash-restore <vault> <title>\n" +
-        "       revision-restore <vault> <entry-path> <row | oldest>\n" +
-        "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --new-keyfile <keyfile> | --remove-keyfile]\n" +
-        "       notes-review <vault>\n" +
-        "       notes-move <vault> <entry-path> [<key>...]\n" +
-        "       notes-dismiss <vault> <entry-path> <key>\n" +
-        "       notes-restore <vault> <entry-path> <key>\n" +
         "       tags-review <vault>\n" +
         "       tag-restore <vault> <entry-path> <tag>\n" +
         "       tags-dismiss <vault> <entry-path> <tag>\n" +
         "       tags-again <vault> <entry-path> <tag>\n" +
-        "       autotype <vault> <entry-path> <window-title> [<entry-path> <window-title>]...\n" +
-        "            (prints the sequence each item would type into a window of that title, typing nothing)\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, status, edit <entry-path> [password], delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
-        "             unsaved-edit <entry-path> <password>, unsaved-move <entry-path> <group-path>, unsaved-delete <entry-path>,\n" +
-        "             unsaved-rename <group-path> <name>, write-open <file>, and with the app's own\n" +
+        "             and with the app's own\n" +
         "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             pair, pairings, unpair <name>, which press Settings › Browser fill's Pair a browser, list it and Remove;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
-        "       twofish-create <vault>\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
         "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed;\n" +
@@ -165,19 +135,12 @@ internal static class Program
                 ["open", var vault] => await driver.OpenAsync(vault).ConfigureAwait(true),
                 ["welcome"] => driver.Welcome(KeePassXcDatabases.LocalConfigPaths),
                 ["welcome", "--keepassxc-config", var ini] => driver.Welcome(() => [ini]),
-                ["open-offered", var row] => await driver.OpenOfferedAsync(row, KeePassXcDatabases.LocalConfigPaths).ConfigureAwait(true),
-                ["open-offered", var row, "--keepassxc-config", var ini] => await driver.OpenOfferedAsync(row, () => [ini]).ConfigureAwait(true),
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
                 ["create", var vault, "--new-keyfile", var keyfile] => await driver.CreateAsync(vault, keyfile).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url, "--username", var username] => await driver.EditAsync(vault, entry, notes, url, username).ConfigureAwait(true),
                 ["item-new", var vault, var template, var folder, var title, .. var options] => await driver.NewItemAsync(vault, template, folder, title, options).ConfigureAwait(true),
-                ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
-                ["field-add", var vault, var entry, var name, "plain"] => await driver.AddFieldAsync(vault, entry, name, protect: false).ConfigureAwait(true),
-                ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
-                ["field-protect", var vault, var entry, var name] => await driver.ToggleProtectionAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
-                ["totp-set", var vault, var entry, var setup] => await driver.SetTotpAsync(vault, entry, setup).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag, "--decline"] => await driver.AddTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
                 ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
@@ -194,26 +157,15 @@ internal static class Program
                 ["env-entry-rm", var vault, var project, var environment, var entry] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: false).ConfigureAwait(true),
                 ["env-entry-rm", var vault, var project, var environment, var entry, "--decline"] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: true).ConfigureAwait(true),
                 ["projects", var vault] => await driver.ListProjectsAsync(vault).ConfigureAwait(true),
-                ["group-rename", var vault, var group, var name] => await driver.RenameGroupAsync(vault, group, name).ConfigureAwait(true),
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
-                ["trash-restore", var vault, var title] => await driver.RestoreRecycledAsync(vault, title).ConfigureAwait(true),
-                ["revision-restore", var vault, var entry, var row] => await driver.RestoreRevisionAsync(vault, entry, row).ConfigureAwait(true),
-                ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
-                ["notes-review", var vault] => await driver.ReviewNotesAsync(vault).ConfigureAwait(true),
-                ["notes-move", var vault, var entry, .. var keys] => await driver.MoveNoteKeysAsync(vault, entry, keys).ConfigureAwait(true),
-                ["notes-dismiss", var vault, var entry, var key] => await driver.DismissNoteKeyAsync(vault, entry, key).ConfigureAwait(true),
-                ["notes-restore", var vault, var entry, var key] => await driver.ReviewNoteKeyAgainAsync(vault, entry, key).ConfigureAwait(true),
                 ["tags-review", var vault] => await driver.ReviewLostTagsAsync(vault).ConfigureAwait(true),
                 ["tag-restore", var vault, var entry, var tag] => await driver.RestoreLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-dismiss", var vault, var entry, var tag] => await driver.DismissLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-again", var vault, var entry, var tag] => await driver.ReviewLostTagAgainAsync(vault, entry, tag).ConfigureAwait(true),
-                ["autotype", var vault, .. var pairs] when pairs.Length > 0 && pairs.Length % 2 == 0 =>
-                    await driver.ReportAutoTypeAsync(vault, pairs).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
-                ["twofish-create", var vault] => TwofishVault.Create(vault),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
                 ["launch", "--background"] => AppLaunch.Run(KeypasteHome.Resolve(home), ["--background"]),
@@ -314,48 +266,6 @@ internal sealed class Driver(string home)
         return await UnlockAsync(unlock, session, vault).ConfigureAwait(true) ?? Did("opened");
     }
 
-    /// <summary>
-    /// Prints, a line for each item and window title, where the sequence Auto-Type would type comes from and the sequence
-    /// as the vault holds it, or why it types nothing, then a line for each window pattern that matched nothing.
-    /// </summary>
-    internal async Task<int> ReportAutoTypeAsync(string vault, string[] pairs)
-    {
-        using var session = new AppVaultSession(TimeProvider.System, home: home);
-        using var unlock = Screen(session);
-
-        if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
-        {
-            return refused;
-        }
-
-        var unlocked = session.Unlocked ?? throw new DriverException("the session holds no vault once unlocked");
-
-        for (var i = 0; i < pairs.Length; i += 2)
-        {
-            var (entry, title) = (pairs[i], pairs[i + 1]);
-            using var plan = unlocked.PlanAutoType(EntryName.Parse(entry), title, TimeProvider.System)
-                ?? throw new DriverException($"Auto-Type offers no item '{entry}'");
-            var said = $"{entry} \"{title}\":";
-            var from = plan.Source switch
-            {
-                null => null,
-                AutoTypeSource.Association => $"association {plan.Association}",
-                var source => source.Value.ToString().ToLowerInvariant(),
-            };
-
-            Console.Out.WriteLine(from is null
-                ? $"{said} off: {plan.Refusal}"
-                : $"{said} {from}{(plan.Expired ? " expired" : string.Empty)} {plan.Sequence}{(plan.CanType ? string.Empty : $" refused: {plan.Refusal}")}");
-
-            foreach (var unmatched in plan.UnmatchedPatterns)
-            {
-                Console.Out.WriteLine($"{said} unmatched: {unmatched}");
-            }
-        }
-
-        return 0;
-    }
-
     /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them (N.2).</summary>
     internal int Welcome(Func<IReadOnlyList<string>> keePassXcConfigs)
     {
@@ -373,28 +283,6 @@ internal sealed class Driver(string home)
         }
 
         return 0;
-    }
-
-    /// <summary>Chooses the welcome's <paramref name="row"/>th database from KeePassXC, counting from 1, and unlocks it.</summary>
-    internal async Task<int> OpenOfferedAsync(string row, Func<IReadOnlyList<string>> keePassXcConfigs)
-    {
-        using var session = new AppVaultSession(TimeProvider.System, home: home);
-        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfigs: keePassXcConfigs);
-
-        if (!int.TryParse(row, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < 1 || n > unlock.KeePassXc.Count)
-        {
-            throw new DriverException($"the welcome offers {unlock.KeePassXc.Count} databases from KeePassXC, not a row {row}");
-        }
-
-        var chosen = unlock.KeePassXc[n - 1].Path;
-        unlock.SelectedKeePassXc = unlock.KeePassXc[n - 1];
-
-        if (unlock.SelectedPath != chosen)
-        {
-            return Refused(unlock.Message);
-        }
-
-        return await UnlockAsync(unlock, session, chosen).ConfigureAwait(true) ?? Did($"opened {chosen}");
     }
 
     /// <summary>Creates a vault through the unlock screen's create form, with a keyfile the form makes at <paramref name="newKeyfile"/> when one is named.</summary>
@@ -511,56 +399,6 @@ internal sealed class Driver(string home)
 
             entries.ConfirmAddCommand.Execute(null);
             return entries.IsAdding ? Refused(form.Error) : Did($"created {folder}/{title}");
-        });
-
-    internal Task<int> AddFieldAsync(string vault, string entry, string name, bool protect) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            var detail = Select(entries, entry);
-
-            Press(detail.BeginAddFieldCommand, "Add field");
-            detail.DraftFieldName = name;
-            detail.NewFieldProtected = protect;
-            Type(detail.NewFieldValue);
-
-            Press(detail.ConfirmAddFieldCommand, "Add");
-            return detail.IsAddingField || entries.Error is not null ? Refused(entries.Error) : Did($"added {name} to {entry}");
-        });
-
-    internal Task<int> SetTotpAsync(string vault, string entry, string setup) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            var detail = Select(entries, entry);
-
-            Press(detail.BeginSetTotpCommand, "Add one-time code");
-            foreach (var c in setup)
-            {
-                detail.NewTotp.Type(c);
-            }
-
-            Press(detail.ConfirmSetTotpCommand, "Add");
-            return detail.IsSettingTotp || entries.Error is not null ? Refused(entries.Error) : Did($"set the one-time code of {entry}");
-        });
-
-    internal Task<int> ReplaceFieldAsync(string vault, string entry, string name) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            var detail = Select(entries, entry);
-
-            Press(Field(detail, name).ReplaceCommand, "Replace");
-            Type(detail.ReplacementFieldValue);
-
-            Press(detail.ConfirmReplaceFieldCommand, "Replace");
-            return detail.IsReplacingField || entries.Error is not null ? Refused(entries.Error) : Did($"replaced {name} on {entry}");
-        });
-
-    internal Task<int> ToggleProtectionAsync(string vault, string entry, string name) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            var detail = Select(entries, entry);
-
-            Press(Field(detail, name).ToggleProtectionCommand, "Protection");
-            return entries.Error is not null ? Refused(entries.Error) : Did($"switched the protection of {name} on {entry}");
         });
 
     internal Task<int> RemoveFieldAsync(string vault, string entry, string name) =>
@@ -798,18 +636,6 @@ internal sealed class Driver(string home)
         return act(screen);
     }
 
-    internal Task<int> RenameGroupAsync(string vault, string group, string name) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            entries.SelectedGroup = entries.Groups.SingleOrDefault(node => node.Path == group)
-                ?? throw new DriverException($"no group '{group}' in the sidebar");
-
-            Press(entries.BeginRenameGroupCommand, "Rename group");
-            entries.DraftGroupName = name;
-            Press(entries.ConfirmRenameGroupCommand, "Rename");
-            return entries.IsRenamingGroup || entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
-        });
-
     internal Task<int> RelocateAsync(string vault, string entry, string group, string title) =>
         WithEntriesAsync(vault, entries => Relocate(entries, entry, group, title));
 
@@ -869,19 +695,6 @@ internal sealed class Driver(string home)
         return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
     }
 
-    /// <summary>Changes the open copy through core and leaves the change unsaved, as a save another program's refused leaves it.</summary>
-    private static void Unsaved(AppVaultSession session, string done, Func<Vault, bool> change)
-    {
-        var vault = session.Unlocked ?? throw new DriverException("an unsaved change needs an unlocked vault");
-
-        if (!change(vault))
-        {
-            throw new DriverException($"core refused the change that would have {done}");
-        }
-
-        Console.Out.WriteLine(done);
-    }
-
     /// <summary>The line a hold prints for a merge, with the words the shell's notice or banner says.</summary>
     private static string Merged(AppVaultSession session, MergeResult merged)
     {
@@ -896,13 +709,6 @@ internal sealed class Driver(string home)
             var refused => $"merged refused {refused}: {MergeNotice.Refused(merged)}",
         };
     }
-
-    internal Task<int> RestoreRecycledAsync(string vault, string title) =>
-        WithTrashAsync(vault, title, trash =>
-        {
-            Press(trash.RestoreCommand, "Restore");
-            return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
-        });
 
     private async Task<int> WithTrashAsync(string vault, string title, Func<TrashViewModel, int> act)
     {
@@ -919,67 +725,6 @@ internal sealed class Driver(string home)
         trash.Selected = trash.Rows.SingleOrDefault(row => row.Title == title)
             ?? throw new DriverException($"no single '{title}' in the trash");
         return act(trash);
-    }
-
-    internal Task<int> RestoreRevisionAsync(string vault, string entry, string which) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            var history = Select(entries, entry).History;
-
-            Press(history.ToggleCommand, "Show history");
-
-            var row = which == "oldest"
-                ? history.Rows.Count - 1
-                : int.Parse(which, System.Globalization.CultureInfo.InvariantCulture);
-
-            if (row < 0 || row >= history.Rows.Count)
-            {
-                throw new DriverException($"the history shows {history.Rows.Count} revisions, not row {row}");
-            }
-
-            history.Selected = history.Rows[row];
-            Press(history.RestoreCommand, "Restore this version");
-            return entries.Error is not null ? Refused(entries.Error) : Did($"restored row {row} of {entry}");
-        });
-
-    internal async Task<int> RestoreBackupAsync(string vault, string backup)
-    {
-        using var session = new AppVaultSession(TimeProvider.System, home: home);
-        using var unlock = Screen(session);
-
-        unlock.Offer(vault);
-
-        if (!string.Equals(unlock.SelectedPath, Path.GetFullPath(vault), StringComparison.Ordinal))
-        {
-            return Refused(unlock.Message);
-        }
-
-        if (await ChooseKeyfileAsync(unlock).ConfigureAwait(true) is { } refused)
-        {
-            return refused;
-        }
-
-        Press(unlock.StartRestoreCommand, "Restore a backup");
-
-        var restore = unlock.Restore ?? throw new DriverException("the restore panel did not open");
-
-        restore.Selected = restore.Rows.SingleOrDefault(row => Path.GetFileName(row.Backup.Path) == backup)
-            ?? throw new DriverException($"no backup '{backup}' listed");
-
-        foreach (var c in _password)
-        {
-            restore.Type(c);
-        }
-
-        await PressAsync(restore.CheckCommand, "Check").ConfigureAwait(true);
-
-        if (!restore.IsConfirming)
-        {
-            return Refused(restore.Message);
-        }
-
-        await PressAsync(restore.ConfirmCommand, "Restore").ConfigureAwait(true);
-        return session.IsUnlocked ? Did($"restored {backup}") : Refused(unlock.Restore?.Message ?? unlock.Message);
     }
 
     internal async Task<int> ExportAsync(string vault, string destination)
@@ -1000,63 +745,6 @@ internal sealed class Driver(string home)
             ? Did(settings.Message)
             : Refused(settings.Message);
     }
-
-    /// <summary>Lists the keys Settings › Recommendations found in notes on unlock, and how many need review: entry, key, kind and state, never a value.</summary>
-    internal Task<int> ReviewNotesAsync(string vault) =>
-        WithRecommendationsAsync(vault, list =>
-        {
-            foreach (var row in list.Rows)
-            {
-                var kind = row.IsToken ? "token" : "assignment";
-                var state = row.IsDismissed ? "dismissed" : "needs-review";
-                Console.Out.WriteLine($"finding entry={row.Entry} key={row.Key} kind={kind} state={state}");
-            }
-
-            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.Rows.Count(row => row.NeedsReview)}"));
-            return 0;
-        });
-
-    /// <summary>Selects one entry's findings, or the named keys of it, and presses Move selected.</summary>
-    internal Task<int> MoveNoteKeysAsync(string vault, string entry, string[] keys) =>
-        WithRecommendationsAsync(vault, list =>
-        {
-            var rows = list.Rows.Where(row => row.Entry == entry && row.NeedsReview && (keys.Length == 0 || keys.Contains(row.Key))).ToList();
-
-            if (rows.Count == 0)
-            {
-                throw new DriverException($"no finding needing review on '{entry}'");
-            }
-
-            foreach (var row in rows)
-            {
-                row.IsSelected = true;
-            }
-
-            Press(list.MoveSelectedCommand, "Move selected");
-            return list.Message.StartsWith("Moved ", StringComparison.Ordinal) ? Did(list.Message) : Refused(list.Message);
-        });
-
-    /// <summary>Presses Dismiss on one finding.</summary>
-    internal Task<int> DismissNoteKeyAsync(string vault, string entry, string key) =>
-        WithRecommendationsAsync(vault, list =>
-        {
-            var row = list.Rows.SingleOrDefault(row => row.Entry == entry && row.Key == key && row.NeedsReview)
-                ?? throw new DriverException($"no finding for {key} on '{entry}'");
-
-            Press(row.DismissCommand, "Dismiss");
-            return list.Message.Length == 0 ? Did("dismissed") : Refused(list.Message);
-        });
-
-    /// <summary>Presses Review again on one dismissed finding.</summary>
-    internal Task<int> ReviewNoteKeyAgainAsync(string vault, string entry, string key) =>
-        WithRecommendationsAsync(vault, list =>
-        {
-            var row = list.Rows.SingleOrDefault(row => row.Entry == entry && row.Key == key && row.IsDismissed)
-                ?? throw new DriverException($"no dismissed finding for {key} on '{entry}'");
-
-            Press(row.ReviewAgainCommand, "Review again");
-            return list.Message.Length == 0 ? Did("restored") : Refused(list.Message);
-        });
 
     /// <summary>Lists the project tags Settings › Recommendations found dropped, and how many need review: entry, tag and state, never a value (V.11).</summary>
     internal Task<int> ReviewLostTagsAsync(string vault) =>
@@ -1310,31 +998,6 @@ internal sealed class Driver(string home)
                     }
 
                     Console.Out.WriteLine("merge end");
-                    break;
-
-                case ["unsaved-edit", var entry, var password]:
-                    Unsaved(session, $"changed {entry}, unsaved", vault =>
-                        vault.Find(entry) is { } found && vault.UpdateEntry(found with { Password = password }));
-                    break;
-
-                case ["unsaved-move", var entry, var group]:
-                    Unsaved(session, $"moved {entry} to {group}, unsaved", vault =>
-                        vault.MoveEntry(EntryName.Parse(entry), group, out _) == OrganizeOutcome.Moved);
-                    break;
-
-                case ["unsaved-delete", var entry]:
-                    Unsaved(session, $"deleted {entry}, unsaved", vault =>
-                        vault.RemoveEntry(entry) is DeletionOutcome.Recycled or DeletionOutcome.DeletedPermanently);
-                    break;
-
-                case ["unsaved-rename", var group, var name]:
-                    Unsaved(session, $"renamed {group} to {name}, unsaved", vault =>
-                        vault.RenameGroup(group, name, out _) == GroupOutcome.Renamed);
-                    break;
-
-                case ["write-open", var file]:
-                    (session.Unlocked ?? throw new DriverException("write-open needs an unlocked vault")).WriteCopyTo(Path.GetFullPath(file));
-                    Console.Out.WriteLine($"wrote the open copy to {file}");
                     break;
 
                 case ["delete", var entry]:
@@ -1997,7 +1660,7 @@ internal sealed class Driver(string home)
         command.Execute(null);
     }
 
-    private static async Task PressAsync(IAsyncRelayCommand command, string button)
+    private static async Task PressAsync(AsyncRelayCommand command, string button)
     {
         if (!command.CanExecute(null))
         {

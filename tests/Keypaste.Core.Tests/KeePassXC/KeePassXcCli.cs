@@ -17,6 +17,12 @@ internal static class KeePassXcCli
 
     private static readonly Lazy<string?> _path = new(Find);
 
+    private static readonly Lazy<Version> _version = new(() =>
+        Version.Parse(System.Text.RegularExpressions.Regex.Match(Try(null, ["--version"]).Output, @"\d+\.\d+\.\d+").Value));
+
+    /// <summary>The CLI's version, for behaviour KeePassXC changed between releases.</summary>
+    internal static Version Version => _version.Value;
+
     /// <summary>The CLI's path, skipping or failing the test as the class remarks say when there is none.</summary>
     internal static string Path_
     {
@@ -39,15 +45,19 @@ internal static class KeePassXcCli
 
     /// <summary>Runs one command on <paramref name="vault"/> with <see cref="Password"/>, failing the test unless it exits 0.</summary>
     /// <returns>What it printed, without Qt's carriage returns.</returns>
-    internal static string Run(string command, string vault, params string[] arguments)
+    internal static string Run(string command, string vault, params string[] arguments) =>
+        Run(new KeePassXcKey(Password, null), command, vault, arguments);
+
+    /// <summary>Runs one command on <paramref name="vault"/> opened with <paramref name="key"/>, failing the test unless it exits 0.</summary>
+    internal static string Run(KeePassXcKey key, string command, string vault, params string[] arguments)
     {
-        var (exit, output, error) = Try(Password, [command, "-q", vault, .. arguments]);
+        var (exit, output, error) = Try(key.Password, [command, "-q", .. key.Arguments, vault, .. arguments]);
         Assert.True(exit == 0, $"keepassxc-cli {command} exited {exit}: {error}");
         return output;
     }
 
-    /// <summary>Runs keepassxc-cli with <paramref name="stdin"/> as its input, whatever it exits with.</summary>
-    internal static (int Exit, string Output, string Error) Try(string stdin, IEnumerable<string> arguments)
+    /// <summary>Runs keepassxc-cli with <paramref name="stdin"/> as its input, or none when null, whatever it exits with.</summary>
+    internal static (int Exit, string Output, string Error) Try(string? stdin, IEnumerable<string> arguments)
     {
         var start = new ProcessStartInfo(Path_)
         {
@@ -64,7 +74,12 @@ internal static class KeePassXcCli
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
-        process.StandardInput.WriteLine(stdin);
+        // A command given no password never reads its input and may exit before a write could reach it.
+        if (stdin is not null)
+        {
+            process.StandardInput.WriteLine(stdin);
+        }
+
         process.StandardInput.Close();
 
         if (!process.WaitForExit(TimeSpan.FromMinutes(1)))
@@ -104,4 +119,11 @@ internal static class KeePassXcCli
         const string macApp = "/Applications/KeePassXC.app/Contents/MacOS/keepassxc-cli";
         return OperatingSystem.IsMacOS() && File.Exists(macApp) ? macApp : null;
     }
+}
+
+/// <summary>What opens a vault in keepassxc-cli: a password, a keyfile, or both.</summary>
+internal sealed record KeePassXcKey(string? Password, string? Keyfile)
+{
+    internal string[] Arguments =>
+        [.. Keyfile is null ? [] : new[] { "-k", Keyfile }, .. Password is null ? new[] { "--no-password" } : []];
 }

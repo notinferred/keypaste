@@ -20,7 +20,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// Tool commands go to a recording runner, the tool's command and files are under the fixture's directory, the
 /// AppImage's link is a fake, and the check goes to a scripted bridge, so no test reaches a real tool's configuration
 /// or links anything. The session's home is the machine home's <c>.keypaste</c> unless a test says otherwise. The real
-/// bridge and the real prompt window are <c>scripts/verify-connect-client.sh</c>.
+/// bridge and the real prompt window are <c>Keypaste.Processes.Tests.ConnectClientTests</c>.
 /// </remarks>
 public sealed class ConnectClientViewModelTests : IDisposable
 {

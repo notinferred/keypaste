@@ -52,5 +52,14 @@ internal sealed class KeePassXcVault : IDisposable
     internal static bool IsProtected(XElement entry, string key) =>
         (string?)entry.Elements("String").Single(s => (string?)s.Element("Key") == key).Element("Value")!.Attribute("ProtectInMemory") == "True";
 
-    public void Dispose() => Directory.Delete(_directory, recursive: true);
+    public void Dispose()
+    {
+        // KeePassXC makes the key files it creates read-only, which Windows refuses to delete.
+        foreach (var path in Directory.EnumerateFiles(_directory, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+
+        Directory.Delete(_directory, recursive: true);
+    }
 }

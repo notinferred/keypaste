@@ -12,7 +12,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// The claim here is this test process's own, standing in for the holder, so this is the fast
-/// regression; <c>scripts/verify-held-saves.sh</c> is V-N.10's evidence, against the app and the agent
+/// regression; <c>Keypaste.Processes.Tests.HeldSavesTests</c> is V-N.10's evidence, against the app and the agent
 /// themselves.
 /// </remarks>
 public sealed class HeldVaultRefusalTests : IDisposable
