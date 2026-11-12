@@ -436,12 +436,7 @@ profile_compat() {
   run bash scripts/make-compat-fixture.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
-  run bash scripts/verify-keepassxc-history.sh artifacts/compat/local-history.kdbx
-  run bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/local-recyclebin.kdbx
-  run bash scripts/verify-keepassxc-run.sh artifacts/compat/local-run
-  run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
-  run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
-  run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
+  KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run npm ci --prefix site --no-audit --no-fund
   run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields

@@ -6,10 +6,8 @@
 #
 # verify-keepassxc-compat.sh proves a vault keypaste CREATES opens in KeePassXC,
 # verify-keepassxc-writeback.sh proves a vault keypaste MODIFIES still does,
-# verify-keepassxc-history.sh proves a revision keypaste RESTORES is the one KeePassXC reads,
-# verify-keepassxc-recyclebin.sh proves a DELETED entry is recoverable,
-# verify-keepassxc-backup.sh proves the copy of a replaced vault is a usable vault, and
-# verify-keepassxc-organize.sh proves a RENAMED entry keeps what keypaste does not model.
+# Keypaste.Core.Tests.KeePassXC proves restored revisions, recovered deletions, kept backups and renamed
+# entries are what KeePassXC reads.
 # This one covers what docs/STEPS.md V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
 # keypaste opens, writes and hands back, in every form such a keyfile can take. It also covers
 # V.1a2: `keypaste access` changes a vault's password and keyfile, and KeePassXC opens the result

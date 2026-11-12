@@ -22,12 +22,12 @@ namespace Keypaste.AppDriver;
 /// The app half of <c>scripts/verify-keepassxc-workflows.sh</c> (9.4). KeePassXC makes the vault and
 /// reads it back; between the two, this presses the same commands the views bind to, on the same view
 /// models, so a refusal a screen makes before core is reached is the app's refusal too. It never calls
-/// core for the act under test: <c>Keypaste.VaultRestorer</c> does that for the per-feature gates.
+/// core for the act under test.
 /// </para>
 /// <para>
 /// A command that is disabled is a refusal, not a silent no-op, so a greyed-out button cannot pass
 /// for a save. Output is the screen's own sentence and never a value. Secrets arrive in the
-/// environment, as they do for the restorer. Exit 0 did it, 1 the screen refused, 2 usage, 3 the
+/// environment. Exit 0 did it, 1 the screen refused, 2 usage, 3 the
 /// driver could not arrange the act.
 /// </para>
 /// <para>
