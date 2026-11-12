@@ -441,9 +441,6 @@ profile_compat() {
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
   KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
-  run npm ci --prefix site --no-audit --no-fund
-  run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
-  run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
 }

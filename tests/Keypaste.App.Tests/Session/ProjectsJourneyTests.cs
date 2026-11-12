@@ -32,9 +32,8 @@ namespace Keypaste.App.Tests.Session;
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
-/// with every frame held to N.1a2's amber rule. The vault is written through Core with the layout
-/// <c>scripts/verify-keepassxc-projects.sh</c> has KeePassXC make, where KeePassXC then reads every
-/// write. Run uses the machine's terminal as the app finds it: <c>cmd.exe</c> on Windows, on Linux
+/// with every frame held to N.1a2's amber rule. The vault is written through Core in a project layout
+/// KeePassXC reads in <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>. Run uses the machine's terminal as the app finds it: <c>cmd.exe</c> on Windows, on Linux
 /// a stand-in <c>x-terminal-emulator</c> put first on <c>PATH</c> that runs its <c>-e</c> command, since a
 /// runner has no display, and on macOS Terminal through an assembled <c>keypaste.app</c> and
 /// <see cref="TerminalStandIn"/>, its window's <c>keypaste run --session</c> asking the app's own endpoint.

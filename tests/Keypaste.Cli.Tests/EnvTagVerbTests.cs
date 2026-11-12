@@ -5,7 +5,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>env tag</c>, <c>env untag</c> and the project listing <c>env ls</c> builds from tags alone.
-/// Tags are checked through the core, and against KeePassXC by <c>verify-keepassxc-projects.sh</c>.
+/// Tags are checked through the core, and against KeePassXC by <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>.
 /// </summary>
 public sealed class EnvTagVerbTests : IDisposable
 {

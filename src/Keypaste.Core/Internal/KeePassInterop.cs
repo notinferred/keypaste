@@ -1391,8 +1391,8 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// <para>
     /// Every other entry with the title, which a person or another program made, is given the value
-    /// rather than a tombstone: KeePassXC's merge applies no deletion and would bring it back
-    /// (verify-keepassxc-projects.sh), while one holding the value settles by time like the first.
+    /// rather than a tombstone: KeePassXC's merge applies no deletion and would bring it back,
+    /// while one holding the value settles by time like the first.
     /// </para>
     /// </remarks>
     internal bool WriteRecord(EntryName name, Func<string, Guid> idOf, string field, string value)

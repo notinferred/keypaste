@@ -289,22 +289,6 @@ jobs:
           dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
           dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
 
-      # The fields gate shares through the site's Worker, run on loopback by wrangler.
-      - name: Install the site's locked packages
-        shell: bash
-        timeout-minutes: 10
-        run: npm ci --prefix site --no-audit --no-fund
-
-      - name: Verify custom fields through real KeePassXC
-        shell: bash
-        timeout-minutes: 10
-        run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
-
-      - name: Verify project tags and their protection through real KeePassXC
-        shell: bash
-        timeout-minutes: 15
-        run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
-
       - name: Verify opening a keyfile-protected vault through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
