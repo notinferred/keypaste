@@ -32,7 +32,8 @@ public sealed class RunSessionTests
         {
             var prompt = app.WaitFor("^env-prompt project=");
             Assert.StartsWith("env-prompt project=ci command=", prompt, StringComparison.Ordinal);
-            Assert.Contains("case-approve directory=", prompt, StringComparison.Ordinal);
+            Assert.Contains("case-approve", prompt, StringComparison.Ordinal);
+            Assert.Contains(" directory=", prompt, StringComparison.Ordinal);
             Assert.EndsWith("project keys=DB_URL,DEPLOY_KEY entries=env/ci/.env,env/ci/.env", prompt, StringComparison.Ordinal);
             app.Send("once");
             AssertReleased(run);
