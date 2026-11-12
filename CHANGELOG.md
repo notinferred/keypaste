@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Quitting the desktop app just after its window moved no longer ends it with a crash report ([F.110](docs/steps/F.110.md)).
+
 An item's kind (Login, API key, Database, Server or Secure note) is kept as its KeePass icon, so KeePassXC shows the same icon, and Item › Change kind changes it without touching its fields ([F.110](docs/steps/F.110.md)).
 
 New item and the password generator open as sheets over the window, the sidebar's Groups and Projects headings each add their own, Import sits at the sidebar's foot, an open item has a share button, and a username box completes a username the vault already uses ([F.110](docs/steps/F.110.md)).

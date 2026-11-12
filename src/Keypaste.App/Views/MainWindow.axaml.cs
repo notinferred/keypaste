@@ -36,7 +36,11 @@ internal sealed partial class MainWindow : Window
 
         ApplyZoom();
         InterfaceZoom.Changed += ApplyZoom;
-        Closed += (_, _) => InterfaceZoom.Changed -= ApplyZoom;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            InterfaceZoom.Changed -= ApplyZoom;
+        };
 
         Opened += (_, _) =>
         {
@@ -44,15 +48,26 @@ internal sealed partial class MainWindow : Window
             NoteBounds();
         };
 
-        // Posted, because a platform can report the new size of a maximize before its new state.
+        // Posted, because a platform can report the new size of a maximize before its new state; a window closed by then has no screen to ask.
         PositionChanged += (_, _) => Dispatcher.UIThread.Post(
             () =>
             {
-                HoldMinimum();
-                NoteBounds();
+                if (!_closed)
+                {
+                    HoldMinimum();
+                    NoteBounds();
+                }
             },
             DispatcherPriority.Background);
-        Resized += (_, _) => Dispatcher.UIThread.Post(NoteBounds, DispatcherPriority.Background);
+        Resized += (_, _) => Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (!_closed)
+                {
+                    NoteBounds();
+                }
+            },
+            DispatcherPriority.Background);
     }
 
     /// <summary>Opens the window as it was left, on the screen it was on or brought back onto one, before it shows.</summary>
@@ -176,6 +191,7 @@ internal sealed partial class MainWindow : Window
     private IInputElement? _beforeMenu;
     private (PixelPoint Position, Size Size)? _normal;
     private WindowMode _mode;
+    private bool _closed;
 
     private void OnGotFocus(object? sender, FocusChangedEventArgs e)
     {
