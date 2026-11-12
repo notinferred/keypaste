@@ -243,8 +243,7 @@ test_desktop() {
   run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
 }
 check_desktop_gates() {
-  integration_script scripts/verify-session-authority.sh
-  integration_script scripts/verify-lock-boundary.sh
+  run_tests dotnet test tests/Keypaste.Processes.Tests/Keypaste.Processes.Tests.csproj --no-build -c Release
   integration_script scripts/verify-current-state.sh
   integration_script scripts/verify-session-lifecycle.sh
   integration_script scripts/verify-desktop-approval.sh

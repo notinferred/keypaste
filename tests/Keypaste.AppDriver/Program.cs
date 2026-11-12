@@ -33,11 +33,11 @@ namespace Keypaste.AppDriver;
 /// launch does, unlocks, prints the session it holds, and then locks or unlocks again on each line
 /// read from standard input until it closes, which it answers as the app answers quitting. Each of
 /// those prints a <c>status</c> line as the authority reports it.
-/// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--locked</c> it starts at the
+/// <c>Keypaste.Processes.Tests</c> drives it (U.1). With <c>--locked</c> it starts at the
 /// unlock screen, as a launch does, and waits for <c>unlock</c>, so
 /// <c>scripts/verify-session-lifecycle.sh</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
-/// <c>withdrawn</c>, so <c>scripts/verify-lock-boundary.sh</c> can lock the app with a real request
+/// <c>withdrawn</c>, so <c>LockBoundaryTests</c> can lock the app with a real request
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
 /// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
 /// <c>relocate</c> act on the held vault through the entries screen, so
