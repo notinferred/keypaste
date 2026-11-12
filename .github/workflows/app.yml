@@ -18,7 +18,6 @@ on:
       - 'scripts/verify-agent-activity.sh'
       - 'scripts/verify-connect-client.sh'
       - 'scripts/verify-run-session.sh'
-      - 'scripts/verify-held-saves.sh'
       - 'scripts/verify-crash-report.sh'
       - 'scripts/verify-browser-host.sh'
       - 'tests/Keypaste.FakeBrowser/**'

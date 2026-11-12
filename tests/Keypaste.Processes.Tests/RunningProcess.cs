@@ -62,8 +62,8 @@ internal sealed class RunningProcess : IDisposable
     /// <summary>Waits until standard output holds <paramref name="count"/> lines matching <paramref name="pattern"/>.</summary>
     internal string WaitForOutput(string pattern, int count = 1) => WaitFor(_output, pattern, count, "standard output");
 
-    /// <summary>Waits until standard error holds a line matching <paramref name="pattern"/>.</summary>
-    internal string WaitForError(string pattern) => WaitFor(_error, pattern, 1, "standard error");
+    /// <summary>Waits until standard error holds <paramref name="count"/> lines matching <paramref name="pattern"/>.</summary>
+    internal string WaitForError(string pattern, int count = 1) => WaitFor(_error, pattern, count, "standard error");
 
     internal int WaitForExit()
     {

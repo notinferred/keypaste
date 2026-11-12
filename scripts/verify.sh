@@ -247,7 +247,6 @@ check_desktop_gates() {
   integration_script scripts/verify-agent-activity.sh
   integration_script scripts/verify-connect-client.sh
   integration_script scripts/verify-run-session.sh
-  integration_script scripts/verify-held-saves.sh
   integration_script scripts/verify-crash-report.sh
   integration_script scripts/verify-browser-host.sh
   # A machine with no ICU is a Linux machine; .NET on Windows and macOS uses the system's own.
