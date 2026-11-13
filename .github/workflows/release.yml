@@ -441,7 +441,7 @@ jobs:
         shell: bash
         run: scripts/third-party-notices.sh check cli artifacts/stage/THIRD_PARTY_NOTICES.md
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-${{ matrix.rid }}
           path: artifacts/dist/*
@@ -467,7 +467,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -508,7 +508,7 @@ jobs:
       # The desktop packages were built by app.yml on this tag, not here. They arrive from that run
       # rather than being rebuilt, so the bytes installed on a runner in 4.7b and upgraded in 4.7d
       # are the bytes that reach the origin.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: contains(steps.components.outputs.list, 'app')
         with:
           pattern: app-*
@@ -669,7 +669,7 @@ jobs:
 
       - name: Keep the manifest and bundle whatever the answer was
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: completion-record
           path: |
