@@ -53,7 +53,11 @@ export default defineConfig({
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'Source on GitHub', href: 'https://github.com/notinferred/keypaste' }],
       customCss: ['./src/styles/brand.css'],
-      components: { SocialIcons: './src/components/SocialIcons.astro' },
+      components: {
+        Head: './src/components/Head.astro',
+        Search: './src/components/Search.astro',
+        SocialIcons: './src/components/SocialIcons.astro',
+      },
       lastUpdated: false,
       sidebar: [
         {

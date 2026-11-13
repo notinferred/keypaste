@@ -10,6 +10,9 @@ node_modules/
 # keypaste.com's content build (site/web builds into site/dist)
 site/dist/
 site/web/.astro/
+# Written by site/web/scripts/pull.mjs from InfernoCMS, which owns the content pages
+site/web/src/content/docs/
+site/web/src/generated/
 .vs/
 .idea/
 *.user

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+keypaste.com's pages come from InfernoCMS and are published from there, and each page has an Ask button that answers from the site's pages with links to them, structured data for search engines and a Markdown version for AI tools.
+
 Quitting the desktop app just after its window moved no longer ends it with a crash report ([F.110](docs/steps/F.110.md)).
 
 An item's kind (Login, API key, Database, Server or Secure note) is kept as its KeePass icon, so KeePassXC shows the same icon, and Item › Change kind changes it without touching its fields ([F.110](docs/steps/F.110.md)).

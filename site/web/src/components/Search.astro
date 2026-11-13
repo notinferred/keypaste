@@ -1,0 +1,200 @@
+---
+import Default from '@astrojs/starlight/components/Search.astro';
+---
+
+<Default {...Astro.props} />
+<kp-ask>
+  <button type="button" class="kp-ask-open" aria-haspopup="dialog">Ask</button>
+  <dialog class="kp-ask-dialog" aria-labelledby="kp-ask-title">
+    <form class="kp-ask-form">
+      <h2 id="kp-ask-title">Ask about keypaste</h2>
+      <label for="kp-ask-query">Your question</label>
+      <div class="kp-ask-row">
+        <input id="kp-ask-query" name="query" type="text" required maxlength="500" autocomplete="off" />
+        <button type="submit">Ask</button>
+      </div>
+      <p class="kp-ask-note">Answered from this site's pages by keypaste's content service.</p>
+      <div class="kp-ask-result" aria-live="polite">
+        <p class="kp-ask-answer" hidden></p>
+        <h3 class="kp-ask-sources-title" hidden></h3>
+        <ul class="kp-ask-sources"></ul>
+      </div>
+      <button type="button" class="kp-ask-close">Close</button>
+    </form>
+  </dialog>
+</kp-ask>
+
+<script>
+  const ASK_URL = 'https://infernocms.com/v1/keypaste/ask';
+
+  class KpAsk extends HTMLElement {
+    connectedCallback() {
+      const dialog = this.querySelector('dialog')!;
+      const form = this.querySelector('form')!;
+      const input = this.querySelector('input')!;
+      const answer = this.querySelector<HTMLElement>('.kp-ask-answer')!;
+      const sourcesTitle = this.querySelector<HTMLElement>('.kp-ask-sources-title')!;
+      const sources = this.querySelector('.kp-ask-sources')!;
+      const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+      const show = (text: string | null, title: string, links: { title: string; url: string }[]) => {
+        answer.hidden = !text;
+        answer.textContent = text ?? '';
+        sourcesTitle.hidden = links.length === 0;
+        sourcesTitle.textContent = title;
+        sources.replaceChildren(
+          ...links.map(({ title, url }) => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.textContent = title;
+            link.href = url;
+            item.append(link);
+            return item;
+          }),
+        );
+      };
+
+      this.querySelector('.kp-ask-open')!.addEventListener('click', () => {
+        dialog.showModal();
+        input.focus();
+      });
+      this.querySelector('.kp-ask-close')!.addEventListener('click', () => dialog.close());
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const query = input.value.trim();
+        if (!query) return;
+        submit.disabled = true;
+        show('Looking…', '', []);
+        try {
+          const response = await fetch(ASK_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+          if (response.status === 429) {
+            show('Too many questions for now. Try again later, or use the search.', '', []);
+            return;
+          }
+          if (!response.ok) throw new Error(String(response.status));
+          const result = await response.json();
+          const links = (Array.isArray(result.sources) ? result.sources : []).filter(
+            (source: { url?: unknown }) => typeof source.url === 'string' && source.url.startsWith('https://'),
+          );
+          const text = typeof result.answer === 'string' ? result.answer : null;
+          show(text ?? (links.length ? null : 'No page matches that question.'), text ? 'Sources' : 'Top matches', links);
+        } catch {
+          show('The answer service did not respond. Try the search instead.', '', []);
+        } finally {
+          submit.disabled = false;
+        }
+      });
+    }
+  }
+  customElements.define('kp-ask', KpAsk);
+</script>
+
+<style>
+  kp-ask {
+    display: contents;
+  }
+  .kp-ask-open {
+    margin-inline-start: 0.5rem;
+    height: 2.5rem;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background-color: var(--sl-color-black);
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    cursor: pointer;
+  }
+  .kp-ask-open:hover {
+    border-color: var(--sl-color-gray-2);
+    color: var(--sl-color-white);
+  }
+  .kp-ask-dialog {
+    width: min(36rem, calc(100% - 2rem));
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-gray-1);
+    box-shadow: var(--sl-shadow-lg);
+  }
+  .kp-ask-dialog::backdrop {
+    background-color: var(--sl-color-backdrop-overlay);
+  }
+  .kp-ask-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .kp-ask-form h2 {
+    margin: 0;
+    font-size: var(--sl-text-xl);
+    color: var(--sl-color-white);
+  }
+  .kp-ask-form label {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+  .kp-ask-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .kp-ask-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.5rem;
+    background-color: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font: inherit;
+  }
+  .kp-ask-form button {
+    padding: 0.5rem 0.9rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background-color: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .kp-ask-form button:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+  .kp-ask-form .kp-ask-close {
+    align-self: flex-end;
+    background-color: transparent;
+    color: var(--sl-color-gray-2);
+    border: 1px solid var(--sl-color-gray-5);
+  }
+  .kp-ask-note {
+    margin: 0;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  .kp-ask-result p,
+  .kp-ask-result h3 {
+    margin: 0 0 0.5rem;
+  }
+  .kp-ask-result h3 {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+  }
+  .kp-ask-sources {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+  }
+  .kp-ask-sources a {
+    color: var(--sl-color-accent-high);
+  }
+</style>

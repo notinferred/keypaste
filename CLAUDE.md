@@ -35,8 +35,9 @@ Documents fall into four layers. A base document describes the product and how t
 | Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, release procedure and installation verification |
 | Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, Unreleased apart from published versions |
 | Public | Guides in `docs/`: desktop, mcp-setup, policy, approvals, safe-agents, replace-dotenv, demo, keepass-and-agents, launch | How to use or present one surface |
-| Public | [keypaste.com's pages](site/web/src/content/docs/) | How keypaste works, the products and their labels (`site/web/src/data/products.json`), comparisons, the vision and the docs hub |
-| Public | [ACAF](site/web/src/content/docs/acaf/v1.mdx) v1 and v1.1 | The Agent Credential Access Format and keypaste's status in RELEASE's terms; a format change is a new version |
+| Public | keypaste.com's pages, in InfernoCMS at `https://infernocms.com`, site `keypaste` | How keypaste works, the products and their labels (`site/web/src/data/products.json`), comparisons, the vision and the docs hub; the build pulls them into `site/web/src/content/docs/`, which git ignores ([site/README](site/README.md#content-pages)) |
+| Public | Topic map, InfernoCMS's graph for site `keypaste` | Which page owns each question keypaste.com answers, the searches it targets and the questions no page answers yet |
+| Public | [ACAF](https://keypaste.com/acaf/v1/) v1 and v1.1, InfernoCMS pages `acaf/v1` and `acaf/v1.1` | The Agent Credential Access Format and keypaste's status in RELEASE's terms; a format change is a new version |
 
 ### What a step writes
 

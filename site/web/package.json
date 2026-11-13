@@ -7,6 +7,10 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "pull": "node scripts/pull.mjs --site keypaste --out src/content/docs --clean --public ../public --jsonld src/generated/jsonld.json",
+    "predev": "npm run pull -- --if-missing",
+    "dev": "astro dev",
+    "prebuild": "npm run pull",
     "build": "astro build"
   },
   "dependencies": {

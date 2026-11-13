@@ -1,0 +1,17 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro';
+import jsonld from '../generated/jsonld.json';
+
+const { id } = Astro.locals.starlightRoute;
+const structuredData = (jsonld as Record<string, unknown>)[id];
+---
+
+<Default />
+{
+  structuredData && (
+    <>
+      <script type="application/ld+json" set:html={JSON.stringify(structuredData).replaceAll('<', '\\u003c')} />
+      <link rel="alternate" type="text/markdown" href={`https://infernocms.com/v1/keypaste/pages/${id}.md`} />
+    </>
+  )
+}
