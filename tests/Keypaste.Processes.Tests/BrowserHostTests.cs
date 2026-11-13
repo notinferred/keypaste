@@ -137,7 +137,10 @@ public sealed class BrowserHostTests
         var manifests = new Dictionary<string, string>();
         foreach (var browser in _browsers)
         {
-            var sharing = OperatingSystem.IsWindows() && browser == "brave" ? " Chrome reads the same setting, so it is on too." : string.Empty;
+            var sharing = !OperatingSystem.IsWindows() ? string.Empty
+                : browser == "brave" ? " Chrome reads the same setting, so it is on too."
+                : browser == "chrome" ? " Brave reads the same setting, so it is on too."
+                : string.Empty;
             Assert.Equal($"browser-on {browser}: {Name(browser)} now starts keypaste at {keypaste}.{sharing}", app.Act($"browser-on {browser}"));
             Assert.StartsWith($"on=true other=false answer={Name(browser)} starts keypaste at {keypaste}. ", Status(app, ref statuses)[browser], StringComparison.Ordinal);
 
