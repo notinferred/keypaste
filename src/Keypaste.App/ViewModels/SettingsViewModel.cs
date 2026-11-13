@@ -260,6 +260,11 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     internal bool HasBrowserFill => BrowserFill is not null;
 
+    /// <summary>Browser fill's browsers, each turned on and off as keypaste's host; null where the shell lists none.</summary>
+    internal BrowserHostsViewModel? BrowserHosts { get; init; }
+
+    internal bool HasBrowserHosts => BrowserHosts is not null;
+
     internal bool HasCrashReports => Crashes is not null;
 
     /// <summary>Shows the one terms screen over this one; the view sets it.</summary>

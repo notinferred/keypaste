@@ -270,6 +270,9 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The link a terminal finds this app's <c>keypaste</c> through; the platform's own unless a test gives another.</summary>
     internal Func<ICliLink?> CliLinkFor { get; init; } = CliLinks.ForThisProcess;
 
+    /// <summary>The browsers' hosts Settings turns on and off; the user's own unless a test or <c>Program</c> gives others.</summary>
+    internal Func<BrowserHostSetup> BrowserHostsFor { get; init; } = BrowserHostSetup.ForThisProcess;
+
     /// <summary>What a project's Run and Open terminal start with, given the authority; the platform's own unless a test gives another.</summary>
     internal Func<AppAuthority?, ProjectLaunching> LaunchingFor { get; init; } = ProjectLaunching.ForThisMachine;
 
@@ -905,6 +908,7 @@ internal sealed partial class App : Application, IDisposable
             CalmMoment = _notifications is { } notifications ? new CalmPermission(notifications, () => _authority?.IsAsking == true).Offer : null,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
+            BrowserHosts = BrowserHostsFor(),
             Tools = ClientConnector.ForThisProcess,
             Launching = LaunchingFor(_authority),
             Crashes = Crashes,

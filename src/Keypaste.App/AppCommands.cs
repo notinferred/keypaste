@@ -132,6 +132,7 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _lostTagMenu;
     private readonly IReadOnlyList<AppMenuEntry> _weakPasswordMenu;
     private readonly IReadOnlyList<AppMenuEntry> _pairingMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _browserHostMenu;
 
     // The row a context menu was opened on, for the rows that cannot be chosen without opening them.
     private object? _context;
@@ -163,6 +164,7 @@ internal sealed class AppCommands
         var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
         _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var removePairing = Routed(Strings.RemovePairing, () => Settings()?.BrowserFill, browser => browser.AskRemoveCommand, _ => Target<PairingItem>());
+        var changeBrowserHost = Routed(Strings.TurnOnForThisBrowser, () => Settings()?.BrowserHosts, hosts => hosts.ChangeCommand, _ => Target<BrowserHostRow>()) with { Says = () => Target<BrowserHostRow>()?.ActionName ?? Strings.TurnOnForThisBrowser };
         var exportReferences = Routed(Strings.ExportEnvKeypasteLabel, Project, project => project.ExportReferencesCommand);
         var newProject = Routed(Strings.NewProjectLabel, Unmodal, shell => shell.NewProjectCommand);
         var importFromAnotherApp = new AppCommand(ImportHeader, [], CanImport, () => Unmodal()?.ImportCommand.Press());
@@ -197,6 +199,7 @@ internal sealed class AppCommands
                 Routed(Strings.ReplaceTheOtherKeypaste, () => Settings() is { OffersCliReplace: true } settings ? settings : null, settings => settings.BeginReplaceCliCommand),
                 Routed(Strings.StopPairing, () => Settings()?.BrowserFill, browser => browser.StopCommand),
                 removePairing,
+                changeBrowserHost,
                 Routed(Strings.ForgetRecentVaults, () => Settings() is { IsConfirmingForgetAll: false } settings ? settings : null, settings => settings.AskForgetAllCommand)),
         ]);
 
@@ -386,6 +389,7 @@ internal sealed class AppCommands
         _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
         _weakPasswordMenu = [openWeakPassword, _line, dismissFinding, reviewFindingAgain];
         _pairingMenu = [removePairing];
+        _browserHostMenu = [changeBrowserHost];
         NewProject = newProject;
         SidebarImport = [importFromAnotherApp, importEnv];
 
@@ -634,7 +638,7 @@ internal sealed class AppCommands
     internal static bool HasContextMenu(object? row) =>
         row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
             or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow
-            or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or PairingItem;
+            or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or PairingItem or BrowserHostRow;
 
     /// <summary>
     /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
@@ -677,6 +681,8 @@ internal sealed class AppCommands
                 return Bound(_weakPasswordMenu, row);
             case PairingItem when Settings() is not null:
                 return Bound(_pairingMenu, row);
+            case BrowserHostRow when Settings() is not null:
+                return Bound(_browserHostMenu, row);
             case EntryAttachmentRow when Items() is not null:
                 return Bound(_attachmentMenu, row);
             case EnvKeyRow { Variable: not null } when Project() is not null:

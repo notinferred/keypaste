@@ -146,7 +146,7 @@ internal sealed record LogRow
         // A browser's line names the build as its client and the pairing as its label (D-0637).
         if (Is(entry.Tool, "browser"))
         {
-            return entry.Label.Length > 0 ? entry.Label : "KeePassXC-Browser";
+            return entry.Label.Length > 0 ? entry.Label : "keypaste's extension";
         }
 
         if (Is(entry.Method, "token"))

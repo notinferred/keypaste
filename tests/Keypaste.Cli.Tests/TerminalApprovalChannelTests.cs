@@ -362,7 +362,7 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(expected == ApprovalAnswer.ApprovedOnce ? "laptop" : null, said.Name);
         var shown = rig.Stderr.ToString();
         Assert.Contains("keypaste: a browser asks to pair with this vault.", shown, StringComparison.Ordinal);
-        Assert.Contains("  browser  KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)", shown, StringComparison.Ordinal);
+        Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)", shown, StringComparison.Ordinal);
         Assert.Contains("  name     laptop", shown, StringComparison.Ordinal);
         Assert.Contains("any program you run can name it too", shown, StringComparison.Ordinal);
     }
@@ -375,7 +375,7 @@ public sealed class TerminalApprovalChannelTests
         rig.Channel.Tell(new PairingNotice(Keypaste.Core.Browser.BrowserIdentity.FirefoxAddOns));
 
         var said = rig.Stderr.ToString();
-        Assert.Contains("KeePassXC-Browser from Firefox Add-ons (keepassxc-browser@keepassxc.org) asked to pair, and was refused", said, StringComparison.Ordinal);
+        Assert.Contains("keypaste's extension from Firefox Add-ons (browser@keypaste.invalid) asked to pair, and was refused", said, StringComparison.Ordinal);
         Assert.Contains("--pair-browser <name>", said, StringComparison.Ordinal);
     }
 

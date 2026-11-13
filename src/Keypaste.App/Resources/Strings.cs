@@ -71,6 +71,7 @@ public static class Strings
     public static string BringAllToFront => Manager.GetString("BringAllToFront", CultureInfo.CurrentUICulture)!;
     public static string Browser => Manager.GetString("Browser", CultureInfo.CurrentUICulture)!;
     public static string BrowserFill => Manager.GetString("BrowserFill", CultureInfo.CurrentUICulture)!;
+    public static string Browsers => Manager.GetString("Browsers", CultureInfo.CurrentUICulture)!;
     public static string CanSee => Manager.GetString("CanSee", CultureInfo.CurrentUICulture)!;
     public static string CanSeeUsernames => Manager.GetString("CanSeeUsernames", CultureInfo.CurrentUICulture)!;
     public static string CanSeeUsernamesOnRequest => Manager.GetString("CanSeeUsernamesOnRequest", CultureInfo.CurrentUICulture)!;
@@ -284,7 +285,6 @@ public static class Strings
     public static string KEY => Manager.GetString("KEY", CultureInfo.CurrentUICulture)!;
     public static string KEYPASTEHOMECapitals => Manager.GetString("KEYPASTEHOMECapitals", CultureInfo.CurrentUICulture)!;
     public static string KeePassItemID => Manager.GetString("KeePassItemID", CultureInfo.CurrentUICulture)!;
-    public static string KeePassXCBrowserPairsWithKeypasteAsItX779e5d => Manager.GetString("KeePassXCBrowserPairsWithKeypasteAsItX779e5d", CultureInfo.CurrentUICulture)!;
     public static string KeePassXCsDatabases => Manager.GetString("KeePassXCsDatabases", CultureInfo.CurrentUICulture)!;
     public static string KeepBoth => Manager.GetString("KeepBoth", CultureInfo.CurrentUICulture)!;
     public static string KeepBothLandsEachBesideYoursUnderX77358f => Manager.GetString("KeepBothLandsEachBesideYoursUnderX77358f", CultureInfo.CurrentUICulture)!;
@@ -298,6 +298,7 @@ public static class Strings
     public static string KeyName => Manager.GetString("KeyName", CultureInfo.CurrentUICulture)!;
     public static string KeyValue => Manager.GetString("KeyValue", CultureInfo.CurrentUICulture)!;
     public static string KeypasteCantWriteItsAuditLog => Manager.GetString("KeypasteCantWriteItsAuditLog", CultureInfo.CurrentUICulture)!;
+    public static string KeypasteExtensionPairsWithTheVaultXb9e44c => Manager.GetString("KeypasteExtensionPairsWithTheVaultXb9e44c", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHasntOpenedThisFileBefore => Manager.GetString("KeypasteHasntOpenedThisFileBefore", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHelp => Manager.GetString("KeypasteHelp", CultureInfo.CurrentUICulture)!;
     public static string KeypasteHome => Manager.GetString("KeypasteHome", CultureInfo.CurrentUICulture)!;
@@ -623,6 +624,9 @@ public static class Strings
     public static string TouchYourYubiKey => Manager.GetString("TouchYourYubiKey", CultureInfo.CurrentUICulture)!;
     public static string Trash => Manager.GetString("Trash", CultureInfo.CurrentUICulture)!;
     public static string TryAgain => Manager.GetString("TryAgain", CultureInfo.CurrentUICulture)!;
+    public static string TurnOff => Manager.GetString("TurnOff", CultureInfo.CurrentUICulture)!;
+    public static string TurnOn => Manager.GetString("TurnOn", CultureInfo.CurrentUICulture)!;
+    public static string TurnOnForThisBrowser => Manager.GetString("TurnOnForThisBrowser", CultureInfo.CurrentUICulture)!;
     public static string URL => Manager.GetString("URL", CultureInfo.CurrentUICulture)!;
     public static string Undo => Manager.GetString("Undo", CultureInfo.CurrentUICulture)!;
     public static string Unlock => Manager.GetString("Unlock", CultureInfo.CurrentUICulture)!;

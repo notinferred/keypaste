@@ -2,6 +2,7 @@ using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Import;
 using Keypaste.Core.Launch;
@@ -67,6 +68,9 @@ internal sealed class CliContext
 
     /// <summary>The AppImage this <c>keypaste</c> runs from, whose link <c>setup</c> registers instead; null outside one.</summary>
     internal Func<McpAppImage?> AppImage { get; init; } = () => null;
+
+    /// <summary>The key under <c>HKCU</c> under which <c>browser</c> reads and writes the browsers' keys on Windows, which a test moves to its own.</summary>
+    internal string HostRegistryRoot { get; init; } = HostPlaces.DefaultRegistryRoot;
 
     /// <summary>The readers <c>import</c> asks about a file that is not a KeePass database.</summary>
     internal IReadOnlyList<IExportReader> ExportReaders { get; init; } = ExportImport.Readers;

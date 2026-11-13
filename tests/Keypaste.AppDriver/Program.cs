@@ -9,6 +9,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
@@ -103,6 +104,8 @@ internal static class Program
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             pair, pairings, unpair <name>, which press Settings › Browser fill's Pair a browser, list it and Remove;\n" +
+        "             browser-status, browser-on <browser>, browser-off <browser>, which list Settings › Browser fill's browsers\n" +
+        "             and press Turn on or Turn off, set up under the KEYPASTE_DRIVER_BROWSER_ folders;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
@@ -111,7 +114,9 @@ internal static class Program
         "       crash-endpoint <folder> [--silent]\n" +
         "            (answers crash reports on loopback 204 and keeps each in <folder>, or never answers, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
-        "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.";
+        "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.\n" +
+        "KEYPASTE_DRIVER_BROWSER_PROGRAM is the keypaste the browsers start, and KEYPASTE_DRIVER_BROWSER_ followed by HOME, USERPROFILE,\n" +
+        "XDG_CONFIG_HOME, APPDATA, LOCALAPPDATA and REGISTRY_ROOT the folders and the key under HKCU they are set up in.";
 
     private static async Task<int> Main(string[] args)
     {
@@ -1037,6 +1042,13 @@ internal sealed class Driver(string home)
                     Unpair(authority, command["unpair ".Length..]);
                     break;
 
+                case ["browser-status"]:
+                    BrowserStatus();
+                    break;
+
+                case [("browser-on" or "browser-off") and var turn, var browser]:
+                    TurnBrowser(browser, on: turn == "browser-on");
+                    break;
 
                 case ["show-prompt"]:
                     Console.Out.WriteLine(await (screen ?? throw new DriverException("show-prompt needs the app's own prompt"))
@@ -1144,6 +1156,64 @@ internal sealed class Driver(string home)
             ? $"not unpaired: {browserFill.Message}"
             : $"unpaired {name}");
     }
+
+    /// <summary>
+    /// Prints <c>browser-shared &lt;sentence&gt;</c> where browsers read one setting, then each browser Settings › Browser fill
+    /// lists, as <c>browser &lt;browser&gt; on=&lt;bool&gt; other=&lt;bool&gt; answer=&lt;sentence&gt; extension=&lt;sentence&gt;</c>.
+    /// </summary>
+    private static void BrowserStatus()
+    {
+        var hosts = BrowserFillHosts();
+
+        if (hosts.HasSharedText)
+        {
+            Console.Out.WriteLine($"browser-shared {hosts.SharedText}");
+        }
+
+        foreach (var row in hosts.Rows)
+        {
+            Console.Out.WriteLine($"browser {row.Name.ToLowerInvariant()} on={Word(row.IsOn)} other={Word(row.ReplacesAnother)} answer={row.Answer} extension={row.Extension}");
+        }
+    }
+
+    /// <summary>
+    /// Presses Turn on or Turn off for one browser and prints <c>browser-on|browser-off &lt;browser&gt;: &lt;message&gt;</c>,
+    /// <c>browser-on &lt;browser&gt; confirm: &lt;prompt&gt;</c> when Turn on asks before replacing another program, which this
+    /// leaves unanswered, or <c>... not offered: &lt;why&gt;</c> when the row's button is the other one.
+    /// </summary>
+    private static void TurnBrowser(string browser, bool on)
+    {
+        var hosts = BrowserFillHosts();
+        var row = hosts.Rows.FirstOrDefault(row => string.Equals(row.Name, browser, StringComparison.OrdinalIgnoreCase))
+            ?? throw new DriverException($"Settings lists no browser named {browser}");
+        var verb = on ? "browser-on" : "browser-off";
+
+        if (row.IsOn == on || !hosts.ChangeCommand.CanExecute(row))
+        {
+            Console.Out.WriteLine($"{verb} {browser} not offered: Settings shows {row.ActionLabel} for {row.Name}");
+            return;
+        }
+
+        hosts.ChangeCommand.Execute(row);
+        Console.Out.WriteLine(row.IsConfirmingReplace
+            ? $"{verb} {browser} confirm: {row.ReplacePrompt}"
+            : $"{verb} {browser}: {hosts.Message}");
+    }
+
+    // The driver is no app bundle, so it sets the browsers up for the keypaste the test names, under the folders it names.
+    private static BrowserHostsViewModel BrowserFillHosts()
+    {
+        static string? Given(string name) => NullIfEmpty(Environment.GetEnvironmentVariable($"KEYPASTE_DRIVER_BROWSER_{name}"));
+
+        var program = Given("PROGRAM") ?? throw new DriverException("KEYPASTE_DRIVER_BROWSER_PROGRAM names no keypaste");
+        var registryRoot = Given("REGISTRY_ROOT") ?? throw new DriverException("KEYPASTE_DRIVER_BROWSER_REGISTRY_ROOT names no key");
+        var places = HostPlaces.From(Given, McpClientMachine.CurrentPlatform, registryRoot);
+        IHostRegistry? registry = OperatingSystem.IsWindows() ? new RegistryHostKeys() : null;
+
+        return new BrowserHostsViewModel(new BrowserHosts(places, registry, new HostProgram(program)), string.Empty);
+    }
+
+    private static string Word(bool value) => value ? "true" : "false";
 
     /// <summary>Prints what Agents shows, read by its own view model from the authority and the audit file.</summary>
     private void Activity(AppAuthority authority)

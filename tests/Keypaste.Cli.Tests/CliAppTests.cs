@@ -175,7 +175,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(26, verbs.Count);
+        Assert.Equal(27, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -217,6 +217,7 @@ public sealed class CliAppTests
             "VAULT",
             "  import      copy in an export or a KeePass database, or edit it in place",
             "  share       create an encrypted, expiring link",
+            "  browser     turn keypaste on or off as each browser's extension host",
             "  lock        lock now and pause all agents",
             "  init        create a new vault",
             "  use         choose the vault used when no --vault is given",
@@ -232,7 +233,7 @@ public sealed class CliAppTests
             $"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
             "                    attachment ls, env ls, log, doctor, token ls,",
-            "                    share ls, clients",
+            "                    share ls, clients, browser",
             "  -h, --help        help for any command",
             "",
             "  version prints the version.",
