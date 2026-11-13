@@ -1,14 +1,14 @@
 # keypaste.com
 
-keypaste.com is a static home page, the content pages, one form endpoint, the share-link routes and a crash-report route that stays off until H-0028. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages), D-0402). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js` and `/api/crash` to `src/crash.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
+keypaste.com is a static home page, the content pages, one form endpoint, the share-link routes and a crash-report route that stays off until H-0028. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages)). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js` and `/api/crash` to `src/crash.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
 
-Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. A free cloud vault keypaste cannot read, team projects over an end-to-end relay and server access a team project chooses are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)).
+The product is local first. A free cloud vault keypaste cannot read, team projects over an end-to-end relay and server access a team project chooses are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)).
 
 ## Database connection
 
 The database passwords live in account-level Hyperdrive configurations. `wrangler.jsonc` contains their IDs; no database password or Wrangler secret belongs in the repository or Worker.
 
-Since 2026-09-25 both tables are in one PlanetScale Postgres database on `aws-us-east-1-3.pg.psdb.cloud` (D-0364). `HYPERDRIVE` (`keypaste-signup`, `efcf6358…`) connects as `keypaste_signup_writer`, which has `INSERT` on `public.signup` and no `SELECT`: a compromised handler can still read newly submitted addresses, but not the stored list. `SHARE_DB` (`keypaste-share`, `59f7f117…`) connects as `keypaste_share`, which can read and write `public.share` and nothing else. Both configs are uncached and use `verify-full` against the uploaded ISRG Root X1 (`f8411755…`). `schema.sql` owns the intended grants; verify effective permissions after any role or connection change.
+Since 2026-09-25 both tables are in one PlanetScale Postgres database on `aws-us-east-1-3.pg.psdb.cloud`. `HYPERDRIVE` (`keypaste-signup`, `efcf6358…`) connects as `keypaste_signup_writer`, which has `INSERT` on `public.signup` and no `SELECT`: a compromised handler can still read newly submitted addresses, but not the stored list. `SHARE_DB` (`keypaste-share`, `59f7f117…`) connects as `keypaste_share`, which can read and write `public.share` and nothing else. Both configs are uncached and use `verify-full` against the uploaded ISRG Root X1 (`f8411755…`). `schema.sql` owns the intended grants; verify effective permissions after any role or connection change.
 
 Both roles were created with SQL (`CREATE ROLE … LOGIN NOINHERIT`), not as PlanetScale managed roles, so they do not appear in the dashboard's role list. Rotating one is `ALTER ROLE … PASSWORD` with an admin connection followed by `wrangler hyperdrive update` with the new password, re-checking the CA and SSL mode afterwards. The connection username carries the branch suffix, `<role>.qhhxudm5mg87`.
 
@@ -25,7 +25,7 @@ pscale role create <database> <branch> keypaste-signup --inherited-roles ''
 Apply the table and grants using an admin connection. `schema.sql` does not create the role and must have `<ROLE>` replaced first.
 
 ```sh
-psql "postgresql://ADMIN@aws-us-east-2-1.pg.psdb.cloud:5432/postgres?sslmode=verify-full" \
+psql "postgresql://ADMIN@HOST:5432/postgres?sslmode=verify-full" \
      -f schema.sql
 ```
 
@@ -41,7 +41,7 @@ Connect Hyperdrive to the restricted role. PlanetScale requires the `.<branch-id
 
 ```sh
 npx wrangler hyperdrive create keypaste-signup \
-  --connection-string="postgresql://pscale_<id>.<branch-id>:PASSWORD@aws-us-east-2-1.pg.psdb.cloud:5432/postgres" \
+  --connection-string="postgresql://pscale_<id>.<branch-id>:PASSWORD@HOST:5432/postgres" \
   --ca-certificate-id <CA_CERT_ID> \
   --sslmode verify-full
 ```
@@ -56,21 +56,15 @@ Verify the CA reference, `verify-full` mode and a successful restricted-role que
 
 ## Recorded database verification
 
-On 2026-09-25, against the new database, each role was checked by connecting as it: `keypaste_signup_writer` inserted into `signup` inside a rolled-back transaction and was refused (42501) reading `signup` and touching `share`; `keypaste_share` inserted, updated, read and deleted a `share` row and was refused (42501) reading or inserting `signup`. Neither role has memberships. Both Hyperdrive configs report `verify-full` with CA `f8411755…`. `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC` was not applied to this database, because PlanetScale's own roles (`pscale_exporter`, `pscale_pgbouncer`, `pscale_replication`) may rely on it; the table grants are what restrict the Worker's roles.
+On 2026-09-25, against the new database, each role was checked by connecting as it: `keypaste_signup_writer` inserted into `signup` inside a rolled-back transaction and was refused (42501) reading `signup` and touching `share`; `keypaste_share` inserted, updated, read and deleted a `share` row and was refused (42501) reading or inserting `signup`. Neither role has memberships. Both Hyperdrive configs report `verify-full` with CA `f8411755…`. `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC` was not applied to this database, because PlanetScale's own roles (`pscale_exporter`, `pscale_pgbouncer`, `pscale_replication`) may rely on it; the table grants are what restrict the Worker's roles. That check does not establish current grants.
 
-The rest of this section records the previous database, which is gone along with its Hyperdrive config `9ef85ab2…`. On 2026-07-28, configuration `9ef85ab258e846fbb2c0d3457b744282` used `keypaste_signup_writer.jb6eu3wgh2u3`, with `NOINHERIT`, no memberships, no superuser or `bypassrls`, and only the required insert access. Select, count, returning, update, delete and other-table reads failed with 42501. Valid submissions returned 303 to `/thanks/` and inserted a row; duplicates and honeypots inserted nothing. Invalid input, origin and content type returned 400.
+Integration-created roles require the same permission review as manually configured roles. A credential update was observed to clear the `mtls` configuration: after updates, inspect and restore the CA and SSL mode, then repeat restricted-role queries. PostgreSQL 18 required select access for `ON CONFLICT (email) DO NOTHING`, so the shipped insert uses bare `ON CONFLICT DO NOTHING`.
 
-The original integration role inherited `postgres` and `pscale_superuser`. It was replaced before the signup table existed; prior submissions returned 503. Integration-created roles require the same permission review as manually configured roles.
-
-The July TLS check used ISRG Root X1, certificate ID `f8411755-7948-4b31-aa11-2a79710ce1d4`, with `verify-full` and a successful query. The configuration retained its PlanetScale integration metadata. Treat these as historical settings and obtain the applicable CA for a new connection.
-
-A credential update was observed to clear the `mtls` configuration. After updates, inspect and restore the CA and SSL mode, then repeat restricted-role queries. PostgreSQL 18 required select access for `ON CONFLICT (email) DO NOTHING`; the shipped insert uses bare `ON CONFLICT DO NOTHING`.
-
-The recorded follow-up is migration to a managed role without inherited roles. Check the active role and subscriber state, verify replacement grants, update Hyperdrive including TLS settings, repeat permission and submission checks, then retire the old credential. Until then, rotation requires SQL administration and a Hyperdrive update.
+Migrating the two roles to managed roles without inherited roles is still open. It means checking the active role and subscriber state, verifying the replacement grants, updating Hyperdrive including its TLS settings, repeating the permission and submission checks, then retiring the old credential. Until then, rotation requires SQL administration and a Hyperdrive update.
 
 ## Content pages
 
-`web/` builds the pages under `/products/`, `/how-it-works/`, `/compare/`, `/vision/` and `/docs/` with Astro and Starlight (D-0401). Each page is Markdown in `web/src/content/docs/`, and a diagram is a fenced `mermaid` block that astro-mermaid draws in the browser; Astro's default Markdown processor runs no remark plugins, so `astro.config.mjs` selects the unified one. `astro.config.mjs` also builds the sidebar.
+`web/` builds the pages under `/products/`, `/how-it-works/`, `/compare/`, `/vision/` and `/docs/` with Astro and Starlight. Each page is Markdown in `web/src/content/docs/`, and a diagram is a fenced `mermaid` block that astro-mermaid draws in the browser; Astro's default Markdown processor runs no remark plugins, so `astro.config.mjs` selects the unified one. `astro.config.mjs` also builds the sidebar.
 
 Each product's Beta, Building or Planned label lives in `web/src/data/products.json`, which drives the sidebar, the products table and each product page; `web/src/data/status.js` says what a label means. The home page's "Where keypaste is going" list repeats the labels, so a release that changes one changes both. The comparison overview carries the month its facts were last checked.
 
@@ -78,7 +72,9 @@ The build needs Node 22.12 or later (`.node-version` names 22 for Cloudflare) an
 
 ## Deploying
 
-Cloudflare's Git integration owns deployment (D-0127). Configure Worker `keypaste-site` with root directory `site`, no build command in the dashboard, deploy command `npm run deploy` and production branch `main`. `wrangler.jsonc`'s `build` step installs and builds `web/` before every `wrangler deploy`, `wrangler versions upload` and `wrangler dev`, and `assets.directory` is `./dist`. The build watch path must include nested files under `site/`. Branch pushes that touch `site/` also build (seen on 2026-10-02), so the dashboard's non-production deploy command must upload a version, never deploy one.
+Cloudflare's Git integration owns deployment: GitHub's workflows deploy nothing and never query the live origin. Configure Worker `keypaste-site` with root directory `site`, no build command in the dashboard, deploy command `npm run deploy` and production branch `main`. `wrangler.jsonc`'s `build` step installs and builds `web/` before every `wrangler deploy`, `wrangler versions upload` and `wrangler dev`, and `assets.directory` is `./dist`. The build watch path must include nested files under `site/`. Branch pushes that touch `site/` also build (seen on 2026-10-02), so the dashboard's non-production deploy command must upload a version, never deploy one. A change to this file alone triggers a site deployment and neither GitHub workflow.
+
+If pushes stop reaching the origin, as BACKLOG's [known defects](../docs/BACKLOG.md#known-defects-and-flaky-tests) record today, compare the Git connection's `repo_id` with `gh api repos/notinferred/keypaste --jq .id`: a connection once kept a deleted repository's ID after the repository was recreated, so no push deployed.
 
 For a manual deployment:
 
@@ -94,20 +90,7 @@ After every deployment, run the live checks:
 ../scripts/verify-site-endpoint.sh
 ```
 
-These checks are manual. GitHub workflows inspect checked-out site content without querying the live origin.
-
-## Deployment evidence
-
-On 2026-09-12, build `1716bdb6` from `309aac3` deployed version `1fcc038c` in 24 seconds. Both live checks passed and the origin matched `public/index.html`. The Git connection had retained deleted repository ID `1312113438` after the repository was recreated as `1358644975` on 2026-09-05, so intervening pushes had not deployed. If pushes stop reaching the origin, compare the connection's `repo_id` with `gh api repos/notinferred/keypaste --jq .id`.
-
-The removed `site.yml` workflow had no `CLOUDFLARE_API_TOKEN` and failed to deploy in all four runs. Its environment was removed on 2026-09-12. Two manual deployments on 2026-09-11 were checked against the live origin:
-
-| Version | Content |
-|---|---|
-| `463e2856-b29b-43ee-b603-110940ab7fc7` | `cf2df87`; concurrent-save defect disclosure |
-| `55a31129-c245-40a5-bc27-c16330f4a2e0` | F.6 tree; Windows `10.0.26100` save-failure disclosure |
-
-The second deployment used then-commit `9de4a16`, later replaced by the F.6 squash. Its site bytes match the squashed commit; an older clone may retain the original SHA.
+These checks are manual; CI runs only the disclosure check's offline self-test.
 
 ## Local checks
 
@@ -123,7 +106,7 @@ Use a dedicated test address for checks that write rows. Verify valid submission
 
 ## Share links
 
-`src/share.js` serves `keypaste share` links (D-0355). The server stores an encrypted envelope, the views left, the expiry and the SHA-256 of a revoke token; the link's key stays in its fragment and never reaches the Worker. `public/s/` is the viewer, which decrypts in the browser under the content security policy in `public/_headers`, set again by the Worker.
+`src/share.js` serves `keypaste share` links. The server stores an encrypted envelope, the views left, the expiry and the SHA-256 of a revoke token; the link's key stays in its fragment and never reaches the Worker. `public/s/` is the viewer, which decrypts in the browser under the content security policy in `public/_headers`, set again by the Worker.
 
 | Method, path | Answer |
 |---|---|
@@ -134,7 +117,7 @@ Use a dedicated test address for checks that write rows. Verify valid submission
 
 Unknown, spent, expired and revoked shares and a wrong revoke token all answer the same 404, and only that 404 carries `x-keypaste-share: gone`, the one answer on which keypaste forgets a share and its revoke token. A foreign `Origin` answers 403, a malformed request 400, an oversized one 413 and a rate-limited one 429.
 
-Sharing is on: `SHARE_ENABLED` is `"1"` in `wrangler.jsonc`'s `vars`, which every deploy sets (D-0364). Any other value makes the API routes answer 503 and the viewer 404, and so does a missing `SHARE_DB` binding. Switching sharing off never makes a client forget a live share, so it can still be revoked once sharing is back on.
+Sharing is on: `SHARE_ENABLED` is `"1"` in `wrangler.jsonc`'s `vars`, which every deploy sets. Any other value makes the API routes answer 503 and the viewer 404, and so does a missing `SHARE_DB` binding. Switching sharing off never makes a client forget a live share, so it can still be revoked once sharing is back on.
 
 The share database was provisioned on 2026-09-25: the `share` table and its index from `schema.sql`, the `keypaste_share` role with only the grants listed there, and the uncached `keypaste-share` Hyperdrive config bound as `SHARE_DB`. Before the deploy, a link made by `keypaste share` through a local `wrangler dev` on that database opened once in headless Edge and was refused on its second open.
 
@@ -155,13 +138,13 @@ node -e 'const fs = require("node:fs"), path = require("node:path");
 npx wrangler dev --config .wrangler/wrangler.json --ip 127.0.0.1 --port 8787 --local-upstream 127.0.0.1:8787
 ```
 
-The share routes use `SHARE_DB` whenever it is bound, so the memory store is reached only without it, and only for `localhost` and `127.0.0.1`; `--local-upstream` keeps the request URL on `127.0.0.1` instead of the routed `keypaste.com`. [verify-keepassxc-fields.sh](../scripts/verify-keepassxc-fields.sh) runs the Worker this way in CI. With a local Postgres, run `npx wrangler dev` on `wrangler.jsonc` itself, with `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` set.
+The share routes use `SHARE_DB` whenever it is bound, so the memory store is reached only without it, and only for `localhost` and `127.0.0.1`; `--local-upstream` keeps the request URL on `127.0.0.1` instead of the routed `keypaste.com`. With a local Postgres, run `npx wrangler dev` on `wrangler.jsonc` itself, with `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` set.
 
-`npm test` runs the share and crash route tests and the share cryptography tests on Node 22.13 or later, which the crash tests' stand-in for D1 needs for `node:sqlite`, and ci's checks job runs them (D-0589). `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
+`npm test` runs the share and crash route tests and the share cryptography tests on Node 22.13 or later, which the crash tests' stand-in for D1 needs for `node:sqlite`, and ci's checks job runs them. `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
 
 ## Crash reports
 
-`src/crash.js` takes the desktop app's crash reports at `POST /api/crash`, one report a request, and nothing on the site reads them back (D-0586). A report is taken only when its bytes are exactly what `CrashScrubber` writes (D-0558): the same fields in the same order, compact, and every value inside the scrubber's grammar, so an exception message, a path or any field the app does not write is refused. `test/crash-vector.json` holds reports the .NET core wrote, which the route must take.
+`src/crash.js` takes the desktop app's crash reports at `POST /api/crash`, one report a request, and nothing on the site reads them back. A report is taken only when its bytes are exactly what `CrashScrubber` writes: the same fields in the same order, compact, and every value inside the scrubber's grammar, so an exception message, a path or any field the app does not write is refused. `test/crash-vector.json` holds reports the .NET core wrote, which the route must take.
 
 | Answer | When |
 |---|---|
@@ -173,17 +156,17 @@ The share routes use `SHARE_DB` whenever it is bound, so the memory store is rea
 | 429 | More than 10 reports a minute from one address, counted by the `CRASH_LIMIT` binding, with `retry-after: 60` |
 | 503 | The route is off, with `retry-after: 86400`; 200 new rows were already made today, with a `retry-after` until midnight UTC; or D1 failed |
 
-The app takes a report off its outbox on 204, 400 and 413, and keeps it otherwise (D-0560).
+The app takes a report off its outbox on 204, 400 and 413, and keeps it otherwise.
 
-D1 holds the reports in one table, made by `crash-schema.sql` (D-0587). A row is one failure on one version, OS and architecture: `fingerprint` is the SHA-256 of the report's kind, catch site, exception type and first eight frames' names, `report` is the first such report exactly as it was sent, `failures` adds up every such report's count, and `first_seen_on` and `last_seen_on` are the Worker's UTC dates of the first and the latest. A repeat always adds to its row, and at most 200 new rows are made a day. No address, header or time of day is stored. The cron deletes a row 90 days after it was last seen, and D1's Time Travel can restore a deleted row for up to 30 days on the paid plan and 7 on the free one. Workers invocation logs are off for the whole Worker, so Workers Logs keeps no record of each request to this route, the share routes or `/subscribe`; the Worker's own console lines are still kept, and they name an error, never a report, a share or an address.
+D1 holds the reports in one table, made by `crash-schema.sql`. A row is one failure on one version, OS and architecture: `fingerprint` is the SHA-256 of the report's kind, catch site, exception type and first eight frames' names, `report` is the first such report exactly as it was sent, `failures` adds up every such report's count, and `first_seen_on` and `last_seen_on` are the Worker's UTC dates of the first and the latest. A repeat always adds to its row, and at most 200 new rows are made a day. No address, header or time of day is stored. The cron deletes a row 90 days after it was last seen, and D1's Time Travel can restore a deleted row for up to 30 days on the paid plan and 7 on the free one. Workers invocation logs are off for the whole Worker, so Workers Logs keeps no record of each request to this route, the share routes or `/subscribe`; the Worker's own console lines are still kept, and they name an error, never a report, a share or an address.
 
-The route answers 503 until `wrangler.jsonc` binds `CRASH_DB` and sets `CRASH_ENABLED` to `"1"` (D-0588). Neither is there before H-0028 makes the database: Wrangler 4.45 and later creates a D1 database on deploy for a binding with no `database_id`, and Cloudflare's documentation does not say what a binding to a missing database does, so the binding arrives in the same commit as its database's ID.
+The route answers 503 until `wrangler.jsonc` binds `CRASH_DB` and sets `CRASH_ENABLED` to `"1"`. Neither is there before H-0028 makes the database: Wrangler 4.45 and later creates a D1 database on deploy for a binding with no `database_id`, and Cloudflare's documentation does not say what a binding to a missing database does, so the binding arrives in the same commit as its database's ID.
 
 ### Switching crash reports on (H-0028)
 
 Run these from `site/` after `npm ci`, signed in to keypaste's Cloudflare account with `npx wrangler login`.
 
-1. Create the database in Cloudflare's default location, with no `--location` or `--jurisdiction`, so it is not held in the EU (D-0588); neither can change later. If Wrangler offers to add a binding, decline: step 2 adds it under the name the Worker reads.
+1. Create the database in Cloudflare's default location, with no `--location` or `--jurisdiction`, so it is not held in the EU; neither can change later. If Wrangler offers to add a binding, decline: step 2 adds it under the name the Worker reads.
 
    ```sh
    npx wrangler d1 create keypaste-crash

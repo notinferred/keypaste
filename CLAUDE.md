@@ -2,86 +2,81 @@
 
 ## Start here
 
-For a task, read this file, the [code map](docs/ARCHITECTURE.md) and the STEPS row or document the task names. Open another document when the task touches what it owns in the table below; do not read every document to begin, because most of them describe surfaces the task does not touch. Code cites threats as `T-<number>`, which THREATS owns. A `D-<number>` label left in code or a document names a retired, agent-written decision whose ledger is gone; remove it from code you touch, and where a task depends on the reason behind one, ask the founder.
+For a task, read this file, the [code map](docs/ARCHITECTURE.md) and the STEPS row or document the task names. Open another document only when the task touches what it owns in the table below.
 
 ## Writing
 
-Write clean, minimal, self-documenting code. Prefer clear names and structure. Default to no comments; add a single line only to explain a non-obvious constraint or decision the code cannot express. Never restate the code or duplicate a document's explanation. Take a capability from the platform, the ecosystem's standard or an established library before writing it, behind an interface keypaste owns, in the order PRODUCT §4.9 sets (D-0670).
+Write clean, minimal, self-documenting code. Prefer clear names and structure. Default to no comments; a single line may explain a constraint or decision the code cannot express. Never restate the code or a document. Take a capability from the platform, the ecosystem's standard or an established library before writing it, behind an interface keypaste owns, in the order PRODUCT §4.9 sets.
 
 Tests exercise product behavior. A rule test over source or workflows holds a security or build invariant the compiler cannot, such as that every Action is pinned to a commit; a test that a workflow, script or document still contains particular text is not written.
 
-Write concise, connected prose without hard wrapping. Use headings, lists, tables and emphasis only when they help navigation or comparison. Preserve code blocks, transcripts and structured records. Remove repetition, filler, rhetorical contrasts, formulaic introductions and conclusions, and unnecessary qualifications. State what the evidence establishes and keep unresolved questions explicit. Do not invent facts or expand the task's scope.
+Write concise, connected prose without hard wrapping. Use headings, lists, tables and emphasis only where they help navigation or comparison. Preserve code blocks, transcripts and structured records. Remove repetition, filler, rhetorical contrasts, formulaic openings and endings, and needless qualifications. State what the evidence establishes and keep unresolved questions explicit. Do not invent facts or expand the task's scope. Use the words of DESIGN's glossary.
 
 ## Documents
 
-Documents fall into four layers that change at different rates. A base document describes the product and how to work on it, never the history of a step.
+Documents fall into four layers. A base document describes the product and how to work on it, never a step's history.
 
-| Layer | Document | Owns | Changes when |
-|---|---|---|---|
-| Base | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws; conflicting decisions do not override it | Dated re-ratification and an updated plan |
-| Base | This file | Working rules and document ownership | Founder direction |
-| Base | [ARCHITECTURE](docs/ARCHITECTURE.md) | Code map: projects, entry points, processes and where each concern lives | A project, entry point or process boundary changes |
-| Base | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits | A guarantee, threat or limit changes |
-| Base | [DESIGN-PRINCIPLES](docs/DESIGN-PRINCIPLES.md) | The eight design principles and each one's test | Founder direction, with PRODUCT's re-ratification |
-| Base | [DESIGN](docs/DESIGN.md) | The design system: how a screen is put together, the marks, the three colours, the type, the shape, the voice, the interaction and usage rules; `docs/design/tokens` holds its CSS copy | Founder direction |
-| Plan | [ROADMAP](ROADMAP.md) | Track order and milestones: which tasks each release or later stage needs | A milestone, its tasks or the track order changes |
-| Plan | [STEPS](docs/STEPS.md) | Open tasks by product track: dependencies, detail and acceptance | A task is selected, finished or re-planned |
-| Plan | [BACKLOG](docs/BACKLOG.md) | Optional ideas, investigation candidates and conditions for reconsideration; no delivery commitments | An idea is added, selected or dropped |
-| Record | [steps](docs/steps/README.md) | One record per completed task | A task completes |
-| Public | [README](README.md) | Introduction, published installation instructions and navigation | A release or published claim changes |
-| Public | [FEATURES](docs/FEATURES.md) | Dated capabilities by surface, implementation evidence and gaps; no parity promise | A capability or gap changes |
-| Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification | Release work |
-| Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, separating Unreleased work from published versions | Each user-visible change |
-| Public | Guides: [desktop](docs/desktop.md), [mcp-setup](docs/mcp-setup.md), [policy](docs/policy.md), [approvals](docs/approvals.md), [safe-agents](docs/safe-agents.md), [replace-dotenv](docs/replace-dotenv.md), [demo](docs/demo.md), [keepass-and-agents](docs/keepass-and-agents.md), [launch](docs/launch.md) | How to use or present one surface | The behavior they describe changes |
-| Public | [keypaste.com's pages](site/web/src/content/docs/) | How keypaste works, each product and its label, design-level comparisons, the vision and the docs hub; labels live in `site/web/src/data/products.json` | A release changes a label, or a page's design changes |
-| Public | [ACAF v1](site/web/src/content/docs/acaf/v1.mdx) | The Agent Credential Access Format: how a KDBX file keeps projects and each agent's access, what readers and writers must do, and keypaste's implementation status in RELEASE's terms | A release changes keypaste's status; a change to the format is a new version, v1.1 onward |
+| Layer | Document | Owns |
+|---|---|---|
+| Base | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws, which conflicting decisions do not override; changes only by dated re-ratification with an updated plan |
+| Base | This file | Working rules and document ownership, by founder direction |
+| Base | [ARCHITECTURE](docs/ARCHITECTURE.md) | Code map: projects, entry points, processes and where each concern lives |
+| Base | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
+| Base | [DESIGN-PRINCIPLES](docs/DESIGN-PRINCIPLES.md) | The eight design principles and their tests, changed with PRODUCT's re-ratification |
+| Base | [DESIGN](docs/DESIGN.md) | The design system, the voice and its glossary, by founder direction |
+| Base | [CONTRIBUTING](CONTRIBUTING.md) | Contributing, local verification, CI and sign-off |
+| Base | [site/README](site/README.md) | keypaste.com's deployment, database and routes |
+| Plan | [ROADMAP](ROADMAP.md) | Track order and milestones: the open tasks each release needs |
+| Plan | [STEPS](docs/STEPS.md) | Open tasks by track: dependencies, detail and acceptance |
+| Plan | [BACKLOG](docs/BACKLOG.md) | Ideas with conditions for reconsideration, and known defects; no commitments |
+| Record | [steps](docs/steps/README.md) | One record per completed task |
+| Public | [README](README.md) | Introduction, published installation and navigation |
+| Public | [FEATURES](docs/FEATURES.md) | Each capability's state by surface, evidence and gaps |
+| Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, release procedure and installation verification |
+| Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, Unreleased apart from published versions |
+| Public | Guides in `docs/`: desktop, mcp-setup, policy, approvals, safe-agents, replace-dotenv, demo, keepass-and-agents, launch | How to use or present one surface |
+| Public | [keypaste.com's pages](site/web/src/content/docs/) | How keypaste works, the products and their labels (`site/web/src/data/products.json`), comparisons, the vision and the docs hub |
+| Public | [ACAF](site/web/src/content/docs/acaf/v1.mdx) v1 and v1.1 | The Agent Credential Access Format and keypaste's status in RELEASE's terms; a format change is a new version |
 
 ### What a step writes
 
-Finishing a task writes its record as `docs/steps/<ID>.md` from the template in [steps](docs/steps/README.md), removes its row from STEPS, and adds one CHANGELOG entry that links the record when users see a change. SECURITY and THREATS change when the step changes a guarantee, threat or limit. FEATURES, the guides and README change only to correct a statement the step made false, never to add one, and the claims `verify-demo.sh` checks stay true at every commit; new capabilities reach them through L.1, which rewrites them for 1.0.0 from CHANGELOG's Unreleased section.
+Finishing a task writes its record as `docs/steps/<ID>.md` from the [template](docs/steps/README.md), removes its row from STEPS and its ID from ROADMAP, and adds one CHANGELOG entry linking the record when users see a change. SECURITY and THREATS change when the step changes a guarantee, threat or limit. FEATURES, the guides and README change only to correct a statement the step made false, never to add one, and the claims `verify-demo.sh` checks stay true at every commit; L.1 rewrites them for 1.0.0.
 
 ### Records
 
-Each fact has one authoritative owner; other documents link to it rather than restating it. Explicit user direction authorizes amendments within its scope. Product scope changes require dated re-ratification and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence.
+Each fact has one owner; other documents link to it rather than restating it. User direction authorizes amendments within its scope. Product scope changes require dated re-ratification and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence. Rewrite outdated text instead of appending another account, and keep history in Git. Published claims require supporting evidence.
 
-Records are proportional to the risk they retire (PRODUCT §6.6). A record fills the template without restating the diff and says what changed and why; a low-risk step's is a few lines. It names no run IDs and tells no rerun story: CI's history holds that evidence. Never write a document whose subject is another document: delete it instead. Tests on the secret, injection, sync and bridge paths are outside this rule and stay mandatory (PRODUCT §4.5); what gets cut is ceremony, never coverage.
+Records are proportional to the risk they retire (PRODUCT §6.6): a record says what changed and why without restating the diff, and a low-risk step's is a few lines. It names no run IDs and tells no rerun story. Never write a document whose subject is another document. Tests on the secret, injection, sync and bridge paths stay mandatory (PRODUCT §4.5): what gets cut is ceremony, never coverage.
 
-IDs are permanent: a retired decision, threat or task ID is never given to something new, and the 5.x and 7.x task IDs of the earlier sync, hosting and organization ideas stay retired. Rewrite outdated current text in the other documents instead of appending another account, and keep history in Git. Published claims require supporting evidence (D-0036).
+Use RELEASE's four states, Implemented, Packaged, Published and Installation-verified, with version, platform and evidence. Source, a local demo or a green pipeline cannot establish an unfinished journey or a release, and documentation authorizes no publication, messages or customer-data changes.
 
-Use RELEASE's four states: Implemented, Packaged, Published and Installation-verified. Record version, platform and evidence. Source code, a local demo or a green pipeline cannot establish an unfinished user journey or public release. Documentation and local implementation do not authorize publication, messages or customer-data changes.
+### IDs
+
+IDs are permanent: a retired decision, threat or task ID is never reused, and the 5.x and 7.x task IDs stay retired.
+
+- A task ID such as `F.112` names a STEPS row or, once done, its record.
+- `H-<number>` names an act only the founder can do: a Human row in STEPS or an input a row names.
+- `T-<number>` names a threat in THREATS. PRODUCT's tracks are written "Track 4", never "T4".
+- `D-<number>` and `O-<number>` name decisions and open questions of a retired ledger that is gone. Code still carries some: remove them from code you touch, and ask the founder when a task depends on the reason behind one.
 
 ## Planning and selection
 
-ROADMAP orders the committed work into milestones and STEPS holds its tasks; BACKLOG is not an implementation queue. The founder selects implementation work, and a documentation-only instruction starts no task. Identify the producer, transport, consumer and user action; the existence of a reader, view, protocol, fixture or package does not prove that the producing operation or complete journey works. A session never adds a STEPS row: a finding, follow-up or check it cannot close goes to BACKLOG, and only the founder makes it a task (D-0673).
+ROADMAP orders the committed work into milestones and STEPS holds its tasks; BACKLOG is not a queue. The founder selects implementation work, and a documentation-only instruction starts no task. A session never adds a STEPS row: a finding, follow-up or check it cannot close goes to BACKLOG, and only the founder makes it a task. Identify the producer, transport, consumer and user action: a reader, view, fixture or package does not prove the journey works.
 
-When the user explicitly requests the next build task, pick the first unchecked ready code task of ROADMAP's current milestone, in its track order, skipping external inputs and blocked work; a specific user selection takes precedence. Build, verify and record only the authorized task, then stop unless the user requested continued implementation. A founder amendment to a selected task's scope is recorded in its step record. Nothing publishes before its Ships after gates pass. Claude settles reversible, local choices that touch no law, scope, money, legal text or published claim, and lists them in the batch's summary; the founder decides the rest (D-0671).
+When the user asks for the next build task, pick the first unchecked STEPS row, top to bottom, that ROADMAP's current milestone names, skipping Human rows, rows waiting on an input and rows with open Needs; the user's own pick comes first. Build, verify and record only that task, then stop unless asked to continue; a founder amendment to its scope goes in its record. Nothing publishes before its Ships after gates pass. Claude settles reversible, local choices that touch no law, scope, money, legal text or published claim, and lists them; the founder decides the rest.
 
-## Local verification and delivery
+## Verification and delivery
 
-The founder's machine builds and tests in short bursts that leave nothing running (D-0671): before each push, `bash scripts/verify.sh compile` restores and builds both solutions and the consistency project with warnings as errors and checks formatting, with the pinned SDK in `~/.dotnet`, and while building, the test classes a change touches run locally with `bash scripts/verify.sh test <class or tests/project>...`, which builds their projects and the programs their tests start and stops the build servers when it ends, and so may the one gate a change touches; long suites stay in CI. Implementation iterates on a branch: commit, then `bash scripts/dev.sh` pushes the branch and follows the ci run the push starts, ci's fast tier, printing each job as it finishes and stopping at the first failure with that job's log; `--wait` waits for every job, `--full` instead dispatches `ci` and `app` on every runner for a change that behaves differently on Windows or macOS, and `--full --tools` also runs ci's `tools` jobs, which install the real AI tools. `bash scripts/dev.sh --profile <backend|integration|desktop|desktop-gates> [--os <runner>]` runs one verify.sh profile through `dev.yml`, which is never a release gate, on one runner unless the change is platform-specific, for a failure only one runner shows or code that behaves differently on Windows or macOS. A dependency or `RuntimeIdentifiers` change regenerates its lock files locally with `dotnet restore --force-evaluate` over `keypaste.slnx`, `keypaste.app.slnx` and the consistency project (D-0676). When the step's code and documents are finished and the branch's fast tier is green, integrate without waiting further: `main`'s push runs every job once, in the background, and a failure there is fixed as the next work. Do not open or approve pull requests from the founder's account.
+The founder's machine builds and tests in short bursts that leave nothing running: `bash scripts/verify.sh compile` before each push, and `bash scripts/verify.sh test <class or tests/project>...` for the classes a change touches; long suites stay in CI. Commit on a branch, push it with `bash scripts/dev.sh`, and integrate once the step is finished and the fast tier is green; a failure on `main` is the next work. [CONTRIBUTING](CONTRIBUTING.md#verification) owns the flags, profiles and CI. Do not open or approve pull requests from the founder's account.
 
-`bash scripts/verify.sh` (or `./scripts/verify.ps1`, which selects Git Bash on Windows) is the runners' command and serves a contributor who has the pinned SDK. With no argument it runs every profile but `compat`, `tools` and `compile`; with a profile's name it runs that one, which is how each CI job calls it. The workflows call `format`, `backend`, `integration`, `desktop`, `desktop-gates`, `scripts`, `workflows` and `tools` by name. `desktop` includes consistency tests, `desktop-gates` drives the app, the CLI and an agent as processes, and `format` runs `dotnet format` once over every project, which no build step repeats. The script owns the command list and its prerequisites; other operating systems, NativeAOT, packaging and public installation retain their separate gates. A step's check is a test in the test project that owns its surface; a new script is written only for build, packaging and release work outside the app, and a script gets a `--selftest` only when it guards the release path.
+Documentation-only work checks claims, links, ownership and scope against source and recorded evidence, builds nothing and proves no runtime or release behavior.
 
-For documentation-only work, inspect changed claims, links, ownership and scope against source and recorded evidence. Do not start a build task or run commands that build code when the user has restricted the work to documents. A documentation review does not establish new runtime or release evidence.
-
-Iterate a runner-only probe on a branch: push the branch and run `gh workflow run <workflow> --ref <branch>`, without a local run or a commit on `main` per attempt, and integrate once it passes. A new workflow needs its file on `main` once before it can be dispatched; later attempts run the branch's copy. Integrate a completed step as one coherent commit after its code, verifier and records are complete.
-
-Diagnose before repairing when the mechanism is unknown. Keep the regression in the tree; delete a probe workflow or reader once its diagnosis closes, keeping its result in the step record. An inconclusive run identifies the next experiment and leaves the diagnosis open. Preserve the failing observation until a regression and repair explain it; a passing retry does not close an intermittent defect. A check that fails without a change to what it checks is a defect: it is diagnosed and fixed, or deleted when what it guards is held elsewhere, and is never kept red or rerun into green.
-
-## CI
-
-`ci.yml` runs on qualifying pushes to any branch, every pull request, dispatch and a weekly schedule; its push-level `paths-ignore` skips specified documents. `app.yml` has a push allowlist for desktop, CLI, core and shared build/test inputs, runs on every pull request and dispatch, and packages matching version tags. A push to any branch but `main` runs ci's fast tier alone: scripts, workflows, format, and backend tests and integration on Linux. `main`'s push runs every job on Linux and Windows, and every other run adds macOS, nothing skipped or cached, except ci's `tools` jobs, which install the real AI tools and run only on the weekly schedule, on a dispatch with `-f tools=true` (D-0438), and on a dispatch with `-f only_tools=true`, which runs nothing else and never counts toward a release, and NuGet restores, which the verification jobs cache by their lock files' hash while `release.yml` and `app.yml`'s package job restore fresh (B.5). Runs on `main` and tags are never cancelled, and each commit and event there has its own concurrency group, so no run waits behind another; on any other branch a newer run cancels the one before it. `ci ok` and `app ok` aggregate each workflow's jobs and fail unless every job succeeded or was skipped, so a job no runner acquired fails them; they are the checks a pull request needs green. A branch's Windows, macOS, compatibility, desktop and packaging evidence takes `dev.sh --full`. The workflow files own the exact triggers.
-
-CI spends nothing that cannot change a verdict (D-0468). A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, and is then treated as Local verification says. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
-
-`README.md`, `docs/launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/download/index.html` must trigger `ci.yml`: `scripts/verify-demo.sh` checks their transcripts against the built binaries. Never add `docs/**` to `paths-ignore`. New documentation paths trigger backend CI unless explicitly ignored.
-
-keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, watching `site/`, with root directory `site`, no build command in the dashboard and deploy command `npm run deploy`, whose wrangler build step builds the content pages in `site/web` (D-0127, D-0402). GitHub workflows do not query the live origin. Run [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) after a site deploy; [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) is also manual. Only the offline disclosure self-test runs in CI. `site/README.md` changes trigger a site deployment while skipping both GitHub workflows.
+Diagnose before repairing when the mechanism is unknown, keep the regression in the tree, and delete a probe once its diagnosis closes. A passing retry does not close an intermittent defect. A check that fails without a change to what it checks is a defect: diagnose and fix it, or delete it when what it guards is held elsewhere; never keep it red or rerun it into green.
 
 ## Releases
 
-[RELEASE.md](docs/RELEASE.md) owns release procedures and the platform/channel matrix. Published version paths are immutable. [publish-release.sh](scripts/publish-release.sh) requires a positively verified empty destination. A partial publication requires a new version; never replace its objects. `release.yml` publishes a tag only when [require-green-gates.sh](scripts/require-green-gates.sh) finds a full green run of each required workflow on its commit: a dispatch, the weekly schedule or the tag's own run (D-0403), ci's with its `tools` jobs green (D-0438). Cut a release by dispatching `ci.yml` with `-f tools=true` at the commit and tagging once it is green; no local run is needed.
+[RELEASE](docs/RELEASE.md) owns the release procedure and matrix. Published version paths are immutable: a partial publication requires a new version. Cut a release by dispatching `ci.yml` with `-f tools=true` at the commit, then tag it once green.
 
 ## Git
 
-Author every commit as `keypaste <contact@keypaste.com>`, including agent-written commits. Use the project identity in first-party pages and metadata while retaining required upstream attribution. Use a subject of at most 72 characters and a matching `Signed-off-by` trailer; include no other body unless requested. Correct an unintended identity before pushing. Merge locally because the GitHub merge button supplies its own identity.
+Author every commit as `keypaste <contact@keypaste.com>`, agent-written too, and use that identity in first-party pages and metadata, keeping required upstream attribution. Use a subject of at most 72 characters and a matching `Signed-off-by` trailer, with no other body unless requested. Correct an unintended identity before pushing. Merge locally, because GitHub's merge button supplies its own identity.

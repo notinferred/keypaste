@@ -23,7 +23,7 @@ flowchart LR
 
 ## Using them together
 
-Both open and save the same file, and keypaste's CI checks every kind of write it makes against a real KeePassXC. Project tags such as `env:billing` and keypaste's fields are ordinary KeePass data, so KeePassXC shows and edits them. keypaste refuses to overwrite a change KeePassXC saved, so neither loses the other's edit.
+Both open and save the same file, and keypaste's CI checks every kind of write it makes against a real KeePassXC. Project tags such as `env:billing` and keypaste's fields are ordinary KeePass data, so KeePassXC shows and edits them. keypaste never silently overwrites a change KeePassXC saved: the CLI refuses to save over it, and the desktop app in the 1.0.0 build merges it with its own copy, so neither loses the other's edit.
 
 ## Pick KeePassXC alone if
 
@@ -32,7 +32,7 @@ Both open and save the same file, and keypaste's CI checks every kind of write i
 
 ## Add keypaste if
 
-- Your projects' API keys sit in entry notes or in `.env` files.
+- Your projects' API keys sit in item notes or in `.env` files.
 - You want an agent to get one approved field, with a record, instead of a pasted secret.
 
 ## Learn more

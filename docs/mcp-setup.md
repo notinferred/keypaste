@@ -1,38 +1,22 @@
 # Connecting keypaste to Claude
 
-keypaste ships an MCP server, `keypaste mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
+> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. The published v0.3.0 ships the bridge as its own `keypaste-mcp` binary, names the approver `keypaste agent`, connects only Claude Code and Codex with `keypaste setup` (printing a block to paste for Cursor and Claude Desktop), and has no desktop app. [FEATURES](FEATURES.md) lists what each version has.
 
-The bridge holds no vault and checks exposure; the approver handles consent and each agent's settings, and records each request it answers. Start the current terminal approver yourself:
+keypaste's MCP bridge, `keypaste mcp`, lets an AI agent see the names of items in your vault and ask for one value at a time. Your MCP client starts the bridge, which holds no vault and checks what the agent can see. You hold the vault unlocked, in the desktop app or with `keypaste approve` in a terminal, and that process asks you or applies your [agent settings](policy.md). Without it, every call is refused with the command that fixes it. [Approvals](approvals.md) explains the prompt and the audit log.
 
 ```sh
 keypaste approve --vault ~/vaults/personal.kdbx
 ```
 
-Enter the master password and review requests in that terminal. Without the approver, calls are refused with startup instructions. [Approvals](approvals.md) explains the prompt.
-
-The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
-
-These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` ships the bridge as its own `keypaste-mcp` binary, names the terminal approver `keypaste agent`, asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` or `KEYPASTE_VAULT` names, or with neither the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window, unless this computer's rules allow or block that kind of value ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste approve` on a vault the desktop holds is refused naming the app. A bridge with no vault named or chosen is refused. `keypaste setup` writes `--vault` only when you name a vault other than the chosen one; under a `KEYPASTE_HOME` other than `~/.keypaste` it also writes the chosen vault, `--audit-log` and `--approver`, and a set `KEYPASTE_APPROVER` writes `--approver`, because a tool may start the bridge without those variables and Gemini CLI strips them. A running bridge keeps the chosen vault it started with until its client restarts it. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
-
-## Before you start
-
-Build the binary:
-
-```sh
-dotnet build keypaste.slnx -c Release
-```
-
-It lands at `artifacts/bin/Keypaste.Cli/release/keypaste` (`keypaste.exe` on Windows), which is the CLI and, run as `keypaste mcp`, the bridge; make it available on `PATH` for the examples below, or use its full path. Published downloads are listed in [RELEASE](RELEASE.md).
+The bridge reaches whichever keypaste process holds the vault named by its `--vault` or `KEYPASTE_VAULT`, or, with neither, the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes. A bridge with no vault named or chosen is refused. A running bridge keeps the chosen vault it started with until its client restarts it.
 
 ## The short way
-
-`setup` is available in CLI/MCP `v0.2.0` and later, including the published `v0.3.0`, which configures Claude Code and Codex and prints a block to paste for Cursor and Claude Desktop. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
 
 ```sh
 keypaste setup --vault ~/vaults/personal.kdbx
 ```
 
-In source, the command finds the AI tools installed here and connects Claude Code, Codex, Gemini CLI and Devin through each tool's own `mcp add` at user scope. VS Code, Cursor and, on macOS and Windows, Claude Desktop have no such command, so `setup` changes only keypaste's entry in the file each one reads: VS Code's user `mcp.json`, `~/.cursor/mcp.json` and `claude_desktop_config.json`. Before its first change to a file it keeps the original as `<file>.keypaste-backup` beside it and never replaces that copy, and it leaves alone a file that does not parse, holds a key twice or changes while it works. It prints every step and asks once for all of them; `--yes` answers for you, and without a terminal nothing changes unless you pass `--yes`.
+`setup` finds the AI tools installed here and connects Claude Code, Codex, Gemini CLI and Devin through each tool's own `mcp add` at user scope. VS Code, Cursor and, on macOS and Windows, Claude Desktop have no such command, so `setup` changes only keypaste's entry in the file each one reads (VS Code's user `mcp.json`, `~/.cursor/mcp.json`, `claude_desktop_config.json`), keeps the first original as `<file>.keypaste-backup`, and leaves alone a file that does not parse, holds a key twice or changes while it works. It prints every step and asks once; `--yes` answers for you, and without a terminal nothing changes unless you pass it.
 
 ```
 keypaste mcp   /home/you/.local/bin/keypaste
@@ -43,39 +27,32 @@ run            offered; each agent runs nothing until you turn run on in its set
   claude-code      claude mcp remove --scope user keypaste
   claude-code      claude mcp add --scope user --transport stdio keypaste -- /home/you/.local/bin/keypaste mcp --vault /home/you/vaults/personal.kdbx --client-label claude-code --allow-run --expose **
   codex            not installed on this machine
-  gemini-cli       gemini mcp remove --scope user keypaste
-  gemini-cli       gemini mcp add --scope user keypaste /home/you/.local/bin/keypaste -- mcp --vault /home/you/vaults/personal.kdbx --client-label gemini-cli --allow-run --expose **
-  devin            not installed on this machine
-  vscode           not installed on this machine
   cursor           edit /home/you/.cursor/mcp.json: set mcpServers.keypaste {"command":"/home/you/.local/bin/keypaste","args":["mcp","--vault","/home/you/vaults/personal.kdbx","--client-label","cursor","--allow-run","--expose","**"]}; keeps the original as /home/you/.cursor/mcp.json.keypaste-backup
-Connect keypaste to these 3 tools? [y/N] y
+Connect keypaste to these 2 tools? [y/N] y
   claude-code      configured
-  gemini-cli       configured; Gemini CLI starts keypaste only in folders you have trusted
   cursor           configured; the original is kept as /home/you/.cursor/mcp.json.keypaste-backup; restart Cursor to load it
-  ...
 ```
 
-A tool's command is found only in the absolute entries of `PATH`, never in the folder you run `setup` from; the macOS app, which Finder starts without your shell's `PATH`, also looks in each tool's documented install folders. On Windows a tool installed with pnpm or yarn is refused, naming its launcher; install it with npm or the vendor's installer. Gemini CLI starts keypaste only in folders you have trusted, and it strips variables whose names contain `KEY`, so a bridge it starts never sees `KEYPASTE_HOME` or `KEYPASTE_APPROVER`.
+- Each tool is registered with its id as its label (`--client-label claude-code`), which its agent settings follow; `--label` gives another. It is registered with `--expose '**'` and `--allow-run` ([what it can see](#what-the-agent-can-see), [running a command](#running-a-command-with-secrets---allow-run)); `--expose <glob,glob>` narrows what every agent these tools start can see.
+- `--vault` is written only for a vault other than the chosen one. Under a `KEYPASTE_HOME` other than `~/.keypaste`, `setup` also writes the vault, `--audit-log` and `--approver`, and a set `KEYPASTE_APPROVER` writes `--approver`, because a tool may start the bridge without your shell's variables.
+- A tool's command is found only in the absolute entries of `PATH`; the macOS app, which Finder starts without your shell's `PATH`, also looks in each tool's install folders. On Windows a tool installed with pnpm or yarn is refused; install it with npm or the vendor's installer. Gemini CLI starts keypaste only in folders you have trusted and strips variables whose names contain `KEY`.
+- `--dry-run` prints every step and changes nothing. `--remove` takes keypaste out of each tool that has it and leaves the tool's other servers alone; a tool without keypaste is reported `not connected`. `setup` exits 0 when any tool was connected, removed or found not connected, 3 when it found none and 6 when every tool it found refused. Running it again is safe and updates a moved vault path.
 
-`--dry-run` prints every step and the program each one starts, and changes nothing. `--remove` first reads each tool's configuration: a tool holding no keypaste entry is reported `not connected` and left alone, and from the others keypaste is removed while their other servers stay. A removal that fails shows the tool's own words. `setup` exits 0 when any tool was connected, removed or found not connected, 3 when it found none and 6 when every tool it found refused. Repeating setup is idempotent and can update a moved vault path.
-
-In source, every tool is registered offering `run` and reaching every item, because the app or `keypaste approve` holding the vault holds each agent to its settings: an agent with none sees every project's variables, gets a value only when you allow it and runs nothing. `--expose <glob,glob>` narrows what any agent these tools start can see, whatever its settings.
-
-`setup` configures paths and exposure. Credential release still requires a running approver and authorization.
+No master password, key file or session identifier is written into a client's configuration.
 
 ## From the desktop app
 
-In source, the Agents screen lists the AI tools it finds on this computer, looking for them in the background each time you open it, as `setup` finds them. A tool whose own configuration holds keypaste's entry says Connected; one without it has Connect, named for the tool as in Connect Claude Code, which connects it to the vault the app has unlocked under the tool's id as its label (`claude-code`, `cursor`), the name its settings follow; `setup --label` and `--expose` still give another label or a narrower exposure from a terminal. When keypaste cannot read a tool's configuration the row says why and still offers Connect, and a tool it cannot start says what stands in the way, with no Connect. Every agent that asked this vault in the last 30 days or has settings has a row too, and Every other agent comes last. Connect opens a pane under the tool's row showing exactly what it will do: for Claude Code, Codex, Gemini CLI and Devin, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and the tool's id, `--allow-run` and `--expose '**'`, as `setup` registers, and `--vault` only when the unlocked vault is not the chosen one, or as above under another `KEYPASTE_HOME`; for VS Code, Cursor and Claude Desktop, the edit of keypaste's entry in the client's file and where its first original is kept. Nothing is written until you press the pane's Connect, and Cancel or opening another tool's Connect drops the preview. While one pane's plan or check runs, no other Connect, Connect again or Disconnect can start.
+Agents lists the AI tools found on this computer and every agent that asked this vault in the last 30 days. Add an agent offers a setup prompt to copy, a specific app to connect, or MCP to add by hand. A tool's Connect (named for it, as in Connect Claude Code) shows exactly what it will run or edit, the same registration `setup` writes, and writes nothing until you press Connect in that pane. Check the connection then starts the registered command as the client would and asks for one value with a reason saying it is a check, which opens the app's prompt like any other request. A connected tool has Connect again, for a moved vault or app, and Disconnect. [The desktop guide](desktop.md) covers the screen.
 
-The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start `~/.local/bin/keypaste` with `mcp`: the script that starts the image with `cli`, which Settings also makes for your terminal and which a newer AppImage re-points when it starts. Connect and `setup` create it first when it is absent; when that path holds a file keypaste did not write, the preview names it and the pane's Connect replaces it, keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
+The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. From an AppImage, which mounts somewhere new each time it starts, it registers `~/.local/bin/keypaste`, creating it first, or replacing another program's file there and keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once or Deny each end the check. A released password is discarded unread, and the audit record appears in Agents › Activity. A tool shown Connected, or whose configuration keypaste cannot read, has Disconnect under its row's Settings, and a Connected one also has Connect again, for a moved vault or app. Disconnect reads the tool's configuration first and says when keypaste is not connected there; otherwise its pane shows the removal, and its Disconnect takes keypaste out of the tool and leaves its other servers alone.
+## By hand
 
-No master password, keyfile or session identifier is written into a client's configuration.
+For a client `setup` does not know, or a scope other than your own.
 
-The following sections show manual configuration, for a client `setup` does not know or a scope other than your own.
+<a id="claude-desktop"></a>
 
-## Claude Desktop
+### Claude Desktop
 
 Open Claude menu → Settings → Developer → Edit Config, or edit the file directly:
 
@@ -85,7 +62,7 @@ Open Claude menu → Settings → Developer → Edit Config, or edit the file di
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
-The packaged Claude Desktop on Windows (Microsoft Store or MSIX) reads its own copy at `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` once it has one; the other Windows install reads the `%APPDATA%` path above.
+The packaged Claude Desktop on Windows (Microsoft Store or MSIX) reads its own copy at `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` once it has one.
 
 ```json
 {
@@ -102,17 +79,11 @@ The packaged Claude Desktop on Windows (Microsoft Store or MSIX) reads its own c
 }
 ```
 
-On Windows the backslashes must be escaped: `"C:\\Users\\you\\keypaste.exe"`.
+Paths must be absolute, because the client's working directory is not yours. On Windows, escape the backslashes: `"C:\\Users\\you\\keypaste.exe"`. Restart Claude Desktop; the server appears under the tools icon. If you set `KEYPASTE_HOME`, connect Claude Desktop with `keypaste setup` or the app's Connect instead, since Claude Desktop does not see your shell's variables.
 
-Paths must be absolute. The client's working directory is not yours, and a relative path will resolve somewhere you did not intend.
+<a id="claude-code"></a>
 
-Keep the master password out of client configuration; enter it only in the approver terminal.
-
-Restart Claude Desktop. The server appears under the tools icon; if it does not, see Troubleshooting.
-
-If you set `KEYPASTE_HOME` to anything other than the default, connect Claude Desktop with `keypaste setup` or the app's Connect, which write that home's vault and audit log into its entry as flags, since Claude Desktop does not see your shell's variables. keypaste's Claude Desktop extension, which is not published yet, always starts the bridge for the default home.
-
-## Claude Code
+### Claude Code
 
 ```sh
 claude mcp add --transport stdio --scope project keypaste \
@@ -121,7 +92,7 @@ claude mcp add --transport stdio --scope project keypaste \
      --client-label claude-code
 ```
 
-`--scope project` writes `.mcp.json` in the repository root, which your teammates get too. The equivalent by hand:
+`--scope project` writes `.mcp.json` in the repository root, which your teammates get too if you commit it. Absolute local paths usually differ between teammates and can reveal usernames, so use `--scope local` to keep it to your own machine. The same by hand:
 
 ```json
 {
@@ -134,191 +105,55 @@ claude mcp add --transport stdio --scope project keypaste \
 }
 ```
 
-A project-scoped `.mcp.json` is a file in the repository that you can commit; the command does not commit it. Absolute local paths usually differ between teammates and can reveal usernames or directory names. Keep master passwords and credentials out of it.
+## If your vault has a key file
 
-Use `--scope local` instead if you would rather keep it to your own machine.
+`keypaste approve` opens the vault, so it is the process that needs the key file: add `--keyfile <path>` beside its `--vault`, or set `KEYPASTE_KEYFILE`. `keypaste mcp` never opens a vault, so its configuration takes no key file and `setup` writes none.
 
-## If your vault has a keyfile
+<a id="what-the-agent-may-see"></a>
 
-`keypaste approve` opens the vault, so it is the process that needs the keyfile: add `--keyfile <path>` beside its `--vault`, or set `KEYPASTE_KEYFILE`.
+## What the agent can see
 
-`keypaste mcp` never opens a vault and never asks for a password, so its entry in a client's configuration takes no keyfile and `keypaste setup` does not write one. A client block that names a keyfile would record where your second factor is kept and change nothing about what the bridge can do.
+`keypaste setup` and the app's Connect register `--expose '**'`, so an agent sees every item outside keypaste's own groups: its title, group, tags and URL, and its username unless Agents see usernames is off. Each value it asks for is then decided by its [agent settings](policy.md), which by default ask you about everything.
 
-## What the agent may see
-
-A bridge's exposure defaults to `tag:env:*`: the variable-named fields of entries tagged into a project, the same variables `keypaste run` uses. Other entries cannot be named or read through it. `keypaste setup` and the app's Connect register `--expose '**'`, so the agent sees every item: its title, group, tags and URL, and its username unless Settings hides it, while each value it asks for is decided by this computer's rules ([agent settings](policy.md)). An `--expose` you give narrows that bridge.
-
-A bridge you configured by hand reaches another group once its own `--expose` does, naming the default with it, because any `--expose` replaces the default:
+A bridge you configure by hand with no `--expose` sees only `tag:env:*`: the variable-named fields of items tagged into a project, the same variables `keypaste run` uses. Any `--expose` replaces that default, so name it again when you add a group:
 
 ```json
 "args": [
-  "--vault", "/absolute/path/to/vault.kdbx",
+  "mcp", "--vault", "/absolute/path/to/vault.kdbx",
   "--expose", "tag:env:*",
   "--expose", "servers/staging/*"
 ]
 ```
 
-Each pattern an agent can see authorizes disclosure of matching entry names. Review additions carefully: names can reveal a vault inventory and help target later requests.
-
-Patterns match the group path and the entry title as two separate things, so `*` stays inside one path segment and `**` spans any number of them. A title containing a slash is matched as a title, so it can never impersonate a deeper group.
+A pattern matches the group path and the title separately: `*` stays inside one path segment and `**` spans any number. A title containing a slash is matched as a title, so it cannot pass for a deeper group. `tag:env:<project>[:<environment>]` reaches only that project's variables, never an item's password, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in. Every pattern discloses the matching names, which can reveal your inventory and help target later requests.
 
 ## The tools
 
-`list_entry_names` takes no arguments and returns, for each exposed entry, its group path and name, the fields that may be asked for and its project tags. It cannot return a value or widen exposure.
+- `list_entry_names` takes no arguments and returns, for each item the agent can see, its group path and title, the fields it may ask for and its project tags. It never returns a value.
+- `request_credential` takes `entry`, `field` and `reason` and returns one field, or with `field` set to `totp` the item's current code, never its seed.
+- `request_attachment` takes `entry`, `name` and `reason` and returns one attachment by its exact name, as base64; one over 5 MiB is refused.
+- `request_save` takes `item` and `field`, or `project`, `environment` and `key`, with `reason`, and asks you to save a value there that you type, paste or generate. The item is created when there is none, a replace needs your confirmation, and the agent learns only whether it was saved ([THREATS](../THREATS.md) T-54).
+- `run`, offered by a bridge started with `--allow-run`, is below.
 
-`request_credential` takes `entry`, `field` and `reason`. It forwards the request to the process holding the vault, which asks the person, or, in source, releases or refuses it without asking when this computer's rules allow or block that kind of value ([agent settings](policy.md)), and returns one field or, in source, with `field` set to `totp`, the entry's current TOTP code, never its seed. The returned credential has no lifetime keypaste can enforce once it has left. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
-
-In source, `request_attachment` takes `entry`, `name` and `reason`, and returns one attachment of the entry, by its exact name, as base64, decided the same way under the rule for attachments; one over 5 MiB is refused.
-
-In source, `request_save` takes `item` and `field`, or `project`, `environment` and `key`, with `reason`, and asks the person to save a value there, which they type, paste or generate; the item is created when there is none, a replace needs their confirmation, and the agent learns only whether it was saved and where ([THREATS](../THREATS.md) T-54).
-
-Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
+The MCP surface cannot add, edit or delete items except through `request_save`. Anyone who can edit the vault can influence item names; keypaste strips control characters, invisible Unicode and structural punctuation and labels the listing as data, which cannot rule out prompt injection ([THREATS](../THREATS.md) T-1).
 
 ## Running a command with secrets (`--allow-run`)
 
-Add `--allow-run` to the bridge's arguments and it offers another tool, `run`. In source, `keypaste setup` and the desktop's Connect add it, and an agent still runs nothing until you turn run on for it, on its row in Agents or with `keypaste clients <agent> --run on`; a configuration written before keeps the arguments it was given until setup or Connect runs again.
+With `--allow-run` the bridge offers `run`. `setup` and Connect add it, and an agent still runs nothing until you turn run on for it, on its row in Agents or with `keypaste clients <agent> --run on`.
 
-`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny or Allow once, every time; a run whose set holds a value the rules block is refused without asking ([T-35](../THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
+`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason`, and an optional `timeout_seconds` (default 120, at most 600). `PATH`, `KEYPASTE_*` and literal values cannot be set, and the program is looked up only in absolute `PATH` entries. Every run is asked, with Deny and Allow once ([Approvals](approvals.md#runs)).
 
-The app or `keypaste approve` records the run before it answers; the bridge then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
+The bridge starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. If the client asked for progress, the bridge reports every 10 seconds while you decide and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped. The replacement is a safety net, not a boundary: a command can still reveal a value in another form, in a file or over the network ([THREATS](../THREATS.md) T-35).
 
-The scrubbing is a safety net, not a boundary: a command can still print a value in another form, write it to a file, send it over the network, and any process of the same user can read its environment while it runs. Approve only commands whose behaviour you know; [THREATS.md](../THREATS.md) T-35 lists the limits.
+## Ending access
 
-## Seeing and ending access
+`keypaste lock --vault <path>` asks the app or `keypaste approve` holding the vault to lock now: every release stops and `keypaste approve` ends. It asks for no password. Disconnect in Agents, or `keypaste setup --remove`, takes keypaste out of a tool. Neither erases what an agent already received; rotate a credential at its provider when that matters.
 
-In source, the earlier spellings `keypaste agent`, `keypaste mcp serve`, `keypaste mcp setup` and `keypaste mcp policy` are refused, each naming the command that replaced it. From another terminal, `keypaste lock --vault <path>` asks the desktop app or `keypaste approve` holding the vault to lock now: every release stops and `keypaste approve` ends. It asks for no password; it reaches the holder over the same per-user endpoint as `keypaste run --session`, and nothing holding the vault is not an error.
+<a id="archiving-it"></a>
 
-## The audit log
+## Seeing what agents did
 
-Every call, allowed or refused, appends one JSON line to `~/.keypaste/audit.jsonl`. The app or `keypaste approve` writes the line of each call it answers, in its own home's log; the bridge writes one only for a call it refused itself or that nothing holding the vault answered. `KEYPASTE_HOME` moves the directory for the process it is set for, and the bridge's `--audit-log` moves only the bridge's own lines.
-
-```sh
-jq -c . < ~/.keypaste/audit.jsonl
-```
-
-```json
-{"v":2,"ts":"2026-07-26T14:03:11.482Z","seq":1,"pid":48122,
- "client":{"name":"claude-code","version":"1.2.3","label":"claude-code","transport":"stdio"},
- "tool":"request_credential",
- "args":{"entry":"env/dev/STRIPE_KEY","entry_kind":"path","field":"password",
-         "reason_excerpt":"deploy the billing service to staging","reason_len":37,
-         "reason_sha256":"..."},
- "decision":"granted","method":"prompt",
- "reason":"a person approved this one request",
- "exposure":["env/**"],
- "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
-```
-
-`decision` is `granted` or `denied`; `method` records how the decision was reached:
-
-| `method` | What happened |
-|---|---|
-| `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
-| `allowed` | In source: released without prompting, because this computer's rules allow that kind of value, or it is an item's URL, or its username while Agents see usernames is on ([policy.md](policy.md)). |
-| `blocked` | In source: refused without prompting, because the rules block that kind of value or it is a passkey's field. |
-| `automatic`, `automatic-commands`, `always-allowed` | Written by source before F.78a, for settings and Always allow rows that no longer exist. Nothing in source writes them. |
-| `grant-cache` | Written by `v0.3.0`: a live approval on the same connection served the request. Nothing in source writes it. |
-| `policy` / `policy-limit` | Written by `v0.3.0`: a standing rule in `policy.toml` released the field without prompting, or had spent its `max_per_hour` allowance. Nothing in source writes them. |
-| `undeliverable` | A person or an Allow rule authorized the request, but the value exceeded the reply limit. Nothing was released; the reason identifies the authorization source. |
-| `exposure` | A listing, naming only what the agent can see. |
-| `no-approver` | In `v0.3.0`, nobody was running `keypaste agent`; in source, nothing held the vault unlocked. |
-| `no-session` | In source: the request did not reach the current session of the process holding this server's vault — the bridge had no vault named or chosen, the process that answered holds another vault, or the vault was locked or unlocked again between attaching and asking. Nothing was considered. |
-| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the desktop app has merged that save, or until the person reloads a file it would not merge or restarts `keypaste approve`; or a change made in keypaste was still being saved; or the vault was reloaded or merged while the request waited for an answer, which withdrew it. Nothing was read. |
-| `merged` | In source, on a `vault_merge` line: the desktop app merged another program's save with changes its copy held and saved the result, naming the items both changed and those kept against a deletion, never a value. |
-| `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
-| `timed-out` / `busy` / `cooldown` | Nobody answered in time; the agent already had as many requests waiting as keypaste lets one wait, or its bridge was carrying as many calls as it carries at once, so this one was refused rather than queued; or a request for the same field was refused a moment ago, and on an `access_change` line any request for more from an agent or a terminal was refused or went unanswered a moment ago. |
-| `cancelled` | The client stopped waiting before anybody answered, or, on an `access_change` line, a lock or a reload took the confirmation down first. Nobody decided anything. |
-| `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
-| `inject-only` | The agent's settings give it no values, so a request for one was refused before anything was read ([policy.md](policy.md)). |
-| `run-off` | In source: the agent's settings do not let it run commands, so a run was refused before anything was read. |
-| `narrowing` | In source, on an `access_change` line: a change to an agent's settings that gave it nothing more, applied at once. A widening a person confirmed or refused is `prompt`. |
-| `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
-| `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
-
-Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt`.
-
-A line an earlier build from source wrote may carry `granted_seconds`, the time a person chose; `v0.3.0` and source write none.
-
-The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
-
-Calls are refused if the audit record cannot be written. An unwritable `~/.keypaste` can also prevent startup. The log grows without automatic rotation or trimming; [Archiving it](#archiving-it) says how to start a new one. On Linux and macOS, keypaste creates owner-readable logs and tightens existing permissions with a stderr notice. Windows logs inherit their directory permissions without an equivalent check, so keep `KEYPASTE_HOME` in a folder only you can read.
-
-## Reading it
-
-```sh
-keypaste log
-keypaste log --denied
-keypaste log --client claude-code --since 2h
-```
-
-```
-3 records in /home/you/.keypaste/audit.jsonl
-
-  time (UTC)           agent        item                decision  method
-  2026-07-26 14:03:09  claude-code  -                   granted   exposure
-  2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
-  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   allowed
-```
-
-`--since` accepts a span (`30m`, `2h`, `7d`) or timestamp (`2026-07-20` or a full timestamp). `--client` matches part of a label or name. Filtered views show both the selected and total record counts.
-
-## Knowing it has not been edited
-
-Each record contains its predecessor's hash in `prev` and its own hash in `hash`. Changing a record breaks the next record's declared link.
-
-```sh
-keypaste log verify
-```
-
-```
-3 records verified in /home/you/.keypaste/audit.jsonl.
-Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
-```
-
-`keypaste log verify` exits 5 for a broken chain and identifies the line and problem. `keypaste log` performs the same check and warns before displaying affected records.
-
-The chain has no secret key, so a file writer can recompute it. Deleting final records also leaves an internally valid chain. Both limits are printed on every successful verification. To detect loss of a previously observed record, retain its hash and supply it later:
-
-```sh
-keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
-```
-
-`--expect` requires a record whose bytes still hash to the supplied value. keypaste does not store the anchor beside the log because a writer could replace both. [THREATS.md](../THREATS.md) T-5 covers these limits.
-
-No release of keypaste wrote a `v:1` record, so in source one is reported as a line something else wrote (D-0416). `keypaste log` marks it and other unverifiable rows with `?`:
-
-```
-  time (UTC)           agent        item                 decision  method
-? 2026-07-26 14:10:00  claude-code  env/prod/PAYROLL_DB  granted   prompt
-
-?  the hash chain does not vouch for this row. Run 'keypaste log verify'.
-```
-
-Unrecognized appended lines are reported by verification; new keypaste records link to the last valid chain record. Records from a newer keypaste version stop appending to avoid a fork. Upgrade or move the file aside to start a new log; the old file remains readable and verifiable.
-
-## Archiving it
-
-keypaste never rotates, trims or moves the log. To start a new one:
-
-1. Quit the app, stop `keypaste approve` and quit every AI tool that runs keypaste's bridge, so nothing has the file open or writes to it. Windows cannot move a file in use, and the app holds the log from its first agent request until it locks.
-2. Run `keypaste log verify` and keep the `Latest` hash it prints somewhere other than this computer. With nothing writing, it is the hash of the file's last record.
-3. Move the file aside, in `KEYPASTE_HOME` if you set one:
-
-```sh
-mv ~/.keypaste/audit.jsonl ~/.keypaste/audit-2026-10.jsonl
-```
-
-```powershell
-Move-Item "$HOME\.keypaste\audit.jsonl" "$HOME\.keypaste\audit-2026-10.jsonl"
-```
-
-The next record starts a new file with a chain of its own, and the archive still verifies against the hash you kept:
-
-```sh
-keypaste log verify --audit-log ~/.keypaste/audit-2026-10.jsonl --expect <hash>
-```
-
-The app's Activity reads only `audit.jsonl`, so it stops showing what you archived; `keypaste log --audit-log <file>` still lists it.
+Every call is a line in `~/.keypaste/audit.jsonl`, which `keypaste log` reads and the app shows as Activity under Agents. [Approvals](approvals.md#the-audit-log) explains the log, how to check it and how to archive it.
 
 ## Checking it works without a client
 
@@ -330,36 +165,15 @@ printf '%s\n' \
   | keypaste mcp --vault ~/vault.kdbx --audit-log /tmp/probe.jsonl
 ```
 
-You should get two JSON lines back, the second listing `list_entry_names`, `request_credential`, `request_attachment` and `request_save`. CI runs a stricter version of exactly this on all three operating systems (`scripts/verify-mcp-stdio.sh`).
+You should get two JSON lines back, the second listing `list_entry_names`, `request_credential`, `request_attachment` and `request_save`. CI runs a stricter version of this on all three operating systems (`scripts/verify-mcp-stdio.sh`).
 
 ## Troubleshooting
 
-If startup fails, check the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable.
+- **Startup fails.** Check that the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable. `keypaste doctor` reports the vault, the process holding it and each AI tool's registration.
+- **"Nothing holds this vault unlocked."** Unlock the vault in the app, or start `keypaste approve --vault <path>` for the vault the bridge names. If one is running, check that both use the same `--approver` or `KEYPASTE_APPROVER`.
+- **The vault is locked, or `vault-changed`.** The holder locked, or another program saved the file. The app merges that save and answers again; `keypaste approve` needs a restart.
+- **Nothing in the audit log.** Confirm the client called a tool, then check `KEYPASTE_HOME`: the app or `keypaste approve` writes in its own home, and `--audit-log` moves only the bridge's lines. The client's MCP server log shows keypaste's stderr.
+- **Protocol errors.** Look for wrappers or shell profiles that print to stdout, which a stdio MCP server reserves for protocol messages.
+- **An old command is refused.** `keypaste agent`, `keypaste mcp serve`, `keypaste mcp setup` and `keypaste mcp policy` are refused in the 1.0.0 build, each naming the command that replaced it, and `keypaste doctor` flags a client still registered to start `keypaste-mcp`.
 
-If calls report "no keypaste agent is running" (in source, "nothing holds this vault unlocked"), start `keypaste approve --vault <path>` (`keypaste agent` in `v0.3.0`) for the intended vault; in source, unlocking that vault in the desktop app serves it too. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. `v0.3.0` repairs that race (F.9).
-
-A call says the vault is locked. The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
-
-Nothing in the audit log. Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` changed the destination: the app or `keypaste approve` writes in its own home, and `--audit-log` moves only the bridge's lines. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
-
-For protocol errors, inspect wrappers and shell profiles for text written to stdout. A stdio MCP server reserves stdout for protocol messages; CI checks that keypaste follows this rule.
-
-## FAQ
-
-Can the agent see my passwords? Each successful request returns one field or attachment of one entry under a human approval or, in source, a kind of value you allowed in Settings and confirmed. Repeated approved requests can accumulate credentials. keypaste cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
-
-Can it see my entry names? Only the ones it can see, the least of its settings and `--expose`, which both default to `tag:env:*`, the entries tagged into a project, and only while the app or `keypaste approve` holds its vault unlocked. Through a tag it reaches only an entry's project variables, never its password field, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in (D-0465); a pattern naming a group, such as `--expose 'services/**'`, reaches whole entries.
-
-Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
-
-Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values. In source, the desktop serves its own saved edits at once and merges another program's save, refusing as `vault-changed` until the merged copy is saved, and an approver whose file another program changed refuses until it is reopened.
-
-The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester.
-
-Do I have to approve every single call? No. In source, a kind of value you allow in Settings, once you confirm it, is released to every agent without asking, and an item's URL and username are; Allow once (`o`) keeps nothing. `v0.3.0` asks `[y/N]` and keeps an approval for up to 300 seconds, and a policy rule can release without asking.
-
-Does anything leave my machine? The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
-
-A client can claim another client's name, but authorization does not use that name. Agents' settings follow the configured `--client-label`, which the client's own handshake cannot change, although another local program can launch a bridge with the same arguments and an agent that can edit its client's configuration can change its label. [THREATS.md](../THREATS.md) T-3 and T-14 describe the boundary.
-
-Should I point this at my personal vault? The default exposure is `tag:env:*`; only the project variables of tagged entries are available through this bridge. Review those entries, the agent's settings and the client's retention behavior before using real credentials. Each approval is one release, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.
+What the bridge does not protect against, such as a client that keeps released values in its transcripts or sends them to a remote model, another local program starting a bridge under an agent's label, or an agent that edits its own client's configuration, is set out in [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) (T-3, T-14).

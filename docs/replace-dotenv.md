@@ -1,8 +1,10 @@
 # Replace your `.env` in 5 minutes
 
+> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. In the published `v0.3.0` each variable is its own item under `env/<project>`, `get` takes `--show` rather than `--field … --reveal`, and there are no environments (`-p`), `env diff`, `kp://` references, `keypaste use` or `--session` runs. [FEATURES](FEATURES.md) lists what each version has.
+
 Import a `.env` file into an encrypted KeePassXC-compatible vault, then start your app with variables injected into its environment. Deleting the original file does not erase backups, snapshots or git history.
 
-The vault uses KDBX4 and stores each variable as an ordinary entry, so other compatible tools can continue reading it.
+Each variable becomes a protected field of an item tagged into the project, in the KDBX 4 file, so KeePassXC and other KeePass apps can read and edit it.
 
 ## Before you start
 
@@ -75,17 +77,17 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
-This command asks for the vault password on each invocation. In source, `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste approve` instead: it asks for no password, either one shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Projects screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#what-the-screens-show)).
+This command asks for the vault password on each invocation. `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste approve` instead: it asks for no password, either one shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Projects screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#projects)).
 
-keypaste places variables in the child environment without writing a plaintext env file. CI points temporary directories at an empty folder and checks that the injection fixture leaves it empty. The child can still write or forward values; review its logging and behavior.
-
-Once delivered, environment values are copies held by the child and possibly its descendants. Locking a vault cannot remove those copies. The focused product will require an unlocked session for new launches and stop new releases when locked; it will not promise to revoke values already supplied.
+keypaste places variables in the child's environment without writing a plaintext env file. The child can still write or forward values, so review its logging and behavior. Once delivered, the values are copies held by the child and its descendants: a `--session` run needs the vault unlocked to start, but locking the vault afterwards cannot take those copies back ([SECURITY](../SECURITY.md)).
 
 The `--` separates the project from its command. Without it, `keypaste run dev npm start` could name `npm` as the project. All arguments after `--` belong to the command. The child receives keypaste's stdin, stdout and stderr, preserving terminal prompts and output. keypaste closes the vault before starting the child, so a long-running server does not keep the vault unlocked. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit. After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`.
 
-## Profiles and references
+<a id="profiles-and-references"></a>
 
-A project holds one set per profile, named with lowercase letters, digits and `-`; everything above is the `dev` profile. A profile's keys are fields of the entries tagged into it: `env set` and `env pull` add a new key to its entry `env/<project>/.env`, or `.env.<profile>` for another profile, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another entry tagged into it. An entry kept the earlier way, one per variable under `env/<project>`, is an ordinary entry and no longer a variable (D-0416). Every env verb and `run` take `-p <profile>`:
+## Environments and references
+
+A project holds one set per environment, named with lowercase letters, digits and `-`; everything above is the `dev` environment. An environment's keys are fields of the items tagged into it: `env set` and `env pull` add a new key to its item `env/<project>/.env`, or `.env.<profile>` for another environment, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another item tagged into it. An item kept the `v0.3.0` way, one per variable under `env/<project>`, is an ordinary item and no longer a variable. Every env verb and `run` take `-p <profile>`:
 
 ```sh
 keypaste env set acme-api DATABASE_URL -p staging
@@ -94,11 +96,11 @@ keypaste env diff acme-api dev staging
 keypaste run -p staging acme-api -- npm start
 ```
 
-`env diff` names a key one profile lacks, a key a profile holds but cannot release (an expired entry, a name that cannot be exported) and a value two profiles share; it never prints a value. Profiles named `prod`, `production`, `prod-*` or `production-*`, in any case, are protected: a `--session` run of one is asked about live every time, allow once only.
+`env diff` names a key one environment lacks, a key an environment holds but cannot release (an expired item, a name that cannot be exported) and a value two environments share; it never prints a value. Environments named `prod`, `production`, `prod-*` or `production-*`, in any case, are protected: a `--session` run of one is asked about live every time, allow once only.
 
-`keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault entry. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that profile.
+`keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault item. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that environment.
 
-Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault entries or another project needs `--env-file`. Only the desktop app maps a directory to a project, so without it name the project, as in `keypaste run acme-api -- npm start`, or the reference file, as in `keypaste run --env-file .env.keypaste -- npm start`; given neither, `run` starts nothing and says which to add. A found or named reference file is always announced with its project and profile, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
+Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault items or another project needs `--env-file`. Only the desktop app maps a directory to a project, so without it name the project, as in `keypaste run acme-api -- npm start`, or the reference file, as in `keypaste run --env-file .env.keypaste -- npm start`; given neither, `run` starts nothing and says which to add. A found or named reference file is always announced with its project and environment, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
 
 <a id="minute-4--the-rest-of-the-repo"></a>
 
@@ -113,7 +115,7 @@ keypaste env pull dev
 keypaste run dev -- npm run dev
 ```
 
-Commit a `.env.keypaste` from `keypaste env export` if you want the variable names and their profile in the repository; it holds no value. One vault can hold several projects, each with its profiles. Use separate vaults and master passwords when environments need different access boundaries.
+Commit a `.env.keypaste` from `keypaste env export` if you want the variable names and their environment in the repository; it holds no value. One vault can hold several projects, each with its environments. Use separate vaults and master passwords when environments need different access boundaries.
 
 ## CI
 
@@ -143,7 +145,7 @@ With non-terminal stdin, confirming verbs (`rm`, `env rm`, `env pull`, `env expo
 
 ## The escape hatch
 
-Export values with `--dotenv` when a tool requires a `.env` file or when moving credentials to another system; `-p` picks the profile:
+Export values with `--dotenv` when a tool requires a `.env` file or when moving credentials to another system; `-p` picks the environment:
 
 ```sh
 keypaste env export dev --dotenv --stdout
@@ -166,9 +168,9 @@ Export uses single quotes where possible, which are literal in `motdotla/dotenv`
 
 ### What if I lose my master password?
 
-Without the master password or another usable copy of the credentials, keypaste cannot recover the vault's contents. There is no master-password reset or support backdoor. Entry history can restore an earlier value in an accessible vault; it cannot recover the master password, an entry that was permanently deleted or a lost vault file.
+Without the master password or another usable copy of the credentials, keypaste cannot recover the vault's contents. There is no master-password reset or support backdoor. Item history can restore an earlier value in an accessible vault; it cannot recover the master password, an item that was permanently deleted or a lost vault file.
 
-Keep a written copy of the master password in a secure physical location. Keep current `.kdbx` backups in protected locations. Their confidentiality depends on the master password's strength. The published `v0.3.0` cannot open vaults that require a key file; in Unreleased source keypaste opens them and `keypaste access` attaches an existing key file. Losing either required factor without a backup can make that vault inaccessible.
+Keep a written copy of the master password in a secure physical location. Keep current `.kdbx` backups in protected locations. Their confidentiality depends on the master password's strength. keypaste opens a vault that needs a key file, and `keypaste access` attaches one; losing either required factor without a backup can make that vault inaccessible.
 
 If you cannot recover access, rotate each credential at its provider.
 
@@ -176,11 +178,11 @@ If you cannot recover access, rotate each credential at its provider.
 
 keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. A cloud vault synced end to end and a relay for team projects are planned ([ROADMAP](../ROADMAP.md)) and not yet built.
 
-One caveat: the published `v0.3.0` does not merge concurrent vault edits. In source, the desktop app merges a save the sync tool delivers with the copy it holds open, by whole item versions, keeping the older of two changes to one item in its history and naming in its notice what both changed; the CLI and `keypaste approve` still refuse to save over a file another program changed. If two machines edit offline, the sync tool may also leave conflicting copies, which keypaste does not merge with each other: keep every conflicting copy, edit in one place at a time where you can, and let synchronization finish before switching machines.
+The desktop app merges a save the sync tool delivers with the copy it holds open, keeping both machines' changes when they edited different fields of one item, and Recommendations offers a sync tool's conflicted copy for review and merge. The CLI and `keypaste approve` refuse to save over a file another program changed. Edit in one place at a time where you can, and let synchronization finish before switching machines.
 
 ### Can my teammate use the same vault?
 
-Someone with the file and master password can read everything in that vault. If you choose to share one, use a dedicated work vault and transfer its password through a separate trusted channel. This gives no per-person revocation or individual accountability and has the concurrent-edit limitation above. Organization management and offboarding are unimplemented options in [BACKLOG](BACKLOG.md). Removing file access cannot invalidate values someone already copied; that requires changing them at their providers.
+Someone with the file and master password can read everything in that vault. If you choose to share one, use a dedicated work vault and transfer its password through a separate trusted channel. This gives no per-person revocation or individual accountability and has the concurrent-edit limitation above. Team projects, with access per person, are planned and not built. Removing file access cannot invalidate values someone already copied; that requires changing them at their providers.
 
 ### Does it work offline?
 
@@ -188,7 +190,7 @@ Yes. The vault is a file on your disk, and keypaste opens, reads and saves it wi
 
 ### What does KeePassXC see?
 
-Ordinary entries. Each variable is a protected field, named as the variable, of an entry whose tag puts it in the project: `env/dev/.env`, tagged `env:dev`, for the ones keypaste added, or any entry you tag yourself. A project kept the earlier way has an entry per variable under `env/dev`, its title the name and its password the value. You can read, edit, add and delete either in KeePassXC with no knowledge of keypaste, and the compatibility gate checks both directions on Linux, macOS and Windows for qualifying CI runs.
+Ordinary entries. Each variable is a protected field, named as the variable, of an entry whose tag puts it in the project: `env/dev/.env`, tagged `env:dev`, for the ones keypaste added, or any entry you tag yourself. A project kept the earlier way has an entry per variable under `env/dev`, its title the name and its password the value. You can read, edit, add and delete either in KeePassXC with no knowledge of keypaste; [FEATURES](FEATURES.md#keepassxc-compatibility) says what the compatibility tests check.
 
 ### Can I keep using `direnv`?
 

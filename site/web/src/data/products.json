@@ -38,7 +38,7 @@
   {
     "slug": "daily-driver",
     "name": "Daily driver",
-    "status": "planned",
+    "status": "building",
     "summary": "Touch ID and Windows Hello, TOTP codes, browser fill, merging a synced file and importers."
   },
   {

@@ -1,21 +1,21 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.23, ratified 2026-11-08. [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+Open tasks by product track, each with its dependencies, detail and acceptance; [CLAUDE.md](../CLAUDE.md#documents) names the owner of everything else. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
-## T6 — Daily driver
+## Track 6 — Daily driver
 
-Each row keeps its historical meaning and is expanded when selected. Designs the founder approved on 2026-10-24 split 8.1 and 8.3a (D-0548), 1.4b (D-0537 to D-0546), and P.4a and P.4b (D-0547) into children, which keep their parents' IDs; a parent closes when all its children have. P.4a1 is done, and the typing children, P.4a2 to P.4a5 and P.4b, left 1.0.0 for BACKLOG (D-0632).
+A row is detailed further when it is selected. A task split into children keeps its ID as their prefix and closes when all of them have. Auto-Type's typing, P.4a2 to P.4a5 and P.4b, is a BACKLOG idea.
 
 - [ ] **8.1e — Install and remove the host per browser.** Needs: 8.1c.
-  - Settings › Browser fill and `keypaste browser` turn the host on and off for Chrome, Chromium, Edge, Brave and Firefox at the user-level places KeePassXC 2.8.0's `NativeMessageInstaller.cpp` writes, which each browser reads before a system one: on Windows the `org.keepassxc.keepassxc_browser` key under Chrome's, Chromium's, Edge's or Mozilla's `HKCU` `NativeMessagingHosts`, Brave reading Chrome's, naming a JSON file under `%LOCALAPPDATA%\keypaste\NativeMessagingHosts\`, and elsewhere each browser's own manifest directory. The manifest allows only the three identities and names the `keypaste` a terminal finds: the MSI's per-user `keypaste.exe`, the app bundle's `keypaste`, re-pointed at each start as the Linux link is (D-0431), `~/.local/bin/keypaste` on Linux, made when absent (D-0435), or a CLI archive's running binary.
+  - Settings › Browser fill and `keypaste browser` turn the host on and off for Chrome, Chromium, Edge, Brave and Firefox at the user-level places KeePassXC 2.8.0's `NativeMessageInstaller.cpp` writes, which each browser reads before a system one: on Windows the `org.keepassxc.keepassxc_browser` key under Chrome's, Chromium's, Edge's or Mozilla's `HKCU` `NativeMessagingHosts`, Brave reading Chrome's, naming a JSON file under `%LOCALAPPDATA%\keypaste\NativeMessagingHosts\`, and elsewhere each browser's own manifest directory. The manifest allows only the three identities and names the `keypaste` a terminal finds: the MSI's per-user `keypaste.exe`, the app bundle's `keypaste`, re-pointed at each start as the Linux link is, `~/.local/bin/keypaste` on Linux, made when absent, or a CLI archive's running binary.
   - Turning on names the program the manifest it replaces points at ("KeePassXC will stop answering Chrome") and keeps a byte copy of that manifest, and of the Windows value, under `~/.keypaste/browsers/replaced/`. Turning off removes keypaste's manifest only while it still names keypaste and puts the copy back, leaving one KeePassXC has since rewritten. Each browser's status is keypaste, KeePassXC with its path, another program with its path, keypaste at a path that no longer exists, or not set up.
   - Accepted when, in `Keypaste.Processes.Tests.BrowserHostTests` on each runner, the fake browser finds and starts the manifest where that browser looks, on Windows through `%COMSPEC% /d /s /c` with redirected pipes as Chromium does; turning off restores a planted KeePassXC manifest and Windows value byte for byte and leaves one KeePassXC rewrote; and the status names KeePassXC, another program, a missing path and none.
 - [ ] **8.3a2 — Fill a login on the person's answer or allowance.** Needs: 8.1d, 8.3a1.
-  - `get-logins` is served on a bound attachment. Candidates are the items whose URL or a `KP2A_URL` field matches by 8.3a1's rules, leaving out recycled items, keypaste's reserved groups, items KeePassXC's `BrowserHideEntry` hides on the item or its group, and expired items, refused as a run refuses them (D-0337); KeePassXC's other narrowing settings are honoured and its allow lists are not.
-  - A candidate with an allowance for the exact origin is released under it; any other is asked about. The prompt names the browser and pairing, the origin in ASCII with its registrable domain emphasised and the form's origin when it differs, and lists candidates by title and username, never a password; the person fills one, optionally ticking "Always fill this item on" that origin, or denies. One prompt per pairing is open at a time, a request meanwhile is answered with no logins, the recent-refusal cooldown applies, and a lock withdraws a waiting prompt (D-0313). Allowances are kept in `.keypaste/browsers`, made only in the app, and listed and removable in Settings.
-  - The reply carries, for each released item, its login and password filled in as D-0465 fills them, its name and its UUID, never its group, a TOTP code, string fields or `KPH:` or `KPXC_` fields. Each released item gets its own line before the reply, and a line that cannot be written refuses the release (D-0439); lines name the identity, the pairing, the origin as `scheme://host:port` and the item's path, never a page's path, query or fragment, a username, a password or a key, and also record each matched item refused, with its reason, and each allowance added or removed.
+  - `get-logins` is served on a bound attachment. Candidates are the items whose URL or a `KP2A_URL` field matches by 8.3a1's rules, leaving out recycled items, keypaste's reserved groups, items KeePassXC's `BrowserHideEntry` hides on the item or its group, and expired items, refused as a run refuses them; KeePassXC's other narrowing settings are honoured and its allow lists are not.
+  - A candidate with an allowance for the exact origin is released under it; any other is asked about. The prompt names the browser and pairing, the origin in ASCII with its registrable domain emphasised and the form's origin when it differs, and lists candidates by title and username, never a password; the person fills one, optionally ticking "Always fill this item on" that origin, or denies. One prompt per pairing is open at a time, a request meanwhile is answered with no logins, the recent-refusal cooldown applies, and a lock withdraws a waiting prompt. Allowances are kept in `.keypaste/browsers`, made only in the app, and listed and removable in Settings.
+  - The reply carries, for each released item, its login and password with their KeePass placeholders filled in from the item, as every released value is, its name and its UUID, never its group, a TOTP code, string fields or `KPH:` or `KPXC_` fields. Each released item gets its own line before the reply, and a line that cannot be written refuses the release; lines name the identity, the pairing, the origin as `scheme://host:port` and the item's path, never a page's path, query or fragment, a username, a password or a key, and also record each matched item refused, with its reason, and each allowance added or removed.
   - THREATS gains a page that is not the item's site, keypaste believing the extension about which page asks, the extension as someone else's code receiving passwords, and an allowance as a rule kept in the vault.
   - Accepted when, in `Keypaste.Processes.Tests.BrowserHostTests` and the owner tests, a fill follows the person's Fill; an allowance releases on its exact origin only; every refusal of 8.3a1 holds; only login, password, name and UUID leave; one line per released item comes before the reply; and no line is written for a lookup that matched nothing.
 - [ ] **8.3a3 — Prove fill in real browsers.** Needs: 8.1e, 8.3a2.
@@ -27,14 +27,14 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **1.4b4 — `keypaste approve` merges another program's save.** Needs: 1.4b2.
-  - The folder watch and poll moved into Core for both owners, and `keypaste approve`'s terminal line, hardware-key touch and refusal text (D-0546).
+  - The folder watch and poll moved into Core for both owners, and `keypaste approve`'s terminal line, hardware-key touch and refusal text.
   - Accepted when `ApproveCommandTests` shows another program's save merged without a restart, and `Keypaste.Core.Tests.KeePassXC.MergeTests` gains, passing on the three runners, G9: `keypaste approve` narrows an agent and an older KeePassXC copy is moved over the file, and the narrowing holds with the older record in history; and G10: KeePassXC saves while `keypaste approve` serves a bridge, and the next request is refused as `vault-changed` and then served from the merged copy in the same session, with no restart.
 
-## T5 — Desktop delivery
+## Track 5 — Desktop delivery
 
 The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.
 
-Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
+Package managers and agent marketplaces carry a version only after it is published.
 
 - [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. Input: 3.5a's credentials.
   - First, a branch preflight with ad-hoc signing settles a bundle layout `codesign` can seal, and the hardened-runtime entitlements. The CoreCLR payload may have to move out of `Contents/MacOS`.
@@ -42,34 +42,36 @@ Package managers and agent marketplaces carry a version only after it is publish
   - `spctl` accepts it, and a changed byte is refused.
   - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
   - `upgrade-desktop.yml`'s macOS leg runs again on the first signed bundle, to see whether macOS App Management permission stops it replacing `/Applications/keypaste.app` ([4.7e2](steps/4.7e2.md)).
-  - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it (D-0523).
+  - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it.
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none.
   - Made when 3.5b's preflight closes and signing is what it needs next.
   - External Apple Developer enrollment, done as an individual by the founder's choice of 2026-11-10: macOS names the founder's legal name as the developer, not keypaste.
   - Repository-scoped Developer ID Application and notarization credentials.
+- [ ] **H-0017 — Make the Windows signing identity.** Human. Needs: none.
+  - A Microsoft Artifact Signing identity verified as keypaste, which `app.yml` and `release.yml` sign with, in place before 4.7c2; Microsoft's validation can take up to 20 business days.
 - [ ] **H-0027 — Approve the terms of use.** Human. Needs: none.
   - The founder or a lawyer approves the draft of 2026-11-06, filling in the legal entity, governing law and place of establishment. Agreement by continuing past one first-launch screen, with no separate opt-in for crash reports, needs the lawyer's check for EU consent; it is the founder's decision of 2026-11-06 ([Q.19](steps/Q.19.md)). The lawyer also checks whether requiring that agreement before the app opens sits with AGPL §10's bar on further restrictions, and whether README's 'no account and no network' stays true with reports sending by default.
   - Settle this with the terms, as the founder directed on 2026-11-05 (Q.11): "We post changes at keypaste.com/terms", where no such page exists.
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12 and B.5 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, Q.1 to Q.12 (D-0682), Q.18 (D-0686), F.75 and V.12 (D-0683), F.76 (D-0684), F.77 to F.80 (founder, 2026-11-07), and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 3.5b, 4.7a2, 4.7e, G.5. Ships after: every Track 6 task but 1.4b4, F.112, and the two person's checks [ROADMAP](../ROADMAP.md#100-the-first-public-release) says hold the release. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
-  - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
+  - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package.
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
 - [ ] **R.1b — Round-trip a tagged entry through the phone apps (H-0024).** Human. Needs: none.
   - Tag an entry and give it a protected env field in keypaste, edit that entry in KeePassium, Strongbox and KeePassDX, and confirm keypaste still reads the tag, the field and its protection; record each app's version.
 - [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2, L.3.
-  - README, keypaste.com and the guides lead with the v1.20 positioning (D-0681) and name 1.0.0.
+  - README, keypaste.com and the guides lead with [PRODUCT §1](PRODUCT.md#1-product)'s account of what keypaste is and who it is for, and name 1.0.0.
   - They link its three desktop downloads, hashes and verification steps.
   - They take a new user from the download to a working vault, a project run and a connected agent, as that version behaves.
   - README's demo GIF and every screenshot are re-rendered from the 1.0.0 binaries.
   - They give the issue route and the private security-reporting route.
   - The launch copy says what keypaste adds over Varlock's KeePass plugin, Strongbox MCP and 1Password Environments, and links the safe-agent guide (L.3).
   - The guides name only the phone apps R.1b's round-trip passed.
-  - Published claims are checked against the published binaries (D-0036).
+  - Published claims are checked against the published binaries.
   - The install blocks move from `keypaste-mcp` to `keypaste mcp`, and `verify-install.sh`'s bridge check moves with them ([F.48](steps/F.48.md)).
   - No announcement, message or signup mail is authorized by this row.
 - [ ] **R.1 — Accept the installed local product.** Needs: 4.7c2, L.1.
@@ -84,7 +86,6 @@ Package managers and agent marketplaces carry a version only after it is publish
   - A Scoop bucket entry for the Windows payloads.
 - [ ] **3.7c — Publish winget installation and updates.** Needs: none. Ships after: 4.7c2. Input: H-0023.
   - winget manifests for the signed MSI, with a stable publisher identity.
-  - Closes O-0011 with its siblings.
 - [ ] **G.6a — Offer keypaste as a Claude Code plugin.** Needs: G.1. Ships after: 4.7c2.
   - A marketplace manifest, the bridge registration, and a skill telling agents to use keypaste rather than ask for a pasted secret.
   - It is built on a branch and merged only then, because a push to `main` publishes it; an earlier build on `hold/G.6a` was deleted on 2026-10-30.
@@ -102,29 +103,29 @@ Package managers and agent marketplaces carry a version only after it is publish
   - The guides L.1 rewrites move into `site/web` as their only home, and the repository keeps links to them; the checks that read `docs/demo.md` and the other transcript pages follow them.
   - The content pages gain a content security policy, checked in a browser against search and the diagrams.
 
-## T7 — Agents without values
+## Track 7 — Agents without values
 
-PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, v1.12 (D-0430) adds X.17 to T7, v1.15 (D-0530) put T7 in 1.0.0, and v1.19 (D-0669) moves it after 1.0.0, which T8–T11 follow too. Each row carries its purpose until it is selected and detailed.
+Each row carries its purpose until it is selected and detailed.
 
 - [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
   - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
-  - The agent asks by host; the owner matches it to an entry's service, the person picks a personal or team entry, and the agent learns only that service, its scope and its grant (D-0405).
+  - The agent asks by host; the owner matches it to an entry's service, the person picks a personal or team entry, and the agent learns only that service, its scope and its grant.
   - The owner writes the audit record of every request it serves.
 - [ ] **X.17 — Let an agent organize the vault without seeing values.** Needs: none.
   - By default the agent sees names and structure only, never a value, and note text counts as a value; the person may allow it to read a vault's note text, told that the text then reaches the agent's provider (PRODUCT §2).
   - It proposes changes such as classifying notes, moving keys into fields or tagging entries for projects; each change is applied only once the person approves it in the app, and one that moves an item into or out of an agent's reach, such as tagging it into a project an agent can see, is flagged as such before the person approves it.
-  - Every name the agent reads reaches its provider, and a planted entry name can steer it, for example into proposing a move into a project an agent is Automatic for (T-13).
+  - Every name the agent reads reaches its provider, and a planted entry name can steer it, for example into proposing a move into a project whose values a rule releases to that agent without asking (T-13).
 
-## T8 — Cloud vault and team projects
+## Track 8 — Cloud vault and team projects
 
 - [ ] **X.2 — Specify the end-to-end sharing protocol.** Needs: none.
   - Member key pairs, a project key wrapped for each member, roles, and removal by re-wrapping and rotation, built from mature audited libraries (§3.6).
-  - Accounts and a person's encrypted vault, the relay's first client, and one store per team that the app keeps, never inside the personal vault (D-0406).
+  - Accounts and a person's encrypted vault, the relay's first client, and one store per team that the app keeps, never inside the personal vault.
   - Reviewed against §3 and §4.3 before any relay code.
 - [ ] **X.3 — Run the relay.** Needs: X.2.
-  - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys: one C# service on .NET, which X.10 and X.13 extend (D-0409).
+  - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys: one C# service on .NET, which X.10 and X.13 extend.
 - [ ] **X.10 — Sync a person's vault through the relay.** Needs: X.3, 1.4b.
-  - At first run everyone is offered an account and a cloud vault as the default choice: the KDBX encrypted on the device under the master password and a key file that is never uploaded, and merged across devices (D-0408).
+  - At first run everyone is offered an account and a cloud vault as the default choice: the KDBX encrypted on the device under the master password and a key file that is never uploaded, and merged across devices.
   - Keeping the vault local stays one choice away and needs no account.
 - [ ] **X.11 — Recover a cloud vault with a kit or a signed-in device.** Needs: X.10.
   - The recovery kit holds the key file as a QR code, the account address and a space for the master password; a device still signed in can set a new password. No copy of the key exists anywhere else (§3.1).
@@ -134,7 +135,7 @@ PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 a
   - Invite, roles for reading, writing and production, and removal with rotation reminders, in the app and the CLI.
   - A record of who fetched what.
 
-## T9 — CI and deploys
+## Track 9 — CI and deploys
 
 - [ ] **X.5 — Verify machine identities at the relay.** Needs: X.3.
   - A CI job or deploy target fetches a project's values under an identity the relay verifies, never a member's key.
@@ -142,16 +143,16 @@ PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 a
 - [ ] **X.7 — Push syncs from a member's machine.** Needs: X.4.
   - Hosting platforms such as GitHub, Vercel and Cloudflare receive values from an approved member's machine, so the relay never decrypts.
 
-## T10 — Organizations
+## Track 10 — Organizations
 
 - [ ] **X.8 — Sign in with SSO and provision with SCIM.** Needs: X.4.
 - [ ] **X.9 — Approve production changes, export the audit and package the relay.** Needs: X.4.
   - A production change waits for a second member's approval, the relay's records export to an organization's log store, and the self-hosted relay ships as a package.
 
-## T11 — Server access by choice
+## Track 11 — Server access by choice
 
 - [ ] **X.13 — Let a team project opt into server access.** Needs: X.4.
-  - Once a team opts a project in, the relay's .NET service on keypaste.com or the team's own holds its key (D-0409); members see which projects a server can read, and the server's records reach each member's local log (§3.3).
+  - Once a team opts a project in, the relay's .NET service on keypaste.com or the team's own holds its key; members see which projects a server can read, and the server's records reach each member's local log (§3.3).
   - Reviewed against §3 and §4.3 before any code.
 - [ ] **X.14 — Proxy agents running in the cloud.** Needs: X.13, X.1.
 - [ ] **X.15 — Let CI sign in with OIDC and store no secret.** Needs: X.13.
@@ -159,4 +160,4 @@ PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 a
 
 ## Completion
 
-The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns public availability: a completed source step does not mean the behavior is in the current download.
+The [current release matrix](RELEASE.md#current-distribution) owns public availability: a completed source step does not mean the behavior is in the current download.

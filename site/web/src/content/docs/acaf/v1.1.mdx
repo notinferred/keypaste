@@ -13,7 +13,12 @@ Version 1.1 is final. It is [version 1](/acaf/v1/) with one change: a value may 
 
 ## Status
 
-keypaste no longer uses this version's agent records. It reads a vault's projects as [Projects](#projects) says, and decides what each agent gets by rules kept on the computer where it runs, never in the vault, so it neither reads nor writes the records under `.keypaste/agents` and leaves any a vault holds as they are. No published keypaste release included this version. The page stays as written for any KeePass app that implements it.
+| Part | keypaste's status |
+|---|---|
+| [Projects](#projects) | Implemented, not yet released: the source build headed for keypaste 1.0.0 reads and writes a vault's projects as this version says, placeholders included. The published `v0.3.0` keeps each variable as its own entry under `env/<project>` and reads no project tags. |
+| [Agents' settings](#agents-settings) | Never Published, and no longer implemented. keypaste wrote these records in its source for a time and then moved each agent's rules to agent settings kept on the computer where it runs, never in the vault. It neither reads nor writes the records under `.keypaste/agents` and leaves any a vault holds as they are. |
+
+The page stays as written for any KeePass app that implements it.
 
 ## Scope
 
@@ -181,7 +186,7 @@ Records add nothing that needs more than KDBX 4.0: a vault at 4.0 stays at 4.0 w
 
 ## Evidence
 
-In keypaste's repository, `AcafRecordTests` holds the record's reading and writing and a change rewriting only what it names, `AcafIdsTests` the UUIDs and the known answers above, `AgentAccessStoreTests` the group, the entry, history, reset, a change keeping what keypaste does not understand, a record read as the file holds it, other versions and other entries under one name, and merges through KeePass's own library both ways, `EffectiveAccessTests` what applies to an item, `AccessChangeTests` what counts as giving more, and `SessionAuthorityAccessTests` the owner applying it over a real pipe. `scripts/verify-keepassxc-projects.sh` has KeePassXC 2.7 import a vault, keypaste write agents' settings into it, KeePassXC edit, add to and save it, and two copies merged with `keepassxc-cli merge` in both directions, after each agent was changed in one copy, the same agent in both and the same agent created in both, keeping one entry per agent with the newer record whole and the older in its history, and a vault at KDBX 4.0.
+In keypaste's repository, `AcafIdsTests` checks the UUIDs and the known answers above; `ProjectTagTests` the project-tag grammar, which tags are reported and which protect; `EnvResolutionTests` that an environment's set is released whole or refused, naming each entry and never a value; `KeePassPlaceholdersTests` the placeholders a value may hold and the refusals; and `ProjectsTests`, in `Keypaste.Core.Tests.KeePassXC`, that the project tags KeePassXC writes are the ones keypaste reads, and the reverse. Agents' settings records are not yet tested by any test in the repository, since keypaste no longer implements them.
 
 ## Licence
 

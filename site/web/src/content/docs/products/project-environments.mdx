@@ -7,21 +7,21 @@ import Status from '../../../components/Status.astro';
 
 <Status id="project-environments" />
 
-A project's API keys and database URLs live in the vault beside your logins. `keypaste run` starts a program with them in its environment and writes no `.env` file.
+A project's API keys and database URLs live in the vault beside your logins. `keypaste run` starts a program with them in its environment and writes no `.env` file. `env pull`, `run` and `env export` are in the published `v0.3.0`; the project tags, environments and references below come with 1.0.0.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  vault[("vault.kdbx, entries tagged env:billing")] -->|reads the whole set, then closes| run["keypaste run dev -- npm start"]
+  vault[("vault.kdbx, items tagged env:billing")] -->|reads the whole set, then closes| run["keypaste run dev -- npm start"]
   refs[".env.keypaste in your repository, references only"] -.-> run
   run e1@--> child["npm start, with the values in its environment"]
   e1@{ animate: true }
 ```
 
-A set is injected whole or not at all. An expired entry, a repeated name or a name that cannot be an environment variable stops the run, and the error names each entry and why, never a value.
+A set is injected whole or not at all. An expired item, a repeated name or a name that cannot be an environment variable stops the run, and the error names each item and why, never a value.
 
-In the release being built, a variable becomes a named field on an ordinary entry, and a KeePass tag such as `env:billing` or `env:billing:prod` puts the entry into a project, so one value can serve several environments. Each project gets a value for dev, staging and prod, and prod always needs a live answer from you. The repository can commit a `.env.keypaste` file of `kp://` references instead of values. Entries kept the earlier way, one per variable under `env/<project>`, stay ordinary entries and are no longer read as variables.
+In the 1.0.0 build, which is not yet released, a variable becomes a named field on an ordinary item, and a KeePass tag such as `env:billing` or `env:billing:prod` puts the item into a project, so one value can serve several environments. Each project gets a value for dev, staging and prod, and prod always needs a live answer from you. The repository can commit a `.env.keypaste` file of `kp://` references instead of values. Items kept the earlier way, one per variable under `env/<project>`, stay ordinary items and are no longer read as variables.
 
 ## What it does
 

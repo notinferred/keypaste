@@ -4,25 +4,19 @@
 
 # Launch material
 
-This is reusable draft copy for the next CLI/MCP release, reviewed against the source on 2026-09-25; its transcript matches the current source, which `v0.3.0` predates (`v0.3.0` prompts `Approve? [y/N]` with a `for N seconds` line). An announcement of `v0.3.0` itself must use the `v0.3.0` [demo](demo.md) recording instead, and when the version that ships this prompt is tagged, re-date this draft to it. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
+> This is draft copy for announcing keypaste 1.0.0, the first desktop release, which is not yet published; it describes the source build headed there. Today's download is the CLI and MCP bridge `v0.3.0`, which has `keypaste agent`, a separate `keypaste-mcp` binary and an `Approve? [y/N]` prompt, so a post about `v0.3.0` must use [its own guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/demo.md) instead. [FEATURES](FEATURES.md) lists what each version has.
 
-[PRODUCT](PRODUCT.md) defines the focused local desktop product. [ROADMAP](../ROADMAP.md) owns what comes next, and [RELEASE](RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
+It is not an instruction to publish or contact anyone, and there is no campaign, schedule or announcement gate: the founder chooses whether and where to use it, and only once 1.0.0 is published and installation-verified ([RELEASE](RELEASE.md)).
 
-## Next release draft
+## 1.0.0 draft
 
-keypaste stores passwords and project environment variables in a local KDBX file and lets an AI client request one credential at a time over MCP.
+keypaste is a local password manager that keeps your logins, keys and project values in a KeePass-format file on your computer, with no account. AI coding agents use what they need one field at a time, each use approved by you and logged.
 
-The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
+It comes as a desktop app for Windows, macOS and Linux, the `keypaste` command-line tool, and an MCP bridge your AI tools start as `keypaste mcp`. An agent asks for one field and says why; you answer in the app or in `keypaste approve` with Deny, Allow once, or for a labelled agent Always allow or Always block. Agent settings say, for each kind of value, whether to ask, allow or block. `keypaste run dev -- npm start` hands a project's variables to a command without a `.env` file. Every request goes into a local, hash-chained log.
 
-For agent access, your MCP client starts `keypaste mcp`. You start and unlock a separate `keypaste approve` in a terminal, which shows credential requests. You answer Deny or Allow once, which releases one field and keeps nothing, or, for an agent whose bridge has a label, Always allow or Always block, each confirmed with `y` and kept for that agent and item; silence for 45 seconds denies access. A kind of value you allow for every agent in Settings, a change that waits for your confirmation, is released without a prompt, and a command is asked about each time. `keypaste approve` records each call it answers in a local hash-chained audit log, the bridge records the calls nothing answered, and a release whose record cannot be written is refused.
+KeePassXC opens the same file, and the source is AGPL-3.0. Locking the vault cannot take back a value a program already received.
 
-The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste approve` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Projects screen launches a project's command or a terminal from that session; none of this is published yet.
-
-The intended product is a familiar local password manager with one unlock session for vault use, native MCP approval and project launches. Existing processes retain credentials they already received; neither locking the vault nor expiring an approval erases those copies.
-
-The source is AGPL-3.0. CI checks KDBX interoperability with real KeePassXC on the advertised operating-system families. This is compatibility evidence, not complete KeePassXC feature parity.
-
-[Install the published CLI](https://github.com/notinferred/keypaste#install), [watch the terminal demo](https://github.com/notinferred/keypaste/blob/main/docs/demo.md), or [read the source](https://github.com/notinferred/keypaste).
+[Install keypaste](https://github.com/notinferred/keypaste#install), [watch the demo](https://github.com/notinferred/keypaste/blob/main/docs/demo.md), or [read the source](https://github.com/notinferred/keypaste).
 
 ## Transcript material
 
@@ -52,7 +46,7 @@ keypaste: an agent is asking for a credential.
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. Setting a kind of value back to Ask stops later releases without asking, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
+A released value goes to the MCP client, which may keep it; [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own the limits a post should link rather than restate.
 
 ## Before using this material
 
