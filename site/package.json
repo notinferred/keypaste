@@ -12,6 +12,6 @@
     "postgres": "3.4.9"
   },
   "devDependencies": {
-    "wrangler": "4.114.0"
+    "wrangler": "4.161.0"
   }
 }
