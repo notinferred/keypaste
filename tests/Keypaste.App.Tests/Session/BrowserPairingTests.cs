@@ -50,7 +50,7 @@ public sealed partial class BrowserPairingTests
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
 
-        Assert.Equal("KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)", Text(window, "IdentityText"));
+        Assert.Equal("keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)", Text(window, "IdentityText"));
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
@@ -66,7 +66,7 @@ public sealed partial class BrowserPairingTests
 
         using var listed = new BrowserFillViewModel(app.Authority, app.Clock);
         var row = Assert.Single(listed.Rows);
-        Assert.Equal(("work laptop", "KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)"), (row.Name, row.Identity));
+        Assert.Equal(("work laptop", "keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)"), (row.Name, row.Identity));
         Assert.Contains("last used", row.Used, StringComparison.Ordinal);
         Assert.False(listed.IsArmed);
     });
@@ -83,7 +83,7 @@ public sealed partial class BrowserPairingTests
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync(2));
 
-        Assert.Equal("KeePassXC-Browser from Firefox Add-ons (keepassxc-browser@keepassxc.org)", Text(window, "IdentityText"));
+        Assert.Equal("keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", Text(window, "IdentityText"));
         window.FindControl<TextBox>("NameBox")!.Text = "work laptop";
         app.Clock.Advance(PromptViewModel.ArmingDelay);
         await PromptedApp.UntilAsync(() => Text(window, "NameProblemText") == "another pairing already has this name");
@@ -107,7 +107,7 @@ public sealed partial class BrowserPairingTests
 
         Assert.Equal(BrowserOutcome.Refused, reply?.Outcome);
         Assert.Equal(PairingNotice.AppText, Text(notice, "NoticeText"));
-        Assert.Equal("KeePassXC-Browser from Microsoft Edge Add-ons (pdffhmdngciaglkoonimfcmckehcpafo)", Text(notice, "IdentityText"));
+        Assert.Equal("keypaste's extension from Microsoft Edge Add-ons (pkpkpkpkpkpkpkpkpkpkpkpkpkpkpkpk)", Text(notice, "IdentityText"));
         Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Rows);
 
         var again = await link.PairAsync(Pair(app), Token);

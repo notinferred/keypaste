@@ -213,7 +213,7 @@
   <data name="KEY" xml:space="preserve"><value>KEY</value></data>
   <data name="KEYPASTEHOMECapitals" xml:space="preserve"><value>KEYPASTE_HOME</value></data>
   <data name="KeePassItemID" xml:space="preserve"><value>KeePass item ID</value></data>
-  <data name="KeePassXCBrowserPairsWithKeypasteAsItX779e5d" xml:space="preserve"><value>KeePassXC-Browser pairs with keypaste as it pairs with KeePassXC. For the next 2 minutes, one browser can ask to pair, and you confirm it in a window keypaste shows.</value></data>
+  <data name="KeypasteExtensionPairsWithTheVaultXb9e44c" xml:space="preserve"><value>keypaste's extension pairs with the vault you have unlocked. For the next 2 minutes, one browser can ask to pair, and you confirm it in a window keypaste shows.</value></data>
   <data name="KeePassXCsDatabases" xml:space="preserve"><value>KeePassXC's databases</value></data>
   <data name="KeepBoth" xml:space="preserve"><value>Keep both</value></data>
   <data name="KeepBothLandsEachBesideYoursUnderX77358f" xml:space="preserve"><value>Keep both lands each beside yours under a numbered name, such as GitHub (2). Nothing in your vault is replaced.</value></data>
@@ -659,4 +659,8 @@
   <data name="Secrets" xml:space="preserve"><value>Secrets</value></data>
   <data name="Where" xml:space="preserve"><value>Where</value></data>
   <data name="Result" xml:space="preserve"><value>Result</value></data>
+  <data name="Browsers" xml:space="preserve"><value>Browsers</value></data>
+  <data name="TurnOn" xml:space="preserve"><value>Turn on</value></data>
+  <data name="TurnOff" xml:space="preserve"><value>Turn off</value></data>
+  <data name="TurnOnForThisBrowser" xml:space="preserve"><value>Turn on for this browser</value></data>
 </root>

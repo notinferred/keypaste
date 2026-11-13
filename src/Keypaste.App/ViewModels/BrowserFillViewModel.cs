@@ -100,7 +100,7 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
             var seconds = left <= TimeSpan.Zero ? 0 : (int)Math.Ceiling(left.TotalSeconds);
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"Pairing is on for {seconds / 60}:{seconds % 60:00}. In KeePassXC-Browser, press Connect, then answer keypaste's window.");
+                $"Pairing is on for {seconds / 60}:{seconds % 60:00}. In keypaste's extension, press Connect, then answer keypaste's window.");
         }
     }
 

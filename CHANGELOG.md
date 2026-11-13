@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Settings › Browser fill and `keypaste browser` turn keypaste on and off as Chrome's, Chromium's, Edge's, Brave's and Firefox's host for keypaste's own browser extension, and show which program each browser starts and whether the extension is installed in it. keypaste no longer answers KeePassXC-Browser ([8.1e](docs/steps/8.1e.md)).
+
 keypaste.com's pages come from InfernoCMS and are published from there, and each page has an Ask button that answers from the site's pages with links to them, structured data for search engines and a Markdown version for AI tools.
 
 Quitting the desktop app just after its window moved no longer ends it with a crash report ([F.110](docs/steps/F.110.md)).

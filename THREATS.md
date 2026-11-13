@@ -39,7 +39,7 @@ A lock withdraws waiting requests, and the owner refuses agents while its vault 
 | `keypaste` CLI and bridge code | Trusted | Open source and auditable under law 3.8. |
 | Vault file | Trusted at rest | KDBX4 gives integrity and confidentiality; entry text stays untrusted (T-1). |
 | MCP client | Semi-trusted, unauthenticated | Starts the bridge and supplies an unverified identity (T-3). |
-| Browser and KeePassXC-Browser | Semi-trusted, unauthenticated | Start the relay naming an extension identity any local process can name, and pair only while the person armed pairing (T-48, T-50). |
+| Browser and keypaste's extension | Semi-trusted, unauthenticated | Start the relay naming an extension identity any local process can name, through the manifest keypaste writes or any other, and pair only while the person armed pairing (T-48, T-50). |
 | Model | Untrusted | Can compose requests from attacker-written context. |
 | Entry names, group paths and a request's `reason` | Untrusted data | Cannot instruct keypaste (T-1, T-2). |
 | Agent rules, `agents.toml` | Trusted only while sealed | Followed only while the owner's seal holds; anything else reads as the defaults, which ask about every value (T-15). |
@@ -672,29 +672,29 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Asset.** Logins released to a browser, and the pairing that admits one.
 
-**Attacker.** A same-user process starting the relay with a browser's arguments, naming any of the three KeePassXC-Browser builds, or speaking the pipe as a browser.
+**Attacker.** A same-user process starting the relay with a browser's arguments, naming any of the three builds of keypaste's extension, or speaking the pipe as a browser.
 
-**Mitigation.** The relay ends KeePassXC-Browser's encrypted session itself, keeping libsodium out of the processes that hold the vault; it holds no vault and cannot reach vault access or the audit log. A browser's connection may only pair, check a pairing, fill and lock. The relay sends typed requests, never the extension's JSON, and with a fill only the pairing a check proved, so the extension's other pairings, KeePassXC's included, go no further. It refuses a reused nonce and logs nothing. Pairing is answered only while the person armed it in Settings or with `keypaste approve --pair-browser`, for two minutes and one confirmation; any other request is refused, recorded and told to the person. The confirmation names the build the browser claimed and says any program can claim it.
+**Mitigation.** The relay ends the extension's encrypted session, KeePassXC-Browser's protocol, itself, keeping libsodium out of the processes that hold the vault; it holds no vault and cannot reach vault access or the audit log. A browser's connection may only pair, check a pairing, fill and lock. The relay sends typed requests, never the extension's JSON, and with a fill only the pairing a check proved, so the extension's other pairings go no further. It refuses a reused nonce and logs nothing. Pairing is answered only while the person armed it in Settings or with `keypaste approve --pair-browser`, for two minutes and one confirmation; any other request is refused, recorded and told to the person. The confirmation names the build the browser claimed and says any program can claim it.
 
 **Limit.** A same-user process can read the relay's memory, where decoded logins stay as strings until collected, and can start keypaste naming the extension or speak the pipe as a browser, obtaining what pairing and fill allow; a program asking first inside an armed window is still shown to the person, who can deny it. The relay believes the browser about which extension started it.
 
 **Status.** Implemented (unreleased); not in v0.3.0. Fill is not implemented yet: the owner refuses every fill (planned, step 8.3a2).
 
-**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`. Unverified: no real browser has started the relay (planned, steps 8.1e and 8.3a3).
+**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. Unverified: no real browser has started the relay, and keypaste's extension does not exist yet (planned, steps 8.1f and 8.3a3).
 
-### T-49 — Two programs answer one host name
+### T-49 — Another program answers keypaste's host name
 
-**Asset.** Which program, keypaste or KeePassXC, answers a browser, and the pairing keys the extension sends.
+**Asset.** Which program a browser starts for keypaste's extension, and the pairing key the extension sends it.
 
-**Attacker.** Whichever program last wrote the browser's manifest for `org.keepassxc.keepassxc_browser`, the fixed name both use.
+**Attacker.** A same-user program that writes a manifest for `com.keypaste.browser` at the user-level place each browser reads before a system one.
 
-**Mitigation.** keypaste answers with a database hash of its own, so the extension stores keypaste's pairing apart and KeePassXC's keeps working. keypaste never honours or writes KeePassXC's pairings or browser settings, so an approval given to KeePassXC releases nothing from keypaste, and only a proved pairing goes further (T-48).
+**Mitigation.** keypaste has its own host name and answers only its own extension, so KeePassXC, which writes `org.keepassxc.keepassxc_browser`, never takes a browser from keypaste and keypaste never takes one from it. Settings › Browser fill and `keypaste browser` name the program each browser starts, another program's path included; Settings asks before turning on replaces another program's manifest, and turning off removes only a manifest keypaste wrote.
 
-**Limit.** A person may believe keypaste's rules applied while KeePassXC answered, or the reverse; the extension says KeePassXC throughout, and each host receives every pairing key the extension holds. KeePassXC retakes a browser at its start while its startup update is on. Nothing installs keypaste's manifest yet, so only one written by hand reaches keypaste (installing it is planned, step 8.1e).
+**Limit.** keypaste does not watch the manifests, so one another program writes is seen only when the status is read, and until then that program receives the extension's requests and its pairing key (T-50).
 
 **Status.** Implemented (unreleased); not in v0.3.0.
 
-**Tests.** `SessionBrowsersTests`, `RelayTests`, `WorkflowsTests`. Unverified: that KeePassXC still answers its own pairing after keypaste's saves ([BACKLOG](docs/BACKLOG.md#investigation-candidates)).
+**Tests.** `BrowserHostsTests`, `BrowserVerbTests`, `BrowserHostSettingsTests`, `BrowserHostTests`.
 
 ### T-50 — A pairing is a bearer key
 

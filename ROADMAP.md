@@ -33,7 +33,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 
 | Outcome | Open tasks |
 |---|---|
-| Worked next, before release work: browser fill is finished, from installing the host per browser to filling in real browsers, and the fixes still marked For 1.0.0 are closed. | 8.1e, 8.3a2, 8.3a3, F.112 |
+| Worked next, before release work: browser fill is finished, from installing the host per browser and keypaste's own extension in the three stores to filling in real browsers, and the fixes still marked For 1.0.0 are closed. | 8.1f, 8.1g, 8.3a2, 8.3a3, F.112 |
 | The Mac app is signed and notarized, and Touch ID quick unlock follows as soon as it is. | 3.5b, 4.10b |
 | Signed, notarized and verified packages for three platforms are published as 1.0.0, with guidance a new user can follow and the phone apps checked by hand, and the installed product is accepted. | 4.7c2, R.1b, L.1, R.1 |
 | `keypaste approve` merges another program's save as the app does; it does not hold the release. | 1.4b4 |
@@ -44,6 +44,7 @@ Outside inputs gate this release, each taken up when the work that needs it is n
 - Apple's Developer ID and notarization credentials, when 3.5b reaches signing (3.5a, H-0015);
 - a Windows signing identity (H-0017), before 4.7c2, allowing up to 20 business days for Microsoft's validation;
 - the terms of use approved by the founder or a lawyer (H-0027), and the crash-report database made and switched on (H-0028), before 4.7c2;
+- the extension's store accounts, IDs and Chrome signing key (H-0029), before 8.1g, allowing days per store for review;
 - for the reach tasks, the MCP Registry namespace and hosting (H-0022) and the package-manager and plugin-directory submissions (H-0023).
 
 The gaps a person would notice are the ones still marked **For 1.0.0.** in step records' limits, which F.112 closes; the test-coverage gaps marked **After 1.0.0.** and the defects [BACKLOG](docs/BACKLOG.md#known-defects-and-flaky-tests) lists do not hold the release.

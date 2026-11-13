@@ -394,7 +394,7 @@
             </StackPanel>
 
             <StackPanel Spacing="16" IsVisible="{Binding ShowsBrowser}">
-              <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds. -->
+              <!-- Browser fill: pairing keypaste's extension, armed by this press alone, and the pairings the vault holds. -->
               <Border Name="BrowserFillCard" IsVisible="{Binding HasBrowserFill}">
                 <StackPanel Spacing="12" DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
                   <Border Classes="group">
@@ -408,7 +408,7 @@
                         <ctl:FieldRow.Actions>
                           <Panel VerticalAlignment="Top">
                             <Button Name="PairBrowser" Classes="ghost sm" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
-                                    ToolTip.Tip="{x:Static res:Strings.KeePassXCBrowserPairsWithKeypasteAsItX779e5d}"
+                                    ToolTip.Tip="{x:Static res:Strings.KeypasteExtensionPairsWithTheVaultXb9e44c}"
                                     AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
                             <Button Name="StopPairing" Classes="ghost sm" Content="{x:Static res:Strings.StopPairing}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
                                     AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
@@ -417,6 +417,53 @@
                       </ctl:FieldRow>
                     </ctl:GroupedRows>
                   </Border>
+
+                  <!-- Each browser's host for keypaste's extension: a manifest of this computer's, not the vault's. -->
+                  <StackPanel Name="BrowserHosts" Spacing="12"
+                              IsVisible="{Binding $parent[views:SettingsView].((vm:SettingsViewModel)DataContext).HasBrowserHosts}"
+                              DataContext="{Binding $parent[views:SettingsView].((vm:SettingsViewModel)DataContext).BrowserHosts}"
+                              x:DataType="vm:BrowserHostsViewModel">
+                    <TextBlock Classes="th" Text="{x:Static res:Strings.Browsers}" Margin="4,0" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="BrowserHostsUnavailable" Classes="caption" Margin="4,0" TextWrapping="Wrap" Text="{Binding UnavailableText}" IsVisible="{Binding !IsAvailable}" />
+                    <Border Classes="group" IsVisible="{Binding IsAvailable}">
+                      <ItemsControl Name="BrowserHostsList" ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:BrowserHostRow">
+                            <ctl:FieldRow Label="{Binding Name}">
+                              <StackPanel Spacing="2">
+                                <TextBlock ctl:MachineRuns.InText="True" Classes="size-13" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Answer}" TextWrapping="Wrap" />
+                                <TextBlock Classes="caption" Text="{Binding Extension}" TextWrapping="Wrap" />
+                                <TextBlock ctl:MachineRuns.InText="True" Classes="caption" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" IsVisible="{Binding IsConfirmingReplace}" />
+                              </StackPanel>
+                              <ctl:FieldRow.Actions>
+                                <Panel VerticalAlignment="Top">
+                                  <Button Classes="ghost sm" Content="{Binding ActionLabel}"
+                                          AutomationProperties.Name="{Binding ActionName}"
+                                          IsVisible="{Binding !IsConfirmingReplace}"
+                                          Command="{Binding $parent[ItemsControl].((vm:BrowserHostsViewModel)DataContext).ChangeCommand}"
+                                          CommandParameter="{Binding}" />
+                                  <StackPanel Orientation="Horizontal" Spacing="8"
+                                              IsVisible="{Binding IsConfirmingReplace}" ctl:ShowInView.OnShow="True">
+                                    <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}"
+                                            Command="{Binding $parent[ItemsControl].((vm:BrowserHostsViewModel)DataContext).CancelReplaceCommand}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Classes="danger sm" Content="{x:Static res:Strings.Replace}" AutomationProperties.Name="{Binding ReplaceName}"
+                                            Command="{Binding $parent[ItemsControl].((vm:BrowserHostsViewModel)DataContext).ReplaceCommand}"
+                                            CommandParameter="{Binding}" />
+                                  </StackPanel>
+                                </Panel>
+                              </ctl:FieldRow.Actions>
+                            </ctl:FieldRow>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Border>
+                    <TextBlock Name="BrowserHostsShared" Classes="caption" Margin="4,0" TextWrapping="Wrap" Text="{Binding SharedText}" IsVisible="{Binding HasSharedText}" />
+                    <TextBlock ctl:MachineRuns.InText="True" Name="BrowserHostsMessage" Classes="caption" Margin="4,0" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+                  </StackPanel>
 
                   <TextBlock Classes="th" Text="{x:Static res:Strings.PairedBrowsers}" Margin="4,0" />
                   <TextBlock Classes="caption" Margin="4,0" Text="{x:Static res:Strings.NoBrowserIsPairedWithThisVault}" IsVisible="{Binding HasNoRows}" />

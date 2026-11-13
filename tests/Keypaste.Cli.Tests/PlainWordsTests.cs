@@ -23,12 +23,13 @@ public sealed partial class PlainWordsTests
         ["attachment", "ls"], ["attachment", "add"], ["attachment", "replace"], ["attachment", "rm"], ["attachment", "save"],
         ["log", "verify"],
         ["share", "ls"], ["share", "revoke"],
+        ["browser", "on"], ["browser", "off"],
     ];
 
     [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?)", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
-    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\bclients(?= {2,})|(?<=share ls, )clients(?=\r?\n)|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
+    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\bclients(?= {2,})|(?<=share ls, )clients(?=, browser\r?\n)|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
     private static partial Regex Interface();
 
     [Fact]

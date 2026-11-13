@@ -10,9 +10,9 @@ namespace Keypaste.Browser.Tests;
 /// </summary>
 public sealed class BrowserCallerTests : IDisposable
 {
-    private const string _chrome = "chrome-extension://oboonakemofpalcgghocfoadofidjkkk/";
+    private const string _chrome = "chrome-extension://kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp/";
 
-    private static readonly string _manifest = Path.Combine(Path.GetTempPath(), "org.keepassxc.keepassxc_browser.json");
+    private static readonly string _manifest = Path.Combine(Path.GetTempPath(), "com.keypaste.browser.json");
 
     private readonly string _home = Directory.CreateTempSubdirectory("keypaste-caller-tests-").FullName;
 
@@ -24,7 +24,7 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(false, _chrome)]
     [InlineData(true, _chrome)]
     [InlineData(true, _chrome, "--parent-window=0")]
-    [InlineData(true, "chrome-extension://pdffhmdngciaglkoonimfcmckehcpafo/", "--parent-window=1180410")]
+    [InlineData(true, "chrome-extension://pkpkpkpkpkpkpkpkpkpkpkpkpkpkpkpk/", "--parent-window=1180410")]
     [InlineData(false, "chrome-extension://abcdefghijklmnopabcdefghijklmnop/")]
     public void A_chrome_family_caller_s_origin_is_a_browser_start(bool windows, params string[] args) =>
         Assert.Equal(args[0], BrowserCaller.Of(args, windows));
@@ -33,7 +33,7 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(false)]
     [InlineData(true)]
     public void Firefox_s_manifest_path_and_add_on_ID_are_a_browser_start(bool windows) =>
-        Assert.Equal("keepassxc-browser@keepassxc.org", BrowserCaller.Of([_manifest, "keepassxc-browser@keepassxc.org"], windows));
+        Assert.Equal("browser@keypaste.invalid", BrowserCaller.Of([_manifest, "browser@keypaste.invalid"], windows));
 
     [Theory]
     [InlineData(false)]
@@ -45,23 +45,23 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(true, _chrome, "--parent-window=")]
     [InlineData(true, _chrome, "--parent-window=12a")]
     [InlineData(true, _chrome, "--parent-window=0", "--extra")]
-    [InlineData(false, "chrome-extension:/oboonakemofpalcgghocfoadofidjkkk/")]
-    [InlineData(false, "org.keepassxc.keepassxc_browser.json", "keepassxc-browser@keepassxc.org")]
+    [InlineData(false, "chrome-extension:/kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp/")]
+    [InlineData(false, "com.keypaste.browser.json", "browser@keypaste.invalid")]
     public void Anything_else_is_not(bool windows, params string[] args) => Assert.Null(BrowserCaller.Of(args, windows));
 
     [Fact]
     public void A_manifest_path_followed_by_an_option_is_not()
     {
         Assert.Null(BrowserCaller.Of([_manifest, "--help"], windows: false));
-        Assert.Null(BrowserCaller.Of([Path.ChangeExtension(_manifest, ".txt"), "keepassxc-browser@keepassxc.org"], windows: false));
+        Assert.Null(BrowserCaller.Of([Path.ChangeExtension(_manifest, ".txt"), "browser@keypaste.invalid"], windows: false));
     }
 
     [Fact]
     public void Keypaste_answers_the_three_KeePassXC_Browser_builds_and_no_other()
     {
         Assert.True(BrowserCaller.TryRead([_chrome], windows: false, out var chrome, out _));
-        Assert.True(BrowserCaller.TryRead(["chrome-extension://pdffhmdngciaglkoonimfcmckehcpafo/", "--parent-window=7"], windows: true, out var edge, out _));
-        Assert.True(BrowserCaller.TryRead([_manifest, "keepassxc-browser@keepassxc.org"], windows: false, out var firefox, out _));
+        Assert.True(BrowserCaller.TryRead(["chrome-extension://pkpkpkpkpkpkpkpkpkpkpkpkpkpkpkpk/", "--parent-window=7"], windows: true, out var edge, out _));
+        Assert.True(BrowserCaller.TryRead([_manifest, "browser@keypaste.invalid"], windows: false, out var firefox, out _));
 
         Assert.Equal(BrowserIdentity.ChromeWebStore, chrome);
         Assert.Equal(BrowserIdentity.EdgeAddOns, edge);

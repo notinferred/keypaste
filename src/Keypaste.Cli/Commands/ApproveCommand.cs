@@ -58,7 +58,7 @@ internal static class ApproveCommand
         $"how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, {ApprovalLimits.DefaultWindowSeconds} by default");
 
     private static readonly Option<string> _pairBrowser =
-        Syntax.Value("--pair-browser", "name", "pair KeePassXC-Browser under this name in the first 2 minutes");
+        Syntax.Value("--pair-browser", "name", "pair keypaste's extension under this name in the first 2 minutes");
 
     internal static CliVerb Command { get; } = new(
         "approve",
@@ -247,7 +247,7 @@ internal static class ApproveCommand
                 if (pairing is not null)
                 {
                     server.Browsers?.Arm(pairing);
-                    console.WriteLine($"keypaste: pairing a browser as {pairing} for the next 2 minutes: in KeePassXC-Browser, press Connect, then answer here.");
+                    console.WriteLine($"keypaste: pairing a browser as {pairing} for the next 2 minutes: in keypaste's extension, press Connect, then answer here.");
                 }
 
                 // Blocking on the listener is the command. There is no synchronization context in

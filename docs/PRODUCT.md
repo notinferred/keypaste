@@ -1,6 +1,6 @@
 # Product rules
 
-Ratified v1.25, 2026-11-10, by the founder's direction of that date; earlier versions are in Git. A scope change updates this document, ROADMAP and STEPS together, and the security laws in §3 change only by a dated re-ratification.
+Ratified v1.26, 2026-11-13, by the founder's direction of that date; earlier versions are in Git. A scope change updates this document, ROADMAP and STEPS together, and the security laws in §3 change only by a dated re-ratification.
 
 ## 1. Product
 
@@ -29,7 +29,7 @@ The product commits to eleven tracks. [ROADMAP](../ROADMAP.md) orders them into 
 - **Track 4, Project environments:** a project's environment is the env-named fields of the entries tagged for it; import a `.env` into fields, explicitly launch an app or terminal with them, and get the latest saved values on the next launch.
 - **Track 3, AI requests in the app:** connect every common client in one step to the vault the person chose, see and answer a bounded request, and inspect the resulting audit record.
 - **Track 5, Desktop delivery:** straightforward onboarding, signed Windows, macOS and Linux packages that include the CLI, installed-product verification, upgrade/recovery and a working feedback route, then package managers and agent marketplaces once a version is published.
-- **Track 6, Daily driver**, in the first desktop release, 1.0.0: quick unlock, TOTP, browser fill, attachment editing, merging a synced file's changes, importers from other password managers and local password health.
+- **Track 6, Daily driver**, in the first desktop release, 1.0.0: quick unlock, TOTP, browser fill, attachment editing, merging a synced file's changes, importers from other password managers and local password health. Browser fill is through keypaste's own extension, a simplified fork of KeePassXC-Browser that keeps its protocol, published in the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons and started by the browser as the host `com.keypaste.browser`; keypaste answers no other extension and never writes KeePassXC's host (founder, 2026-11-13).
 - **Track 7, Agents without values**, after the first desktop release, 1.0.0: the process holding the vault attaches an approved credential to an agent's requests for the hosts its entry names, the agent holds only a placeholder, and the owner writes the audit record; an agent can also organize the vault from its names and structure, proposing changes the person approves in the app.
 - **Track 8, Cloud vault and team projects:** the relay's first job is a person's own vault: an account, the vault synced end to end and merged across devices, recovery through a kit the person keeps or a device still signed in, and the cloud's tiers; then a project's secrets shared through the relay on keypaste.com or self-hosted; members identified by their own key pairs; roles for reading, writing and production; removing a member re-wraps the project key and prompts rotation; a record of who fetched what.
 - **Track 9, CI and deploys:** machine identities the relay verifies, a GitHub Action, and syncs to hosting platforms pushed from a member's machine.
