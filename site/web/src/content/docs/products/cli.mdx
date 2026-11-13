@@ -7,7 +7,9 @@ import Status from '../../../components/Status.astro';
 
 <Status id="cli" />
 
-`keypaste` is the whole product from a terminal. It creates or opens a KDBX vault, keeps logins and project variables in it, runs programs with those variables, and answers AI agents' requests. It reads and writes the same file KeePassXC opens, and CI checks every write against a real KeePassXC on Windows, macOS and Linux.
+`keypaste` is the whole product from a terminal. It creates or opens a KDBX vault, keeps logins and project variables in it, runs programs with those variables, and answers AI agents' requests. It reads and writes the same file KeePassXC opens, and CI checks its writes against a real KeePassXC on Linux and Windows, and on macOS in release runs.
+
+The published version is `v0.3.0`, for macOS on Apple Silicon, Linux x64 and arm64, and Windows x64. The 1.0.0 release, which adds the desktop app, renames some commands: `keypaste agent` becomes `keypaste approve`, and the separate `keypaste-mcp` bridge becomes `keypaste mcp`. [Features](https://github.com/notinferred/keypaste/blob/main/docs/FEATURES.md) lists what each version has.
 
 ## How it works
 
@@ -16,7 +18,7 @@ flowchart LR
   you["You, in a terminal"] --> cli["keypaste"]
   cli <-->|reads and saves, with a backup| vault[("vault.kdbx on your disk")]
   cli e1@--> child["your program, with its variables"]
-  cli e2@--> owner["keypaste agent, holding the vault for agents"]
+  cli e2@--> owner["keypaste agent, holding the vault for agents (keypaste approve in 1.0.0)"]
   vault <-->|the same file| kpxc["KeePassXC and KeePass phone apps"]
   e1@{ animate: true }
   e2@{ animate: true }
@@ -29,7 +31,7 @@ The vault is an ordinary KDBX 4 file. keypaste never invents a format and writes
 - Logins with a username, password, URL and notes, in groups. `keypaste get` copies a password and clears the clipboard after twenty seconds.
 - Generated passwords from a shell-safe alphabet, stored without ever being printed.
 - Project variables from a `.env` file into the vault with `keypaste env pull`, and into a program with `keypaste run dev -- npm start`.
-- `keypaste agent` holds the vault for AI agents and asks you about each request; `keypaste setup` connects the AI tools it finds.
+- `keypaste agent`, `keypaste approve` in 1.0.0, holds the vault for AI agents and asks you about each request; `keypaste setup` connects the AI tools it finds.
 - `keypaste log` reads back every request an agent made, allowed or refused.
 
 ## Limits

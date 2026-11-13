@@ -1,18 +1,16 @@
 # Claude asks for a key, you approve, the deploy runs
 
+> This demo runs the source build headed for keypaste 1.0.0, which is not yet published. The published `v0.3.0` has `keypaste agent` and a separate `keypaste-mcp` binary instead of `keypaste approve` and `keypaste mcp`, asks `Approve? [y/N]`, and keeps a variable as its own item, so its transcript differs. [FEATURES](FEATURES.md) lists what each version has.
+
 This demo uses two terminals to show a failed deploy, a credential request, approval and a successful retry, followed by its audit record. The recorded flow takes about sixty seconds.
 
-`keypaste approve` holds the vault and asks for approval. Your MCP client starts `keypaste mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
+`keypaste approve` holds the vault and asks for approval. Your MCP client starts `keypaste mcp`, which forwards requests without holding a vault. You start the approver yourself. The desktop app approves the same way while it holds the vault unlocked; this demo uses the terminal. [Approvals](approvals.md) explains what you authorize.
 
 The terminal output below was captured from real keypaste processes. Claude's actions and wording can vary between runs.
 
 ## Before you start
 
-```sh
-dotnet build keypaste.slnx -c Release
-```
-
-The binary lands at `artifacts/bin/Keypaste.Cli/release/keypaste` (`.exe` on Windows); `keypaste mcp` is its bridge. Make that build directory available on `PATH`, or replace the commands below with its full path; an older installed `keypaste` will otherwise still run. You also need Claude Code, and two terminals you can see at once. This page verifies the source build; [RELEASE](RELEASE.md) owns published availability.
+Until 1.0.0 is published, the demo needs `keypaste` [built from source](../README.md#building-from-source). Put its build directory, `artifacts/bin/Keypaste.Cli/release/`, first on `PATH`, or use its full path below; an older installed `keypaste` would otherwise run. You also need Claude Code, and two terminals you can see at once.
 
 Use a disposable vault. The tool returns credentials as text and structured data, which Claude can display and retain in transcripts or session files. This demo uses a fake value.
 
@@ -33,7 +31,7 @@ Value for STRIPE_KEY:
 Set STRIPE_KEY on env/demo/.env, created and tagged env:demo
 ```
 
-The key is a variable of the project `demo`: a protected field named `STRIPE_KEY` on the entry `env/demo/.env`, which the tag `env:demo` puts in the project's `dev` environment. That is the field the request below names, and one an agent with no settings of its own can see. Nothing is echoed at the prompts. When it asks for the value, paste this:
+The key is a variable of the project `demo`: a protected field named `STRIPE_KEY` on the item `env/demo/.env`, which the tag `env:demo` puts in the project's `dev` environment. That is the field the request below names, and one an agent with no settings of its own can see. Nothing is echoed at the prompts. When it asks for the value, paste this:
 
 ```
 sk_test_EXAMPLE_ONLY_not_a_real_key_0000
@@ -63,7 +61,7 @@ The equivalent by hand, in `.mcp.json`:
 }
 ```
 
-`--scope local` applies only to this machine. In source, a bridge without `--expose` reaches only the project variables of tagged entries (`tag:env:*`), and so does an agent with no settings of its own, which is where `env set` put the key; an `--expose` you add can only narrow that further, and the agent's settings say what it gets ([agent settings](policy.md)). `--client-label claude-code` is the name those settings follow. The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
+`--scope local` applies only to this machine. A bridge without `--expose` reaches only the project variables of tagged items (`tag:env:*`), and so does an agent with no settings of its own, which is where `env set` put the key; an `--expose` you add can only narrow that further, and the agent's settings say what it gets ([agent settings](policy.md)). `--client-label claude-code` is the name those settings follow. The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
 
 Work in a small scratch project rather than a real one. Copy `scripts/demo/deploy.sh` from this repository into it; that is the deploy Claude will run.
 
@@ -149,7 +147,7 @@ Your run may use different arguments. Claude writes the reason. `agent` is the s
 
 `o` releases it for this request only. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 
-Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
+Claude may call `list_entry_names` first to find the item, or go straight to the credential. Either is fine, and both appear in the log.
 
 <a id="030--say-yes"></a>
 
@@ -222,25 +220,25 @@ keypaste log verify
 Latest: seq 2, hash d1845344153201c850ac949d108d24d4243931aa38c82f909558910aac78e8ae
 ```
 
-Every verification reports the limits of the chain: complete recomputation and deletion of final records can escape detection. `--expect <hash>` detects loss of a previously observed record; [Connecting keypaste to Claude](mcp-setup.md) explains its use.
+Every verification reports the limits of the chain: complete recomputation and deletion of final records can escape detection. `--expect <hash>` detects loss of a previously observed record; [Approvals](approvals.md#knowing-it-has-not-been-edited) explains its use.
 
-Repeat the credential request and it asks again, since Allow once keeps nothing. Had you allowed project variables for every agent in Settings, the second release would read `allowed` instead of `prompt`: the credential was released under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
+Repeat the credential request and it asks again, since Allow once keeps nothing. Had you allowed project variables for every agent in Agents, the second release would read `allowed` instead of `prompt`: the credential was released under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
 
 ## When it does not go like this
 
 | What you see | What it is |
 |---|---|
-| `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste approve` from starting on it; lock the vault in the app first. |
+| `DENIED. Nobody can approve this right now` (`v0.3.0`: `No keypaste agent is running`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. An app with this vault unlocked keeps `keypaste approve` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read STRIPE_KEY from env/demo/.env`. |
 | `DENIED. That item is outside what this agent can see` (`v0.3.0`: `outside what this server was configured to expose`) | The request named something other than `STRIPE_KEY` on `env/demo/.env`, the key was stored some other way than `env set`, or an `--expose` was added to the bridge. Approval cannot widen it. |
-| The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |
+| The dialog never appears | Look at the terminal running `keypaste approve`: that is where this demo's prompt appears. |
 | The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 
 <a id="the-honest-limits"></a>
 
 ## Limits
 
-The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. keypaste cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. In source, a kind of value you allowed for every agent is not asked about ([agent settings](policy.md)); the demo's rules allow nothing, so every request comes to you.
+The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. keypaste cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved item name. It cannot verify whether the claim is true. Claude may choose another item, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. A kind of value you allowed for every agent is not asked about ([agent settings](policy.md)); the demo's rules allow nothing, so every request comes to you.
 
 ## Verifying it yourself
 

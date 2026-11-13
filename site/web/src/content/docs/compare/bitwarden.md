@@ -17,7 +17,7 @@ flowchart LR
   end
   subgraph kp["keypaste"]
     k1[("vault.kdbx on your disk")] --> k2["keypaste app"]
-    k3["agent"] --> k4["keypaste-mcp"] --> k2
+    k3["agent"] --> k4["keypaste mcp"] --> k2
     k2 -->|asks you, then one field| k3
   end
 ```

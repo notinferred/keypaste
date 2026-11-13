@@ -6,13 +6,22 @@ description: How a KeePass file keeps a vault's projects and what each AI agent 
 import { Code } from '@astrojs/starlight/components';
 import schema from '../../../../../public/acaf/v1/record.schema.json?raw';
 
+:::note[Superseded by version 1.1]
+[Version 1.1](/acaf/v1.1/) supersedes this version. It differs only in letting a value hold KeePass placeholders that fill in from its own entry. This page stays as published.
+:::
+
 The Agent Credential Access Format (ACAF) says how a KDBX file keeps two things: a vault's projects, the environment variables a program runs with, and each AI agent's access to them, what it may see, whether it is given values, whether it may run commands and how its requests are answered. A KeePass app that follows it can open a vault keypaste wrote, keep every agent's settings intact, and apply them the way keypaste does; one that does not apply them can still keep them.
 
 Version 1 is final. Any change to what follows is a new version, starting with 1.1. "Must", "must not", "never" and "may" below are requirements on an implementation.
 
 ## Status
 
-keypaste no longer uses this version's agent records, nor those of [version 1.1](/acaf/v1.1/), which differs from this version only in filling in a value's placeholders that name its own entry. It reads a vault's projects as version 1.1 says, and decides what each agent gets by rules kept on the computer where it runs, never in the vault, leaving any records a vault holds as they are. No published keypaste release included either version. The page stays as written for any KeePass app that implements it.
+| Part | keypaste's status |
+|---|---|
+| [Projects](#projects) | keypaste implements [version 1.1](/acaf/v1.1/)'s projects, not this version's: it fills in a value's placeholders that name its own entry, where this version refuses the set. That is implemented in the source build headed for keypaste 1.0.0 and not yet released. The published `v0.3.0` keeps each variable as its own entry under `env/<project>` and reads no project tags. |
+| [Agents' settings](#agents-settings) | Never Published, and no longer implemented. keypaste wrote these records in its source for a time and then moved each agent's rules to agent settings kept on the computer where it runs, never in the vault. It neither reads nor writes the records under `.keypaste/agents` and leaves any a vault holds as they are. |
+
+The page stays as written for any KeePass app that implements it.
 
 ## Scope
 
@@ -178,7 +187,7 @@ Records add nothing that needs more than KDBX 4.0: a vault at 4.0 stays at 4.0 w
 
 ## Evidence
 
-In keypaste's repository, `AcafRecordTests` holds the record's reading and writing and a change rewriting only what it names, `AcafIdsTests` the UUIDs and the known answers above, `AgentAccessStoreTests` the group, the entry, history, reset, a change keeping what keypaste does not understand, a record read as the file holds it, other versions and other entries under one name, and merges through KeePass's own library both ways, `EffectiveAccessTests` what applies to an item, `AccessChangeTests` what counts as giving more, and `SessionAuthorityAccessTests` the owner applying it over a real pipe. `scripts/verify-keepassxc-projects.sh` has KeePassXC 2.7 import a vault, keypaste write agents' settings into it, KeePassXC edit, add to and save it, and two copies merged with `keepassxc-cli merge` in both directions, after each agent was changed in one copy, the same agent in both and the same agent created in both, keeping one entry per agent with the newer record whole and the older in its history, and a vault at KDBX 4.0.
+In keypaste's repository, `AcafIdsTests` checks the UUIDs and the known answers above; `ProjectTagTests` the project-tag grammar, which tags are reported and which protect; `EnvResolutionTests` that an environment's set is released whole or refused, naming each entry and never a value; and `ProjectsTests`, in `Keypaste.Core.Tests.KeePassXC`, that the project tags KeePassXC writes are the ones keypaste reads, and the reverse. This version's refusal of a value holding a placeholder is not tested, since keypaste implements version 1.1 there, and agents' settings records are not yet tested by any test in the repository, since keypaste no longer implements them.
 
 ## Licence
 

@@ -2,7 +2,7 @@
 
 # KeePass vaults and agent access
 
-> CLI launch essay. The cited reports and announcements describe their stated 2025–2026 periods; they are not an exhaustive current market inventory. Recheck comparisons before publishing a new campaign. [PRODUCT](PRODUCT.md) owns the focused local password-manager direction, [FEATURES](FEATURES.md) owns the current capability inventory, and [RELEASE](RELEASE.md) owns current downloads.
+> This essay describes the source build headed for keypaste 1.0.0, which is not yet published. The published `v0.3.0` has `keypaste agent`, a separate `keypaste-mcp` binary, an `Approve? [y/N]` prompt whose `y` keeps a grant for up to 300 seconds, and no `keypaste import`. [FEATURES](FEATURES.md) lists what each version has. The reports cited cover their stated 2025–2026 periods and are not a current market inventory.
 
 A coding agent that needs a credential may ask you to paste it into the chat, exposing it to the client and its retained conversation.
 
@@ -34,17 +34,15 @@ Giving an agent a plaintext `.env` exposes all credentials in that file without 
 
 ## Local approvals
 
-`keypaste-mcp` is the bridge launched by your client; it holds no vault and forwards requests. You start `keypaste agent`, `keypaste approve` in source, in a terminal to unlock the vault and approve releases. Requests cannot trigger a master-password prompt, avoiding prompts another program could imitate.
+Your MCP client starts `keypaste mcp`, a bridge that holds no vault and forwards requests. You unlock the vault where you approve: in `keypaste approve`, which you start in a terminal, or in the desktop app. An agent cannot make keypaste ask for the master password, so no other program can imitate that prompt through it.
 
-An agent cannot even name an entry you did not expose. In `v0.3.0` the default is the `env/` subtree and nothing else, and widening it takes a glob you typed into your own client config. In source, an agent sees every project's variables, the env-named fields of entries tagged into a project, until you change its settings, and widening them takes your confirmation where the vault is unlocked; a glob in the client config can only narrow them.
+An agent cannot name an item outside what it can see. `keypaste setup` lets an agent see every item's title, group, tags and URL, and its [agent settings](policy.md) decide which values it may have: each kind of value is Ask, Allow or Block, Ask by default, and Allow takes effect only once you confirm it where the vault is unlocked. A glob in the client's configuration can only narrow what the agent sees.
 
-The approver resolves the entry, rechecks what the agent can see, considers a recent refusal, then releases or refuses without asking if you allowed or blocked that kind of value for every agent, or prompts. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
-
-In source, Allow once releases one field and keeps nothing. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
+Each request is answered by those settings or by you: Deny, Allow once, or for a labelled agent Always allow or Always block for that item's field. Silence for 45 seconds denies it. Every call is written to a local, hash-chained audit log before the answer, without the released value, and a call is refused if the log cannot be written. [Approving an agent's request](approvals.md) explains each choice.
 
 ## What it looks like
 
-<sub>The published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. In source, for the next release, the prompt is:</sub>
+<sub>The 1.0.0 build's terminal approver; the published <code>v0.3.0</code> asks <code>Approve? [y/N]</code>.</sub>
 
 ```
 ────────────────────────────────────────────────────────────
@@ -72,35 +70,29 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`exposure` records a listing of what the agent can see; `prompt` records a request a person reviewed, and `allowed` one released without asking because you allowed that kind of value. [The demo](demo.md) shows the flow in about sixty seconds.
+`exposure` records a listing of what the agent can see and `prompt` a request a person reviewed. [The demo](demo.md) shows the flow in about sixty seconds.
 
 ## Moving from another KeePass file
 
-`keypaste import` is in source for the next release; the published v0.3.0 does not have it.
-
 An existing KDBX file can stay where it is: `keypaste import old.kdbx --in-place` checks that it unlocks and remembers it, and from then on `--vault old.kdbx`, `KEYPASTE_VAULT` or `keypaste use old.kdbx` opens it like any other vault. With no vault named or chosen, `--in-place` is the default.
 
-To bring it into the vault you already use, name that vault. The file is opened read-only and never written; a `<name>.keyx` or `<name>.key` beside it is used as its keyfile unless `--source-keyfile none` says otherwise.
+To bring it into the vault you already use, name that vault. The file is opened read-only and never written; a `<name>.keyx` or `<name>.key` beside it is used as its key file unless `--source-keyfile none` says otherwise.
 
 ```
 keypaste import old.kdbx --vault mine.kdbx --dry-run
 keypaste import old.kdbx --vault mine.kdbx --into old
 ```
 
-Each top-level group lands under `--into`, which defaults to the file's name. In source, that includes an `env` group, whose entries keep the tags that put them in projects; the published `v0.3.0` keeps a valid `env/<project>` set at its own path when your vault does not already have that project, and `--dry-run` shows why. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. `--dry-run` shows every row and where it will land first; a row that still cannot land, such as a destination changed to a reserved group, stops the whole import before anything is written.
+Each top-level group lands under `--into`, which defaults to the file's name, including an `env` group, whose entries keep the tags that put them in projects. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and keypaste's reserved `.keypaste` group stay behind. `--dry-run` shows every row and where it will land; a row that cannot land stops the whole import before anything is written. The desktop's Import from another app does the same and also takes other password managers' exports.
 
 <a id="what-this-does-not-do"></a>
 
 ## Limits
 
-`request_credential` returns the credential as text and structured data. A client may send those results to a remote model, retain them in its session file and put the value on a command line. keypaste cannot erase those copies or revoke the credential at its provider. The local audit records the release, not every later use.
-
-keypaste removes control characters from the reason, caps its length and labels its author, but cannot verify the claim. A kind of value you allowed reaches every agent without human review, and in `v0.3.0` so do the fields a policy rule matches. Anyone who can write the audit file can recompute its hash chain. A hostile process running as your user is outside these protections.
+A released value goes to the agent's client, which may send it to a remote model, keep it in a session file or put it on a command line; keypaste cannot erase those copies or revoke the credential at its provider, and its log records the release, not every later use. keypaste labels the agent's reason as the agent's claim and cannot verify it. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) state the guarantees and limits.
 
 <a id="the-stance"></a>
 
 ## Availability
 
-The local vault works without an account or network and opens in KeePassXC. A permanent CI gate checks compatibility in both directions against a real `keepassxc-cli` on all three operating systems. The source is licensed under AGPL-3.0.
-
-It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals or settings you confirmed, and a local audit. In source, the desktop app and `keypaste approve` share one owner per vault: the app asks about each agent request in its own window, launches projects through the same session, and one lock ends it; the published `v0.3.0` predates this. [ROADMAP](../ROADMAP.md) has what comes next and [BACKLOG](BACKLOG.md) the optional ideas.
+The vault works without an account or network and opens in KeePassXC; [FEATURES](FEATURES.md#keepassxc-compatibility) says what the compatibility tests check. The source is licensed under AGPL-3.0. Today's download is the pre-1.0 CLI and MCP bridge `v0.3.0`, unsigned, with the terminal approver; the desktop app comes with 1.0.0 ([RELEASE](RELEASE.md)). [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection.

@@ -6,72 +6,23 @@
   </picture>
 </h1>
 
-<p align="center">One vault for your passwords and your projects' secrets. Your AI agents get a secret only when you say yes.</p>
+<p align="center">A local password manager whose AI agents get a secret only when you say yes.</p>
 
-<p align="center">
-  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app: the vault's groups and projects in the sidebar, the list of items beside the open github login, whose username, masked password, URL and custom fields sit in grouped rows.">
-</p>
-
-<p align="center"><sub>The desktop app, built from source. It is not released yet.</sub></p>
-
-## What keypaste does
-
-**Keeps your passwords.** Everything lives in one encrypted file on your computer, in the KeePass format, so KeePassXC and other KeePass apps open the same file. There is no account and nothing leaves your machine. Logins, notes, custom fields, one-time codes and attachments sit in groups, with history for every change and backups beside the vault.
-
-**Keeps your projects' secrets.** Each project gets one set of keys with a value for dev, staging and prod. `keypaste run` hands them to a command through its environment and writes nothing to disk, and a `.env.keypaste` file of references, with no values in it, is safe to commit.
-
-**Asks you before an agent gets anything.** An AI agent asks for one field of one item and says why. You answer Deny, Allow once, or Always allow or Always block for that agent and item. Every request is recorded in a local log, each line chained to the one before it.
-
-**Makes strong passwords.** Choose a length and which characters to use, or a passphrase from the EFF word list.
-
-<table>
-  <tr>
-    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code asks for the DATABASE_URL field of env/acme-api/.env, with the agent's reason, what allowing means, and the choices Deny and Allow once."></td>
-    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="The acme-api project: its keys across dev, staging and prod with masked values, and Run as its one action."></td>
-    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: the AI tools found on this computer beside the chosen agent's settings for what it may see and what it is asked about."></td>
-  </tr>
-  <tr>
-    <td>An agent's request</td>
-    <td>A project's keys</td>
-    <td>Your agents</td>
-  </tr>
-</table>
-
-## The approval, in the terminal
-
-![An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.](docs/demo/keypaste-demo.gif)
-
-<sub>Rendered from the source's output for the next release, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
-
-```
-────────────────────────────────────────────────────────────
-keypaste: an agent is asking for a credential.
-
-  agent    claude-code (claude-code)
-  item     env/demo/.env
-  field    STRIPE_KEY
-
-  the agent says it needs this because:
-    deploy the billing service to staging
-
-  That sentence was written by the agent, not by keypaste. Treat it as a claim.
-
-[d] deny  [o] once  [a] always  [b] block  45s ›
-```
-
-[The demo](docs/demo.md) walks through a request, an approval and a deploy in about sixty seconds.
+keypaste keeps your logins, keys and project values in a KeePass-format (KDBX) file on your computer, with no account, and KeePassXC opens the same file. It lets AI coding agents use what they need one field at a time, each use approved by you and logged. It has three parts: the `keypaste` command-line tool, the MCP bridge that connects AI tools such as Claude Code, and the desktop app.
 
 ## Where it stands
 
-You can download the command-line tool and the agent bridge today, as `v0.3.0`. The desktop app, and much of what this page describes, is in the source and comes with the next release; [FEATURES](docs/FEATURES.md) lists what works where. keypaste is open source under AGPL-3.0.
+**You can install today:** the command-line tool and the MCP bridge, `v0.3.0`, for macOS (Apple Silicon), Linux (x64 and arm64) and Windows (x64). It stores items and project variables, runs a command with a project's variables in its environment instead of a `.env` file, and lets an agent ask for one field while you approve it in your terminal. [Install it](#install).
 
-If you have `v0.1.0` or `v0.2.0`, replace it. `v0.2.0` could undo a save that raced another program's save, without keeping the lost change in history. `v0.1.0` could also delete a vault through `env export`, change the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` fixes. Published versions never change, so both remain available with those defects.
+**1.0.0 adds** the desktop app for Windows, macOS and Linux, and it is the next public release (0.4.0 and 0.5.0 are never published). It is implemented in source and not yet published. It also brings a prompt with Always allow and Always block per agent, settings per kind of value (passwords, project variables, one-time codes and more), projects with dev, staging and prod environments, `.env.keypaste` reference files you can commit, key files and YubiKeys, Trash, imports from other password managers, share links, passphrases and browser fill through KeePassXC-Browser. [FEATURES](docs/FEATURES.md) gives each capability's state and version, and the guides below describe the 1.0.0 build.
 
-You can carry the vault between computers with any file-sync service. keypaste opens KeePassXC's files but does not do everything KeePassXC does.
+**Planned later:** agents that use credentials they never hold, your own end-to-end-encrypted cloud vault, then team projects. None of these exists yet.
+
+keypaste is open source under AGPL-3.0.
 
 ## Install
 
-Download the archive and its checksum, verify the hash, then extract it. Each binary is a native executable with no .NET runtime dependency. The Unix instructions move both binaries into `~/.local/bin`.
+These blocks install `v0.3.0`. Download the archive and its checksum, verify the hash, then extract it. Each binary is a native executable with no .NET runtime dependency. The Unix instructions move both binaries into `~/.local/bin`.
 
 <a id="macos--apple-silicon"></a>
 
@@ -87,7 +38,7 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
-**macOS 14 or later.** This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs have no published binary and require a source build. [GitHub offers native Intel runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this release matrix does not yet build or test that target.
+**macOS 14 or later.** This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs have no published binary and need a source build.
 
 <a id="linux--x64-and-arm64"></a>
 
@@ -122,65 +73,19 @@ Expand-Archive $a -DestinationPath .
 
 Windows 10 1809 or later. This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor.
 
-On Windows, put the extracted binaries in a directory you add to `PATH`. On macOS and Linux, check that `~/.local/bin` is on `PATH` with `command -v keypaste`.
-
-Keep the absolute path of `keypaste-mcp` for your MCP client configuration.
+On Windows, put the extracted binaries in a directory on your `PATH`. On macOS and Linux, check that `~/.local/bin` is on `PATH` with `command -v keypaste`. Keep the absolute path of `keypaste-mcp` for your MCP client's configuration.
 
 <a id="what-the-checksum-does-and-does-not-prove"></a>
 
 ### Download verification
 
-The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. `v0.3.0` also publishes a build attestation that GitHub CLI can check without an account, covering every asset and the release manifest; `v0.2.0` and earlier have none. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
+The checksum detects a corrupted or incomplete download; it does not authenticate the publisher, because it is served from the same origin as the archive. The published binaries are unsigned and un-notarized. Every `v0.3.0` asset carries a build attestation that GitHub CLI can check without an account; [SECURITY.md](SECURITY.md#verifying-a-release) gives the steps and [THREATS.md](THREATS.md) T-21 the trust boundary. If macOS blocks the unsigned binary, `xattr -d com.apple.quarantine ~/.local/bin/keypaste` removes the quarantine attribute; the command-line download above should not set it.
 
-The installation instructions keep downloaded commands visible for review before execution.
+If you still run `v0.1.0` or `v0.2.0`, replace it: [SECURITY.md](SECURITY.md) lists their defects, which `v0.3.0` fixes. Published versions never change, so the old downloads stay available with those defects.
 
-Browser downloads set `com.apple.quarantine`; these command-line download and extraction steps should avoid it. The release runner executed the binary with quarantine deliberately set, but that observation does not establish behavior on every Mac. If macOS blocks the unsigned binary, `xattr -d com.apple.quarantine ~/.local/bin/keypaste` removes the attribute.
+## First steps
 
-### Or build it from source
-
-Building from source lets you inspect the code you compile without relying on a prebuilt binary matching it. Install the SDK pinned in [`global.json`](global.json):
-
-```sh
-git clone https://github.com/notinferred/keypaste
-cd keypaste
-dotnet build keypaste.slnx -c Release
-```
-
-`keypaste` lands at `artifacts/bin/Keypaste.Cli/release/` (`.exe` on Windows), and in source it is also the MCP bridge, run as `keypaste mcp`. This is also the only supported route on Intel Macs, on musl distributions such as Alpine, and on Windows on ARM.
-
-## Sixty seconds to a project with no `.env` in it
-
-```sh
-keypaste init ~/vault.kdbx
-export KEYPASTE_VAULT=~/vault.kdbx
-
-keypaste env pull dev
-keypaste run dev -- npm start
-```
-
-[Replace your `.env` in 5 minutes](docs/replace-dotenv.md) covers import, CI use, sync, export and lost master passwords.
-
-## Connecting it to Claude
-
-`keypaste-mcp` is started by your MCP client and forwards requests without holding a vault. You start `keypaste agent`, which 0.5.0 renames `keypaste approve`, in your terminal to unlock the vault and approve requests:
-
-```sh
-keypaste agent --vault ~/vault.kdbx
-```
-
-If you installed `v0.1.0` and have not replaced it yet, configure the client using the manual [Claude Code](docs/mcp-setup.md#claude-code) or [Claude Desktop](docs/mcp-setup.md#claude-desktop) instructions, with the absolute path of the downloaded `keypaste-mcp`.
-
-With `v0.2.0` or later, configure clients with:
-
-```sh
-keypaste setup --vault ~/vault.kdbx
-```
-
-`setup` configures detected clients through their `mcp add` command, or prints a configuration block for clients without one. `--dry-run` prints commands without changing configuration; `--remove` removes keypaste. `v0.1.0` lacks `setup`; every later release includes it.
-
-Client configuration contains no master password. [Connecting keypaste to Claude](docs/mcp-setup.md) explains setup, exposure and audit reading.
-
-## Using it
+With `v0.3.0`:
 
 ```sh
 keypaste init ~/vault.kdbx
@@ -188,18 +93,31 @@ export KEYPASTE_VAULT=~/vault.kdbx
 
 keypaste add github --username me --url https://github.com
 keypaste ls
-keypaste get github
-keypaste get github --show
-keypaste rm github --yes
+keypaste get github            # copies the password, cleared after twenty seconds
+keypaste get github --show     # prints it instead
+
+keypaste env pull myapp        # imports ./.env into the project, then offers to delete it
+keypaste run myapp -- npm start
 ```
 
-`ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
+`ls` prints a names-only group tree. Password prompts never echo, data goes to stdout and diagnostics to stderr, and `--vault` works in place of `KEYPASTE_VAULT`. `run` opens the vault, hands the project's variables to the command through its environment, closes the vault and writes nothing to disk. `env export --dotenv` writes plaintext when a tool needs a file. [Replace your `.env`](docs/replace-dotenv.md) covers projects, CI and export.
 
-In `v0.3.0`, `rm` permanently deletes the entry and its history. In 0.5.0, which is not yet published, it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off, and `get --reveal` replaces `get --show`, which is refused. Printing a value with `get` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
+In 1.0.0, `get --reveal` replaces `get --show`, `rm` moves an item to Trash instead of deleting it, and a project's variables live on items tagged into the project; [FEATURES](docs/FEATURES.md#older-command-names-in-v030) lists every renamed command.
+
+| exit code | meaning |
+| --- | --- |
+| 0 | success |
+| 1 | usage error |
+| 2 | internal or environment error (including no usable clipboard, and an item name two items answer to) |
+| 3 | vault or item not found |
+| 4 | wrong master password |
+| 5 | the audit log is not the file keypaste wrote |
+
+When stdin is not a terminal, each prompt reads one line in order: `init` takes the new password twice, and `add` and `env set` take the master password and then a value unless generating one.
 
 ### Generating one
 
-`add` and `env set` generate the secret they store when you pass `--generate`, and print how much of it there was rather than what it was:
+`add` and `env set` generate the secret they store when you pass `--generate`, and print how strong it is rather than what it is:
 
 ```sh
 keypaste add github --generate
@@ -207,108 +125,49 @@ keypaste add github --generate --length 32 --no-symbols --no-lookalikes
 keypaste env set billing STRIPE_KEY --generate
 ```
 
-Characters come from an 85-character alphabet: letters, digits and `!#%()*+,-./:;=?@[]^_{}~`. The punctuation that breaks in a shell, in YAML or in a URL is left out on purpose. Twenty characters is the default, about 128 bits; `--length` takes 8 to 256. `--no-symbols` leaves letters and digits, `--no-lookalikes` drops `Il1O0`, and both cost entropy to solve a problem the Copy button and `keypaste run` are there to remove.
+Characters come from an 85-character alphabet that leaves out punctuation which breaks in a shell, YAML or a URL. Twenty characters is the default, about 128 bits; `--length` takes 8 to 256, `--no-symbols` keeps letters and digits and `--no-lookalikes` drops `Il1O0`.
 
-**New in 0.5.0, not yet published:** `--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. These options and `keypaste generate` are absent from the published `v0.3.0` download. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
+1.0.0 adds passphrases from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md), about 12.9 bits a word: `--words` takes 6 to 32 and `--separator` sets what goes between them (a full stop by default; a hyphen is refused because four of the list's words contain one). `keypaste generate --words 6` prints a passphrase and stores nothing.
 
 ```sh
 keypaste add github --generate --words 6
 keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 ```
 
-`keypaste generate --words 6` prints a passphrase and stores nothing. Generation details go to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing.
+## Connecting an AI agent
 
-| exit code | meaning |
-| --- | --- |
-| 0 | success |
-| 1 | usage error |
-| 2 | internal or environment error (including no usable clipboard, and an entry name two entries answer to) |
-| 3 | vault or entry not found |
-| 4 | wrong master password |
-| 5 | the audit log is not the file keypaste wrote |
-
-When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. While the desktop app or `keypaste approve` holds the vault they take the value alone, and the holder asks you to allow the change; a line more is refused. In 0.5.0, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
-
-## Environment variables
-
-In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --reveal`; an entry of the earlier layout stays an ordinary entry and is no longer a variable. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
+In `v0.3.0`, your MCP client starts `keypaste-mcp`, which holds no vault and forwards each request. You start the approver, `keypaste agent`, in a terminal; it unlocks the vault and asks you about each request. `keypaste setup` registers the bridge with the AI tools it finds, or prints the configuration to paste. Client configuration holds no master password, and an agent cannot make keypaste ask for one.
 
 ```sh
-keypaste env pull billing
-keypaste env pull billing config/.env.prod --yes --delete-source
-keypaste env set billing DATABASE_URL
-keypaste env set billing STRIPE_KEY=sk_test_x
-keypaste env ls
-keypaste env ls billing
-keypaste get env/billing/DATABASE_URL --show
-keypaste env rm billing STRIPE_KEY --yes
-keypaste env export billing --dotenv --stdout
+keypaste agent --vault ~/vault.kdbx
+keypaste setup --vault ~/vault.kdbx
 ```
 
-`env ls` lists projects; adding a project name lists variable names without values. `env pull` validates the entire file before importing. Malformed input leaves the vault unchanged. Its plan lists new, updated and unchanged variables by name; unchanged values are not rewritten.
+In 1.0.0 the bridge is `keypaste mcp` inside the one `keypaste` binary, the terminal approver is `keypaste approve`, and the desktop app approves while it holds the vault unlocked. [Connecting keypaste to Claude](docs/mcp-setup.md) covers setup, manual configuration and what an agent can see.
 
-The parser accepts `export` prefixes, comments, three quoting styles and multiline values. A `#` starts a comment only after a space, so `PASSWORD=hunter2#42` retains its suffix. Duplicate keys are errors. `${VAR}` and `$VAR` remain literal to avoid binding the vault to one machine's environment. Double quotes expand `\n`, `\r`, `\t`, `\\` and `\"`; use single quotes for a literal Windows path such as `C:\temp`.
+## The approval
 
-The `KEY=value` form exposes the value to shell history and process listings, so keypaste warns on use. Updates retain old values in KeePassXC entry history. Deleting a `.env` does not erase its storage or backups; see [`SECURITY.md`](SECURITY.md).
+![An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.](docs/demo/keypaste-demo.gif)
 
-## Running things with those variables
+<sub>The 1.0.0 build's terminal approver, with a scripted MCP client in place of the agent. The published `v0.3.0` asks <code>Approve? [y/N]</code> instead. The prompt as text:</sub>
 
-```sh
-keypaste run dev -- npm start
-keypaste run prod -- ./deploy.sh
+```
+────────────────────────────────────────────────────────────
+keypaste: an agent is asking for a credential.
+
+  agent    claude-code (claude-code)
+  item     env/demo/.env
+  field    STRIPE_KEY
+
+  the agent says it needs this because:
+    deploy the billing service to staging
+
+  That sentence was written by the agent, not by keypaste. Treat it as a claim.
+
+[d] deny  [o] once  [a] always  [b] block  45s ›
 ```
 
-The `--` is required. Without it, `keypaste run dev npm start` cannot be told apart from a project called `npm`; everything after it belongs to the command, including flags keypaste also understands.
-
-The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. `run` opens the vault itself, asking for its password, and closes it before starting the child. In source, `keypaste run --session` opens nothing and asks for no password: the desktop app or `keypaste approve` holding the vault unlocked shows the project, its variable names, the command and the directory, and the child starts only if you allow it there. A refusal, a lock, 45 seconds without an answer or nothing holding the vault each end the run with a reason and no child. The child receives a snapshot: later edits or locks do not update or erase its environment.
-
-After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit.
-
-A set is injected whole or not at all. An expired entry, an untitled one, an invalid or repeated name, or names differing only in case prevent injection, and the error lists every offending key and why, never a value, so they can be corrected in KeePassXC. An entry in the recycle bin is not part of the set.
-
-## Getting them back out
-
-`env export` writes plaintext for tools that require a file or for moving credentials elsewhere.
-
-```sh
-keypaste env export billing .env --dotenv
-keypaste env export billing --dotenv --stdout
-```
-
-In `v0.3.0`, export requires `--dotenv`. In 0.5.0, `keypaste env export billing -p staging > .env.keypaste` without it writes one `kp://` reference per variable and no value, which `keypaste run --env-file .env.keypaste -- <command>` resolves; [Replace your `.env`](docs/replace-dotenv.md#profiles-and-references) covers profiles and references. With `--dotenv`, file output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
-
-Export uses single quotes where possible for consistent reading by `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh`. Values containing apostrophes or carriage returns need escapes; keypaste names those keys on stderr because readers differ in escape handling.
-
-<a id="what-an-agent-can-and-cannot-do"></a>
-
-## Agent access
-
-In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_attachment`, asks for one attachment of an entry by its name, a fourth, `request_save`, asks you to save a value the agent never sees, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
-
-A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a kind of value you allowed for every agent and confirmed. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
-
-An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. In `v0.3.0` matching requests can reuse a live approval; in source each is asked again unless its kind of value is allowed. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
-
-`v0.3.0`'s TTL expires its cached approval, and in source setting a kind of value back to Ask stops later releases without asking. Neither erases the client's copies or revokes the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
-
-In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose` globs in your client configuration widen it. In 0.5.0 an agent sees every project's variables, the custom fields named like environment variables on entries tagged into a project, until you change its settings, and an `--expose` in the client configuration can only narrow that.
-
-### Saying yes in advance
-
-In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
-
-In 0.5.0 `policy.toml` is no longer read. Each kind of value an agent can ask for, passwords, custom fields, project variables, card values, identity values, TOTP codes, notes and attachments, is Ask, Allow or Block for every agent, set in the app's Agents and Ask by default. Allow releases without asking you and records each release, and takes effect only once you confirm it; a passkey is always blocked. Agents see each item's title, group, tags and URL, and its username unless Agents hides it. A command is asked about each time, with Allow once only, and only for an agent you turned run on for:
-
-```sh
-keypaste clients
-keypaste clients claude-code --run on
-```
-
-The rules are kept on this computer in `~/.keypaste/agents.toml`, sealed with a key the vault holds, so neither a synced vault nor another program editing the file gives an agent more. [Agent settings](docs/policy.md) explains them.
-
-### Seeing what happened
-
-Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or refused. `keypaste log` reads it back:
+Every request, allowed or refused, is one line in a local log, each line chained to the one before it, and `keypaste log` reads it back:
 
 ```
 3 records in /home/you/.keypaste/audit.jsonl
@@ -319,97 +178,62 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
   2026-07-26 14:07:44  claude-code  env/demo/.env  denied    prompt
 ```
 
-`--denied`, `--client <text>` and `--since 2h` narrow it, and a narrowed view always says so.
+[The demo](docs/demo.md) walks through a request, an approval and a deploy in about sixty seconds. [Approving an agent's request](docs/approvals.md) explains each choice and the log, and [SECURITY.md](SECURITY.md) what approval does not protect against.
 
-Each audit record includes its predecessor's hash. `keypaste log verify` checks the chain and reports its limits on every pass: a complete recomputed chain and records removed from the end can escape detection.
+## The desktop app
 
-[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, standing approvals and audit tampering.
+<p align="center">
+  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app: the vault's groups and projects in the sidebar, the list of items beside the open github login, whose username, masked password, URL and custom fields sit in grouped rows.">
+</p>
 
-[KeePass and agents](docs/keepass-and-agents.md) explains the local approval design and its relation to browser integration.
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code asks for the DATABASE_URL field of env/acme-api/.env, with the agent's reason, what allowing means, and the choices Deny and Allow once."></td>
+    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="The acme-api project: its keys across dev, staging and prod with masked values, and Run as its one action."></td>
+    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: the AI tools found on this computer beside the chosen agent's settings for what it may see and what it is asked about."></td>
+  </tr>
+  <tr>
+    <td>An agent's request</td>
+    <td>A project's keys</td>
+    <td>Your agents</td>
+  </tr>
+</table>
 
-## Packages
+The desktop app comes with 1.0.0. These screenshots are of the source build; [the desktop guide](docs/desktop.md) describes it.
 
-| Roadmap name | Project | Ships as |
-| --- | --- | --- |
-| `keypaste-core` | `src/Keypaste.Core` | shared vault library |
-| `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
-| `keypaste-mcp` | `src/Keypaste.Mcp` | the stdio forwarding bridge, inside `keypaste` as `keypaste mcp`; `v0.3.0` ships it as `keypaste-mcp` |
-| `keypaste-app` | `src/Keypaste.App` | desktop app; source builds and CI packages, no public release |
+## Guides
 
-## Vault format
+The guides describe the 1.0.0 build; each says what `v0.3.0` lacks.
 
-KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
+- [Replace your `.env`](docs/replace-dotenv.md): projects, environments, `keypaste run`, CI and export.
+- [Connecting keypaste to Claude](docs/mcp-setup.md): `keypaste setup`, manual configuration, key files and exposure.
+- [Approving an agent's request](docs/approvals.md): the prompt, its choices and the audit log.
+- [Agent settings](docs/policy.md): Ask, Allow or Block for each kind of value, per agent.
+- [Running agents safely](docs/safe-agents.md): sandbox settings for Claude Code, Codex and Cursor.
+- [The desktop app](docs/desktop.md).
+- [The demo](docs/demo.md).
+- [KeePass vaults and agent access](docs/keepass-and-agents.md): why approvals are local, and moving from another KeePass file.
 
-`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and on each pull request that changes the code that writes vaults or the gate's own scripts. This is a permanent gate under docs/PRODUCT.md §4.6.
+[FEATURES](docs/FEATURES.md) lists every capability by surface and state, [RELEASE](docs/RELEASE.md) what is published and verified, [CHANGELOG](CHANGELOG.md) each change, and [SECURITY](SECURITY.md) and [THREATS](THREATS.md) the guarantees and limits.
 
-Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
+## Building from source
 
-The CLI, MCP server and desktop app share vault and authorization logic in `Keypaste.Core` (docs/PRODUCT.md §4.3).
-
-## Build and test
-
-Local verification needs the .NET SDK pinned in [`global.json`](global.json), Git, jq and running Docker for workflow validation with the pinned actionlint image. Process checks use GNU timeout (included with Git Bash/Linux; `gtimeout` from coreutils on macOS) to bound a stuck child. From PowerShell, run:
-
-```powershell
-./scripts/verify.ps1
-```
-
-From Git Bash, macOS or Linux, run:
-
-```sh
-bash scripts/verify.sh
-```
-
-The command runs every check but the KeePassXC compatibility gate. A full run validates workflows, restores locked dependencies, checks formatting and builds both solutions plus the separate CLI/desktop consistency project, exercises offline script fixtures and real CLI/MCP process interactions, then runs their Release tests. The PowerShell wrapper selects Git Bash. `--list` prints the selection and commands without executing them, and `--from <profile>` resumes after a failure. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns the final verification procedure. Other operating systems, NativeAOT and release installation retain their separate gates. To run the CLI after building, use `dotnet run --project src/Keypaste.Cli -c Release`.
-
-Builds treat warnings as errors and enforce code style. Declare dependencies in `Directory.Packages.props` and the project, then regenerate the lock files with `dotnet restore --force-evaluate` over `keypaste.slnx`, `keypaste.app.slnx` and `tests/Keypaste.Consistency.Tests`, with the SDK `global.json` pins, and commit them. Changes to `RuntimeIdentifiers` also require regenerated locks; otherwise `--locked-mode` fails with NU1004.
-
-Do not pass `-r` to restore. It narrows the runtime identifier set and conflicts with lock files recording all four targets. The projects already declare their RIDs and `PublishAot=true`; restore with `dotnet restore --locked-mode` and select a RID only when publishing.
-
-### Building a native binary yourself
-
-NativeAOT binaries must be built on their target operating system. Per O-0005, Linux needs `clang` and `zlib1g-dev`, macOS needs Xcode command line tools, and Windows needs MSVC C++ build tools with `vswhere.exe` discoverable. `keypaste` links libsodium, which `scripts/build-libsodium.sh` builds first from its signed release; it also needs curl, OpenSSL 3, and `make` outside Windows.
+Building from source lets you inspect the code you run, and it is the only route on Intel Macs, musl distributions such as Alpine, and Windows on ARM. With the .NET SDK pinned in [`global.json`](global.json):
 
 ```sh
-bash scripts/build-libsodium.sh
-dotnet restore keypaste.slnx --locked-mode
-dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out
-dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 --no-restore -o out
+git clone https://github.com/notinferred/keypaste
+cd keypaste
+dotnet build keypaste.slnx -c Release
 ```
 
-`dotnet publish` otherwise restores implicitly with its selected RID, rewriting the locks for one target and breaking the next locked restore. Use `--no-restore` after a full restore, as `release.yml` does.
-
-Publishing produces one native file per project; `PublishAot=true` is already configured. Use `osx-arm64` or `win-x64` for those platforms. `scripts/verify-aot-trim.sh` compares publish diagnostics with the accepted vendored-code baseline and rejects new warnings or any warning from `src/`. Capture output after changes under `third_party/`:
-
-```sh
-dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cli.log 2>&1
-scripts/verify-aot-trim.sh cli.log
-```
-
-Eleven vendored-code diagnostics are accepted; `scripts/aot-trim-baseline.txt` lists them. ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
-
-`third_party/Directory.Build.props` isolates vendored source from project style checks, and `dotnet format` excludes `third_party/` to preserve upstream mergeability.
-
-To run the KeePassXC compatibility gate locally you need `keepassxc-cli` on `PATH` (or `KPXC_CLI` pointing at it):
-
-```sh
-bash scripts/verify.sh compat
-```
-
-In PowerShell, use `./scripts/verify.ps1 compat`.
-
-The fixture is built by the shipped `keypaste` binary, so the gate covers the CLI as well as the vault writer. The write-back script builds its own vault and drives both tools in turn: keypaste modifies an entry, then KeePassXC edits and adds env variables that keypaste has to read back.
+`keypaste` lands in `artifacts/bin/Keypaste.Cli/release/` (`.exe` on Windows) and, built this way, is also the MCP bridge as `keypaste mcp`. The vault is KDBX 4 with AES-256 and Argon2d, written through [KeePassLib](third_party/KeePassLib/UPSTREAM.md) vendored from KeePass 2.61; keypaste writes no cryptography of its own. [CONTRIBUTING](CONTRIBUTING.md) covers verification and contributing, and [ARCHITECTURE](docs/ARCHITECTURE.md) the code map.
 
 ## Found something wrong?
 
-Bugs, missing features and "this made no sense to me" go to the [issue tracker](https://github.com/notinferred/keypaste/issues). They are read by the person who wrote the thing. A report that says what you ran, what you expected and what happened is worth more than a polished one.
+Bugs, missing features and "this made no sense to me" go to the [issue tracker](https://github.com/notinferred/keypaste/issues). A report that says what you ran, what you expected and what happened is worth more than a polished one.
 
-Anything that looks like a security problem goes to <security@keypaste.com> instead of the tracker. [`SECURITY.md`](SECURITY.md) owns what is in scope, what happens next and how fast.
-
-## Security
-
-Report vulnerabilities privately using [`SECURITY.md`](SECURITY.md).
+Report anything that looks like a security problem privately to <security@keypaste.com>, not the tracker. [SECURITY.md](SECURITY.md) owns scope, process and timing.
 
 ## License
 
-[AGPL-3.0](LICENSE). Auditable code is the trust strategy (docs/PRODUCT.md §3.8).
+[AGPL-3.0](LICENSE). Auditable code is how keypaste earns trust.

@@ -38,15 +38,15 @@ Only one process holds a vault at a time, so nothing saves the vault behind the 
 
 ## What it does
 
-- Logins, notes, custom fields and tags, search that never reads a password, history you can restore, and a Trash that KeePassXC sees as its own recycle bin.
-- Keys left in an entry's notes are flagged in Recommendations and moved into protected fields only when you confirm.
-- An agent's request appears in the app's own prompt window, and the Agents screen shows what is waiting, and each agent's settings list what it is always allowed.
+- Logins, notes, custom fields and tags, search that never reads a password, history you can restore, and a Trash that KeePassXC sees as its own Recycle Bin.
+- Keys left in an item's notes are flagged in Recommendations and moved into protected fields only when you confirm.
+- An agent's request appears in the app's own prompt window, the Agents screen shows what is waiting, and each agent's settings list what it is always allowed or always blocked.
 - A project runs from the app with its variables, in a terminal or as a command.
 - A vault that also needs a YubiKey opens with it.
 
 ## Limits
 
-Locking stops new releases; it cannot take back a value an agent or program already received. The app is not downloadable yet: packages are built and tested internally and ship once they can be signed for Windows and macOS.
+Locking stops new releases; it cannot take back a value an agent or program already received. The app is not downloadable yet. It is implemented in the source, and its Windows, macOS and Linux packages are built and installed on CI runners but not published; it ships in 1.0.0 once the packages can be signed for Windows and macOS.
 
 ## Read more
 
