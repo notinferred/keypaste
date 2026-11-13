@@ -10,6 +10,7 @@ using Keypaste.Core.Clients;
 using Keypaste.Core.Import;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
+using Microsoft.Win32;
 
 namespace Keypaste.Cli.Tests;
 
@@ -35,6 +36,9 @@ internal sealed class CliHarness : IDisposable
     internal string Directory { get; }
 
     internal string VaultPath { get; }
+
+    /// <summary>The key under <c>HKCU</c> that <c>browser</c> writes under on Windows, this harness's own and removed with it.</summary>
+    internal string HostRegistryRoot { get; } = $@"Software\keypaste-tests\{Guid.NewGuid():n}";
 
     internal StringWriter Stdout { get; } = new(CultureInfo.InvariantCulture);
 
@@ -98,6 +102,7 @@ internal sealed class CliHarness : IDisposable
         StdoutIsTerminal = StdoutIsTerminal,
         ExportReaders = ExportReaders,
         ShareTransport = shareTransport,
+        HostRegistryRoot = HostRegistryRoot,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
@@ -144,6 +149,12 @@ internal sealed class CliHarness : IDisposable
     {
         Stdout.Dispose();
         Stderr.Dispose();
+
+        if (OperatingSystem.IsWindows())
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(HostRegistryRoot, throwOnMissingSubKey: false);
+        }
+
         System.IO.Directory.Delete(Directory, recursive: true);
     }
 }

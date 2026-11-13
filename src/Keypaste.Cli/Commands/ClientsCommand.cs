@@ -308,7 +308,7 @@ internal static class ClientsCommand
     /// <summary>A kept answer's field, scrubbed, since an agent's request named it.</summary>
     private static string Field(string field) => EntryNameSanitizer.Sanitize(field).Text;
 
-    private static void Table(TextWriter writer, IConsoleStyle style, string[] headings, List<string[]> rows)
+    internal static void Table(TextWriter writer, IConsoleStyle style, string[] headings, List<string[]> rows)
     {
         var widths = headings[..^1]
             .Select((heading, column) => Math.Max(heading.Length, rows.Count == 0 ? 0 : rows.Max(row => row[column].Length)))

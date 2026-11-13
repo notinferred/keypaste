@@ -33,7 +33,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 
 | Outcome | Open tasks |
 |---|---|
-| Worked next, before release work: browser fill is finished, from installing the host per browser and keypaste's own extension in the three stores to filling in real browsers, and the fixes still marked For 1.0.0 are closed. | 8.1e, 8.1f, 8.1g, 8.3a2, 8.3a3, F.112 |
+| Worked next, before release work: browser fill is finished, from installing the host per browser and keypaste's own extension in the three stores to filling in real browsers, and the fixes still marked For 1.0.0 are closed. | 8.1f, 8.1g, 8.3a2, 8.3a3, F.112 |
 | The Mac app is signed and notarized, and Touch ID quick unlock follows as soon as it is. | 3.5b, 4.10b |
 | Signed, notarized and verified packages for three platforms are published as 1.0.0, with guidance a new user can follow and the phone apps checked by hand, and the installed product is accepted. | 4.7c2, R.1b, L.1, R.1 |
 | `keypaste approve` merges another program's save as the app does; it does not hold the release. | 1.4b4 |

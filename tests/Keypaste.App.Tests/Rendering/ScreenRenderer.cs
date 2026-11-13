@@ -772,9 +772,15 @@ public sealed class ScreenRenderer
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
         var tools = new FakeTools(Path.Combine(demo.Home, "computer")).ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable();
+        using var browsers = new TempBrowserHosts();
+        browsers.Profile(Core.Browser.HostBrowser.Chrome, withExtension: true);
+        browsers.Profile(Core.Browser.HostBrowser.Edge, withExtension: false);
+        browsers.Hosts().TurnOn(Core.Browser.HostBrowser.Chrome);
+        browsers.PlantOther(Core.Browser.HostBrowser.Firefox, "/opt/other/host");
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock, post: action => Avalonia.Threading.Dispatcher.UIThread.Post(action))
         {
             Tools = () => tools.Connector(),
+            BrowserHosts = browsers.Setup,
         };
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
@@ -857,7 +863,7 @@ public sealed class ScreenRenderer
         settingsScreen.Section = SettingsSectionChoice.Browser;
         var browserFill = settingsScreen.BrowserFill!;
         browserFill.PairCommand.Press();
-        var pairing = new PairingItem("work laptop", "chrome-extension://oboonakemofpalcgghocfoadofidjkkk", "Last used 2 days ago");
+        var pairing = new PairingItem("work laptop", "chrome-extension://kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp", "Last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
         WindowInput.Drain();
         foreach (var toast in shell.Toasts.Shown.ToList())

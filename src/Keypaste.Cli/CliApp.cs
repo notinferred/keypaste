@@ -181,9 +181,9 @@ internal static class CliApp
         ]),
         ("VAULT",
         [
-            ImportCommand.Command, ShareCommand.Command, LockCommand.Command, InitCommand.Command, UseCommand.Command,
-            AddCommand.Command, ListCommand.Command, SearchCommand.Command, RemoveCommand.Command, GenerateCommand.Command,
-            AccessCommand.Command,
+            ImportCommand.Command, ShareCommand.Command, BrowserCommand.Command, LockCommand.Command, InitCommand.Command,
+            UseCommand.Command, AddCommand.Command, ListCommand.Command, SearchCommand.Command, RemoveCommand.Command,
+            GenerateCommand.Command, AccessCommand.Command,
         ]),
     ];
 
@@ -233,7 +233,7 @@ internal static class CliApp
         writer.WriteLine($"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
         writer.WriteLine("                    attachment ls, env ls, log, doctor, token ls,");
-        writer.WriteLine("                    share ls, clients");
+        writer.WriteLine("                    share ls, clients, browser");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
         writer.WriteLine("  version prints the version.");

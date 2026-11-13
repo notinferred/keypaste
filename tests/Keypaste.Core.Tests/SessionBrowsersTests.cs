@@ -68,7 +68,7 @@ public sealed class SessionBrowsersTests : IDisposable
         Assert.Equal("pair", line.GetProperty("args").GetProperty("field").GetString());
         Assert.Equal("denied", line.GetProperty("decision").GetString());
         Assert.Equal("not-armed", line.GetProperty("method").GetString());
-        Assert.Equal("oboonakemofpalcgghocfoadofidjkkk", line.GetProperty("client").GetProperty("name").GetString());
+        Assert.Equal("kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp", line.GetProperty("client").GetProperty("name").GetString());
         Assert.Equal("session-one", line.GetProperty("session").GetString());
         Assert.DoesNotContain(_key, _log.Text(), StringComparison.Ordinal);
     }
@@ -85,7 +85,7 @@ public sealed class SessionBrowsersTests : IDisposable
 
         Assert.Equal(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = "work laptop" }, reply);
         var prompt = Assert.Single(_fixture.Channel.PairingPrompts);
-        Assert.Equal("KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)", prompt.IdentityText);
+        Assert.Equal("keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)", prompt.IdentityText);
         Assert.Null(prompt.NameProblem(prompt.SuggestedName));
         Assert.False(prompt.NameChosen);
 
@@ -170,7 +170,7 @@ public sealed class SessionBrowsersTests : IDisposable
         Assert.Equal(3, refusals.Count);
         Assert.All(refusals, line => Assert.Equal("not-paired", line.GetProperty("method").GetString()));
         Assert.All(refusals, line => Assert.Equal("check", line.GetProperty("args").GetProperty("field").GetString()));
-        Assert.Equal("pdffhmdngciaglkoonimfcmckehcpafo", refusals[0].GetProperty("client").GetProperty("name").GetString());
+        Assert.Equal("pkpkpkpkpkpkpkpkpkpkpkpkpkpkpkpk", refusals[0].GetProperty("client").GetProperty("name").GetString());
         Assert.DoesNotContain(_key, _log.Text(), StringComparison.Ordinal);
         Assert.NotNull(Assert.Single(owner.Browsers.List()).LastUsed);
     }

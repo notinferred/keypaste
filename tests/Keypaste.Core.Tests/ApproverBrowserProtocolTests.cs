@@ -22,9 +22,9 @@ public sealed class ApproverBrowserProtocolTests
     }
 
     [Theory]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"keepassxc-browser@keepassxc.org","client_name":"claude-code"}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"keepassxc-browser@keepassxc.org","client_label":"cursor"}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"keepassxc-browser@keepassxc.org","exposure":["**"]}""")]
+    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.invalid","client_name":"claude-code"}""")]
+    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.invalid","client_label":"cursor"}""")]
+    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.invalid","exposure":["**"]}""")]
     [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":""}""")]
     [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"}""")]
     public void An_attachment_that_names_a_browser_and_an_agent_or_a_browser_out_of_bounds_is_refused(string frame) =>

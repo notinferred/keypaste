@@ -962,7 +962,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post), BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast) { AskDiscard = AskDiscard },
@@ -1034,6 +1034,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The <c>keypaste</c> a terminal runs, which Settings links to this app's own; none where the platform needs no link.</summary>
     internal ICliLink? CliLink { get; init; }
+
+    /// <summary>The browsers' hosts, which Settings › Browser fill turns on and off beside the pairings; none lists no browsers.</summary>
+    internal BrowserHostSetup? BrowserHosts { get; init; }
 
     /// <summary>What Agents finds and connects AI tools through each time it opens; none looks for no tools.</summary>
     internal Func<ClientConnector?> Tools { get; init; } = () => null;

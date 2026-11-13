@@ -1,7 +1,9 @@
 using Avalonia;
 using Keypaste.App.Globalization;
+using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Ownership;
@@ -50,6 +52,7 @@ internal static class Program
         }
 
         var home = KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        var browserHosts = BrowserHostSetup.ForThisProcess();
 
         return Run(
             args,
@@ -69,11 +72,13 @@ internal static class Program
                         Crashes = crashes,
                         DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null,
                         HandedPath = HandedFile.FromArguments(args, Environment.CurrentDirectory),
+                        BrowserHostsFor = () => browserHosts,
                     },
                     showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
             }),
             Console.Error,
-            ReopenWait);
+            ReopenWait,
+            browserHosts.Hosts);
     }
 
     private static Func<AppClaim, int> OnceADisplayIsAwake(Func<AppClaim, int> start) =>
@@ -88,13 +93,15 @@ internal static class Program
     /// <param name="start">Runs the app under its claim and returns its exit code.</param>
     /// <param name="stderr">Where a start the running app never answered says so.</param>
     /// <param name="wait">How long to wait for the running app to answer.</param>
+    /// <param name="browserHosts">The browsers' manifests, which every start re-points as it does the link; null where there is no <c>keypaste</c> to name.</param>
     /// <returns>The app's exit code, 0 when the running app showed its window, or 1 when it never answered.</returns>
-    internal static int Run(string[] args, string home, ICliLink? cliLink, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait)
+    internal static int Run(string[] args, string home, ICliLink? cliLink, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait, BrowserHosts? browserHosts = null)
     {
         ArgumentNullException.ThrowIfNull(start);
         ArgumentNullException.ThrowIfNull(stderr);
 
         cliLink?.KeepCurrent();
+        browserHosts?.KeepCurrent();
 
         AppClaim? claim = null;
 
