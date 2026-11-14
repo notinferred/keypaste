@@ -1,0 +1,105 @@
+{
+    "manifest_version": 2,
+    "name": "keypaste",
+    "version": "1.0.0",
+    "description": "__MSG_extensionDescription__",
+    "author": "keypaste",
+    "homepage_url": "https://keypaste.com",
+    "icons": {
+        "16": "icons/keypaste.svg",
+        "32": "icons/keypaste.svg",
+        "48": "icons/keypaste-large.svg",
+        "96": "icons/keypaste-large.svg",
+        "128": "icons/keypaste-large.svg"
+    },
+    "browser_action": {
+        "default_icon": {
+            "16": "icons/keypaste.svg",
+            "32": "icons/keypaste.svg"
+        },
+        "default_title": "keypaste",
+        "default_popup": "popups/popup.html"
+    },
+    "options_ui": {
+        "page": "options/options.html",
+        "open_in_tab": true
+    },
+    "background": {
+        "scripts": [
+            "common/browser-polyfill.min.js",
+            "common/global.js",
+            "common/sites.js",
+            "background/nacl.min.js",
+            "background/nacl-util.min.js",
+            "background/client.js",
+            "background/keepass.js",
+            "background/browserAction.js",
+            "background/tabs.js",
+            "background/page.js",
+            "background/event.js",
+            "background/init.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "exclude_matches": [
+                "file:///*.xml*"
+            ],
+            "js": [
+                "common/browser-polyfill.min.js",
+                "common/global.js",
+                "common/sites.js",
+                "content/ui.js",
+                "content/autocomplete.js",
+                "content/credential-autocomplete.js",
+                "content/fields.js",
+                "content/fill.js",
+                "content/form.js",
+                "content/icon.js",
+                "content/icon-handler.js",
+                "content/keypaste.js",
+                "content/observer-helper.js",
+                "content/username-field.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": true
+        }
+    ],
+    "commands": {
+        "fill_username_password": {
+            "description": "__MSG_contextMenuFillUsernameAndPassword__",
+            "suggested_key": {
+                "default": "Alt+Shift+U",
+                "mac": "MacCtrl+Shift+U"
+            }
+        }
+    },
+    "web_accessible_resources": [
+        "icons/keypaste.svg",
+        "icons/keypaste-disconnected.svg",
+        "icons/keypaste-locked.svg",
+        "css/autocomplete.css",
+        "css/colors.css",
+        "css/notification.css",
+        "css/username.css"
+    ],
+    "permissions": [
+        "contextMenus",
+        "nativeMessaging",
+        "storage",
+        "tabs",
+        "webNavigation",
+        "https://*/*",
+        "http://*/*"
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "browser@keypaste.invalid",
+            "strict_min_version": "115.0"
+        }
+    },
+    "default_locale": "en"
+}

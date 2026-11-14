@@ -1,0 +1,344 @@
+'use strict';
+
+/**
+ * @Object kpxcFields
+ * Provides methods for input field handling.
+ */
+const kpxcFields = {};
+kpxcFields.popoverSupported = true;
+
+// Returns all username & password combinations detected from the inputs.
+// After username field is detected, first password field found after that will be saved as a combination.
+kpxcFields.getAllCombinations = async function(inputs) {
+    const combinations = [];
+    let usernameField = null;
+
+    for (const input of inputs) {
+        if (!input) {
+            continue;
+        }
+
+        if (input.getLowerCaseAttribute('type') === 'password') {
+            const combination = {
+                username: (!usernameField || usernameField.size < 1) ? null : usernameField,
+                password: input,
+                passwordInputs: [ input ],
+                form: input.form
+            };
+
+            combinations.push(kpxcFields.getExistingCombination(combination));
+            usernameField = null;
+        } else if (input.getLowerCaseAttribute('autocomplete') === 'one-time-code') {
+            // A one-time code is never a username
+            continue;
+        } else {
+            usernameField = input;
+        }
+    }
+
+    // Allow single input if autocomplete="username" is present, or Username-Only Detection is enabled for the page
+    const autoComplete = usernameField?.getLowerCaseAttribute('autocomplete');
+    if (combinations.length === 0 && usernameField &&
+        (kpxc.singleInputEnabledForPage || autoComplete?.includes('username') || autoComplete?.includes('email'))
+    ) {
+        const combination = {
+            username: usernameField,
+            password: null,
+            passwordInputs: [],
+            form: usernameField.form
+        };
+
+        combinations.push(combination);
+    }
+
+    return combinations;
+};
+
+// If there are multiple combinations, return the first one where input field can be found inside the document.
+// Only used from popup fill.
+kpxcFields.getCombinationFromAllInputs = function() {
+    const inputs = kpxcObserverHelper.getInputs(document.body);
+
+    for (const combination of kpxc.combinations) {
+        for (const value of Object.values(combination)) {
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    if (inputs.some(i => i === v)) {
+                        return combination;
+                    }
+                }
+            } else {
+                if (inputs.some(i => i === value)) {
+                    return combination;
+                }
+            }
+        }
+    }
+
+    return kpxc.combinations[0];
+};
+
+// Checks if existing combination is found and recognized fields are added to it
+kpxcFields.getExistingCombination = function(combination) {
+    // Lookup existing combinations that use the same form
+    const existingCombination = kpxc.combinations?.find(c => c.form === combination?.form);
+    if (existingCombination) {
+        // Replace values to the existing combination
+        existingCombination.username ??= combination.username;
+        existingCombination.password ??= combination.password;
+        if (existingCombination.passwordInputs?.length === 0) {
+            existingCombination.passwordInputs = combination.passwordInputs;
+        } else if (combination?.password) {
+            // If password field is found in the current combination, force assign it to the existing combination
+            existingCombination.password = combination.password;
+        }
+
+        // Remove username field from combination with certain sites (replaced by password input)
+        if (kpxcSites.combinationExceptionFound(existingCombination)) {
+            existingCombination.username = null;
+        }
+
+        return existingCombination;
+    }
+
+    return combination;
+};
+
+// Return all input fields on the page, but ignore previously detected
+kpxcFields.getAllPageInputs = async function(previousInputs = []) {
+    const fields = [];
+    const inputs = kpxcObserverHelper.getInputs(document.body);
+
+    for (const input of inputs) {
+        // Ignore fields that are already detected
+        if (previousInputs.some(e => e === input)) {
+            continue;
+        }
+
+        if (kpxcFields.isVisible(input) && kpxcFields.isAutocompleteAppropriate(input)) {
+            fields.push(input);
+        }
+    }
+
+    kpxc.detectedFields = previousInputs.length + fields.length;
+
+    await kpxc.initCombinations(inputs);
+    return fields;
+};
+
+/**
+ * Returns the combination where input field is used
+ * @param {HTMLElement} field Input field
+ * @param {String} givenType For example: 'username', 'password'
+ */
+kpxcFields.getCombination = async function(field, givenType) {
+    for (const combination of kpxc.combinations) {
+        if (givenType) {
+            // Strictly search a given type
+            const c = combination[givenType];
+            if (c && (c === field || (Array.isArray(c) && c.includes(field)))) {
+                return combination;
+            }
+        } else if (Object.values(combination).find(c => c === field)) {
+            return combination;
+        }
+    }
+
+    return undefined;
+};
+
+// Check for new password via autocomplete attribute
+kpxcFields.isAutocompleteAppropriate = function(field) {
+    const autocomplete = field.getLowerCaseAttribute('autocomplete');
+    return autocomplete !== 'new-password';
+};
+
+// Returns true if form is a search form
+kpxcFields.isSearchForm = function(form) {
+    // Check form action
+    const formAction = form.getLowerCaseAttribute('action');
+    if (formAction?.includes('search') && !formAction?.includes('research')) {
+        return true;
+    }
+
+    // Ignore form with search classes
+    const formId = form.getLowerCaseAttribute('id');
+    if (form.className?.includes('search') || (formId?.includes('search') && !formId?.includes('research'))) {
+        return true;
+    }
+
+    return false;
+};
+
+// Checks if input field is a search field. Attributes or form action containing 'search', or parent element holding
+// role="search" will be identified as a search field.
+kpxcFields.isSearchField = function(target) {
+    // Check element attributes
+    for (const attr of target.attributes) {
+        if ((attr.value && (attr.value.toLowerCase().includes('search')) || attr.value === 'q')) {
+            return true;
+        }
+    }
+
+    // Check closest form
+    const closestForm = kpxc.getForm(target);
+    if (closestForm && kpxcFields.isSearchForm(closestForm)) {
+        return true;
+    }
+
+    // Check parent elements for role='search'
+    if (target.closest('[role~=\'search\']')) {
+        return true;
+    }
+
+    return false;
+};
+
+// :popover-open selector is supported only with Firefox >= 125 and Chrome >= 114
+kpxcFields.discoverOverlays = function() {
+    try {
+        kpxcFields.overlays = document.querySelectorAll(':popover-open, [popover]');
+    } catch (e) {
+        // Ignore SyntaxError (e.g., unsupported selector)
+        if (!(e instanceof SyntaxError)) {
+            kpxcFields.popoverSupported = false;
+            logError(e);
+        }
+    }
+};
+
+// Checks if element has an overlay
+kpxcFields.hasOverlay = function(elem) {
+    try {
+        return elem?.hasAttribute('popover') || elem?.matches(':popover-open');
+    } catch (e) {
+        // Ignore SyntaxError (e.g., unsupported selector)
+        if (!(e instanceof SyntaxError)) {
+            kpxcFields.popoverSupported = false;
+            logError(e);
+        }
+    }
+};
+
+// Check the visibility of existing fields
+kpxcFields.checkExistingFields = function() {
+    if (kpxc.inputs?.some(input => !kpxcFields.isVisible(input))) {
+        kpxc.clearAllFromPage();
+        kpxc.combinations = [];
+    }
+};
+
+// Check for popup overlays
+kpxcFields.isOverlayOnTop = function(rect) {
+    for (const overlay of kpxcFields.overlays ?? []) {
+        if (kpxcSites.overlayExceptionFound(overlay)) {
+            continue;
+        }
+
+        const overlayRect = overlay?.getBoundingClientRect();
+        if (overlayRect && elementsOverlap(rect, overlayRect)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+/**
+ * Check if element is the topmost element
+ * @param {HTMLElement} elem    Element to be checked
+ * @param {DOMRect} rect        Precalculated DOMRect of the element
+ * @returns {boolean}           True if element is the topmost
+ */
+kpxcFields.isTopElement = function(elem, rect) {
+    if (!elem || !rect) {
+        return false;
+    }
+
+    const rootNode = elem.getRootNode() ?? document;
+
+    // Returns the topmost element from point x, height/2
+    // If the input has a label as the top element and it's inside the input, allow it.
+    // Also allows if the topmost element is a child of the label (e.g., span inside label).
+    const getTopmostElement = (element, x, elementRect) => {
+        const topElement = rootNode.elementFromPoint(x, elementRect.top + (elementRect.height / 2));
+        return element?.labels instanceof NodeList &&
+            element.labels[0]?.contains(topElement) &&
+            elementsOverlap(elementRect, topElement.getBoundingClientRect())
+            ? element
+            : topElement;
+    };
+
+    // Check topmost element from three points inside the input
+    if (matchesWithNodeName(elem, 'INPUT') && [
+        getTopmostElement(elem, rect.left + (rect.width / 4), rect), // First third
+        getTopmostElement(elem, rect.left + (rect.width / 2), rect), // Middle
+        getTopmostElement(elem, rect.left + (rect.width / 1.33), rect), // Last third
+    ].some((e) => e !== elem)) {
+        return false;
+    }
+
+    // Check if element has an overlay
+    if (kpxcFields.isOverlayOnTop(rect)) {
+        return false;
+    }
+
+    return true;
+};
+
+// Returns true if element is visible on the page
+kpxcFields.isVisible = function(elem) {
+    // Returns true if opacity is not set, otherwise check the limits
+    const isOpacityAllowed = (opacity) => {
+        const opac = Number(opacity);
+        return opacity === '' || (opac >= MIN_OPACITY && opac <= MAX_OPACITY);
+    };
+
+    // Check element position and size
+    const rect = elem.getBoundingClientRect();
+    if (rect.x < 0
+        || rect.y < 0
+        || rect.width < MIN_INPUT_FIELD_WIDTH_PX
+        || rect.x > Math.max(document.body.scrollWidth, document.body.offsetWidth, document.documentElement.clientWidth)
+        || rect.y > Math.max(document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight)
+        || rect.height < MIN_INPUT_FIELD_WIDTH_PX) {
+        return false;
+    }
+
+    if (!kpxcFields.isTopElement(elem, rect)) {
+        return false;
+    }
+
+    // Check CSS visibility
+    const elemStyle = getComputedStyle(elem);
+    if (elemStyle.visibility && (elemStyle.visibility === 'hidden' || elemStyle.visibility === 'collapse')
+        || !isOpacityAllowed(elemStyle.opacity)
+        || parseInt(elemStyle.width, 10) <= MIN_INPUT_FIELD_WIDTH_PX
+        || parseInt(elemStyle.height, 10) <= MIN_INPUT_FIELD_WIDTH_PX) {
+        return false;
+    }
+
+    // Check for parent opacity
+    if (kpxcFields.traverseParents(elem, f => !isOpacityAllowed(f.style.opacity))) {
+        return false;
+    }
+
+    return true;
+};
+
+/**
+ * Returns the first parent element satisfying the {@code predicate} mapped by {@code resultFn} or else {@code defaultVal}.
+ * @param {HTMLElement} element     The start element (excluded, starting with the parents)
+ * @param {function} predicate      Matcher for the element to find, type (HTMLElement) => boolean
+ * @param {function} resultFn       Callback function of type (HTMLElement) => {*} called for the first matching element
+ * @param {fun} defaultValFn        Fallback return value supplier, if no element matching the predicate can be found
+ */
+kpxcFields.traverseParents = function(element, predicate, resultFn = () => true, defaultValFn = () => false) {
+    for (let f = element.parentElement; f !== null; f = f.parentElement) {
+        if (predicate(f)) {
+            return resultFn(f);
+        }
+    }
+
+    return defaultValFn();
+};

@@ -1,0 +1,45 @@
+.kpxc-username-icon {
+    background-color: transparent;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    border: 0;
+    padding: 0 !important;
+    position: absolute;
+}
+
+.kpxc-username-icon.disconnected {
+    background-image: url('chrome-extension://__MSG_@@extension_id__/icons/keypaste-disconnected.svg');
+}
+
+.kpxc-username-icon.disconnected-moz {
+    background-image: url('moz-extension://__MSG_@@extension_id__/icons/keypaste-disconnected.svg');
+}
+
+.kpxc-username-icon.disconnected-safari {
+    background-image: url('safari-web-extension://__MSG_@@extension_id__/icons/keypaste-disconnected.svg');
+}
+
+.kpxc-username-icon.lock {
+    background-image: url('chrome-extension://__MSG_@@extension_id__/icons/keypaste-locked.svg');
+}
+
+.kpxc-username-icon.lock-moz {
+    background-image: url('moz-extension://__MSG_@@extension_id__/icons/keypaste-locked.svg');
+}
+
+.kpxc-username-icon.lock-safari {
+    background-image: url('safari-web-extension://__MSG_@@extension_id__/icons/keypaste-locked.svg');
+}
+
+.kpxc-username-icon.unlock {
+    background-image: url('chrome-extension://__MSG_@@extension_id__/icons/keypaste.svg');
+}
+
+.kpxc-username-icon.unlock-moz {
+    background-image: url('moz-extension://__MSG_@@extension_id__/icons/keypaste.svg');
+}
+
+.kpxc-username-icon.unlock-safari {
+    background-image: url('safari-web-extension://__MSG_@@extension_id__/icons/keypaste.svg');
+}

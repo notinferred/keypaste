@@ -24,7 +24,7 @@ public sealed record PairingPrompt
     /// <summary>Whether the person chose the name when they armed pairing, so the prompt shows it rather than asks for one.</summary>
     public bool NameChosen { get; init; }
 
-    /// <summary>What the prompt says asked: <c>keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)</c>.</summary>
+    /// <summary>What the prompt says asked: <c>keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)</c>.</summary>
     public string IdentityText => Identity.Described;
 
     /// <summary>Why a name cannot be given to this pairing, or null when it can.</summary>

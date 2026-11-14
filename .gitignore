@@ -3,6 +3,8 @@ artifacts/
 [Bb]in/
 [Oo]bj/
 TestResults/
+# Playwright's output for the extension's tests
+extension/test-results/
 
 # Tooling
 .wrangler/

@@ -362,7 +362,7 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(expected == ApprovalAnswer.ApprovedOnce ? "laptop" : null, said.Name);
         var shown = rig.Stderr.ToString();
         Assert.Contains("keypaste: a browser asks to pair with this vault.", shown, StringComparison.Ordinal);
-        Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)", shown, StringComparison.Ordinal);
+        Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", shown, StringComparison.Ordinal);
         Assert.Contains("  name     laptop", shown, StringComparison.Ordinal);
         Assert.Contains("any program you run can name it too", shown, StringComparison.Ordinal);
     }

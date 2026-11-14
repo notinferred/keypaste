@@ -1,0 +1,97 @@
+.kpxc-notification {
+    align-items: flex-start;
+    background: var(--kp-card);
+    border: 1px solid var(--kp-line);
+    border-radius: 10px;
+    box-shadow: var(--kp-shadow-popover);
+    box-sizing: border-box;
+    color: var(--kp-text);
+    display: flex;
+    font: 400 13px/1.5 var(--kp-sans);
+    font-style: normal;
+    gap: 12px;
+    left: 50%;
+    letter-spacing: normal;
+    max-width: calc(100vw - 32px);
+    padding: 12px 8px 12px 16px;
+    position: fixed;
+    text-align: start;
+    text-transform: none;
+    top: 16px;
+    transform: translateX(-50%);
+    width: 480px;
+    word-spacing: normal;
+    z-index: 2147483646;
+}
+
+.kpxc-icon {
+    fill: none;
+    flex: none;
+    height: 16px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    width: 16px;
+}
+
+.kpxc-notification > .kpxc-icon {
+    margin-top: 2px;
+}
+
+.kpxc-notification-success > .kpxc-icon {
+    color: var(--kp-ok);
+}
+
+.kpxc-notification-info > .kpxc-icon {
+    color: var(--kp-info);
+}
+
+.kpxc-notification-warning > .kpxc-icon {
+    color: var(--kp-amber-mark);
+}
+
+.kpxc-notification-error > .kpxc-icon {
+    color: var(--kp-danger);
+}
+
+.kpxc-notification-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.kpxc-notification-source {
+    color: var(--kp-text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.kpxc-notification-message {
+    overflow-wrap: anywhere;
+}
+
+.kpxc-notification-dismiss {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    color: var(--kp-text-muted);
+    display: flex;
+    flex: none;
+    height: 28px;
+    justify-content: center;
+    margin: -4px 0;
+    padding: 0;
+    width: 28px;
+}
+
+.kpxc-notification-dismiss:hover {
+    background: var(--kp-hover);
+}
+
+.kpxc-notification-dismiss:focus-visible {
+    outline: 2px solid var(--kp-amber-mark);
+    outline-offset: 2px;
+}

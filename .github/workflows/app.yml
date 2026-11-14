@@ -16,6 +16,8 @@ on:
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
       - 'tests/Keypaste.FakeBrowser/**'
+      - 'extension/**'
+      - 'scripts/verify-extension-load.sh'
       - 'scripts/verify-clipboard-markers.sh'
       - 'scripts/exercise-desktop-install.sh'
       - 'scripts/exercise-desktop-upgrade.sh'
@@ -221,6 +223,57 @@ jobs:
       - name: Read the clipboard's markers
         shell: bash
         run: bash scripts/verify-clipboard-markers.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" clipboard-markers
+
+  # keypaste's browser extension (8.1f): its two builds, its own tests, and each build loaded in a real browser and paired with
+  # a held vault. The zips' bytes depend on Node's zlib, so Node is pinned exactly.
+  extension:
+    name: extension (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
+      - name: Install the extension's locked dependencies and build it
+        shell: bash
+        working-directory: extension
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          node build.js
+          sha256sum ../artifacts/extension/*.zip
+
+      - name: Lint the extension
+        shell: bash
+        working-directory: extension
+        run: npm run lint
+
+      # Upstream's config retries in CI; a retry would hide an intermittent failure, so none runs.
+      - name: Run the extension's own tests
+        shell: bash
+        working-directory: extension
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium firefox
+          npx playwright test --retries=0
+
+      - name: Load both builds in Chromium and Firefox and pair them with a held vault
+        shell: bash
+        run: bash scripts/verify-extension-load.sh
 
   # Hosted macOS runners are scarce and a job left queued is cancelled, so the desktop's macOS checks share one job.
   # The gates' scripts run under macOS's stock bash 3.2 (D-0398).
@@ -636,7 +689,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [targets, desktop, desktop-gates, clipboard-markers, macos, package]
+    needs: [targets, desktop, desktop-gates, clipboard-markers, extension, macos, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

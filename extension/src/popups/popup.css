@@ -1,0 +1,108 @@
+body {
+    background: var(--kp-panel);
+    width: 22.5rem;
+}
+
+.bar {
+    align-items: center;
+    border-bottom: 1px solid var(--kp-line);
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 8px 16px;
+}
+
+.bar h1 {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.content {
+    padding: 16px;
+}
+
+#not-configured,
+#need-reconfigure,
+#configured-not-associated,
+#configured-and-associated,
+#error-encountered,
+#database-not-opened,
+#filter-block {
+    display: none;
+}
+
+.content section > * + * {
+    margin-top: 12px;
+}
+
+.waiting {
+    align-items: center;
+    color: var(--kp-text-secondary);
+    display: flex;
+    gap: 12px;
+}
+
+.waiting-dot {
+    background: var(--kp-amber);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--kp-amber-tint);
+    height: 8px;
+    margin-left: 3px;
+    width: 8px;
+}
+
+.logins {
+    border: 1px solid var(--kp-line);
+    border-radius: 10px;
+    list-style: none;
+    margin: 0;
+    max-height: 20rem;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.logins li + li {
+    border-top: 1px solid var(--kp-line-subtle);
+}
+
+.login {
+    background: transparent;
+    border: 0;
+    color: var(--kp-text);
+    display: block;
+    font-family: var(--kp-sans);
+    padding: 8px 12px;
+    text-align: start;
+    width: 100%;
+}
+
+.login:hover {
+    background: var(--kp-hover);
+}
+
+.login:focus-visible {
+    outline-offset: -2px;
+}
+
+.login-title,
+.login-username {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.login-title {
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.login-username {
+    color: var(--kp-text-muted);
+    font-size: 12px;
+}
+
+.login:hover .login-username {
+    color: var(--kp-text-secondary);
+}

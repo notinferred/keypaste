@@ -1,0 +1,93 @@
+/* keypaste's palette from docs/DESIGN.md, for the pages and the content scripts' shadow roots */
+:root,
+:host {
+    color-scheme: light;
+    --kp-ground: #F7F7F5;
+    --kp-panel: #FFFFFF;
+    --kp-card: #FFFFFF;
+    --kp-hover: #EFEFEC;
+    --kp-secondary: #E6E6E2;
+    --kp-secondary-hover: #DDDDD8;
+    --kp-line-subtle: #E8E8E4;
+    --kp-line: #DCDCD7;
+    --kp-line-strong: #C4C4BE;
+    --kp-edge: #84847F;
+    --kp-edge-hover: #6B6D72;
+    --kp-text: #111214;
+    --kp-text-secondary: #3A3C40;
+    --kp-text-muted: #6B6D72;
+    --kp-text-disabled: #A3A5A9;
+    --kp-amber: #F2B544;
+    --kp-amber-hover: #F7C566;
+    --kp-amber-press: #D99D2E;
+    --kp-amber-mark: #8A5A00;
+    --kp-amber-tint: rgb(242 181 68 / 0.12);
+    --kp-amber-glow: rgb(242 181 68 / 0.15);
+    --kp-on-amber: #111214;
+    --kp-ok: #007840;
+    --kp-danger: #B02A2D;
+    --kp-info: #296898;
+    --kp-danger-tint: rgb(176 42 45 / 0.12);
+    --kp-shadow-popover: 0 8px 24px rgb(0 0 0 / 0.35);
+    --kp-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --kp-mono: "Fragment Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root,
+    :host {
+        color-scheme: dark;
+        --kp-ground: #111214;
+        --kp-panel: #18191C;
+        --kp-card: #1D1E22;
+        --kp-hover: #24262A;
+        --kp-secondary: #2A2C30;
+        --kp-secondary-hover: #33363B;
+        --kp-line-subtle: #26282C;
+        --kp-line: #2C2E33;
+        --kp-line-strong: #3A3D43;
+        --kp-edge: #74767C;
+        --kp-edge-hover: #8E9096;
+        --kp-text: #F2F2F0;
+        --kp-text-secondary: #C9CACD;
+        --kp-text-muted: #8E9096;
+        --kp-text-disabled: #55575C;
+        --kp-amber-mark: #F2B544;
+        --kp-ok: #72D699;
+        --kp-danger: #F7857D;
+        --kp-info: #7FBEF3;
+        --kp-danger-tint: rgb(247 133 125 / 0.12);
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root,
+    :host {
+        --kp-line-subtle: #55575C;
+        --kp-line: #4A4C50;
+        --kp-line-strong: #3A3C40;
+        --kp-edge: #3A3C40;
+        --kp-edge-hover: #1D1E22;
+        --kp-text: #000000;
+        --kp-text-secondary: #1D1E22;
+        --kp-text-muted: #3A3C40;
+        --kp-text-disabled: #55575C;
+        --kp-amber-mark: #6B4500;
+    }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+    :root,
+    :host {
+        --kp-line-subtle: #A9ABB0;
+        --kp-line: #B4B6BB;
+        --kp-line-strong: #C9CACD;
+        --kp-edge: #C9CACD;
+        --kp-edge-hover: #F2F2F0;
+        --kp-text: #FFFFFF;
+        --kp-text-secondary: #F2F2F0;
+        --kp-text-muted: #D9DADD;
+        --kp-text-disabled: #A9ABB0;
+        --kp-amber-mark: #F2B544;
+    }
+}
