@@ -181,6 +181,20 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out NamesReply? reply) ? reply : null;
     }
 
+    /// <summary>Searches the items an agent may be shown.</summary>
+    /// <param name="request">What to search for, and the exposure to apply.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>
+    /// <returns>The reply, or null when the approver could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<FindReply?> FindAsync(FindRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out FindReply? reply) ? reply : null;
+    }
+
     /// <summary>Asks for one field of one entry.</summary>
     /// <param name="request">What the agent asked for.</param>
     /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>

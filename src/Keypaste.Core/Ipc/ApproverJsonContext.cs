@@ -16,6 +16,8 @@ namespace Keypaste.Core.Ipc;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(NamesRequestFrame))]
 [JsonSerializable(typeof(NamesReplyFrame))]
+[JsonSerializable(typeof(FindRequestFrame))]
+[JsonSerializable(typeof(FindReplyFrame))]
 [JsonSerializable(typeof(AttachRequestFrame))]
 [JsonSerializable(typeof(AttachReplyFrame))]
 [JsonSerializable(typeof(CredentialRequestFrame))]
@@ -74,6 +76,55 @@ internal sealed class NameRow(ListedEntry entry)
     public IReadOnlyList<string> Tags => entry.Tags;
 
     public static IEnumerable<NameRow> Of(IEnumerable<ListedEntry> entries) => entries.Select(entry => new NameRow(entry));
+}
+
+internal sealed class FindRequestFrame(FindRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.FindKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? ClientLabel => request.ClientLabel;
+    public string? Text => request.Text;
+    public string? Host => request.Host;
+    public int? ItemKind => (int?)request.Kind;
+    public string? RelatedTo => request.RelatedTo;
+}
+
+internal sealed class FindReplyFrame(FindReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.FindKind;
+    public bool Unlocked => reply.VaultUnlocked;
+    public string Reason => reply.Reason;
+    public bool Complete => reply.Complete;
+    public string? Session => reply.Session;
+    public int? Method => (int?)reply.Refusal;
+    public bool Recorded => reply.Recorded;
+    public IEnumerable<FoundRow> Found => FoundRow.Of(reply.Found);
+}
+
+internal sealed class FoundRow(FoundAccess found)
+{
+    public string Group => found.Entry.Listing.Name.GroupPath;
+    public string Title => found.Entry.Listing.Name.Title;
+    public int Kind => (int)found.Entry.Kind;
+    public string? Origin => found.Entry.Origin?.ToString();
+    public string? Username => found.Entry.Username;
+    public IReadOnlyList<string> Fields => found.Entry.Listing.Fields;
+    public IReadOnlyList<string> Tags => found.Entry.Listing.Tags;
+    public IEnumerable<LinkRow> Links => found.Links.Select(link => new LinkRow(link));
+
+    public static IEnumerable<FoundRow> Of(IEnumerable<FoundAccess> found) => found.Select(item => new FoundRow(item));
+}
+
+internal sealed class LinkRow(AccessLink link)
+{
+    public string Group => link.Name.GroupPath;
+    public string Title => link.Name.Title;
+    public string? Site => link.Site;
+    public IReadOnlyList<string> Projects => link.Projects;
 }
 
 internal sealed class AttachRequestFrame(AttachRequest request)

@@ -323,6 +323,10 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ListAsync(names, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.Find when ApproverProtocol.TryDecode(frame, out FindRequest? find):
+                return ApproverProtocol.Encode(
+                    await _handler.FindAsync(find, connectionId, cancellationToken).ConfigureAwait(false));
+
             case ApproverMessageKind.Credential when ApproverProtocol.TryDecode(frame, out CredentialRequest? credential):
                 return ApproverProtocol.Encode(
                     await _handler.RequestAsync(credential, connectionId, cancellationToken).ConfigureAwait(false));

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Infrastructure;
 using Xunit;
@@ -1022,5 +1023,160 @@ public sealed class ApproverProtocolTests
         Assert.True(
             ApproverProtocol.Fitted(listing with { Session = new string('s', 1000) }).Names.Count
             < ApproverProtocol.Fitted(listing).Names.Count);
+    }
+
+    // ------------------------------------------------------------------------- a search (find)
+
+    private static FoundAccess Found(string title, int links = 1) => new(
+        new IndexedEntry(
+            new ListedEntry(new EntryName("services", title), ["password"], ["env:billing"]),
+            ItemKind.Login,
+            Origin("https://dashboard.stripe.com"),
+            "billing@acme.test"),
+        [.. Enumerable.Range(0, links).Select(link => new AccessLink(new EntryName("services", $"linked {link}"), "stripe.com", ["billing"]))]);
+
+    private static WebOrigin Origin(string url) =>
+        WebOrigin.TryReadItem(url, out var origin) ? origin : throw new ArgumentException(url, nameof(url));
+
+    [Fact]
+    public void AFindRequestSurvivesTheRoundTrip()
+    {
+        var request = new FindRequest(["env/**"], "stripe", "https://stripe.com/login", ItemKind.ApiKey, "k1_abc")
+        {
+            ClientLabel = "billing-bot",
+            Vault = "/vaults/team.kdbx",
+            Session = "session-one",
+        };
+
+        Assert.Equal(ApproverMessageKind.Find, ApproverProtocol.KindOf(ApproverProtocol.Encode(request)));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out FindRequest? decoded));
+        Assert.Equal(request.Exposure, decoded.Exposure);
+        Assert.Equal(request.Query, decoded.Query);
+        Assert.Equal((request.ClientLabel, request.Vault, request.Session), (decoded.ClientLabel, decoded.Vault, decoded.Session));
+    }
+
+    [Fact]
+    public void AFindRequestNamingOnlyText_DecodesWithNoOtherPart()
+    {
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], "stripe", null, null, null)), out FindRequest? decoded));
+        Assert.Equal(new AccessQuery("stripe"), decoded.Query);
+    }
+
+    [Theory]
+    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"item_kind":99}""")]
+    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"text":7}""")]
+    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"host":null}""")]
+    [InlineData("""{"v":2,"kind":"find","vault":"v","exposure":[],"text":"stripe"}""")]
+    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","text":"stripe"}""")]
+    public void AMalformedFindRequest_IsRefused(string frame) =>
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out FindRequest? _));
+
+    [Fact]
+    public void AFindRequestBeyondItsBounds_IsRefused()
+    {
+        var overlong = new string('a', AccessQuery.MaximumPartLength + 1);
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], overlong, null, null, null)), out FindRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], null, overlong, null, null)), out FindRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], null, null, null, overlong)), out FindRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new FindRequest([.. Enumerable.Repeat("env/**", ApproverProtocol.MaximumExposureGlobs + 1)], "stripe", null, null, null)),
+            out FindRequest? _));
+    }
+
+    [Fact]
+    public void AFindReplySurvivesTheRoundTrip()
+    {
+        var anonymous = new FoundAccess(new IndexedEntry(new ListedEntry(new EntryName("", "LOOSE"), [], []), ItemKind.None, null, null), []);
+        var reply = new FindReply(true, [Found("Stripe"), anonymous], string.Empty, true) { Session = "session-one", Recorded = true };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
+
+        Assert.True(decoded.VaultUnlocked && decoded.Complete && decoded.Recorded);
+        Assert.Equal("session-one", decoded.Session);
+        Assert.Equal(2, decoded.Found.Count);
+        Assert.Equal(reply.Found[0].Entry, decoded.Found[0].Entry);
+        Assert.Equal("https://dashboard.stripe.com:443", decoded.Found[0].Entry.Origin?.ToString());
+        Assert.Equal(["billing"], decoded.Found[0].Entry.Projects);
+        var link = Assert.Single(decoded.Found[0].Links);
+        Assert.Equal((new EntryName("services", "linked 0"), "stripe.com"), (link.Name, link.Site));
+        Assert.Equal(["billing"], link.Projects);
+        Assert.Equal(anonymous.Entry, decoded.Found[1].Entry);
+        Assert.Empty(decoded.Found[1].Links);
+    }
+
+    /// <summary>A row names an item as a listing does, by group and title, and never carries its UUID.</summary>
+    [Fact]
+    public void AFoundItem_TravelsWithoutItsUuid()
+    {
+        var item = Found("Stripe");
+        var withUuid = item with { Entry = item.Entry with { Listing = item.Entry.Listing with { Name = item.Entry.Listing.Name with { Uuid = "0123456789abcdef0123456789abcdef" } } } };
+
+        var frame = Encoding.UTF8.GetString(ApproverProtocol.Encode(new FindReply(true, [withUuid], string.Empty, true)));
+
+        Assert.DoesNotContain("0123456789abcdef", frame, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARefusedSearchKeepsItsMethod()
+    {
+        var reply = new FindReply(false, [], "a search names text, a host, a kind or a related item", true) { Refusal = AuditMethod.InvalidRequest };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
+        Assert.Equal(AuditMethod.InvalidRequest, decoded.Refusal);
+        Assert.Equal(reply.Reason, decoded.Reason, StringComparer.Ordinal);
+        Assert.Empty(decoded.Found);
+    }
+
+    [Fact]
+    public void AFindReplyBeyondItsCounts_IsRefused()
+    {
+        var tooMany = new FindReply(true, [.. Enumerable.Range(0, AccessIndex.MaximumResults + 1).Select(n => Found($"item {n}", links: 0))], string.Empty, true);
+        var tooLinked = new FindReply(true, [Found("Stripe", AccessIndex.MaximumLinks + 1)], string.Empty, true);
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(tooMany), out FindReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(tooLinked), out FindReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(tooMany with { Found = [.. tooMany.Found.Take(AccessIndex.MaximumResults)] }), out FindReply? _));
+    }
+
+    private const string _row = """{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[]""";
+
+    [Theory]
+    [InlineData(_row + ""","origin":"https://stripe.com/login"}""")]
+    [InlineData(_row + ""","origin":"https://stripe.com"}""")]
+    [InlineData(_row + ""","origin":"ftp://stripe.com:21"}""")]
+    [InlineData("""{"group":"g","title":"t","kind":99,"fields":[],"tags":[],"links":[]}""")]
+    [InlineData("""{"group":"g","title":"t","fields":[],"tags":[],"links":[]}""")]
+    [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[]}""")]
+    [InlineData(_row + ""","username":null}""")]
+    [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[null]}]}""")]
+    public void AFindReplyWithAMalformedRow_IsRefused(string row) =>
+        Assert.False(ApproverProtocol.TryDecode(
+            Encoding.UTF8.GetBytes($$"""{"v":2,"kind":"find","unlocked":true,"reason":"","complete":true,"found":[{{row}}]}"""),
+            out FindReply? _));
+
+    /// <summary>Rows too long for one frame are dropped whole from the end, and the reply says it is not complete.</summary>
+    [Fact]
+    public void AnOversizeSearch_SaysItIsNotComplete()
+    {
+        var reply = new FindReply(true, [.. Enumerable.Range(0, AccessIndex.MaximumResults).Select(n => Found($"{n} {new string('x', 4000)}"))], string.Empty, true);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
+
+        Assert.False(decoded.Complete);
+        Assert.NotEmpty(decoded.Found);
+        Assert.True(decoded.Found.Count < AccessIndex.MaximumResults);
+        Assert.Equal(reply.Found[0].Entry, decoded.Found[0].Entry);
+    }
+
+    [Fact]
+    public void ASearchThatFits_SaysItIsComplete()
+    {
+        var reply = new FindReply(true, [.. Enumerable.Range(0, AccessIndex.MaximumResults).Select(n => Found($"item {n}", AccessIndex.MaximumLinks))], string.Empty, true);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
+
+        Assert.True(decoded.Complete);
+        Assert.Equal(AccessIndex.MaximumResults, decoded.Found.Count);
     }
 }

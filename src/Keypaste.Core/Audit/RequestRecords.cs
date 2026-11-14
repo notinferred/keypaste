@@ -32,6 +32,9 @@ public static class AuditTools
 
     /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
     public const string Save = "request_save";
+
+    /// <summary>An agent's search of the items it may be shown.</summary>
+    public const string Find = "find_access";
 }
 
 /// <summary>What a browser's line is about, written as its field.</summary>
@@ -111,6 +114,71 @@ public static class RequestRecords
         string? session,
         string? vault) =>
         Listing(client, AuditDecision.Granted, AuditMethod.Exposure, Invariant($"listed {count} item names"), exposure, session, vault);
+
+    /// <summary>The line for an agent's search, naming what it searched for and never what it found.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="query">What the agent searched for, as it wrote it.</param>
+    /// <param name="decision">Whether anything was searched.</param>
+    /// <param name="method">How that was decided.</param>
+    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
+    /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <returns>The record to append, each part of the query sanitized and capped.</returns>
+    public static AuditRecord Finding(
+        AuditClient client,
+        AccessQuery query,
+        AuditDecision decision,
+        AuditMethod method,
+        string reason,
+        IReadOnlyList<string> exposure,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(reason);
+        ArgumentNullException.ThrowIfNull(exposure);
+
+        return new AuditRecord
+        {
+            Tool = AuditTools.Find,
+            Client = client,
+            Args = AuditArgs.ForFind(query),
+            Decision = decision,
+            Method = method,
+            Reason = reason,
+            Exposure = exposure,
+            Session = session,
+            Vault = vault,
+        };
+    }
+
+    /// <summary>The line for a search that was made, counting the items its reply names.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="query">What the agent searched for, as it wrote it.</param>
+    /// <param name="found">The items as the reply carries them.</param>
+    /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord Found(
+        AuditClient client,
+        AccessQuery query,
+        IReadOnlyList<FoundAccess> found,
+        IReadOnlyList<string> exposure,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(found);
+
+        var linked = found.SelectMany(item => item.Links).Select(link => link.Name)
+            .Except(found.Select(item => item.Entry.Listing.Name))
+            .Distinct()
+            .Count();
+
+        return Finding(client, query, AuditDecision.Granted, AuditMethod.Exposure, Invariant($"found {Count(found.Count, "item")} and linked {linked} more"), exposure, session, vault);
+    }
 
     /// <summary>A credential line's reason, naming the attachment a request asked for, since the line's field says only <c>attachment</c>.</summary>
     /// <param name="attachment">The attachment's name, or null for a field.</param>

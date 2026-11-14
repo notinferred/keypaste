@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Keypaste.Core.Audit;
 
 /// <summary>The authorization answer a bridge gave.</summary>
@@ -234,6 +236,28 @@ public sealed record AuditArgs
     /// </remarks>
     public string? ReasonSha256 { get; init; }
 
+    /// <summary>What a search asked for, each part sanitized and capped, or null for any other request.</summary>
+    public AuditQuery? Query { get; init; }
+
+    /// <summary>Reduces a search to what the log keeps: each part of its query the agent wrote.</summary>
+    /// <param name="query">What the agent searched for.</param>
+    /// <returns>The arguments, holding no value.</returns>
+    public static AuditArgs ForFind(AccessQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        static string? Prose(string? part) => string.IsNullOrWhiteSpace(part) ? null : EntryNameSanitizer.SanitizeProse(part, EntryLength).Text;
+
+        return new AuditArgs
+        {
+            Query = new AuditQuery(
+                Prose(query.Text),
+                Prose(query.Host),
+                query.Kind is { } kind ? JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString()) : null,
+                string.IsNullOrWhiteSpace(query.RelatedTo) ? null : EntryNameSanitizer.Sanitize(query.RelatedTo, EntryLength).Text),
+        };
+    }
+
     /// <summary>Reduces a run request to what the log keeps: the set's group, when it named one, and the reason.</summary>
     /// <param name="group">The set's name (<see cref="EnvProfileNames.SetName"/>), or null for references, whose entries the line lists instead.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
@@ -282,6 +306,13 @@ public sealed record AuditArgs
         };
     }
 }
+
+/// <summary>The parts of an agent's search, as its line keeps them.</summary>
+/// <param name="Text">The text searched for, sanitized as prose and capped, or null.</param>
+/// <param name="Host">The host or URL searched for, sanitized as prose and capped, or null.</param>
+/// <param name="Kind">The kind searched for, in snake case, or null.</param>
+/// <param name="Related">The handle of the item searched around, sanitized and capped, or null.</param>
+public sealed record AuditQuery(string? Text, string? Host, string? Kind, string? Related);
 
 /// <summary>One line of the audit trail: who asked for what, and what keypaste did about it.</summary>
 /// <remarks>

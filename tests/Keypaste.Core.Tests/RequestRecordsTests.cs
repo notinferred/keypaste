@@ -215,6 +215,61 @@ public sealed class RequestRecordsTests : IDisposable
         Assert.Null(line.CommandSha256);
     }
 
+    private static FoundAccess Found(string group, string title, params string[] linked) => new(
+        new IndexedEntry(new ListedEntry(new EntryName(group, title), ["password"], []), ItemKind.Login, null, "billing@acme.test"),
+        [.. linked.Select(other => new AccessLink(new EntryName(group, other), "stripe.com", []))]);
+
+    [Fact]
+    public void ASearch_CountsTheItemsItFoundAndLinked_AndNamesNone()
+    {
+        var found = new[] { Found("services", "Stripe", "Stripe test", "Dashboard"), Found("services", "Stripe test", "Stripe") };
+
+        var line = RequestRecords.Found(_client, new AccessQuery("stripe", Kind: ItemKind.ApiKey), found, _exposure, _session, _vault);
+
+        Assert.Equal("find_access", line.Tool);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Exposure, "found 2 items and linked 1 more"), (line.Decision, line.Method, line.Reason));
+        Assert.Equal((_session, _vault), (line.Session, line.Vault));
+        Assert.Equal(new AuditQuery("stripe", null, "api_key", null), line.Args.Query);
+        Assert.Null(line.Entries);
+    }
+
+    /// <summary>Every part of a query is the agent's text, so each is sanitized and capped before the line keeps it.</summary>
+    [Fact]
+    public void ASearchRefusal_KeepsTheQuerySanitizedAndCapped_InItsLine()
+    {
+        var hostile = "evil\nline‮" + new string('t', 400);
+        var query = new AccessQuery(hostile, "https://stripe.com/\u0007login", ItemKind.SecureNote, "k1_\r\nforged");
+
+        using (var log = Open())
+        {
+            var line = RequestRecords.Finding(_client, query, AuditDecision.Denied, AuditMethod.InvalidRequest, "refused", _exposure, null, _vault);
+            Assert.True(log.TryAppend(line, out var error), error);
+        }
+
+        var text = Assert.Single(Lines());
+        using var parsed = JsonDocument.Parse(text);
+        var written = parsed.RootElement.GetProperty("args").GetProperty("query");
+        var writtenText = written.GetProperty("text").GetString()!;
+        Assert.Equal("find_access", parsed.RootElement.GetProperty("tool").GetString());
+        Assert.DoesNotContain('\n', writtenText);
+        Assert.DoesNotContain('‮', writtenText);
+        Assert.True(writtenText.Length <= AuditArgs.EntryLength);
+        Assert.DoesNotContain('\u0007', written.GetProperty("host").GetString()!);
+        Assert.Equal("secure_note", written.GetProperty("kind").GetString());
+        Assert.DoesNotContain('\n', written.GetProperty("related").GetString()!);
+        Assert.Equal("refused", parsed.RootElement.GetProperty("reason").GetString());
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out _));
+        Assert.Single(entries);
+    }
+
+    [Fact]
+    public void ASearchLine_LeavesOutWhatTheQueryDidNotName()
+    {
+        var line = RequestRecords.Finding(_client, new AccessQuery(Host: "stripe.com"), AuditDecision.Denied, AuditMethod.VaultLocked, "the vault is locked", _exposure, null, _vault);
+
+        Assert.Equal(new AuditQuery(null, "stripe.com", null, null), line.Args.Query);
+    }
+
     [Fact]
     public void ARunLine_CarriesCommandEntriesAndVault()
     {

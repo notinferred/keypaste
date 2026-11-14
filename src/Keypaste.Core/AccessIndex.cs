@@ -10,6 +10,9 @@ namespace Keypaste.Core;
 /// <param name="RelatedTo">An entry's handle as <see cref="EntryHandle.For"/> makes it, matching the items linked to that one.</param>
 public sealed record AccessQuery(string? Text = null, string? Host = null, ItemKind? Kind = null, string? RelatedTo = null)
 {
+    /// <summary>The longest text, host or handle a search carries to the vault's owner.</summary>
+    public const int MaximumPartLength = 256;
+
     /// <summary>Whether it asks for nothing, which <see cref="AccessIndex.Find"/> refuses.</summary>
     public bool IsEmpty =>
         string.IsNullOrWhiteSpace(Text) && string.IsNullOrWhiteSpace(Host) && Kind is null && string.IsNullOrWhiteSpace(RelatedTo);

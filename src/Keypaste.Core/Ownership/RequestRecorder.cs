@@ -44,6 +44,15 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
         : reply.Names.Count == 0 ? reply with { Recorded = false }
         : new NamesReply(false, [], _unrecorded, true) { Session = reply.Session, Refusal = AuditMethod.Failed };
 
+    /// <summary>A search once its line is written; one naming anything whose line cannot be written names nothing.</summary>
+    /// <param name="reply">The reply as it will leave.</param>
+    /// <param name="record">Its line.</param>
+    /// <returns>The reply to send, saying whether it was recorded.</returns>
+    internal FindReply Recorded(FindReply reply, AuditRecord record) =>
+        TryAppend(record) ? reply with { Recorded = true }
+        : reply.Found.Count == 0 ? reply with { Recorded = false }
+        : new FindReply(false, [], _unrecorded, true) { Session = reply.Session, Refusal = AuditMethod.Failed };
+
     /// <summary>A credential reply once its line is written; a release whose line cannot be written becomes a refusal.</summary>
     /// <param name="reply">The reply as it will leave.</param>
     /// <param name="record">Its line.</param>

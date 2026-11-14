@@ -3,8 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// The entries an agent may be shown. Yields <see cref="ListedEntry"/>, which holds only names, and
-/// has nowhere to put anything else.
+/// The entries an agent may be shown. Yields <see cref="ListedEntry"/>, which holds only names, or for a search
+/// <see cref="IndexedEntry"/>, which adds only the origin and username an agent sees without asking.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,6 +30,18 @@ public interface IEntryNameLister
     bool TryList(
         EntryExposure exposure,
         [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names,
+        out CredentialFailure failure);
+
+    /// <summary>The entries inside an exposure as a search reads them, each as its reach shows it.</summary>
+    /// <param name="exposure">What may be named.</param>
+    /// <param name="showsUsername">Whether Settings shows agents each item's username.</param>
+    /// <param name="index">The raw, unsanitized entries, as <see cref="AccessIndex.Admitted"/> admits them.</param>
+    /// <param name="failure">Why there are none, when there are none.</param>
+    /// <returns><see langword="true"/> when the vault could be read, even if nothing matched.</returns>
+    bool TryIndex(
+        EntryExposure exposure,
+        bool showsUsername,
+        [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index,
         out CredentialFailure failure);
 }
 
@@ -114,6 +126,46 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
             // Anything at all. A narrower filter lets an IOException or a cryptographic failure out
             // of the vault escape the approver and reach the bridge as an unlogged failure; failing
             // closed here is what makes the caller's refusal a decision (law 3.7).
+            failure = CredentialFailure.Failed;
+            return false;
+        }
+
+        failure = CredentialFailure.None;
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public bool TryIndex(
+        EntryExposure exposure,
+        bool showsUsername,
+        [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index,
+        out CredentialFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(exposure);
+
+        index = null;
+
+        if (_unlockedVault() is not { } vault)
+        {
+            failure = CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        try
+        {
+            var state = vault.ReadSavedIndex(showsUsername, out var entries);
+
+            if (entries is null)
+            {
+                failure = VaultCredentialSource.Failure(state);
+                return false;
+            }
+
+            index = AccessIndex.Admitted(entries, exposure);
+        }
+        catch (Exception)
+        {
+            // Anything at all, failing closed as TryList does (law 3.7).
             failure = CredentialFailure.Failed;
             return false;
         }

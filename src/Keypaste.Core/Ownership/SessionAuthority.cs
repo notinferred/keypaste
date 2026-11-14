@@ -345,6 +345,53 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
+    /// <remarks>Recorded as a listing is, under the client its connection attached as, with what the agent searched for and how many items the reply names.</remarks>
+    public async ValueTask<FindReply> FindAsync(FindRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var client = _attached.TryGetValue(connectionId, out var attachment) && attachment.Client is { } attached
+            ? AuditClient.Of(attached.Name, attached.Version, attached.Label)
+            : AuditClient.Unknown;
+
+        FindReply Answer(FindReply reply) => _recorder.Recorded(
+            reply,
+            reply.VaultUnlocked
+                ? RequestRecords.Found(client, request.Query, reply.Found, request.Exposure, reply.Session, VaultNamed(request.Vault))
+                : RequestRecords.Finding(
+                    client,
+                    request.Query,
+                    AuditDecision.Denied,
+                    reply.Refusal ?? AuditMethod.VaultLocked,
+                    reply.Reason,
+                    request.Exposure,
+                    reply.Session,
+                    VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(new FindReply(false, [], refusal.Reason, true) { Refusal = refusal.Method });
+        }
+
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        var reply = await Decided(
+            token => _inner.FindAsync(request, connectionId, token),
+            lifetime,
+            (method, reason) => new FindReply(false, [], reason, true) { Refusal = method },
+            lifetime.Ended,
+            withdrawn.Token).ConfigureAwait(false);
+
+        if (!lifetime.TryCommit())
+        {
+            reply = new FindReply(false, [], _lockedReason, true) { Refusal = AuditMethod.VaultLocked };
+        }
+
+        return Answer(ApproverProtocol.Fitted(reply with { Session = request.Session, Recorded = true }));
+    }
+
+    /// <inheritdoc/>
     public async ValueTask<CredentialReply> RequestAsync(
         CredentialRequest request,
         string connectionId,
