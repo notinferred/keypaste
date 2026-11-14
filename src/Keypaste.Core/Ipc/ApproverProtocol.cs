@@ -1866,10 +1866,13 @@ public static partial class ApproverProtocol
     private static bool TryParse(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out JsonDocument? document)
     {
         document = null;
+        var copy = frame.ToArray();
 
         try
         {
-            var parsed = JsonDocument.Parse(frame.ToArray(), _strict);
+            // Through a stream the document reads its own pooled copy, which it clears when disposed, so this one can be zeroed now.
+            using var stream = new MemoryStream(copy, writable: false);
+            var parsed = JsonDocument.Parse(stream, _strict);
 
             if (parsed.RootElement.ValueKind != JsonValueKind.Object)
             {
@@ -1883,6 +1886,10 @@ public static partial class ApproverProtocol
         catch (JsonException)
         {
             return false;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(copy);
         }
     }
 

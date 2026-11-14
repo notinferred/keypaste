@@ -1,8 +1,9 @@
 using Xunit;
+using static System.FormattableString;
 
 namespace Keypaste.Processes.Tests;
 
-/// <summary>keypaste lowers its core dump limit to zero as it starts, so a crash writes none of its memory to disk.</summary>
+/// <summary>keypaste lowers its core dump limit to zero as it starts, so a crash writes none of its memory to disk, and on Linux keypaste approve is closed to other processes.</summary>
 public sealed class CoreDumpTests
 {
     [Fact]
@@ -40,5 +41,20 @@ public sealed class CoreDumpTests
         var started = run.Output[0];
         Assert.SkipWhen(started == "0", "The hard core dump limit here is zero, so keypaste has no limit to lower.");
         Assert.Equal(["0", started], run.Output.Skip(1));
+    }
+
+    [Fact]
+    public void Keypaste_approve_on_Linux_is_closed_to_other_processes_of_its_user()
+    {
+        Assert.SkipUnless(OperatingSystem.IsLinux(), "Only Linux keeps the flag.");
+
+        using var workspace = new Workspace();
+        using var approve = RunningProcess.Start(Built.Keypaste, workspace.Environment, "approve", "--vault", workspace.Vault);
+        approve.Send(Workspace.Master);
+        approve.WaitForError("listening on");
+        using var waiting = RunningProcess.Start("/bin/cat", workspace.Environment);
+
+        Assert.NotEmpty(File.ReadAllBytes(Invariant($"/proc/{waiting.Id}/environ")));
+        Assert.Throws<UnauthorizedAccessException>(() => File.ReadAllBytes(Invariant($"/proc/{approve.Id}/environ")));
     }
 }

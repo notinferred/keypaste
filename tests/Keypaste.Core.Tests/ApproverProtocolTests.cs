@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Keypaste.Core.Approval;
@@ -113,6 +114,24 @@ public sealed class ApproverProtocolTests
 
         Assert.Null(ApproverProtocol.Decoded<EnvReply>(frame, ApproverProtocol.TryDecode));
         Assert.All(frame, value => Assert.Equal(0, value));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void DecodingAFrameLeavesNoCopyOfItInPooledMemory(int cutShort)
+    {
+        var frame = ApproverProtocol.Encode(Granted())[..^cutShort];
+        var seeded = ArrayPool<byte>.Shared.Rent(frame.Length + 1);
+        Array.Fill(seeded, (byte)0xFF);
+        ArrayPool<byte>.Shared.Return(seeded);
+
+        Assert.Equal(cutShort == 0, ApproverProtocol.TryDecode(frame, out CredentialReply? _));
+
+        var pooled = ArrayPool<byte>.Shared.Rent(frame.Length + 1);
+        ArrayPool<byte>.Shared.Return(pooled);
+        Assert.Same(seeded, pooled);
+        Assert.All(pooled.AsSpan(0, frame.Length).ToArray(), value => Assert.Equal(0, value));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Keypaste.Browser;
+using Keypaste.Cli.Commands;
 using Keypaste.Cli.Output;
 using Keypaste.Core.Clients;
 using Keypaste.Infrastructure;
@@ -26,6 +27,12 @@ internal static class Program
         }
 
         _ = MemoryDumps.TryPrevent();
+
+        // Here rather than in the command, which the CLI's tests run inside their own host.
+        if (args is [var verb, ..] && verb == ApproveCommand.Command.Name)
+        {
+            _ = MemoryDumps.TryPreventAttach();
+        }
 
         if (args is [SelfTestFlag])
         {
