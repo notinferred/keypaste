@@ -194,6 +194,10 @@ public sealed class BrowserHostsTests : IDisposable
     }
 
     [Fact]
+    public void A_program_named_by_a_relative_path_is_refused_since_no_browser_starts_one() =>
+        Assert.Throws<ArgumentException>(() => Hosts(new HostProgram(Path.Combine("artifacts", "keypaste"))));
+
+    [Fact]
     public void A_program_that_cannot_be_made_writes_no_manifest()
     {
         var hosts = Hosts(new HostProgram(_program, () => "~/.local/bin/keypaste could not be made"));

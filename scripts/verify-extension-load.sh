@@ -42,7 +42,8 @@ for project in src/Keypaste.Cli/Keypaste.Cli.csproj tests/Keypaste.AppDriver/Key
   dotnet build "$project" --no-restore -c Release -warnaserror
 done
 dotnet build-server shutdown >/dev/null 2>&1 || true
-cli="$(keypaste_bin)"
+# A browser starts its host only from an absolute path.
+cli="$(cd "$(dirname "$(keypaste_bin)")" && pwd)/$(basename "$(keypaste_bin)")"
 driver="$(app_driver)"
 
 work="$(mktemp -d)"
