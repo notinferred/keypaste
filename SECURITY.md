@@ -83,6 +83,8 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - The bridge holds no vault and makes no network request (v0.3.0) [T-9].
 - Every answered request is recorded before the reply, and an unrecordable release is refused (v0.3.0) [T-6].
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
+- A search names at most 25 items it reaches, with their origins, usernames while Settings shows them and the links among them, never a value (unreleased) [T-55].
+- An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
 - Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
 - One prompt at a time; 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].
@@ -186,3 +188,5 @@ The reporting mailbox has been tested from an external address. GitHub private v
 [T-43]: THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
 [T-44]: THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
 [T-51]: THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
+[T-54]: THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
+[T-55]: THREATS.md#t-55--a-search-maps-the-persons-infrastructure
