@@ -1632,6 +1632,29 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Every live entry outside keypaste's own groups as a search names it, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="showsUsername">Whether Settings shows agents each item's username (<see cref="Agents.AgentRules.ShowsUsername"/>); when not, no username is read.</param>
+    /// <param name="index">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    public SavedRead ReadSavedIndex(bool showsUsername, out IReadOnlyList<IndexedEntry>? index)
+    {
+        index = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            index = _interop.ReadIndex(showsUsername);
+            return SavedRead.Current;
+        }
+    }
+
     /// <summary>One custom field's value, but only while this vault holds exactly what its file holds.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="field">The custom field's name, matched exactly.</param>

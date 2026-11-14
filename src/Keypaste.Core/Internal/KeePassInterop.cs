@@ -1940,6 +1940,16 @@ internal sealed class KeePassInterop : IDisposable
         return listed;
     }
 
+    /// <summary>Every live entry outside keypaste's own groups as a search names it, by the traversal <see cref="Collect"/> uses; only its URL and, when <paramref name="showsUsername"/>, its username are read.</summary>
+    internal IReadOnlyList<IndexedEntry> ReadIndex(bool showsUsername)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<IndexedEntry> indexed = [];
+        CollectIndex(_database.RootGroup, string.Empty, indexed, Bin(), showsUsername);
+        return indexed;
+    }
+
     /// <summary>Every live entry with its own tags, and the variable fields of each one a project tag names, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<EnvEntry> ReadEnvEntries()
     {
@@ -3685,20 +3695,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         foreach (PwEntry entry in group.Entries)
         {
-            // Emptiness is read from the length KeePassLib keeps, so no value is decrypted.
-            List<string> fields =
-            [
-                .. _standardFields.Where(field => entry.Strings.Get(field.Value) is { IsEmpty: false }).Select(field => field.Key),
-                .. Totp.TotpSpec.MayHold(name => entry.Strings.Get(name) is { IsEmpty: false }) ? [Approval.CredentialFields.Totp] : Array.Empty<string>(),
-                .. entry.Strings.Select(field => field.Key)
-                    .Where(key => !PwDefs.IsStandardField(key) && Approval.CredentialFields.IsAgentCustom(key))
-                    .Order(StringComparer.Ordinal),
-            ];
-
-            listed.Add(new ListedEntry(
-                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)),
-                fields,
-                [.. entry.Tags.Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)]));
+            listed.Add(Listed(entry, new EntryName(groupPath, ReadField(entry, PwDefs.TitleField))));
         }
 
         foreach (PwGroup child in group.Groups)
@@ -3708,6 +3705,49 @@ internal sealed class KeePassInterop : IDisposable
                 CollectListing(child, ChildPath(groupPath, child.Name), listed, bin);
             }
         }
+    }
+
+    private static void CollectIndex(PwGroup group, string groupPath, List<IndexedEntry> indexed, PwGroup? bin, bool showsUsername)
+    {
+        if (ReservedGroups.IsReserved(groupPath))
+        {
+            return;
+        }
+
+        foreach (PwEntry entry in group.Entries)
+        {
+            var name = new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() };
+            var username = showsUsername ? ReadField(entry, PwDefs.UserNameField) : string.Empty;
+
+            indexed.Add(new IndexedEntry(
+                Listed(entry, name),
+                KindOf(entry),
+                Browser.WebOrigin.TryReadItem(ReadField(entry, PwDefs.UrlField).Trim(), out var origin) ? origin : null,
+                username.Length > 0 ? username : null));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectIndex(child, ChildPath(groupPath, child.Name), indexed, bin, showsUsername);
+            }
+        }
+    }
+
+    private static ListedEntry Listed(PwEntry entry, EntryName name)
+    {
+        // Emptiness is read from the length KeePassLib keeps, so no value is decrypted.
+        List<string> fields =
+        [
+            .. _standardFields.Where(field => entry.Strings.Get(field.Value) is { IsEmpty: false }).Select(field => field.Key),
+            .. Totp.TotpSpec.MayHold(source => entry.Strings.Get(source) is { IsEmpty: false }) ? [Approval.CredentialFields.Totp] : Array.Empty<string>(),
+            .. entry.Strings.Select(field => field.Key)
+                .Where(key => !PwDefs.IsStandardField(key) && Approval.CredentialFields.IsAgentCustom(key))
+                .Order(StringComparer.Ordinal),
+        ];
+
+        return new ListedEntry(name, fields, [.. entry.Tags.Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)]);
     }
 
     private static void CollectEnvEntries(PwGroup group, string groupPath, List<EnvEntry> found, PwGroup? bin)
