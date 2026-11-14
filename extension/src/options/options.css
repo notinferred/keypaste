@@ -1,0 +1,54 @@
+body {
+    padding: 40px 16px;
+}
+
+.page {
+    margin: 0 auto;
+    max-width: 40rem;
+}
+
+h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+}
+
+h2 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+section {
+    border-top: 1px solid var(--kp-line);
+    margin-top: 24px;
+    padding-top: 24px;
+}
+
+section > * + * {
+    margin-top: 12px;
+}
+
+details {
+    border: 1px solid var(--kp-line);
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+summary {
+    font-weight: 500;
+}
+
+pre {
+    color: var(--kp-text-secondary);
+    font-family: var(--kp-mono);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+#paired,
+#paired-times,
+#not-paired {
+    display: none;
+}

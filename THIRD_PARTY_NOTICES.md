@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons, and links Polly and System.CommandLine. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database. Every NuGet package a release carries, direct or indirect, is listed with its licence and copyright under [NuGet packages a release carries](#nuget-packages-a-release-carries).
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons, and links Polly and System.CommandLine. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database. Its browser extension is a separate GPL-3.0 program forked from KeePassXC-Browser, with its own components under [keypaste's browser extension](#keypastes-browser-extension). Every NuGet package a release carries, direct or indirect, is listed with its licence and copyright under [NuGet packages a release carries](#nuget-packages-a-release-carries).
 
 ## KeePassLib
 
@@ -64,7 +64,7 @@ The [upstream list](https://publicsuffix.org/list/) is vendored at `third_party/
 
 Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans). Licensed under the SIL Open Font License, Version 1.1; the full text is in `src/Keypaste.App/Assets/Fonts/OFL-InstrumentSans.txt`.
 
-The Regular, Medium and SemiBold faces are embedded unmodified in the desktop app as its interface typeface. The fonts remain under the OFL.
+The Regular, Medium and SemiBold faces are embedded unmodified in the desktop app as its interface typeface, and in the browser extension's `fonts/` for its pages. The fonts remain under the OFL.
 
 ## Fragment Mono
 
@@ -76,7 +76,7 @@ The Regular face is embedded unmodified in the desktop app for keys, values, pat
 
 Copyright (c) Lucide Contributors 2022; portions copyright (c) Cole Bemis 2013-2022 as part of Feather (MIT). Licensed under the ISC License; the full text is in `third_party/lucide/LICENSE`, and [UPSTREAM.md](third_party/lucide/UPSTREAM.md) records the release.
 
-The icons are vendored as SVG at `third_party/lucide/icons/`. [lucide-to-axaml.py](scripts/lucide-to-axaml.py) converts the ones the desktop app uses into path geometry in `src/Keypaste.App/Theme/Icons.axaml`, which the app strokes at its own width; the shapes are not otherwise modified.
+The icons are vendored as SVG at `third_party/lucide/icons/`. [lucide-to-axaml.py](scripts/lucide-to-axaml.py) converts the ones the desktop app uses into path geometry in `src/Keypaste.App/Theme/Icons.axaml`, which the app strokes at its own width; the browser extension inlines the ones it uses as SVG. The shapes are not otherwise modified.
 
 ## Polly
 
@@ -115,6 +115,13 @@ The desktop app references `Yubico.YubiKey` 1.18.0 from NuGet, with its `Yubico.
 Copyright (c) Microsoft Corporation. Licensed under the MIT License; the text is at <https://github.com/microsoft/CsWinRT/blob/master/LICENSE>.
 
 The desktop app's Windows target, which only its Windows package carries, references the targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 that the .NET SDK supplies, and so ships `Microsoft.Windows.SDK.NET.dll` and C#/WinRT's `WinRT.Runtime.dll`, to reach Windows Hello (D-0549). They are not vendored or modified, and the CLI, the MCP bridge and the Linux and macOS packages do not contain them.
+
+## keypaste's browser extension
+
+The browser extension in `extension/` is keypaste's modified version of [KeePassXC-Browser](https://github.com/keepassxreboot/keepassxc-browser) 1.10.4.1, copyright the KeePassXC Team and its contributors, licensed under the GNU General Public License version 3; the full text is in `extension/LICENSE`, and [UPSTREAM.md](extension/UPSTREAM.md) records the commit, the archive's SHA-256 and every modification. It is a separate program, distributed under GPL-3.0: it runs in the browser and reaches keypaste only through native messaging, never by linking, so this AGPL-3.0-only distribution does not contain it. Beside Lucide's icons and Instrument Sans, above, it carries three files from upstream unmodified:
+
+- `background/nacl.min.js` and `background/nacl-util.min.js`, minified [TweetNaCl.js](https://github.com/dchest/tweetnacl-js) and [tweetnacl-util](https://github.com/dchest/tweetnacl-util-js), which their authors dedicate to the public domain under the Unlicense. The files carry no header naming a version or a licence, so the dedication is read from the upstream projects. They seal and open the NaCl boxes the extension exchanges with keypaste.
+- `common/browser-polyfill.min.js`, Mozilla's [webextension-polyfill](https://github.com/mozilla/webextension-polyfill) 0.12.0, licensed under the Mozilla Public License, Version 2.0, as the file's own header says; the text is at <https://mozilla.org/MPL/2.0/>. MPL-2.0 is a file-level licence and §3.3 permits distributing the file within the GPL-3.0 extension.
 
 ## KeePassXC test database
 

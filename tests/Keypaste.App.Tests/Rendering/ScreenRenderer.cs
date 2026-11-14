@@ -863,7 +863,7 @@ public sealed class ScreenRenderer
         settingsScreen.Section = SettingsSectionChoice.Browser;
         var browserFill = settingsScreen.BrowserFill!;
         browserFill.PairCommand.Press();
-        var pairing = new PairingItem("work laptop", "chrome-extension://kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp", "Last used 2 days ago");
+        var pairing = new PairingItem("work laptop", "chrome-extension://fipabobollckgdobkjfkkchimlphcicg", "Last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
         WindowInput.Drain();
         foreach (var toast in shell.Toasts.Shown.ToList())

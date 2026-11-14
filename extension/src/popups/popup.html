@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title data-i18n="popupTitle"></title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="../css/colors.css">
+    <link rel="stylesheet" href="../css/page.css">
+    <link rel="stylesheet" href="popup.css">
+    <script src="../common/browser-polyfill.min.js"></script>
+    <script src="../common/global.js"></script>
+    <script src="../common/global_ui.js"></script>
+    <script src="popup_functions.js"></script>
+    <script defer src="popup.js"></script>
+    <script defer src="../common/translate.js"></script>
+  </head>
+  <body>
+    <header id="settings" class="bar">
+      <h1 data-i18n="popupTitle"></h1>
+      <button id="options-button" class="button quiet" type="button" data-i18n="[title]popupSettingsText">
+        <!-- Lucide settings, ISC -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button id="lock-database-button" class="button quiet" type="button" hidden data-i18n="[title]lockDatabase">
+        <!-- Lucide lock, ISC -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </button>
+    </header>
+
+    <main class="content" aria-live="polite">
+      <div id="initial-state" class="waiting">
+        <span class="waiting-dot" aria-hidden="true"></span>
+        <p data-i18n="popupCheckingStatus"></p>
+      </div>
+
+      <section id="not-configured">
+        <p data-i18n="popupNotConfigured"></p>
+        <div class="actions">
+          <button id="connect-button" class="button primary" type="button" data-i18n="[title]connectButtonTitle">
+            <!-- Lucide link, ISC -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span data-i18n="popupConnectButton"></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="need-reconfigure">
+        <p data-i18n="popupNeedReconfigure"></p>
+        <p class="problem">
+          <!-- Lucide triangle-alert, ISC -->
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span id="need-reconfigure-message"></span>
+        </p>
+        <p data-i18n="popupNeedReconfigureMessage"></p>
+        <div class="actions">
+          <button id="reconnect-button" class="button primary" type="button" data-i18n="[title]reconnectButtonTitle">
+            <!-- Lucide link, ISC -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span data-i18n="popupReconnectButton"></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="configured-not-associated">
+        <p data-i18n="popupConfiguredNotAssociated" data-i18n-placeholder="<span class='identifier' id='unassociated-identifier'></span>"></p>
+      </section>
+
+      <section id="configured-and-associated">
+        <p data-i18n="popupConfiguredAndAssociated" data-i18n-placeholder="<span class='identifier' id='associated-identifier'></span>"></p>
+        <div class="actions">
+          <button id="redetect-fields-button" class="button primary" type="button" data-i18n="[title]redetectButtonTitle">
+            <!-- Lucide scan-search, ISC -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></svg>
+            <span data-i18n="popupRedetectButton"></span>
+          </button>
+        </div>
+        <p id="iframe-detected" class="note" hidden>
+          <!-- Lucide info, ISC -->
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <span data-i18n="popupIframeDetected"></span>
+        </p>
+      </section>
+
+      <section id="error-encountered">
+        <p data-i18n="popupErrorEncountered"></p>
+        <p class="problem">
+          <!-- Lucide triangle-alert, ISC -->
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span id="error-message"></span>
+        </p>
+        <p data-i18n="popupGettingStartedText"></p>
+        <div class="actions">
+          <button id="reload-status-button" class="button primary" type="button" data-i18n="[title]reloadButtonTitle">
+            <!-- Lucide refresh-cw, ISC -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            <span data-i18n="popupReloadButton"></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="database-not-opened">
+        <p class="note">
+          <!-- Lucide lock, ISC -->
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span id="database-error-message"></span>
+        </p>
+        <div class="actions">
+          <button id="reopen-database-button" class="button primary" type="button" data-i18n="[title]reopenDatabaseButtonTitle">
+            <!-- Lucide lock-open, ISC -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+            <span data-i18n="popupReopenButton"></span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

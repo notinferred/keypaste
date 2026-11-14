@@ -46,8 +46,8 @@ public sealed class ProgramDispatchTests
     public void A_browser_starting_its_host_starts_the_relay()
     {
         string[] chrome = OperatingSystem.IsWindows()
-            ? ["chrome-extension://kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp/", "--parent-window=0"]
-            : ["chrome-extension://kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp/"];
+            ? ["chrome-extension://fipabobollckgdobkjfkkchimlphcicg/", "--parent-window=0"]
+            : ["chrome-extension://fipabobollckgdobkjfkkchimlphcicg/"];
         string[] firefox = [Path.Combine(Path.GetTempPath(), "com.keypaste.browser.json"), "browser@keypaste.invalid"];
 
         Assert.True(BrowserEntry.StartsRelay(chrome));

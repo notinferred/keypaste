@@ -1,0 +1,20 @@
+{
+  "name": "keypaste-browser",
+  "version": "1.0.0",
+  "description": "Fill your logins from keypaste",
+  "main": "build.js",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^20.14.10",
+    "eslint": "^9.39.1"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "lint": "npx eslint --no-warn-ignored src/**/*.js",
+    "tests": "npx playwright test"
+  },
+  "license": "GPL-3.0",
+  "private": true,
+  "homepage": "https://keypaste.com"
+}
