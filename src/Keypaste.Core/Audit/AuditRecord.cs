@@ -254,7 +254,8 @@ public sealed record AuditArgs
                 Prose(query.Text),
                 Prose(query.Host),
                 query.Kind is { } kind ? JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString()) : null,
-                string.IsNullOrWhiteSpace(query.RelatedTo) ? null : EntryNameSanitizer.Sanitize(query.RelatedTo, EntryLength).Text),
+                string.IsNullOrWhiteSpace(query.RelatedTo) ? null : EntryNameSanitizer.Sanitize(query.RelatedTo, EntryLength).Text,
+                string.IsNullOrWhiteSpace(query.Project) ? null : EntryNameSanitizer.Sanitize(query.Project, EntryLength).Text),
         };
     }
 
@@ -312,7 +313,8 @@ public sealed record AuditArgs
 /// <param name="Host">The host or URL searched for, sanitized as prose and capped, or null.</param>
 /// <param name="Kind">The kind searched for, in snake case, or null.</param>
 /// <param name="Related">The handle of the item searched around, sanitized and capped, or null.</param>
-public sealed record AuditQuery(string? Text, string? Host, string? Kind, string? Related);
+/// <param name="Project">The project searched within, sanitized and capped, or null.</param>
+public sealed record AuditQuery(string? Text, string? Host, string? Kind, string? Related, string? Project = null);
 
 /// <summary>One line of the audit trail: who asked for what, and what keypaste did about it.</summary>
 /// <remarks>

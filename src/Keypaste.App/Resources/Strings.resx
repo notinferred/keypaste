@@ -615,6 +615,10 @@
   <data name="NoAgentIsConnectedYet" xml:space="preserve"><value>No agent is connected yet. Add one to get started.</value></data>
   <data name="SetupPromptText" xml:space="preserve"><value>Connect yourself to keypaste, which keeps my credentials. In a terminal, run `keypaste setup`, then `keypaste doctor`, and follow what they say. Afterwards use keypaste's tools when you need a credential. Never ask me to paste a secret into this chat.</value></data>
   <data name="Usernames" xml:space="preserve"><value>Usernames</value></data>
+  <data name="HostsAndReferences" xml:space="preserve"><value>Hosts and references</value></data>
+  <data name="AgentsSeeHostsAndReferences" xml:space="preserve"><value>Agents see hosts and references</value></data>
+  <data name="AgentsSeeAnItemsHostFieldAndWhichItemsItReferences" xml:space="preserve"><value>A search shows agents the host in an item's Host field and which items its fields reference, and these then reach their AI tool's provider.</value></data>
+  <data name="CanSeeHostsAndReferences" xml:space="preserve"><value>Hosts in Host fields, and which items reference others.</value></data>
   <data name="Connection" xml:space="preserve"><value>Connection</value></data>
   <data name="EveryAIToolFoundIsConnected" xml:space="preserve"><value>Every AI tool found on this computer is already connected.</value></data>
   <data name="EveryAgentOnThisComputer" xml:space="preserve"><value>Every agent on this computer</value></data>

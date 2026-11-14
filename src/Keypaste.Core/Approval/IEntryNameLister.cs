@@ -35,12 +35,14 @@ public interface IEntryNameLister
     /// <summary>The entries inside an exposure as a search reads them, each as its reach shows it.</summary>
     /// <param name="exposure">What may be named.</param>
     /// <param name="showsUsername">Whether Settings shows agents each item's username.</param>
+    /// <param name="showsLinkedHosts">Whether Settings shows agents hosts and references.</param>
     /// <param name="index">The raw, unsanitized entries, as <see cref="AccessIndex.Admitted"/> admits them.</param>
     /// <param name="failure">Why there are none, when there are none.</param>
     /// <returns><see langword="true"/> when the vault could be read, even if nothing matched.</returns>
     bool TryIndex(
         EntryExposure exposure,
         bool showsUsername,
+        bool showsLinkedHosts,
         [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index,
         out CredentialFailure failure);
 }
@@ -138,6 +140,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
     public bool TryIndex(
         EntryExposure exposure,
         bool showsUsername,
+        bool showsLinkedHosts,
         [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index,
         out CredentialFailure failure)
     {
@@ -153,7 +156,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
 
         try
         {
-            var state = vault.ReadSavedIndex(showsUsername, out var entries);
+            var state = vault.ReadSavedIndex(showsUsername, showsLinkedHosts, out var entries);
 
             if (entries is null)
             {

@@ -222,6 +222,8 @@
                                    IsVisible="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
                         <TextBlock Name="CanSeeUsernamesOnRequest" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeUsernamesOnRequest}"
                                    IsVisible="{Binding !$parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsUsername}" />
+                        <TextBlock Name="CanSeeHostsAndReferences" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.CanSeeHostsAndReferences}"
+                                   IsVisible="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).RulesForEveryAgent.ShowsLinkedHosts}" />
                         <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.ChangeUsernamesUnderEveryOtherAgent}" IsVisible="{Binding !IsEveryOther}" />
                       </StackPanel>
                     </ctl:FieldRow>

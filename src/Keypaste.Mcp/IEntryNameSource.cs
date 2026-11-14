@@ -63,6 +63,9 @@ internal sealed record EntryNameListing(
     /// <summary>The items a search found with their links, unsanitized and unfiltered, best first. Empty unless available.</summary>
     public IReadOnlyList<FoundAccess> Found { get; init; } = [];
 
+    /// <summary>The projects the owner says the items found belong to, unsanitized and unfiltered. Empty unless available.</summary>
+    public IReadOnlyList<AccessProject> Projects { get; init; } = [];
+
     /// <summary>The unlocked session that answered, or null when none did.</summary>
     public string? Session { get; init; }
 
@@ -145,7 +148,11 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
 
         var (reply, outcome, refusal) = await approver
             .FindAsync(
-                new FindRequest(options.Exposure.Globs, query.Text, query.Host, query.Kind, query.RelatedTo) { ClientLabel = options.ClientLabel },
+                new FindRequest(options.Exposure.Globs, query.Text, query.Host, query.Kind, query.RelatedTo)
+                {
+                    ClientLabel = options.ClientLabel,
+                    Project = query.Project,
+                },
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -155,6 +162,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             ?? new EntryNameListing(VaultAvailability.Available, [], string.Empty, reply!.Complete)
             {
                 Found = reply.Found,
+                Projects = reply.Projects,
                 Session = reply.Session,
                 Recorded = true,
             };

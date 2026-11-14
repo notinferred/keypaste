@@ -64,7 +64,7 @@ public sealed class FindAccessToolTests
         Assert.False(tool.Annotations.DestructiveHint);
         Assert.False(tool.Annotations.OpenWorldHint);
         var properties = tool.InputSchema.GetProperty("properties");
-        Assert.Equal(["text", "host", "kind", "related_to"], properties.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["text", "host", "kind", "related_to", "project"], properties.EnumerateObject().Select(property => property.Name));
         Assert.Equal(
             Enum.GetValues<ItemKind>().Select(kind => JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString())),
             properties.GetProperty("kind").GetProperty("enum").EnumerateArray().Select(kind => kind.GetString()));
@@ -136,6 +136,67 @@ public sealed class FindAccessToolTests
 
         var row = Assert.Single(Rows(result));
         Assert.Equal(["env/prod/STRIPE_LIVE"], row.GetProperty("links").EnumerateArray().Select(link => link.GetProperty("path").GetString()));
+    }
+
+    /// <summary>A project is shown only when an item this bridge shows belongs to it, one line each above the rows.</summary>
+    [Fact]
+    public async Task TheProjectsOfWhatItShows_AreNamedAboveTheRows_AndOneKnownOnlyThroughAHiddenItemIsNot()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Found = Unlocked(
+            Item(_stripe, ["env:billing"]),
+            Item(new EntryName("servers/production", "root"), ["env:infra:prod"])) with
+        {
+            Projects = [new AccessProject("billing", ["dev", "prod"], 3), new AccessProject("infra", ["prod"], 1)],
+        };
+        harness.Approver.Start();
+        var client = await harness.StartAsync();
+
+        var result = await FindAsync(client, new() { ["project"] = "billing" });
+
+        var lines = Between(TextOf(result));
+        Assert.Equal("project billing: environments dev, prod; 3 items", lines[0]);
+        Assert.Equal(2, lines.Length);
+        Assert.DoesNotContain("infra", TextOf(result), StringComparison.Ordinal);
+        var project = Assert.Single(result.StructuredContent!.Value.GetProperty("projects").EnumerateArray());
+        Assert.Equal(("billing", 3), (project.GetProperty("name").GetString(), project.GetProperty("items").GetInt32()));
+        Assert.Equal("billing", Assert.Single(harness.Approver.SearchesReceived).Project);
+    }
+
+    /// <summary>A same account or a reference is believed only where this bridge reaches whole each item it was read from.</summary>
+    [Fact]
+    public async Task AccountAndReferenceLinks_AreKeptOnlyBetweenItemsTheBridgeReachesWhole()
+    {
+        var webhook = new EntryName("env/dev", "STRIPE_WEBHOOK");
+        var root = new EntryName("env/prod", "ROOT");
+        await using var harness = new McpHarness();
+        harness.Approver.Found = Unlocked(
+            Item(
+                _stripe,
+                [],
+                username: "dan",
+                links:
+                [
+                    new AccessLink(webhook, null, []) { SameAccount = true },
+                    new AccessLink(root, null, []) { References = true },
+                    new AccessLink(new EntryName("personal", "bank-login"), null, []) { SameAccount = true },
+                ]),
+            Item(new EntryName("env/dev", "NO_USER"), [], links: [new AccessLink(webhook, null, []) { SameAccount = true }]));
+        harness.Approver.Start();
+        var client = await harness.StartAsync();
+
+        var result = await FindAsync(client, new() { ["text"] = "stripe" });
+
+        var lines = Between(TextOf(result));
+        Assert.EndsWith(
+            $"links: {EntryHandle.For(webhook)} env/dev/STRIPE_WEBHOOK (same account), {EntryHandle.For(root)} env/prod/ROOT (references)",
+            lines[0],
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("bank-login", TextOf(result), StringComparison.Ordinal);
+        Assert.DoesNotContain("links:", lines[1], StringComparison.Ordinal);
+        var link = Rows(result)[0].GetProperty("links")[0];
+        Assert.True(link.GetProperty("same_account").GetBoolean());
+        Assert.False(link.GetProperty("references").GetBoolean());
     }
 
     [Fact]

@@ -52,6 +52,8 @@ public static class Strings
     public static string Agents => Manager.GetString("Agents", CultureInfo.CurrentUICulture)!;
     public static string AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL => Manager.GetString("AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL", CultureInfo.CurrentUICulture)!;
     public static string AgentsAndTheCLI => Manager.GetString("AgentsAndTheCLI", CultureInfo.CurrentUICulture)!;
+    public static string AgentsSeeAnItemsHostFieldAndWhichItemsItReferences => Manager.GetString("AgentsSeeAnItemsHostFieldAndWhichItemsItReferences", CultureInfo.CurrentUICulture)!;
+    public static string AgentsSeeHostsAndReferences => Manager.GetString("AgentsSeeHostsAndReferences", CultureInfo.CurrentUICulture)!;
     public static string AgentsSeeUsernames => Manager.GetString("AgentsSeeUsernames", CultureInfo.CurrentUICulture)!;
     public static string AgentsWithoutALabel => Manager.GetString("AgentsWithoutALabel", CultureInfo.CurrentUICulture)!;
     public static string All => Manager.GetString("All", CultureInfo.CurrentUICulture)!;
@@ -73,6 +75,7 @@ public static class Strings
     public static string BrowserFill => Manager.GetString("BrowserFill", CultureInfo.CurrentUICulture)!;
     public static string Browsers => Manager.GetString("Browsers", CultureInfo.CurrentUICulture)!;
     public static string CanSee => Manager.GetString("CanSee", CultureInfo.CurrentUICulture)!;
+    public static string CanSeeHostsAndReferences => Manager.GetString("CanSeeHostsAndReferences", CultureInfo.CurrentUICulture)!;
     public static string CanSeeUsernames => Manager.GetString("CanSeeUsernames", CultureInfo.CurrentUICulture)!;
     public static string CanSeeUsernamesOnRequest => Manager.GetString("CanSeeUsernamesOnRequest", CultureInfo.CurrentUICulture)!;
     public static string Cancel => Manager.GetString("Cancel", CultureInfo.CurrentUICulture)!;
@@ -260,6 +263,7 @@ public static class Strings
     public static string HidingTheAppIsNotMinimizing => Manager.GetString("HidingTheAppIsNotMinimizing", CultureInfo.CurrentUICulture)!;
     public static string History => Manager.GetString("History", CultureInfo.CurrentUICulture)!;
     public static string Host => Manager.GetString("Host", CultureInfo.CurrentUICulture)!;
+    public static string HostsAndReferences => Manager.GetString("HostsAndReferences", CultureInfo.CurrentUICulture)!;
     public static string Import => Manager.GetString("Import", CultureInfo.CurrentUICulture)!;
     public static string ImportADotEnvFile => Manager.GetString("ImportADotEnvFile", CultureInfo.CurrentUICulture)!;
     public static string ImportAKeePassDatabase => Manager.GetString("ImportAKeePassDatabase", CultureInfo.CurrentUICulture)!;

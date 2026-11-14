@@ -13,11 +13,12 @@ public sealed class AgentRulesFileTests : IDisposable
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public void An_absent_file_asks_about_every_value_shows_usernames_and_runs_nothing()
+    public void An_absent_file_asks_about_every_value_shows_usernames_hides_hosts_and_references_and_runs_nothing()
     {
         Assert.True(File.TryRead(out var rules, out var problem), problem);
 
         Assert.True(rules.ShowsUsername);
+        Assert.False(rules.ShowsLinkedHosts);
         Assert.All(FieldCategories.Ruled, category => Assert.Equal(CategoryRule.Ask, rules.RuleFor(category)));
         Assert.Equal(CategoryRule.Block, rules.RuleFor(FieldCategory.Passkey));
         Assert.False(rules.Runs("claude-code"));
@@ -26,7 +27,7 @@ public sealed class AgentRulesFileTests : IDisposable
     [Fact]
     public void What_is_written_reads_back_as_itself()
     {
-        var written = (AgentRules.Defaults with { ShowsUsername = false })
+        var written = (AgentRules.Defaults with { ShowsUsername = false, ShowsLinkedHosts = true })
             .Allowing(FieldCategory.ProjectVariable, confirmed: true)
             .With(FieldCategory.Notes, CategoryRule.Block)
             .WithRun("claude-code", run: true)
@@ -40,6 +41,7 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.Equal(("0123abcd", true), (file.Seal, file.Present));
         Assert.True(read.Runs("claude-code"));
         Assert.False(read.Runs("cursor"));
+        Assert.True(read.ShowsLinkedHosts);
         Assert.Equal(CategoryRule.Allow, read.RuleFor(FieldCategory.ProjectVariable));
     }
 
@@ -73,6 +75,7 @@ public sealed class AgentRulesFileTests : IDisposable
     [InlineData("[[pick]]\nagent = \"*\"\nname = \"Mail\"\nfield = \"password\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
     [InlineData("[[rules]]\npassword = \"sometimes\"\n", "line 2")]
     [InlineData("[[rules]]\npasskey = \"allow\"\n", "line 2")]
+    [InlineData("[[rules]]\nhosts_and_references = \"allow\"\n", "line 2")]
     [InlineData("[[client]]\nlabel = \"claude-code\"\n", "line 1")]
     [InlineData("[[agent]]\nname = \"claude-code\"\nrun = 2\n", "line 3")]
     [InlineData("[[agent]]\nname = \"a\"\n[[agent]]\nname = \"a\"\n", "same agent")]

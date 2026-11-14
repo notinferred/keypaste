@@ -176,10 +176,14 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     /// <summary>When set, a search's read of the vault fails this way, as a vault that no longer matches its file does.</summary>
     internal CredentialFailure? IndexFailure { get; set; }
 
+    /// <summary>Whether the last search was read with hosts and references shown, or null before any.</summary>
+    internal bool? IndexedWithLinkedHosts { get; private set; }
+
     /// <summary>Both entries are on stripe.com's site, so each links to the other wherever both are exposed.</summary>
-    public bool TryIndex(EntryExposure exposure, bool showsUsername, [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index, out CredentialFailure failure)
+    public bool TryIndex(EntryExposure exposure, bool showsUsername, bool showsLinkedHosts, [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index, out CredentialFailure failure)
     {
         index = null;
+        IndexedWithLinkedHosts = showsLinkedHosts;
 
         if (Locked || IndexFailure is not null)
         {

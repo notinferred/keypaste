@@ -90,6 +90,7 @@ internal sealed class FindRequestFrame(FindRequest request)
     public string? Host => request.Host;
     public int? ItemKind => (int?)request.Kind;
     public string? RelatedTo => request.RelatedTo;
+    public string? Project => request.Project;
 }
 
 internal sealed class FindReplyFrame(FindReply reply)
@@ -103,6 +104,14 @@ internal sealed class FindReplyFrame(FindReply reply)
     public int? Method => (int?)reply.Refusal;
     public bool Recorded => reply.Recorded;
     public IEnumerable<FoundRow> Found => FoundRow.Of(reply.Found);
+    public IEnumerable<FoundProjectRow> Projects => reply.Projects.Select(project => new FoundProjectRow(project));
+}
+
+internal sealed class FoundProjectRow(AccessProject project)
+{
+    public string Name => project.Name;
+    public IReadOnlyList<string> Environments => project.Environments;
+    public int Items => project.Items;
 }
 
 internal sealed class FoundRow(FoundAccess found)
@@ -125,6 +134,9 @@ internal sealed class LinkRow(AccessLink link)
     public string Title => link.Name.Title;
     public string? Site => link.Site;
     public IReadOnlyList<string> Projects => link.Projects;
+    public bool SameAccount => link.SameAccount;
+    public bool References => link.References;
+    public bool ReferencedBy => link.ReferencedBy;
 }
 
 internal sealed class AttachRequestFrame(AttachRequest request)

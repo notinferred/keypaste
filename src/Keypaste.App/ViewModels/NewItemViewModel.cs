@@ -123,7 +123,7 @@ internal sealed record FolderChoice(string Path, string Label, int Depth)
 internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 {
     /// <summary>The custom field a database's or a server's host is kept in.</summary>
-    internal const string HostField = "Host";
+    internal const string HostField = IndexedEntry.HostField;
 
     private const string _keyNameRule = "Name the key as a project reads it: capitals, digits and _, such as OPENAI_API_KEY.";
 

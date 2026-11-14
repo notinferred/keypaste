@@ -593,6 +593,7 @@ public sealed class AuditLog : IDisposable
                 WriteOptional(writer, "host", query.Host);
                 WriteOptional(writer, "kind", query.Kind);
                 WriteOptional(writer, "related", query.Related);
+                WriteOptional(writer, "project", query.Project);
                 writer.WriteEndObject();
             }
 

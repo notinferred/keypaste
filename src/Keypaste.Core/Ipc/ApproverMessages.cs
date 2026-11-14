@@ -49,7 +49,7 @@ public enum ApproverMessageKind
     /// <summary>An agent's request that the person save a value it never sees (F.79).</summary>
     Save = 20,
 
-    /// <summary>An agent's search of the items it may be shown, by text, host, kind or related item.</summary>
+    /// <summary>An agent's search of the items it may be shown, by text, host, kind, related item or project.</summary>
     Find = 21,
 }
 
@@ -193,8 +193,11 @@ public sealed record FindRequest(IReadOnlyList<string> Exposure, string? Text, s
     /// <summary>The session this connection attached to.</summary>
     public string Session { get; init; } = string.Empty;
 
+    /// <summary>A project the items found are members of, as the agent wrote it, or null.</summary>
+    public string? Project { get; init; }
+
     /// <summary>What the agent searches for.</summary>
-    public AccessQuery Query => new(Text, Host, Kind, RelatedTo);
+    public AccessQuery Query => new(Text, Host, Kind, RelatedTo, Project);
 }
 
 /// <summary>The items a search found inside the exposure, each with its links, or why there are none.</summary>
@@ -208,6 +211,9 @@ public sealed record FindReply(
     string Reason,
     bool Complete)
 {
+    /// <summary>The projects the items found are members of, raw, at most <see cref="AccessIndex.MaximumProjects"/>; empty when nothing was found.</summary>
+    public IReadOnlyList<AccessProject> Projects { get; init; } = [];
+
     /// <summary>The session that answered, or null when none did.</summary>
     public string? Session { get; init; }
 

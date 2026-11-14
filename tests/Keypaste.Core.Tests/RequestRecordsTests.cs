@@ -238,7 +238,7 @@ public sealed class RequestRecordsTests : IDisposable
     public void ASearchRefusal_KeepsTheQuerySanitizedAndCapped_InItsLine()
     {
         var hostile = "evil\nline‮" + new string('t', 400);
-        var query = new AccessQuery(hostile, "https://stripe.com/\u0007login", ItemKind.SecureNote, "k1_\r\nforged");
+        var query = new AccessQuery(hostile, "https://stripe.com/\u0007login", ItemKind.SecureNote, "k1_\r\nforged", "billing\nforged");
 
         using (var log = Open())
         {
@@ -257,6 +257,7 @@ public sealed class RequestRecordsTests : IDisposable
         Assert.DoesNotContain('\u0007', written.GetProperty("host").GetString()!);
         Assert.Equal("secure_note", written.GetProperty("kind").GetString());
         Assert.DoesNotContain('\n', written.GetProperty("related").GetString()!);
+        Assert.DoesNotContain('\n', written.GetProperty("project").GetString()!);
         Assert.Equal("refused", parsed.RootElement.GetProperty("reason").GetString());
         Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out _));
         Assert.Single(entries);

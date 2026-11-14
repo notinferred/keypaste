@@ -27,6 +27,14 @@
                         ToolTip.Tip="{x:Static res:Strings.AgentsAlwaysSeeAnItemsTitleGroupTagsAndURL}"
                         IsChecked="{Binding ShowsUsername}" />
         </ctl:FieldRow>
+        <ctl:FieldRow Label="{x:Static res:Strings.HostsAndReferences}">
+          <ToggleSwitch Name="ShowHostsAndReferences"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.Name="{x:Static res:Strings.AgentsSeeHostsAndReferences}"
+                        AutomationProperties.HelpText="{x:Static res:Strings.AgentsSeeAnItemsHostFieldAndWhichItemsItReferences}"
+                        ToolTip.Tip="{x:Static res:Strings.AgentsSeeAnItemsHostFieldAndWhichItemsItReferences}"
+                        IsChecked="{Binding ShowsLinkedHosts}" />
+        </ctl:FieldRow>
       </ctl:GroupedRows>
     </Border>
 

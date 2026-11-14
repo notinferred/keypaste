@@ -4,7 +4,7 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
-An agent can search the items it may see with `find_access`, by text, host, kind or a related item, and gets each item's handle, origin, username when Settings shows it and the items it shares a site or a project with, never a value.
+An agent can search the items it may see with `find_access`, by text, host, kind, project or a related item, and gets each item's handle, origin, username when Settings shows it, the items it shares a site, a project or an account with, and the projects the items found belong to with their environments, never a value. Hosts and references, a new switch beside Usernames in Agents, off by default, adds the host in a `Host` field and links between items one of whose fields references the other.
 
 On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command.
 

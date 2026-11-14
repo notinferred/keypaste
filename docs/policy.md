@@ -16,7 +16,7 @@ The 1.0.0 build does not read `policy.toml` and carries none of its rules over; 
 
 ## What an agent sees
 
-An agent sees each item that its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): the item's title, group, tags and URL, and its username unless Agents see usernames is turned off under Every other agent in Agents. That switch hides the username alone, so the agent then asks for it. Listing works either way.
+An agent sees each item that its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): the item's title, group, tags and URL, and its username unless Agents see usernames is turned off under Every other agent in Agents. That switch hides the username alone, so the agent then asks for it. Listing works either way. Hosts and references, beside it and off until you turn it on, lets a search also show the host in an item's Host field and which items reference another's fields; those then reach the agent's AI provider too.
 
 ## How each value is answered
 

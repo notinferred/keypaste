@@ -74,6 +74,25 @@ public sealed class AgentRulesViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Hosts_and_references_start_hidden_and_turn_on_and_off_at_once()
+    {
+        using var model = new AgentRulesViewModel(_authority);
+        Assert.False(model.ShowsLinkedHosts);
+
+        model.ShowsLinkedHosts = true;
+
+        Assert.True(_authority.TryRules(out var rules, out _));
+        Assert.True(rules.ShowsLinkedHosts);
+        Assert.Equal("Agents' searches show hosts and references.", model.Message);
+
+        model.ShowsLinkedHosts = false;
+
+        Assert.True(_authority.TryRules(out rules, out _));
+        Assert.False(rules.ShowsLinkedHosts);
+        Assert.False(model.IsIgnored);
+    }
+
+    [Fact]
     public void Rules_changed_outside_keypaste_are_said_to_be_ignored()
     {
         File.WriteAllText(KeypasteHome.AgentsPath(_fixture.Home), "[[rules]]\npassword = \"allow\"\n");

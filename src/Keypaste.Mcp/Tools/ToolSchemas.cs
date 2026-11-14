@@ -63,7 +63,13 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 256,
-              "description": "An item's handle; finds the items sharing a site or a project with it."
+              "description": "An item's handle; finds the items linked to it by a site, a project, an account or a reference."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "A project's name, exactly; finds its items in every environment."
             }
           },
           "minProperties": 1,
@@ -71,7 +77,7 @@ internal static class ToolSchemas
         }
         """;
 
-    /// <summary>The structured result of <c>find_access</c>: names, origins and usernames, never a value.</summary>
+    /// <summary>The structured result of <c>find_access</c>: names, origins, usernames, links and projects, never a value.</summary>
     internal const string FindOutputJson = """
         {
           "type": "object",
@@ -79,6 +85,18 @@ internal static class ToolSchemas
             "vault": { "type": "string" },
             "truncated": { "type": "boolean" },
             "count": { "type": "integer" },
+            "projects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "environments": { "type": "array", "items": { "type": "string" } },
+                  "items": { "type": "integer" }
+                },
+                "required": ["name", "environments", "items"]
+              }
+            },
             "items": {
               "type": "array",
               "items": {
@@ -100,9 +118,12 @@ internal static class ToolSchemas
                         "handle": { "type": "string" },
                         "path": { "type": "string" },
                         "site": { "type": ["string", "null"] },
-                        "projects": { "type": "array", "items": { "type": "string" } }
+                        "projects": { "type": "array", "items": { "type": "string" } },
+                        "same_account": { "type": "boolean" },
+                        "references": { "type": "boolean" },
+                        "referenced_by": { "type": "boolean" }
                       },
-                      "required": ["handle", "path", "site", "projects"]
+                      "required": ["handle", "path", "site", "projects", "same_account", "references", "referenced_by"]
                     }
                   },
                   "altered": { "type": "boolean" }
@@ -111,7 +132,7 @@ internal static class ToolSchemas
               }
             }
           },
-          "required": ["vault", "truncated", "count", "items"]
+          "required": ["vault", "truncated", "count", "projects", "items"]
         }
         """;
 

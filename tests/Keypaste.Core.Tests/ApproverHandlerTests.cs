@@ -382,6 +382,38 @@ public sealed class ApproverHandlerTests
     }
 
     [Fact]
+    public async Task ASearch_ReadsHostsAndReferences_OnlyWhileSettingsShowThem()
+    {
+        using var fixture = new ApproverFixture();
+
+        await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+        Assert.False(fixture.Source.IndexedWithLinkedHosts);
+
+        fixture.Rules.Rules = AgentRules.Defaults with { ShowsLinkedHosts = true };
+        await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+        Assert.True(fixture.Source.IndexedWithLinkedHosts);
+    }
+
+    /// <summary>A project's environments and count come from the members the exposure reaches, never from one it hides.</summary>
+    [Fact]
+    public async Task ASearch_NamesTheProjectsOfWhatItFound_FromExposedMembersAlone()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Source.Tagged[new EntryName("env/dev", "STRIPE_KEY")] = ["env:billing:prod"];
+        fixture.Source.Tagged[new EntryName("personal", "bank")] = ["env:billing:dev"];
+
+        var exposed = await fixture.Handler.FindAsync(Search(kind: ItemKind.ApiKey), "conn-1", Token);
+        var whole = await fixture.Handler.FindAsync(Search(kind: ItemKind.ApiKey, exposure: "**"), "conn-1", Token);
+        var byProject = await fixture.Handler.FindAsync(Search(exposure: "**") with { Project = "billing" }, "conn-1", Token);
+
+        Assert.Equal(("billing", "prod", 1), Shown(Assert.Single(exposed.Projects)));
+        Assert.Equal(("billing", "dev, prod", 2), Shown(Assert.Single(whole.Projects)));
+        Assert.Equal(2, byProject.Found.Count);
+    }
+
+    private static (string, string, int) Shown(AccessProject project) => (project.Name, string.Join(", ", project.Environments), project.Items);
+
+    [Fact]
     public async Task ASearch_IsRefused_WhenTheAgentRulesCannotBeRead()
     {
         using var fixture = new ApproverFixture();
@@ -405,7 +437,7 @@ public sealed class ApproverHandlerTests
         Assert.False(reply.VaultUnlocked);
         Assert.Empty(reply.Found);
         Assert.Equal(AuditMethod.InvalidRequest, reply.Refusal);
-        Assert.Equal("a search names text, a host, a kind or a related item", reply.Reason);
+        Assert.Equal("a search names text, a host, a kind, a related item or a project", reply.Reason);
     }
 
     [Fact]
