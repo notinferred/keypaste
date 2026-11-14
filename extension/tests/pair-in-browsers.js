@@ -2,13 +2,15 @@
 'use strict';
 
 // scripts/verify-extension-load.sh's browser half: tests/Keypaste.AppDriver holds the vault, turns the host on for Chromium and
-// Firefox, and arms pairing; each browser loads its unpacked build, its options page presses Connect, the driver allows the
-// pairing, and the page and Settings' list must both show it under that build.
+// Firefox, and arms pairing; each browser loads its unpacked build, its options page presses Connect once the extension has
+// connected, the driver allows the pairing, and the page and Settings' list must both show it under that build. On a failure
+// it prints what each browser and keypaste left: the extension's status, page and console, the host manifest and the logs.
 //
 // Usage: pair-in-browsers.js <root> <driver> <keypaste> <vault> <chromium build> <firefox build> <firefox> <geckodriver> <chrome id>
 
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 const readline = require('node:readline');
@@ -32,6 +34,55 @@ const { KEYPASTE_DRIVER_PASSWORD: password, ...inherited } = process.env;
 const browserEnvironment = { ...inherited, HOME: home, XDG_CONFIG_HOME: configHome, KEYPASTE_HOME: keypasteHome, KEYPASTE_VAULT: vault };
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const pause = () => new Promise((resolve) => setTimeout(resolve, 200));
+
+const readOr = function(file) {
+    try {
+        return fs.readFileSync(file, 'utf8');
+    } catch (error) {
+        return `(${error.message})`;
+    }
+};
+
+const listOr = function(directory) {
+    try {
+        return fs.readdirSync(directory).join('\n');
+    } catch (error) {
+        return `(${error.message})`;
+    }
+};
+
+// What a failed pairing leaves to read, each part in its own collapsed group of the job's log.
+const report = function(sections) {
+    for (const [ title, text ] of sections) {
+        console.error(`::group::${title}`);
+        console.error(text || '(empty)');
+        console.error('::endgroup::');
+    }
+};
+
+const hostSections = (manifestDirectory) => [
+    [ `host manifests in ${manifestDirectory}`, listOr(manifestDirectory) ],
+    [ 'com.keypaste.browser.json', readOr(path.join(manifestDirectory, 'com.keypaste.browser.json')) ],
+    [ 'the owner\'s audit', readOr(path.join(keypasteHome, 'audit.jsonl')) ],
+];
+
+// The extension connects to keypaste as it starts, and until it has, Connect gives up without asking keypaste anything.
+const waitConnected = function(status, seen) {
+    return withinWait((async () => {
+        for (;;) {
+            seen.status = await status();
+            if (seen.status?.keypasteAvailable && !seen.status.databaseClosed) {
+                return;
+            }
+            await pause();
+        }
+    })(), 'the extension to connect to keypaste');
+};
+
+// The background's own answer to get_status, without asking keypaste again.
+const STATUS_ACTION = { action: 'get_status', args: [ true ] };
 
 const withinWait = function(promise, what) {
     let timer;
@@ -128,33 +179,99 @@ const requirePaired = async function(app, build, name, shown) {
     console.log(`paired ${build} as ${name}`);
 };
 
+// Chromium started here rather than by Playwright, so its standard error, where the hosts it starts write theirs, reaches a file.
+const launchChromium = async function(log) {
+    const child = spawn(chromium.executablePath(), [
+        '--headless',
+        '--no-sandbox',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--password-store=basic',
+        '--use-mock-keychain',
+        '--enable-logging=stderr',
+        '--v=0',
+        '--remote-debugging-port=0',
+        // Chromium on Linux reads a user's host manifests from <user data dir>/NativeMessagingHosts, where the driver set Chromium up.
+        `--user-data-dir=${path.join(configHome, 'chromium')}`,
+        `--disable-extensions-except=${chromiumBuild}`,
+        `--load-extension=${chromiumBuild}`,
+        'about:blank',
+    ], { env: browserEnvironment, stdio: [ 'ignore', 'pipe', 'pipe' ] });
+    const exited = new Promise((resolve) => child.on('exit', resolve));
+    const out = fs.createWriteStream(log);
+    child.stdout.pipe(out, { end: false });
+    const stop = async () => {
+        child.kill();
+        await withinWait(exited, 'Chromium to exit');
+        await new Promise((resolve) => out.end(resolve));
+    };
+    try {
+        const endpoint = await withinWait(new Promise((resolve, reject) => {
+            readline.createInterface({ input: child.stderr }).on('line', (line) => {
+                out.write(line + '\n');
+                const listening = /DevTools listening on (ws:\/\/\S+)/.exec(line);
+                if (listening) {
+                    resolve(listening[1]);
+                }
+            });
+            exited.then((code) => reject(new Error(`Chromium exited with ${code} before it listened for DevTools`)));
+        }), 'Chromium to listen for DevTools');
+        const browser = await chromium.connectOverCDP(endpoint);
+        return { context: browser.contexts()[0], stop: async () => {
+            await browser.close();
+            await stop();
+        } };
+    } catch (error) {
+        await stop();
+        throw error;
+    }
+};
+
 const pairChromium = async function(app) {
     const build = `keypaste's extension from the Chrome Web Store (${chromeId})`;
-    // Chromium on Linux reads a user's host manifests from <user data dir>/NativeMessagingHosts, where the driver set Chromium up.
-    const context = await chromium.launchPersistentContext(path.join(configHome, 'chromium'), {
-        channel: 'chromium',
-        headless: true,
-        env: browserEnvironment,
-        ignoreDefaultArgs: [ '--disable-extensions' ],
-        args: [ `--disable-extensions-except=${chromiumBuild}`, `--load-extension=${chromiumBuild}` ],
-    });
+    const log = path.join(root, 'chromium.log');
+    const consoles = [];
+    const seen = {};
+    let page;
+    let stop = async () => {};
     try {
+        const launched = await launchChromium(log);
+        stop = launched.stop;
+        const { context } = launched;
+        const listen = (worker) => worker.on('console', (message) => consoles.push(`worker ${message.type()}: ${message.text()}`));
+        context.on('serviceworker', listen);
+        context.serviceWorkers().forEach(listen);
         const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker', { timeout: WAIT_MS });
         const id = new URL(worker.url()).host;
         if (id !== chromeId) {
             throw new Error(`Chromium loaded the extension as ${id}, not ${chromeId}`);
         }
 
-        const page = await context.newPage();
+        page = await context.newPage();
+        page.on('console', (message) => consoles.push(`page ${message.type()}: ${message.text()}`));
+        page.on('pageerror', (error) => consoles.push(`page error: ${error.message}`));
         await page.goto(`chrome-extension://${id}/options/options.html`);
         // The page shows both lines until it has read the pairing.
         await page.locator('#paired').waitFor({ state: 'hidden', timeout: WAIT_MS });
+        await waitConnected(() => page.evaluate((message) => browser.runtime.sendMessage(message), STATUS_ACTION), seen);
         const name = await pair(app, build, () => page.locator('#connect-button').click());
         await page.locator('#paired').waitFor({ state: 'visible', timeout: WAIT_MS });
         await requirePaired(app, build, name, (await page.locator('#paired').textContent()).trim());
-    } finally {
-        await context.close();
+    } catch (error) {
+        const shown = page ? await page.locator('body').innerText().catch((reason) => `(${reason.message})`) : '(no page)';
+        await stop().catch((reason) => console.error(`closing Chromium: ${reason.message}`));
+        report([
+            [ 'Chromium: the extension\'s last status', JSON.stringify(seen.status) ],
+            [ 'Chromium: the options page', shown ],
+            [ 'Chromium: the extension\'s console', consoles.join('\n') ],
+            ...hostSections(path.join(configHome, 'chromium', 'NativeMessagingHosts')),
+            [ `Chromium's log, with keypaste's standard error (${log})`, readOr(log) ],
+        ]);
+        throw error;
     }
+    await stop();
 };
 
 const freePort = () => new Promise((resolve, reject) => {
@@ -168,9 +285,13 @@ const freePort = () => new Promise((resolve, reject) => {
 
 // The W3C WebDriver commands geckodriver answers, plus its own add-on install.
 class Gecko {
-    static async start() {
+    // geckodriver's log, with Firefox's standard output and error, where the hosts it starts write theirs, goes to log.
+    static async start(log) {
         const port = await freePort();
-        const gecko = new Gecko(port, spawn(geckodriverPath, [ '--port', String(port), '--log', 'warn' ], { env: browserEnvironment, stdio: 'inherit' }));
+        const output = fs.openSync(log, 'w');
+        const child = spawn(geckodriverPath, [ '--port', String(port), '--log', 'info' ], { env: browserEnvironment, stdio: [ 'ignore', output, output ] });
+        fs.closeSync(output);
+        const gecko = new Gecko(port, child);
         await withinWait((async () => {
             for (;;) {
                 try {
@@ -219,7 +340,12 @@ class Gecko {
                         binary: firefoxBinary,
                         args: [ '-headless' ],
                         // Fixes the add-on's internal UUID, which names its pages' moz-extension:// origin.
-                        prefs: { 'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ID]: uuid }) },
+                        prefs: {
+                            'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ID]: uuid }),
+                            // The add-on's console, into Firefox's standard output.
+                            'devtools.console.stdout.chrome': true,
+                            'devtools.console.stdout.content': true,
+                        },
                     },
                 },
             },
@@ -243,6 +369,14 @@ class Gecko {
         })(), `${selector} to ${displayed ? 'show' : 'hide'}`);
     }
 
+    // The options page's own browser.runtime.sendMessage.
+    async ask(message) {
+        return this.session('POST', '/execute/async', {
+            script: 'const done = arguments[1]; browser.runtime.sendMessage(arguments[0]).then(done, (error) => done({ failed: String(error) }));',
+            args: [ message ],
+        });
+    }
+
     async stop() {
         if (this.id) {
             await this.session('DELETE', '').catch((error) => console.error(`closing Firefox: ${error.message}`));
@@ -256,8 +390,11 @@ const pairFirefox = async function(app) {
     const build = `keypaste's extension from Firefox Add-ons (${FIREFOX_ID})`;
     const uuid = crypto.randomUUID();
     // Firefox on Linux reads a user's host manifests from ~/.mozilla/native-messaging-hosts, under the HOME the driver set Firefox up in.
-    const gecko = await Gecko.start();
+    const log = path.join(root, 'geckodriver.log');
+    const seen = {};
+    let gecko;
     try {
+        gecko = await Gecko.start(log);
         await gecko.open(uuid);
         const installed = await gecko.session('POST', '/moz/addon/install', { path: firefoxBuild, temporary: true });
         if (installed !== FIREFOX_ID) {
@@ -266,13 +403,25 @@ const pairFirefox = async function(app) {
 
         await gecko.session('POST', '/url', { url: `moz-extension://${uuid}/options/options.html` });
         await gecko.waitDisplayed('#paired', false);
+        await waitConnected(() => gecko.ask(STATUS_ACTION), seen);
         const connect = await gecko.element('#connect-button');
         const name = await pair(app, build, () => gecko.session('POST', `/element/${connect}/click`, {}));
         const paired = await gecko.waitDisplayed('#paired');
         await requirePaired(app, build, name, (await gecko.session('GET', `/element/${paired}/text`)).trim());
-    } finally {
-        await gecko.stop();
+    } catch (error) {
+        const shown = gecko?.id
+            ? await gecko.session('POST', '/execute/sync', { script: 'return document.body.innerText;', args: [] }).catch((reason) => `(${reason.message})`)
+            : '(no session)';
+        await gecko?.stop().catch((reason) => console.error(`closing Firefox: ${reason.message}`));
+        report([
+            [ 'Firefox: the extension\'s last status', JSON.stringify(seen.status) ],
+            [ 'Firefox: the options page', shown ],
+            ...hostSections(path.join(home, '.mozilla', 'native-messaging-hosts')),
+            [ `geckodriver's and Firefox's log, with the add-on's console and keypaste's standard error (${log})`, readOr(log) ],
+        ]);
+        throw error;
     }
+    await gecko.stop();
 };
 
 (async () => {
