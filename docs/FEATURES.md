@@ -74,7 +74,7 @@ Every row is Implemented (unreleased) and in the internal packages; none is Publ
 | Projects screen: every key against every environment, import and export, and Run or Open terminal with the set after a confirmation naming the command, directory and variables | Opens only Terminal on macOS, `cmd.exe` on Windows and the first Linux terminal emulator found; locking does not stop a terminal already started |
 | Agents: Add an agent, connections, each agent's settings and kept answers, the waiting request, and Activity, the log of what agents and tokens asked for | |
 | Prompt window for credentials, attachments, saves, runs and terminal edits | |
-| Share links, scoped tokens and browser fill: turn keypaste on for each browser and pair keypaste's own extension with the vault from Settings | keypaste's extension is not built or published yet (8.1f, 8.1g), so no real browser has paired |
+| Share links, scoped tokens and browser fill: turn keypaste on for each browser and pair keypaste's own extension with the vault from Settings | keypaste's extension is built and pairs in Chromium and Firefox under test IDs in CI, and is not in any store yet (8.1g) |
 | Import from another app: KeePass files and other password managers' exports, with a plan you edit | Checked in headless tests, not observed in an installed app |
 | System notifications for a request while keypaste is in the background | No person has seen one; macOS posts them only from a signed build, which does not exist yet |
 | Drag and drop, and Open With for `.kdbx` | No real drag or Open With has been run |

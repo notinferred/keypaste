@@ -680,7 +680,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Status.** Implemented (unreleased); not in v0.3.0. Fill is not implemented yet: the owner refuses every fill (planned, step 8.3a2).
 
-**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. Unverified: no real browser has started the relay, and keypaste's extension does not exist yet (planned, steps 8.1f and 8.3a3).
+**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. `verify-extension-load.sh` has Chromium and Firefox start the relay for keypaste's extension and pair it. Unverified: a fill in a real browser (planned, step 8.3a3).
 
 ### T-49 — Another program answers keypaste's host name
 

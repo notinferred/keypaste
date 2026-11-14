@@ -1,0 +1,101 @@
+.kpxcAutocomplete-container {
+    background-color: var(--kp-card);
+    border: 1px solid var(--kp-line);
+    border-radius: 10px;
+    box-shadow: var(--kp-shadow-popover);
+    box-sizing: border-box;
+    color: var(--kp-text);
+    display: none;
+    font: 400 13px/1.5 var(--kp-sans);
+    font-style: normal;
+    letter-spacing: normal;
+    min-width: 16em;
+    overflow: hidden;
+    padding: 4px;
+    position: absolute !important;
+    text-align: start;
+    text-transform: none;
+    word-spacing: normal;
+    z-index: 2147483646;
+}
+
+.kpxcAutocomplete-container--visible {
+    display: block;
+}
+
+.kpxcAutocomplete-items {
+    max-height: 15rem;
+    overflow-y: auto;
+}
+
+.kpxcAutocomplete-item {
+    border-radius: 7px;
+    padding: 6px 8px 6px 10px;
+}
+
+.kpxcAutocomplete-item__header {
+    align-items: baseline;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.kpxcAutocomplete-item__label,
+.kpxcAutocomplete-item__group,
+.kpxcAutocomplete-item__value,
+.kpxcAutocomplete-item__value--last {
+    overflow: hidden;
+    pointer-events: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kpxcAutocomplete-item__label {
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.kpxcAutocomplete-item__group {
+    color: var(--kp-text-muted);
+    flex: none;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    max-width: 40%;
+    text-transform: uppercase;
+}
+
+.kpxcAutocomplete-item__value,
+.kpxcAutocomplete-item__value--last {
+    color: var(--kp-text-muted);
+    font-size: 12px;
+}
+
+.kpxcAutocomplete-item--active {
+    background-color: var(--kp-amber-tint);
+    box-shadow: inset 2px 0 0 var(--kp-amber-mark);
+}
+
+.kpxcAutocomplete-item--active .kpxcAutocomplete-item__group,
+.kpxcAutocomplete-item--active .kpxcAutocomplete-item__value,
+.kpxcAutocomplete-item--active .kpxcAutocomplete-item__value--last {
+    color: var(--kp-text-secondary);
+}
+
+.kpxcAutocomplete-container footer {
+    border-top: 1px solid var(--kp-line-subtle);
+    color: var(--kp-text-muted);
+    font-size: 12px;
+    margin-top: 4px;
+    padding: 4px 8px 0;
+}
+
+.kpxcAutocomplete-announcer {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}

@@ -78,6 +78,12 @@ public sealed class BrowserHosts
         ArgumentNullException.ThrowIfNull(places);
         ArgumentNullException.ThrowIfNull(program);
 
+        // A browser starts a host only from an absolute path.
+        if (!Path.IsPathFullyQualified(program.Path))
+        {
+            throw new ArgumentException($"{program.Path} is not an absolute path", nameof(program));
+        }
+
         if (places.Platform == McpClientPlatform.Windows && registry is null)
         {
             throw new ArgumentException("Windows reads manifests through the registry", nameof(registry));

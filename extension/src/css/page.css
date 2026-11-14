@@ -1,0 +1,184 @@
+@font-face {
+    font-family: "Instrument Sans";
+    font-weight: 400;
+    src: url("../fonts/InstrumentSans-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "Instrument Sans";
+    font-weight: 500;
+    src: url("../fonts/InstrumentSans-Medium.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "Instrument Sans";
+    font-weight: 600;
+    src: url("../fonts/InstrumentSans-SemiBold.ttf") format("truetype");
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--kp-ground);
+    color: var(--kp-text);
+    font-family: var(--kp-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+h1,
+h2,
+p {
+    margin: 0;
+}
+
+.icon {
+    fill: none;
+    flex: none;
+    height: 14px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    width: 14px;
+}
+
+.button {
+    align-items: center;
+    background: var(--kp-secondary);
+    border: 0;
+    border-radius: 7px;
+    color: var(--kp-text);
+    display: inline-flex;
+    font: 500 13px/1.5 var(--kp-sans);
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 12px;
+    transition: background-color 120ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.button:hover {
+    background: var(--kp-secondary-hover);
+}
+
+.button .icon {
+    color: var(--kp-text-muted);
+}
+
+.button.primary {
+    background: var(--kp-amber);
+    color: var(--kp-on-amber);
+    font-weight: 600;
+}
+
+.button.primary .icon {
+    color: var(--kp-on-amber);
+}
+
+.button.primary:hover {
+    background: var(--kp-amber-hover);
+}
+
+.button.primary:active {
+    background: var(--kp-amber-press);
+}
+
+.button.quiet {
+    background: transparent;
+    justify-content: center;
+    min-width: 28px;
+    padding: 4px;
+}
+
+.button.quiet:hover {
+    background: var(--kp-hover);
+}
+
+.button.quiet .icon {
+    height: 16px;
+    width: 16px;
+}
+
+:focus-visible {
+    outline: 2px solid var(--kp-amber-mark);
+    outline-offset: 2px;
+}
+
+.field {
+    background: var(--kp-panel);
+    border: 1px solid var(--kp-edge);
+    border-radius: 6px;
+    color: var(--kp-text);
+    font: 400 14px/1.5 var(--kp-sans);
+    padding: 4px 8px;
+    width: 100%;
+}
+
+.field:hover {
+    border-color: var(--kp-edge-hover);
+}
+
+.field:focus,
+.field:focus-visible {
+    border-color: var(--kp-amber-mark);
+    box-shadow: 0 0 0 3px var(--kp-amber-glow);
+    outline: none;
+}
+
+.label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.helper {
+    color: var(--kp-text-muted);
+    font-size: 12px;
+}
+
+.identifier {
+    font-family: var(--kp-mono);
+    font-size: 13px;
+}
+
+.problem,
+.note {
+    align-items: flex-start;
+    border-radius: 7px;
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+.problem {
+    background: var(--kp-danger-tint);
+}
+
+.problem .icon {
+    color: var(--kp-danger);
+    margin-top: 3px;
+}
+
+.note {
+    background: var(--kp-hover);
+}
+
+.note .icon {
+    color: var(--kp-text-muted);
+    margin-top: 3px;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+[hidden] {
+    display: none !important;
+}

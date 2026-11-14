@@ -20,9 +20,9 @@ namespace Keypaste.Processes.Tests;
 /// </remarks>
 public sealed class BrowserHostTests
 {
-    private const string _chrome = "kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp";
-    private const string _edge = "pkpkpkpkpkpkpkpkpkpkpkpkpkpkpkpk";
-    private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (kpkpkpkpkpkpkpkpkpkpkpkpkpkpkpkp)";
+    private const string _chrome = "fipabobollckgdobkjfkkchimlphcicg";
+    private const string _edge = "iobkkhmaklkkeiadigbohfaplldmaogd";
+    private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)";
     private const string _notice = "A browser asked to pair. To pair it, press Pair a browser.";
     private const int _notFound = 20;
     private static readonly string[] _browsers = ["chrome", "chromium", "edge", "brave", "firefox"];
