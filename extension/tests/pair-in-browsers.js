@@ -99,6 +99,8 @@ class HeldApp {
         this.process = spawn(driverPath, [ 'hold', vault ], {
             env: {
                 ...inherited,
+                // The vault's pipe is named from the person's profile, so the owner and the browser's keypaste share one HOME.
+                HOME: home,
                 KEYPASTE_HOME: keypasteHome,
                 KEYPASTE_DRIVER_PASSWORD: password,
                 KEYPASTE_DRIVER_BROWSER_PROGRAM: keypaste,
