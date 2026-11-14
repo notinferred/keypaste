@@ -354,8 +354,9 @@ class Gecko {
     async waitDisplayed(selector, displayed = true) {
         return withinWait((async () => {
             for (;;) {
-                const element = await this.element(selector);
-                if (await this.session('GET', `/element/${element}/displayed`) === displayed) {
+                // The page may not have built the element yet, which WebDriver answers as no such element.
+                const element = await this.element(selector).catch(() => null);
+                if (element && await this.session('GET', `/element/${element}/displayed`) === displayed) {
                     return element;
                 }
                 await new Promise((resolve) => setTimeout(resolve, 200));
