@@ -343,7 +343,8 @@ class Gecko {
                     browserName: 'firefox',
                     'moz:firefoxOptions': {
                         binary: firefoxBinary,
-                        args: [ '-headless' ],
+                        // Lets the session load the add-on's page from Firefox's own chrome, which WebDriver's navigation refuses.
+                        args: [ '-headless', '-remote-allow-system-access' ],
                         // Fixes the add-on's internal UUID, which names its pages' moz-extension:// origin.
                         prefs: {
                             'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ID]: uuid }),
@@ -372,6 +373,21 @@ class Gecko {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             }
         })(), `${selector} to ${displayed ? 'show' : 'hide'}`);
+    }
+
+    // WebDriver navigates only to web pages, so the tab loads the add-on's page as Firefox's own chrome would.
+    async openExtensionPage(url) {
+        await this.session('POST', '/moz/context', { context: 'chrome' });
+        await this.session('POST', '/execute/sync', {
+            script: 'gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]), { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });',
+            args: [ url ],
+        });
+        await this.session('POST', '/moz/context', { context: 'content' });
+        await withinWait((async () => {
+            while (await this.session('GET', '/url') !== url) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+            }
+        })(), `Firefox to show ${url}`);
     }
 
     // The options page's own browser.runtime.sendMessage.
@@ -406,7 +422,7 @@ const pairFirefox = async function(app) {
             throw new Error(`Firefox installed the add-on as ${installed}, not ${FIREFOX_ID}`);
         }
 
-        await gecko.session('POST', '/url', { url: `moz-extension://${uuid}/options/options.html` });
+        await gecko.openExtensionPage(`moz-extension://${uuid}/options/options.html`);
         await gecko.waitDisplayed('#paired', false);
         await waitConnected(() => gecko.ask(STATUS_ACTION), seen);
         const connect = await gecko.element('#connect-button');
