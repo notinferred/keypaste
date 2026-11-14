@@ -90,6 +90,11 @@ keepass.associate = async function(tab) {
     }
 
     try {
+        // Connect pressed while the browser is still starting keypaste waits for it rather than giving up unasked.
+        if (!keepass.isConnected || !keepass.serverPublicKey) {
+            await keepass.reconnect(tab);
+        }
+
         await keepass.getDatabaseHash(tab);
         if (keepass.isDatabaseClosed || !keepass.isKeypasteAvailable) {
             return AssociatedAction.NOT_ASSOCIATED;
@@ -194,8 +199,9 @@ keepass.getDatabaseHash = async function(tab, args = []) {
         return '';
     }
 
-    if (!keepass.serverPublicKey) {
-        keepass.changePublicKeys(tab);
+    // A request sealed before the key exchange has answered would go to keypaste with no key to open it.
+    if (!keepass.serverPublicKey && !await keepass.changePublicKeys(tab)) {
+        return '';
     }
 
     const [ enableTimeout = false, triggerUnlock = false ] = args;

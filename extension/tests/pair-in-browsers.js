@@ -35,8 +35,6 @@ const browserEnvironment = { ...inherited, HOME: home, XDG_CONFIG_HOME: configHo
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const pause = () => new Promise((resolve) => setTimeout(resolve, 200));
-
 const readOr = function(file) {
     try {
         return fs.readFileSync(file, 'utf8');
@@ -68,18 +66,8 @@ const hostSections = (manifestDirectory) => [
     [ 'the owner\'s audit', readOr(path.join(keypasteHome, 'audit.jsonl')) ],
 ];
 
-// The extension connects to keypaste as it starts, and until it has, Connect gives up without asking keypaste anything.
-const waitConnected = function(status, seen) {
-    return withinWait((async () => {
-        for (;;) {
-            seen.status = await status();
-            if (seen.status?.keypasteAvailable && !seen.status.databaseClosed) {
-                return;
-            }
-            await pause();
-        }
-    })(), 'the extension to connect to keypaste');
-};
+// The extension's own state, read for a failure's report.
+const statusOr = (status) => status().then(JSON.stringify, (reason) => `(${reason.message})`);
 
 // The background's own answer to get_status, without asking keypaste again.
 const STATUS_ACTION = { action: 'get_status', args: [ true ] };
@@ -235,7 +223,6 @@ const pairChromium = async function(app) {
     const build = `keypaste's extension from the Chrome Web Store (${chromeId})`;
     const log = path.join(root, 'chromium.log');
     const consoles = [];
-    const seen = {};
     let page;
     let stop = async () => {};
     try {
@@ -260,15 +247,16 @@ const pairChromium = async function(app) {
         await page.goto(`chrome-extension://${id}/options/options.html`);
         // The page shows both lines until it has read the pairing.
         await page.locator('#paired').waitFor({ state: 'hidden', timeout: WAIT_MS });
-        await waitConnected(() => page.evaluate((message) => browser.runtime.sendMessage(message), STATUS_ACTION), seen);
+        // Connect is pressed at once, while the extension may still be starting keypaste, as a person might.
         const name = await pair(app, build, () => page.locator('#connect-button').click());
         await page.locator('#paired').waitFor({ state: 'visible', timeout: WAIT_MS });
         await requirePaired(app, build, name, (await page.locator('#paired').textContent()).trim());
     } catch (error) {
         const shown = page ? await page.locator('body').innerText().catch((reason) => `(${reason.message})`) : '(no page)';
+        const status = page ? await statusOr(() => page.evaluate((message) => browser.runtime.sendMessage(message), STATUS_ACTION)) : '(no page)';
         await stop().catch((reason) => console.error(`closing Chromium: ${reason.message}`));
         report([
-            [ 'Chromium: the extension\'s last status', JSON.stringify(seen.status) ],
+            [ 'Chromium: the extension\'s status', status ],
             [ 'Chromium: the options page', shown ],
             [ 'Chromium: the extension\'s console', consoles.join('\n') ],
             ...hostSections(path.join(configHome, 'chromium', 'NativeMessagingHosts')),
@@ -412,7 +400,6 @@ const pairFirefox = async function(app) {
     const uuid = crypto.randomUUID();
     // Firefox on Linux reads a user's host manifests from ~/.mozilla/native-messaging-hosts, under the HOME the driver set Firefox up in.
     const log = path.join(root, 'geckodriver.log');
-    const seen = {};
     let gecko;
     try {
         gecko = await Gecko.start(log);
@@ -424,7 +411,6 @@ const pairFirefox = async function(app) {
 
         await gecko.openExtensionPage(`moz-extension://${uuid}/options/options.html`);
         await gecko.waitDisplayed('#paired', false);
-        await waitConnected(() => gecko.ask(STATUS_ACTION), seen);
         const connect = await gecko.element('#connect-button');
         const name = await pair(app, build, () => gecko.session('POST', `/element/${connect}/click`, {}));
         const paired = await gecko.waitDisplayed('#paired');
@@ -433,9 +419,10 @@ const pairFirefox = async function(app) {
         const shown = gecko?.id
             ? await gecko.session('POST', '/execute/sync', { script: 'return document.body.innerText;', args: [] }).catch((reason) => `(${reason.message})`)
             : '(no session)';
+        const status = gecko?.id ? await statusOr(() => gecko.ask(STATUS_ACTION)) : '(no session)';
         await gecko?.stop().catch((reason) => console.error(`closing Firefox: ${reason.message}`));
         report([
-            [ 'Firefox: the extension\'s last status', JSON.stringify(seen.status) ],
+            [ 'Firefox: the extension\'s status', status ],
             [ 'Firefox: the options page', shown ],
             ...hostSections(path.join(home, '.mozilla', 'native-messaging-hosts')),
             [ `geckodriver's and Firefox's log, with the add-on's console and keypaste's standard error (${log})`, readOr(log) ],
