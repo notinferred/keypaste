@@ -144,6 +144,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 - The log is append-only within keypaste and hash-chained; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
 - The vault's owner signs the chain with a key the vault holds every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so a rewrite before the last one needs the unlocked vault (unreleased) [T-5].
+- Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
 - Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.
 - Limit: lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
 - Limit: the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)) and can hold sensitive agent-written text.

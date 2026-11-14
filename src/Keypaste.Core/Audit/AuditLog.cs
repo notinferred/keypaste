@@ -71,8 +71,8 @@ public sealed class AuditLog : IDisposable
     /// the file (THREATS.md assumption 1): the writer reads <see cref="TailWindowBytes"/> back to find
     /// the line a record links to, and the verifier buffers no line past four times the cap. It
     /// matches the 64 KiB the owner reads a request under, which lets a run's line name about a
-    /// thousand items (D-0454). A record over it is rewritten without the agent's reason, then
-    /// without a run's command head, and refused if it still does not fit. The chain spends
+    /// thousand items. A record over it is rewritten without the agent's reason, then
+    /// without a run's command head, then without its caller, and refused if it still does not fit. The chain spends
     /// <see cref="AuditChain.ChainOverheadBytes"/> of it.
     /// </remarks>
     public const int MaximumRecordBytes = 64 * 1024;
@@ -308,6 +308,11 @@ public sealed class AuditLog : IDisposable
                 if (bytes.Length > MaximumRecordBytes && record.Command is not null)
                 {
                     bytes = Compose(record with { Command = null }, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
+                }
+
+                if (bytes.Length > MaximumRecordBytes && record.Caller is not null)
+                {
+                    bytes = Compose(record with { Command = null, Caller = null }, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
                 }
 
                 if (bytes.Length > MaximumRecordBytes)
@@ -577,6 +582,20 @@ public sealed class AuditLog : IDisposable
             writer.WriteString("transport", Transport);
             writer.WriteEndObject();
 
+            if (record.Caller is { } caller)
+            {
+                writer.WriteStartObject("caller");
+                if (caller.Pid is { } pid)
+                {
+                    writer.WriteNumber("pid", pid);
+                }
+
+                WriteOptional(writer, "path", caller.Path);
+                WriteOptional(writer, "signature", caller.Signature is { } signature ? Wire(signature) : null);
+                WriteOptional(writer, "signer", caller.Signer);
+                writer.WriteEndObject();
+            }
+
             writer.WriteString("tool", record.Tool);
 
             writer.WriteStartObject("args");
@@ -721,6 +740,15 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Blocked => "blocked",
         AuditMethod.RulesChanged => "rules-changed",
         AuditMethod.Checkpoint => AuditCheckpoint.Method,
+        _ => "unknown",
+    };
+
+    private static string Wire(CallerSignature signature) => signature switch
+    {
+        CallerSignature.NotSigned => "unsigned",
+        CallerSignature.AdHoc => "adhoc",
+        CallerSignature.Invalid => "invalid",
+        CallerSignature.Valid => "valid",
         _ => "unknown",
     };
 

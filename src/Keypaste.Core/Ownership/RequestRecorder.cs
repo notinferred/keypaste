@@ -9,6 +9,7 @@ namespace Keypaste.Core.Ownership;
 /// point them elsewhere (THREATS.md T-14, T-30, T-32). A release whose line cannot be written is refused
 /// and nothing in it is sent, and a listing that names anything is a release here (T-6). A refusal is
 /// answered whether its line was written or not, since it releases nothing, and its reply says which.
+/// A line written while answering a connection names the program on it (<see cref="PipeCaller"/>).
 /// </remarks>
 /// <param name="audit">Opens the owner's log, asked before each request is decided and again when it is answered; a null answer refuses the request.</param>
 internal sealed class RequestRecorder(Func<AuditLog?> audit)
@@ -112,7 +113,7 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     {
         try
         {
-            return audit() is { } log && log.TryAppend(record, out _);
+            return audit() is { } log && log.TryAppend(record with { Caller = record.Caller ?? PipeCaller.Current }, out _);
         }
         catch (ObjectDisposedException)
         {

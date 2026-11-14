@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Each audit line the app or `keypaste approve` writes for a request names the program that connected, its process id, path and whether its code signature checks out, in a new `caller` object; nothing is refused because of it.
+
 An agent can search the items it may see with `find_access`, by text, host, kind, project or a related item, and gets each item's handle, origin, username when Settings shows it, the items it shares a site, a project or an account with, and the projects the items found belong to with their environments, never a value. Hosts and references, a new switch beside Usernames in Agents, off by default, adds the host in a `Host` field and links between items one of whose fields references the other.
 
 The app and `keypaste approve` sign the audit log every 64 lines they write and when the vault locks, with a key kept in the vault, and `keypaste log verify --checkpoints` checks those signatures, so rewriting the log before the last one needs the unlocked vault.

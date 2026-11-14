@@ -36,6 +36,10 @@ namespace Keypaste.Core.Ipc;
 /// closes an idle connection: a bridge waits between an agent's requests.
 /// </para>
 /// <para>
+/// Each connection's program is named once, as it is accepted, and every line written while answering it names
+/// that program (<see cref="PipeCaller"/>); nothing is refused for it.
+/// </para>
+/// <para>
 /// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
 /// connection sending any other kind unanswered, as it ends one sending a kind this version does not know
 /// (D-0451).
@@ -191,6 +195,8 @@ public sealed class ApproverListener : IDisposable
 
         try
         {
+            // Off the accept loop, since a signature check reads the caller's file.
+            PipeCaller.Current = await Task.Run(() => PipeCaller.Of(pipe), cancellationToken).ConfigureAwait(false);
             next = framer.ReadAsync(cancellationToken).AsTask();
 
             while (await next.ConfigureAwait(false) is { } frame)

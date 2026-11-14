@@ -164,6 +164,30 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     }
 
     /// <summary>A listing carries nothing of its own, so it is recorded under the client its connection attached as, counting what it named.</summary>
+    /// <summary>Each line the owner writes for a connection names the program on it, which the client's own name cannot choose, and nothing is refused for it.</summary>
+    [Fact]
+    public async Task ALine_NamesTheProgramOnTheConnection()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        await using (var owner = Owner.Start(this))
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.True((await client.ListAsync(Listing(), Token))?.Recorded);
+            Assert.True((await client.RequestAsync(Credential(), Token))?.Recorded);
+        }
+
+        var lines = _log.Lines();
+        Assert.Equal(2, lines.Count);
+
+        foreach (var line in lines)
+        {
+            var caller = line.GetProperty("caller");
+            Assert.Equal(Environment.ProcessId, caller.GetProperty("pid").GetInt32());
+            Assert.Equal(PathIdentity.Canonical(Environment.ProcessPath!), PathIdentity.Canonical(caller.GetProperty("path").GetString()!), StringComparer.FromComparison(PathIdentity.Comparison));
+        }
+    }
+
     [Fact]
     public async Task AListing_IsRecordedUnderTheClientItsConnectionAttachedAs()
     {
