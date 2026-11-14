@@ -294,7 +294,8 @@ class Gecko {
     static async start(log) {
         const port = await freePort();
         const output = fs.openSync(log, 'w');
-        const child = spawn(geckodriverPath, [ '--port', String(port), '--log', 'info' ], { env: browserEnvironment, stdio: [ 'ignore', output, output ] });
+        // --allow-system-access lets the session load the add-on's page from Firefox's own chrome, which WebDriver's navigation refuses.
+        const child = spawn(geckodriverPath, [ '--port', String(port), '--log', 'info', '--allow-system-access' ], { env: browserEnvironment, stdio: [ 'ignore', output, output ] });
         fs.closeSync(output);
         const gecko = new Gecko(port, child);
         await withinWait((async () => {
@@ -343,8 +344,7 @@ class Gecko {
                     browserName: 'firefox',
                     'moz:firefoxOptions': {
                         binary: firefoxBinary,
-                        // Lets the session load the add-on's page from Firefox's own chrome, which WebDriver's navigation refuses.
-                        args: [ '-headless', '-remote-allow-system-access' ],
+                        args: [ '-headless' ],
                         // Fixes the add-on's internal UUID, which names its pages' moz-extension:// origin.
                         prefs: {
                             'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ID]: uuid }),
