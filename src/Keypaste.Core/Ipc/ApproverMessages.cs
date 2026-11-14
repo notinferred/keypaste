@@ -48,6 +48,9 @@ public enum ApproverMessageKind
 
     /// <summary>An agent's request that the person save a value it never sees (F.79).</summary>
     Save = 20,
+
+    /// <summary>An agent's search of the items it may be shown, by text, host, kind or related item.</summary>
+    Find = 21,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -166,6 +169,49 @@ public sealed record NamesReply(
     /// Why an unlocked vault named nothing, when the reason has a word of its own; null reads as the
     /// vault being locked, as before this existed.
     /// </summary>
+    public AuditMethod? Refusal { get; init; }
+
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
+}
+
+/// <summary>An agent's search of the items its bridge exposes.</summary>
+/// <param name="Exposure">The globs the bridge was configured with, applied again by the approver.</param>
+/// <param name="Text">Text to find, as the agent wrote it, or null.</param>
+/// <param name="Host">A host or URL, as the agent wrote it, or null.</param>
+/// <param name="Kind">The kind of item, or null for any.</param>
+/// <param name="RelatedTo">An entry's handle the items found are linked to, as the agent wrote it, or null.</param>
+public sealed record FindRequest(IReadOnlyList<string> Exposure, string? Text, string? Host, ItemKind? Kind, string? RelatedTo)
+{
+    /// <summary>The bridge's <c>--client-label</c>, raw, as <see cref="NamesRequest.ClientLabel"/> is.</summary>
+    public string? ClientLabel { get; init; }
+
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+
+    /// <summary>What the agent searches for.</summary>
+    public AccessQuery Query => new(Text, Host, Kind, RelatedTo);
+}
+
+/// <summary>The items a search found inside the exposure, each with its links, or why there are none.</summary>
+/// <param name="VaultUnlocked">Whether a vault was open and the search was made.</param>
+/// <param name="Found">The raw, unsanitized items, best first, at most <see cref="AccessIndex.MaximumResults"/>. Sanitizing is the bridge's job.</param>
+/// <param name="Reason">Why nothing was searched, when nothing was. keypaste's own words, not an agent's.</param>
+/// <param name="Complete">Whether these are all the items that matched; as with <see cref="NamesReply.Complete"/>, it has no default.</param>
+public sealed record FindReply(
+    bool VaultUnlocked,
+    IReadOnlyList<FoundAccess> Found,
+    string Reason,
+    bool Complete)
+{
+    /// <summary>The session that answered, or null when none did.</summary>
+    public string? Session { get; init; }
+
+    /// <summary>Why nothing was searched, when the reason has a word of its own; null reads as the vault being locked.</summary>
     public AuditMethod? Refusal { get; init; }
 
     /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>

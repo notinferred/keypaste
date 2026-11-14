@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Browser;
 
@@ -27,6 +28,8 @@ public static class BrowserEntry
     public static async Task<int> RunAsync(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
+
+        _ = MemoryDumps.TryPrevent();
 
         using var stop = new CancellationTokenSource();
         using var terminated = OnTerminate(stop);

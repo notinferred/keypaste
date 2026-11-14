@@ -7,6 +7,7 @@ using Keypaste.Core.Browser;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.App;
 
@@ -45,6 +46,7 @@ internal static class Program
         ArgumentNullException.ThrowIfNull(args);
 
         IcuFallback.Apply();
+        _ = MemoryDumps.TryPrevent();
 
         if (TryRunHeadless(args, Console.Out, Console.Error, out var exitCode))
         {

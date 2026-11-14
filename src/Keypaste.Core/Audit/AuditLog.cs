@@ -586,6 +586,16 @@ public sealed class AuditLog : IDisposable
             }
 
             WriteOptional(writer, "reason_sha256", args.ReasonSha256);
+            if (args.Query is { } query)
+            {
+                writer.WriteStartObject("query");
+                WriteOptional(writer, "text", query.Text);
+                WriteOptional(writer, "host", query.Host);
+                WriteOptional(writer, "kind", query.Kind);
+                WriteOptional(writer, "related", query.Related);
+                writer.WriteEndObject();
+            }
+
             writer.WriteEndObject();
 
             writer.WriteString("decision", Wire(record.Decision));

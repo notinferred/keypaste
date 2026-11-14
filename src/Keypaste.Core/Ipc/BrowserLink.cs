@@ -62,7 +62,7 @@ public sealed class BrowserLink : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out AttachReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<AttachReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to pair this browser.</summary>
@@ -100,7 +100,7 @@ public sealed class BrowserLink : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out BrowserFillReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<BrowserFillReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to lock now.</summary>
@@ -131,12 +131,23 @@ public sealed class BrowserLink : IAsyncDisposable
         _ = _next.ContinueWith(static read => read.Exception, TaskScheduler.Default);
     }
 
-    private static BrowserReply? Reply(byte[]? frame) =>
-        frame is not null && ApproverProtocol.TryDecode(frame, out BrowserReply? reply) ? reply : null;
+    private static BrowserReply? Reply(byte[]? frame) => ApproverProtocol.Decoded<BrowserReply>(frame, ApproverProtocol.TryDecode);
 
     private Task<byte[]?> ReadNext() => _framer.ReadAsync(CancellationToken.None).AsTask();
 
     private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ExchangeOnceAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(request);
+        }
+    }
+
+    private async ValueTask<byte[]?> ExchangeOnceAsync(byte[] request, CancellationToken cancellationToken)
     {
         // Refused before anything is written, so a request too large leaves the link as it was.
         if (IsSpent || request.Length > MessageFramer.MaximumPayloadBytes)

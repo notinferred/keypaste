@@ -200,23 +200,34 @@ public sealed class ApproverListener : IDisposable
                 next = framer.ReadAsync(cancellationToken).AsTask();
 
                 var kind = ApproverProtocol.KindOf(frame);
-                var reply = await AnswerWhileWaitedForAsync(frame, kind, connectionId, next, cancellationToken).ConfigureAwait(false);
+                byte[]? reply = null;
 
-                if (reply is null)
+                try
                 {
-                    // Unparseable, a kind this version does not serve, or a peer no longer waiting.
-                    // Ending the connection is the whole response: replying to a message we could
-                    // not read would mean guessing what it asked for.
-                    return;
-                }
+                    reply = await AnswerWhileWaitedForAsync(frame, kind, connectionId, next, cancellationToken).ConfigureAwait(false);
 
-                // A reply is delivered for as long as its peer takes to read it, and a stop gives it one
-                // second more: a request a lock or a shutdown withdrew still has its denial to deliver,
-                // which the owner has recorded, rather than a reply that never came (D-0313, D-0420).
-                using var delivery = new CancellationTokenSource();
-                using var stopping = cancellationToken.Register(
-                    static state => ((CancellationTokenSource)state!).CancelAfter(_deliveryBound), delivery);
-                await framer.WriteAsync(reply, MaximumReplyFrameBytes(kind), delivery.Token).ConfigureAwait(false);
+                    if (reply is null)
+                    {
+                        // Unparseable, a kind this version does not serve, or a peer no longer waiting.
+                        // Ending the connection is the whole response: replying to a message we could
+                        // not read would mean guessing what it asked for.
+                        return;
+                    }
+
+                    // A reply is delivered for as long as its peer takes to read it, and a stop gives it one
+                    // second more: a request a lock or a shutdown withdrew still has its denial to deliver,
+                    // which the owner has recorded, rather than a reply that never came.
+                    using var delivery = new CancellationTokenSource();
+                    using var stopping = cancellationToken.Register(
+                        static state => ((CancellationTokenSource)state!).CancelAfter(_deliveryBound), delivery);
+                    await framer.WriteAsync(reply, MaximumReplyFrameBytes(kind), delivery.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // A request may carry a value to save and a reply a released one.
+                    CryptographicOperations.ZeroMemory(frame);
+                    CryptographicOperations.ZeroMemory(reply);
+                }
             }
         }
         catch (Exception)
@@ -322,6 +333,10 @@ public sealed class ApproverListener : IDisposable
             case ApproverMessageKind.Names when ApproverProtocol.TryDecode(frame, out NamesRequest? names):
                 return ApproverProtocol.Encode(
                     await _handler.ListAsync(names, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.Find when ApproverProtocol.TryDecode(frame, out FindRequest? find):
+                return ApproverProtocol.Encode(
+                    await _handler.FindAsync(find, connectionId, cancellationToken).ConfigureAwait(false));
 
             case ApproverMessageKind.Credential when ApproverProtocol.TryDecode(frame, out CredentialRequest? credential):
                 return ApproverProtocol.Encode(

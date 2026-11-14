@@ -175,10 +175,12 @@ internal sealed class McpHarness : IAsyncDisposable
 
         // Pointed at a real approver, the listing goes through the real source too: the point of
         // that constructor is to leave nothing faked but the human.
+        var names = new ApproverEntryNameSource(_approver, options);
         serverOptions.ToolCollection.Add(
             _approverPipeName is null
                 ? new ListEntryNamesTool(Source, options, _audit)
-                : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
+                : new ListEntryNamesTool(names, options, _audit));
+        serverOptions.ToolCollection.Add(new FindAccessTool(names, options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit, attachments: true));
         serverOptions.ToolCollection.Add(new SaveValueTool(options, _approver, _audit));
@@ -354,6 +356,10 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
                 ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty, Complete) { Recorded = Recorded }
                 : new EntryNameListing(Availability, [], ToolText.VaultLocked, true) { Recorded = Recorded });
     }
+
+    /// <summary>Searches are answered by <see cref="FakeApprover"/> over its pipe, so this source is never asked one.</summary>
+    public ValueTask<EntryNameListing> FindAsync(AccessQuery query, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("the harness's searches go through its FakeApprover");
 
     public void Dispose()
     {

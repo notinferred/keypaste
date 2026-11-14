@@ -84,6 +84,12 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>What the approver says the vault contains.</summary>
     internal NamesReply Names { get; set; } = new(false, [], "no vault is unlocked", true);
 
+    /// <summary>What the approver says a search found.</summary>
+    internal FindReply Found { get; set; } = new(false, [], "no vault is unlocked", true);
+
+    /// <summary>Every search that reached the approver, in the order it arrived.</summary>
+    internal ConcurrentQueue<FindRequest> SearchesReceived { get; } = [];
+
     /// <summary>Every request that reached the approver, in the order it arrived.</summary>
     internal ConcurrentBag<CredentialRequest> Received { get; } = [];
 
@@ -257,6 +263,12 @@ internal sealed class FakeApprover : IAsyncDisposable
             }
 
             return ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });
+        }
+
+        public ValueTask<FindReply> FindAsync(FindRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.SearchesReceived.Enqueue(request);
+            return ValueTask.FromResult(approver.Found with { Session = approver.Session, Recorded = approver.Records });
         }
 
         public async ValueTask<CredentialReply> RequestAsync(

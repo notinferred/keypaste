@@ -37,6 +37,84 @@ internal static class ToolSchemas
     internal const string ListInputJson =
         """{"type":"object","properties":{},"additionalProperties":false}""";
 
+    /// <summary>The arguments of <c>find_access</c>, each optional and at least one given; the bounds are <c>AccessQuery</c>'s, which the owner applies again.</summary>
+    internal const string FindInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "Text found, ignoring case, in an item's title, group, host, username, field names or projects."
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "A host or URL, such as github.com; items on the same site match, its own host first."
+            },
+            "kind": {
+              "type": "string",
+              "enum": ["none", "login", "api_key", "database", "server", "secure_note"],
+              "description": "The kind of item; none is an item with no kind set."
+            },
+            "related_to": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "An item's handle; finds the items sharing a site or a project with it."
+            }
+          },
+          "minProperties": 1,
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The structured result of <c>find_access</c>: names, origins and usernames, never a value.</summary>
+    internal const string FindOutputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "vault": { "type": "string" },
+            "truncated": { "type": "boolean" },
+            "count": { "type": "integer" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "handle": { "type": "string" },
+                  "group": { "type": "string" },
+                  "name": { "type": "string" },
+                  "kind": { "type": "string" },
+                  "origin": { "type": ["string", "null"] },
+                  "username": { "type": ["string", "null"] },
+                  "fields": { "type": "array", "items": { "type": "string" } },
+                  "projects": { "type": "array", "items": { "type": "string" } },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "handle": { "type": "string" },
+                        "path": { "type": "string" },
+                        "site": { "type": ["string", "null"] },
+                        "projects": { "type": "array", "items": { "type": "string" } }
+                      },
+                      "required": ["handle", "path", "site", "projects"]
+                    }
+                  },
+                  "altered": { "type": "boolean" }
+                },
+                "required": ["handle", "group", "name", "kind", "origin", "username", "fields", "projects", "links", "altered"]
+              }
+            }
+          },
+          "required": ["vault", "truncated", "count", "items"]
+        }
+        """;
+
     /// <summary>The four arguments the build prompt specifies for <c>request_credential</c>.</summary>
     internal const string CredentialInputJson = """
         {
@@ -212,6 +290,12 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>list_entry_names</c>.</summary>
     internal static readonly JsonElement ListInput = Parse(ListInputJson);
+
+    /// <summary><see cref="FindInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement FindInput = Parse(FindInputJson);
+
+    /// <summary><see cref="FindOutputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement FindOutput = Parse(FindOutputJson);
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);

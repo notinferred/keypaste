@@ -330,6 +330,110 @@ public sealed class ApproverHandlerTests
         Assert.NotEmpty(reply.Reason);
     }
 
+    // ------------------------------------------------------------------------ a search (find)
+
+    private static FindRequest Search(string? text = null, ItemKind? kind = null, string? relatedTo = null, params string[] exposure) =>
+        new(exposure.Length == 0 ? ["env/**"] : exposure, text, null, kind, relatedTo) { ClientLabel = ApproverFixture.Agent };
+
+    /// <summary>The control: with both items exposed, each found item links to the other on stripe.com's site.</summary>
+    [Fact]
+    public async Task ASearchOfTheWholeVault_LinksItemsOnOneSite()
+    {
+        using var fixture = new ApproverFixture();
+
+        var reply = await fixture.Handler.FindAsync(Search(kind: ItemKind.ApiKey, exposure: "**"), "conn-1", Token);
+
+        var found = Assert.Single(reply.Found);
+        Assert.True(reply.VaultUnlocked && reply.Complete);
+        Assert.Equal(new EntryName("env/dev", "STRIPE_KEY"), found.Entry.Listing.Name);
+        Assert.Equal("billing@acme.test", found.Entry.Username);
+        var link = Assert.Single(found.Links);
+        Assert.Equal((new EntryName("personal", "bank"), "stripe.com"), (link.Name, link.Site));
+    }
+
+    [Fact]
+    public async Task AnItemOutsideTheExposure_IsNeverFoundOrLinked()
+    {
+        using var fixture = new ApproverFixture();
+
+        var stripe = await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+        var bank = await fixture.Handler.FindAsync(Search("bank"), "conn-1", Token);
+        var related = await fixture.Handler.FindAsync(Search(relatedTo: EntryHandle.For(new EntryName("personal", "bank"))), "conn-1", Token);
+
+        var found = Assert.Single(stripe.Found);
+        Assert.Equal(new EntryName("env/dev", "STRIPE_KEY"), found.Entry.Listing.Name);
+        Assert.Empty(found.Links);
+        Assert.True(bank.VaultUnlocked);
+        Assert.Empty(bank.Found);
+        Assert.Empty(related.Found);
+    }
+
+    [Fact]
+    public async Task ASearch_HidesUsernames_WhenSettingsHideThem()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Rules.Rules = AgentRules.Defaults with { ShowsUsername = false };
+
+        var reply = await fixture.Handler.FindAsync(Search(kind: ItemKind.ApiKey), "conn-1", Token);
+
+        var found = Assert.Single(reply.Found);
+        Assert.Null(found.Entry.Username);
+        Assert.Equal("https://dashboard.stripe.com:443", found.Entry.Origin?.ToString());
+    }
+
+    [Fact]
+    public async Task ASearch_IsRefused_WhenTheAgentRulesCannotBeRead()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Rules.Unreadable = "agents.toml is damaged";
+
+        var reply = await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+
+        Assert.False(reply.VaultUnlocked);
+        Assert.Empty(reply.Found);
+        Assert.Equal(AuditMethod.Failed, reply.Refusal);
+        Assert.Equal("agent rules are not usable: agents.toml is damaged", reply.Reason);
+    }
+
+    [Fact]
+    public async Task AnEmptySearch_IsRefusedWithAReason()
+    {
+        using var fixture = new ApproverFixture();
+
+        var reply = await fixture.Handler.FindAsync(Search("   "), "conn-1", Token);
+
+        Assert.False(reply.VaultUnlocked);
+        Assert.Empty(reply.Found);
+        Assert.Equal(AuditMethod.InvalidRequest, reply.Refusal);
+        Assert.Equal("a search names text, a host, a kind or a related item", reply.Reason);
+    }
+
+    [Fact]
+    public async Task ASearchOfAVaultThatNoLongerMatchesItsFile_IsRefusedAsChanged()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Source.IndexFailure = CredentialFailure.ChangedOnDisk;
+
+        var reply = await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+
+        Assert.False(reply.VaultUnlocked);
+        Assert.Empty(reply.Found);
+        Assert.Equal(AuditMethod.VaultChanged, reply.Refusal);
+    }
+
+    [Fact]
+    public async Task ASearchOfALockedVault_SaysSo()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Source.Locked = true;
+
+        var reply = await fixture.Handler.FindAsync(Search("STRIPE"), "conn-1", Token);
+
+        Assert.False(reply.VaultUnlocked);
+        Assert.Empty(reply.Found);
+        Assert.Equal("no vault is unlocked", reply.Reason);
+    }
+
     // ------------------------------------------------------- a release nobody could send (F.3d)
 
     /// <summary>

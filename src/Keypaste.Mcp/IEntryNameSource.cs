@@ -44,9 +44,9 @@ internal enum VaultAvailability
     Unrecorded = 6,
 }
 
-/// <summary>What the vault had to say when asked for its entry names.</summary>
+/// <summary>What the vault had to say when asked for its entry names or searched.</summary>
 /// <param name="Availability">Whether there was anything to say.</param>
-/// <param name="Names">The entries with their field names and project tags, unsanitized and unfiltered. Empty unless available.</param>
+/// <param name="Names">The entries a listing named with their field names and project tags, unsanitized and unfiltered. Empty unless available.</param>
 /// <param name="Reason">A human-readable explanation, used when the answer is a refusal.</param>
 /// <param name="Complete">Whether these are all the names there were.</param>
 /// <remarks>
@@ -60,6 +60,9 @@ internal sealed record EntryNameListing(
     string Reason,
     bool Complete)
 {
+    /// <summary>The items a search found with their links, unsanitized and unfiltered, best first. Empty unless available.</summary>
+    public IReadOnlyList<FoundAccess> Found { get; init; } = [];
+
     /// <summary>The unlocked session that answered, or null when none did.</summary>
     public string? Session { get; init; }
 
@@ -75,9 +78,9 @@ internal sealed record EntryNameListing(
 /// </summary>
 /// <remarks>
 /// <para>
-/// It yields <see cref="EntryName"/>, which holds a group path and a title and has no other members.
-/// So no implementation — including the one that reads a real unlocked vault — can return a password through the
-/// listing path even by mistake. That is a structural guarantee, not a promise (THREATS.md T-8).
+/// It yields <see cref="EntryName"/>, which holds a group path and a title and has no other members, and for a search
+/// <see cref="IndexedEntry"/>, which adds only an origin and a username. So no implementation — including the one that
+/// reads a real unlocked vault — can return a password through the listing or search path even by mistake. That is a structural guarantee, not a promise (THREATS.md T-8).
 /// </para>
 /// <para>
 /// <b><c>request_credential</c> deliberately does not use this.</b> It is served by a separate seam
@@ -92,6 +95,12 @@ internal interface IEntryNameSource
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The names, or a refusal.</returns>
     ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken);
+
+    /// <summary>Searches the items the vault may show.</summary>
+    /// <param name="query">What to search for, already checked to be within its bounds.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The items found, or a refusal.</returns>
+    ValueTask<EntryNameListing> FindAsync(AccessQuery query, CancellationToken cancellationToken);
 }
 
 /// <summary>Asks the process holding the vault which names may be shown.</summary>
@@ -119,6 +128,45 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             .ListAsync(new NamesRequest(options.Exposure.Globs) { ClientLabel = options.ClientLabel }, cancellationToken)
             .ConfigureAwait(false);
 
+        var answer = reply is null ? (Answer?)null : new Answer(reply.VaultUnlocked, reply.Refusal, reply.Session, reply.Recorded);
+
+        return await RefusalAsync(answer, outcome, refusal, cancellationToken).ConfigureAwait(false)
+            ?? new EntryNameListing(VaultAvailability.Available, reply!.Names, string.Empty, reply.Complete)
+            {
+                Session = reply.Session,
+                Recorded = true,
+            };
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask<EntryNameListing> FindAsync(AccessQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var (reply, outcome, refusal) = await approver
+            .FindAsync(
+                new FindRequest(options.Exposure.Globs, query.Text, query.Host, query.Kind, query.RelatedTo) { ClientLabel = options.ClientLabel },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var answer = reply is null ? (Answer?)null : new Answer(reply.VaultUnlocked, reply.Refusal, reply.Session, reply.Recorded);
+
+        return await RefusalAsync(answer, outcome, refusal, cancellationToken).ConfigureAwait(false)
+            ?? new EntryNameListing(VaultAvailability.Available, [], string.Empty, reply!.Complete)
+            {
+                Found = reply.Found,
+                Session = reply.Session,
+                Recorded = true,
+            };
+    }
+
+    /// <summary>Why a listing or a search shows nothing, or null when the owner recorded an answer from an unlocked vault.</summary>
+    private async ValueTask<EntryNameListing?> RefusalAsync(
+        Answer? reply,
+        ApproverOutcome outcome,
+        AttachReply? refusal,
+        CancellationToken cancellationToken)
+    {
         // Sharing the pipe with the credential path means sharing its one-at-a-time rule, and
         // refusing is the answer that does not queue. The refusals below say they are complete
         // because each returns before anything is rendered: saying otherwise would attach "some names
@@ -140,13 +188,13 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 : new EntryNameListing(VaultAvailability.NoSession, [], ToolText.NoSession, true);
         }
 
-        // A withdrawn listing's reply is still read, so one its owner recorded adds no line here.
+        // A withdrawn request's reply is still read, so one its owner recorded adds no line here.
         if (cancellationToken.IsCancellationRequested && reply is not { Recorded: false })
         {
             return new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true) { Recorded = reply is not null };
         }
 
-        if (reply is null)
+        if (reply is not { } answer)
         {
             if (outcome == ApproverOutcome.Failed)
             {
@@ -159,29 +207,28 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
         }
 
         // Nothing an unrecorded reply named is shown: entry names are an asset too (law 3.5, T-6).
-        if (!reply.Recorded)
+        if (!answer.Recorded)
         {
             return new EntryNameListing(VaultAvailability.Unrecorded, [], ToolText.AuditUnavailable, true)
             {
-                Session = reply.Session,
+                Session = answer.Session,
             };
         }
 
-        if (reply.Refusal == Core.Audit.AuditMethod.VaultChanged)
+        if (answer.Refusal == Core.Audit.AuditMethod.VaultChanged)
         {
             return new EntryNameListing(VaultAvailability.Changed, [], ToolText.VaultChanged, true)
             {
-                Session = reply.Session,
+                Session = answer.Session,
                 Recorded = true,
             };
         }
 
-        return reply.VaultUnlocked
-            ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty, reply.Complete)
-            {
-                Session = reply.Session,
-                Recorded = true,
-            }
+        return answer.VaultUnlocked
+            ? null
             : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true) { Recorded = true };
     }
+
+    /// <summary>What a listing's or a search's reply says about itself.</summary>
+    private readonly record struct Answer(bool VaultUnlocked, Core.Audit.AuditMethod? Refusal, string? Session, bool Recorded);
 }

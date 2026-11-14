@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Browser;
 
 namespace Keypaste.Core.Tests;
 
@@ -171,6 +172,36 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         failure = CredentialFailure.None;
         return true;
     }
+
+    /// <summary>When set, a search's read of the vault fails this way, as a vault that no longer matches its file does.</summary>
+    internal CredentialFailure? IndexFailure { get; set; }
+
+    /// <summary>Both entries are on stripe.com's site, so each links to the other wherever both are exposed.</summary>
+    public bool TryIndex(EntryExposure exposure, bool showsUsername, [NotNullWhen(true)] out IReadOnlyList<IndexedEntry>? index, out CredentialFailure failure)
+    {
+        index = null;
+
+        if (Locked || IndexFailure is not null)
+        {
+            failure = IndexFailure ?? CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        IndexedEntry Indexed(EntryName name, ItemKind kind, string url, string username) =>
+            new(new ListedEntry(name, ["password", "STRIPE_SECRET_KEY"], Tags(name)), kind, Origin(url), showsUsername ? username : null);
+
+        index = AccessIndex.Admitted(
+            [
+                Indexed(_entries[0], ItemKind.ApiKey, "https://dashboard.stripe.com", "billing@acme.test"),
+                Indexed(_entries[1], ItemKind.Login, "https://stripe.com", "me@bank.test"),
+            ],
+            exposure);
+        failure = CredentialFailure.None;
+        return true;
+    }
+
+    private static WebOrigin Origin(string url) =>
+        WebOrigin.TryReadItem(url, out var origin) ? origin : throw new ArgumentException(url, nameof(url));
 }
 
 internal sealed class FakeChannel : IApprovalChannel

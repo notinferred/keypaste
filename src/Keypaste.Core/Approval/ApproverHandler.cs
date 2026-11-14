@@ -197,6 +197,48 @@ public sealed class ApproverHandler
         return ValueTask.FromResult(new NamesReply(true, seen, string.Empty, true));
     }
 
+    /// <summary>Searches the items its bridge's exposure reaches, linking each only to others it reaches.</summary>
+    /// <param name="request">What to search for, the exposure the bridge is configured with, and its label.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The best <see cref="AccessIndex.MaximumResults"/> items, complete only when no other matched, or the reason there are none.</returns>
+    public ValueTask<FindReply> FindAsync(FindRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out _))
+        {
+            return ValueTask.FromResult(
+                new FindReply(false, [], "this bridge's --expose is not usable", true) { Refusal = AuditMethod.Failed });
+        }
+
+        if (!_rules.TryRead(out var rules, out var problem))
+        {
+            _narrate?.Invoke($"refused a search: {Unusable(problem)}");
+            return ValueTask.FromResult(new FindReply(false, [], Unusable(problem), true) { Refusal = AuditMethod.Failed });
+        }
+
+        var query = request.Query;
+
+        if (query.IsEmpty)
+        {
+            return ValueTask.FromResult(
+                new FindReply(false, [], "a search names text, a host, a kind or a related item", true) { Refusal = AuditMethod.InvalidRequest });
+        }
+
+        if (!_lister.TryIndex(exposure, rules.ShowsUsername, out var index, out var failure))
+        {
+            return ValueTask.FromResult(
+                IsStale(failure)
+                    ? new FindReply(false, [], Stale(failure, "a search"), true) { Refusal = AuditMethod.VaultChanged }
+                    : new FindReply(false, [], Explain(failure), true));
+        }
+
+        var found = AccessIndex.Find(AccessIndex.Admitted(index, exposure), query, AccessIndex.MaximumResults + 1);
+
+        return ValueTask.FromResult(new FindReply(true, [.. found.Take(AccessIndex.MaximumResults)], string.Empty, found.Count <= AccessIndex.MaximumResults));
+    }
+
     /// <summary>Decides one credential request, asking a human if its category says to.</summary>
     /// <param name="request">What the agent asked for.</param>
     /// <param name="connectionId">Who is asking.</param>

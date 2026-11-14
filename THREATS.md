@@ -100,7 +100,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Attacker.** A connected agent trying to see or reach more entries than intended.
 
-**Mitigation.** An agent sees only what its bridge's `--expose` reaches: `**` as `keypaste setup` and Connect register it, or `tag:env:*` (project entries, env-named fields only) for a bridge configured by hand without one. Of each entry it sees the title, group, tags and URL, and the username unless Settings hides it; every other value is decided by its category. `list_entry_names` takes no arguments, so an agent cannot widen its view or page. Patterns match raw group and title separately, so a title of slashes cannot pose as a group. A tag selector reaches only the entry's project variables, refusing a password, username, URL or notes before anyone is asked, and a malformed selector stops the bridge from starting. The owner re-checks every request.
+**Mitigation.** An agent sees only what its bridge's `--expose` reaches: `**` as `keypaste setup` and Connect register it, or `tag:env:*` (project entries, env-named fields only) for a bridge configured by hand without one. Of each entry it sees the title, group, tags and URL, and the username unless Settings hides it; every other value is decided by its category. `list_entry_names` takes no arguments and `find_access` only what to search for, so an agent cannot widen its view or page (T-55). Patterns match raw group and title separately, so a title of slashes cannot pose as a group. A tag selector reaches only the entry's project variables, refusing a password, username, URL or notes before anyone is asked, and a malformed selector stops the bridge from starting. The owner re-checks every request.
 
 **Limit.** A wide view with a category set to Allow releases every value of that category it covers without a prompt; `--expose "**"` reaches every entry whole. A variable naming another field by placeholder carries that field out (T-8). Names omitted from an overflowing listing may appear in a reply of another size.
 
@@ -156,7 +156,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Attacker.** An agent asking for more than one field, a field it should never get, or a value carrying other fields inside it.
 
-**Mitigation.** Listing and credential replies are separate message kinds, and a credential reply carries one field. Every TOTP seed field (`otp`, `TimeOtp-*` and the like) and a standard name in another case are refused before anything is read, and passkey fields are Blocked under every rule. Run references and `share --field` accept only env-named custom fields (`[A-Z][A-Z0-9_]{0,127}`, not `KPEX_`, `KPXC_` or `KP2A_`). `totp` releases the current code, computed after authorization; the seed never leaves. Placeholders fill in only from the same entry and only from fields that could leave by name; anything else, a loop, nesting past 10 or a value past 1 MiB refuses the value whole. An attachment is released as base64, at most 5 MiB. A value over the 64 KiB frame is refused whole, never truncated.
+**Mitigation.** Listing, search and credential replies are separate message kinds. A search's items carry names, the URL's origin and, while Settings shows it, the username, which an agent sees without asking ([PRODUCT §2](docs/PRODUCT.md)), and no other value; a credential reply carries one field. Every TOTP seed field (`otp`, `TimeOtp-*` and the like) and a standard name in another case are refused before anything is read, and passkey fields are Blocked under every rule. Run references and `share --field` accept only env-named custom fields (`[A-Z][A-Z0-9_]{0,127}`, not `KPEX_`, `KPXC_` or `KP2A_`). `totp` releases the current code, computed after authorization; the seed never leaves. Placeholders fill in only from the same entry and only from fields that could leave by name; anything else, a loop, nesting past 10 or a value past 1 MiB refuses the value whole. An attachment is released as base64, at most 5 MiB. A value over the 64 KiB frame is refused whole, never truncated.
 
 **Limit.** A variable holding `{PASSWORD}` gives the entry's password, under the variable's name, to whoever may get the variable, and the prompt and log name only the field asked for. A value keypaste cannot fill in is refused only after it was allowed, and its field then cools down for a minute. A run resolves every reference before its prompt, and entry resolution reads standard fields, passwords included, into memory, so a denial does not mean nothing was read (T-18). A TOTP code with the password lets an agent sign in as the person within that period.
 
@@ -296,7 +296,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Attacker.** A debugger, core dump, hibernation file or swap page, same-user access included.
 
-**Mitigation.** Master passwords are read into clearable buffers, and derived key material is zeroed after use. The owner keeps no released value for a later request: Allow once keeps nothing and neither an Allow nor an always answer holds a value, so each release reads the vault again. The bridge holds no vault, only the plaintext it delivers. Crash reports carry no memory and keypaste never collects a dump. A locked Windows app holds only the sealed quick-unlock copy (T-44).
+**Mitigation.** Master passwords are read into clearable buffers, and derived key material is zeroed after use. The owner keeps no released value for a later request: Allow once keeps nothing and neither an Allow nor an always answer holds a value, so each release reads the vault again. The bridge holds no vault, only the plaintext it delivers. Crash reports carry no memory and keypaste never collects a dump; on Linux and macOS every keypaste process sets its core dump limit to zero as it starts, so a crash writes no core file. A locked Windows app holds only the sealed quick-unlock copy (T-44).
 
 **Limit.** keypaste makes no claim of in-memory secrecy. Garbage collection can leave relocated copies; vault reads and MCP serialization create strings that cannot be cleared; entry resolution reads standard fields, passwords included, before approval, so a denial does not mean a secret was never read; the pipe and OS can leave copies in swap or dumps. `SecureString` is unused because it does not encrypt on Linux or macOS. Nothing bounds the lifetime of these copies, the client's copies or the credential itself.
 
@@ -765,3 +765,17 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 **Status.** Implemented (unreleased); not in v0.3.0.
 
 **Tests.** `ValueSaveRequestTests`, `SaveValueWindowTests`, `TerminalApprovalChannelTests`, `ServerToolsTests`.
+
+### T-55 — A search maps the person's infrastructure
+
+**Asset.** Which hosts, accounts and projects the person's items connect, which a search's origins, usernames and links lay out together.
+
+**Attacker.** A connected agent, or the provider whose model it runs on, using `find_access` to learn which sites, accounts and projects go together, by host or from one item's handle to the items linked to it.
+
+**Mitigation.** A search reaches only what its bridge's `--expose` reaches, and the owner and the bridge each apply it to every item found and to both ends of every link, so a link never names an item outside it (T-4). A reply holds at most 25 items with at most 8 links each. An origin is the URL's scheme, host and port, never its path, query or credentials; a username appears only while Settings shows usernames to agents, and an item reached only through a project tag shows neither. Each part of a query is at most 256 characters, and an empty query is refused before the owner is asked. Every search is recorded with what it searched for and how many items it named (T-6).
+
+**Limit.** What a search shows reaches the agent's provider as names do: under `--expose "**"`, repeated searches can name every host, username and shared project the vault holds.
+
+**Status.** Implemented (unreleased); not in v0.3.0.
+
+**Tests.** `AccessIndexTests`, `ApproverHandlerTests`, `EntryExposureTests`, `FindAccessToolTests`.

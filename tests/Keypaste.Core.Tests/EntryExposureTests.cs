@@ -407,6 +407,21 @@ public sealed class EntryExposureTests
         Assert.False(Exposure("api/**").MayPermit(entry, "STRIPE_SECRET_KEY"));
     }
 
+    /// <summary>A search's link names projects but no environment, so only a selector naming the project in every environment reaches its other end.</summary>
+    [Fact]
+    public void AnEntryKnownOnlyByItsProjects_IsReachedByPlaceOrByASelectorForEveryEnvironment()
+    {
+        var entry = Name("services", "Stripe");
+
+        Assert.True(EntryExposure.Default.ReachesWithoutTags(entry, ["billing"]));
+        Assert.True(Exposure("tag:env:billing").ReachesWithoutTags(entry, ["web", "billing"]));
+        Assert.True(Exposure("services/**").ReachesWithoutTags(entry, []));
+        Assert.False(Exposure("tag:env:billing:dev").ReachesWithoutTags(entry, ["billing"]));
+        Assert.False(Exposure("tag:env:web").ReachesWithoutTags(entry, ["billing"]));
+        Assert.False(EntryExposure.Default.ReachesWithoutTags(entry, []));
+        Assert.False(EntryExposure.Default.ReachesWithoutTags(Name(ReservedGroups.Tokens, "7d2e91c0"), ["billing"]));
+    }
+
     /// <summary>
     /// A selector that does not parse is refused, never read as a place: <c>TAG:env:x</c> taken as a
     /// title pattern would leave a different exposure in force than the one written.

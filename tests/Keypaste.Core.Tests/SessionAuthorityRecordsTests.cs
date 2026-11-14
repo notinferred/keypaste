@@ -80,6 +80,9 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
     private NamesRequest Listing(string session = "session-one") => new(["env/**"]) { ClientLabel = _agent, Vault = VaultPath, Session = session };
 
+    private FindRequest Search(string? text = "STRIPE", string session = "session-one") =>
+        new(["env/**"], text, null, null, null) { ClientLabel = _agent, Vault = VaultPath, Session = session };
+
     private RunRequest Run(string session = "session-one") => new()
     {
         Program = Program,
@@ -181,6 +184,86 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Equal(["env/**"], line.GetProperty("exposure").EnumerateArray().Select(glob => glob.GetString()));
         Assert.Equal("session-one", line.GetProperty("session").GetString());
         Assert.Equal(VaultKey, line.GetProperty("vault").GetString());
+    }
+
+    /// <summary>
+    /// A search reaches the vault through the owner both the app and <c>keypaste approve</c> compose, and its line
+    /// is written before its reply is read, with what was searched for and how many items it named (T-6).
+    /// </summary>
+    [Fact]
+    public async Task ASearchStraightToThePipe_IsAnsweredFromTheVault_AndRecordedFirst()
+    {
+        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        using var lifetime = new SessionLifetime();
+
+        using (var server = SessionServer.Listen(pipe, new SessionServerOptions
+        {
+            Vault = VaultIdentity.Of(_directory, VaultPath),
+            Lifetime = lifetime,
+            CurrentLifetime = () => lifetime,
+            UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? _vault : null,
+            Channel = new FakeChannel(),
+            Rules = new FakeAgentRules(),
+            Audit = () => _log.Log,
+        }))
+        {
+            using var stop = new CancellationTokenSource();
+            var running = server.RunAsync(stop.Token);
+
+            await using (var client = await ApproverClient.TryConnectAsync(pipe, _wait, Token))
+            {
+                Assert.NotNull(client);
+                Assert.True((await client.AttachAsync(new AttachRequest(VaultPath) { Client = new AttachClient("claude-code", "2.1.0", _agent) }, Token))?.Attached);
+
+                var reply = await client.FindAsync(Search() with { Session = lifetime.Id }, Token);
+
+                Assert.True(reply?.Recorded);
+                var found = Assert.Single(reply!.Found);
+                Assert.Equal(new EntryName("env/dev", "STRIPE_KEY"), found.Entry.Listing.Name);
+                var line = Assert.Single(_log.Lines());
+                Assert.Equal("find_access", line.GetProperty("tool").GetString());
+                Assert.Equal(("granted", "found 1 item and linked 0 more"), (line.GetProperty("decision").GetString(), line.GetProperty("reason").GetString()));
+                Assert.Equal("STRIPE", line.GetProperty("args").GetProperty("query").GetProperty("text").GetString());
+                Assert.Equal(_agent, line.GetProperty("client").GetProperty("label").GetString());
+                Assert.Equal(VaultKey, line.GetProperty("vault").GetString());
+            }
+
+            await stop.CancelAsync();
+
+            try
+            {
+                await running;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
+            {
+                // Stopping the listener is how it ends.
+            }
+        }
+
+        Assert.DoesNotContain(_stripe, _log.Text(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A search refused at admission or as empty is recorded as refused, with the query it carried.</summary>
+    [Fact]
+    public async Task ARefusedSearch_IsRecordedWithItsQuery()
+    {
+        await using var owner = Owner.Start(this);
+
+        await using (var unattached = await ConnectAsync(owner))
+        {
+            await unattached.FindAsync(Search(), Token);
+        }
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            var empty = await client.FindAsync(Search(text: null), Token);
+            Assert.Equal((AuditMethod.InvalidRequest, true), (empty?.Refusal, empty?.Recorded));
+        }
+
+        var lines = _log.Lines();
+        Assert.Equal(["no-session", "invalid-request"], lines.Select(line => line.GetProperty("method").GetString()));
+        Assert.All(lines, line => Assert.Equal(("find_access", "denied"), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString())));
+        Assert.Equal("STRIPE", lines[0].GetProperty("args").GetProperty("query").GetProperty("text").GetString());
     }
 
     /// <summary>A person's yes is recorded before the reply is read, with what was asked and for how long, and never the value.</summary>
@@ -352,6 +435,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
             var credential = await client.RequestAsync(Credential(), Token);
             var listing = await client.ListAsync(Listing(), Token);
             var run = await client.ReleaseRunAsync(Run(), Token);
+            var search = await client.FindAsync(Search(), Token);
 
             Assert.Equal(AuditDecision.Denied, credential?.Decision);
             Assert.Equal(AuditMethod.Failed, credential!.Method);
@@ -361,6 +445,9 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
             Assert.Empty(listing!.Names);
             Assert.False(listing.Recorded);
+
+            Assert.Empty(search!.Found);
+            Assert.Equal((false, AuditMethod.Failed, false), (search.VaultUnlocked, search.Refusal, search.Recorded));
 
             Assert.NotEqual(EnvOutcome.Resolved, run?.Set.Outcome);
             Assert.Empty(run!.Set.Variables);
@@ -389,8 +476,13 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         var listing = await client.ListAsync(Listing(), Token);
         var run = await client.ReleaseRunAsync(Run(), Token);
         var env = await client.ReleaseEnvAsync(new EnvRequest("acme-api", ["npm", "run", "migrate"], _directory) { Vault = VaultPath, Session = "session-one" }, Token);
+        var search = await client.FindAsync(Search(), Token);
 
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        Assert.NotNull(search);
+        Assert.Equal((AuditMethod.Failed, false, "the audit log could not be opened"), (search.Refusal, search.Recorded, search.Reason));
+        Assert.Empty(search.Found);
 
         Assert.NotNull(credential);
         Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, false), (credential.Decision, credential.Method, credential.Recorded));

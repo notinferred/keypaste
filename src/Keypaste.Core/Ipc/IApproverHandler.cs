@@ -38,6 +38,14 @@ public interface IApproverHandler
     /// <returns>The names, or the reason there are none.</returns>
     ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken);
 
+    /// <summary>Searches the items the agent on this connection may be shown.</summary>
+    /// <param name="request">What to search for, and the exposure the bridge is configured with.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The items found, or why there are none. A handler that does not search refuses.</returns>
+    ValueTask<FindReply> FindAsync(FindRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new FindReply(false, [], "this keypaste process does not search items", true) { Refusal = AuditMethod.NoSession });
+
     /// <summary>Decides one credential request, asking a human if it has to.</summary>
     /// <param name="request">What the agent asked for.</param>
     /// <param name="connectionId">Who is asking.</param>
