@@ -31,7 +31,7 @@ A source feature is not in a downloaded binary until a release publishes it.
 | Share links: `keypaste share` encrypts one field or a login on this machine and uploads only ciphertext to keypaste.com; links expire, open a set number of times and can be revoked | Implemented (unreleased) | |
 | `keypaste lock`, `status`, `doctor` | Implemented (unreleased) | |
 | Audit log: `log` with `--since`, `--denied`, `--client`; `log verify` | Published `v0.3.0` | |
-| `log --json`, `log verify --expect <hash>` | Implemented (unreleased) | A fully recomputed log or a removed tail is caught only against a hash you kept |
+| `log --json`, `log verify --expect <hash>`, `log verify --checkpoints` | Implemented (unreleased) | A recomputed log is caught only before the last checkpoint, and a removed tail only against a hash you kept |
 
 ## MCP bridge and approvals
 

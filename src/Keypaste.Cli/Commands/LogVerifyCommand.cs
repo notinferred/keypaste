@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -25,9 +26,11 @@ internal static class LogVerifyCommand
 {
     private static readonly Option<string> _expect = Syntax.Value("--expect", "hash", "a hash from an earlier run, which the chain must still hold");
 
+    private static readonly Option<bool> _checkpoints = Syntax.Flag("--checkpoints", "open the vault and check the checkpoints its owner signed");
+
     internal static CliVerb Command { get; } = new("verify", "check the whole chain and report it in full", Execute)
     {
-        _expect, CliOptions.AuditLog,
+        _expect, _checkpoints, CliOptions.AuditLog, CliOptions.Vault, CliOptions.Keyfile,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -53,11 +56,41 @@ internal static class LogVerifyCommand
             return CliApp.ExitNotFound;
         }
 
-        // The anchor is answered by the same pass that checks the chain, because only a record whose
-        // own bytes still hash to it can answer for it. Searching the file's text would accept a
-        // hash sitting in any field — including an entry name, which the agent writes.
-        var report = AuditChainVerifier.Verify(path, expected);
+        if (!line.GetValue(_checkpoints))
+        {
+            return Report(AuditChainVerifier.Verify(path, expected), path, context);
+        }
 
+        if (!VaultLocator.TryResolve(line, context.Environment, out var vaultPath, out var locateError))
+        {
+            context.Stderr.WriteLine($"keypaste log verify: {locateError}");
+            return CliApp.ExitUsageError;
+        }
+
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+
+        return VaultSession.Open(vaultPath, line, context, vault =>
+        {
+            var key = AuditCheckpointKey.Read(vault, VaultIdentity.Of(home, vaultPath));
+
+            if (key is null)
+            {
+                context.Stderr.WriteLine("keypaste log verify: this vault holds no checkpoint key yet, so no checkpoint was checked");
+            }
+
+            var report = AuditChainVerifier.Verify(path, expected, key);
+
+            if (key is not null)
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(key.Key);
+            }
+
+            return Report(report, path, context);
+        });
+    }
+
+    private static int Report(AuditChainReport report, string path, CliContext context)
+    {
         if (report.Verdict == AuditChainVerdict.Unreadable)
         {
             context.Stderr.WriteLine($"keypaste log verify: {path} could not be read: {report.Error}");

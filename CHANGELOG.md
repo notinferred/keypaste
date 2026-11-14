@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 An agent can search the items it may see with `find_access`, by text, host, kind, project or a related item, and gets each item's handle, origin, username when Settings shows it, the items it shares a site, a project or an account with, and the projects the items found belong to with their environments, never a value. Hosts and references, a new switch beside Usernames in Agents, off by default, adds the host in a `Host` field and links between items one of whose fields references the other.
 
+The app and `keypaste approve` sign the audit log every 64 lines they write and when the vault locks, with a key kept in the vault, and `keypaste log verify --checkpoints` checks those signatures, so rewriting the log before the last one needs the unlocked vault.
+
 On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command.
 
 keypaste has its own browser extension, a simplified fork of KeePassXC-Browser for Chrome, Chromium, Edge, Brave and Firefox that pairs with keypaste and fills logins, in keypaste's design; it is not in the stores yet ([8.1f](docs/steps/8.1f.md)).

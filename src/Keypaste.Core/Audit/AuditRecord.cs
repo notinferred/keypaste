@@ -162,6 +162,10 @@ public enum AuditMethod
     /// <summary>This computer's agent rules changed where it was asked, as <c>keypaste clients</c> does, with nobody shown a confirmation.</summary>
     /// <remarks>Released nothing; any program the person runs can run that verb, so the line never claims a person acted.</remarks>
     RulesChanged = 35,
+
+    /// <summary>The vault's owner signed the chain up to this line with the vault's checkpoint key.</summary>
+    /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
+    Checkpoint = 36,
 }
 
 /// <summary>Who asked.</summary>
@@ -373,6 +377,9 @@ public sealed record AuditRecord
 
     /// <summary>Lowercase hex SHA-256 of the run's canonical argv, program first, or null.</summary>
     public string? CommandSha256 { get; init; }
+
+    /// <summary>On a checkpoint line, the HMAC-SHA256 its owner wrote over the chain up to it, as lowercase hex; otherwise null.</summary>
+    public string? Checkpoint { get; init; }
 
     /// <summary>The longest command head a line keeps.</summary>
     public const int CommandLength = 256;

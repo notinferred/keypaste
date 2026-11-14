@@ -80,6 +80,9 @@ public sealed record AuditEntry
 
     /// <summary>Whether this record was granted.</summary>
     public bool Granted => string.Equals(Decision, "granted", StringComparison.Ordinal);
+
+    /// <summary>Whether this is the owner's checkpoint rather than a request, which no listing shows.</summary>
+    public bool IsCheckpoint => string.Equals(Method, AuditCheckpoint.Method, StringComparison.Ordinal);
 }
 
 /// <summary>Where an incremental read of the log stopped.</summary>
@@ -151,7 +154,10 @@ public static class AuditReader
 
                 if (Parse(line, number) is { } entry)
                 {
-                    read.Add(entry);
+                    if (!entry.IsCheckpoint)
+                    {
+                        read.Add(entry);
+                    }
                 }
                 else
                 {
@@ -250,7 +256,10 @@ public static class AuditReader
 
             if (Parse(line, number) is { } entry)
             {
-                read.Add(entry);
+                if (!entry.IsCheckpoint)
+                {
+                    read.Add(entry);
+                }
             }
             else
             {

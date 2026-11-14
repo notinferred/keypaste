@@ -243,12 +243,25 @@ public sealed class AuditLog : IDisposable
         ArgumentNullException.ThrowIfNull(record);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var written = Append(record, out error);
+        var written = Append((_, _) => record, out error);
         AppendFinished?.Invoke(written ? null : error);
         return written;
     }
 
-    private bool Append(AuditRecord record, out string error)
+    /// <summary>Appends a checkpoint signing the chain up to it, without raising <see cref="AppendFinished"/>.</summary>
+    /// <param name="key">The vault's checkpoint key.</param>
+    /// <param name="session">The unlocked session writing it.</param>
+    /// <param name="error">Why it was not written, otherwise empty.</param>
+    /// <returns>Whether the line was written.</returns>
+    internal bool TryCheckpoint(AuditCheckpointKey key, string session, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Append((sequence, previous) => AuditCheckpoint.Record(key, session, sequence, previous), out error);
+    }
+
+    private bool Append(Func<long, string, AuditRecord> recordAt, out string error)
     {
         lock (_gate)
         {
@@ -283,6 +296,7 @@ public sealed class AuditLog : IDisposable
                     .ToString(TimestampFormat, CultureInfo.InvariantCulture);
 
                 var sequence = tail.Sequence + 1;
+                var record = recordAt(sequence, tail.Previous);
                 var bytes = Compose(record, timestamp, sequence, tail.Previous, withReasonExcerpt: true);
 
                 if (bytes.Length > MaximumRecordBytes)
@@ -627,6 +641,7 @@ public sealed class AuditLog : IDisposable
 
             WriteOptional(writer, "command", record.Command);
             WriteOptional(writer, "command_sha256", record.CommandSha256);
+            WriteOptional(writer, "checkpoint", record.Checkpoint);
 
             // Last, so the bytes the hash covers include the link. The other order would let a
             // line's link be re-pointed without disturbing its hash.
@@ -705,6 +720,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Allowed => "allowed",
         AuditMethod.Blocked => "blocked",
         AuditMethod.RulesChanged => "rules-changed",
+        AuditMethod.Checkpoint => AuditCheckpoint.Method,
         _ => "unknown",
     };
 

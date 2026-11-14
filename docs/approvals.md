@@ -192,7 +192,14 @@ keypaste log verify
 Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
 ```
 
-`keypaste log verify` exits 5 for a broken chain and names the line and the problem; `keypaste log` runs the same check and marks a row the chain does not vouch for with `?`. The chain has no secret key, so whoever can write the file can recompute it, and deleting the last records leaves a valid chain; both limits are printed on every pass. To detect a lost record, keep a hash somewhere else and supply it later:
+`keypaste log verify` exits 5 for a broken chain and names the line and the problem; `keypaste log` runs the same check and marks a row the chain does not vouch for with `?`. The chain alone has no secret key, so whoever can write the file can recompute it. The app and `keypaste approve` therefore add a checkpoint every 64 lines they write and when the vault locks, signed with a key the vault holds; `keypaste log verify --checkpoints` asks for the master password and fails when a checkpoint naming the vault is not signed by its key:
+
+```
+2 checkpoints found, 2 signed by this vault's key.
+Unsigned tail: 5 records after the last signed checkpoint.
+```
+
+Records after the last checkpoint are unsigned, and deleting the last records leaves a valid chain; both limits are printed on every pass. To detect a lost record, keep a hash somewhere else and supply it later:
 
 ```sh
 keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
