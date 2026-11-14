@@ -243,11 +243,14 @@ const pairChromium = async function(app) {
         const listen = (worker) => worker.on('console', (message) => consoles.push(`worker ${message.type()}: ${message.text()}`));
         context.on('serviceworker', listen);
         context.serviceWorkers().forEach(listen);
-        const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker', { timeout: WAIT_MS });
+        // Chromium runs component extensions of its own beside keypaste's, so the worker is found by the ID the test key gives.
+        const ours = (worker) => new URL(worker.url()).host === chromeId;
+        const worker = context.serviceWorkers().find(ours)
+            ?? await context.waitForEvent('serviceworker', { predicate: ours, timeout: WAIT_MS }).catch(() => {
+                const seen = context.serviceWorkers().map((other) => other.url()).join(', ') || 'none';
+                throw new Error(`Chromium ran no extension as ${chromeId}; its extension workers: ${seen}`);
+            });
         const id = new URL(worker.url()).host;
-        if (id !== chromeId) {
-            throw new Error(`Chromium loaded the extension as ${id}, not ${chromeId}`);
-        }
 
         page = await context.newPage();
         page.on('console', (message) => consoles.push(`page ${message.type()}: ${message.text()}`));
