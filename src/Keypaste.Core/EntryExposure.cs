@@ -264,6 +264,20 @@ public sealed class EntryExposure
             || (_selectors.Length > 0 && !ReservedGroups.IsReserved(name.GroupPath) && CredentialFields.IsAgentCustom(field));
     }
 
+    /// <summary>Whether this exposure reaches an entry whose tags are unknown, knowing only projects it is a member of.</summary>
+    /// <param name="name">The real, unsanitized name.</param>
+    /// <param name="projects">Projects the entry is a member of, in an environment not known.</param>
+    /// <returns><see langword="true"/> when a place pattern matches it, or a selector names one of the projects in every environment.</returns>
+    public bool ReachesWithoutTags(EntryName name, IEnumerable<string> projects)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(projects);
+
+        return Reach(name, []) == ExposureReach.Entry
+            || (!ReservedGroups.IsReserved(name.GroupPath)
+                && projects.Any(project => _selectors.Any(selector => selector.Environment is null && MatchOne(selector.Project, project))));
+    }
+
     /// <summary>Whether this exposure provably reaches at least as far as another, entry by entry.</summary>
     /// <param name="other">The other exposure.</param>
     /// <returns>

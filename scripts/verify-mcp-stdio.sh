@@ -62,14 +62,14 @@ while IFS= read -r line; do
     || die "a line on stdout is not JSON: $line"
 done <"$OUT"
 
-# 2. Exactly four tools, with the names the documentation promises.
+# 2. Exactly five tools, with the names the documentation promises.
 tools="$(jq -c 'select(.id == 2) | .result.tools' <"$OUT" | head -n 1)"
 [ -n "$tools" ] || die "no tools/list response"
 
 count="$(printf '%s' "$tools" | jq 'length')"
-[ "$count" = "4" ] || die "expected exactly 4 tools, got $count"
+[ "$count" = "5" ] || die "expected exactly 5 tools, got $count"
 
-for want in list_entry_names request_credential request_attachment request_save; do
+for want in list_entry_names find_access request_credential request_attachment request_save; do
   printf '%s' "$tools" | jq -e --arg n "$want" 'any(.[]; .name == $n)' >/dev/null \
     || die "tool $want is missing"
 done
@@ -152,7 +152,7 @@ RUN_OUT="$WORK/run-stdout.txt"
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
-[ "$(printf '%s' "$run_tools" | jq 'length')" = "5" ] || die "--allow-run did not list exactly 5 tools"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "6" ] || die "--allow-run did not list exactly 6 tools"
 printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
   || die "run is missing destructiveHint=true or openWorldHint=true"
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \

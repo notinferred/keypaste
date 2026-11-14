@@ -190,6 +190,18 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             AnswerBound,
             cancellationToken);
 
+    /// <summary>Asks the owner to search the items it may show.</summary>
+    /// <param name="request">What to search for and the exposure to apply. Its vault and session are filled in here.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
+    /// <returns>The reply, and what became of the exchange.</returns>
+    internal ValueTask<Exchange<FindReply>> FindAsync(
+        FindRequest request,
+        CancellationToken cancellationToken) =>
+        ExchangeAsync(
+            (client, session, token) => client.FindAsync(request with { Vault = vaultPath, Session = session }, token),
+            AnswerBound,
+            cancellationToken);
+
     private async ValueTask<Exchange<T>> ExchangeAsync<T>(
         Func<ApproverClient, string, CancellationToken, ValueTask<T?>> exchange,
         TimeSpan bound,
