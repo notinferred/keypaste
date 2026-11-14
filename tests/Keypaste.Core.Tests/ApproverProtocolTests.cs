@@ -98,6 +98,24 @@ public sealed class ApproverProtocolTests
     }
 
     [Fact]
+    public void AReceivedFrameIsZeroedOnceDecoded()
+    {
+        var frame = ApproverProtocol.Encode(Granted());
+
+        Assert.Equal("sk_live_sentinel", ApproverProtocol.Decoded<CredentialReply>(frame, ApproverProtocol.TryDecode)?.Value);
+        Assert.All(frame, value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public void AFrameThatDoesNotDecodeIsZeroedToo()
+    {
+        var frame = ApproverProtocol.Encode(Granted());
+
+        Assert.Null(ApproverProtocol.Decoded<EnvReply>(frame, ApproverProtocol.TryDecode));
+        Assert.All(frame, value => Assert.Equal(0, value));
+    }
+
+    [Fact]
     public void ANamesReplySurvivesTheRoundTrip()
     {
         var reply = new NamesReply(

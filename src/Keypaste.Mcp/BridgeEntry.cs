@@ -3,6 +3,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -35,6 +36,8 @@ public static class BridgeEntry
     public static async Task<int> RunAsync(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
+
+        _ = MemoryDumps.TryPrevent();
 
         var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 

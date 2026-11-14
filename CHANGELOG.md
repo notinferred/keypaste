@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 An agent can search the items it may see with `find_access`, by text, host, kind or a related item, and gets each item's handle, origin, username when Settings shows it and the items it shares a site or a project with, never a value.
 
+On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command.
+
 keypaste has its own browser extension, a simplified fork of KeePassXC-Browser for Chrome, Chromium, Edge, Brave and Firefox that pairs with keypaste and fills logins, in keypaste's design; it is not in the stores yet ([8.1f](docs/steps/8.1f.md)).
 
 Settings › Browser fill and `keypaste browser` turn keypaste on and off as Chrome's, Chromium's, Edge's, Brave's and Firefox's host for keypaste's own browser extension, and show which program each browser starts and whether the extension is installed in it. keypaste no longer answers KeePassXC-Browser ([8.1e](docs/steps/8.1e.md)).

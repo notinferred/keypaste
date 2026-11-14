@@ -164,7 +164,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out AttachReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<AttachReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks for the entry names an agent may be shown.</summary>
@@ -178,7 +178,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out NamesReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<NamesReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Searches the items an agent may be shown.</summary>
@@ -192,7 +192,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out FindReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<FindReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks for one field of one entry.</summary>
@@ -210,7 +210,7 @@ public sealed class ApproverClient : IAsyncDisposable
             withdrawable: true,
             replyFrameBytes: request.Attachment is null ? MessageFramer.MaximumFrameBytes : ApproverProtocol.MaximumAttachmentReplyFrameBytes).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out CredentialReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<CredentialReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks for a project's env set.</summary>
@@ -225,7 +225,7 @@ public sealed class ApproverClient : IAsyncDisposable
         var frame = await ExchangeAsync(
             ApproverProtocol.Encode(request), cancellationToken, replyFrameBytes: ApproverProtocol.MaximumEnvReplyFrameBytes).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<EnvReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to lock now.</summary>
@@ -239,7 +239,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out LockReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<LockReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to change one agent in this computer's rules, which it seals.</summary>
@@ -252,7 +252,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out RulesChangeReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<RulesChangeReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to put an agent's request to save a value to the person.</summary>
@@ -265,7 +265,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out SaveReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<SaveReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to make a terminal's edit, which waits for the person to allow it.</summary>
@@ -279,7 +279,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out EditReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<EditReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks for a set under a scoped token.</summary>
@@ -294,7 +294,7 @@ public sealed class ApproverClient : IAsyncDisposable
         var frame = await ExchangeAsync(
             ApproverProtocol.Encode(request), cancellationToken, replyFrameBytes: ApproverProtocol.MaximumEnvReplyFrameBytes).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<EnvReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks for the secrets an agent's run would inject.</summary>
@@ -308,7 +308,7 @@ public sealed class ApproverClient : IAsyncDisposable
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
-        return frame is not null && ApproverProtocol.TryDecode(frame, out RunReply? reply) ? reply : null;
+        return ApproverProtocol.Decoded<RunReply>(frame, ApproverProtocol.TryDecode);
     }
 
     private async ValueTask<byte[]?> ExchangeAsync(
@@ -316,6 +316,19 @@ public sealed class ApproverClient : IAsyncDisposable
         CancellationToken cancellationToken,
         bool withdrawable = false,
         int replyFrameBytes = MessageFramer.MaximumFrameBytes)
+    {
+        try
+        {
+            return await ExchangeOnceAsync(request, withdrawable, replyFrameBytes, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // A request may carry a value to save.
+            CryptographicOperations.ZeroMemory(request);
+        }
+    }
+
+    private async ValueTask<byte[]?> ExchangeOnceAsync(byte[] request, bool withdrawable, int replyFrameBytes, CancellationToken cancellationToken)
     {
         if (_disposed || _withdrawn)
         {

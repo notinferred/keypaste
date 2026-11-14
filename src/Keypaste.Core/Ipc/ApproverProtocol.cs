@@ -253,6 +253,7 @@ public static partial class ApproverProtocol
             return frame;
         }
 
+        CryptographicOperations.ZeroMemory(frame);
         var refusal = WriteCredential(Bounded(reply, reply.Entry));
 
         // Belt and braces: the entry is capped by EntryNameSanitizer long before it gets here, and
@@ -277,7 +278,7 @@ public static partial class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return WriteCredential(reply).Length <= PayloadBound(reply);
+        return Measured(WriteCredential(reply)) <= PayloadBound(reply);
     }
 
     /// <summary>The largest frame carrying an attachment to the bridge that asked for it, the one credential reply over <see cref="MessageFramer.MaximumFrameBytes"/>.</summary>
@@ -300,7 +301,7 @@ public static partial class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return WriteEnv(reply).Length <= MaximumEnvReplyPayloadBytes;
+        return Measured(WriteEnv(reply)) <= MaximumEnvReplyPayloadBytes;
     }
 
     /// <summary>Whether <see cref="Encode(RunReply)"/> would send this reply as it is.</summary>
@@ -311,7 +312,7 @@ public static partial class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return WriteRun(reply).Length <= MessageFramer.MaximumPayloadBytes;
+        return Measured(WriteRun(reply)) <= MessageFramer.MaximumPayloadBytes;
     }
 
     private static CredentialReply Bounded(CredentialReply reply, string? entry) =>
@@ -334,6 +335,31 @@ public static partial class ApproverProtocol
                 Session = reply.Session,
                 Recorded = reply.Recorded,
             };
+
+    /// <summary>One of the protocol's <c>TryDecode</c> overloads.</summary>
+    internal delegate bool FrameDecoder<T>(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out T? decoded)
+        where T : class;
+
+    /// <summary>A frame received from the peer, decoded and then zeroed, because a frame may carry a value.</summary>
+    internal static T? Decoded<T>(byte[]? frame, FrameDecoder<T> decode)
+        where T : class
+    {
+        try
+        {
+            return frame is not null && decode(frame, out var decoded) ? decoded : null;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(frame);
+        }
+    }
+
+    /// <summary>The length of a frame written only to be measured, which is zeroed because it may carry a released value.</summary>
+    private static int Measured(byte[] frame)
+    {
+        CryptographicOperations.ZeroMemory(frame);
+        return frame.Length;
+    }
 
     private static byte[] WriteCredential(CredentialReply reply) =>
         JsonSerializer.SerializeToUtf8Bytes(new CredentialReplyFrame(reply), Wire.CredentialReplyFrame);
@@ -392,6 +418,7 @@ public static partial class ApproverProtocol
             return frame;
         }
 
+        CryptographicOperations.ZeroMemory(frame);
         var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
         var refusal = WriteEnv(new EnvReply(tooLarge, tooLarge.Refusal));
 
@@ -1688,6 +1715,7 @@ public static partial class ApproverProtocol
             return frame;
         }
 
+        CryptographicOperations.ZeroMemory(frame);
         var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
         var refusal = WriteRun(new RunReply(tooLarge, AuditMethod.Undeliverable, UndeliverableReason(reply.Method))
         {

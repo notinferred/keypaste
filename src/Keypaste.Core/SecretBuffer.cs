@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// <para>
 /// Exists because <see cref="Vault"/> takes a <see cref="ReadOnlySpan{T}"/> of <see cref="char"/>
-/// and zeroes its UTF-8 copy in a <c>finally</c> (DECISIONS.md D-0007). If a caller read the master
+/// and zeroes its UTF-8 copy in a <c>finally</c>. If a caller read the master
 /// password into a <see cref="string"/>, that promise would be worthless one layer up: strings are
 /// immutable and cannot be cleared.
 /// </para>
@@ -17,8 +17,8 @@ namespace Keypaste.Core;
 /// </para>
 /// <para>
 /// <b>What this does not protect against, stated plainly so the documentation does not
-/// overclaim:</b> the garbage collector may relocate this array and leave an unreachable copy
-/// behind; the value can reach swap, a hibernation file, or a core dump; a debugger or any
+/// overclaim:</b> the array is pinned, so the garbage collector leaves no copy of it behind, but
+/// the value can reach swap, a hibernation file, or a dump on Windows; a debugger or any
 /// process running as the same user can read it; and it necessarily becomes a
 /// <see cref="string"/> somewhere anyway — <see cref="VaultEntry.Password"/> is one such place.
 /// This narrows the window and reduces the number of copies. It is not a security boundary, and
@@ -30,7 +30,7 @@ public sealed class SecretBuffer : IDisposable
     /// <summary>How many characters the buffer holds before it has to grow.</summary>
     public const int InitialCapacity = 64;
 
-    private char[] _buffer = new char[InitialCapacity];
+    private char[] _buffer = GC.AllocateArray<char>(InitialCapacity, pinned: true);
     private int _length;
     private bool _disposed;
 
@@ -70,7 +70,7 @@ public sealed class SecretBuffer : IDisposable
 
         if (_length == _buffer.Length)
         {
-            var grown = new char[_buffer.Length * 2];
+            var grown = GC.AllocateArray<char>(_buffer.Length * 2, pinned: true);
             _buffer.AsSpan(0, _length).CopyTo(grown);
             Array.Clear(_buffer);
             _buffer = grown;

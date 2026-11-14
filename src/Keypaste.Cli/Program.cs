@@ -1,6 +1,7 @@
 using Keypaste.Browser;
 using Keypaste.Cli.Output;
 using Keypaste.Core.Clients;
+using Keypaste.Infrastructure;
 using Keypaste.Mcp;
 
 namespace Keypaste.Cli;
@@ -23,6 +24,8 @@ internal static class Program
         {
             return await BrowserEntry.RunAsync(args).ConfigureAwait(false);
         }
+
+        _ = MemoryDumps.TryPrevent();
 
         if (args is [SelfTestFlag])
         {

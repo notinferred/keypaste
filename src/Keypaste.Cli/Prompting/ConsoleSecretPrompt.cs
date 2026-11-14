@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using Keypaste.Core;
 
@@ -95,15 +94,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     {
         if (!IsInteractive)
         {
-            var line = ReadRedirectedLine();
-            if (line is null)
-            {
-                return null;
-            }
-
-            var piped = new SecretBuffer();
-            piped.Append(line);
-            return piped;
+            return ReadRedirectedSecret();
         }
 
         _prompts.Write(prompt);
@@ -265,46 +256,67 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         return _clock.GetTimestamp();
     }
 
+    private string? ReadRedirectedLine()
+    {
+        using var line = ReadRedirectedSecret();
+        return line is null ? null : new string(line.Value);
+    }
+
     /// <summary>
-    /// Reads exactly one line from the redirected stream, consuming not one byte more.
+    /// Reads exactly one line from the redirected stream, consuming not one byte more, decoding each byte straight into the
+    /// buffer so no other copy of a secret is left behind.
     /// </summary>
     /// <remarks>
     /// Everything after the newline is left in the pipe for whoever reads next — which for
-    /// <c>keypaste run</c> is the child process. Decoding happens once at the end rather than per
-    /// byte, so a multi-byte character split across the loop still arrives intact.
+    /// <c>keypaste run</c> is the child process. One decoder reads every byte, so a multi-byte character split across the
+    /// loop still arrives intact.
     /// </remarks>
-    private string? ReadRedirectedLine()
+    private SecretBuffer? ReadRedirectedSecret()
     {
-        var bytes = new List<byte>(SecretBuffer.InitialCapacity);
+        var decoder = Encoding.UTF8.GetDecoder();
+        Span<byte> read = stackalloc byte[1];
+        Span<char> decoded = stackalloc char[4];
+        var line = new SecretBuffer();
+        var anything = false;
 
-        while (true)
+        try
         {
-            var next = _redirectedInput.ReadByte();
+            int next;
 
-            if (next < 0)
+            while ((next = _redirectedInput.ReadByte()) >= 0 && next != '\n')
             {
-                // End of input. A final line with no newline still counts; nothing at all does not.
-                return bytes.Count == 0 ? null : Decode(bytes);
+                anything = true;
+                read[0] = (byte)next;
+                line.Append(decoded[..decoder.GetChars(read, decoded, flush: false)]);
             }
 
-            if (next == '\n')
+            line.Append(decoded[..decoder.GetChars([], decoded, flush: true)]);
+
+            // A CRLF pipe leaves the carriage return behind, and it would otherwise become part of
+            // the password.
+            if (line.Value is [.., '\r'])
             {
-                return Decode(bytes);
+                line.Backspace();
             }
 
-            bytes.Add((byte)next);
-        }
-    }
+            // End of input. A final line with no newline still counts; nothing at all does not.
+            if (next < 0 && !anything)
+            {
+                line.Dispose();
+                return null;
+            }
 
-    private static string Decode(List<byte> bytes)
-    {
-        // A CRLF pipe leaves the carriage return behind, and it would otherwise become part of
-        // the password.
-        if (bytes.Count > 0 && bytes[^1] == '\r')
+            return line;
+        }
+        catch
         {
-            bytes.RemoveAt(bytes.Count - 1);
+            line.Dispose();
+            throw;
         }
-
-        return Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(bytes));
+        finally
+        {
+            read.Clear();
+            decoded.Clear();
+        }
     }
 }
