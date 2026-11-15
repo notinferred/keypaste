@@ -428,7 +428,7 @@ public sealed class RunToolTests : IDisposable
 
         var tools = await client.ListToolsAsync(cancellationToken: Token);
 
-        Assert.Equal([ToolText.FindToolName, ToolText.ListToolName, ToolText.AttachmentToolName, ToolText.CredentialToolName, ToolText.SaveToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
+        Assert.Equal([ToolText.FindToolName, ToolText.ListToolName, ToolText.AttachmentToolName, ToolText.CredentialToolName, ToolText.SetToolName, ToolText.SaveToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]

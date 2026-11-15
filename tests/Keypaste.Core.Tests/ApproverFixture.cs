@@ -95,6 +95,12 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 
     public IReadOnlyList<string> Tags(EntryName name) => Tagged.TryGetValue(name, out var tags) ? tags : [];
 
+    /// <summary>Items a test adds beside the two, resolved and read as they are and searched as the test describes them, before Settings hide anything.</summary>
+    internal List<IndexedEntry> Added { get; } = [];
+
+    /// <summary>Items a test adds that more than one item answers to, as two logins of one title in one group do.</summary>
+    internal HashSet<string> Ambiguous { get; } = new(StringComparer.Ordinal);
+
     public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
     {
         name = null;
@@ -106,7 +112,13 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
             return false;
         }
 
-        foreach (var candidate in _entries)
+        if (Ambiguous.Contains(entryArgument))
+        {
+            failure = CredentialFailure.Ambiguous;
+            return false;
+        }
+
+        foreach (var candidate in _entries.Concat(Added.Select(added => added.Listing.Name)))
         {
             var path = candidate.GroupPath.Length == 0
                 ? candidate.Title
@@ -198,6 +210,12 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
             [
                 Indexed(_entries[0], ItemKind.ApiKey, "https://dashboard.stripe.com", "billing@acme.test"),
                 Indexed(_entries[1], ItemKind.Login, "https://stripe.com", "me@bank.test"),
+                .. Added.Select(added => added with
+                {
+                    Listing = added.Listing with { Tags = [.. added.Listing.Tags, .. Tags(added.Listing.Name)] },
+                    Username = showsUsername ? added.Username : null,
+                    References = showsLinkedHosts ? added.References : [],
+                }),
             ],
             exposure);
         failure = CredentialFailure.None;
@@ -227,6 +245,19 @@ internal sealed class FakeChannel : IApprovalChannel
     internal EnvReleasePrompt? LastEnvPrompt { get; private set; }
 
     internal RunPrompt? LastRunPrompt { get; private set; }
+
+    /// <summary>The last linked set asked about.</summary>
+    internal SetPrompt? LastSetPrompt { get; private set; }
+
+    /// <summary>How many linked sets were asked about, of all the prompts <see cref="Asked"/> counts.</summary>
+    internal int SetsAsked { get; private set; }
+
+    public ValueTask<ApprovalAnswer> AskAsync(SetPrompt prompt, CancellationToken cancellationToken)
+    {
+        LastSetPrompt = prompt;
+        SetsAsked++;
+        return AnswerAsync(cancellationToken);
+    }
 
     /// <summary>What a terminal's edit is answered with; a no unless a test says otherwise.</summary>
     internal ApprovalAnswer EditAnswer { get; set; } = ApprovalAnswer.Denied;

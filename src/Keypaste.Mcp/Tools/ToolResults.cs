@@ -96,6 +96,50 @@ internal static class ToolResults
         StructuredContent = Structured(field, value, codeSeconds),
     };
 
+    /// <summary>The result carrying a linked set a person released, under the same terms as <see cref="Release"/>.</summary>
+    /// <param name="fields">Each field as the agent named it, the item by its own <c>entry</c> argument, with its value, in the order asked.</param>
+    /// <returns>A success result carrying exactly those values and nothing else.</returns>
+    /// <remarks>Each value is named by what the agent sent, so it can tell them apart, and by nothing the vault holds.</remarks>
+    internal static CallToolResult ReleaseSet(IReadOnlyList<(string Entry, string Field, string Value, int CodeSeconds)> fields)
+    {
+        using var buffer = new MemoryStream(512);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteStartArray("fields");
+
+            foreach (var (entry, field, value, codeSeconds) in fields)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("entry", entry);
+                writer.WriteString("field", field);
+                writer.WriteString("value", value);
+                writer.WriteNumber("expires_in_seconds", codeSeconds);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        using var parsed = JsonDocument.Parse(buffer.ToArray());
+
+        return new CallToolResult
+        {
+            IsError = false,
+            Content =
+            [
+                new TextContentBlock
+                {
+                    Text = ToolText.ReleasedSet(fields.Count)
+                        + string.Join("\n\n", fields.Select(released => ToolText.SetFieldShown(released.Entry, released.Field, released.CodeSeconds) + released.Value)),
+                },
+            ],
+            StructuredContent = parsed.RootElement.Clone(),
+        };
+    }
+
     /// <summary>The result carrying one attachment, as base64, under the same terms as <see cref="Release"/>.</summary>
     /// <param name="name">The attachment's name as the agent asked for it.</param>
     /// <param name="base64">Its bytes as base64.</param>

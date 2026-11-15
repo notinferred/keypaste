@@ -316,6 +316,109 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Single(owner.Authority.Released);
     }
 
+    private SetRequest LinkedSet(string session = "session-one") => new()
+    {
+        Items = [new("env/dev/STRIPE_KEY", "password"), new("personal/bank", "username"), new("personal/bank", "password")],
+        Reason = "reconcile the payouts",
+        Exposure = ["**"],
+        ClientName = "claude-code",
+        ClientVersion = "2.1.0",
+        ClientLabel = _agent,
+        Vault = VaultPath,
+        Session = session,
+    };
+
+    /// <summary>A released set is one line per field, each naming its item, field and place under one set id, written before the reply and holding no value.</summary>
+    [Fact]
+    public async Task AReleasedSet_IsRecordedAsOneLinePerField_UnderOneSetId()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.RequestSetAsync(LinkedSet(), Token);
+        var lines = _log.Lines();
+
+        Assert.Equal(AuditDecision.Granted, reply?.Decision);
+        Assert.True(reply!.Recorded);
+        Assert.Equal(3, reply.Fields.Count);
+        Assert.Equal(3, lines.Count);
+        Assert.All(lines, line =>
+        {
+            Assert.Equal("request_linked_set", line.GetProperty("tool").GetString());
+            Assert.Equal(("granted", "prompt"), (line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+            Assert.Equal(3, line.GetProperty("args").GetProperty("set").GetProperty("of").GetInt32());
+            Assert.NotNull(line.GetProperty("args").GetProperty("item").GetString());
+        });
+        Assert.Single(lines.Select(line => line.GetProperty("args").GetProperty("set").GetProperty("id").GetString()).Distinct());
+        Assert.Equal([1, 2, 3], lines.Select(line => line.GetProperty("args").GetProperty("set").GetProperty("position").GetInt32()));
+        Assert.Equal(
+            [("env/dev/STRIPE_KEY", "password"), ("personal/bank", "username"), ("personal/bank", "password")],
+            lines.Select(line => (line.GetProperty("args").GetProperty("entry").GetString(), line.GetProperty("args").GetProperty("field").GetString())));
+        Assert.DoesNotContain(ApproverFixture.Sentinel, _log.Text(), StringComparison.Ordinal);
+        Assert.Equal(3, owner.Authority.Released.Count);
+    }
+
+    /// <summary>A refused set is one line, naming how many fields it asked for and no place in it.</summary>
+    [Fact]
+    public async Task ARefusedSet_IsRecordedOnce()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.RequestSetAsync(LinkedSet(), Token);
+        var line = Assert.Single(_log.Lines());
+
+        Assert.Equal((AuditDecision.Denied, true), (reply?.Decision, reply?.Recorded));
+        Assert.Equal(("request_linked_set", "denied", "prompt"), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+        Assert.Equal(3, line.GetProperty("args").GetProperty("set").GetProperty("of").GetInt32());
+        Assert.False(line.GetProperty("args").GetProperty("set").TryGetProperty("position", out _));
+        Assert.Equal(["env/dev/STRIPE_KEY", "personal/bank", "personal/bank"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.Empty(owner.Authority.Released);
+    }
+
+    /// <summary>A set whose lines cannot be written is refused whole: no field leaves and no line is written for part of it (T-6).</summary>
+    [Fact]
+    public async Task ASetTheOwnerCannotRecord_IsRefusedWithNothingInIt()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        using (var held = new FileStream(_log.Path + ".lock", FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            var reply = await client.RequestSetAsync(LinkedSet(), Token);
+
+            Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, false), (reply?.Decision, reply?.Method, reply?.Recorded));
+            Assert.Empty(reply!.Fields);
+            Assert.NotEmpty(held.Name);
+        }
+
+        Assert.Empty(_log.Lines());
+        Assert.Empty(owner.Authority.Released);
+        Assert.Contains("refused a set for billing-bot: the audit log could not be written, so nothing was sent", _narration);
+    }
+
+    /// <summary>A set withdrawn by a lock while the person is asked releases nothing, and is recorded as locked.</summary>
+    [Fact]
+    public async Task ALockWhileASetIsAsked_ReleasesNothing()
+    {
+        _fixture.Channel.Hold = true;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var asking = client.RequestSetAsync(LinkedSet(), Token).AsTask();
+        await _fixture.Channel.Waiting.WaitAsync(_wait, Token);
+        _lifetime!.End();
+        var reply = await asking.WaitAsync(_wait, Token);
+        var line = Assert.Single(_log.Lines());
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.VaultLocked), (reply?.Decision, reply?.Method));
+        Assert.Empty(reply!.Fields);
+        Assert.Equal("vault-locked", line.GetProperty("method").GetString());
+        Assert.Equal(0, _fixture.Source.Reads);
+    }
+
     /// <summary>A refusal says who refused it, and keeps no grant length.</summary>
     [Fact]
     public async Task APersonsRefusal_IsRecordedAsTheirs()

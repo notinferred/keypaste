@@ -93,6 +93,12 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>Every request that reached the approver, in the order it arrived.</summary>
     internal ConcurrentBag<CredentialRequest> Received { get; } = [];
 
+    /// <summary>What a linked set is answered with; a person's refusal unless a test says otherwise.</summary>
+    internal SetReply SetAnswer { get; set; } = new() { Decision = AuditDecision.Denied, Method = AuditMethod.Prompt, Reason = "a person refused this request" };
+
+    /// <summary>Every linked set that reached the approver, in the order it arrived.</summary>
+    internal ConcurrentQueue<SetRequest> SetsReceived { get; } = [];
+
     /// <summary>Every attach that reached the approver, with the identity its bridge sent.</summary>
     internal ConcurrentQueue<AttachRequest> Attached { get; } = [];
 
@@ -263,6 +269,12 @@ internal sealed class FakeApprover : IAsyncDisposable
             }
 
             return ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });
+        }
+
+        public ValueTask<SetReply> RequestSetAsync(SetRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.SetsReceived.Enqueue(request);
+            return ValueTask.FromResult(approver.SetAnswer with { Session = approver.Session, Recorded = approver.Records });
         }
 
         public ValueTask<FindReply> FindAsync(FindRequest request, string connectionId, CancellationToken cancellationToken)

@@ -77,7 +77,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 ### Agent access
 
 - A release needs a person's answer or a rule the person set: per-category Ask, Allow or Block, Ask by default, each Allow confirmed in the app (unreleased); a `policy.toml` rule (v0.3.0) [T-12] [T-15].
-- One approval releases one field or attachment to an agent (v0.3.0: one field); a whole env set to a child process for `keypaste run --session` and the `run` tool, asked every time (unreleased) [T-30] [T-35].
+- One approval releases one field or attachment to an agent (v0.3.0: one field), or a linked set of up to four fields the person allows together, asked every time and recorded one line per field (unreleased) [T-56]; a whole env set to a child process for `keypaste run --session` and the `run` tool, asked every time (unreleased) [T-30] [T-35].
 - A scoped token releases its sets to `keypaste run --token` with no prompt, except protected sets (unreleased) [T-32].
 - An entry's title, group, tags and URL, and its username unless Settings hides it, reach agents unasked (unreleased) [T-4].
 - The bridge holds no vault and makes no network request (v0.3.0) [T-9].

@@ -146,7 +146,7 @@ public static class AccessIndex
                 .ThenBy(match => match.Entry.Listing.Name.Title, StringComparer.Ordinal)
                 .ThenBy(match => match.Entry.Listing.Name.Uuid, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(match => new FoundAccess(match.Entry, LinksOf(match.Entry, entries))),
+                .Select(match => new FoundAccess(match.Entry, Linked(match.Entry, entries))),
         ];
     }
 
@@ -208,7 +208,19 @@ public static class AccessIndex
             : 0;
     }
 
-    private static List<AccessLink> LinksOf(IndexedEntry entry, IReadOnlyList<IndexedEntry> entries) =>
+    /// <summary>The items one entry is linked to among <paramref name="entries"/>, exactly as a search that found it names them.</summary>
+    /// <param name="entry">The entry, one of <paramref name="entries"/>.</param>
+    /// <param name="entries">The entries searched, which the exposure has already admitted.</param>
+    /// <returns>At most <see cref="MaximumLinks"/>, the most shared first.</returns>
+    public static IReadOnlyList<AccessLink> LinksOf(IndexedEntry entry, IReadOnlyList<IndexedEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        return Linked(entry, entries);
+    }
+
+    private static List<AccessLink> Linked(IndexedEntry entry, IReadOnlyList<IndexedEntry> entries) =>
         [
             .. entries
                 .Select(other => Link(entry, other))

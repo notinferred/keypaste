@@ -165,6 +165,48 @@ internal static class ToolSchemas
         }
         """;
 
+    /// <summary>The arguments of <c>request_linked_set</c>: two to four fields, the first item the anchor, and why; the bounds are <c>SetRequestRules</c>'s.</summary>
+    internal const string SetInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "description": "The handle from find_access or list_entry_names (preferred), or the item's full path."
+                  },
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "description": "One field of that item, as request_credential takes it; never an attachment."
+                  }
+                },
+                "required": ["entry", "field"],
+                "additionalProperties": false
+              },
+              "description": "The fields to release together. The first item is the anchor; every other item is the anchor itself or one find_access links to it."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human who approves or denies the whole set. Be specific and honest."
+            }
+          },
+          "required": ["items", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
     /// <summary>The arguments of <c>request_save</c>: an item and a field, or a project, an environment and a key, and why.</summary>
     /// <remarks>The bounds are the owner's, which it applies again; which of the two places is named it checks itself.</remarks>
     internal const string SaveInputJson = """
@@ -320,6 +362,9 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
+
+    /// <summary><see cref="SetInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement SetInput = Parse(SetInputJson);
 
     /// <summary><see cref="SaveInputJson"/>, parsed once.</summary>
     internal static readonly JsonElement SaveInput = Parse(SaveInputJson);

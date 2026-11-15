@@ -28,7 +28,7 @@ namespace Keypaste.Core.Approval;
 /// this computer's, never a vault's, so an agent record a vault carries releases nothing unasked.
 /// </para>
 /// </remarks>
-public sealed class ApproverHandler
+public sealed partial class ApproverHandler
 {
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;

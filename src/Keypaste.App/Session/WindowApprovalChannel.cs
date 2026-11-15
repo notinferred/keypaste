@@ -103,6 +103,15 @@ internal sealed class WindowApprovalChannel(
         return ShowAsync(request, () => new EnvApprovalWindow(request), cancellationToken);
     }
 
+    /// <summary>Asks the person to allow an agent's linked set once or deny it, in a prompt window of its own.</summary>
+    public ValueTask<ApprovalAnswer> AskAsync(SetPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new SetApprovalViewModel(prompt);
+        return ShowAsync(request, () => new SetApprovalWindow(request), cancellationToken);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);

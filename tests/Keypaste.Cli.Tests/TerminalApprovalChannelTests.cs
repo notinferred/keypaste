@@ -717,4 +717,63 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Edit(), Token));
         Assert.Contains("keypaste: denied. Nothing was written.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
+
+    private static SetPrompt LinkedSet() =>
+        SetPrompt.For(
+            "claude-code",
+            "billing-bot",
+            [(new EntryName("work", "db"), "host"), (new EntryName("work", "db"), "password"), (new EntryName("work/ssh", "deploy"), "password")],
+            "migrate the billing database");
+
+    [Fact]
+    public async Task TheSetDialog_IsExactlyTheBlock_AndYAllowsItOnce()
+    {
+        var rig = Build("y");
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await rig.Channel.AskAsync(LinkedSet(), Token));
+
+        string[] expected =
+        [
+            string.Empty,
+            TerminalApprovalChannel.Rule,
+            "keypaste: an agent is asking for 3 fields together, allowed once or denied as a whole.",
+            string.Empty,
+            "  agent    claude-code (billing-bot)",
+            "  fields   [1] work/db · host",
+            "           [2] work/db · password",
+            "           [3] work/ssh/deploy · password",
+            string.Empty,
+            "  the agent says it needs this because:",
+            "    migrate the billing database",
+            string.Empty,
+            "  That sentence was written by the agent, not by keypaste. Treat it as a claim.",
+            "  Allowing sends every value above to the agent at once, and it can read them and pass them on.",
+            string.Empty,
+            "  [d] deny: the agent gets none of them.",
+            "  [y] allow once: the agent gets all of them, this one time.",
+            string.Empty,
+            "keypaste: allowed once.",
+            TerminalApprovalChannel.Rule,
+            string.Empty,
+        ];
+
+        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
+        Assert.Equal("[d] deny  [y] allow once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+    }
+
+    /// <summary>A set offers no always: <c>o</c>, <c>a</c> and <c>b</c> answer nothing here, and only <c>y</c> allows.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("d")]
+    [InlineData("n")]
+    [InlineData("o")]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task ASet_IsDeniedByAnythingButY(string answer)
+    {
+        var rig = Build(answer);
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(LinkedSet(), Token));
+        Assert.Contains("keypaste: denied. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
 }

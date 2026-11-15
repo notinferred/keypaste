@@ -292,6 +292,9 @@ public sealed record AuditArgs
     /// <summary>What a search asked for, each part sanitized and capped, or null for any other request.</summary>
     public AuditQuery? Query { get; init; }
 
+    /// <summary>Which linked set the line belongs to, and the field's place in it, or null for any other request.</summary>
+    public AuditSet? Set { get; init; }
+
     /// <summary>Reduces a search to what the log keeps: each part of its query the agent wrote.</summary>
     /// <param name="query">What the agent searched for.</param>
     /// <returns>The arguments, holding no value.</returns>
@@ -360,6 +363,12 @@ public sealed record AuditArgs
         };
     }
 }
+
+/// <summary>A line's place in a linked set: one line per field released, or one for a set refused.</summary>
+/// <param name="Id">The set's random identifier, which every line of one set shares, or null where the owner gave it none.</param>
+/// <param name="Position">The field's place, from 1, or null on the one line of a set refused.</param>
+/// <param name="Of">How many fields the set named.</param>
+public sealed record AuditSet(string? Id, int? Position, int Of);
 
 /// <summary>The parts of an agent's search, as its line keeps them.</summary>
 /// <param name="Text">The text searched for, sanitized as prose and capped, or null.</param>

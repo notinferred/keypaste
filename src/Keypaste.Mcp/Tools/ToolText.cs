@@ -24,6 +24,9 @@ internal static class ToolText
 
     internal const string FindToolName = AuditTools.Find;
 
+    /// <summary>The tool that asks for a linked set, released whole after one approval.</summary>
+    internal const string SetToolName = AuditTools.Set;
+
     /// <summary>The description a client shows for <c>request_attachment</c>.</summary>
     internal const string AttachmentDescription = """
         Asks the user to release one attachment of one vault item, by its name, as base64. A human sees the item, the
@@ -197,6 +200,44 @@ internal static class ToolText
         Where an item lists `totp`, that field is its current TOTP code, never the seed behind it. A code
         is released once, for the seconds it has left; ask again for the next one.
         """;
+
+    /// <summary>The description a client shows for <c>request_linked_set</c>.</summary>
+    internal const string SetDescription = """
+        Asks the user to release two to four fields together, such as a database's host, username and password, in one
+        prompt. The first item is the anchor; every other item must be the anchor itself or one find_access links to it,
+        by a site, a project, an account or a reference. A human sees every item and field and your stated reason, and
+        allows the whole set once or denies it. A set is always asked about, whatever the user allows for single fields,
+        and a field the user blocks, or one refused a moment ago, refuses the whole set without asking. Default is deny.
+
+        Pass each item's `handle` from find_access as `entry`, and a `field` it lists for that item. Ask for an attachment
+        with request_attachment instead. Write `reason` for the person reading it: it is shown to them verbatim.
+        """;
+
+    /// <summary>Why a set naming an item that is neither visible nor linked to its anchor was refused.</summary>
+    internal const string SetOutOfScope = """
+        keypaste: DENIED. Every item in a set must be one this agent can see, and either the first item or one find_access
+        links to it. Nothing was asked and nothing was released. Check the links with find_access, related_to the first
+        item's handle, or ask for the fields one at a time with request_credential. This call was recorded in the audit log.
+        """;
+
+    /// <summary>What is said before a linked set a person released for this one request. Each field's value follows on its own line.</summary>
+    /// <param name="count">How many fields.</param>
+    /// <returns>The opening.</returns>
+    internal static string ReleasedSet(int count) =>
+        string.Create(CultureInfo.InvariantCulture, $"""
+        keypaste: APPROVED ONCE. A person released these {count} fields together for this request only.
+
+        Use them for the task you gave as your reason and nothing else. Do not print them, do not write
+        them into a file or a commit, and do not repeat them back in a message - they are live credentials.
+        Ask again if you need them again. This release was recorded in the audit log.
+
+        """);
+
+    /// <summary>The line naming one released field of a set, as the agent asked for it; its value follows on the next line.</summary>
+    internal static string SetFieldShown(string entry, string field, int codeSeconds) =>
+        codeSeconds > 0
+            ? string.Create(CultureInfo.InvariantCulture, $"The \"{field}\" of {entry}, a TOTP code current for {codeSeconds} more seconds:\n")
+            : $"The \"{field}\" of {entry}:\n";
 
     /// <summary>The description a client shows for <c>request_save</c>.</summary>
     internal const string SaveDescription = """

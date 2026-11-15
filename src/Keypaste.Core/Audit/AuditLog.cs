@@ -243,9 +243,37 @@ public sealed class AuditLog : IDisposable
         ArgumentNullException.ThrowIfNull(record);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var written = Append((_, _) => record, out error);
+        var written = Append([(_, _) => record], out error);
         AppendFinished?.Invoke(written ? null : error);
         return written;
+    }
+
+    /// <summary>Appends records as one write, chained in order, or none of them.</summary>
+    /// <param name="records">What happened, one line each.</param>
+    /// <param name="error">A message naming the problem, or empty on success.</param>
+    /// <returns><see langword="false"/> when nothing was written, in which case the caller must deny every one.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="records"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The log has been disposed.</exception>
+    /// <remarks>Every line is composed and measured before any is written, so one that cannot be leaves the log as it was.</remarks>
+    public bool TryAppendAll(IReadOnlyList<AuditRecord> records, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var written = Append([.. records.Select(record => (Func<long, string, AuditRecord>)((_, _) => record))], out error);
+
+        if (!written)
+        {
+            AppendFinished?.Invoke(error);
+            return false;
+        }
+
+        foreach (var _ in records)
+        {
+            AppendFinished?.Invoke(null);
+        }
+
+        return true;
     }
 
     /// <summary>Appends a checkpoint signing the chain up to it, without raising <see cref="AppendFinished"/>.</summary>
@@ -258,10 +286,10 @@ public sealed class AuditLog : IDisposable
         ArgumentNullException.ThrowIfNull(key);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Append((sequence, previous) => AuditCheckpoint.Record(key, session, sequence, previous), out error);
+        return Append([(sequence, previous) => AuditCheckpoint.Record(key, session, sequence, previous)], out error);
     }
 
-    private bool Append(Func<long, string, AuditRecord> recordAt, out string error)
+    private bool Append(IReadOnlyList<Func<long, string, AuditRecord>> recordsAt, out string error)
     {
         lock (_gate)
         {
@@ -295,35 +323,26 @@ public sealed class AuditLog : IDisposable
                     .UtcDateTime
                     .ToString(TimestampFormat, CultureInfo.InvariantCulture);
 
-                var sequence = tail.Sequence + 1;
-                var record = recordAt(sequence, tail.Previous);
-                var bytes = Compose(record, timestamp, sequence, tail.Previous, withReasonExcerpt: true);
+                var sequence = tail.Sequence;
+                var previous = tail.Previous;
+                using var lines = new MemoryStream();
 
-                if (bytes.Length > MaximumRecordBytes)
+                foreach (var recordAt in recordsAt)
                 {
-                    bytes = Compose(record, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
-                }
+                    sequence++;
 
-                // A run's command head goes next: its argv is still committed to by command_sha256.
-                if (bytes.Length > MaximumRecordBytes && record.Command is not null)
-                {
-                    bytes = Compose(record with { Command = null }, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
-                }
+                    if (Fitted(recordAt(sequence, previous), timestamp, sequence, previous, out var hash, out error) is not { } bytes)
+                    {
+                        return false;
+                    }
 
-                if (bytes.Length > MaximumRecordBytes && record.Caller is not null)
-                {
-                    bytes = Compose(record with { Command = null, Caller = null }, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
-                }
-
-                if (bytes.Length > MaximumRecordBytes)
-                {
-                    error = $"the record is {bytes.Length} bytes, over the {MaximumRecordBytes}-byte limit";
-                    return false;
+                    lines.Write(bytes);
+                    previous = hash;
                 }
 
                 // Seek first: another process may have appended since this stream last wrote, and
                 // FileStream would otherwise write at its own stale idea of the end and destroy
-                // that record. Then one write and a flush, so the line lands whole.
+                // that record. Then one write and a flush, so the lines land whole.
                 _stream.Seek(0, SeekOrigin.End);
 
                 // The one byte keypaste ever writes that is not part of a record. A crash between a
@@ -334,7 +353,7 @@ public sealed class AuditLog : IDisposable
                     _stream.Write("\n"u8);
                 }
 
-                _stream.Write(bytes);
+                _stream.Write(lines.GetBuffer().AsSpan(0, (int)lines.Length));
                 _stream.Flush();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -547,6 +566,38 @@ public sealed class AuditLog : IDisposable
         return true;
     }
 
+    /// <summary>One record composed as it will be written, its agent's reason, command head and caller dropped in that order until it fits.</summary>
+    /// <returns>The line, with the hash the next one links to, or null with the reason when even the smallest form is over the limit.</returns>
+    private static byte[]? Fitted(AuditRecord record, string timestamp, long sequence, string previous, out string hash, out string error)
+    {
+        error = string.Empty;
+        var bytes = Compose(record, timestamp, sequence, previous, withReasonExcerpt: true, out hash);
+
+        if (bytes.Length > MaximumRecordBytes)
+        {
+            bytes = Compose(record, timestamp, sequence, previous, withReasonExcerpt: false, out hash);
+        }
+
+        // A run's command head goes next: its argv is still committed to by command_sha256.
+        if (bytes.Length > MaximumRecordBytes && record.Command is not null)
+        {
+            bytes = Compose(record with { Command = null }, timestamp, sequence, previous, withReasonExcerpt: false, out hash);
+        }
+
+        if (bytes.Length > MaximumRecordBytes && record.Caller is not null)
+        {
+            bytes = Compose(record with { Command = null, Caller = null }, timestamp, sequence, previous, withReasonExcerpt: false, out hash);
+        }
+
+        if (bytes.Length > MaximumRecordBytes)
+        {
+            error = $"the record is {bytes.Length} bytes, over the {MaximumRecordBytes}-byte limit";
+            return null;
+        }
+
+        return bytes;
+    }
+
     /// <summary>
     /// Writes one record and seals it. The key order is fixed and documented, so "the bytes of a
     /// line" is a well-defined thing for the hash chain to commit to.
@@ -562,7 +613,8 @@ public sealed class AuditLog : IDisposable
         string timestamp,
         long sequence,
         string previous,
-        bool withReasonExcerpt)
+        bool withReasonExcerpt,
+        out string hash)
     {
         using var buffer = new MemoryStream(1024);
 
@@ -630,6 +682,19 @@ public sealed class AuditLog : IDisposable
                 writer.WriteEndObject();
             }
 
+            if (args.Set is { } set)
+            {
+                writer.WriteStartObject("set");
+                WriteOptional(writer, "id", set.Id);
+                if (set.Position is { } position)
+                {
+                    writer.WriteNumber("position", position);
+                }
+
+                writer.WriteNumber("of", set.Of);
+                writer.WriteEndObject();
+            }
+
             writer.WriteEndObject();
 
             writer.WriteString("decision", Wire(record.Decision));
@@ -672,11 +737,11 @@ public sealed class AuditLog : IDisposable
         // Everything except the closing brace: the line exactly as it stands immediately before the
         // hash member is appended, which is what AuditChain defines the hash as covering.
         var committed = buffer.GetBuffer().AsSpan(0, (int)buffer.Length - 1);
-        var hash = Encoding.ASCII.GetBytes(AuditChain.HashOf(committed));
+        hash = AuditChain.HashOf(committed);
 
         buffer.SetLength(buffer.Length - 1);
         buffer.Write(",\"hash\":\""u8);
-        buffer.Write(hash);
+        buffer.Write(Encoding.ASCII.GetBytes(hash));
         buffer.Write("\"}\n"u8);
 
         return buffer.ToArray();

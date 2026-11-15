@@ -22,6 +22,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(AttachReplyFrame))]
 [JsonSerializable(typeof(CredentialRequestFrame))]
 [JsonSerializable(typeof(CredentialReplyFrame))]
+[JsonSerializable(typeof(SetRequestFrame))]
+[JsonSerializable(typeof(SetReplyFrame))]
 [JsonSerializable(typeof(EnvRequestFrame))]
 [JsonSerializable(typeof(EnvReplyFrame))]
 [JsonSerializable(typeof(AttachedFrame))]
@@ -191,6 +193,46 @@ internal sealed class CredentialReplyFrame(CredentialReply reply)
     public string? Session => reply.Session;
     public bool Recorded => reply.Recorded;
     public string? Value => reply.Value;
+}
+
+internal sealed class SetRequestFrame(SetRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SetKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public IEnumerable<SetItemRow> Items => request.Items.Select(item => new SetItemRow(item));
+    public string Reason => request.Reason;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? Client => request.ClientName;
+    public string? ClientVersion => request.ClientVersion;
+    public string? ClientLabel => request.ClientLabel;
+}
+
+internal sealed class SetItemRow(SetItem item)
+{
+    public string Entry => item.Entry;
+    public string Field => item.Field;
+}
+
+internal sealed class SetReplyFrame(SetReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SetKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public string? Session => reply.Session;
+    public bool Recorded => reply.Recorded;
+    public IEnumerable<SetFieldRow> Fields => reply.Fields.Select(released => new SetFieldRow(released));
+}
+
+internal sealed class SetFieldRow(SetField released)
+{
+    public string Entry => released.Entry;
+    public string Field => released.Field;
+    public string Value => released.Value;
+    public int CodeSeconds => released.CodeSeconds;
 }
 
 internal sealed class EnvRequestFrame(EnvRequest request)

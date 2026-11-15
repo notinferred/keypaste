@@ -466,6 +466,7 @@ public static partial class ApproverProtocol
                 BrowserLockKind => ApproverMessageKind.BrowserLock,
                 SaveKind => ApproverMessageKind.Save,
                 FindKind => ApproverMessageKind.Find,
+                SetKind => ApproverMessageKind.Set,
                 _ => ApproverMessageKind.Unknown,
             };
         }

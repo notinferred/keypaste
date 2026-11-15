@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+An agent can ask with `request_linked_set` for up to four fields of one item and the items `find_access` links to it, such as a database's host, username and password, in one prompt that you allow once or deny; a set is always asked about, a blocked field refuses it whole, and each released field is its own audit line.
+
 Each audit line the app or `keypaste approve` writes for a request names the program that connected, its process id, path and whether its code signature checks out, in a new `caller` object; nothing is refused because of it.
 
 An agent can search the items it may see with `find_access`, by text, host, kind, project or a related item, and gets each item's handle, origin, username when Settings shows it, the items it shares a site, a project or an account with, and the projects the items found belong to with their environments, never a value. Hosts and references, a new switch beside Usernames in Agents, off by default, adds the host in a `Host` field and links between items one of whose fields references the other.

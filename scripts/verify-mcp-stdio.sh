@@ -62,14 +62,14 @@ while IFS= read -r line; do
     || die "a line on stdout is not JSON: $line"
 done <"$OUT"
 
-# 2. Exactly five tools, with the names the documentation promises.
+# 2. Exactly six tools, with the names the documentation promises.
 tools="$(jq -c 'select(.id == 2) | .result.tools' <"$OUT" | head -n 1)"
 [ -n "$tools" ] || die "no tools/list response"
 
 count="$(printf '%s' "$tools" | jq 'length')"
-[ "$count" = "5" ] || die "expected exactly 5 tools, got $count"
+[ "$count" = "6" ] || die "expected exactly 6 tools, got $count"
 
-for want in list_entry_names find_access request_credential request_attachment request_save; do
+for want in list_entry_names find_access request_credential request_attachment request_linked_set request_save; do
   printf '%s' "$tools" | jq -e --arg n "$want" 'any(.[]; .name == $n)' >/dev/null \
     || die "tool $want is missing"
 done

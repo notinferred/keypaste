@@ -51,6 +51,9 @@ public enum ApproverMessageKind
 
     /// <summary>An agent's search of the items it may be shown, by text, host, kind, related item or project.</summary>
     Find = 21,
+
+    /// <summary>An agent's linked set: fields of one item and of the items linked to it, released whole after one approval.</summary>
+    Set = 22,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>

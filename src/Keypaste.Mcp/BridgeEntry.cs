@@ -110,6 +110,7 @@ public static class BridgeEntry
         serverOptions.ToolCollection.Add(new FindAccessTool(names, options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit, attachments: true));
+        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, approver, audit));
 
         // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one (F.79).
         serverOptions.ToolCollection.Add(new SaveValueTool(options, approver, audit));

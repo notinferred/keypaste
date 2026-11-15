@@ -53,6 +53,14 @@ public interface IApproverHandler
     /// <returns>The decision, and the field value on the one path that has one.</returns>
     ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken);
 
+    /// <summary>Decides an agent's linked set, asking a human before any of it leaves.</summary>
+    /// <param name="request">The fields asked for, the anchor's first.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Every field, or why none was released. A handler that releases no sets refuses.</returns>
+    ValueTask<SetReply> RequestSetAsync(SetRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new SetReply { Decision = AuditDecision.Denied, Method = AuditMethod.NoSession, Reason = "this keypaste process does not release linked sets" });
+
     /// <summary>Decides one request for a project's env set, asking a human before any of it leaves.</summary>
     /// <param name="request">The project, and the command and directory the runner will start it in.</param>
     /// <param name="connectionId">Who is asking.</param>
