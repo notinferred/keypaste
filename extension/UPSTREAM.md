@@ -43,6 +43,10 @@ The wire protocol is upstream's unchanged, so keypaste's relay answers it: `chan
 
 Permissions go from `activeTab`, `clipboardWrite`, `contextMenus`, `cookies`, `nativeMessaging`, `notifications`, `offscreen`, `storage`, `tabs`, `webNavigation`, `webRequest`, `webRequestAuthProvider` (Firefox `webRequestBlocking` and `https://api.github.com/`) and optional `privacy`, to `contextMenus`, `nativeMessaging`, `storage`, `tabs` and `webNavigation`, with the same host permissions.
 
+### Changed
+
+- `background/client.js` times a request from when every request sent before it on the native port is answered, since keypaste answers one at a time: a status check queued behind a pairing the person is still confirming is no longer taken for keypaste being unreachable, which cleared the database hash the pairing's answer is verified against.
+
 ### Restyled
 
 The popup, the login popup, the options page, the field icon, the drop-down and the page notifications follow keypaste's [design system](../docs/DESIGN.md), light and dark, in hand-written CSS: `css/colors.css` holds the palette as variables for the pages and the shadow roots, and `css/page.css` the pages' type, buttons, fields, focus ring and notes. The content scripts' UI stays in closed shadow roots, as upstream's does.
