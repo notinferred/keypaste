@@ -16,6 +16,9 @@ public sealed class CrashReportTests
     private const string _message = "SENTINEL-MESSAGE-3c9f57";
     private const string _vaultName = "SENTINEL-VAULT-6f1c2a";
 
+    // CrashSender.FirstPass: a start sends nothing for its first 30 seconds.
+    private static readonly TimeSpan _firstPass = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void A_UI_thread_crash_with_a_copy_ends_with_code_70_keeps_one_report_holding_no_sentinel_and_the_next_start_sends_it_byte_for_byte()
     {
@@ -39,7 +42,7 @@ public sealed class CrashReportTests
         using var again = Launch(setup, home, endpoint.Url);
         again.WaitForOutput("^screen unlock");
         Assert.DoesNotContain(again.Output, line => line == "screen first-launch");
-        endpoint.Process.WaitForOutput("^received 1");
+        endpoint.Process.WaitForOutput("^received 1", within: _firstPass + RunningProcess.Wait);
         Assert.Equal(sent, File.ReadAllBytes(Path.Combine(endpoint.Folder, "1.json")));
         var head = File.ReadAllLines(Path.Combine(endpoint.Folder, "1.head"));
         Assert.Equal("POST /api/crash HTTP/1.1", head[0].TrimEnd('\r'));
@@ -90,7 +93,7 @@ public sealed class CrashReportTests
         app.WaitForOutput("^screen unlock");
         app.Send($"unlock {setup.Vault}");
         app.WaitForOutput("^screen shell");
-        silent.Process.WaitForOutput("^connected");
+        silent.Process.WaitForOutput("^connected", within: _firstPass + RunningProcess.Wait);
 
         app.Send("lock");
         app.WaitForOutput("^screen unlock", 2);
