@@ -4,4 +4,5 @@ here="$(dirname "$(readlink -f "$0")")"
 case "${1:-}" in
   cli) shift; exec "$here/usr/bin/keypaste" "$@" ;;
 esac
-exec "$here/usr/bin/keypaste-app" "$@"
+# .NET's diagnostics would let any process of this user attach to the app and read the unlocked vault.
+DOTNET_EnableDiagnostics=0 exec "$here/usr/bin/keypaste-app" "$@"

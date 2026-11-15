@@ -1,3 +1,5 @@
+using Keypaste.Infrastructure;
+
 namespace Keypaste.Core;
 
 /// <summary>
@@ -17,8 +19,9 @@ namespace Keypaste.Core;
 /// </para>
 /// <para>
 /// <b>What this does not protect against, stated plainly so the documentation does not
-/// overclaim:</b> the array is pinned, so the garbage collector leaves no copy of it behind, but
-/// the value can reach swap, a hibernation file, or a dump on Windows; a debugger or any
+/// overclaim:</b> the array is pinned, so the garbage collector leaves no copy of it behind, and
+/// its pages are locked out of swap and Windows' error reports where the system allows, but the
+/// value can reach swap when it refuses, a hibernation file, or a dump; a debugger or any
 /// process running as the same user can read it; and it necessarily becomes a
 /// <see cref="string"/> somewhere anyway — <see cref="VaultEntry.Password"/> is one such place.
 /// This narrows the window and reduces the number of copies. It is not a security boundary, and
@@ -30,7 +33,7 @@ public sealed class SecretBuffer : IDisposable
     /// <summary>How many characters the buffer holds before it has to grow.</summary>
     public const int InitialCapacity = 64;
 
-    private char[] _buffer = GC.AllocateArray<char>(InitialCapacity, pinned: true);
+    private char[] _buffer = Held(InitialCapacity);
     private int _length;
     private bool _disposed;
 
@@ -70,9 +73,10 @@ public sealed class SecretBuffer : IDisposable
 
         if (_length == _buffer.Length)
         {
-            var grown = GC.AllocateArray<char>(_buffer.Length * 2, pinned: true);
+            var grown = Held(_buffer.Length * 2);
             _buffer.AsSpan(0, _length).CopyTo(grown);
             Array.Clear(_buffer);
+            SecretMemory.Release(_buffer);
             _buffer = grown;
         }
 
@@ -137,7 +141,15 @@ public sealed class SecretBuffer : IDisposable
         }
 
         Array.Clear(_buffer);
+        SecretMemory.Release(_buffer);
         _length = 0;
         _disposed = true;
+    }
+
+    private static char[] Held(int length)
+    {
+        var array = GC.AllocateArray<char>(length, pinned: true);
+        _ = SecretMemory.TryHold(array);
+        return array;
     }
 }

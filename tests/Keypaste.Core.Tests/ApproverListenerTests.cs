@@ -106,6 +106,51 @@ public sealed class ApproverListenerTests
         Assert.Equal(2, handler.ConnectionIds.Distinct(StringComparer.Ordinal).Count());
     }
 
+    /// <summary>A connection is named by the program on it, read from the system once as it is accepted, and each of its requests is answered under that name.</summary>
+    [Fact]
+    public async Task AConnectionFromThisProcess_IsNamedByItsPidAndExecutable_OncePerConnection()
+    {
+        var handler = new RecordingHandler();
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        await client.ListAsync(new NamesRequest(["env/**"]), Token);
+        await client.ListAsync(new NamesRequest(["env/**"]), Token);
+
+        var callers = handler.Callers.ToArray();
+        Assert.Equal(2, callers.Length);
+        Assert.Same(callers[0], callers[1]);
+
+        var caller = callers[0];
+        Assert.NotNull(caller);
+        Assert.Equal(Environment.ProcessId, caller.Pid);
+        Assert.Equal(PathIdentity.Canonical(Environment.ProcessPath!), PathIdentity.Canonical(caller.Path!), StringComparer.FromComparison(PathIdentity.Comparison));
+
+        if (OperatingSystem.IsLinux())
+        {
+            Assert.Null(caller.Signature);
+        }
+        else
+        {
+            Assert.NotEqual(CallerSignature.Unknown, caller.Signature);
+        }
+    }
+
+    /// <summary>A signature check that throws names the caller's signature unknown and costs the connection nothing.</summary>
+    [Fact]
+    public async Task ASignatureCheckThatFails_LeavesTheSignatureUnknown()
+    {
+        var name = UniqueName();
+        await using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await using var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await Task.WhenAll(server.WaitForConnectionAsync(Token), client.ConnectAsync(Token));
+
+        var caller = PipeCaller.Of(server, new FailingSignatures());
+
+        Assert.Equal((Environment.ProcessId, CallerSignature.Unknown, (string?)null), (caller.Pid, caller.Signature, caller.Signer));
+        Assert.NotNull(caller.Path);
+    }
+
     /// <summary>
     /// A grant belongs to the process the human approved for, so the approver has to be told when
     /// that process goes away. Without this, grants would outlive the connection that earned them.
@@ -603,6 +648,11 @@ public sealed class ApproverListenerTests
         }
     }
 
+    private sealed class FailingSignatures : ICodeSignatures
+    {
+        public (CallerSignature State, string? Signer) Check(string executable) => throw new IOException("the program could not be read");
+    }
+
     private sealed class RecordingHandler : IApproverHandler
     {
         internal const string Sentinel = "sk_live_listener_sentinel";
@@ -612,6 +662,8 @@ public sealed class ApproverListenerTests
         internal ConcurrentBag<EnvRequest> Envs { get; } = [];
 
         internal ConcurrentBag<string> ConnectionIds { get; } = [];
+
+        internal ConcurrentQueue<AuditCaller?> Callers { get; } = new();
 
         internal ConcurrentBag<string> Disconnections { get; } = [];
 
@@ -638,6 +690,7 @@ public sealed class ApproverListenerTests
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
         {
             ConnectionIds.Add(connectionId);
+            Callers.Enqueue(PipeCaller.Current);
             Listed.TrySetResult();
 
             return ValueTask.FromResult(new NamesReply(true, Names, string.Empty, true));

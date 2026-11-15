@@ -1,4 +1,8 @@
+using System.Security.Cryptography;
+using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -15,6 +19,8 @@ namespace Keypaste.Cli.Tests;
 /// </remarks>
 public sealed class LogVerbTests : IDisposable
 {
+    private const string _master = "correct horse battery staple";
+
     private static readonly string _escape = "\u001b[31mred";
 
     private readonly CliHarness _cli = new();
@@ -282,6 +288,61 @@ public sealed class LogVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitNotFound, _cli.Run("log", "verify"));
         Assert.Contains("nothing was checked", _cli.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VerifyWithoutTheVault_SaysTheCheckpointsWereNotChecked()
+    {
+        SeedSigned(signedWith: null);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "verify"));
+
+        Assert.Contains("1 checkpoint found, not checked: --checkpoints opens the vault to check them.", _cli.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VerifyWithTheVault_ChecksTheCheckpointsAndNamesTheUnsignedTail()
+    {
+        SeedSigned(signedWith: null);
+        _cli.Prompt.Enqueue(_master);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "verify", "--checkpoints", "--vault", _cli.VaultPath));
+
+        Assert.Contains("1 checkpoint found, 1 signed by this vault's key.", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("Unsigned tail: 0 records after the last signed checkpoint.", _cli.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACheckpointTheVaultsKeyDidNotSign_FailsVerify()
+    {
+        SeedSigned(signedWith: RandomNumberGenerator.GetBytes(32));
+        _cli.Prompt.Enqueue(_master);
+
+        _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify", "--checkpoints", "--vault", _cli.VaultPath));
+
+        Assert.Contains(AuditText.Describe(AuditChainFault.Forged), _cli.Out, StringComparison.Ordinal);
+    }
+
+    /// <summary>Two records, then a checkpoint signed with <paramref name="signedWith"/> or else the key the vault holds.</summary>
+    private void SeedSigned(byte[]? signedWith)
+    {
+        Seed();
+        _cli.SeedVault(_master);
+        var held = RandomNumberGenerator.GetBytes(32);
+
+        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        {
+            Assert.True(vault.WriteRecord(new EntryName(ReservedGroups.Keys, AuditCheckpoint.KeyTitle), AcafIds.Agent, AuditCheckpoint.KeyField, Convert.ToBase64String(held)));
+            vault.Save();
+        }
+
+        var identity = VaultIdentity.Of(Path.Combine(_cli.Directory, ".keypaste"), _cli.VaultPath);
+        Assert.True(AuditLog.TryOpen(LogPath, TimeProvider.System, out var log, out var error), error);
+
+        using (log)
+        {
+            Assert.True(log.TryCheckpoint(new AuditCheckpointKey(signedWith ?? held, identity.Key), "session-one", out var written), written);
+        }
     }
 
     /// <summary>

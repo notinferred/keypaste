@@ -162,6 +162,10 @@ public enum AuditMethod
     /// <summary>This computer's agent rules changed where it was asked, as <c>keypaste clients</c> does, with nobody shown a confirmation.</summary>
     /// <remarks>Released nothing; any program the person runs can run that verb, so the line never claims a person acted.</remarks>
     RulesChanged = 35,
+
+    /// <summary>The vault's owner signed the chain up to this line with the vault's checkpoint key.</summary>
+    /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
+    Checkpoint = 36,
 }
 
 /// <summary>Who asked.</summary>
@@ -192,6 +196,55 @@ public sealed record AuditClient(string? Name, string? Version, string? Label)
 
     private static string? Clean(string? value) =>
         value is null ? null : EntryNameSanitizer.Sanitize(value, MaximumTextLength).Text;
+}
+
+/// <summary>What the operating system said of the code signature of the program on the other end of the owner's pipe.</summary>
+public enum CallerSignature
+{
+    /// <summary>The check could not be made or did not finish.</summary>
+    Unknown = 0,
+
+    /// <summary>The program carries no signature.</summary>
+    NotSigned = 1,
+
+    /// <summary>The program is signed with no signer identity, as macOS signs every program a linker builds for Apple silicon.</summary>
+    AdHoc = 2,
+
+    /// <summary>The program carries a signature that does not verify.</summary>
+    Invalid = 3,
+
+    /// <summary>The program's signature verifies.</summary>
+    Valid = 4,
+}
+
+/// <summary>The program on the other end of the owner's pipe, as the operating system names it when the connection is accepted.</summary>
+/// <remarks>
+/// Recorded, never decided on: a process id can be reused before its path is read, and a process of the
+/// same user can inject into or pose as a signed program (THREATS.md T-10).
+/// </remarks>
+/// <param name="Pid">The connecting process's id, or null when the system did not say.</param>
+/// <param name="Path">Its executable, sanitized and capped, or null.</param>
+/// <param name="Signature">What its code signature checked out as, or null where the system has no code signing, as on Linux.</param>
+/// <param name="Signer">The signer's Windows certificate subject or macOS team ID, sanitized and capped, or null.</param>
+public sealed record AuditCaller(int? Pid, string? Path, CallerSignature? Signature, string? Signer)
+{
+    /// <summary>The longest executable path kept.</summary>
+    public const int PathLength = DisplayTextSanitizer.MaximumLength;
+
+    /// <summary>The longest signer kept.</summary>
+    public const int SignerLength = 256;
+
+    /// <summary>The caller as a line records it, its path and signer sanitized, on one line and capped.</summary>
+    /// <param name="pid">The process id, or null.</param>
+    /// <param name="path">Its executable, or null.</param>
+    /// <param name="signature">Its signature state, or null where there is no code signing.</param>
+    /// <param name="signer">Its signer, or null.</param>
+    /// <returns>The caller.</returns>
+    public static AuditCaller Of(int? pid, string? path, CallerSignature? signature, string? signer) =>
+        new(pid, Clean(path, PathLength), signature, Clean(signer, SignerLength));
+
+    private static string? Clean(string? value, int maximumLength) =>
+        value is null || DisplayTextSanitizer.Sanitize(value.ReplaceLineEndings(" ").Replace('\t', ' '), maximumLength).Text is not { Length: > 0 } text ? null : text;
 }
 
 /// <summary>The arguments a tool was called with, reduced to what is safe to keep.</summary>
@@ -239,6 +292,9 @@ public sealed record AuditArgs
     /// <summary>What a search asked for, each part sanitized and capped, or null for any other request.</summary>
     public AuditQuery? Query { get; init; }
 
+    /// <summary>Which linked set the line belongs to, and the field's place in it, or null for any other request.</summary>
+    public AuditSet? Set { get; init; }
+
     /// <summary>Reduces a search to what the log keeps: each part of its query the agent wrote.</summary>
     /// <param name="query">What the agent searched for.</param>
     /// <returns>The arguments, holding no value.</returns>
@@ -254,7 +310,8 @@ public sealed record AuditArgs
                 Prose(query.Text),
                 Prose(query.Host),
                 query.Kind is { } kind ? JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString()) : null,
-                string.IsNullOrWhiteSpace(query.RelatedTo) ? null : EntryNameSanitizer.Sanitize(query.RelatedTo, EntryLength).Text),
+                string.IsNullOrWhiteSpace(query.RelatedTo) ? null : EntryNameSanitizer.Sanitize(query.RelatedTo, EntryLength).Text,
+                string.IsNullOrWhiteSpace(query.Project) ? null : EntryNameSanitizer.Sanitize(query.Project, EntryLength).Text),
         };
     }
 
@@ -307,12 +364,19 @@ public sealed record AuditArgs
     }
 }
 
+/// <summary>A line's place in a linked set: one line per field released, or one for a set refused.</summary>
+/// <param name="Id">The set's random identifier, which every line of one set shares, or null where the owner gave it none.</param>
+/// <param name="Position">The field's place, from 1, or null on the one line of a set refused.</param>
+/// <param name="Of">How many fields the set named.</param>
+public sealed record AuditSet(string? Id, int? Position, int Of);
+
 /// <summary>The parts of an agent's search, as its line keeps them.</summary>
 /// <param name="Text">The text searched for, sanitized as prose and capped, or null.</param>
 /// <param name="Host">The host or URL searched for, sanitized as prose and capped, or null.</param>
 /// <param name="Kind">The kind searched for, in snake case, or null.</param>
 /// <param name="Related">The handle of the item searched around, sanitized and capped, or null.</param>
-public sealed record AuditQuery(string? Text, string? Host, string? Kind, string? Related);
+/// <param name="Project">The project searched within, sanitized and capped, or null.</param>
+public sealed record AuditQuery(string? Text, string? Host, string? Kind, string? Related, string? Project = null);
 
 /// <summary>One line of the audit trail: who asked for what, and what keypaste did about it.</summary>
 /// <remarks>
@@ -335,6 +399,9 @@ public sealed record AuditRecord
 
     /// <summary>Who called it.</summary>
     public required AuditClient Client { get; init; }
+
+    /// <summary>The program on the owner's pipe that asked, or null for a line no connection asked for.</summary>
+    public AuditCaller? Caller { get; init; }
 
     /// <summary>What they asked for.</summary>
     public AuditArgs Args { get; init; } = AuditArgs.None;
@@ -371,6 +438,9 @@ public sealed record AuditRecord
 
     /// <summary>Lowercase hex SHA-256 of the run's canonical argv, program first, or null.</summary>
     public string? CommandSha256 { get; init; }
+
+    /// <summary>On a checkpoint line, the HMAC-SHA256 its owner wrote over the chain up to it, as lowercase hex; otherwise null.</summary>
+    public string? Checkpoint { get; init; }
 
     /// <summary>The longest command head a line keeps.</summary>
     public const int CommandLength = 256;

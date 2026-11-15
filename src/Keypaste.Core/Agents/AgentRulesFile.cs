@@ -52,7 +52,7 @@ public interface IAgentRules
 public sealed record RulesFileRead(AgentRules Rules, string? Seal, bool Present);
 
 /// <summary>
-/// <c>agents.toml</c> under the keypaste home: whether usernames are shown, each category's rule and each known
+/// <c>agents.toml</c> under the keypaste home: whether usernames, and hosts and references, are shown, each category's rule and each known
 /// agent's run switch, and the seal its owner wrote, which <see cref="SealedAgentRules"/> checks; beside it,
 /// <c>agents.id</c>, this home's random identity, which the seal covers so a file copied from another home is not valid here.
 /// </summary>
@@ -68,6 +68,7 @@ public sealed class AgentRulesFile(string path)
     private const string _rulesTable = "rules";
     private const string _agentTable = "agent";
     private const string _usernameKey = "username";
+    private const string _linkedHostsKey = "hosts_and_references";
     private const string _nameKey = "name";
     private const string _runKey = "run";
     private const string _alwaysTable = "always";
@@ -255,6 +256,12 @@ public sealed class AgentRulesFile(string path)
     {
         writer.Table(_rulesTable).Text(_usernameKey, rules.ShowsUsername ? "shown" : "hidden");
 
+        // Written only while shown, so a file sealed before the switch existed still renders, and seals, as it did.
+        if (rules.ShowsLinkedHosts)
+        {
+            writer.Text(_linkedHostsKey, "shown");
+        }
+
         foreach (var category in FieldCategories.Ruled)
         {
             writer.Text(FieldCategories.Key(category), Word(rules.RuleFor(category)));
@@ -405,6 +412,22 @@ public sealed class AgentRulesFile(string path)
                         continue;
                     default:
                         error = $"{At(pair.Line)}: {_usernameKey} is \"shown\" or \"hidden\"";
+                        return false;
+                }
+            }
+
+            if (string.Equals(pair.Key, _linkedHostsKey, StringComparison.Ordinal))
+            {
+                switch (pair.Value.Text)
+                {
+                    case "shown":
+                        rules = rules with { ShowsLinkedHosts = true };
+                        continue;
+                    case "hidden":
+                        rules = rules with { ShowsLinkedHosts = false };
+                        continue;
+                    default:
+                        error = $"{At(pair.Line)}: {_linkedHostsKey} is \"shown\" or \"hidden\"";
                         return false;
                 }
             }

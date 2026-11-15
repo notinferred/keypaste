@@ -6,7 +6,7 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 
-// An agent's search of the items it may be shown, and what it found: names, origins and usernames, never a value.
+// An agent's search of the items it may be shown, and what it found: names, origins, usernames, links and projects, never a value.
 public static partial class ApproverProtocol
 {
     internal const string FindKind = "find";
@@ -28,17 +28,27 @@ public static partial class ApproverProtocol
 
     /// <summary>A search's reply exactly as <see cref="Encode(FindReply)"/> sends it, measured as <see cref="Fitted(NamesReply)"/> measures a listing.</summary>
     /// <param name="reply">The items, or the reason there are none.</param>
-    /// <returns>The items that fit one frame, complete only when nothing was dropped, or the <see cref="Undersized"/> stand-in.</returns>
+    /// <returns>
+    /// The items that fit one frame, complete only when nothing was dropped, with the projects a kept item is a member of, or the
+    /// <see cref="Undersized"/> stand-in.
+    /// </returns>
     public static FindReply Fitted(FindReply reply)
     {
         ArgumentNullException.ThrowIfNull(reply);
 
         var kept = Fit(WriteFound(reply with { Found = [], Complete = false }).Length, FoundRow.Of(reply.Found), Wire.FoundRow);
-        var fitted = kept == reply.Found.Count ? reply : reply with { Found = [.. reply.Found.Take(kept)], Complete = false };
+        var fitted = kept == reply.Found.Count
+            ? reply
+            : reply with
+            {
+                Found = [.. reply.Found.Take(kept)],
+                Projects = [.. reply.Projects.Where(project => reply.Found.Take(kept).Any(item => item.Entry.Projects.Contains(project.Name, StringComparer.Ordinal)))],
+                Complete = false,
+            };
 
         return WriteFound(fitted).Length <= MessageFramer.MaximumPayloadBytes
             ? fitted
-            : reply with { Found = [], Reason = Undersized, Complete = false };
+            : reply with { Found = [], Projects = [], Reason = Undersized, Complete = false };
     }
 
     private static byte[] WriteFound(FindReply reply) =>
@@ -56,12 +66,14 @@ public static partial class ApproverProtocol
             && TryQueryPart(root, "text", out var text)
             && TryQueryPart(root, "host", out var host)
             && TryQueryPart(root, "related_to", out var relatedTo)
+            && TryQueryPart(root, "project", out var project)
             && TryOptionalKind(root, "item_kind", out var kind)
                 ? new FindRequest(exposure, text, host, kind, relatedTo)
                 {
                     ClientLabel = Optional(root, "client_label"),
                     Vault = vault,
                     Session = session,
+                    Project = project,
                 }
                 : null;
 
@@ -72,7 +84,10 @@ public static partial class ApproverProtocol
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="reply">The decoded reply.</param>
     /// <returns><see langword="true"/> when the frame was a well-formed search reply within every bound.</returns>
-    /// <remarks>An origin is accepted only as <c>scheme://host:port</c> exactly as the owner writes one, and a kind only when this version defines it.</remarks>
+    /// <remarks>
+    /// An origin is accepted only as <c>scheme://host:port</c> exactly as the owner writes one, a kind only when this version defines it,
+    /// and a project only with its environments and a count of at least one item within their bounds; a frame without projects has none.
+    /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out FindReply? reply)
     {
         reply = null;
@@ -108,12 +123,18 @@ public static partial class ApproverProtocol
                 found.Add(item);
             }
 
+            if (!TryProjects(root, out var projects))
+            {
+                return false;
+            }
+
             reply = new FindReply(
                 unlocked.GetBoolean(),
                 found,
                 Optional(root, "reason") ?? string.Empty,
                 TrueOnly(root, "complete"))
             {
+                Projects = projects,
                 Session = Optional(root, "session"),
                 Refusal = TryInteger(root, "method", out var method)
                     ? Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed
@@ -155,17 +176,75 @@ public static partial class ApproverProtocol
                 || !TryString(link, "group", out var linkGroup)
                 || !TryString(link, "title", out var linkTitle)
                 || !TryOptionalString(link, "site", out var site)
-                || !TryStrings(link, "projects", out var projects))
+                || !TryStrings(link, "projects", out var projects)
+                || !TryOptionalBoolean(link, "same_account", out var sameAccount)
+                || !TryOptionalBoolean(link, "references", out var references)
+                || !TryOptionalBoolean(link, "referenced_by", out var referencedBy))
             {
                 return false;
             }
 
-            linked.Add(new AccessLink(new EntryName(linkGroup, linkTitle), site, projects));
+            linked.Add(new AccessLink(new EntryName(linkGroup, linkTitle), site, projects)
+            {
+                SameAccount = sameAccount,
+                References = references,
+                ReferencedBy = referencedBy,
+            });
         }
 
         var listing = new ListedEntry(new EntryName(group, title), fields, tags);
         found = new FoundAccess(new IndexedEntry(listing, (ItemKind)kind, origin, username), linked);
         return true;
+    }
+
+    /// <summary>A reply's projects: absent reads as none, and present, each must be within its bounds.</summary>
+    private static bool TryProjects(JsonElement root, out IReadOnlyList<AccessProject> projects)
+    {
+        projects = [];
+
+        if (!root.TryGetProperty("projects", out var rows))
+        {
+            return true;
+        }
+
+        if (rows.ValueKind != JsonValueKind.Array || rows.GetArrayLength() > AccessIndex.MaximumProjects)
+        {
+            return false;
+        }
+
+        var decoded = new List<AccessProject>(rows.GetArrayLength());
+
+        foreach (var row in rows.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.Object
+                || !TryString(row, "name", out var name)
+                || !TryStrings(row, "environments", out var environments)
+                || environments.Count > AccessIndex.MaximumEnvironments
+                || !TryInteger(row, "items", out var items)
+                || items is < 1 or > Approval.VaultEntryNameLister.MaximumNames)
+            {
+                return false;
+            }
+
+            decoded.Add(new AccessProject(name, environments, items));
+        }
+
+        projects = decoded;
+        return true;
+    }
+
+    /// <summary>An optional flag: absent reads as false, and one present must be true or false.</summary>
+    private static bool TryOptionalBoolean(JsonElement root, string name, out bool value)
+    {
+        value = false;
+
+        if (!root.TryGetProperty(name, out var element))
+        {
+            return true;
+        }
+
+        value = element.ValueKind == JsonValueKind.True;
+        return element.ValueKind is JsonValueKind.True or JsonValueKind.False;
     }
 
     /// <summary>An optional part of a query: absent reads as none, and one present must be a string within <see cref="AccessQuery.MaximumPartLength"/>.</summary>

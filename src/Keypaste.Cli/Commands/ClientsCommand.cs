@@ -266,6 +266,7 @@ internal static class ClientsCommand
             [
                 [FieldCategories.Shown(FieldCategory.Url), "shown"],
                 [FieldCategories.Shown(FieldCategory.Username), rules.ShowsUsername ? "shown" : "hidden"],
+                ["hosts and references", rules.ShowsLinkedHosts ? "shown" : "hidden"],
                 .. FieldCategories.Ruled.Select(category => new[] { FieldCategories.Shown(category), Word(rules.RuleFor(category)) }),
                 [FieldCategories.Shown(FieldCategory.Passkey), Word(CategoryRule.Block)],
             ]);
@@ -337,6 +338,11 @@ internal static class ClientsCommand
             json.WriteStartObject();
             json.WriteString("kind", "username");
             json.WriteString("rule", rules.ShowsUsername ? "shown" : "hidden");
+            json.WriteEndObject();
+
+            json.WriteStartObject();
+            json.WriteString("kind", "hosts-and-references");
+            json.WriteString("rule", rules.ShowsLinkedHosts ? "shown" : "hidden");
             json.WriteEndObject();
 
             foreach (var category in FieldCategories.Ruled.Append(FieldCategory.Passkey))

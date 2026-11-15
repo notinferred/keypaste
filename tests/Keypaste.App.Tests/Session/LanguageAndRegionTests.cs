@@ -174,7 +174,7 @@ public sealed partial class LanguageAndRegionTests
         {
             "keypaste", "API_KEY", "Work/github", "~/code/acme-api", "db.example.com:5432", "env:project:prod", "https://", "OPENAI_API_KEY", "STRIPE_SECRET_KEY", "billing-api", "npm start", "staging", "STRIPE_KEY", "FIELD_NAME", "ci-staging", "read:acme-api/staging/*",
         };
-        var prompts = new[] { "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow" };
+        var prompts = new[] { "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow", "SetApprovalWindow" };
         var app = Path.Combine(RepoRoot(), "src", "Keypaste.App");
 
         var literals = Directory.EnumerateFiles(app, "*.axaml", SearchOption.AllDirectories)
@@ -213,7 +213,7 @@ public sealed partial class LanguageAndRegionTests
     {
         var views = Path.Combine(RepoRoot(), "src", "Keypaste.App", "Views");
 
-        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow" })
+        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "SetApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow" })
         {
             Assert.DoesNotContain("res:Strings", File.ReadAllText(Path.Combine(views, prompt + ".axaml")), StringComparison.Ordinal);
         }

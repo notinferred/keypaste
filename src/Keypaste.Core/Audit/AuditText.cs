@@ -211,6 +211,7 @@ public static class AuditText
                 lines.Add(string.Empty);
                 lines.Add("Every record before the first break is still intact and still verified.");
                 lines.Add("What this means is that the file is not the file keypaste wrote.");
+                AddCheckpoints(lines, report);
 
                 // Said on a broken file too. The observations below are precisely the ones that
                 // explain which rows of `keypaste log` cannot be believed, and withholding them
@@ -229,6 +230,7 @@ public static class AuditText
                         $"Latest: seq {report.LatestSequence}, hash {report.LatestHash}"));
                 }
 
+                AddCheckpoints(lines, report);
                 AddForgiven(lines, report);
                 AddAnchor(lines, report);
                 lines.Add(string.Empty);
@@ -247,6 +249,29 @@ public static class AuditText
 
         lines.Add(string.Empty);
         lines.AddRange(forgiven);
+    }
+
+    private static void AddCheckpoints(List<string> lines, AuditChainReport report)
+    {
+        if (report.SignedCheckpoints is not { } signed)
+        {
+            lines.Add($"{Count(report.Checkpoints, "checkpoint")} found, not checked: --checkpoints opens the vault to check them.");
+            return;
+        }
+
+        var forged = report.Findings.Count(f => f.Fault == AuditChainFault.Forged);
+        var elsewhere = report.Checkpoints - signed - forged;
+
+        lines.Add(Invariant($"{Count(report.Checkpoints, "checkpoint")} found, {signed} signed by this vault's key."));
+
+        if (elsewhere > 0)
+        {
+            lines.Add($"Not checked: {Count(elsewhere, "checkpoint")} naming another vault.");
+        }
+
+        lines.Add(signed == 0
+            ? "No checkpoint is signed by this vault's key, so no record is signed."
+            : $"Unsigned tail: {Count(report.UnsignedRecords, "record")} after the last signed checkpoint.");
     }
 
     private static void AddAnchor(List<string> lines, AuditChainReport report)
@@ -278,9 +303,10 @@ public static class AuditText
     [
         "This detects careless edits: a record changed, removed, inserted, or written by something",
         $"else. A record it cannot check at all is marked {UnverifiedMark} rather than vouched for.",
-        "It cannot detect a rewrite that recomputed the chain, because the chain holds no secret,",
-        "and it cannot detect records deleted from the end, because nothing follows them. Record",
-        "the latest hash somewhere else and pass it back with --expect to close that second one.",
+        "A rewrite that recomputed the chain is caught only before the last checkpoint the vault's",
+        "key signed, checked with --checkpoints; records after it are unsigned.",
+        "It cannot detect records deleted from the end, because nothing follows them. Record the",
+        "latest hash somewhere else and pass it back with --expect to close that.",
     ];
 
     private static IEnumerable<string> Breaks(AuditChainReport report)
@@ -346,6 +372,7 @@ public static class AuditText
         AuditChainFault.Altered => "its own bytes have changed since it was written.",
         AuditChainFault.Unlinked => "it does not follow the record before it. One was removed or inserted.",
         AuditChainFault.Restarted => "the chain starts again here. The records before it were cut off.",
+        AuditChainFault.Forged => "a checkpoint this vault's key did not sign. The chain was rewritten without the vault.",
         _ => "it is not a record keypaste wrote. Something else wrote into the log.",
     };
 

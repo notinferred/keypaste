@@ -9,6 +9,7 @@ namespace Keypaste.Core.Ownership;
 /// point them elsewhere (THREATS.md T-14, T-30, T-32). A release whose line cannot be written is refused
 /// and nothing in it is sent, and a listing that names anything is a release here (T-6). A refusal is
 /// answered whether its line was written or not, since it releases nothing, and its reply says which.
+/// A line written while answering a connection names the program on it (<see cref="PipeCaller"/>).
 /// </remarks>
 /// <param name="audit">Opens the owner's log, asked before each request is decided and again when it is answered; a null answer refuses the request.</param>
 internal sealed class RequestRecorder(Func<AuditLog?> audit)
@@ -69,6 +70,22 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
             Session = reply.Session,
         };
 
+    /// <summary>A linked set's reply once all its lines are written together; a set any of whose lines cannot be written is refused whole.</summary>
+    /// <param name="reply">The reply as it will leave.</param>
+    /// <param name="records">One line per field released, or the one line of a refusal.</param>
+    /// <returns>The reply to send, saying whether it was recorded.</returns>
+    internal SetReply Recorded(SetReply reply, IReadOnlyList<AuditRecord> records) =>
+        TryAppendAll(records) ? reply with { Recorded = true }
+        : reply.Decision != AuditDecision.Granted ? reply with { Recorded = false }
+        : new SetReply
+        {
+            Decision = AuditDecision.Denied,
+            Method = AuditMethod.Failed,
+            Reason = _unrecorded,
+            Entries = reply.Entries,
+            Session = reply.Session,
+        };
+
     /// <summary>An agent's run reply once its line is written; a release whose line cannot be written becomes a refusal.</summary>
     /// <param name="reply">The reply as it will leave.</param>
     /// <param name="record">Its line.</param>
@@ -108,11 +125,24 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     /// <returns>Whether it was written.</returns>
     internal bool Recorded(AuditRecord record) => TryAppend(record);
 
+    private bool TryAppendAll(IReadOnlyList<AuditRecord> records)
+    {
+        try
+        {
+            return audit() is { } log && log.TryAppendAll([.. records.Select(record => record with { Caller = record.Caller ?? PipeCaller.Current })], out _);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The owner closed its log as the session ended.
+            return false;
+        }
+    }
+
     private bool TryAppend(AuditRecord record)
     {
         try
         {
-            return audit() is { } log && log.TryAppend(record, out _);
+            return audit() is { } log && log.TryAppend(record with { Caller = record.Caller ?? PipeCaller.Current }, out _);
         }
         catch (ObjectDisposedException)
         {

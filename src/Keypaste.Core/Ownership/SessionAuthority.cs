@@ -456,6 +456,80 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Admitted, decided, committed and recorded as <see cref="RequestAsync"/> is: a released set is one line per field, written together
+    /// under one random set id before the reply, and a set any of whose lines cannot be written is refused whole; a refused set is one line.
+    /// </remarks>
+    public async ValueTask<SetReply> RequestSetAsync(SetRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var set = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        var auditClient = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
+
+        SetReply Answer(SetReply reply) => _recorder.Recorded(
+            reply,
+            reply.Decision == AuditDecision.Granted
+                ? RequestRecords.SetReleased(auditClient, set, request.Items, request.Reason, reply.Fields, reply.Reason, request.Exposure, reply.Session, VaultNamed(request.Vault))
+                : [RequestRecords.SetRefused(auditClient, set, request.Items, request.Reason, reply.Method, reply.Reason, reply.Entries, request.Exposure, reply.Session, VaultNamed(request.Vault))]);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(SetRefused(refusal.Method, refusal.Reason, []));
+        }
+
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
+
+        var reply = await Decided(
+            token => _inner.RequestSetAsync(request, connectionId, token),
+            lifetime,
+            (method, reason) => SetRefused(method, reason, []),
+            waiting,
+            withdrawn.Token).ConfigureAwait(false);
+
+        if (!lifetime.TryCommitAfter(waiting) && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
+        {
+            // The released strings are dropped here, never sent: the lock or the reload came before the release.
+            var (method, reason) = WithdrawnBy(lifetime, reply.Decision == AuditDecision.Granted ? "this was released" : "anybody answered");
+            reply = SetRefused(method, reason, reply.Entries);
+        }
+
+        reply = reply with { Session = request.Session };
+
+        if (reply.Decision == AuditDecision.Granted && !ApproverProtocol.Fits(reply with { Recorded = true }))
+        {
+            reply = SetRefused(AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(reply.Method), reply.Entries) with { Session = request.Session };
+        }
+
+        var answered = Answer(reply);
+        var client = ConnectedClient.Named(request.ClientLabel, request.ClientName);
+
+        if (answered.Decision == AuditDecision.Granted)
+        {
+            foreach (var field in answered.Fields)
+            {
+                Record(lifetime, [field.Entry], client, AuditLog.Wire(answered.Method), field.Item);
+            }
+        }
+        else if (reply.Decision == AuditDecision.Granted)
+        {
+            _environments?.Narrate?.Invoke($"refused a set for {client}: {_unrecordedNarration}");
+        }
+
+        return answered;
+    }
+
+    private static SetReply SetRefused(AuditMethod method, string reason, IReadOnlyList<string> entries) => new()
+    {
+        Decision = AuditDecision.Denied,
+        Method = method,
+        Reason = reason,
+        Entries = entries,
+    };
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// Recorded under <c>keypaste clients</c>, naming the agent. Turning run on releases nothing unasked, since every run
     /// is asked, so the owner makes it without a confirmation; a set or a forget is refused unless it releases nothing more
     /// unasked, since a terminal proves no person agreed. What it writes is sealed with the vault's key.

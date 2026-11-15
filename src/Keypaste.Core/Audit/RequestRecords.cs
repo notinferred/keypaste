@@ -35,6 +35,9 @@ public static class AuditTools
 
     /// <summary>An agent's search of the items it may be shown.</summary>
     public const string Find = "find_access";
+
+    /// <summary>An agent's linked set: one line per field released, or one for the set refused.</summary>
+    public const string Set = "request_linked_set";
 }
 
 /// <summary>What a browser's line is about, written as its field.</summary>
@@ -247,6 +250,78 @@ public static class RequestRecords
             Exposure = exposure,
             Session = session,
             Vault = vault,
+        };
+    }
+
+    /// <summary>The lines of a linked set released: one per field, each naming its item and its place in the set, never a value.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="set">The set's random identifier, which every line shares.</param>
+    /// <param name="asked">The fields as the agent named them, the anchor's first.</param>
+    /// <param name="statedReason">The agent's stated reason, verbatim.</param>
+    /// <param name="released">Each field released, in the order asked.</param>
+    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
+    /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
+    /// <param name="session">The unlocked session that answered.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>One record per field, to append together.</returns>
+    public static IReadOnlyList<AuditRecord> SetReleased(
+        AuditClient client,
+        string set,
+        IReadOnlyList<SetItem> asked,
+        string statedReason,
+        IReadOnlyList<SetField> released,
+        string reason,
+        IReadOnlyList<string> exposure,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(asked);
+        ArgumentNullException.ThrowIfNull(released);
+
+        AuditRecord Line(SetField field, int index)
+        {
+            var line = Credential(client, asked[index].Entry, field.Field, statedReason, AuditDecision.Granted, AuditMethod.Prompt, reason, field.Entry, exposure, session, vault, field.Item);
+            return line with { Tool = AuditTools.Set, Args = line.Args with { Set = new AuditSet(set, index + 1, released.Count) } };
+        }
+
+        return [.. released.Select(Line)];
+    }
+
+    /// <summary>The one line of a linked set refused, naming its first item and every item the owner resolved.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="set">The set's random identifier, or null where the bridge refused it itself.</param>
+    /// <param name="asked">The fields as the agent named them, the anchor's first.</param>
+    /// <param name="statedReason">The agent's stated reason, verbatim.</param>
+    /// <param name="method">How it was refused.</param>
+    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
+    /// <param name="entries">Each item resolved, as every prompt shows it.</param>
+    /// <param name="exposure">The globs the asking bridge was configured to expose.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord SetRefused(
+        AuditClient client,
+        string? set,
+        IReadOnlyList<SetItem> asked,
+        string statedReason,
+        AuditMethod method,
+        string reason,
+        IReadOnlyList<string> entries,
+        IReadOnlyList<string> exposure,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(asked);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var first = asked.Count > 0 ? asked[0] : new SetItem(string.Empty, string.Empty);
+        var line = Credential(client, first.Entry, first.Field, statedReason, AuditDecision.Denied, method, reason, entries.Count > 0 ? entries[0] : null, exposure, session, vault);
+
+        return line with
+        {
+            Tool = AuditTools.Set,
+            Args = line.Args with { Set = new AuditSet(set, null, asked.Count) },
+            Entries = entries.Count > 0 ? [.. entries.Select(entry => EntryNameSanitizer.SanitizePath(entry, maximumLength: AuditArgs.EntryLength).Text)] : null,
         };
     }
 

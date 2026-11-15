@@ -210,6 +210,25 @@ public sealed class ApprovalGate : IDisposable
         return new SaveAnswer(answer, answer == ApprovalAnswer.ApprovedOnce ? value : null);
     }
 
+    /// <summary>Asks a human about an agent's linked set, under the same window, slot and cooldown, Allow once alone counting as yes.</summary>
+    /// <param name="cooldownKeys">Each field's key: a set any of them is cooling under is refused unasked, and a refusal cools all of them.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <param name="asker">The agent asking, from <see cref="Asker"/>, whose request waits its turn; null takes the turn now or is busy.</param>
+    /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise; an always is a denial.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
+    public ValueTask<ApprovalAnswer> AskAsync(
+        IReadOnlyList<string> cooldownKeys,
+        SetPrompt prompt,
+        CancellationToken cancellationToken,
+        string? asker = null)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKeys);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken, asker: asker);
+    }
+
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown.</param>

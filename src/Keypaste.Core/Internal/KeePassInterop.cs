@@ -1940,13 +1940,17 @@ internal sealed class KeePassInterop : IDisposable
         return listed;
     }
 
-    /// <summary>Every live entry outside keypaste's own groups as a search names it, by the traversal <see cref="Collect"/> uses; only its URL and, when <paramref name="showsUsername"/>, its username are read.</summary>
-    internal IReadOnlyList<IndexedEntry> ReadIndex(bool showsUsername)
+    /// <summary>
+    /// Every live entry outside keypaste's own groups as a search names it, by the traversal <see cref="Collect"/> uses; only its URL,
+    /// when <paramref name="showsUsername"/>, its username, and when <paramref name="showsLinkedHosts"/>, its host field and every
+    /// field's references, are read.
+    /// </summary>
+    internal IReadOnlyList<IndexedEntry> ReadIndex(bool showsUsername, bool showsLinkedHosts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         List<IndexedEntry> indexed = [];
-        CollectIndex(_database.RootGroup, string.Empty, indexed, Bin(), showsUsername);
+        CollectIndex(_database.RootGroup, string.Empty, indexed, Bin(), showsUsername, showsLinkedHosts);
         return indexed;
     }
 
@@ -3707,7 +3711,7 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    private static void CollectIndex(PwGroup group, string groupPath, List<IndexedEntry> indexed, PwGroup? bin, bool showsUsername)
+    private static void CollectIndex(PwGroup group, string groupPath, List<IndexedEntry> indexed, PwGroup? bin, bool showsUsername, bool showsLinkedHosts)
     {
         if (ReservedGroups.IsReserved(groupPath))
         {
@@ -3718,21 +3722,47 @@ internal sealed class KeePassInterop : IDisposable
         {
             var name = new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() };
             var username = showsUsername ? ReadField(entry, PwDefs.UserNameField) : string.Empty;
+            var origin = OriginOf(ReadField(entry, PwDefs.UrlField))
+                ?? (showsLinkedHosts && entry.Strings.Get(IndexedEntry.HostField) is { } host ? OriginOf(Uncached(host)) : null);
 
-            indexed.Add(new IndexedEntry(
-                Listed(entry, name),
-                KindOf(entry),
-                Browser.WebOrigin.TryReadItem(ReadField(entry, PwDefs.UrlField).Trim(), out var origin) ? origin : null,
-                username.Length > 0 ? username : null));
+            indexed.Add(new IndexedEntry(Listed(entry, name), KindOf(entry), origin, username.Length > 0 ? username : null)
+            {
+                References = showsLinkedHosts ? ReferencesOf(entry) : [],
+            });
         }
 
         foreach (PwGroup child in group.Groups)
         {
             if (!ReferenceEquals(child, bin))
             {
-                CollectIndex(child, ChildPath(groupPath, child.Name), indexed, bin, showsUsername);
+                CollectIndex(child, ChildPath(groupPath, child.Name), indexed, bin, showsUsername, showsLinkedHosts);
             }
         }
+    }
+
+    private static Browser.WebOrigin? OriginOf(string value) => Browser.WebOrigin.TryReadItem(value.Trim(), out var origin) ? origin : null;
+
+    /// <summary>The other items an entry's fields reference by UUID, each value read and cleared in place, never kept.</summary>
+    private static List<string> ReferencesOf(PwEntry entry)
+    {
+        HashSet<string> uuids = new(StringComparer.Ordinal);
+
+        foreach (var field in entry.Strings)
+        {
+            char[] chars = field.Value.ReadChars();
+
+            try
+            {
+                FieldReferences.Collect(chars, uuids);
+            }
+            finally
+            {
+                Array.Clear(chars);
+            }
+        }
+
+        uuids.Remove(entry.Uuid.ToHexString());
+        return [.. uuids.Order(StringComparer.Ordinal)];
     }
 
     private static ListedEntry Listed(PwEntry entry, EntryName name)

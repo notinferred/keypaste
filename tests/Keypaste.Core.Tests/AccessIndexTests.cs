@@ -114,6 +114,75 @@ public sealed class AccessIndexTests : IDisposable
     }
 
     [Fact]
+    public void A_project_finds_its_members_in_every_environment()
+    {
+        Assert.Equal([_database, _gist, _github], Names(Find(Everything(), new AccessQuery(Project: "web"))));
+        Assert.Equal([_gist], Names(Find(Everything(), new AccessQuery(Text: "gist", Project: "web"))));
+        Assert.Empty(Find(Everything(), new AccessQuery(Project: "Web")));
+    }
+
+    [Fact]
+    public void The_projects_of_what_was_found_count_only_admitted_members()
+    {
+        var entries = Everything();
+        Assert.True(EntryExposure.TryCreate(["Work/**"], out var work, out var error), error);
+        var admitted = AccessIndex.Admitted(entries, work);
+
+        var everywhere = AccessIndex.Projects(Find(entries, new AccessQuery(Text: "GitHub")), entries);
+        var withinWork = AccessIndex.Projects(Find(admitted, new AccessQuery(Text: "GitHub")), admitted);
+
+        Assert.Equal([("web", "dev, prod", 3)], everywhere.Select(Shown));
+        Assert.Equal([("web", "dev, prod", 2)], withinWork.Select(Shown));
+        Assert.Empty(AccessIndex.Projects(Find(admitted, new AccessQuery(Text: "token")), admitted));
+    }
+
+    [Fact]
+    public void Two_items_shown_whole_with_one_username_link_as_one_account()
+    {
+        IndexedEntry[] entries =
+        [
+            Item("Work", "GitHub", username: "dan"),
+            Item("Work", "Gist", username: "dan"),
+            Item("Work", "GitLab", username: "Dan"),
+            Item("Work", "Bitbucket"),
+        ];
+
+        var github = Assert.Single(Find(entries, new AccessQuery(Text: "GitHub")));
+
+        var link = Assert.Single(github.Links);
+        Assert.Equal(new EntryName("Work", "Gist"), link.Name);
+        Assert.True(link.SameAccount);
+
+        var throughProject = AccessIndex.Admitted([.. entries.Select(entry => entry with { Listing = entry.Listing with { Tags = ["env:web"] } })], EntryExposure.Default);
+        var links = Assert.Single(Find(throughProject, new AccessQuery(Text: "GitHub"))).Links;
+        Assert.Equal(3, links.Count);
+        Assert.All(links, each => Assert.False(each.SameAccount));
+    }
+
+    [Fact]
+    public void A_reference_links_both_ends_only_to_an_admitted_item()
+    {
+        const string root = "0123456789ABCDEF0123456789ABCDEF";
+        const string secret = "FEDCBA9876543210FEDCBA9876543210";
+        IndexedEntry[] entries =
+        [
+            Item("Ops", "Deploy", references: [root.ToLowerInvariant(), secret, new string('A', 32)]),
+            Item("Ops", "Root", uuid: root),
+            Item("Personal", "Secret", uuid: secret),
+        ];
+        Assert.True(EntryExposure.TryCreate(["Ops/**"], out var ops, out var error), error);
+        var admitted = AccessIndex.Admitted(entries, ops);
+
+        var deploy = Assert.Single(Find(admitted, new AccessQuery(Text: "Deploy")));
+        var rootFound = Assert.Single(Find(admitted, new AccessQuery(Text: "Root")));
+
+        var references = Assert.Single(deploy.Links);
+        Assert.Equal((new EntryName("Ops", "Root"), true, false), (references.Name, references.References, references.ReferencedBy));
+        var referencedBy = Assert.Single(rootFound.Links);
+        Assert.Equal((new EntryName("Ops", "Deploy"), false, true), (referencedBy.Name, referencedBy.References, referencedBy.ReferencedBy));
+    }
+
+    [Fact]
     public void An_empty_query_is_refused()
     {
         Assert.Throws<ArgumentException>(() => AccessIndex.Find(Everything(), new AccessQuery(Text: "  ")));
@@ -123,6 +192,14 @@ public sealed class AccessIndexTests : IDisposable
         AccessIndex.Find(entries, query, limit);
 
     private static EntryName[] Names(IEnumerable<FoundAccess> found) => [.. found.Select(one => one.Entry.Listing.Name)];
+
+    private static (string, string, int) Shown(AccessProject project) => (project.Name, string.Join(", ", project.Environments), project.Items);
+
+    private static IndexedEntry Item(string group, string title, string? uuid = null, string? username = null, string[]? references = null) =>
+        new(new ListedEntry(new EntryName(group, title) { Uuid = uuid ?? Guid.NewGuid().ToString("N").ToUpperInvariant() }, ["password"], []), ItemKind.Login, null, username)
+        {
+            References = references ?? [],
+        };
 
     private IReadOnlyList<IndexedEntry> Everything() => Index(
         (new VaultEntry { Title = _github.Title, GroupPath = _github.GroupPath, Kind = ItemKind.Login, Url = "https://github.com", Username = "dan", Password = "pw" }, ["env:web"]),
@@ -152,7 +229,7 @@ public sealed class AccessIndexTests : IDisposable
         }
 
         vault.Save();
-        Assert.Equal(SavedRead.Current, vault.ReadSavedIndex(showsUsername: true, out var index));
+        Assert.Equal(SavedRead.Current, vault.ReadSavedIndex(showsUsername: true, showsLinkedHosts: false, out var index));
         return index!;
     }
 }

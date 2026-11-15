@@ -376,6 +376,11 @@ public sealed partial class PlainWordsTests
         };
 
         yield return ("the run prompt", new RunApprovalWindow(new RunApprovalViewModel(run)));
+        yield return ("the linked set prompt", new SetApprovalWindow(new SetApprovalViewModel(SetPrompt.For(
+            "claude-code",
+            "work laptop",
+            [(new EntryName("env/billing", ".env"), "STRIPE_KEY"), (new EntryName("env/billing", "webhook"), "password")],
+            "Rotate the webhook secret."))));
 
         var timed = ApprovalPrompt.For("claude-code", new EntryName("env/billing", ".env"), "STRIPE_KEY", "Run the tests against the dev account.", "work laptop");
 

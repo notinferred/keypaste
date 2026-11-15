@@ -28,6 +28,11 @@
     <string>public.app-category.developer-tools</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSEnvironment</key>
+    <dict>
+        <key>DOTNET_EnableDiagnostics</key>
+        <string>0</string>
+    </dict>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

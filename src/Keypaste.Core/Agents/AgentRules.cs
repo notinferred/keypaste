@@ -44,7 +44,7 @@ public enum RuleLevel
 public readonly record struct DecidedRule(CategoryRule Rule, RuleLevel Level);
 
 /// <summary>
-/// What agents get on this computer: whether usernames are shown, each category's rule for every agent, each agent's own
+/// What agents get on this computer: whether usernames, and hosts and references, are shown, each category's rule for every agent, each agent's own
 /// rules, and the answers a person told keypaste to remember, kept in <c>agents.toml</c> under the keypaste home and never
 /// in a vault, so a synced or edited vault releases nothing more.
 /// </summary>
@@ -64,11 +64,17 @@ public sealed record AgentRules
     private Dictionary<FieldCategory, CategoryRule> Rules { get; init; } = [];
     private readonly IReadOnlyList<KnownAgent> _agents = [];
 
-    /// <summary>The username shown, every category asked, no agent running commands.</summary>
+    /// <summary>The username shown, hosts and references hidden, every category asked, no agent running commands.</summary>
     public static AgentRules Defaults { get; } = new();
 
     /// <summary>Whether agents see each item's username without asking; its title, group, tags and URL they always see.</summary>
     public bool ShowsUsername { get; init; } = true;
+
+    /// <summary>
+    /// Whether a search shows agents the host an item's <see cref="IndexedEntry.HostField"/> names when its URL names none, and links
+    /// the items one's KeePass field references name by UUID; while off, neither is read.
+    /// </summary>
+    public bool ShowsLinkedHosts { get; init; }
 
     /// <summary>The agents this computer knows, by name.</summary>
     /// <exception cref="ArgumentException">Two share a name, or there are more than <see cref="MaximumAgents"/>.</exception>
@@ -398,6 +404,7 @@ public sealed record AgentRules
     public bool Equals(AgentRules? other) =>
         other is not null
         && ShowsUsername == other.ShowsUsername
+        && ShowsLinkedHosts == other.ShowsLinkedHosts
         && FieldCategories.Ruled.All(category => RuleFor(category) == other.RuleFor(category))
         && _agents.SequenceEqual(other._agents)
         && AgentCategories.ToHashSet().SetEquals(other.AgentCategories)
@@ -405,7 +412,7 @@ public sealed record AgentRules
         && Picks.SequenceEqual(other.Picks);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(ShowsUsername, _agents.Count, Answers.Count, Picks.Count);
+    public override int GetHashCode() => HashCode.Combine(ShowsUsername, ShowsLinkedHosts, _agents.Count, Answers.Count, Picks.Count);
 
     /// <summary>These rules as a file holds them, its sections read in turn, nothing confirmed by a person.</summary>
     internal AgentRules Read(IReadOnlyList<AgentCategoryRule> agentCategories, IReadOnlyList<RememberedAnswer> answers, IReadOnlyList<RememberedPick> picks) =>

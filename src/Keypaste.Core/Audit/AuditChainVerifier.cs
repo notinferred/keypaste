@@ -46,6 +46,9 @@ public enum AuditChainFault
 
     /// <summary>A record from a newer schema. Nothing here can check it, so nothing here vouches for it.</summary>
     Unverifiable = 8,
+
+    /// <summary>A checkpoint naming the vault whose key was given, which that key did not sign. The chain was rewritten without the vault.</summary>
+    Forged = 9,
 }
 
 /// <summary>One thing the verifier found, and where.</summary>
@@ -112,6 +115,15 @@ public sealed record AuditChainReport
     /// </remarks>
     public bool? Anchored { get; init; }
 
+    /// <summary>How many checkpoint lines the chain holds, signed or not.</summary>
+    public int Checkpoints { get; init; }
+
+    /// <summary>How many checkpoints the vault's key signed, or null when no key was given.</summary>
+    public int? SignedCheckpoints { get; init; }
+
+    /// <summary>How many chained records follow the last checkpoint the vault's key signed, or all of them when none was.</summary>
+    public int UnsignedRecords { get; init; }
+
     /// <summary>Why the file could not be read, when that is the verdict.</summary>
     public string Error { get; init; } = string.Empty;
 
@@ -153,7 +165,9 @@ public sealed record AuditChainReport
 /// </para>
 /// <para>
 /// <b>What it cannot do.</b> The chain holds no secret, so anyone who can write the file can
-/// recompute it; and records deleted from the end leave a chain that is internally perfect. See
+/// recompute it, unless the vault's checkpoint key is given to check the checkpoints its owner
+/// signed, and then only up to the last of them; and records deleted from the end leave a chain
+/// that is internally perfect. See
 /// THREATS.md T-5, which states both as residuals rather than leaving them to be discovered — and
 /// <see cref="AuditText.Limits"/>, which prints them on a <em>passing</em> check rather than only on
 /// a failing one.
@@ -184,20 +198,21 @@ public static class AuditChainVerifier
     /// A hash from an earlier run to look for, or null. Answered from the chain, never from the
     /// file's text: <see cref="AuditChainReport.Anchored"/> says why that distinction matters.
     /// </param>
+    /// <param name="checkpoints">The vault's checkpoint key, to check the checkpoints naming that vault, or null.</param>
     /// <returns>What was found. Never throws for an ordinary I/O failure.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
     /// <remarks>
     /// Opened <see cref="FileShare.ReadWrite"/>, because a bridge may be holding the log open
     /// for writing and on Windows any narrower share mode fails outright against it.
     /// </remarks>
-    public static AuditChainReport Verify(string path, string? anchor = null)
+    public static AuditChainReport Verify(string path, string? anchor = null, AuditCheckpointKey? checkpoints = null)
     {
         ArgumentNullException.ThrowIfNull(path);
 
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            return Verify(stream, path, anchor);
+            return Verify(stream, path, anchor, checkpoints);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                        or NotSupportedException or ArgumentException)
@@ -215,14 +230,15 @@ public static class AuditChainVerifier
     /// <param name="stream">The bytes of the log, positioned at its start.</param>
     /// <param name="path">The name to report, for messages.</param>
     /// <param name="anchor">A hash from an earlier run to look for, or null.</param>
+    /// <param name="checkpoints">The vault's checkpoint key, or null.</param>
     /// <returns>What was found.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stream"/> or <paramref name="path"/> is null.</exception>
-    public static AuditChainReport Verify(Stream stream, string path, string? anchor = null)
+    public static AuditChainReport Verify(Stream stream, string path, string? anchor = null, AuditCheckpointKey? checkpoints = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(path);
 
-        var walk = new Walk(path, anchor);
+        var walk = new Walk(path, anchor, checkpoints);
         var buffer = new byte[8192];
 
         using var pending = new MemoryStream(1024);
@@ -278,12 +294,15 @@ public static class AuditChainVerifier
     /// A class rather than a set of locals because <see cref="Line"/> takes a span, and a span
     /// cannot cross into an iterator or a closure.
     /// </remarks>
-    private sealed class Walk(string path, string? anchor)
+    private sealed class Walk(string path, string? anchor, AuditCheckpointKey? key)
     {
         private readonly List<AuditChainFinding> _findings = [];
         private int _number;
         private int _records;
         private int _newer;
+        private int _checkpoints;
+        private int _signed;
+        private int _unsigned;
         private bool _chained;
         private bool _unfinished;
         private bool _rewritten;
@@ -366,6 +385,9 @@ public static class AuditChainVerifier
                 Unfinished = _unfinished,
                 Rewritten = _rewritten,
                 Anchored = anchor is null ? null : _anchored,
+                Checkpoints = _checkpoints,
+                SignedCheckpoints = key is null ? null : _signed,
+                UnsignedRecords = _unsigned,
                 Findings = _findings,
             };
         }
@@ -434,6 +456,15 @@ public static class AuditChainVerifier
                 Found(AuditChainFault.Unlinked, inspected);
             }
 
+            if (Signs(line, inspected, intact))
+            {
+                _unsigned = 0;
+            }
+            else
+            {
+                _unsigned++;
+            }
+
             if (_chained && inspected.Sequence != _sequence + 1)
             {
                 Found(AuditChainFault.SequenceGap, inspected);
@@ -443,6 +474,30 @@ public static class AuditChainVerifier
             _chained = true;
             _sequence = inspected.Sequence;
             _hash = inspected.Hash;
+        }
+
+        private bool Signs(ReadOnlySpan<byte> line, AuditLine inspected, bool intact)
+        {
+            if (!AuditCheckpoint.TryRead(line, out var vault, out var mac))
+            {
+                return false;
+            }
+
+            _checkpoints++;
+
+            if (!intact || key is null || !string.Equals(vault, key.Vault, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!AuditCheckpoint.Verifies(key, inspected.Sequence, inspected.Previous, mac))
+            {
+                Found(AuditChainFault.Forged, inspected);
+                return false;
+            }
+
+            _signed++;
+            return true;
         }
 
         private void Found(AuditChainFault fault, AuditLine inspected) =>

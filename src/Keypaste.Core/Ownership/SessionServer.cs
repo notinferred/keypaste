@@ -72,15 +72,18 @@ public sealed record SessionServerOptions
 public sealed class SessionServer : IDisposable
 {
     private readonly ApprovalGate _gate;
+    private readonly AuditCheckpoints _checkpoints;
     private ApproverListener? _listener;
     private bool _disposed;
 
     private SessionServer(
         SessionAuthority authority,
-        ApprovalGate gate)
+        ApprovalGate gate,
+        AuditCheckpoints checkpoints)
     {
         Authority = authority;
         _gate = gate;
+        _checkpoints = checkpoints;
     }
 
     /// <summary>What answers each request.</summary>
@@ -105,6 +108,8 @@ public sealed class SessionServer : IDisposable
 
         var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits);
 
+        var checkpoints = new AuditCheckpoints(options.Audit, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id);
+
         try
         {
             var handler = new ApproverHandler(
@@ -123,14 +128,14 @@ public sealed class SessionServer : IDisposable
                 : null;
 
             var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
-                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Audit, uses, options.Clock, options.Narrate)
+                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, checkpoints.Watched, uses, options.Clock, options.Narrate)
                 : null;
 
             var authority = new SessionAuthority(
                 options.Vault,
                 options.CurrentLifetime,
                 handler,
-                options.Audit,
+                checkpoints.Watched,
                 new SessionEnvironments(gate, options.UnlockedFor, options.Clock, options.Narrate, launches),
                 options.LockNow,
                 options.Clock,
@@ -146,7 +151,7 @@ public sealed class SessionServer : IDisposable
                 browsers.Removed += (_, pairing) => authority.Unbind(pairing);
             }
 
-            return new SessionServer(authority, gate) { Browsers = browsers };
+            return new SessionServer(authority, gate, checkpoints) { Browsers = browsers };
         }
         catch
         {
@@ -218,6 +223,7 @@ public sealed class SessionServer : IDisposable
 
         _disposed = true;
         _listener?.Dispose();
+        _checkpoints.Seal();
         _gate.Dispose();
     }
 }

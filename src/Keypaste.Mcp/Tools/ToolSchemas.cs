@@ -63,7 +63,13 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 256,
-              "description": "An item's handle; finds the items sharing a site or a project with it."
+              "description": "An item's handle; finds the items linked to it by a site, a project, an account or a reference."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "A project's name, exactly; finds its items in every environment."
             }
           },
           "minProperties": 1,
@@ -71,7 +77,7 @@ internal static class ToolSchemas
         }
         """;
 
-    /// <summary>The structured result of <c>find_access</c>: names, origins and usernames, never a value.</summary>
+    /// <summary>The structured result of <c>find_access</c>: names, origins, usernames, links and projects, never a value.</summary>
     internal const string FindOutputJson = """
         {
           "type": "object",
@@ -79,6 +85,18 @@ internal static class ToolSchemas
             "vault": { "type": "string" },
             "truncated": { "type": "boolean" },
             "count": { "type": "integer" },
+            "projects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "environments": { "type": "array", "items": { "type": "string" } },
+                  "items": { "type": "integer" }
+                },
+                "required": ["name", "environments", "items"]
+              }
+            },
             "items": {
               "type": "array",
               "items": {
@@ -100,9 +118,12 @@ internal static class ToolSchemas
                         "handle": { "type": "string" },
                         "path": { "type": "string" },
                         "site": { "type": ["string", "null"] },
-                        "projects": { "type": "array", "items": { "type": "string" } }
+                        "projects": { "type": "array", "items": { "type": "string" } },
+                        "same_account": { "type": "boolean" },
+                        "references": { "type": "boolean" },
+                        "referenced_by": { "type": "boolean" }
                       },
-                      "required": ["handle", "path", "site", "projects"]
+                      "required": ["handle", "path", "site", "projects", "same_account", "references", "referenced_by"]
                     }
                   },
                   "altered": { "type": "boolean" }
@@ -111,7 +132,7 @@ internal static class ToolSchemas
               }
             }
           },
-          "required": ["vault", "truncated", "count", "items"]
+          "required": ["vault", "truncated", "count", "projects", "items"]
         }
         """;
 
@@ -140,6 +161,48 @@ internal static class ToolSchemas
             }
           },
           "required": ["entry", "field", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The arguments of <c>request_linked_set</c>: two to four fields, the first item the anchor, and why; the bounds are <c>SetRequestRules</c>'s.</summary>
+    internal const string SetInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "description": "The handle from find_access or list_entry_names (preferred), or the item's full path."
+                  },
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "description": "One field of that item, as request_credential takes it; never an attachment."
+                  }
+                },
+                "required": ["entry", "field"],
+                "additionalProperties": false
+              },
+              "description": "The fields to release together. The first item is the anchor; every other item is the anchor itself or one find_access links to it."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human who approves or denies the whole set. Be specific and honest."
+            }
+          },
+          "required": ["items", "reason"],
           "additionalProperties": false
         }
         """;
@@ -299,6 +362,9 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
+
+    /// <summary><see cref="SetInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement SetInput = Parse(SetInputJson);
 
     /// <summary><see cref="SaveInputJson"/>, parsed once.</summary>
     internal static readonly JsonElement SaveInput = Parse(SaveInputJson);

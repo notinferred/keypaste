@@ -28,7 +28,7 @@ namespace Keypaste.Core.Approval;
 /// this computer's, never a vault's, so an agent record a vault carries releases nothing unasked.
 /// </para>
 /// </remarks>
-public sealed class ApproverHandler
+public sealed partial class ApproverHandler
 {
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;
@@ -223,10 +223,10 @@ public sealed class ApproverHandler
         if (query.IsEmpty)
         {
             return ValueTask.FromResult(
-                new FindReply(false, [], "a search names text, a host, a kind or a related item", true) { Refusal = AuditMethod.InvalidRequest });
+                new FindReply(false, [], "a search names text, a host, a kind, a related item or a project", true) { Refusal = AuditMethod.InvalidRequest });
         }
 
-        if (!_lister.TryIndex(exposure, rules.ShowsUsername, out var index, out var failure))
+        if (!_lister.TryIndex(exposure, rules.ShowsUsername, rules.ShowsLinkedHosts, out var index, out var failure))
         {
             return ValueTask.FromResult(
                 IsStale(failure)
@@ -234,9 +234,14 @@ public sealed class ApproverHandler
                     : new FindReply(false, [], Explain(failure), true));
         }
 
-        var found = AccessIndex.Find(AccessIndex.Admitted(index, exposure), query, AccessIndex.MaximumResults + 1);
+        var admitted = AccessIndex.Admitted(index, exposure);
+        var found = AccessIndex.Find(admitted, query, AccessIndex.MaximumResults + 1);
+        List<FoundAccess> kept = [.. found.Take(AccessIndex.MaximumResults)];
 
-        return ValueTask.FromResult(new FindReply(true, [.. found.Take(AccessIndex.MaximumResults)], string.Empty, found.Count <= AccessIndex.MaximumResults));
+        return ValueTask.FromResult(new FindReply(true, kept, string.Empty, found.Count <= AccessIndex.MaximumResults)
+        {
+            Projects = AccessIndex.Projects(kept, admitted),
+        });
     }
 
     /// <summary>Decides one credential request, asking a human if its category says to.</summary>

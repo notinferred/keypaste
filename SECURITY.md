@@ -77,12 +77,14 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 ### Agent access
 
 - A release needs a person's answer or a rule the person set: per-category Ask, Allow or Block, Ask by default, each Allow confirmed in the app (unreleased); a `policy.toml` rule (v0.3.0) [T-12] [T-15].
-- One approval releases one field or attachment to an agent (v0.3.0: one field); a whole env set to a child process for `keypaste run --session` and the `run` tool, asked every time (unreleased) [T-30] [T-35].
+- One approval releases one field or attachment to an agent (v0.3.0: one field), or a linked set of up to four fields the person allows together, asked every time and recorded one line per field (unreleased) [T-56]; a whole env set to a child process for `keypaste run --session` and the `run` tool, asked every time (unreleased) [T-30] [T-35].
 - A scoped token releases its sets to `keypaste run --token` with no prompt, except protected sets (unreleased) [T-32].
 - An entry's title, group, tags and URL, and its username unless Settings hides it, reach agents unasked (unreleased) [T-4].
 - The bridge holds no vault and makes no network request (v0.3.0) [T-9].
 - Every answered request is recorded before the reply, and an unrecordable release is refused (v0.3.0) [T-6].
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
+- A search names at most 25 items it reaches, with their origins, usernames while Settings shows them and the links among them, never a value (unreleased) [T-55].
+- An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
 - Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
 - One prompt at a time; 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].
@@ -141,8 +143,10 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 ### Audit
 
 - The log is append-only within keypaste and hash-chained; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
+- The vault's owner signs the chain with a key the vault holds every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so a rewrite before the last one needs the unlocked vault (unreleased) [T-5].
+- Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
 - Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.
-- Limit: the chain has no secret, so its tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
+- Limit: lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
 - Limit: the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)) and can hold sensitive agent-written text.
 
 ## Maintainer note
@@ -186,3 +190,5 @@ The reporting mailbox has been tested from an external address. GitHub private v
 [T-43]: THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
 [T-44]: THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
 [T-51]: THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
+[T-54]: THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
+[T-55]: THREATS.md#t-55--a-search-maps-the-persons-infrastructure

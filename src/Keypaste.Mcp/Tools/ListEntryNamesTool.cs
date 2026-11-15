@@ -13,12 +13,8 @@ namespace Keypaste.Mcp.Tools;
 /// value, for the part of the vault the user chose to expose.
 /// </summary>
 /// <remarks>
-/// The names come from <c>keypaste approve</c> over the approver socket
-/// (<see cref="ApproverEntryNameSource"/>); the filtering, sanitizing and formatting below are what
-/// this file adds to them. Until 2.2 that code was unreachable in the shipped binary and this
-/// comment said so — THREATS.md T-7 was the gap. It is on the live path now, and the thing that
-/// makes that checkable rather than asserted is <c>scripts/verify-approval-e2e.sh</c>, which drives
-/// a real bridge against a real approver in another process.
+/// The names come from the vault's owner over the approver pipe (<see cref="ApproverEntryNameSource"/>);
+/// the filtering, sanitizing and formatting below are what this file adds to them.
 /// </remarks>
 internal sealed class ListEntryNamesTool(
     IEntryNameSource source,

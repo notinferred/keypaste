@@ -146,7 +146,7 @@ public sealed record ApprovalPrompt
     /// though it lived somewhere it does not, which is the one thing a human reading this line is
     /// being asked to judge.
     /// </remarks>
-    private static SanitizedName Display(EntryName entry)
+    internal static SanitizedName Display(EntryName entry)
     {
         var title = EntryNameSanitizer.Sanitize(entry.Title);
 

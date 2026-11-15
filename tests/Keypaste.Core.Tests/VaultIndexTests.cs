@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>What the vault's owner reads for a search: names, kind, a URL's origin and, when Settings shows it, a username, and nothing from its own groups or the bin.</summary>
+/// <summary>What the vault's owner reads for a search: names, kind, a URL's origin, and, when Settings shows them, a username, a host field's origin and references, and nothing from its own groups or the bin.</summary>
 public sealed class VaultIndexTests : IDisposable
 {
     private const string _master = "correct horse battery staple";
@@ -37,6 +37,45 @@ public sealed class VaultIndexTests : IDisposable
 
         Assert.Equal(["dan", null], Index(vault, showsUsername: true).Select(entry => entry.Username));
         Assert.Equal([null, null], Index(vault, showsUsername: false).Select(entry => entry.Username));
+    }
+
+    [Fact]
+    public void A_host_field_gives_an_origin_only_while_settings_show_hosts_and_the_url_gives_none()
+    {
+        using var vault = Vault.Create(Path.Combine(_directory, "hosts.kdbx"), _master);
+        var server = new EntryName("Ops", "Database");
+        var site = new EntryName("Web", "Shop");
+        vault.AddEntry(new VaultEntry { Title = server.Title, GroupPath = server.GroupPath, Password = "pw" });
+        vault.AddEntry(new VaultEntry { Title = site.Title, GroupPath = site.GroupPath, Url = "https://shop.example.com/cart", Password = "pw" });
+        vault.SetFields(server, [new FieldWrite(IndexedEntry.HostField, " db.example.com:5432/app?user=admin ")]);
+        vault.SetFields(site, [new FieldWrite(IndexedEntry.HostField, "cdn.example.net")]);
+        vault.Save();
+
+        Assert.Equal([null, "https://shop.example.com:443"], Index(vault, showsUsername: true).Select(entry => entry.Origin?.ToString()));
+        Assert.Equal(
+            ["https://db.example.com:5432", "https://shop.example.com:443"],
+            Index(vault, showsUsername: true, showsLinkedHosts: true).Select(entry => entry.Origin?.ToString()));
+    }
+
+    [Fact]
+    public void References_by_uuid_in_any_field_are_read_only_while_settings_show_them()
+    {
+        using var vault = Saved(new VaultEntry { Title = "Root", GroupPath = "Ops", Password = "pw" });
+        var target = vault.ReadEntries().Single().Uuid!;
+        var absent = new string('a', 32);
+        vault.AddEntry(new VaultEntry
+        {
+            Title = "Deploy",
+            GroupPath = "Ops",
+            Password = $"{{REF:P@I:{target.ToLowerInvariant()}}}",
+            Notes = $"see {{ref:u@i:{absent}}} and {{REF:U@T:Root}} and {{REF:P@I:{target[..31]}}}",
+        });
+        vault.Save();
+
+        Assert.All(Index(vault, showsUsername: true), entry => Assert.Empty(entry.References));
+
+        var deploy = Index(vault, showsUsername: true, showsLinkedHosts: true).Single(entry => entry.Listing.Name.Title == "Deploy");
+        Assert.Equal(new[] { absent.ToUpperInvariant(), target.ToUpperInvariant() }.Order(StringComparer.Ordinal), deploy.References);
     }
 
     [Fact]
@@ -80,13 +119,13 @@ public sealed class VaultIndexTests : IDisposable
         using var vault = Saved(new VaultEntry { Title = "GitHub", GroupPath = "Web", Password = "pw" });
         vault.AddEntry(new VaultEntry { Title = "Unsaved", GroupPath = "Web", Password = "pw" });
 
-        Assert.NotEqual(SavedRead.Current, vault.ReadSavedIndex(showsUsername: true, out var index));
+        Assert.NotEqual(SavedRead.Current, vault.ReadSavedIndex(showsUsername: true, showsLinkedHosts: false, out var index));
         Assert.Null(index);
     }
 
-    private static IReadOnlyList<IndexedEntry> Index(Vault vault, bool showsUsername)
+    private static IReadOnlyList<IndexedEntry> Index(Vault vault, bool showsUsername, bool showsLinkedHosts = false)
     {
-        Assert.Equal(SavedRead.Current, vault.ReadSavedIndex(showsUsername, out var index));
+        Assert.Equal(SavedRead.Current, vault.ReadSavedIndex(showsUsername, showsLinkedHosts, out var index));
         return index!;
     }
 

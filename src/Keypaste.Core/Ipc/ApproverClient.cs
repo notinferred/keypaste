@@ -195,6 +195,20 @@ public sealed class ApproverClient : IAsyncDisposable
         return ApproverProtocol.Decoded<FindReply>(frame, ApproverProtocol.TryDecode);
     }
 
+    /// <summary>Asks for a linked set, released whole or not at all.</summary>
+    /// <param name="request">What the agent asked for.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>
+    /// <returns>The reply, or null when the approver could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<SetReply?> RequestSetAsync(SetRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+
+        return ApproverProtocol.Decoded<SetReply>(frame, ApproverProtocol.TryDecode);
+    }
+
     /// <summary>Asks for one field of one entry.</summary>
     /// <param name="request">What the agent asked for.</param>
     /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>

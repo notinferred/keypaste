@@ -52,6 +52,7 @@ public sealed class CurrentStateTests
         var released = bridge.Call("request_credential", Request());
         Assert.Contains(_external, released.ToString(), StringComparison.Ordinal);
         Assert.Equal(app.Session, Workspace.Lines(workspace.OwnerLog)[^1].GetProperty("session").GetString());
+        app.Driver.WaitForOutput("^approved", asked + 1);
         Assert.Equal(asked + 1, app.Driver.Output.Count(l => l.StartsWith("approved", StringComparison.Ordinal)));
     }
 

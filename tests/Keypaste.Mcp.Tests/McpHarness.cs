@@ -183,6 +183,7 @@ internal sealed class McpHarness : IAsyncDisposable
         serverOptions.ToolCollection.Add(new FindAccessTool(names, options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit, attachments: true));
+        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, _approver, _audit));
         serverOptions.ToolCollection.Add(new SaveValueTool(options, _approver, _audit));
 
         if (options.AllowRun)

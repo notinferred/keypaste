@@ -59,6 +59,13 @@
     <AssemblyMetadata Include="KeypasteCrashEndpoint" Value="$(KeypasteCrashEndpoint)" />
   </ItemGroup>
 
+  <!-- Without createdump the runtime, and the keypaste published beside it, cannot write a dump that ignores the core dump limit, whatever DOTNET_DbgEnableMiniDump says. -->
+  <Target Name="LeaveOutCreatedump" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'createdump'" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
   </ItemGroup>

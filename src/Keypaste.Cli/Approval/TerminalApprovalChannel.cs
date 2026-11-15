@@ -268,6 +268,25 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return allowed ? new PairingAnswer(ApprovalAnswer.ApprovedOnce, request.SuggestedName) : new PairingAnswer(ApprovalAnswer.Denied, null);
     }
 
+    /// <summary>Shows an agent's linked set, every item and field, and reads <c>y</c> to allow it once; anything else denies the whole set.</summary>
+    public async ValueTask<ApprovalAnswer> AskAsync(SetPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+
+        try
+        {
+            var choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "allow once"), cancellationToken).ConfigureAwait(false);
+            return Said(choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied);
+        }
+        catch (OperationCanceledException)
+        {
+            return Withdrawn("Nothing was released.");
+        }
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -511,6 +530,46 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         lines.Add(string.Empty);
         lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+        lines.Add(string.Empty);
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>A linked set: the agent, each item and field by number, and the agent's claim last; never a value.</summary>
+    internal static string Render(SetPrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            string.Create(CultureInfo.InvariantCulture, $"keypaste: an agent is asking for {request.Fields.Count} fields together, allowed once or denied as a whole."),
+            string.Empty,
+            $"  agent    {Named(request.Client, request.Label)}",
+        ];
+
+        lines.AddRange(request.Fields.Select((field, index) =>
+            string.Create(CultureInfo.InvariantCulture, $"  {(index == 0 ? "fields" : "      ")}   [{index + 1}] {field.Entry} · {field.Field}")));
+        lines.Add(string.Empty);
+        lines.Add("  the agent says it needs this because:");
+        lines.Add($"    {request.Reason}");
+
+        if (request.ReasonWasTruncated)
+        {
+            lines.Add("    (cut short — the full text is hashed in the audit log)");
+        }
+
+        if (request.EntryWasAltered || request.ReasonWasAltered)
+        {
+            lines.Add(string.Empty);
+            lines.Add("  Characters that cannot be shown were scrubbed from the items or the reason above.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+        lines.Add("  Allowing sends every value above to the agent at once, and it can read them and pass them on.");
+        lines.Add(string.Empty);
+        lines.Add("  [d] deny: the agent gets none of them.");
+        lines.Add("  [y] allow once: the agent gets all of them, this one time.");
         lines.Add(string.Empty);
 
         return string.Join(Environment.NewLine, lines);

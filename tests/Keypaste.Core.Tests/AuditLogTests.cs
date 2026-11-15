@@ -638,6 +638,90 @@ public sealed class AuditLogTests : IDisposable
         Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
     }
 
+    /// <summary>A linked set's lines go in as one write, chained in order with consecutive sequence numbers, and readers read each.</summary>
+    [Fact]
+    public void LinesAppendedTogether_ChainInOrder_AndCarryTheirPlaceInTheSet()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out var error), error);
+            Assert.True(log.TryAppendAll([.. Enumerable.Range(1, 3).Select(position => Denial("request_linked_set", new AuditArgs { Set = new AuditSet("ab12", position, 3) }))], out error), error);
+            Assert.True(log.TryAppend(Denial(), out error), error);
+        }
+
+        var lines = Lines();
+        Assert.Equal(5, lines.Length);
+
+        using var second = JsonDocument.Parse(lines[2]);
+        var set = second.RootElement.GetProperty("args").GetProperty("set");
+        Assert.Equal(("ab12", 2, 3), (set.GetProperty("id").GetString(), set.GetProperty("position").GetInt32(), set.GetProperty("of").GetInt32()));
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], lines.Select(line => { using var parsed = JsonDocument.Parse(line); return parsed.RootElement.GetProperty("seq").GetInt64(); }));
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
+        Assert.Equal((5, 0), (entries.Count, unreadable));
+        Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
+    }
+
+    /// <summary>When one of the lines cannot be written, none is, so a set is never recorded in part.</summary>
+    [Fact]
+    public void LinesAppendedTogether_WriteNoneWhenOneIsTooLarge()
+    {
+        using (var log = Open())
+        {
+            Assert.False(log.TryAppendAll([Denial(), Denial() with { Exposure = [new string('x', AuditLog.MaximumRecordBytes)] }], out var error));
+            Assert.Contains("over the", error, StringComparison.Ordinal);
+        }
+
+        Assert.False(File.Exists(LogPath) && File.ReadAllText(LogPath).Length > 0);
+    }
+
+    /// <summary>The program on the owner's pipe is written after the client, sanitized and capped, and a reader that knows nothing of it still reads the line.</summary>
+    [Fact]
+    public void ACaller_IsWrittenSanitizedAndCapped_AndReadersStillReadTheLine()
+    {
+        using (var log = Open())
+        {
+            var caller = AuditCaller.Of(4242, "C:\\Program Files\\claude\u202E.exe\n", CallerSignature.Valid, new string('s', 400));
+            Assert.True(log.TryAppend(Denial() with { Caller = caller }, out var error), error);
+            Assert.True(log.TryAppend(Denial() with { Caller = AuditCaller.Of(7, "/usr/bin/node", null, null) }, out error), error);
+            Assert.True(log.TryAppend(Denial(), out error), error);
+        }
+
+        var lines = Lines();
+        using var signed = JsonDocument.Parse(lines[0]);
+        using var linux = JsonDocument.Parse(lines[1]);
+        using var none = JsonDocument.Parse(lines[2]);
+
+        var recorded = signed.RootElement.GetProperty("caller");
+        Assert.Equal(4242, recorded.GetProperty("pid").GetInt32());
+        Assert.Equal("C:\\Program Files\\claude .exe", recorded.GetProperty("path").GetString());
+        Assert.Equal("valid", recorded.GetProperty("signature").GetString());
+        Assert.Equal(AuditCaller.SignerLength, recorded.GetProperty("signer").GetString()!.Length);
+        Assert.Equal(["v", "ts", "seq", "pid", "client", "caller", "tool"], signed.RootElement.EnumerateObject().Take(7).Select(member => member.Name));
+
+        Assert.Equal(["pid", "path"], linux.RootElement.GetProperty("caller").EnumerateObject().Select(member => member.Name));
+        Assert.False(none.RootElement.TryGetProperty("caller", out _));
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
+        Assert.Equal((3, 0), (entries.Count, unreadable));
+        Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
+    }
+
+    /// <summary>A record that fits only without its caller is written without it rather than refused.</summary>
+    [Fact]
+    public void ARecordThatFitsOnlyWithoutItsCaller_LosesItsCaller()
+    {
+        using (var log = Open())
+        {
+            var unexposed = Unexposed(log);
+            var caller = AuditCaller.Of(1, "/" + new string('p', AuditCaller.PathLength), CallerSignature.NotSigned, null);
+            Assert.True(log.TryAppend(Sized(AuditLog.MaximumRecordBytes, unexposed) with { Caller = caller }, out var error), error);
+        }
+
+        var line = Lines()[1];
+        Assert.Equal(AuditLog.MaximumRecordBytes, line.Length + 1);
+        Assert.DoesNotContain("\"caller\"", line, StringComparison.Ordinal);
+    }
+
     /// <summary>A record of exactly the cap lands whole, and the next one links to it (D-0454).</summary>
     [Fact]
     public void ARecordOfTheFullSize_LandsWhole_AndTheNextLinksToIt()

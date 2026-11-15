@@ -88,26 +88,29 @@ class Message {
         this.request = request;
         this.timeout = undefined;
 
+        this.timeoutValue = timeoutValue || keepassClient.messageTimeout;
+
         this.promise = new Promise((resolve, reject) => {
             this.reject = reject;
             this.resolve = resolve;
-
-            const messageTimeout = timeoutValue || keepassClient.messageTimeout;
-
-            // Handle timeout
-            if (this.enableTimeout) {
-                this.timeout = setTimeout(() => {
-                    const errorMessage = {
-                        action: request.action,
-                        error: kpErrors.getError(kpErrors.TIMEOUT_OR_NOT_CONNECTED),
-                        errorCode: kpErrors.TIMEOUT_OR_NOT_CONNECTED
-                    };
-
-                    keepass.isKeypasteAvailable = false;
-                    resolve(errorMessage);
-                }, messageTimeout);
-            }
         });
+    }
+
+    startTimeout() {
+        if (!this.enableTimeout) {
+            return;
+        }
+
+        this.timeout = setTimeout(() => {
+            const errorMessage = {
+                action: this.request.action,
+                error: kpErrors.getError(kpErrors.TIMEOUT_OR_NOT_CONNECTED),
+                errorCode: kpErrors.TIMEOUT_OR_NOT_CONNECTED
+            };
+
+            keepass.isKeypasteAvailable = false;
+            this.resolve(errorMessage);
+        }, this.timeoutValue);
     }
 
     cancelTimeout() {
@@ -126,12 +129,19 @@ keepassClient.sendNativeMessage = async function(request, enableTimeout = false,
         return;
     }
 
+    const port = keepassClient.nativePort;
     const message = new Message(request, enableTimeout, timeoutValue);
+    message.port = port;
+    let earlier = [];
     await navigator.locks.request('messageBuffer', async (lock) => {
+        earlier = messageBuffer.buffer.filter(pending => pending.port === port).map(pending => pending.promise);
         messageBuffer.addMessage(message);
     });
 
-    keepassClient.nativePort.postMessage(request);
+    port.postMessage(request);
+
+    // keypaste answers one request at a time, so the wait is timed from when the requests sent before this one are answered.
+    Promise.all(earlier).then(() => message.startTimeout());
 
     const response = await message.promise;
 

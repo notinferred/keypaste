@@ -22,6 +22,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(AttachReplyFrame))]
 [JsonSerializable(typeof(CredentialRequestFrame))]
 [JsonSerializable(typeof(CredentialReplyFrame))]
+[JsonSerializable(typeof(SetRequestFrame))]
+[JsonSerializable(typeof(SetReplyFrame))]
 [JsonSerializable(typeof(EnvRequestFrame))]
 [JsonSerializable(typeof(EnvReplyFrame))]
 [JsonSerializable(typeof(AttachedFrame))]
@@ -90,6 +92,7 @@ internal sealed class FindRequestFrame(FindRequest request)
     public string? Host => request.Host;
     public int? ItemKind => (int?)request.Kind;
     public string? RelatedTo => request.RelatedTo;
+    public string? Project => request.Project;
 }
 
 internal sealed class FindReplyFrame(FindReply reply)
@@ -103,6 +106,14 @@ internal sealed class FindReplyFrame(FindReply reply)
     public int? Method => (int?)reply.Refusal;
     public bool Recorded => reply.Recorded;
     public IEnumerable<FoundRow> Found => FoundRow.Of(reply.Found);
+    public IEnumerable<FoundProjectRow> Projects => reply.Projects.Select(project => new FoundProjectRow(project));
+}
+
+internal sealed class FoundProjectRow(AccessProject project)
+{
+    public string Name => project.Name;
+    public IReadOnlyList<string> Environments => project.Environments;
+    public int Items => project.Items;
 }
 
 internal sealed class FoundRow(FoundAccess found)
@@ -125,6 +136,9 @@ internal sealed class LinkRow(AccessLink link)
     public string Title => link.Name.Title;
     public string? Site => link.Site;
     public IReadOnlyList<string> Projects => link.Projects;
+    public bool SameAccount => link.SameAccount;
+    public bool References => link.References;
+    public bool ReferencedBy => link.ReferencedBy;
 }
 
 internal sealed class AttachRequestFrame(AttachRequest request)
@@ -179,6 +193,46 @@ internal sealed class CredentialReplyFrame(CredentialReply reply)
     public string? Session => reply.Session;
     public bool Recorded => reply.Recorded;
     public string? Value => reply.Value;
+}
+
+internal sealed class SetRequestFrame(SetRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SetKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public IEnumerable<SetItemRow> Items => request.Items.Select(item => new SetItemRow(item));
+    public string Reason => request.Reason;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? Client => request.ClientName;
+    public string? ClientVersion => request.ClientVersion;
+    public string? ClientLabel => request.ClientLabel;
+}
+
+internal sealed class SetItemRow(SetItem item)
+{
+    public string Entry => item.Entry;
+    public string Field => item.Field;
+}
+
+internal sealed class SetReplyFrame(SetReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.SetKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public string? Session => reply.Session;
+    public bool Recorded => reply.Recorded;
+    public IEnumerable<SetFieldRow> Fields => reply.Fields.Select(released => new SetFieldRow(released));
+}
+
+internal sealed class SetFieldRow(SetField released)
+{
+    public string Entry => released.Entry;
+    public string Field => released.Field;
+    public string Value => released.Value;
+    public int CodeSeconds => released.CodeSeconds;
 }
 
 internal sealed class EnvRequestFrame(EnvRequest request)

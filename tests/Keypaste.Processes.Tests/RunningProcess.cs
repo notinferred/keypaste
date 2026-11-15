@@ -63,11 +63,11 @@ internal sealed class RunningProcess : IDisposable
 
     internal void CloseInput() => _process.StandardInput.Close();
 
-    /// <summary>Waits until standard output holds <paramref name="count"/> lines matching <paramref name="pattern"/>.</summary>
-    internal string WaitForOutput(string pattern, int count = 1) => WaitFor(_output, pattern, count, "standard output");
+    /// <summary>Waits until standard output holds <paramref name="count"/> lines matching <paramref name="pattern"/>, for <see cref="Wait"/> unless <paramref name="within"/> says.</summary>
+    internal string WaitForOutput(string pattern, int count = 1, TimeSpan? within = null) => WaitFor(_output, pattern, count, "standard output", within ?? Wait);
 
     /// <summary>Waits until standard error holds <paramref name="count"/> lines matching <paramref name="pattern"/>.</summary>
-    internal string WaitForError(string pattern, int count = 1) => WaitFor(_error, pattern, count, "standard error");
+    internal string WaitForError(string pattern, int count = 1) => WaitFor(_error, pattern, count, "standard error", Wait);
 
     internal int WaitForExit()
     {
@@ -99,10 +99,10 @@ internal sealed class RunningProcess : IDisposable
         }
     }
 
-    private string WaitFor(ConcurrentQueue<string> lines, string pattern, int count, string stream)
+    private string WaitFor(ConcurrentQueue<string> lines, string pattern, int count, string stream, TimeSpan within)
     {
         var deadline = Stopwatch.StartNew();
-        while (deadline.Elapsed < Wait)
+        while (deadline.Elapsed < within)
         {
             var matching = lines.Where(line => Regex.IsMatch(line, pattern)).ToList();
             if (matching.Count >= count)

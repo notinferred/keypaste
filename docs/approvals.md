@@ -12,7 +12,7 @@ This guide owns the approval prompt, at the terminal and in the desktop app, and
   keypaste approve ◄─── local pipe ────  keypaste mcp
    • holds the unlocked vault             • checks what it can see
    • asks you                             • refuses anything out of scope
-   • writes the audit line                • returns one field
+   • writes the audit line                • returns one field, or a set
 ```
 
 Your MCP client starts `keypaste mcp`, which holds no vault. You hold the vault unlocked, either in the desktop app or with `keypaste approve` in a terminal you opened, and that process decides each request under your agent settings: it asks you, releases without asking, or refuses. An agent cannot trigger a master-password prompt, so you are never taught to trust a password window another program could imitate.
@@ -62,6 +62,12 @@ The answers:
 An allow counts only once the choices have been on screen for a second, and keys typed before they appeared are discarded, so a key meant for the last prompt cannot answer this one.
 
 When more than one item answers to the name an agent asked for, such as two logins for one site, you are asked to pick one: each shows its title, group, username and URL, none is picked for you, and only the picked item's field is sent.
+
+<a id="linked-sets"></a>
+
+### Linked sets
+
+An agent's `request_linked_set` asks for two to four fields together, of one item and of items `find_access` links to it. The prompt lists every item and field under the agent's reason and offers only Deny and Allow once; at the terminal, `y` allows the set once and anything else denies it. A set is asked about every time, even when your settings allow each of its fields, and a field you block, one refused in the last minute or an item the agent cannot see or that is not linked refuses the whole set without asking. Allow once sends every value; Deny sends none, and holds each of its fields back for a minute.
 
 <a id="approving-in-the-desktop-app"></a>
 
@@ -136,7 +142,7 @@ The app or `keypaste approve` appends one JSON line to `~/.keypaste/audit.jsonl`
  "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
 
-A line never holds the released value. It records the item, the field, the client and its label, the agent's reason, the decision and how it was reached, and also `vault`, the identity of the vault that answered, and `entries`, the items a release or run used. A `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole argument list as `command_sha256`. Item names and reasons are logged, so keep secret values out of them, and treat the log as sensitive.
+A linked set writes one `request_linked_set` line per field it released, each with `"set":{"id":…,"position":…,"of":…}` in `args` under one id, and one line, without `position`, for a set refused. A line never holds the released value. It records the item, the field, the client and its label, the agent's reason, the decision and how it was reached, and also `vault`, the identity of the vault that answered, and `entries`, the items a release or run used. A `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole argument list as `command_sha256`. Item names and reasons are logged, so keep secret values out of them, and treat the log as sensitive.
 
 A call is refused when its line cannot be written. The log is never rotated or trimmed. On Linux and macOS keypaste creates it owner-readable and tightens looser permissions with a notice; on Windows it inherits its folder's permissions, so keep `KEYPASTE_HOME` in a folder only you can read.
 
@@ -192,7 +198,14 @@ keypaste log verify
 Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
 ```
 
-`keypaste log verify` exits 5 for a broken chain and names the line and the problem; `keypaste log` runs the same check and marks a row the chain does not vouch for with `?`. The chain has no secret key, so whoever can write the file can recompute it, and deleting the last records leaves a valid chain; both limits are printed on every pass. To detect a lost record, keep a hash somewhere else and supply it later:
+`keypaste log verify` exits 5 for a broken chain and names the line and the problem; `keypaste log` runs the same check and marks a row the chain does not vouch for with `?`. The chain alone has no secret key, so whoever can write the file can recompute it. The app and `keypaste approve` therefore add a checkpoint every 64 lines they write and when the vault locks, signed with a key the vault holds; `keypaste log verify --checkpoints` asks for the master password and fails when a checkpoint naming the vault is not signed by its key:
+
+```
+2 checkpoints found, 2 signed by this vault's key.
+Unsigned tail: 5 records after the last signed checkpoint.
+```
+
+Records after the last checkpoint are unsigned, and deleting the last records leaves a valid chain; both limits are printed on every pass. To detect a lost record, keep a hash somewhere else and supply it later:
 
 ```sh
 keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8

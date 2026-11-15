@@ -166,6 +166,18 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             cancellationToken,
             retry: false);
 
+    /// <summary>Asks the owner to decide an agent's linked set.</summary>
+    /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
+    /// <returns>The owner's answer, and what became of the exchange.</returns>
+    /// <remarks>Never sent twice: a request whose reply was lost may already have been answered by a person.</remarks>
+    internal ValueTask<Exchange<SetReply>> RequestSetAsync(SetRequest request, CancellationToken cancellationToken) =>
+        ExchangeAsync(
+            (client, session, token) => client.RequestSetAsync(request with { Vault = vaultPath, Session = session }, token),
+            ReleaseBound,
+            cancellationToken,
+            retry: false);
+
     /// <summary>Asks the owner to put an agent's request to save a value to the person.</summary>
     /// <param name="request">Where the value goes and why. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent.</param>

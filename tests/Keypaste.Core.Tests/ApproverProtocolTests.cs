@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Keypaste.Core.Approval;
@@ -113,6 +114,24 @@ public sealed class ApproverProtocolTests
 
         Assert.Null(ApproverProtocol.Decoded<EnvReply>(frame, ApproverProtocol.TryDecode));
         Assert.All(frame, value => Assert.Equal(0, value));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void DecodingAFrameLeavesNoCopyOfItInPooledMemory(int cutShort)
+    {
+        var frame = ApproverProtocol.Encode(Granted())[..^cutShort];
+        var seeded = ArrayPool<byte>.Shared.Rent(frame.Length + 1);
+        Array.Fill(seeded, (byte)0xFF);
+        ArrayPool<byte>.Shared.Return(seeded);
+
+        Assert.Equal(cutShort == 0, ApproverProtocol.TryDecode(frame, out CredentialReply? _));
+
+        var pooled = ArrayPool<byte>.Shared.Rent(frame.Length + 1);
+        ArrayPool<byte>.Shared.Return(pooled);
+        Assert.Same(seeded, pooled);
+        Assert.All(pooled.AsSpan(0, frame.Length).ToArray(), value => Assert.Equal(0, value));
     }
 
     [Fact]
@@ -1064,6 +1083,7 @@ public sealed class ApproverProtocolTests
             ClientLabel = "billing-bot",
             Vault = "/vaults/team.kdbx",
             Session = "session-one",
+            Project = "billing",
         };
 
         Assert.Equal(ApproverMessageKind.Find, ApproverProtocol.KindOf(ApproverProtocol.Encode(request)));
@@ -1097,6 +1117,7 @@ public sealed class ApproverProtocolTests
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], overlong, null, null, null)), out FindRequest? _));
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], null, overlong, null, null)), out FindRequest? _));
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], null, null, null, overlong)), out FindRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new FindRequest([], null, null, null, null) { Project = overlong }), out FindRequest? _));
         Assert.False(ApproverProtocol.TryDecode(
             ApproverProtocol.Encode(new FindRequest([.. Enumerable.Repeat("env/**", ApproverProtocol.MaximumExposureGlobs + 1)], "stripe", null, null, null)),
             out FindRequest? _));
@@ -1123,6 +1144,46 @@ public sealed class ApproverProtocolTests
         Assert.Empty(decoded.Found[1].Links);
     }
 
+    [Fact]
+    public void AFindReplysProjectsAndLinksBySomethingOtherThanASite_SurviveTheRoundTrip()
+    {
+        var item = Found("Stripe", links: 0) with
+        {
+            Links = [new AccessLink(new EntryName("services", "Root"), null, []) { SameAccount = true, References = true, ReferencedBy = true }],
+        };
+        var reply = new FindReply(true, [item], string.Empty, true) { Projects = [new AccessProject("billing", ["dev", "prod"], 3)] };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
+
+        var project = Assert.Single(decoded.Projects);
+        Assert.Equal(("billing", 3), (project.Name, project.Items));
+        Assert.Equal(["dev", "prod"], project.Environments);
+        var link = Assert.Single(decoded.Found[0].Links);
+        Assert.True(link.SameAccount && link.References && link.ReferencedBy);
+    }
+
+    private const string _reply = """{"v":2,"kind":"find","unlocked":true,"reason":"","complete":true,"found":[]""";
+
+    [Theory]
+    [InlineData(_reply + ""","projects":{}}""")]
+    [InlineData(_reply + ""","projects":[{"name":"billing","environments":["dev"],"items":0}]}""")]
+    [InlineData(_reply + ""","projects":[{"name":"billing","environments":["dev"]}]}""")]
+    [InlineData(_reply + ""","projects":[{"name":"billing","environments":["1","2","3","4","5","6","7","8","9"],"items":1}]}""")]
+    [InlineData(_reply + ""","projects":[{"environments":["dev"],"items":1}]}""")]
+    public void AFindReplyWithMalformedProjects_IsRefused(string frame) =>
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out FindReply? _));
+
+    [Fact]
+    public void AFindReplyNamingMoreProjectsThanOneSearchDoes_IsRefused()
+    {
+        var reply = new FindReply(true, [], string.Empty, true)
+        {
+            Projects = [.. Enumerable.Range(0, AccessIndex.MaximumProjects + 1).Select(n => new AccessProject($"p{n}", ["dev"], 1))],
+        };
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? _));
+    }
+
     /// <summary>A row names an item as a listing does, by group and title, and never carries its UUID.</summary>
     [Fact]
     public void AFoundItem_TravelsWithoutItsUuid()
@@ -1138,7 +1199,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void ARefusedSearchKeepsItsMethod()
     {
-        var reply = new FindReply(false, [], "a search names text, a host, a kind or a related item", true) { Refusal = AuditMethod.InvalidRequest };
+        var reply = new FindReply(false, [], "a search names text, a host, a kind, a related item or a project", true) { Refusal = AuditMethod.InvalidRequest };
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
         Assert.Equal(AuditMethod.InvalidRequest, decoded.Refusal);
@@ -1168,6 +1229,8 @@ public sealed class ApproverProtocolTests
     [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[]}""")]
     [InlineData(_row + ""","username":null}""")]
     [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[null]}]}""")]
+    [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[],"same_account":1}]}""")]
+    [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[],"references":"yes"}]}""")]
     public void AFindReplyWithAMalformedRow_IsRefused(string row) =>
         Assert.False(ApproverProtocol.TryDecode(
             Encoding.UTF8.GetBytes($$"""{"v":2,"kind":"find","unlocked":true,"reason":"","complete":true,"found":[{{row}}]}"""),
@@ -1177,11 +1240,15 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AnOversizeSearch_SaysItIsNotComplete()
     {
-        var reply = new FindReply(true, [.. Enumerable.Range(0, AccessIndex.MaximumResults).Select(n => Found($"{n} {new string('x', 4000)}"))], string.Empty, true);
+        var reply = new FindReply(true, [.. Enumerable.Range(0, AccessIndex.MaximumResults).Select(n => Found($"{n} {new string('x', 4000)}"))], string.Empty, true)
+        {
+            Projects = [new AccessProject("billing", ["dev"], AccessIndex.MaximumResults), new AccessProject("orphan", ["dev"], 1)],
+        };
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out FindReply? decoded));
 
         Assert.False(decoded.Complete);
+        Assert.Equal(["billing"], decoded.Projects.Select(project => project.Name));
         Assert.NotEmpty(decoded.Found);
         Assert.True(decoded.Found.Count < AccessIndex.MaximumResults);
         Assert.Equal(reply.Found[0].Entry, decoded.Found[0].Entry);

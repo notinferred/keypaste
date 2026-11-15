@@ -15,7 +15,7 @@ internal sealed record CategoryChoice(FieldCategory Category, CategoryRule Rule,
 /// <param name="Choices">Ask, Allow and Block.</param>
 internal sealed record CategoryRow(FieldCategory Category, string Name, IReadOnlyList<CategoryChoice> Choices);
 
-/// <summary>Settings › Agents: what every agent gets of each kind of value on this computer, the username switch and each category's rule.</summary>
+/// <summary>Settings › Agents: what every agent gets of each kind of value on this computer, the username and the hosts and references switches, and each category's rule.</summary>
 /// <remarks>
 /// Each change goes through the authority that answers agents, which seals it with the vault's key and records it. Allow takes
 /// the person's confirmation first, since it releases values nobody is asked about; Ask and Block take effect at once.
@@ -27,6 +27,7 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
     private readonly Session.AppAuthority _authority;
     private IReadOnlyList<CategoryRow> _rows = [];
     private bool _showsUsername = true;
+    private bool _showsLinkedHosts;
     private FieldCategory? _confirming;
 
     /// <param name="authority">The authority that answers agents, which reads and seals the rules.</param>
@@ -61,6 +62,23 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
             }
 
             Change(rules => rules with { ShowsUsername = value }, value ? "Agents see usernames again." : "Agents are asked before they get a username.");
+        }
+    }
+
+    /// <summary>Whether a search shows agents the host in an item's Host field and which items its fields reference.</summary>
+    internal bool ShowsLinkedHosts
+    {
+        get => _showsLinkedHosts;
+        set
+        {
+            if (value == _showsLinkedHosts)
+            {
+                return;
+            }
+
+            Change(
+                rules => rules with { ShowsLinkedHosts = value },
+                value ? "Agents' searches show hosts and references." : "Agents' searches no longer show hosts or references.");
         }
     }
 
@@ -136,6 +154,7 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
         Problem = string.Empty;
         Ignored = ignored is null ? string.Empty : $"{char.ToUpperInvariant(ignored[0])}{ignored[1..]}. Until then every value is asked about and no agent may run commands.";
         SetProperty(ref _showsUsername, rules.ShowsUsername, nameof(ShowsUsername));
+        SetProperty(ref _showsLinkedHosts, rules.ShowsLinkedHosts, nameof(ShowsLinkedHosts));
 
         List<CategoryRow> rows = [.. FieldCategories.Ruled.Select(category => Row(category, rules.RuleFor(category)))];
 
