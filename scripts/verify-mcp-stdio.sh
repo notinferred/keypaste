@@ -136,7 +136,7 @@ jq -se 'any(.[]; .id == 7 and .result.isError == true)' <"$NOINIT_OUT" >/dev/nul
   || die "a tool call before initialize did not return isError=true"
 
 # 8. --allow-run adds exactly one tool, and its hints say what it is: it runs a program the agent
-#    names, so it is destructive and open-world, while the other three stay neither.
+#    names, so it is destructive and open-world, while the others stay neither.
 RUN_OUT="$WORK/run-stdout.txt"
 : >"$RUN_OUT"
 {
@@ -152,7 +152,7 @@ RUN_OUT="$WORK/run-stdout.txt"
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
-[ "$(printf '%s' "$run_tools" | jq 'length')" = "6" ] || die "--allow-run did not list exactly 6 tools"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "7" ] || die "--allow-run did not list exactly 7 tools"
 printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
   || die "run is missing destructiveHint=true or openWorldHint=true"
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
@@ -198,6 +198,6 @@ KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run off 2>/dev/null \
   || die "keypaste clients did not turn cursor's run off with nothing holding a vault"
 grep -q '^\[\[seal\]\]' "$HOME_DIR/agents.toml" && die "a change made with nothing holding a vault left agents.toml looking sealed"
 
-echo "ok: keypaste mcp speaks MCP over stdio, exposes three tools, denies every call, audits them,"
+echo "ok: keypaste mcp speaks MCP over stdio, exposes six tools, denies every call, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
 echo "    prints one help for every help form, and refuses mcp serve, setup and policy naming their replacements"

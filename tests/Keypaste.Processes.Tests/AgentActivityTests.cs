@@ -61,7 +61,7 @@ public sealed class AgentActivityTests
             app.Send("lock");
             app.WaitFor("^locked");
             Assert.True(McpBridge.IsError(bridge.Reply(waiting)));
-            var line = Workspace.Lines(workspace.OwnerLog)[^1];
+            var line = Workspace.Lines(workspace.OwnerLog).Last(written => written.GetProperty("method").GetString() != "checkpoint");
             Assert.Equal(("vault-locked", first), (line.GetProperty("method").GetString(), line.GetProperty("session").GetString()));
         }
 

@@ -103,10 +103,7 @@ internal static class AuditCheckpoint
     {
         try
         {
-            var text = vault?.ReadRecords(ReservedGroups.Keys, KeyField).FirstOrDefault(record => string.Equals(record.Title, KeyTitle, StringComparison.Ordinal))?.Value;
-            var key = new byte[_keyBytes];
-
-            return text is not null && Convert.TryFromBase64String(text, key, out var length) && length == _keyBytes ? key : null;
+            return KeyIn(vault?.ReadRecords(ReservedGroups.Keys, KeyField));
         }
         catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
         {
@@ -114,10 +111,22 @@ internal static class AuditCheckpoint
         }
     }
 
-    /// <summary>Writes a new random key into the vault, unless it already holds one; the caller saves.</summary>
+    /// <summary>The key the vault's file holds, read only while the open vault holds exactly what its file does.</summary>
+    internal static byte[]? SavedKeyOf(Vault vault) =>
+        vault.ReadSavedRecords(ReservedGroups.Keys, KeyField, out var records) == SavedRead.Current ? KeyIn(records) : null;
+
+    /// <summary>Writes a new random key into the vault, unless it already holds one; set as <see cref="Vault.BeforeEachSave"/>, a save already being made writes it.</summary>
     internal static bool WriteNewKey(Vault vault) =>
         KeyOf(vault) is null
         && vault.WriteRecord(new EntryName(ReservedGroups.Keys, KeyTitle), Agents.AcafIds.Agent, KeyField, Convert.ToBase64String(RandomNumberGenerator.GetBytes(_keyBytes)));
+
+    private static byte[]? KeyIn(IEnumerable<ReservedRecord>? records)
+    {
+        var text = records?.FirstOrDefault(record => string.Equals(record.Title, KeyTitle, StringComparison.Ordinal))?.Value;
+        var key = new byte[_keyBytes];
+
+        return text is not null && Convert.TryFromBase64String(text, key, out var length) && length == _keyBytes ? key : null;
+    }
 
     private static string Mac(AuditCheckpointKey key, long sequence, string previous) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(

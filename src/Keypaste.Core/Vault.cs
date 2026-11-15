@@ -27,6 +27,7 @@ public sealed class Vault : IDisposable
     private bool _backedUp;
     private bool _rekeyed;
     private VaultBackup? _lastKept;
+    private Func<Vault, bool>? _beforeEachSave;
 
     /// <summary>The key this unlock's base digests content with, zeroed on disposal (D-0599).</summary>
     private readonly byte[] _baseKey = RandomNumberGenerator.GetBytes(32);
@@ -77,6 +78,16 @@ public sealed class Vault : IDisposable
 
     /// <summary>Raised after a save has written the file, outside the state lock.</summary>
     public event EventHandler? Saved;
+
+    /// <summary>
+    /// An edit of keypaste's own records that each save of this vault, and of a copy merged from it, makes before it writes, so a
+    /// record keypaste needs is written by a save already being made rather than by a save of its own.
+    /// </summary>
+    internal Func<Vault, bool>? BeforeEachSave
+    {
+        get => Volatile.Read(ref _beforeEachSave);
+        set => Volatile.Write(ref _beforeEachSave, value);
+    }
 
     /// <summary>Whether the file holds what this vault holds, and when it was last written.</summary>
     /// <returns>
@@ -367,6 +378,7 @@ public sealed class Vault : IDisposable
             }
 
             var handedOver = false;
+            file.BeforeEachSave = BeforeEachSave;
 
             try
             {
@@ -3173,6 +3185,8 @@ public sealed class Vault : IDisposable
             {
                 throw new VaultChangedOnDiskException();
             }
+
+            BeforeEachSave?.Invoke(this);
 
             lock (_state)
             {

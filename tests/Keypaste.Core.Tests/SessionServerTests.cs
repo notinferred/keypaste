@@ -53,7 +53,7 @@ public sealed class SessionServerTests : IDisposable
         Assert.Contains("\"method\":\"no-session\"", Assert.Single(File.ReadAllLines(path)), StringComparison.Ordinal);
     }
 
-    /// <summary>An owner signs what it recorded when its session ends, with a key it saved in the vault.</summary>
+    /// <summary>An owner signs what it recorded when its session ends, with the key the vault's next save wrote.</summary>
     [Fact]
     public async Task The_owner_signs_what_it_recorded_when_its_session_ends()
     {
@@ -68,18 +68,15 @@ public sealed class SessionServerTests : IDisposable
             {
                 Audit = () => audit,
                 UnlockedFor = asked => asked.IsLive ? vault : null,
-                WriteEdit = (_, edit) =>
-                {
-                    edit(vault);
-                    vault.Save();
-                    return AgentSave.Saved;
-                },
             });
 
             await server.Authority.ReleaseEnvAsync(
                 new EnvRequest("dev", ["deploy"], _directory) { Vault = VaultPath, Session = lifetime.Id },
                 "never-attached",
                 TestContext.Current.CancellationToken);
+
+            vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "secret-mine" });
+            vault.Save();
         }
 
         var report = AuditChainVerifier.Verify(path, checkpoints: AuditCheckpointKey.Read(vault, VaultIdentity.Of(_directory, VaultPath)));

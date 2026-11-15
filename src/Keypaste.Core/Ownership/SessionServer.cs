@@ -108,12 +108,7 @@ public sealed class SessionServer : IDisposable
 
         var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits);
 
-        var checkpoints = new AuditCheckpoints(
-            options.Audit,
-            () => options.UnlockedFor(lifetime),
-            options.WriteEdit is { } writeKey ? edit => writeKey(lifetime, edit) : null,
-            options.Vault,
-            lifetime.Id);
+        var checkpoints = new AuditCheckpoints(options.Audit, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id);
 
         try
         {

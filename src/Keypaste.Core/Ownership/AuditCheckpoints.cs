@@ -1,23 +1,22 @@
-using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Signs the owner's audit log with the vault's checkpoint key after every <see cref="AuditCheckpoint.Every"/> lines
-/// it writes and when its session ends, making the key on the session's first line when the vault holds none.
+/// it writes and when its session ends. A vault that holds no key is given one by its next save, never by a save of
+/// its own, and until that save the lines stay unsigned.
 /// </summary>
 /// <remarks>
 /// A checkpoint that cannot be written refuses nothing: the lines it would have signed stay unsigned, and the next
 /// line the owner writes tries again.
 /// </remarks>
-internal sealed class AuditCheckpoints(Func<AuditLog?> audit, Func<Vault?> vault, Func<Func<Vault, bool>, AgentSave>? save, VaultIdentity identity, string session)
+internal sealed class AuditCheckpoints(Func<AuditLog?> audit, Func<Vault?> vault, VaultIdentity identity, string session)
 {
     private readonly Lock _gate = new();
     private AuditLog? _watched;
     private AuditCheckpointKey? _key;
     private int _unsigned;
-    private bool _making;
     private bool _sealed;
 
     /// <summary>The owner's log, watched for the lines written to it.</summary>
@@ -45,8 +44,19 @@ internal sealed class AuditCheckpoints(Func<AuditLog?> audit, Func<Vault?> vault
     /// <summary>Signs what the session wrote since its last checkpoint, then stops; the session's vault is no longer needed.</summary>
     internal void Seal()
     {
+        bool fetch;
+
         lock (_gate)
         {
+            fetch = !_sealed && _key is null && _unsigned > 0;
+        }
+
+        var key = fetch ? Key() : null;
+
+        lock (_gate)
+        {
+            Keep(key);
+
             if (_sealed)
             {
                 return;
@@ -88,32 +98,16 @@ internal sealed class AuditCheckpoints(Func<AuditLog?> audit, Func<Vault?> vault
             }
 
             _unsigned++;
-            fetch = _key is null && !_making && (_unsigned == 1 || _unsigned >= AuditCheckpoint.Every);
-            _making |= fetch;
+            fetch = _key is null;
         }
 
-        if (fetch)
-        {
-            // Outside the gate: a save can merge another program's save, whose line comes back here.
-            var key = Key();
-
-            lock (_gate)
-            {
-                _making = false;
-
-                if (_sealed && key is not null)
-                {
-                    CryptographicOperations.ZeroMemory(key.Key);
-                }
-                else
-                {
-                    _key ??= key;
-                }
-            }
-        }
+        // Read outside the gate, which the vault's owner may be waiting on while it holds its own.
+        var key = fetch ? Key() : null;
 
         lock (_gate)
         {
+            Keep(key);
+
             if (!_sealed && _unsigned >= AuditCheckpoint.Every)
             {
                 TryWrite();
@@ -121,16 +115,40 @@ internal sealed class AuditCheckpoints(Func<AuditLog?> audit, Func<Vault?> vault
         }
     }
 
+    /// <summary>Takes a key read for this session, unless one is held already or the session has ended. Call under the gate.</summary>
+    private void Keep(AuditCheckpointKey? key)
+    {
+        if (key is null)
+        {
+            return;
+        }
+
+        if (_sealed || _key is not null)
+        {
+            CryptographicOperations.ZeroMemory(key.Key);
+            return;
+        }
+
+        _key = key;
+    }
+
+    /// <summary>The key the vault's file holds; when the open vault holds none, its next save is asked to write one.</summary>
     private AuditCheckpointKey? Key()
     {
         try
         {
-            if (AuditCheckpointKey.Read(vault(), identity) is { } held)
+            if (vault() is not { } open)
             {
-                return held;
+                return null;
             }
 
-            return save is not null && save(AuditCheckpoint.WriteNewKey).Holds ? AuditCheckpointKey.Read(vault(), identity) : null;
+            if (AuditCheckpoint.KeyOf(open) is null)
+            {
+                open.BeforeEachSave = AuditCheckpoint.WriteNewKey;
+                return null;
+            }
+
+            return AuditCheckpoint.SavedKeyOf(open) is { } saved ? new AuditCheckpointKey(saved, identity.Key) : null;
         }
         catch (ObjectDisposedException)
         {

@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Xunit;
@@ -17,6 +16,8 @@ public sealed class AuditCheckpointTests : IDisposable
     public AuditCheckpointTests()
     {
         _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        Assert.True(AuditCheckpoint.WriteNewKey(_vault));
+        _vault.Save();
         _log = new OwnerLog(_directory);
     }
 
@@ -47,18 +48,62 @@ public sealed class AuditCheckpointTests : IDisposable
     }
 
     [Fact]
-    public void The_first_line_saves_a_key_in_the_vault_and_a_later_session_keeps_it()
+    public void A_vault_without_a_key_is_never_saved_for_one_and_its_next_save_writes_the_key_a_later_session_keeps()
     {
-        Append(Checkpoints(), 1);
-        var first = Key().Key;
+        var path = Path.Combine(_directory, "fresh.kdbx");
+        var identity = VaultIdentity.Of(_directory, path);
+        using var fresh = Vault.Create(path, EnvStoreTests.MasterPassword);
+        fresh.Save();
+        var written = File.ReadAllBytes(path);
+        var checkpoints = new AuditCheckpoints(() => _log.Log, () => fresh, identity, "session-one");
 
-        using (var saved = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
-        {
-            Assert.Equal(first, Assert.IsType<AuditCheckpointKey>(AuditCheckpointKey.Read(saved, Identity)).Key);
-        }
+        Append(checkpoints, AuditCheckpoint.Every);
 
-        Append(Checkpoints(), 1);
-        Assert.Equal(first, Key().Key);
+        Assert.Equal(written, File.ReadAllBytes(path));
+        Assert.Empty(CheckpointLines());
+
+        fresh.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "secret-mine" });
+        fresh.Save();
+        Append(checkpoints, 1);
+
+        Assert.Equal(new[] { AuditCheckpoint.Every + 2 }, CheckpointLines());
+
+        using var reopened = Vault.Open(path, EnvStoreTests.MasterPassword);
+        var later = new AuditCheckpoints(() => _log.Log, () => reopened, identity, "session-two");
+        Append(later, 1);
+        later.Seal();
+
+        var report = AuditChainVerifier.Verify(_log.Path, checkpoints: Assert.IsType<AuditCheckpointKey>(AuditCheckpointKey.Read(reopened, identity)));
+        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
+        Assert.Equal(2, report.SignedCheckpoints);
+    }
+
+    [Fact]
+    public void A_merge_of_another_programs_save_with_the_owners_change_writes_the_key_and_a_merge_alone_saves_nothing()
+    {
+        var path = Path.Combine(_directory, "fresh.kdbx");
+        var identity = VaultIdentity.Of(_directory, path);
+        using var fresh = Vault.Create(path, EnvStoreTests.MasterPassword);
+        fresh.Save();
+        Append(new AuditCheckpoints(() => _log.Log, () => fresh, identity, "session-one"), 1);
+
+        SaveElsewhere(path, "THEIRS");
+        var theirs = File.ReadAllBytes(path);
+        var updated = fresh.MergeAnotherSave();
+        using var copy = updated.Copy;
+
+        Assert.Equal(VaultMergeSaveOutcome.Updated, updated.Outcome);
+        Assert.Equal(theirs, File.ReadAllBytes(path));
+
+        copy!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "secret-mine" });
+        SaveElsewhere(path, "LATER");
+        Assert.Throws<VaultChangedOnDiskException>(copy.Save);
+        var merged = copy.MergeAnotherSave();
+        using var saved = merged.Copy;
+
+        Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
+        using var file = Vault.Open(path, EnvStoreTests.MasterPassword);
+        Assert.NotNull(AuditCheckpointKey.Read(file, identity));
     }
 
     [Fact]
@@ -177,8 +222,7 @@ public sealed class AuditCheckpointTests : IDisposable
     public void A_checkpoint_that_cannot_be_written_refuses_nothing_and_the_next_line_retries()
     {
         Vault? open = null;
-        var checkpoints = new AuditCheckpoints(() => _log.Log, () => open, null, Identity, "session-one");
-        Assert.True(_vault.WriteRecord(new EntryName(ReservedGroups.Keys, AuditCheckpoint.KeyTitle), AcafIds.Agent, AuditCheckpoint.KeyField, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))));
+        var checkpoints = new AuditCheckpoints(() => _log.Log, () => open, Identity, "session-one");
 
         Append(checkpoints, AuditCheckpoint.Every + 3);
         Assert.Empty(CheckpointLines());
@@ -189,17 +233,13 @@ public sealed class AuditCheckpointTests : IDisposable
         Assert.Equal(new[] { AuditCheckpoint.Every + 5 }, CheckpointLines());
     }
 
-    private AuditCheckpoints Checkpoints() => new(() => _log.Log, () => _vault, Save, Identity, "session-one");
+    private AuditCheckpoints Checkpoints() => new(() => _log.Log, () => _vault, Identity, "session-one");
 
-    private AgentSave Save(Func<Vault, bool> edit)
+    private static void SaveElsewhere(string path, string title)
     {
-        if (!edit(_vault))
-        {
-            return AgentSave.Unchanged;
-        }
-
-        _vault.Save();
-        return AgentSave.Saved;
+        using var other = Vault.Open(path, EnvStoreTests.MasterPassword);
+        other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = title, Password = "secret-theirs" });
+        other.Save();
     }
 
     private AuditCheckpointKey Key() => Assert.IsType<AuditCheckpointKey>(AuditCheckpointKey.Read(_vault, Identity));
