@@ -29,6 +29,7 @@ public sealed class SessionBrowsersTests : IDisposable
     private readonly SessionLifetime _lifetime = new("session-one");
     private readonly Vault _vault;
     private readonly string _key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+    private readonly HeldRules _rules = new();
 
     public SessionBrowsersTests()
     {
@@ -268,6 +269,318 @@ public sealed class SessionBrowsersTests : IDisposable
         Assert.NotNull(PairingNames.Problem(new string('x', PairingNames.MaximumLength + 1), []));
     }
 
+    [Fact]
+    public async Task A_click_asks_the_person_and_fills_the_login_they_chose_with_its_line_written_first()
+    {
+        var github = AddLogin("web", "GitHub", "dana", "{USERNAME}-s3cret", "https://github.com");
+        AddLogin("web", "Bank", "dana", "bank-s3cret", "https://bank.example");
+        _fixture.Channel.AnswerFill = (prompt, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, prompt.Candidates[0].Uuid, false));
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var before = _log.Lines().Count;
+
+        var reply = await link.FillAsync(Fill("https://gist.github.com/login?next=/secret#frag", personAsked: true), Token);
+
+        Assert.Equal(BrowserOutcome.Done, reply?.Outcome);
+        var login = Assert.Single(reply!.Logins);
+        Assert.Equal(("dana", "dana-s3cret", "GitHub"), (login.Login, login.Password, login.Name));
+        Assert.Equal(github, login.Uuid, ignoreCase: true);
+
+        var prompt = Assert.Single(_fixture.Channel.FillPrompts);
+        Assert.Equal("https://gist.github.com:443", prompt.Origin);
+        Assert.Equal("github.com", prompt.Site);
+        Assert.Equal("laptop", prompt.Pairing);
+        Assert.True(prompt.OffersAlways);
+        var candidate = Assert.Single(prompt.Candidates);
+        Assert.Equal(("GitHub", "dana", "web"), (candidate.Title, candidate.Username, candidate.Group));
+        Assert.Equal(github, candidate.Uuid, ignoreCase: true);
+
+        var line = Assert.Single(_log.Lines().Skip(before));
+        Assert.Equal("fill", line.GetProperty("args").GetProperty("field").GetString());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal("prompt", line.GetProperty("method").GetString());
+        Assert.Equal(github, line.GetProperty("args").GetProperty("item").GetString(), ignoreCase: true);
+        Assert.Equal("web/GitHub", line.GetProperty("args").GetProperty("entry").GetString());
+        Assert.Equal("laptop", line.GetProperty("client").GetProperty("label").GetString());
+        Assert.EndsWith("on https://gist.github.com:443", line.GetProperty("reason").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("s3cret", _log.Text(), StringComparison.Ordinal);
+        Assert.DoesNotContain("next=", _log.Text(), StringComparison.Ordinal);
+        Assert.DoesNotContain("/login", _log.Text(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_page_load_asks_nobody_and_releases_only_what_the_person_always_fills_on_that_exact_origin()
+    {
+        var github = AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var before = _log.Lines().Count;
+
+        var unallowed = await link.FillAsync(Fill("https://github.com/login", personAsked: false), Token);
+        _rules.Rules = _rules.Rules.AllowingFill(new BrowserAllowance("laptop", Paired(owner), "https://github.com:443", github));
+        var allowed = await link.FillAsync(Fill("https://github.com/login", personAsked: false), Token);
+        var subdomain = await link.FillAsync(Fill("https://gist.github.com/", personAsked: false), Token);
+
+        Assert.Equal(BrowserOutcome.Done, unallowed?.Outcome);
+        Assert.Empty(unallowed!.Logins);
+        Assert.Equal("s3cret", Assert.Single(allowed!.Logins).Password);
+        Assert.Empty(subdomain!.Logins);
+        Assert.Empty(_fixture.Channel.FillPrompts);
+
+        var line = Assert.Single(_log.Lines().Skip(before));
+        Assert.Equal("allowed", line.GetProperty("method").GetString());
+        Assert.Equal(github, line.GetProperty("args").GetProperty("item").GetString(), ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task Ticking_always_keeps_an_allowance_for_that_pairing_and_origin_which_the_next_page_load_fills_under()
+    {
+        var github = AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        _fixture.Channel.AnswerFill = (prompt, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, prompt.Candidates[0].Uuid, true));
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+
+        var chosen = await link.FillAsync(Fill("https://github.com/login", personAsked: true), Token);
+        var after = await link.FillAsync(Fill("https://github.com/", personAsked: false), Token);
+
+        Assert.Single(chosen!.Logins);
+        Assert.Equal(new BrowserAllowance("laptop", Paired(owner), "https://github.com:443", github), Assert.Single(_rules.Rules.BrowserAllowances));
+        Assert.Single(after!.Logins);
+        Assert.Single(_fixture.Channel.FillPrompts);
+        Assert.Contains("will always fill it here", _log.Lines()[^2].GetProperty("reason").GetString(), StringComparison.Ordinal);
+        Assert.Equal("allowed", _log.Lines()[^1].GetProperty("method").GetString());
+    }
+
+    [Theory]
+    [InlineData("http://github.com/login", "http://github.com", null)]
+    [InlineData("https://nas/", "https://nas", null)]
+    [InlineData("https://github.com/login", "https://github.com", "https://collector.example/post")]
+    public async Task No_always_is_offered_or_kept_where_every_fill_is_asked(string page, string address, string? submitUrl)
+    {
+        AddLogin(string.Empty, "Site", "dana", "s3cret", address);
+        _fixture.Channel.AnswerFill = (prompt, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, prompt.Candidates[0].Uuid, true));
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+
+        var reply = await link.FillAsync(Fill(page, personAsked: true, submitUrl), Token);
+
+        Assert.Single(reply!.Logins);
+        Assert.False(Assert.Single(_fixture.Channel.FillPrompts).OffersAlways);
+        Assert.Empty(_rules.Rules.BrowserAllowances);
+    }
+
+    [Fact]
+    public async Task A_refusal_fills_nothing_and_holds_the_page_back_a_minute()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var before = _log.Lines().Count;
+
+        var denied = await link.FillAsync(Fill("https://github.com/login", personAsked: true), Token);
+        var again = await link.FillAsync(Fill("https://github.com/login", personAsked: true), Token);
+        _fixture.Clock.Advance(TimeSpan.FromSeconds(61));
+        var later = await link.FillAsync(Fill("https://github.com/login", personAsked: true), Token);
+
+        Assert.Equal(BrowserOutcome.Refused, denied?.Outcome);
+        Assert.Equal(BrowserOutcome.Refused, again?.Outcome);
+        Assert.Equal(BrowserOutcome.Refused, later?.Outcome);
+        Assert.Equal(2, _fixture.Channel.FillPrompts.Count);
+        Assert.Equal(["prompt", "cooldown", "prompt"], _log.Lines().Skip(before).Select(line => line.GetProperty("method").GetString()));
+        Assert.All(_log.Lines().Skip(before), line => Assert.Equal("denied", line.GetProperty("decision").GetString()));
+    }
+
+    [Fact]
+    public async Task An_expired_or_trashed_item_is_never_offered_and_a_click_records_the_expired_one_kept_out()
+    {
+        var expired = AddLogin(string.Empty, "Old", "dana", "s3cret", "https://github.com", expires: _fixture.Clock.GetUtcNow().AddDays(-1));
+        AddLogin(string.Empty, "Trashed", "dana", "s3cret", "https://github.com");
+        _vault.RemoveEntry(new EntryName(string.Empty, "Trashed"), out _);
+        _vault.Save();
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var before = _log.Lines().Count;
+
+        var reply = await link.FillAsync(Fill("https://github.com/", personAsked: true), Token);
+
+        Assert.Empty(reply!.Logins);
+        Assert.Empty(_fixture.Channel.FillPrompts);
+        var line = Assert.Single(_log.Lines().Skip(before));
+        Assert.Equal(expired, line.GetProperty("args").GetProperty("item").GetString(), ignoreCase: true);
+        Assert.Equal("blocked", line.GetProperty("method").GetString());
+        Assert.StartsWith("expired ", line.GetProperty("reason").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Two_items_of_one_title_are_told_apart_by_uuid()
+    {
+        var work = AddLogin("web", "GitHub", "dana-work", "work-s3cret", "https://github.com");
+        AddLogin("web", "GitHub", "dana", "home-s3cret", "https://github.com");
+        _fixture.Channel.AnswerFill = (prompt, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, work, false));
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+
+        var reply = await link.FillAsync(Fill("https://github.com/", personAsked: true), Token);
+
+        Assert.Equal(2, Assert.Single(_fixture.Channel.FillPrompts).Candidates.Count);
+        Assert.Equal("work-s3cret", Assert.Single(reply!.Logins).Password);
+    }
+
+    [Fact]
+    public async Task A_pairing_removed_while_the_person_is_asked_fills_nothing()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        _fixture.Channel.AnswerFill = (prompt, _) =>
+        {
+            Assert.True(owner.Browsers.Remove("laptop").Removed);
+            return ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, prompt.Candidates[0].Uuid, false));
+        };
+
+        var reply = await link.FillAsync(Fill("https://github.com/", personAsked: true), Token);
+
+        Assert.NotEqual(BrowserOutcome.Done, reply?.Outcome);
+        Assert.DoesNotContain(_log.Lines(), line => line.GetProperty("args").GetProperty("field").GetString() == "fill" && line.GetProperty("decision").GetString() == "granted");
+    }
+
+    [Fact]
+    public async Task A_lock_while_the_person_is_asked_fills_nothing()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        _fixture.Channel.AnswerFill = (prompt, _) =>
+        {
+            _lifetime.End();
+            return ValueTask.FromResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, prompt.Candidates[0].Uuid, false));
+        };
+
+        var reply = await link.FillAsync(Fill("https://github.com/", personAsked: true), Token);
+
+        Assert.Equal(BrowserOutcome.Locked, reply?.Outcome);
+        Assert.Empty(reply!.Logins);
+        Assert.DoesNotContain(_log.Lines(), line => line.GetProperty("decision").GetString() == "granted" && line.GetProperty("args").GetProperty("field").GetString() == "fill");
+    }
+
+    [Fact]
+    public async Task A_click_while_another_prompt_is_up_gets_no_logins_and_nobody_is_asked_twice()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        var answer = new TaskCompletionSource<FillAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _fixture.Channel.AnswerFill = (_, _) =>
+        {
+            asked.TrySetResult();
+            return new ValueTask<FillAnswer>(answer.Task);
+        };
+        await using var owner = Owner.Start(this);
+        await using var first = await PairedLinkAsync(owner);
+        await using var second = await CheckedLinkAsync(owner);
+
+        var waiting = first.FillAsync(Fill("https://github.com/", personAsked: true), Token).AsTask();
+        await asked.Task.WaitAsync(_wait, Token);
+        var busy = await second.FillAsync(Fill("https://github.com/", personAsked: true), Token);
+        answer.SetResult(new FillAnswer(ApprovalAnswer.ApprovedOnce, _fixture.Channel.FillPrompts[0].Candidates[0].Uuid, false));
+        var filled = await waiting;
+
+        Assert.Equal(BrowserOutcome.Done, busy?.Outcome);
+        Assert.Empty(busy!.Logins);
+        Assert.Single(filled!.Logins);
+        Assert.Single(_fixture.Channel.FillPrompts);
+    }
+
+    [Fact]
+    public async Task A_lookup_that_matches_nothing_asks_nobody_and_writes_no_line()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var before = _log.Lines().Count;
+
+        var reply = await link.FillAsync(Fill("https://example.org/login", personAsked: true), Token);
+        var suffix = await link.FillAsync(Fill("https://github.io/", personAsked: true), Token);
+
+        Assert.Equal(BrowserOutcome.Done, reply?.Outcome);
+        Assert.Empty(reply!.Logins);
+        Assert.Equal(BrowserOutcome.Done, suffix?.Outcome);
+        Assert.Empty(suffix!.Logins);
+        Assert.Empty(_fixture.Channel.FillPrompts);
+        Assert.Equal(before, _log.Lines().Count);
+    }
+
+    [Fact]
+    public async Task A_release_whose_line_cannot_be_written_is_refused()
+    {
+        AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        _rules.Rules = _rules.Rules.AllowingFill(new BrowserAllowance("laptop", Paired(owner), "https://github.com:443", Uuid("GitHub")));
+        _log.Log.Dispose();
+
+        var reply = await link.FillAsync(Fill("https://github.com/", personAsked: false), Token);
+
+        Assert.NotEqual(BrowserOutcome.Done, reply?.Outcome);
+        Assert.Empty(reply!.Logins);
+    }
+
+    [Fact]
+    public async Task Settings_lists_the_allowances_of_pairings_that_exist_and_removes_one_with_a_line()
+    {
+        var github = AddLogin(string.Empty, "GitHub", "dana", "s3cret", "https://github.com");
+        await using var owner = Owner.Start(this);
+        await using var link = await PairedLinkAsync(owner);
+        var kept = new BrowserAllowance("laptop", Paired(owner), "https://github.com:443", github);
+        _rules.Rules = _rules.Rules
+            .AllowingFill(kept)
+            .AllowingFill(new BrowserAllowance("laptop", Paired(owner).AddDays(-1), "https://github.com:443", github));
+
+        var listed = owner.Browsers.Allowances();
+        Assert.True(owner.Browsers.Unallow(kept, out var problem), problem);
+
+        Assert.Equal(new AllowanceRow(kept, "GitHub"), Assert.Single(listed));
+        Assert.DoesNotContain(kept, _rules.Rules.BrowserAllowances);
+        Assert.Equal("unallow", _log.Lines()[^1].GetProperty("args").GetProperty("field").GetString());
+        Assert.Equal("removed", _log.Lines()[^1].GetProperty("method").GetString());
+    }
+
+    /// <summary>Adds a login and returns its UUID as the vault's rules keep one, in lower case.</summary>
+    private string AddLogin(string group, string title, string username, string password, string url, DateTimeOffset? expires = null)
+    {
+        _vault.AddEntry(new VaultEntry { GroupPath = group, Title = title, Username = username, Password = password, Url = url });
+
+        if (expires is { } at)
+        {
+            _vault.SetExpiryUnchecked(new EntryName(group, title), at);
+        }
+
+        _vault.Save();
+        return Lower(_vault.ReadEntries().Last(entry => entry.Title == title && entry.Username == username).Uuid!);
+    }
+
+    private string Uuid(string title) => Lower(_vault.ReadEntries().First(entry => entry.Title == title).Uuid!);
+
+    private static string Lower(string hex) => hex.ToLowerInvariant();
+
+    private BrowserFillRequest Fill(string url, bool personAsked, string? submitUrl = null) =>
+        new("laptop", _key, url) { SubmitUrl = submitUrl, PersonAsked = personAsked, Vault = VaultPath, Session = "session-one" };
+
+    private static DateTimeOffset Paired(Owner owner) => owner.Browsers.List().Single(row => row.Pairing.Id == "laptop").Pairing.Created;
+
+    /// <summary>A browser paired as <c>laptop</c> whose connection a check bound to that pairing.</summary>
+    private async Task<BrowserLink> PairedLinkAsync(Owner owner)
+    {
+        await PairedAsync(owner, "laptop");
+        return await CheckedLinkAsync(owner);
+    }
+
+    private async Task<BrowserLink> CheckedLinkAsync(Owner owner)
+    {
+        var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check("laptop", _key), Token))?.Outcome);
+        return link;
+    }
+
     private BrowserPairRequest Pair() => new(_key) { Vault = VaultPath, Session = "session-one" };
 
     private BrowserCheckRequest Check(string pairing, string key) => new(pairing, key) { Vault = VaultPath, Session = "session-one" };
@@ -332,6 +645,7 @@ public sealed class SessionBrowsersTests : IDisposable
                 test._fixture.Gate,
                 lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
                 test.Write,
+                test._rules,
                 () => test._log.Log,
                 new PairingUses(),
                 test._fixture.Clock,
@@ -378,6 +692,34 @@ public sealed class SessionBrowsersTests : IDisposable
 
             _listener.Dispose();
             _stop.Dispose();
+        }
+    }
+
+    /// <summary>Rules held in memory that change as the sealed file would, or refuse to while <see cref="Refuses"/> says so.</summary>
+    private sealed class HeldRules : IAgentRules
+    {
+        internal AgentRules Rules { get; set; } = AgentRules.Defaults;
+
+        internal string? Refuses { get; set; }
+
+        public bool TryRead([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out AgentRules? rules, out string problem)
+        {
+            rules = Rules;
+            problem = string.Empty;
+            return true;
+        }
+
+        public bool TryChange(Func<AgentRules, AgentRules> change, out string problem)
+        {
+            if (Refuses is { } refused)
+            {
+                problem = refused;
+                return false;
+            }
+
+            Rules = change(Rules);
+            problem = string.Empty;
+            return true;
         }
     }
 }

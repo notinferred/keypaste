@@ -141,7 +141,7 @@ public sealed class SessionServer : IDisposable
                 : null;
 
             var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
-                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, checkpoints.Watched, uses, options.Clock, options.Narrate)
+                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Rules, checkpoints.Watched, uses, options.Clock, options.Narrate)
                 : null;
 
             var authority = new SessionAuthority(

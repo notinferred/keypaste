@@ -34,6 +34,10 @@ internal sealed class Workspace : IDisposable
     /// <summary>Stores <paramref name="secret"/> at <paramref name="entry"/> with the built keypaste.</summary>
     internal void Add(string entry, string secret) => Keypaste("add", Master, secret, entry, "--vault", Vault);
 
+    /// <summary>Adds a login with its username and URL, as a browser's fill matches it.</summary>
+    internal void AddLogin(string entry, string secret, string username, string url) =>
+        Keypaste("add", Master, secret, entry, "--username", username, "--url", url, "--vault", Vault);
+
     /// <summary>The owner's or bridge's log lines from <paramref name="after"/> on.</summary>
     internal static IReadOnlyList<JsonElement> Lines(string log, int after = 0) =>
         [.. Read(log).Skip(after).Select(line => JsonDocument.Parse(line).RootElement.Clone())];

@@ -36,6 +36,11 @@ public sealed record PairingRow(BrowserPairing Pairing, DateTimeOffset? LastUsed
 /// <param name="Reason">keypaste's own words when it was not removed, otherwise empty.</param>
 public sealed record PairingRemoval(bool Removed, string Reason);
 
+/// <summary>An "Always fill" allowance as Settings lists it.</summary>
+/// <param name="Allowance">The allowance.</param>
+/// <param name="Item">Its item's title, sanitized, or words saying the vault no longer holds it.</param>
+public sealed record AllowanceRow(BrowserAllowance Allowance, string Item);
+
 /// <summary>
 /// Pairs a browser with this owner's unlocked vault while the person has armed pairing, and checks the pairings the extension
 /// presents, writing a pairing only after the person confirms it and saving it under the owner's claim (D-0633 to D-0635).
@@ -64,6 +69,7 @@ public sealed class SessionBrowsers : IBrowserRequests
     private readonly ApprovalGate _gate;
     private readonly Func<SessionLifetime, Vault?> _unlockedFor;
     private readonly Func<SessionLifetime, Func<Vault, bool>, AgentSave> _write;
+    private readonly IAgentRules _rules;
     private readonly RequestRecorder _recorder;
     private readonly PairingUses _uses;
     private readonly TimeProvider _clock;
@@ -78,6 +84,7 @@ public sealed class SessionBrowsers : IBrowserRequests
     /// <param name="gate">Where the person is asked, under the same slot and window as agents.</param>
     /// <param name="unlockedFor">The vault while a lifetime is live, otherwise null.</param>
     /// <param name="write">Runs an edit on the lifetime's vault and saves it under the owner's claim.</param>
+    /// <param name="rules">This computer's sealed rules, which keep the person's browser allowances.</param>
     /// <param name="audit">Opens the owner's log, as the authority's does.</param>
     /// <param name="uses">When each pairing was last proven, kept for the owner's life.</param>
     /// <param name="clock">What time it is.</param>
@@ -88,6 +95,7 @@ public sealed class SessionBrowsers : IBrowserRequests
         ApprovalGate gate,
         Func<SessionLifetime, Vault?> unlockedFor,
         Func<SessionLifetime, Func<Vault, bool>, AgentSave> write,
+        IAgentRules rules,
         Func<AuditLog?> audit,
         PairingUses uses,
         TimeProvider clock,
@@ -98,6 +106,7 @@ public sealed class SessionBrowsers : IBrowserRequests
         _gate = gate;
         _unlockedFor = unlockedFor;
         _write = write;
+        _rules = rules;
         _recorder = new RequestRecorder(audit);
         _uses = uses;
         _clock = clock;
@@ -203,6 +212,13 @@ public sealed class SessionBrowsers : IBrowserRequests
         }
 
         _uses.Forget(_vault.Key, id);
+
+        // Tidying only: an allowance applies only while its pairing exists, so one left behind here releases nothing.
+        if (_rules.TryRead(out var rules, out _) && rules.BrowserAllowances.Any(allowance => Owns(removed, allowance)))
+        {
+            _rules.TryChange(held => held.WithoutPairing(removed.Id, removed.Created), out _);
+        }
+
         Record(removed.Identity, id, BrowserAct.Remove, AuditDecision.Granted, AuditMethod.Removed, "the person removed the pairing in keypaste");
         _narrate?.Invoke($"removed the pairing {id}");
         Removed?.Invoke(this, id);
@@ -353,26 +369,335 @@ public sealed class SessionBrowsers : IBrowserRequests
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(browser);
 
-        PairingCheck check;
+        var proof = Prove(request.Pairing, request.IdentificationKey, browser);
+
+        return ValueTask.FromResult(proof.Pairing is not null
+            ? new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = request.Pairing }
+            : new BrowserReply(proof.Outcome, proof.Reason));
+    }
+
+    /// <summary>The allowances of each pairing the vault holds now, as Settings lists them, each with its item's title.</summary>
+    /// <returns>Each allowance, oldest first; none while the rules are ignored or the vault is locked.</returns>
+    public IReadOnlyList<AllowanceRow> Allowances()
+    {
+        try
+        {
+            if (_unlockedFor(_lifetime) is not { } vault || !_rules.TryRead(out var rules, out _))
+            {
+                return [];
+            }
+
+            var pairings = new BrowserPairings(vault).List();
+            var entries = vault.ReadEntries();
+
+            return
+            [
+                .. rules.BrowserAllowances
+                    .Where(allowance => pairings.Any(pairing => Owns(pairing, allowance)))
+                    .Select(allowance => new AllowanceRow(
+                        allowance,
+                        entries.FirstOrDefault(entry => string.Equals(entry.Uuid, allowance.Item, StringComparison.OrdinalIgnoreCase)) is { } entry
+                            ? EntryNameSanitizer.Sanitize(entry.Title).Text
+                            : "an item no longer in the vault")),
+            ];
+        }
+        catch (ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Removes one "Always fill" allowance for the person, so the next fill it covered is asked again.</summary>
+    /// <param name="allowance">The allowance.</param>
+    /// <param name="problem">Why it was not removed, or empty.</param>
+    /// <returns>Whether it was removed.</returns>
+    public bool Unallow(BrowserAllowance allowance, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(allowance);
+
+        if (!_rules.TryChange(rules => rules.ForgettingFill(allowance), out problem))
+        {
+            return false;
+        }
+
+        if (_unlockedFor(_lifetime) is { } vault && new BrowserPairings(vault).List().FirstOrDefault(pairing => Owns(pairing, allowance)) is { } owner)
+        {
+            var line = RequestRecords.Browser(owner.Identity, owner.Id, BrowserAct.Unallow, AuditDecision.Granted, AuditMethod.Removed, $"the person removed always filling an item on {allowance.Origin}", _lifetime.Id, _vault.Key);
+            _recorder.Recorded(line with { Args = line.Args with { Item = allowance.Item } });
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// A page's own request releases only the items the person always fills on its exact origin and asks nobody. A request the
+    /// extension says the person made also puts any other matching item to them, one prompt at a time, and fills the one they
+    /// choose. Each released item and, for a request the person made, each matched item kept out, gets its own line, all written
+    /// before the reply; a lookup that matched nothing writes none.
+    /// </para>
+    /// <para>
+    /// After the person answers, the pairing is proven again and the chosen item read again by its UUID through the same rules,
+    /// so a pairing removed, or an item recycled, hidden or edited out of the page, while they were asked releases nothing.
+    /// </para>
+    /// </remarks>
+    public async ValueTask<BrowserFillReply> FillAsync(BrowserFillRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(browser);
+
+        var waiting = _lifetime.Waiting;
+
+        if (_unlockedFor(_lifetime) is null)
+        {
+            return new BrowserFillReply(BrowserOutcome.Locked, "the vault is locked");
+        }
+
+        if (!_recorder.Opens)
+        {
+            return new BrowserFillReply(BrowserOutcome.Refused, RequestRecorder.Unopened);
+        }
+
+        if (!LoginLookup.TryRead(request.Url, request.SubmitUrl, httpAuthentication: false, out var lookup, out _))
+        {
+            return NoLogins;
+        }
+
+        var proof = Prove(request.Pairing, request.IdentificationKey, browser);
+
+        if (proof.Pairing is not { } pairing)
+        {
+            return new BrowserFillReply(proof.Outcome, proof.Reason);
+        }
+
+        var origin = lookup.Page.ToString();
+
+        if (Match(lookup, out var read) is { } unread)
+        {
+            return Refuse(browser, pairing.Id, unread.Method, unread.Reason, origin);
+        }
+
+        var rules = _rules.TryRead(out var held, out _) ? held : AgentRules.Defaults;
+        var allowed = lookup.AsksEveryTime
+            ? []
+            : read.Candidates.Where(item => rules.AllowsFill(pairing.Id, pairing.Created, origin, item.Name.Uuid!)).ToList();
+        var toAsk = read.Candidates.Except(allowed).ToList();
+        List<AuditRecord> lines = [];
+
+        if (request.PersonAsked)
+        {
+            lines.AddRange(read.Refused.Select(refused => FillLine(browser, pairing.Id, refused.Item.Name, origin, AuditDecision.Denied, AuditMethod.Blocked, refused.Reason)));
+        }
+
+        FillAnswer answer = default;
+
+        if (request.PersonAsked && toAsk.Count > 0)
+        {
+            var prompt = new FillPrompt
+            {
+                Identity = browser,
+                Pairing = pairing.Id,
+                Origin = origin,
+                Site = lookup.Page.Site ?? lookup.Page.Host,
+                FormOrigin = lookup.OtherSiteForm?.ToString(),
+                Candidates = [.. toAsk.Take(FillPrompt.MaximumCandidates).Select(Listed)],
+                OffersAlways = !lookup.AsksEveryTime && rules.HasBrowserRoom,
+            };
+
+            answer = await _gate.AskAsync($"browser\0{pairing.Id}\0{origin}", prompt, cancellationToken).ConfigureAwait(false);
+
+            if (!_lifetime.IsLive || waiting.IsCancellationRequested)
+            {
+                var withdrawn = _lifetime.IsLive ? $"{_lifetime.WithdrawnBecause} before the login was filled" : "the vault was locked before the login was filled";
+                return Refuse(browser, pairing.Id, _lifetime.IsLive ? AuditMethod.VaultChanged : AuditMethod.VaultLocked, withdrawn, origin, _lifetime.IsLive ? BrowserOutcome.Refused : BrowserOutcome.Locked);
+            }
+
+            if (answer.Answer != ApprovalAnswer.ApprovedOnce)
+            {
+                lines.Add(FillLine(browser, pairing.Id, null, origin, AuditDecision.Denied, answer.Answer.ToAuditMethod(), Unasked(answer.Answer)));
+            }
+
+            // Proven again, and the page's items read again, since the person may have removed the pairing or changed an item while asked.
+            proof = Prove(request.Pairing, request.IdentificationKey, browser);
+
+            if (proof.Pairing is null)
+            {
+                return new BrowserFillReply(proof.Outcome, proof.Reason);
+            }
+
+            if (Match(lookup, out read) is { } reread)
+            {
+                return Refuse(browser, pairing.Id, reread.Method, reread.Reason, origin);
+            }
+        }
+
+        var chosen = answer.Answer == ApprovalAnswer.ApprovedOnce ? answer.Uuid : null;
+        var releasing = read.Candidates
+            .Where(item => allowed.Any(was => SameItem(was, item)) || string.Equals(item.Name.Uuid, chosen, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (releasing.Count == 0)
+        {
+            var refused = answer.Answer is ApprovalAnswer.Denied or ApprovalAnswer.TimedOut or ApprovalAnswer.Cooldown;
+            return _recorder.Recorded(refused ? new BrowserFillReply(BrowserOutcome.Refused, Unasked(answer.Answer)) : NoLogins, lines);
+        }
+
+        if (_unlockedFor(_lifetime) is not { } vault)
+        {
+            return new BrowserFillReply(BrowserOutcome.Locked, "the vault is locked");
+        }
+
+        List<BrowserLogin> logins = [];
+        List<(BrowserItem Item, bool Asked)> released = [];
+
+        foreach (var item in releasing)
+        {
+            var wasAsked = string.Equals(item.Name.Uuid, chosen, StringComparison.OrdinalIgnoreCase);
+
+            if (vault.ReadSavedLogin(item.Name.Uuid!, out var login) != SavedRead.Current || login is null)
+            {
+                lines.Add(FillLine(browser, pairing.Id, item.Name, origin, AuditDecision.Denied, AuditMethod.VaultChanged, "the item could not be read as the vault's file holds it"));
+                continue;
+            }
+
+            if (login.Username.Value is not { } username || login.Password.Value is not { } password)
+            {
+                var why = $"its {(login.Username.Value is null ? "username" : "password")} {login.Username.Refusal ?? login.Password.Refusal}";
+                lines.Add(FillLine(browser, pairing.Id, item.Name, origin, AuditDecision.Denied, AuditMethod.Unfillable, why));
+                continue;
+            }
+
+            logins.Add(new BrowserLogin(username, password, login.Entry.Title, item.Name.Uuid!));
+            released.Add((item, wasAsked));
+        }
+
+        var reply = logins.Count > 0 ? new BrowserFillReply(BrowserOutcome.Done, string.Empty) { Logins = logins } : NoLogins;
+
+        if (logins.Count > 0 && !ApproverProtocol.Fits(reply))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.Undeliverable, "the logins would not fit one reply", origin);
+        }
+
+        if (logins.Count > 0 && !_lifetime.TryCommitAfter(waiting))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.VaultLocked, "the vault was locked before the login was filled", origin, BrowserOutcome.Locked);
+        }
+
+        var kept = answer.Always && chosen is not null && released.Any(pair => pair.Asked) ? KeepAlways(pairing, origin, chosen) : null;
+
+        foreach (var (item, wasAsked) in released)
+        {
+            var why = !wasAsked ? "filled without asking, as the person always fills it here"
+                : kept is null ? "a person chose it"
+                : kept.Length == 0 ? "a person chose it and will always fill it here, until they remove that in Settings"
+                : $"a person chose it; always filling it here could not be kept: {kept}";
+
+            lines.Add(FillLine(browser, pairing.Id, item.Name, origin, AuditDecision.Granted, wasAsked ? AuditMethod.Prompt : AuditMethod.Allowed, why));
+        }
+
+        _uses.Used(_vault.Key, pairing.Id, _clock.GetUtcNow());
+        _narrate?.Invoke($"filled {released.Count} login(s) on {origin} for {pairing.Id}");
+        return _recorder.Recorded(reply, lines);
+    }
+
+    private static BrowserFillReply NoLogins => new(BrowserOutcome.Done, string.Empty);
+
+    private static bool Owns(BrowserPairing pairing, BrowserAllowance allowance) =>
+        string.Equals(pairing.Id, allowance.Pairing, StringComparison.Ordinal) && pairing.Created == allowance.Paired;
+
+    private static bool SameItem(BrowserItem left, BrowserItem right) =>
+        string.Equals(left.Name.Uuid, right.Name.Uuid, StringComparison.OrdinalIgnoreCase);
+
+    private static FillCandidate Listed(BrowserItem item) => new(
+        item.Name.Uuid!,
+        EntryNameSanitizer.Sanitize(item.Name.Title).Text,
+        item.Username.Length == 0 ? string.Empty : EntryNameSanitizer.Sanitize(item.Username).Text,
+        EntryNameSanitizer.SanitizePath(item.Name.GroupPath).Text);
+
+    private static string Unasked(ApprovalAnswer answer) => answer switch
+    {
+        ApprovalAnswer.Denied => "a person refused to fill a login here",
+        ApprovalAnswer.TimedOut => "nobody answered inside the window",
+        ApprovalAnswer.Cooldown => "a fill here was refused or went unanswered a moment ago, so nobody was asked",
+        ApprovalAnswer.Busy => "another prompt is waiting for an answer, so nobody was asked",
+        ApprovalAnswer.Cancelled => "the request was withdrawn before anybody answered",
+        _ => "the prompt could not be shown, so nobody was asked",
+    };
+
+    /// <summary>Keeps the person's "Always fill", and says why not when it could not be kept.</summary>
+    /// <returns>Empty when kept, otherwise why not.</returns>
+    private string KeepAlways(BrowserPairing pairing, string origin, string item)
+    {
+        var allowance = new BrowserAllowance(pairing.Id, pairing.Created, origin, item);
+
+        try
+        {
+            return _rules.TryChange(rules => rules.HasBrowserRoom || rules.AllowsFill(pairing.Id, pairing.Created, origin, item) ? rules.AllowingFill(allowance) : rules, out var problem)
+                ? string.Empty
+                : problem;
+        }
+        catch (InvalidOperationException full)
+        {
+            return full.Message;
+        }
+    }
+
+    /// <summary>The page's matching items and those kept out, as the vault's file holds them, or why they cannot be read.</summary>
+    private (AuditMethod Method, string Reason)? Match(LoginLookup lookup, out (IReadOnlyList<BrowserItem> Candidates, IReadOnlyList<RefusedMatch> Refused) read)
+    {
+        read = ([], []);
 
         try
         {
             if (_unlockedFor(_lifetime) is not { } vault)
             {
-                return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Locked, "the vault is locked"));
+                return (AuditMethod.VaultLocked, "the vault is locked");
             }
 
-            check = new BrowserPairings(vault).Verify(request.Pairing, browser, request.IdentificationKey);
+            switch (vault.ReadSavedBrowserItems(out var items))
+            {
+                case SavedRead.Current:
+                    read = LoginCandidates.Of(lookup, items!, _clock.GetUtcNow());
+                    return null;
+                case SavedRead.Unreadable:
+                    return (AuditMethod.Failed, "the vault's file could not be read to compare");
+                default:
+                    return (AuditMethod.VaultChanged, "the vault differs from its file, so no login is filled until keypaste saves, merges or reloads it");
+            }
         }
         catch (ObjectDisposedException)
         {
-            return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Locked, "the vault is locked"));
+            return (AuditMethod.VaultLocked, "the vault is locked");
+        }
+    }
+
+    /// <summary>Proves a pairing against the vault as its file holds it, recording a refusal.</summary>
+    private (BrowserPairing? Pairing, BrowserOutcome Outcome, string Reason) Prove(string id, string identificationKey, BrowserIdentity browser)
+    {
+        PairingCheck check;
+        BrowserPairing? pairing;
+
+        try
+        {
+            if (_unlockedFor(_lifetime) is not { } vault)
+            {
+                return (null, BrowserOutcome.Locked, "the vault is locked");
+            }
+
+            var pairings = new BrowserPairings(vault);
+            check = pairings.Verify(id, browser, identificationKey);
+            pairing = check == PairingCheck.Valid ? pairings.List().FirstOrDefault(listed => string.Equals(listed.Id, id, StringComparison.Ordinal)) : null;
+        }
+        catch (ObjectDisposedException)
+        {
+            return (null, BrowserOutcome.Locked, "the vault is locked");
         }
 
-        if (check == PairingCheck.Valid)
+        if (pairing is not null)
         {
-            _uses.Used(_vault.Key, request.Pairing, _clock.GetUtcNow());
-            return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = request.Pairing });
+            _uses.Used(_vault.Key, id, _clock.GetUtcNow());
+            return (pairing, BrowserOutcome.Done, string.Empty);
         }
 
         var (method, why) = check switch
@@ -383,14 +708,19 @@ public sealed class SessionBrowsers : IBrowserRequests
             _ => (AuditMethod.NotPaired, "the vault holds no pairing of that name for this browser and key"),
         };
 
-        Record(browser, request.Pairing, BrowserAct.Check, AuditDecision.Denied, method, why);
-        return ValueTask.FromResult(new BrowserReply(check == PairingCheck.Unknown ? BrowserOutcome.NotPaired : BrowserOutcome.Refused, why));
+        Record(browser, id, BrowserAct.Check, AuditDecision.Denied, method, why);
+        return (null, check is PairingCheck.Unknown or PairingCheck.Valid ? BrowserOutcome.NotPaired : BrowserOutcome.Refused, why);
     }
 
-    /// <inheritdoc/>
-    /// <remarks>Filling comes with 8.3a2; until then a fill on a pairing the check proved is refused, unrecorded.</remarks>
-    public ValueTask<BrowserFillReply> FillAsync(BrowserFillRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(new BrowserFillReply(BrowserOutcome.Refused, "this keypaste pairs browsers and does not fill logins in them yet"));
+    private AuditRecord FillLine(BrowserIdentity browser, string pairing, EntryName? item, string origin, AuditDecision decision, AuditMethod method, string reason) =>
+        RequestRecords.BrowserFill(browser, pairing, item, origin, decision, method, reason, _lifetime.Id, _vault.Key);
+
+    /// <summary>Refuses a fill whole, recording one line that names no item.</summary>
+    private BrowserFillReply Refuse(BrowserIdentity browser, string pairing, AuditMethod method, string reason, string origin, BrowserOutcome outcome = BrowserOutcome.Refused)
+    {
+        _recorder.Recorded(FillLine(browser, pairing, null, origin, AuditDecision.Denied, method, reason));
+        return new BrowserFillReply(outcome, reason);
+    }
 
     private bool TryTakeArming(out string? name, out DateTimeOffset until)
     {

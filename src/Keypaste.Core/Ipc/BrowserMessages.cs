@@ -57,6 +57,12 @@ public sealed record BrowserFillRequest(string Pairing, string IdentificationKey
     /// <summary>The URL the page's form posts to, as the extension reports it, or null when it named none.</summary>
     public string? SubmitUrl { get; init; }
 
+    /// <summary>
+    /// Whether the extension says the person asked, by the field's key icon or Connect, rather than a page's load: only then may the
+    /// person be asked. It is the extension's claim, and decides only whether to ask, never what is released.
+    /// </summary>
+    public bool PersonAsked { get; init; }
+
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
 
@@ -65,7 +71,7 @@ public sealed record BrowserFillRequest(string Pairing, string IdentificationKey
 
     /// <summary>A description with the key left out.</summary>
     /// <returns>The pairing and the page.</returns>
-    public override string ToString() => $"BrowserFillRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl} }}";
+    public override string ToString() => $"BrowserFillRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl}, PersonAsked = {PersonAsked} }}";
 }
 
 /// <summary>Asks the vault's owner to lock now, as <c>keypaste lock</c> does, for the browser attached on this connection (D-0627).</summary>

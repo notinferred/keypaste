@@ -9,7 +9,8 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// A browser pairs with the vault's owner only while the person armed pairing (8.1d), across real processes: tests/Keypaste.FakeBrowser
+/// A browser pairs with the vault's owner only while the person armed pairing (8.1d), and fills a login only on the person's answer
+/// or an allowance they made (8.3a2), across real processes: tests/Keypaste.FakeBrowser
 /// starts the built keypaste as each browser starts KeePassXC-Browser's native messaging host and speaks the extension's protocol to it,
 /// and tests/Keypaste.AppDriver holds the vault, its pairing confirmation and notice drawn and clicked.
 /// </summary>
@@ -106,6 +107,64 @@ public sealed class BrowserHostTests
             Assert.DoesNotContain(identification, Workspace.Text(workspace.OwnerLog), StringComparison.Ordinal);
             Assert.DoesNotContain(app.Driver.Output, line => line.Contains(identification, StringComparison.Ordinal));
         }
+    }
+
+    [Fact]
+    public void A_page_load_asks_nobody_a_click_fills_the_login_the_person_picks_and_Always_fills_that_exact_origin_alone()
+    {
+        using var workspace = new Workspace();
+        workspace.AddLogin("GitHub", "gh-s3cret", "dana", "https://github.com");
+        workspace.AddLogin("Bank", "bank-s3cret", "dana", "https://bank.example");
+        using var app = HeldApp.Hold(workspace);
+        var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        app.Send("pair");
+        app.WaitFor("^pairing armed");
+        string name;
+        using (var pairing = StartBrowser(workspace, "chrome", key, "associate"))
+        {
+            var prompt = app.WaitFor("^pair-prompt identity=");
+            name = prompt[(prompt.IndexOf(" name=", StringComparison.Ordinal) + " name=".Length)..];
+            app.Send("allow");
+            Assert.Equal("true", Assert.Single(Answers(pairing)).GetProperty("success").GetString());
+            app.WaitFor("^pair-prompt withdrawn");
+        }
+
+        // A page's own load with nothing always filled gets no logins, asks nobody and writes no line.
+        var lines = Workspace.Lines(workspace.OwnerLog).Count;
+        var load = Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/login");
+        Assert.Equal("15", load[1].GetProperty("errorCode").GetString());
+        Assert.DoesNotContain(app.Driver.Output, line => line.StartsWith("fill-prompt", StringComparison.Ordinal));
+        Assert.Equal(lines, Workspace.Lines(workspace.OwnerLog).Count);
+
+        // The person's click puts the matching login to them, never its password, and fills the one they pick, one line first.
+        using (var click = StartBrowser(workspace, "chrome", key, $"test-associate={name}", "click=https://github.com/login?next=/x"))
+        {
+            Assert.Equal($"fill-prompt origin=https://github.com:443 pairing={name} logins=GitHub, dana · top level always=offered", app.WaitFor("^fill-prompt origin="));
+            app.Send("fill 1 always");
+            var entry = Assert.Single(Answers(click)[1].GetProperty("entries").EnumerateArray());
+            Assert.Equal(["login", "name", "password", "uuid"], entry.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal));
+            Assert.Equal(("dana", "GitHub", "gh-s3cret"), (entry.GetProperty("login").GetString(), entry.GetProperty("name").GetString(), entry.GetProperty("password").GetString()));
+            app.WaitFor("^fill-prompt withdrawn");
+        }
+
+        AssertLast(workspace, "fill", "granted", "prompt", _chrome, label: name);
+        Assert.Single(Workspace.Lines(workspace.OwnerLog).Skip(lines), line => line.GetProperty("args").GetProperty("field").GetString() == "fill");
+
+        // Always fills that exact origin on a page's own load, and no other origin of the site.
+        var allowed = Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/");
+        Assert.Equal("gh-s3cret", Assert.Single(allowed[1].GetProperty("entries").EnumerateArray()).GetProperty("password").GetString());
+        AssertLast(workspace, "fill", "granted", "allowed", _chrome, label: name);
+        Assert.Equal("15", Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://gist.github.com/")[1].GetProperty("errorCode").GetString());
+        Assert.Single(app.Driver.Output, line => line.StartsWith("fill-prompt origin=", StringComparison.Ordinal));
+
+        app.Send("allowances");
+        app.WaitFor($"^allowance item=GitHub on https://github.com:443 in {Regex.Escape(name)}$");
+
+        var log = Workspace.Text(workspace.OwnerLog);
+        Assert.DoesNotContain("s3cret", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("next=", log, StringComparison.Ordinal);
+        Assert.DoesNotContain(key, log, StringComparison.Ordinal);
     }
 
     [Fact]

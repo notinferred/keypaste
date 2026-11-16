@@ -361,6 +361,36 @@ public sealed class ApprovalGate : IDisposable
             : new PairingAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null);
     }
 
+    /// <summary>Asks a human whether to fill a login in a browser, under the same window and slot as every other question, Fill alone counting as yes.</summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal or no answer: the pairing and the page's origin.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer, with the chosen item only when it allows one the prompt listed, and Always only where the prompt offered it.</returns>
+    /// <remarks>It never waits its turn: a request while another prompt is up is busy, so a browser's other requests are not held behind it.</remarks>
+    public async ValueTask<FillAnswer> AskAsync(string cooldownKey, FillPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        string? uuid = null;
+        var always = false;
+        var answer = await AskThroughAsync(
+            [cooldownKey],
+            new Asked(null, null, null, null),
+            async token =>
+            {
+                var said = await _channel.AskAsync(prompt, token).ConfigureAwait(false);
+                (uuid, always) = (said.Uuid, said.Always);
+                return said.Answer;
+            },
+            cancellationToken,
+            coolUnanswered: true).ConfigureAwait(false);
+
+        return answer == ApprovalAnswer.ApprovedOnce && prompt.Candidates.Any(candidate => string.Equals(candidate.Uuid, uuid, StringComparison.OrdinalIgnoreCase))
+            ? new FillAnswer(answer, uuid, always && prompt.OffersAlways)
+            : new FillAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null, false);
+    }
+
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
         IReadOnlyList<string> cooldownKeys,
         Asked listed,

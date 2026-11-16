@@ -67,6 +67,34 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.Null(read.PickFor("cursor", "services/Mail", "password"));
     }
 
+    [Fact]
+    public void Browser_allowances_read_back_as_themselves()
+    {
+        var paired = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.Zero);
+        var written = AgentRules.Defaults
+            .AllowingFill(new BrowserAllowance("work laptop", paired, "https://github.com:443", "0123456789ABCDEF0123456789ABCDEF"))
+            .AllowingFill(new BrowserAllowance("work laptop", paired, "http://nas:5000", "fedcba9876543210fedcba9876543210"));
+
+        Assert.True(File.TryWrite(written, seal: null, out var problem), problem);
+        Assert.True(File.TryRead(out var read, out problem), problem);
+
+        Assert.Equal(written, read);
+        Assert.True(read.AllowsFill("work laptop", paired, "https://github.com:443", "0123456789abcdef0123456789abcdef"));
+        Assert.False(read.AllowsFill("work laptop", paired.AddSeconds(1), "https://github.com:443", "0123456789abcdef0123456789abcdef"));
+        Assert.False(read.AllowsFill("work laptop", paired, "https://gist.github.com:443", "0123456789abcdef0123456789abcdef"));
+    }
+
+    [Fact]
+    public void Rules_without_allowances_are_written_and_sealed_as_before_allowances_existed()
+    {
+        var rules = AgentRules.Defaults.WithRun("claude-code", run: true);
+        var allowing = rules.AllowingFill(new BrowserAllowance("laptop", DateTimeOffset.UnixEpoch, "https://github.com:443", "0123456789abcdef0123456789abcdef"));
+
+        Assert.DoesNotContain("fill", AgentRulesFile.Canonical(rules), StringComparison.Ordinal);
+        Assert.Equal(AgentRulesFile.Canonical(rules), AgentRulesFile.Canonical(allowing.WithoutPairing("laptop", DateTimeOffset.UnixEpoch)));
+        Assert.StartsWith(AgentRulesFile.Canonical(rules), AgentRulesFile.Canonical(allowing), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("[[agent]]\nname = \"a\"\npassword = \"sometimes\"\n", "line 3")]
     [InlineData("[[agent]]\nname = \"a\"\npasskey = \"allow\"\n", "line 3")]
@@ -79,6 +107,10 @@ public sealed class AgentRulesFileTests : IDisposable
     [InlineData("[[client]]\nlabel = \"claude-code\"\n", "line 1")]
     [InlineData("[[agent]]\nname = \"claude-code\"\nrun = 2\n", "line 3")]
     [InlineData("[[agent]]\nname = \"a\"\n[[agent]]\nname = \"a\"\n", "same agent")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"yesterday\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123\"\n", "line 1")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "same allowance")]
     public void A_file_keypaste_cannot_read_refuses_and_is_left_as_it_is(string text, string said)
     {
         var path = Path.Combine(_directory, "agents.toml");

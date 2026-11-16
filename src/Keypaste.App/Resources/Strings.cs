@@ -59,6 +59,7 @@ public static class Strings
     public static string All => Manager.GetString("All", CultureInfo.CurrentUICulture)!;
     public static string AllItems => Manager.GetString("AllItems", CultureInfo.CurrentUICulture)!;
     public static string AlwaysAnswers => Manager.GetString("AlwaysAnswers", CultureInfo.CurrentUICulture)!;
+    public static string AlwaysFilled => Manager.GetString("AlwaysFilled", CultureInfo.CurrentUICulture)!;
     public static string AnotherDevicesChangesWerentMerged => Manager.GetString("AnotherDevicesChangesWerentMerged", CultureInfo.CurrentUICulture)!;
     public static string AnswerInThePromptWindow => Manager.GetString("AnswerInThePromptWindow", CultureInfo.CurrentUICulture)!;
     public static string AnsweringAgents => Manager.GetString("AnsweringAgents", CultureInfo.CurrentUICulture)!;
@@ -407,6 +408,7 @@ public static class Strings
     public static string NoAgentIsConnectedYet => Manager.GetString("NoAgentIsConnectedYet", CultureInfo.CurrentUICulture)!;
     public static string NoAlwaysAnswersYet => Manager.GetString("NoAlwaysAnswersYet", CultureInfo.CurrentUICulture)!;
     public static string NoBrowserIsPairedWithThisVault => Manager.GetString("NoBrowserIsPairedWithThisVault", CultureInfo.CurrentUICulture)!;
+    public static string NoItemIsAlwaysFilled => Manager.GetString("NoItemIsAlwaysFilled", CultureInfo.CurrentUICulture)!;
     public static string NoKeyFile => Manager.GetString("NoKeyFile", CultureInfo.CurrentUICulture)!;
     public static string NoKeysFoundInNotesNoWeakX50d3ee => Manager.GetString("NoKeysFoundInNotesNoWeakX50d3ee", CultureInfo.CurrentUICulture)!;
     public static string NoKeysYetAddTheFirstOneX0cbcf7 => Manager.GetString("NoKeysYetAddTheFirstOneX0cbcf7", CultureInfo.CurrentUICulture)!;
@@ -593,6 +595,7 @@ public static class Strings
     public static string Sort => Manager.GetString("Sort", CultureInfo.CurrentUICulture)!;
     public static string SortThisList => Manager.GetString("SortThisList", CultureInfo.CurrentUICulture)!;
     public static string Start => Manager.GetString("Start", CultureInfo.CurrentUICulture)!;
+    public static string StopAlwaysFillingValue => Manager.GetString("StopAlwaysFillingValue", CultureInfo.CurrentUICulture)!;
     public static string StopPairing => Manager.GetString("StopPairing", CultureInfo.CurrentUICulture)!;
     public static string StopUsingAKeyFile => Manager.GetString("StopUsingAKeyFile", CultureInfo.CurrentUICulture)!;
     public static string StopUsingTheYubiKey => Manager.GetString("StopUsingTheYubiKey", CultureInfo.CurrentUICulture)!;

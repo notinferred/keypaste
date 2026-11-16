@@ -340,6 +340,77 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return allowed ? new PairingAnswer(ApprovalAnswer.ApprovedOnce, request.SuggestedName) : new PairingAnswer(ApprovalAnswer.Denied, null);
     }
 
+    /// <summary>Lists the logins a browser may fill by number and reads the number of the one to fill; anything else denies. No Always here: that is the app's.</summary>
+    public async ValueTask<FillAnswer> AskAsync(FillPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        var numbers = string.Concat(Enumerable.Range(1, request.Candidates.Count).Select(number => number.ToString(CultureInfo.InvariantCulture)));
+        _console.WriteLine(Render(request, RuleLine));
+
+        char? choice;
+
+        try
+        {
+            choice = await ChooseAsync(numbers, () => Filling(request.Candidates.Count, Remaining(started)), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _ = Withdrawn("Nothing was filled.");
+            return new FillAnswer(ApprovalAnswer.Denied, null, false);
+        }
+
+        if (choice is not { } digit || numbers.IndexOf(digit, StringComparison.Ordinal) is var picked && picked < 0)
+        {
+            _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Danger, "keypaste: denied. Nothing was filled."), RuleLine));
+            return new FillAnswer(ApprovalAnswer.Denied, null, false);
+        }
+
+        var candidate = request.Candidates[picked];
+        _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Ok, $"keypaste: filling {Described(candidate)}."), RuleLine));
+        return new FillAnswer(ApprovalAnswer.ApprovedOnce, candidate.Uuid, false);
+    }
+
+    /// <summary>A browser's request to fill: the build, the pairing, the page's origin and each login by title and username, never a password.</summary>
+    internal static string Render(FillPrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            "keypaste: a browser asks to fill a login.",
+            string.Empty,
+            $"  browser  {request.IdentityText}",
+            $"  pairing  {request.Pairing}",
+            $"  page     {request.Origin}",
+        ];
+
+        if (request.FormOrigin is { } form)
+        {
+            lines.Add($"  sends to {form}, another site");
+        }
+
+        lines.Add(string.Empty);
+        lines.AddRange(request.Candidates.Select((candidate, index) => string.Create(CultureInfo.InvariantCulture, $"  [{index + 1}] {Described(candidate)}")));
+        lines.Add(string.Empty);
+        lines.Add("  The browser says which page asks, and any program you run can say it too,");
+        lines.Add("  so fill only on a page you are signing in to now.");
+        lines.Add(string.Empty);
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string Described(FillCandidate candidate) =>
+        candidate.Username.Length == 0 ? candidate.Title : $"{candidate.Title} ({candidate.Username})";
+
+    /// <summary>The fill's choice line: deny first, then the numbers that fill a login.</summary>
+    private string Filling(int count, int secondsLeft) =>
+        _console.Paint(Tone.Accent, "[d] deny  ")
+        + _console.Paint(Tone.Ok, count == 1 ? "[1] fill  " : string.Create(CultureInfo.InvariantCulture, $"[1-{count}] fill  "))
+        + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
+        + " ";
+
     /// <summary>Shows an agent's linked set, every item and field, and reads <c>y</c> to allow it once; anything else denies the whole set.</summary>
     public async ValueTask<ApprovalAnswer> AskAsync(SetPrompt request, CancellationToken cancellationToken)
     {

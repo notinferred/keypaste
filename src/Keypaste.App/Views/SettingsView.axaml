@@ -534,6 +534,29 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </Border>
+
+                  <TextBlock Classes="th" Text="{x:Static res:Strings.AlwaysFilled}" Margin="4,0" />
+                  <TextBlock Classes="caption" Margin="4,0" TextWrapping="Wrap" Text="{x:Static res:Strings.NoItemIsAlwaysFilled}" IsVisible="{Binding HasNoAllowances}" />
+                  <Border Classes="group" IsVisible="{Binding HasAllowances}">
+                    <ItemsControl Name="AllowancesList" ItemsSource="{Binding Allowances}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AllowanceItem">
+                          <ctl:FieldRow Label="{Binding Item}">
+                            <TextBlock ctl:MachineRuns.InText="True" Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
+                            <ctl:FieldRow.Actions>
+                              <Button Classes="ghost sm" Content="{x:Static res:Strings.Remove}" VerticalAlignment="Top"
+                                      AutomationProperties.Name="{Binding Item, StringFormat={x:Static res:Strings.StopAlwaysFillingValue}}"
+                                      Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).UnallowCommand}"
+                                      CommandParameter="{Binding}" />
+                            </ctl:FieldRow.Actions>
+                          </ctl:FieldRow>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Border>
                 </StackPanel>
               </Border>
             </StackPanel>

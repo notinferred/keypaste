@@ -560,6 +560,7 @@ internal sealed class BrowserFillRequestFrame(BrowserFillRequest request)
     public string IdentificationKey => request.IdentificationKey;
     public string Url => request.Url;
     public string? SubmitUrl => request.SubmitUrl;
+    public bool PersonAsked => request.PersonAsked;
 }
 
 internal sealed class BrowserReplyFrame(BrowserReply reply)

@@ -124,6 +124,15 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     internal ItemChangeReply Recorded(ItemChangeReply reply, AuditRecord record) =>
         reply with { Recorded = TryAppend(record) };
 
+    /// <summary>A browser's fill reply once all its lines are written together; logins any of whose lines cannot be written are refused whole.</summary>
+    /// <param name="reply">The reply as it will leave.</param>
+    /// <param name="records">One line per item released or refused, or none for a lookup that released nothing.</param>
+    /// <returns>The reply to send.</returns>
+    internal BrowserFillReply Recorded(BrowserFillReply reply, IReadOnlyList<AuditRecord> records) =>
+        records.Count == 0 || TryAppendAll(records) || reply.Logins.Count == 0
+            ? reply
+            : new BrowserFillReply(BrowserOutcome.Refused, _unrecorded);
+
     /// <summary>Writes the line of something the owner did that released nothing and answers nobody, such as a merge it saved.</summary>
     /// <param name="record">Its line.</param>
     /// <returns>Whether it was written.</returns>

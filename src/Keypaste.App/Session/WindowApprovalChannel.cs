@@ -148,6 +148,19 @@ internal sealed class WindowApprovalChannel(
         return answer == ApprovalAnswer.ApprovedOnce ? new PairingAnswer(answer, request.Name) : new PairingAnswer(answer, null);
     }
 
+    /// <summary>Asks the person who clicked in a page to fill one of its logins, once or always there, in a prompt window of its own.</summary>
+    public async ValueTask<FillAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new FillViewModel(prompt);
+        var answer = await ShowAsync(request, () => new FillWindow(request), cancellationToken).ConfigureAwait(false);
+
+        return answer == ApprovalAnswer.ApprovedOnce && request.PickedUuid is { } uuid
+            ? new FillAnswer(answer, uuid, request.AlwaysPicked)
+            : new FillAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null, false);
+    }
+
     /// <summary>Tells the person a browser asked to pair while pairing was not on, in one notice at a time, which takes nothing down.</summary>
     public void Tell(PairingNotice notice)
     {

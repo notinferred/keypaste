@@ -7,8 +7,8 @@ namespace Keypaste.Core.Browser;
 /// <para>
 /// An item matches a page on its own host, or a subdomain of it at a label boundary, within one registrable domain, and on the
 /// same scheme and port: <c>gist.github.com</c> matches an item for <c>https://github.com</c>, while <c>ab.example.com</c> does not
-/// match one for <c>b.example.com</c>, nor <c>example.com</c> one for <c>login.example.com</c>. An IP address or <c>localhost</c>
-/// matches only itself, and a public suffix, which has no registrable domain, matches nothing. An item's address with no scheme
+/// match one for <c>b.example.com</c>, nor <c>example.com</c> one for <c>login.example.com</c>. An IP address, <c>localhost</c>
+/// or a single label such as <c>nas</c> matches only itself, and a public suffix, which has no registrable domain, matches nothing. An item's address with no scheme
 /// is <c>https</c>, and one with no port has its scheme's default.
 /// </para>
 /// <para>
@@ -36,10 +36,10 @@ public sealed class LoginLookup
     public WebOrigin? OtherSiteForm { get; }
 
     /// <summary>
-    /// Whether a fill here is asked about every time and never remembered: the page is <c>http</c>, or its form posts to another
-    /// registrable domain.
+    /// Whether a fill here is asked about every time and never remembered: the page is <c>http</c>, its host is a single label
+    /// anyone on the network can answer to, or its form posts to another registrable domain.
     /// </summary>
-    public bool AsksEveryTime => Page.Scheme == Uri.UriSchemeHttp || OtherSiteForm is not null;
+    public bool AsksEveryTime => Page.Scheme == Uri.UriSchemeHttp || Page.IsSingleLabel || OtherSiteForm is not null;
 
     /// <summary>Reads the extension's request.</summary>
     /// <param name="url">The page's URL, which a browser writes with its host in A-labels.</param>

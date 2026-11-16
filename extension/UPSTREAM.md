@@ -45,6 +45,7 @@ Permissions go from `activeTab`, `clipboardWrite`, `contextMenus`, `cookies`, `n
 
 ### Changed
 
+- `background/keepass.js` sends `triggerUnlock` with `get-logins` when the person asked, by the field's key icon or Connect, as upstream sends it with `get-databasehash`, so keypaste asks the person only then and a page's own load asks nobody.
 - `background/client.js` times a request from when every request sent before it on the native port is answered, since keypaste answers one at a time: a status check queued behind a pairing the person is still confirming is no longer taken for keypaste being unreachable, which cleared the database hash the pairing's answer is verified against.
 
 ### Restyled

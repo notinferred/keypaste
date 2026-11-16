@@ -912,7 +912,7 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
         Save(window, output, "04-settings-agent-rules-allow");
         rules.CancelGrantCommand.Press();
-        SetDrawnState(rules, nameof(rules.Ignored), "Agent rules were changed outside keypaste and are ignored until you set them again. Until then every value is asked about and no agent may run commands.");
+        SetDrawnState(rules, nameof(rules.Ignored), "Agent rules and browser fill allowances were changed outside keypaste and are ignored until you set them again. Until then every value is asked about and no agent may run commands.");
         WindowInput.Drain();
         Save(window, output, "04-settings-agent-rules-ignored");
 

@@ -56,18 +56,22 @@ public sealed class ApproverBrowserProtocolTests
         var check = new BrowserCheckRequest("keypaste on this computer", _key) { Vault = "/v.kdbx", Session = "s" };
         var fill = new BrowserFillRequest("keypaste on this computer", _key, "https://github.com/login") { SubmitUrl = "https://github.com/session", Vault = "/v.kdbx", Session = "s" };
         var withoutForm = fill with { SubmitUrl = null };
+        var personAsked = fill with { PersonAsked = true };
         var browserLock = new BrowserLockRequest { Vault = "/v.kdbx", Session = "s" };
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(pair), out BrowserPairRequest? decodedPair));
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(check), out BrowserCheckRequest? decodedCheck));
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(fill), out BrowserFillRequest? decodedFill));
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(withoutForm), out BrowserFillRequest? decodedWithoutForm));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(personAsked), out BrowserFillRequest? decodedPersonAsked));
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(browserLock), out BrowserLockRequest? decodedLock));
 
         Assert.Equal(pair, decodedPair);
         Assert.Equal(check, decodedCheck);
         Assert.Equal(fill, decodedFill);
         Assert.Equal(withoutForm, decodedWithoutForm);
+        Assert.Equal(personAsked, decodedPersonAsked);
+        Assert.False(decodedFill.PersonAsked);
         Assert.Equal(browserLock, decodedLock);
 
         Assert.Equal(ApproverMessageKind.BrowserPair, ApproverProtocol.KindOf(ApproverProtocol.Encode(pair)));
@@ -86,6 +90,15 @@ public sealed class ApproverBrowserProtocolTests
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new BrowserPairRequest(tooLong) { Vault = "/v", Session = "s" }), out BrowserPairRequest? _));
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new BrowserCheckRequest(tooLong, _key) { Vault = "/v", Session = "s" }), out BrowserCheckRequest? _));
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new BrowserCheckRequest(string.Empty, _key) { Vault = "/v", Session = "s" }), out BrowserCheckRequest? _));
+    }
+
+    [Fact]
+    public void A_fill_whose_person_asked_is_not_true_or_false_is_refused()
+    {
+        var fill = new BrowserFillRequest("laptop", _key, "https://github.com/") { PersonAsked = true, Vault = "/v.kdbx", Session = "s" };
+        var text = Encoding.UTF8.GetString(ApproverProtocol.Encode(fill)).Replace("\"person_asked\":true", "\"person_asked\":\"yes\"", StringComparison.Ordinal);
+
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(text), out BrowserFillRequest? _));
     }
 
     [Fact]

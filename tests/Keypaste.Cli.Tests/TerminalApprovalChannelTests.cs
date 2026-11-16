@@ -367,6 +367,41 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("any program you run can name it too", shown, StringComparison.Ordinal);
     }
 
+    private static FillPrompt FillPromptFor() => new()
+    {
+        Identity = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore,
+        Pairing = "laptop",
+        Origin = "https://github.com:443",
+        Site = "github.com",
+        FormOrigin = "https://collector.example:443",
+        Candidates = [new FillCandidate("AAAA", "GitHub", "dana", "web"), new FillCandidate("BBBB", "GitHub", string.Empty, "work")],
+        OffersAlways = true,
+    };
+
+    /// <summary>A browser's fill lists each login by number, never a password, and a number fills that one; there is no always here.</summary>
+    [Theory]
+    [InlineData("1", ApprovalAnswer.ApprovedOnce, "AAAA")]
+    [InlineData("2", ApprovalAnswer.ApprovedOnce, "BBBB")]
+    [InlineData("3", ApprovalAnswer.Denied, null)]
+    [InlineData("d", ApprovalAnswer.Denied, null)]
+    [InlineData("", ApprovalAnswer.Denied, null)]
+    public async Task A_fill_lists_the_logins_by_number_and_a_number_fills_that_one(string answer, ApprovalAnswer expected, string? uuid)
+    {
+        var rig = Build(answer);
+
+        var said = await rig.Channel.AskAsync(FillPromptFor(), Token);
+
+        Assert.Equal(new FillAnswer(expected, uuid, false), said);
+        var shown = rig.Stderr.ToString();
+        Assert.Contains("keypaste: a browser asks to fill a login.", shown, StringComparison.Ordinal);
+        Assert.Contains("  page     https://github.com:443", shown, StringComparison.Ordinal);
+        Assert.Contains("  sends to https://collector.example:443, another site", shown, StringComparison.Ordinal);
+        Assert.Contains("  [1] GitHub (dana)", shown, StringComparison.Ordinal);
+        Assert.Contains("  [2] GitHub", shown, StringComparison.Ordinal);
+        Assert.Equal("[d] deny  [1-2] fill  45s › ", rig.Prompt.PromptsSeen[0]);
+        Assert.DoesNotContain("always", shown, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void ARequestToPairWhileNotArmed_SaysHowToPair()
     {

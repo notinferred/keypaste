@@ -408,6 +408,26 @@ public sealed class RelayTests
         Assert.DoesNotContain("correct horse", fill.Reply.ToJsonString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_fill_tells_the_owner_whether_the_extension_says_the_person_asked(bool triggerUnlock)
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Done, string.Empty);
+        var key = Key();
+        await CheckAsync(rig, key);
+
+        await rig.Browser.RequestAsync(
+            "get-logins",
+            new JsonObject { ["url"] = "https://github.com/login", ["keys"] = new JsonArray(new JsonObject { ["id"] = _pairing, ["key"] = key }) },
+            ExtensionClient.NewNonce(),
+            triggerUnlock,
+            Token);
+
+        Assert.Equal(triggerUnlock, Assert.IsType<BrowserFillRequest>(rig.Owner.Asked[^1]).PersonAsked);
+    }
+
     [Fact]
     public async Task A_fill_before_a_check_is_answered_with_error_8_and_reaches_no_owner()
     {

@@ -1766,6 +1766,61 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Every live item outside keypaste's own groups a page's request for logins may match, with no password, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="items">The items when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    internal SavedRead ReadSavedBrowserItems(out IReadOnlyList<Browser.BrowserItem>? items)
+    {
+        items = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            items = _interop.ReadBrowserItems();
+            return SavedRead.Current;
+        }
+    }
+
+    /// <summary>A live item's username and password as they leave keypaste, each with its own item's placeholders filled in, found by UUID, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="uuid">The item's UUID, as 32 hex digits.</param>
+    /// <param name="login">When the answer is <see cref="SavedRead.Current"/>, the item and its two values, or null when no live item has that UUID; otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    /// <remarks>By UUID, since two logins of one title in one group, one per account, are common and a name would refuse both.</remarks>
+    internal SavedRead ReadSavedLogin(string uuid, out SavedLogin? login)
+    {
+        ArgumentNullException.ThrowIfNull(uuid);
+
+        login = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            if (_interop.ReadLiveByUuid(uuid) is { } found)
+            {
+                login = new SavedLogin(
+                    found.Entry,
+                    Filled(found.Entry.Username, () => found.Fields)!,
+                    Filled(found.Entry.Password, () => found.Fields)!);
+            }
+
+            return SavedRead.Current;
+        }
+    }
+
     private static PlaceholderFill? Filled(string value, Func<PlaceholderFields?> read)
     {
         if (KeePassPlaceholders.HoldsPlaceholder(value))

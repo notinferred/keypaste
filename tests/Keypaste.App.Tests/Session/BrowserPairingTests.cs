@@ -196,6 +196,75 @@ public sealed partial class BrowserPairingTests
         window.Close();
     });
 
+    [Fact]
+    public Task A_click_in_a_page_opens_the_fill_window_which_shows_no_password_and_fills_the_login_picked() => HeadlessSession.On(async () =>
+    {
+        await using var app = await PromptedApp.StartAsync(seed: vault =>
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "GitHub", Username = "dana", Password = "fill-s3cret", Url = "https://github.com" });
+            vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "GitHub work", Username = "dana-work", Password = "work-s3cret", Url = "https://github.com" });
+        });
+        await PairAsync(app, "laptop");
+        await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
+        Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
+
+        var filling = link.FillAsync(Fill(app, "https://github.com/login"), Token).AsTask();
+        var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
+
+        Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
+        Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
+        Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text));
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => (text.Text ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
+        Assert.True(window.FindControl<CheckBox>("AlwaysBox")!.IsVisible);
+
+        var request = (FillViewModel)window.DataContext!;
+        app.Clock.Advance(PromptViewModel.ArmingDelay);
+        await Task.Delay(200, Token);
+        Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+
+        request.Picked = request.Rows[1];
+        await app.ArmAsync("Allow");
+        Click(window, "Allow");
+
+        var reply = await filling.WaitAsync(_wait, Token);
+        Assert.Equal("work-s3cret", Assert.Single(reply!.Logins).Password);
+        await PromptedApp.WithdrawnAsync(window);
+        Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Allowances);
+    });
+
+    [Fact]
+    public Task Always_fill_is_listed_in_Settings_and_Remove_asks_again_next_time() => HeadlessSession.On(async () =>
+    {
+        await using var app = await PromptedApp.StartAsync(seed: vault =>
+            vault.AddEntry(new VaultEntry { Title = "GitHub", Username = "dana", Password = "fill-s3cret", Url = "https://github.com" }));
+        await PairAsync(app, "laptop");
+        await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
+        Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
+
+        var filling = link.FillAsync(Fill(app, "https://github.com/login"), Token).AsTask();
+        var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
+        ((FillViewModel)window.DataContext!).Always = true;
+        await app.ArmAsync("Allow");
+        Click(window, "Allow");
+        Assert.Single((await filling.WaitAsync(_wait, Token))!.Logins);
+        await PromptedApp.WithdrawnAsync(window);
+
+        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
+        var row = Assert.Single(browserFill.Allowances);
+        Assert.Equal(("GitHub", "on https://github.com:443 in laptop"), (row.Item, row.Where));
+
+        var silent = await link.FillAsync(Fill(app, "https://github.com/", personAsked: false), Token);
+        Assert.Single(silent!.Logins);
+
+        browserFill.UnallowCommand.Execute(row);
+        Assert.Empty(browserFill.Allowances);
+        Assert.Empty((await link.FillAsync(Fill(app, "https://github.com/", personAsked: false), Token))!.Logins);
+    });
+
+    private static BrowserFillRequest Fill(PromptedApp app, string url, bool personAsked = true) =>
+        new("laptop", _key, url) { PersonAsked = personAsked, Vault = app.Vault, Session = app.SessionId };
+
     private static BrowserPairRequest Pair(PromptedApp app) => new(_key) { Vault = app.Vault, Session = app.SessionId };
 
     private static BrowserCheckRequest Check(PromptedApp app, string pairing) => new(pairing, _key) { Vault = app.Vault, Session = app.SessionId };

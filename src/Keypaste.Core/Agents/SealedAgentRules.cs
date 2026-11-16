@@ -27,7 +27,7 @@ namespace Keypaste.Core.Agents;
 public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Func<Func<Vault, bool>, AgentSave> save) : IAgentRules
 {
     /// <summary>What the app says while the file's rules are ignored.</summary>
-    public const string IgnoredText = "agent rules were changed outside keypaste and are ignored until you set them again";
+    public const string IgnoredText = "agent rules and browser fill allowances were changed outside keypaste and are ignored until you set them again";
 
     /// <summary>The title of the vault's record that holds the key.</summary>
     internal const string KeyTitle = "agent-rules";

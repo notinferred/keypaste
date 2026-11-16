@@ -250,7 +250,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 ### T-15 — Agent rules are a file any program of the person's can write
 
-**Asset.** The agent rules.
+**Asset.** The agent rules, and the browser allowances the same file keeps (T-61).
 
 **Attacker.** A same-user program writing `~/.keypaste/agents.toml`, or a synced, shared, restored or KeePassXC-edited vault carrying agent records.
 
@@ -678,7 +678,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Limit.** A same-user process can read the relay's memory, where decoded logins stay as strings until collected, and can start keypaste naming the extension or speak the pipe as a browser, obtaining what pairing and fill allow; a program asking first inside an armed window is still shown to the person, who can deny it. The relay believes the browser about which extension started it.
 
-**Status.** Implemented (unreleased); not in v0.3.0. Fill is not implemented yet: the owner refuses every fill (planned, step 8.3a2).
+**Status.** Implemented (unreleased); not in v0.3.0.
 
 **Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. `verify-extension-load.sh` has Chromium and Firefox start the relay for keypaste's extension and pair it. Unverified: a fill in a real browser (planned, step 8.3a3).
 
@@ -702,7 +702,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Attacker.** Whoever reads the browser profile, where the extension keeps the key it proves a pairing with, and can reach the owner's pipe; anyone who can write the vault.
 
-**Mitigation.** The vault keeps only the key's SHA-256, so a vault copy gives no key, and no line, prompt or output holds it. A pairing is bound to the build that paired, and is proven only against the vault as saved. Settings lists each pairing with its last use, and Remove purges it, survives merges and unbinds its connections. A pairing releases nothing by itself: each fill is to be asked about or allowed for one exact origin (planned, step 8.3a2).
+**Mitigation.** The vault keeps only the key's SHA-256, so a vault copy gives no key, and no line, prompt or output holds it. A pairing is bound to the build that paired, and is proven only against the vault as saved. Settings lists each pairing with its last use, and Remove purges it, survives merges and unbinds its connections. A pairing releases nothing by itself: each fill is asked about, or allowed for one exact origin (T-61).
 
 **Limit.** A same-user process can read the profile's key and present it under the build it claims (T-48), obtaining what a fill releases; KeePassXC's protocol has only that key as proof. Anyone who can write the vault can add a record, though one whose key they lack proves nothing. Last use is kept in memory and restarts with each owner start.
 
@@ -807,3 +807,59 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 **Status.** Implemented (unreleased); not in v0.3.0.
 
 **Tests.** `ItemChangeRequestTests`, `ItemChangeViewModelTests`, `ItemChangeWindowTests`, `TerminalApprovalChannelTests`, `ServerToolsTests`, `KeePassXC.AgentChangesTests`.
+
+### T-58 — A page that is not the item's site
+
+**Asset.** A login filled into a page.
+
+**Attacker.** A page made to look like the item's site: a lookalike or longer domain, another tenant of a shared host, a subdomain someone else controls, the site over `http`, or a form that posts to another site.
+
+**Mitigation.** An item matches a page only on its own host or a subdomain of it at a label boundary, within one registrable domain by the vendored Public Suffix List, both sections read, and on the same scheme and port; an IP address, `localhost` and a single label such as `nas` match only themselves. A host that is not ASCII, a URL naming a user, a wildcard and HTTP authentication get no logins. A page's own load asks nobody and releases only what the person always fills on its exact origin; a request the extension says the person made puts the matching items to them by title and username, the origin with its site emphasised and, where the form posts to another site, that site named. An `http` page, a single-label host and a form posting to another site are asked about every time and offer no Always. KeePassXC's hide, HTTP-authentication-only and connection-only settings on an item or its groups, its deny list, an expired item and the Trash keep an item out. Each item released is recorded with the page's origin before the reply, never its path or query.
+
+**Limit.** Whoever controls any subdomain of the item's site is offered its login there. The list ages until it is refreshed, and a release refuses a copy more than 60 days old. Anyone on the network can answer to a single-label host, so it is asked every time. A person can fill a lookalike they misread; the prompt names the origin and cannot make them read it.
+
+**Status.** Implemented (unreleased); not in v0.3.0.
+
+**Tests.** `LoginLookupTests`, `LoginCandidatesTests`, `SessionBrowsersTests`, `BrowserHostTests`. Unverified: a fill in a real browser (planned, step 8.3a3).
+
+### T-59 — keypaste believes the extension about which page asks, and whether the person clicked
+
+**Asset.** Logins released to a browser, and the person's attention.
+
+**Attacker.** A same-user process holding a pairing's key (T-50), or a compromised extension, naming any page and claiming the person clicked.
+
+**Mitigation.** The page's URL only chooses which items match; nothing is released without the person's answer or an allowance they made for that pairing, origin and item. The extension's `triggerUnlock`, which marks the person's click, decides only whether the person may be asked, never what is released. The prompt says the browser names the page and any program can, and to fill only where the person is signing in now. A fill takes the one prompt slot and never waits its turn, a refusal or no answer holds that pairing and origin back a minute, and a request while any prompt is up gets no logins.
+
+**Limit.** Such a process receives every item allowed for the origins it names, unasked (T-61), and can put prompts claiming any page in front of the person, one a minute per origin. The relay answers one message at a time, so a browser's other tabs wait behind a prompt.
+
+**Status.** Implemented (unreleased); not in v0.3.0.
+
+**Tests.** `SessionBrowsersTests`, `RelayTests`, `BrowserHostTests`.
+
+### T-60 — The extension, someone else's code, receives passwords
+
+**Asset.** Every login released to a browser.
+
+**Attacker.** A malicious or compromised extension build, a compromised store account publishing an update, or the browser itself.
+
+**Mitigation.** keypaste answers only its own extension's three builds, by the ID or add-on ID the browser names, and each pairing is bound to the build that paired. A release carries only the item's username and password, placeholders filled in from the item, its title and UUID: never its group, a TOTP code, string fields or another item. The extension is keypaste's own fork, published as source, and its page UI sits in closed shadow roots. Each release is recorded per item.
+
+**Limit.** Once released, the extension and the page it fills hold the password: the page's own scripts can read a filled field, and an extension update could send it anywhere. keypaste cannot verify the code the browser runs, and the browser names the build (T-48).
+
+**Status.** Implemented (unreleased); not in v0.3.0. The extension is not yet in a store (step 8.1g).
+
+**Tests.** `RelayTests`, `SessionBrowsersTests`, `BrowserHostTests`.
+
+### T-61 — An allowance is a standing rule
+
+**Asset.** The logins the person always fills on a site.
+
+**Attacker.** A same-user process holding a pairing's key, one writing `~/.keypaste/agents.toml`, or anything that changes the vault.
+
+**Mitigation.** "Always fill this item on" an origin is kept on this computer in `agents.toml`, sealed with the agent rules (T-15), never in the vault, so a synced or edited vault adds none. Each names one pairing and when it was paired, one exact origin as `scheme://host:port` and one item's UUID, so a later pairing of the same name inherits nothing; it applies only while that pairing exists and the item still matches the page by T-58's rules. It is offered only on a person's click, never where every fill is asked, made only in the app, listed in Settings › Browser fill and removed there, and each release under it is recorded as `allowed`.
+
+**Limit.** Whoever holds the pairing's key receives the allowed items on those origins without anybody being asked (T-50, T-59). A domain that changes hands keeps the allowance. An altered or unsealed file gives no allowances, which fails closed, and an Always ticked then starts from the defaults, dropping the agent rules too, as an agent's Always does (T-15). Allowances do not follow the vault to another computer.
+
+**Status.** Implemented (unreleased); not in v0.3.0.
+
+**Tests.** `AgentRulesFileTests`, `SealedAgentRulesTests`, `SessionBrowsersTests`, `BrowserPairingTests`, `BrowserHostTests`.

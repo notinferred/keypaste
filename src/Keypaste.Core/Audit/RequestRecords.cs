@@ -63,6 +63,12 @@ public enum BrowserAct
 
     /// <summary>The person's removal of a pairing.</summary>
     Remove = 2,
+
+    /// <summary>A login filled in a page, or a matched item refused one.</summary>
+    Fill = 3,
+
+    /// <summary>The person's removal of an "Always fill" allowance.</summary>
+    Unallow = 4,
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -605,6 +611,8 @@ public static class RequestRecords
                 {
                     BrowserAct.Check => "check",
                     BrowserAct.Remove => "remove",
+                    BrowserAct.Fill => "fill",
+                    BrowserAct.Unallow => "unallow",
                     _ => "pair",
                 },
             },
@@ -613,6 +621,42 @@ public static class RequestRecords
             Reason = EntryNameSanitizer.SanitizeProse(reason, AuditArgs.ReasonExcerptLength).Text,
             Session = session,
             Vault = vault,
+        };
+    }
+
+    /// <summary>The line for one item a browser's fill released or refused, naming the item and the page's origin and never a username or password.</summary>
+    /// <param name="identity">The build the browser named.</param>
+    /// <param name="pairing">The pairing's name.</param>
+    /// <param name="item">The item's path, with its UUID, or null for a fill refused before any item was chosen.</param>
+    /// <param name="origin">The page's origin, as <c>scheme://host:port</c>, which the reason names; never a path, query or fragment.</param>
+    /// <param name="decision">Whether it was filled.</param>
+    /// <param name="method">How that was decided.</param>
+    /// <param name="reason">keypaste's own words, completed with the origin. Trusted text.</param>
+    /// <param name="session">The unlocked session that answered.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord BrowserFill(
+        BrowserIdentity identity,
+        string pairing,
+        EntryName? item,
+        string origin,
+        AuditDecision decision,
+        AuditMethod method,
+        string reason,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+
+        var line = Browser(identity, pairing, BrowserAct.Fill, decision, method, $"{reason}, on {origin}", session, vault);
+
+        return item is null ? line : line with
+        {
+            Args = line.Args with
+            {
+                Entry = EntryNameSanitizer.SanitizePath(Editing.TerminalEdit.PathOf(item), maximumLength: AuditArgs.EntryLength).Text,
+                Item = item.Uuid,
+            },
         };
     }
 

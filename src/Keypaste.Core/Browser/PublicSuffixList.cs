@@ -40,6 +40,11 @@ internal static class PublicSuffixList
         return labels.Length > suffixLabels ? Suffix(labels, labels.Length - suffixLabels - 1) : null;
     }
 
+    /// <summary>Whether the list names a top-level name itself, such as <c>com</c> or <c>ck</c>, rather than leaving it to its default rule.</summary>
+    /// <param name="label">One label in lowercase A-labels.</param>
+    /// <returns><see langword="true"/> when a rule names it.</returns>
+    internal static bool Names(string label) => _rules.Value.Names.Contains(label) || _rules.Value.Wildcards.Contains(label);
+
     private static int SuffixLabels(string[] labels, Rules rules)
     {
         for (var first = 0; first < labels.Length; first++)

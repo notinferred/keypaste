@@ -62,7 +62,8 @@ keepass.retrieveCredentials = async function(tab, args = []) {
             messageData.submitUrl = submiturl;
         }
 
-        const response = await keepassClient.sendMessage(kpAction, tab, messageData, nonce);
+        // triggerUnlock marks a request the person made, which keypaste may ask them about; a page's own load asks nobody.
+        const response = await keepassClient.sendMessage(kpAction, tab, messageData, nonce, false, triggerUnlock);
         if (response) {
             entries = removeDuplicateEntries(response.entries);
             keepass.updateLastUsed(keepass.databaseHash);

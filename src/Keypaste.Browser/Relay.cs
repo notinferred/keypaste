@@ -354,9 +354,11 @@ internal sealed class Relay : IAsyncDisposable
             return Error(GetLogins, ExtensionError.AssociationFailed);
         }
 
+        // The extension marks a request the person made, by the key icon or Connect, as one that may unlock: only that may ask them.
         var request = new BrowserFillRequest(paired.Id, paired.Key, url)
         {
             SubmitUrl = inner.GetValueOrDefault("submitUrl"),
+            PersonAsked = knock,
             Vault = _options.VaultPath,
             Session = session,
         };
@@ -542,7 +544,7 @@ internal sealed class Relay : IAsyncDisposable
         }
     }
 
-    /// <summary>The logins as KeePassXC lists them, each with only its username, title, password and UUID (D-0548).</summary>
+    /// <summary>The logins as KeePassXC lists them, each with only its username, title, password and UUID, never its group, a TOTP code or another field.</summary>
     private static void WriteLogins(Utf8JsonWriter writer, IReadOnlyList<BrowserLogin> logins, string pairing)
     {
         writer.WriteNumber("count", logins.Count);

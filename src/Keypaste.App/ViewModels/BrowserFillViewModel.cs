@@ -21,6 +21,18 @@ internal sealed partial class PairingItem(string name, string identity, string u
     internal partial bool IsConfirmingRemove { get; set; }
 }
 
+/// <summary>An "Always fill" allowance as Settings lists it: the item, the page and the browser, removed in one press since a fill asked again undoes it.</summary>
+/// <param name="allowance">The allowance.</param>
+/// <param name="item">Its item's title.</param>
+internal sealed class AllowanceItem(Keypaste.Core.Agents.BrowserAllowance allowance, string item)
+{
+    internal Keypaste.Core.Agents.BrowserAllowance Allowance { get; } = allowance;
+
+    internal string Item { get; } = item;
+
+    internal string Where { get; } = $"on {allowance.Origin} in {allowance.Pairing}";
+}
+
 /// <summary>
 /// Settings › Browser fill: Pair a browser, which arms pairing for two minutes and one pairing, and the pairings the vault
 /// holds, each with its last use and Remove (D-0634).
@@ -53,9 +65,11 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         AskRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, true), row => row is not null);
         CancelRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, false), row => row is not null);
         RemoveCommand = new RelayCommand<PairingItem>(Remove, row => row is not null);
+        UnallowCommand = new RelayCommand<AllowanceItem>(Unallow, row => row is not null);
 
         ArmedUntil = _authority.PairingArmedUntil;
         Rows = Read();
+        Allowances = ReadAllowances();
 
         if (IsArmed)
         {
@@ -73,6 +87,18 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
 
     /// <summary>Removes one pairing, having been confirmed, so the browser holding it is refused from its next check.</summary>
     internal RelayCommand<PairingItem> RemoveCommand { get; }
+
+    /// <summary>Stops always filling one item on one page, so the next fill there is asked again.</summary>
+    internal RelayCommand<AllowanceItem> UnallowCommand { get; }
+
+    /// <summary>The items filled without asking, oldest first.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAllowances), nameof(HasNoAllowances))]
+    internal partial IReadOnlyList<AllowanceItem> Allowances { get; private set; } = [];
+
+    internal bool HasAllowances => Allowances.Count > 0;
+
+    internal bool HasNoAllowances => Allowances.Count == 0;
 
     /// <summary>The pairings the vault holds, by name.</summary>
     [ObservableProperty]
@@ -159,7 +185,24 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
             ? $"Removed the pairing {row.Name}. That browser has to pair again before it can ask for anything."
             : $"The pairing {row.Name} was not removed: {removed.Reason?.TrimEnd('.')}. Try again.";
         Rows = Read();
+        Allowances = ReadAllowances();
     }
+
+    private void Unallow(AllowanceItem? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        Message = _authority.Unallow(row.Allowance, out var problem)
+            ? $"keypaste will ask before filling {row.Item} {row.Where} again."
+            : $"keypaste still fills {row.Item} {row.Where} without asking: {problem.TrimEnd('.')}. Try again.";
+        Allowances = ReadAllowances();
+    }
+
+    private IReadOnlyList<AllowanceItem> ReadAllowances() =>
+        [.. _authority.Allowances().Select(row => new AllowanceItem(row.Allowance, row.Item))];
 
     private void Tick()
     {

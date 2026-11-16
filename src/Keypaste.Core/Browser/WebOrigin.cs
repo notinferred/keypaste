@@ -9,17 +9,20 @@ namespace Keypaste.Core.Browser;
 /// Only an absolute <c>http</c> or <c>https</c> URL has one. Its host is ASCII, in lowercase: a domain name in A-labels, an IPv4
 /// address in dotted decimal, a bracketed IPv6 address or <c>localhost</c>. A URL naming a user before its host, a host that is
 /// not ASCII or a port outside 1 to 65535 has none, and neither does a domain name with an empty label or ending in a number.
+/// A single label the Public Suffix List does not name, such as <c>nas</c> or <c>router</c>, is a host on the person's network,
+/// which matches only itself.
 /// </remarks>
 public sealed record WebOrigin
 {
     private static readonly SearchValues<char> _authorityEnds = SearchValues.Create("/?#\\");
 
-    private WebOrigin(string scheme, string host, int port, bool isExactHost)
+    private WebOrigin(string scheme, string host, int port, bool isExactHost, bool isSingleLabel)
     {
         Scheme = scheme;
         Host = host;
         Port = port;
         IsExactHost = isExactHost;
+        IsSingleLabel = isSingleLabel;
         Site = isExactHost ? host : PublicSuffixList.RegistrableDomain(host);
     }
 
@@ -38,12 +41,20 @@ public sealed record WebOrigin
     /// </summary>
     public string? Site { get; }
 
-    /// <summary>Whether the host is an IP address or <c>localhost</c>, which matches only itself.</summary>
+    /// <summary>Whether the host is an IP address, <c>localhost</c> or a single label, which matches only itself.</summary>
     internal bool IsExactHost { get; }
+
+    /// <summary>Whether the host is a single label such as <c>nas</c>, which anyone on the network can answer to.</summary>
+    internal bool IsSingleLabel { get; }
 
     /// <summary>The origin as <c>scheme://host:port</c>, with no path, query or fragment.</summary>
     /// <returns>The origin.</returns>
     public override string ToString() => $"{Scheme}://{Host}:{Port.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>Whether text is an origin exactly as <see cref="ToString"/> writes one.</summary>
+    /// <param name="text">The text.</param>
+    /// <returns><see langword="true"/> when it is.</returns>
+    internal static bool IsOrigin(string text) => TryRead(text, out var origin, out _) && string.Equals(origin.ToString(), text, StringComparison.Ordinal);
 
     /// <summary>Reads a URL the browser sent, which names its scheme.</summary>
     internal static bool TryRead([NotNullWhen(true)] string? url, [NotNullWhen(true)] out WebOrigin? origin, out LookupRefusal refusal)
@@ -100,7 +111,8 @@ public sealed record WebOrigin
             return false;
         }
 
-        origin = new WebOrigin(scheme, host, port, isExactHost);
+        var isSingleLabel = !isExactHost && !host.Contains('.', StringComparison.Ordinal) && !PublicSuffixList.Names(host);
+        origin = new WebOrigin(scheme, host, port, isExactHost || isSingleLabel, isSingleLabel);
         refusal = LookupRefusal.None;
         return true;
     }

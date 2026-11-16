@@ -685,4 +685,7 @@
   <data name="TurnOn" xml:space="preserve"><value>Turn on</value></data>
   <data name="TurnOff" xml:space="preserve"><value>Turn off</value></data>
   <data name="TurnOnForThisBrowser" xml:space="preserve"><value>Turn on for this browser</value></data>
+  <data name="AlwaysFilled" xml:space="preserve"><value>Always filled</value></data>
+  <data name="NoItemIsAlwaysFilled" xml:space="preserve"><value>No item is filled without asking. When keypaste asks to fill a login, you can tick Always fill to skip the question on that site.</value></data>
+  <data name="StopAlwaysFillingValue" xml:space="preserve"><value>Stop always filling {0}</value></data>
 </root>

@@ -356,6 +356,18 @@ internal sealed class FakeChannel : IApprovalChannel
 
     public void Tell(PairingNotice notice) => PairingNotices.Add(notice);
 
+    /// <summary>How a fill prompt is answered; a no unless a test says otherwise.</summary>
+    internal Func<FillPrompt, CancellationToken, ValueTask<FillAnswer>> AnswerFill { get; set; } = (_, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.Denied, null, false));
+
+    /// <summary>Every fill prompt shown, in order.</summary>
+    internal List<FillPrompt> FillPrompts { get; } = [];
+
+    public ValueTask<FillAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
+    {
+        FillPrompts.Add(prompt);
+        return AnswerFill(prompt, cancellationToken);
+    }
+
     private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {
         Asked++;

@@ -1,0 +1,87 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.FillWindow"
+                    x:DataType="vm:FillViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a browser asks to fill a login"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Fixed heights, as in the other prompt windows, the list three rows that scroll past them, so neither the page nor how many
+       logins match move the buttons. The page and the build are what the extension claims (THREATS.md T-48, T-58), and no password
+       is drawn. No button is the default: Enter fills nothing, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="globe" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Name="TitleText" Classes="prompt-title size-16" Text="A browser asks to fill a login" />
+          <TextBlock Name="PairingText" Classes="prompt-sub size-13" Text="{Binding Pairing}" MaxWidth="300" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call size-12" Padding="12,8">
+        <StackPanel Spacing="2">
+          <TextBlock Name="IdentityText" Text="{Binding Identity}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="OriginText" Classes="value" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Origin}">
+            <Run Text="{Binding OriginBefore}" /><Run Text="{Binding OriginSite}" FontWeight="SemiBold" Foreground="{DynamicResource KpTextPrimary}" /><Run Text="{Binding OriginAfter}" />
+          </TextBlock>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Name="FormText" Classes="size-13" Height="20" Text="{Binding FormNote}" Foreground="{DynamicResource KpDanger}"
+                 TextTrimming="CharacterEllipsis" IsVisible="{Binding HasFormNote}" />
+
+      <Border Classes="prompt-reason" Height="164" Padding="4">
+        <ListBox Name="Candidates" ItemsSource="{Binding Rows}" SelectedItem="{Binding Picked}" SelectionMode="Single"
+                 AutomationProperties.Name="Logins that match this page">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:FillRow">
+              <StackPanel Spacing="2" Height="44" VerticalAlignment="Center" AutomationProperties.Name="{Binding Spoken}">
+                <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" TextWrapping="Wrap" />
+
+      <CheckBox Name="AlwaysBox" Height="32" IsChecked="{Binding Always}" IsVisible="{Binding ShowsAlways}">
+        <TextBlock Classes="size-13" Text="{Binding AlwaysText}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+      </CheckBox>
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Fill"
+                HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

@@ -77,13 +77,18 @@ public sealed class AgentRulesFile(string path)
     private const string _itemKey = "item";
     private const string _fieldKey = "field";
     private const string _ruleKey = "rule";
+    private const string _fillTable = "fill";
+    private const string _pairingKey = "pairing";
+    private const string _pairedKey = "paired";
+    private const string _originKey = "origin";
+    private const string _pairedFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
-    // Room for every agent and every remembered answer, each naming a field or an attachment and a name up to a request's length.
+    // Room for every agent, every remembered answer, each naming a field or an attachment and a name up to a request's length, and every browser allowance.
     private static readonly TomlLimits _limits = TomlLimits.Policy with
     {
-        Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + 2,
+        Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + AgentRules.MaximumBrowserAllowances + 2,
         Pairs = FieldCategories.Ruled.Count + 2,
-        Lines = 2048,
+        Lines = 2048 + (AgentRules.MaximumBrowserAllowances * 6),
         Bytes = 256 * 1024,
         LineLength = 1024,
         StringLength = Approval.CredentialRequestRules.MaximumEntryLength + 128,
@@ -227,6 +232,12 @@ public sealed class AgentRulesFile(string path)
             return false;
         }
 
+        if (rules.BrowserAllowances.Any(allowance => !CanWrite(allowance.Pairing) || !CanWrite(allowance.Origin)))
+        {
+            problem = "a browser allowance names a pairing or an origin that cannot be written";
+            return false;
+        }
+
         var writer = new TomlWriter(_limits)
             .Comment(" What every AI agent gets on this computer. keypaste writes this file and seals it with a key the vault holds;")
             .Comment(" a change made anywhere else is ignored, and every value is asked about, until it is set again in keypaste.");
@@ -290,6 +301,16 @@ public sealed class AgentRulesFile(string path)
             writer.BlankLine().Table(_pickTable).Text(_agentKey, pick.Agent).Text(_nameKey, pick.Name).Text(_fieldKey, pick.Field).Text(_itemKey, pick.Item);
         }
 
+        // Last, and only when there are any, so a file sealed before allowances existed still renders, and seals, as it did.
+        foreach (var allowance in rules.BrowserAllowances)
+        {
+            writer.BlankLine().Table(_fillTable)
+                .Text(_pairingKey, allowance.Pairing)
+                .Text(_pairedKey, allowance.Paired.UtcDateTime.ToString(_pairedFormat, CultureInfo.InvariantCulture))
+                .Text(_originKey, allowance.Origin)
+                .Text(_itemKey, allowance.Item);
+        }
+
         return writer;
     }
 
@@ -304,6 +325,7 @@ public sealed class AgentRulesFile(string path)
         List<AgentCategoryRule> agentCategories = [];
         List<RememberedAnswer> answers = [];
         List<RememberedPick> picks = [];
+        List<BrowserAllowance> allowances = [];
         var sawRules = false;
 
         foreach (var table in document.Tables)
@@ -358,6 +380,14 @@ public sealed class AgentRulesFile(string path)
 
                     picks.Add(pick);
                     break;
+                case _fillTable:
+                    if (!TryAllowance(table, out var allowance, out error))
+                    {
+                        return false;
+                    }
+
+                    allowances.Add(allowance);
+                    break;
                 default:
                     error = $"{At(table.Line)}: [[{table.Name}]] is not a section keypaste reads here";
                     return false;
@@ -383,7 +413,19 @@ public sealed class AgentRulesFile(string path)
             return false;
         }
 
-        rules = (parsed with { Agents = agents }).Read(agentCategories, answers, picks);
+        if (allowances.Count > AgentRules.MaximumBrowserAllowances)
+        {
+            error = $"keypaste reads at most {AgentRules.MaximumBrowserAllowances} [[{_fillTable}]] sections";
+            return false;
+        }
+
+        if (allowances.GroupBy(allowance => (allowance.Pairing, allowance.Paired, allowance.Origin, allowance.Item)).Any(same => same.Count() > 1))
+        {
+            error = $"two [[{_fillTable}]] sections keep the same allowance";
+            return false;
+        }
+
+        rules = (parsed with { Agents = agents }).Read(agentCategories, answers, picks, allowances);
         error = string.Empty;
         return true;
     }
@@ -530,6 +572,28 @@ public sealed class AgentRulesFile(string path)
         }
 
         pick = new RememberedPick(texts[0], texts[1], texts[2], texts[3].ToLowerInvariant());
+        return true;
+    }
+
+    private static bool TryAllowance(TomlTable table, [NotNullWhen(true)] out BrowserAllowance? allowance, out string error)
+    {
+        allowance = null;
+
+        if (!TryTexts(table, [_pairingKey, _pairedKey, _originKey, _itemKey], out var texts, out error))
+        {
+            return false;
+        }
+
+        if (Browser.PairingNames.Problem(texts[0], []) is not null
+            || !DateTimeOffset.TryParseExact(texts[1], _pairedFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var paired)
+            || !Browser.WebOrigin.IsOrigin(texts[2])
+            || !AgentRules.IsItem(texts[3]))
+        {
+            error = $"{At(table.Line)}: a [[{_fillTable}]] section names a pairing, when it was paired, an origin as scheme://host:port and an item's UUID";
+            return false;
+        }
+
+        allowance = new BrowserAllowance(texts[0], paired, texts[2], texts[3].ToLowerInvariant());
         return true;
     }
 

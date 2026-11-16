@@ -266,7 +266,7 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        _attached.TryRemove(connectionId, out _);
+        _attached.TryRemove(connectionId, out var earlier);
 
         static ValueTask<AttachReply> Answer(AttachReply reply) => ValueTask.FromResult(reply with { OwnerVersion = CoreInfo.Version });
 
@@ -288,12 +288,21 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var now = _clock.GetUtcNow();
-        _attached[connectionId] = new Attachment(request.Vault, lifetime.Id, request.Client, now)
+        var attachment = new Attachment(request.Vault, lifetime.Id, request.Client, now)
         {
             LastRequestAt = now,
             Exposure = request.Exposure ?? [],
             Browser = browser,
         };
+
+        // The relay attaches again before each of the extension's requests, so the same build on the same connection and unlock
+        // keeps the pairing its check proved; anything else starts unbound (D-0635).
+        if (earlier is { Browser: { } was } && ReferenceEquals(was, browser) && earlier.Session == lifetime.Id && earlier.Vault == request.Vault)
+        {
+            attachment.Pairing = earlier.Pairing;
+        }
+
+        _attached[connectionId] = attachment;
 
         // A browser's attachment is told the hash its extension files this vault's pairing under (D-0636).
         return Answer(AttachReply.To(lifetime.Id) with { DatabaseHash = browser is null ? null : _browsers?.DatabaseHash() });

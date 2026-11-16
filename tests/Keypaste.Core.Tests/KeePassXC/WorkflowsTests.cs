@@ -138,6 +138,23 @@ public sealed class WorkflowsTests
     }
 
     [Fact]
+    public void Keypaste_reads_KeePassXCs_browser_settings_on_an_item_and_a_group_as_KeePassXC_wrote_them()
+    {
+        using var file = new KeePassXcVault();
+        var key = new KeePassXcKey(KeePassXcCli.Password, null);
+        Import(file, key);
+
+        using var vault = Open(file, key);
+        Assert.Equal(SavedRead.Current, vault.ReadSavedBrowserItems(out var items));
+        var byTitle = items!.ToDictionary(item => item.Name.Title, StringComparer.Ordinal);
+
+        Assert.Equal(Keypaste.Core.Browser.BrowserNarrowing.None, byTitle["database"].Narrowing);
+        Assert.Equal(["kp83a2.example"], byTitle["database"].DeniedHosts);
+        Assert.Equal(Keypaste.Core.Browser.BrowserNarrowing.Hidden, byTitle["cache"].Narrowing);
+        Assert.Equal(Keypaste.Core.Browser.BrowserNarrowing.OnlyHttpAuthentication, byTitle["plain"].Narrowing);
+    }
+
+    [Fact]
     public void KeePassXC_reads_each_template_keypaste_makes_whole_with_no_revision()
     {
         using var file = new KeePassXcVault();
@@ -376,7 +393,7 @@ public sealed class WorkflowsTests
                 </AutoType>
                 <CustomData>
                   <Item><Key>kp94.entry</Key><Value>kp94-entry-value</Value></Item>
-                  <Item><Key>KeePassXC-Browser Settings</Key><Value>{"{"}"Allow":["kp81d.example"],"Deny":[],"Realm":""{"}"}</Value></Item>
+                  <Item><Key>KeePassXC-Browser Settings</Key><Value>{"{"}"Allow":["kp81d.example"],"Deny":["kp83a2.example"],"Realm":""{"}"}</Value></Item>
                 </CustomData>
                 <History><Entry><UUID>{Uuid("database")}</UUID>
                   <String><Key>Title</Key><Value>database</Value></String>
@@ -392,6 +409,7 @@ public sealed class WorkflowsTests
             </Group>
             <Group><UUID>{Uuid("archive")}</UUID><Name>archive</Name></Group>
             <Group><UUID>{Uuid("review")}</UUID><Name>review</Name><EnableAutoType>false</EnableAutoType>
+              <CustomData><Item><Key>BrowserOnlyHttpAuth</Key><Value>true</Value></Item></CustomData>
               <Entry><UUID>{Uuid("plain")}</UUID>
                 <String><Key>Title</Key><Value>plain</Value></String>
                 <String><Key>Password</Key><Value ProtectInMemory="True">p-1</Value></String>
@@ -458,7 +476,8 @@ public sealed class WorkflowsTests
             string.Join('\n', export.Descendants("Item")
                 .Select(item => $"{(string?)item.Element("Key")}={(string?)item.Element("Value")}")
                 .Where(item => item.StartsWith("KPXC_BROWSER_", StringComparison.Ordinal) || item.StartsWith("_CREATED_", StringComparison.Ordinal)
-                    || item.StartsWith("KeePassXC-Browser Settings", StringComparison.Ordinal) || item.StartsWith("BrowserHideEntry", StringComparison.Ordinal))
+                    || item.StartsWith("KeePassXC-Browser Settings", StringComparison.Ordinal) || item.StartsWith("BrowserHideEntry", StringComparison.Ordinal)
+                    || item.StartsWith("BrowserOnlyHttpAuth", StringComparison.Ordinal))
                 .Order(StringComparer.Ordinal));
     }
 }

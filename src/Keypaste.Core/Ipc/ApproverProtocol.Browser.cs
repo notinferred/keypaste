@@ -128,12 +128,19 @@ public static partial class ApproverProtocol
             || !TryBrowserField(root, "pairing", out var pairing)
             || !TryBrowserField(root, "identification_key", out var key)
             || !TryString(root, "url", out var url)
-            || (root.TryGetProperty("submit_url", out _) && !TryString(root, "submit_url", out _)))
+            || (root.TryGetProperty("submit_url", out _) && !TryString(root, "submit_url", out _))
+            || (root.TryGetProperty("person_asked", out var asked) && asked.ValueKind is not (JsonValueKind.True or JsonValueKind.False)))
         {
             return false;
         }
 
-        request = new BrowserFillRequest(pairing, key, url) { SubmitUrl = Optional(root, "submit_url"), Vault = vault, Session = session };
+        request = new BrowserFillRequest(pairing, key, url)
+        {
+            SubmitUrl = Optional(root, "submit_url"),
+            PersonAsked = asked.ValueKind == JsonValueKind.True,
+            Vault = vault,
+            Session = session,
+        };
         return true;
     }
 

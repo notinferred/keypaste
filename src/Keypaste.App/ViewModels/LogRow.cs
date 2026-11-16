@@ -186,6 +186,8 @@ internal sealed record LogRow
             {
                 "check" => "Checked its pairing",
                 "remove" => "Removed a pairing",
+                "fill" => entry.Granted ? "Filled a login" : "Asked to fill a login",
+                "unallow" => "Stopped always filling",
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
             },
             "vault_merge" => "Merged another program's save",

@@ -183,6 +183,25 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         Assert.Equal(2, browsers.Decided.Count);
     }
 
+    /// <summary>The relay attaches again before each of the extension's requests; the same build on the same connection keeps its pairing, another build does not.</summary>
+    [Fact]
+    public async Task Attaching_again_as_the_same_build_keeps_the_pairing_its_check_proved_and_as_another_build_does_not()
+    {
+        var browsers = new FakeBrowsers();
+        await using var owner = Owner.Start(this, browsers: browsers);
+        await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(link, "laptop");
+        var fill = new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" };
+
+        Assert.True((await link.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, Token))?.Attached);
+        var same = await link.FillAsync(fill, Token);
+        Assert.True((await link.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.EdgeAddOns.Caller }, Token))?.Attached);
+        var another = await link.FillAsync(fill, Token);
+
+        Assert.Equal(BrowserOutcome.Done, same?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, another?.Outcome);
+    }
+
     [Fact]
     public async Task A_check_that_fails_and_a_removed_pairing_each_leave_the_connection_bound_to_nothing()
     {

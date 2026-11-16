@@ -33,9 +33,25 @@ public sealed class LoginLookupTests
     [Theory]
     [InlineData("https://github.io/")]
     [InlineData("https://co.uk/")]
-    [InlineData("http://router/")]
+    [InlineData("https://com/")]
+    [InlineData("https://ck/")]
     public void A_public_suffix_has_no_registrable_domain_and_gets_no_logins(string page) =>
         Refused(page, LookupRefusal.PublicSuffix);
+
+    [Theory]
+    [InlineData("http://router/", "http://router", true)]
+    [InlineData("https://nas:5001/login", "nas:5001", true)]
+    [InlineData("https://nas/", "https://nas.example.com", false)]
+    [InlineData("https://nas.example.com/", "https://nas", false)]
+    [InlineData("https://nas/", "http://nas", false)]
+    [InlineData("https://nas:5001/", "https://nas", false)]
+    [InlineData("https://nas/", "https://router", false)]
+    public void A_single_label_host_matches_only_itself(string page, string item, bool matches) =>
+        Assert.Equal(matches, Lookup(page).Matches(item));
+
+    [Fact]
+    public void A_single_label_host_is_asked_about_every_time_whatever_its_scheme() =>
+        Assert.True(Lookup("https://nas/").AsksEveryTime);
 
     [Theory]
     [InlineData("https://192.168.1.10:8443/login", "https://192.168.1.10:8443")]

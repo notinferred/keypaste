@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+keypaste fills a login in the browser through its own extension: when you click the key icon in a sign-in field, keypaste asks you which matching login to fill, naming the site, and you can tick Always fill to skip the question on that exact site; a page that just loads asks you nothing. Settings › Browser fill lists the logins you always fill and removes them, `keypaste approve` asks the same question in its terminal, and every login filled is recorded in Activity ([8.3a2](docs/steps/8.3a2.md)).
+
 An agent's request for a value of an item tagged into a protected environment, such as `env:billing:prod`, is now asked every time with Deny or Allow once, whatever Agents allows or an Always allow kept, as a run of its set already is.
 
 Recommendations now lists an item whose KeePass expiry date is within Settings › Remind me before an item expires (off, 7, 14 or 30 days, 14 by default), and an item tagged `needs-update`, each with a button that opens in your browser the provider's page for a new key, a login's change-password page or the item's URL; keypaste makes no request and changes nothing at the provider.
