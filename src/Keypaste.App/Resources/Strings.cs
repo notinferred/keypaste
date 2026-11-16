@@ -223,6 +223,10 @@ public static class Strings
     public static string ExampleWebAddress => Manager.GetString("ExampleWebAddress", CultureInfo.CurrentUICulture)!;
     public static string ExitFullScreen => Manager.GetString("ExitFullScreen", CultureInfo.CurrentUICulture)!;
     public static string Expires => Manager.GetString("Expires", CultureInfo.CurrentUICulture)!;
+    public static string ExpiryReminderFourteenDays => Manager.GetString("ExpiryReminderFourteenDays", CultureInfo.CurrentUICulture)!;
+    public static string ExpiryReminderOff => Manager.GetString("ExpiryReminderOff", CultureInfo.CurrentUICulture)!;
+    public static string ExpiryReminderSevenDays => Manager.GetString("ExpiryReminderSevenDays", CultureInfo.CurrentUICulture)!;
+    public static string ExpiryReminderThirtyDays => Manager.GetString("ExpiryReminderThirtyDays", CultureInfo.CurrentUICulture)!;
     public static string Export => Manager.GetString("Export", CultureInfo.CurrentUICulture)!;
     public static string ExportAnEncryptedCopy => Manager.GetString("ExportAnEncryptedCopy", CultureInfo.CurrentUICulture)!;
     public static string ExportAnEncryptedCopyOfThisVault => Manager.GetString("ExportAnEncryptedCopyOfThisVault", CultureInfo.CurrentUICulture)!;
@@ -470,6 +474,8 @@ public static class Strings
     public static string Reference => Manager.GetString("Reference", CultureInfo.CurrentUICulture)!;
     public static string Refresh => Manager.GetString("Refresh", CultureInfo.CurrentUICulture)!;
     public static string Reload => Manager.GetString("Reload", CultureInfo.CurrentUICulture)!;
+    public static string RemindMeBeforeAnItemExpires => Manager.GetString("RemindMeBeforeAnItemExpires", CultureInfo.CurrentUICulture)!;
+    public static string RemindMeBeforeAnItemExpiresHelp => Manager.GetString("RemindMeBeforeAnItemExpiresHelp", CultureInfo.CurrentUICulture)!;
     public static string Remove => Manager.GetString("Remove", CultureInfo.CurrentUICulture)!;
     public static string RemoveAttachment => Manager.GetString("RemoveAttachment", CultureInfo.CurrentUICulture)!;
     public static string RemoveField => Manager.GetString("RemoveField", CultureInfo.CurrentUICulture)!;
@@ -490,6 +496,7 @@ public static class Strings
     public static string RenameOrMoveLabel => Manager.GetString("RenameOrMoveLabel", CultureInfo.CurrentUICulture)!;
     public static string Replace => Manager.GetString("Replace", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAWeakOrReusedPasswordOnX22ee0c => Manager.GetString("ReplaceAWeakOrReusedPasswordOnX22ee0c", CultureInfo.CurrentUICulture)!;
+    public static string ReplaceAnItemBeforeItExpires => Manager.GetString("ReplaceAnItemBeforeItExpires", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAttachmentLabel => Manager.GetString("ReplaceAttachmentLabel", CultureInfo.CurrentUICulture)!;
     public static string ReplaceTheOneTimeCode => Manager.GetString("ReplaceTheOneTimeCode", CultureInfo.CurrentUICulture)!;
     public static string ReplaceTheOtherKeypaste => Manager.GetString("ReplaceTheOtherKeypaste", CultureInfo.CurrentUICulture)!;

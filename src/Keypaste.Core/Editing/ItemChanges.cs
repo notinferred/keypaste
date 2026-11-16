@@ -3,7 +3,7 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.Core.Editing;
 
-/// <summary>What an agent's change to an item would do, decided before the person is asked (THREATS.md T-57).</summary>
+/// <summary>What an agent's change to an item would do, decided before the person is asked or an unasked change is made (THREATS.md T-57).</summary>
 public sealed record ItemChangeCheck
 {
     /// <summary>Why it cannot be made, in keypaste's words, or null.</summary>
@@ -17,8 +17,9 @@ public sealed record ItemChangeCheck
 }
 
 /// <summary>
-/// Makes a change an agent asked for and the person allowed: moving an item to Trash, setting KeePass's expiry, adding the
-/// <see cref="ItemChangeRules.NeedsUpdateTag"/> tag, or deleting for good an item the same agent's approved save created.
+/// Makes a change an agent asked for: moving an item to Trash, setting KeePass's expiry or deleting for good an item the same
+/// agent's approved save created, each once the person allowed it, or adding or removing the
+/// <see cref="ItemChangeRules.NeedsUpdateTag"/> tag, which nobody is asked about.
 /// </summary>
 /// <remarks>Nothing here saves the vault or reads a value it holds; the caller saves under its claim.</remarks>
 public static class ItemChanges
@@ -52,6 +53,9 @@ public static class ItemChanges
             case ItemChangeKind.MarkNeedsUpdate when vault.Tags(item)?.Contains(ItemChangeRules.NeedsUpdateTag, StringComparer.Ordinal) == true:
                 return new ItemChangeCheck { Refusal = $"the item is already tagged {ItemChangeRules.NeedsUpdateTag}" };
 
+            case ItemChangeKind.ClearNeedsUpdate when vault.Tags(item)?.Contains(ItemChangeRules.NeedsUpdateTag, StringComparer.Ordinal) != true:
+                return new ItemChangeCheck { Refusal = $"the item is not tagged {ItemChangeRules.NeedsUpdateTag}" };
+
             case ItemChangeKind.Delete:
                 if (!AgentNames.IsNamed(agent) || !string.Equals(vault.AgentThatCreated(item), agent, StringComparison.Ordinal))
                 {
@@ -65,11 +69,11 @@ public static class ItemChanges
         return new ItemChangeCheck { Item = item };
     }
 
-    /// <summary>Makes the change, checking first that the item is still the one, by UUID and name, a person was shown. Does not save the vault.</summary>
+    /// <summary>Makes the change, checking first that the item is still the one, by UUID and name, that was checked. Does not save the vault.</summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="change">The change.</param>
     /// <param name="agent">The asking bridge's raw label, or null.</param>
-    /// <param name="shown">The check the person saw.</param>
+    /// <param name="shown">The check the person saw, or that an unasked change made.</param>
     /// <param name="now">The time, which an expiry given no day takes.</param>
     /// <param name="zone">The zone an expiry's day starts in.</param>
     /// <returns>Null once the vault holds the change, otherwise why nothing was changed.</returns>
@@ -98,6 +102,7 @@ public static class ItemChanges
             ItemChangeKind.MoveToTrash => vault.RemoveEntry(item) == DeletionOutcome.Recycled,
             ItemChangeKind.MarkExpired => vault.SetExpiry(item, change.Expires is { } day ? StartOf(day, zone) : now),
             ItemChangeKind.MarkNeedsUpdate => vault.AddTag(item, ItemChangeRules.NeedsUpdateTag),
+            ItemChangeKind.ClearNeedsUpdate => vault.RemoveTags(item, [ItemChangeRules.NeedsUpdateTag]),
             ItemChangeKind.Delete => vault.DeleteForGood(item),
             _ => false,
         };

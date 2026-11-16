@@ -9,8 +9,8 @@ using ModelContextProtocol.Server;
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
-/// The tool an agent uses to ask the person to allow one change to an item it can see: moving it to Trash, marking it expired,
-/// marking it as needing an update, or deleting for good an item it created through an approved save (THREATS.md T-57).
+/// The tool an agent uses to change an item it can see: asking the person to allow moving it to Trash, marking it expired or
+/// deleting for good an item it created through an approved save, or adding or removing the needs-update tag unasked (THREATS.md T-57).
 /// </summary>
 /// <remarks>
 /// No value crosses this file in either direction: the request names an item, a change and a reason, and the reply says whether
@@ -28,7 +28,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
     public override Tool ProtocolTool { get; } = new()
     {
         Name = ToolText.ItemChangeToolName,
-        Title = "Ask the user to change an item",
+        Title = "Change an item, asking the user where it must",
         Description = ToolText.ItemChangeDescription,
         InputSchema = ToolSchemas.ItemChangeInput,
         Annotations = new ToolAnnotations
@@ -121,7 +121,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
 
         if (reply is { Recorded: false })
         {
-            return new Verdict(AuditDecision.Denied, AuditMethod.Failed, McpAudit.Unrecorded, ToolText.AuditUnavailable, Session: reply.Session);
+            return new Verdict(AuditDecision.Denied, AuditMethod.Failed, McpAudit.Unrecorded, ToolText.ItemChangeUnrecorded, Session: reply.Session);
         }
 
         if (reply is null)

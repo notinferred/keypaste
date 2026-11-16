@@ -95,7 +95,7 @@ public sealed class AppCommandsTests : IDisposable
 
         var item = commands.Menus.Single(group => group.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Recommendations").Entries();
         Assert.Equal(
-            ["Move to a field", "Restore tag", "Open item", "Dismiss", "Review again", "Select all", "Move selected"],
+            ["Move to a field", "Restore tag", "Open item", "Open URL", "Dismiss", "Review again", "Select all", "Move selected"],
             item.OfType<AppCommand>().Select(command => command.Header));
     }
 

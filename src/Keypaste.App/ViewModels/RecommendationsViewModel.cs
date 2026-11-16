@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recommendations;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.App.ViewModels;
 
@@ -13,7 +14,7 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Rows">Each item with it.</param>
 internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyList<PasswordRow> Rows);
 
-/// <summary>Items › Recommendations: keys left in notes (C.2, D-0372), project tags another app dropped (V.11) and weak, reused or expired passwords (V.9), for review.</summary>
+/// <summary>Items › Recommendations: keys left in notes (C.2), project tags another app dropped (V.11), weak, reused or expired passwords (V.9), and items expiring soon or marked as needing an update, for review.</summary>
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is
@@ -37,6 +38,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private readonly AppVaultSession _session;
     private readonly Action<EntryName>? _open;
     private readonly Action<Action>? _post;
+    private readonly DesktopPreferences? _preferences;
+    private readonly IWebLauncher? _web;
     private readonly string _dismissalsPath;
     private readonly bool _dismissalsReadable;
     private readonly NoteKeyCheck _check = new();
@@ -45,6 +48,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
     private IReadOnlyList<LostProjectTag> _lost = [];
     private IReadOnlyList<PasswordFinding> _weakReusedExpired = [];
+    private IReadOnlyList<ItemReminder> _reminders = [];
+    private int _expiryDays;
     private SameNameTells? _tells;
     private bool _disposed;
     private int _generation;
@@ -53,18 +58,34 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <param name="home">The keypaste home dismissals are kept in.</param>
     /// <param name="open">Shows an item in Items.</param>
     /// <param name="post">Runs an action on the UI thread; null shows a check's findings on the context that asked for it, or, with none, checks on the asking thread.</param>
-    internal RecommendationsViewModel(AppVaultSession session, string? home, Action<EntryName>? open = null, Action<Action>? post = null)
+    /// <param name="preferences">Where the days to remind before an expiry are set; null reminds at <see cref="AppSettings.DefaultExpiryReminderDays"/>.</param>
+    /// <param name="web">Opens a reminder's page in the browser.</param>
+    internal RecommendationsViewModel(
+        AppVaultSession session,
+        string? home,
+        Action<EntryName>? open = null,
+        Action<Action>? post = null,
+        DesktopPreferences? preferences = null,
+        IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         _open = open;
         _post = post;
+        _preferences = preferences;
+        _web = web;
+        _expiryDays = ExpiryDays;
         _dismissalsPath = KeypasteHome.RecommendationsPath(home);
         _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out var dismissals);
         _dismissals = [.. dismissals];
 
         MoveSelectedCommand = new RelayCommand(() => Move([.. Rows.Where(row => row.IsSelected && !row.IsDismissed)]));
+
+        if (_preferences is not null)
+        {
+            _preferences.Changed += OnPreferencesChanged;
+        }
 
         Check();
     }
@@ -92,6 +113,22 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             .OrderBy(group => group.Key)
             .Select(group => new PasswordGroup(PasswordRow.Heading(group.Key), PasswordRow.Reason(group.Key), [.. group])),
     ];
+
+    /// <summary>Every item expiring soon or marked as needing an update: those needing review first, then those dismissed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasReminders), nameof(Line), nameof(ReminderGroups))]
+    internal partial IReadOnlyList<ReminderRow> Reminders { get; private set; } = [];
+
+    /// <summary>The reminders by reason, in the order the reasons are declared.</summary>
+    internal IReadOnlyList<ReminderGroup> ReminderGroups =>
+    [
+        .. Reminders
+            .GroupBy(row => row.Finding.Reason)
+            .OrderBy(group => group.Key)
+            .Select(group => new ReminderGroup(ReminderRow.Heading(group.Key), ReminderRow.Reason(group.Key, _expiryDays), [.. group])),
+    ];
+
+    internal bool HasReminders => Reminders.Count > 0;
 
     /// <summary>Sync tools' conflicted copies beside the vault, each to review and merge.</summary>
     [ObservableProperty]
@@ -187,7 +224,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         get
         {
-            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + (HasFragileKeyFile ? 1 : 0) + ConflictedCopies.Count - NeedsReview;
+            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + Reminders.Count + (HasFragileKeyFile ? 1 : 0) + ConflictedCopies.Count - NeedsReview;
 
             return NeedsReview > 0
                 ? string.Create(CultureInfo.InvariantCulture, $"Recommendations: {NeedsReview} to review")
@@ -198,9 +235,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>
         Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed)
-        + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0) + ConflictedCopies.Count;
+        + Reminders.Count(row => !row.IsDismissed) + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0) + ConflictedCopies.Count;
 
-    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && !HasFragileKeyFile && ConflictedCopies.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && Reminders.Count == 0 && !HasFragileKeyFile && ConflictedCopies.Count == 0;
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
@@ -223,16 +260,18 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <summary>The latest check, complete once its findings are shown, or handed to the UI thread, or dropped.</summary>
     internal Task Checking { get; private set; } = Task.CompletedTask;
 
-    /// <summary>Checks the open vault's notes, tags and passwords again, off the UI thread.</summary>
+    /// <summary>Checks the open vault's notes, tags, passwords and expiries again, off the UI thread.</summary>
     internal void Check()
     {
         var generation = ++_generation;
+        _expiryDays = ExpiryDays;
 
         if (_disposed || _session.Unlocked is not { } vault)
         {
             _noteKeys = [];
             _lost = [];
             _weakReusedExpired = [];
+            _reminders = [];
             _tells = null;
             Show();
             Checking = Task.CompletedTask;
@@ -242,18 +281,18 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         // With no UI thread to come back to, a finished scan would be shown on a pool thread while its owner goes on.
         if (_post is null && SynchronizationContext.Current is null)
         {
-            Show(generation, vault, Task.FromResult(Scan(_check, vault, _session.Clock.GetUtcNow())));
+            Show(generation, vault, Task.FromResult(Scan(_check, vault, _session.Clock.GetUtcNow(), _expiryDays)));
             Checking = Task.CompletedTask;
             return;
         }
 
-        Checking = CheckAsync(generation, vault, _session.Clock.GetUtcNow());
+        Checking = CheckAsync(generation, vault, _session.Clock.GetUtcNow(), _expiryDays);
     }
 
-    private async Task CheckAsync(int generation, Vault vault, DateTimeOffset now)
+    private async Task CheckAsync(int generation, Vault vault, DateTimeOffset now, int expiryDays)
     {
         var check = _check;
-        var scan = Task.Run(() => Scan(check, vault, now));
+        var scan = Task.Run(() => Scan(check, vault, now, expiryDays));
         await ((Task)scan).ConfigureAwait(_post is null
             ? ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing
             : ConfigureAwaitOptions.SuppressThrowing);
@@ -269,11 +308,16 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     }
 
     /// <summary>Every finding, or null when a lock disposed the vault, or <see cref="Dispose"/> the check, mid-scan.</summary>
-    private static Findings? Scan(NoteKeyCheck check, Vault vault, DateTimeOffset now)
+    private static Findings? Scan(NoteKeyCheck check, Vault vault, DateTimeOffset now, int expiryDays)
     {
         try
         {
-            return new Findings(check.Scan(vault), LostProjectTagCheck.Scan(vault), PasswordHealthCheck.Scan(vault, now), SameNameTells.Of(vault.ReadEntries()));
+            return new Findings(
+                check.Scan(vault),
+                LostProjectTagCheck.Scan(vault),
+                PasswordHealthCheck.Scan(vault, now),
+                ItemReminderCheck.Scan(vault, now, expiryDays),
+                SameNameTells.Of(vault.ReadEntries()));
         }
         catch (ObjectDisposedException)
         {
@@ -298,6 +342,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _noteKeys = found.NoteKeys;
         _lost = found.Lost;
         _weakReusedExpired = found.Passwords;
+        _reminders = found.Reminders;
         _tells = found.Tells;
         Show();
     }
@@ -310,6 +355,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             Rows = [];
             LostTags = [];
             Passwords = [];
+            Reminders = [];
             FragileKeyFile = null;
             ConflictedCopies = [];
             return;
@@ -338,6 +384,11 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
             .ThenBy(row => row.Finding.Problem)];
+        Reminders = [.. _reminders
+            .Select(finding => new ReminderRow(this, finding, IsDismissed(vaultKey, finding)))
+            .OrderBy(row => row.IsDismissed)
+            .ThenBy(row => row.Finding.When ?? DateTimeOffset.MaxValue)
+            .ThenBy(row => row.Entry, StringComparer.Ordinal)];
     }
 
     /// <summary>Shows what putting a lost tag back does, before it is written (D-0415).</summary>
@@ -415,7 +466,30 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     }
 
     /// <summary>Shows the item a password finding names in Items, found again by its UUID so a rename since the check still finds it.</summary>
-    internal void Open(PasswordRow row)
+    internal void Open(PasswordRow row) => Open(row.Finding.EntryUuid, row.Entry);
+
+    /// <summary>Shows the item a reminder names in Items, found again by its UUID.</summary>
+    internal void Open(ReminderRow row) => Open(row.Finding.EntryUuid, row.Entry);
+
+    /// <summary>Opens a reminder's page in the browser, which makes the only request; nothing changes at the provider or in the vault.</summary>
+    internal async Task OpenPageAsync(ReminderRow row)
+    {
+        if (row.Finding.Page is not { } page)
+        {
+            return;
+        }
+
+        Message = string.Empty;
+
+#pragma warning disable RS0030 // The reminder's page, which the person asked to open.
+        if (_web is null || !await _web.OpenAsync(page.Address).ConfigureAwait(true))
+#pragma warning restore RS0030
+        {
+            Message = $"Your system didn't open {row.PageAddress}. Copy it and paste it into your browser.";
+        }
+    }
+
+    private void Open(string entryUuid, string shown)
     {
         if (_session.Unlocked is not { } vault)
         {
@@ -423,9 +497,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             return;
         }
 
-        if (vault.EntryNameOf(row.Finding.EntryUuid) is not { } name)
+        if (vault.EntryNameOf(entryUuid) is not { } name)
         {
-            Message = $"{row.Entry} is no longer in this vault. Check the list, then try again.";
+            Message = $"{shown} is no longer in this vault. Check the list, then try again.";
             return;
         }
 
@@ -460,6 +534,12 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     internal void ReviewAgain(PasswordRow row) =>
         ReviewAgain(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.Password, row.Finding.Key));
 
+    internal void Dismiss(ReminderRow row) =>
+        Dismiss(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.Reminder, row.Finding.Key));
+
+    internal void ReviewAgain(ReminderRow row) =>
+        ReviewAgain(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.Reminder, row.Finding.Key));
+
     public void Dispose()
     {
         if (_disposed)
@@ -469,9 +549,16 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
         _disposed = true;
         _generation++;
+
+        if (_preferences is not null)
+        {
+            _preferences.Changed -= OnPreferencesChanged;
+        }
+
         Rows = [];
         LostTags = [];
         Passwords = [];
+        Reminders = [];
         _check.Dispose();
     }
 
@@ -526,6 +613,19 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private bool IsDismissed(string vaultKey, PasswordFinding finding) =>
         _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Password, finding.Key));
 
+    private bool IsDismissed(string vaultKey, ItemReminder finding) =>
+        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Reminder, finding.Key));
+
+    private int ExpiryDays => _preferences?.Current.ExpiryReminderDays ?? AppSettings.DefaultExpiryReminderDays;
+
+    private void OnPreferencesChanged(object? sender, EventArgs e)
+    {
+        if (ExpiryDays != _expiryDays)
+        {
+            Check();
+        }
+    }
+
     private string VaultKey() => _session.Identity?.Key ?? string.Empty;
 
     private string Moved(int keys, IReadOnlyList<EntryName> entries)
@@ -558,5 +658,10 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     internal static string Shown(EntryName entry) =>
         EntryNameSanitizer.SanitizePath(entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title).Text;
 
-    private sealed record Findings(IReadOnlyList<NoteKeyFinding> NoteKeys, IReadOnlyList<LostProjectTag> Lost, IReadOnlyList<PasswordFinding> Passwords, SameNameTells Tells);
+    private sealed record Findings(
+        IReadOnlyList<NoteKeyFinding> NoteKeys,
+        IReadOnlyList<LostProjectTag> Lost,
+        IReadOnlyList<PasswordFinding> Passwords,
+        IReadOnlyList<ItemReminder> Reminders,
+        SameNameTells Tells);
 }

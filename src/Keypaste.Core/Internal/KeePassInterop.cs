@@ -13,6 +13,7 @@ using KeePass::KeePassLib.Security;
 using KeePass::KeePassLib.Serialization;
 using KeePass::KeePassLib.Utility;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Approval;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Recommendations;
@@ -1913,6 +1914,16 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
+    /// <summary>Every live entry's expiry, URL, kind and needs-update tag outside keypaste's own groups, by the traversal <see cref="Collect"/> uses; no secret is read.</summary>
+    internal IReadOnlyList<EntryReminderFacts> ReadReminderFacts()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<EntryReminderFacts> found = [];
+        CollectReminderFacts(_database.RootGroup, string.Empty, found, Bin());
+        return found;
+    }
+
     /// <summary>Every live entry carrying a tag of its own, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<EntryTags> ReadTags()
     {
@@ -3612,6 +3623,54 @@ internal sealed class KeePassInterop : IDisposable
                 CollectPasswordHealth(child, childPath, found, bin, key);
             }
         }
+    }
+
+    private static void CollectReminderFacts(PwGroup group, string groupPath, List<EntryReminderFacts> found, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            var needsUpdate = entry.HasTag(ItemChangeRules.NeedsUpdateTag);
+
+            found.Add(new EntryReminderFacts(
+                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() },
+                entry.Uuid.ToHexString(),
+                ReadField(entry, PwDefs.UrlField),
+                KindOf(entry),
+                entry.Expires ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true)) : null,
+                !entry.QualityCheck || entry.CustomData.Get(_excludedFromReports) == "true",
+                needsUpdate,
+                needsUpdate ? TaggedSince(entry, ItemChangeRules.NeedsUpdateTag) : null));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            var childPath = ChildPath(groupPath, child.Name);
+
+            if (!ReferenceEquals(child, bin) && !ReservedGroups.IsReserved(childPath))
+            {
+                CollectReminderFacts(child, childPath, found, bin);
+            }
+        }
+    }
+
+    /// <summary>When the version that added <paramref name="tag"/> to the entry was saved, or null when every version its history keeps carries it.</summary>
+    private static DateTimeOffset? TaggedSince(PwEntry entry, string tag)
+    {
+        var since = entry.LastModificationTime;
+
+        foreach (var position in HistoryNewestFirst(entry))
+        {
+            var version = entry.History.GetAt(position);
+
+            if (!version.HasTag(tag))
+            {
+                return new DateTimeOffset(TimeUtil.ToUtc(since, true));
+            }
+
+            since = version.LastModificationTime;
+        }
+
+        return null;
     }
 
     /// <summary>KeePass's estimate of a password and its HMAC under <paramref name="key"/>, or nulls when it is empty or holds a placeholder; one longer than <see cref="_longestRated"/> has a digest and no estimate.</summary>

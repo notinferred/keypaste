@@ -90,7 +90,7 @@ Agents › Activity shows `~/.keypaste/audit.jsonl` as a table, newest first, fi
 
 ### Recommendations
 
-Items › Recommendations lists, never by value, keys left in notes (`KEY=value` lines, and lines that are exactly a GitHub, GitLab, Stripe, Anthropic, OpenAI, AWS, Slack or npm token), a project tag a later save dropped along with other changes, and a sync tool's conflicted copy to review and merge. Move to a field writes each value to a protected field and removes that line in one revision, refusing, with nothing written, when the notes or the field changed. Restore tag names what it reaches first. Dismiss hides a finding on this machine.
+Items › Recommendations lists, never by value, keys left in notes (`KEY=value` lines, and lines that are exactly a GitHub, GitLab, Stripe, Anthropic, OpenAI, AWS, Slack or npm token), a project tag a later save dropped along with other changes, weak, reused and expired passwords, an item expiring within Settings › Remind me before an item expires (14 days by default) or tagged `needs-update`, a key file keyed by its exact bytes, and a sync tool's conflicted copy to review and merge. An expiring or `needs-update` item's row opens, in the browser and only when pressed, the provider's page for a new key on the few hosts keypaste knows, a login's `/.well-known/change-password`, or its URL; keypaste changes nothing at the provider. Move to a field writes each value to a protected field and removes that line in one revision, refusing, with nothing written, when the notes or the field changed. Restore tag names what it reaches first. Dismiss hides a finding on this machine.
 
 ### Copying
 

@@ -395,7 +395,7 @@ public sealed class ServerToolsTests
         Assert.Equal(2, harness.Approver.SavesReceived.Count);
     }
 
-    /// <summary>request_item_change says whether the person allowed the change, and the bridge refuses a malformed call or a path it cannot see whole unasked (T-57).</summary>
+    /// <summary>request_item_change says whether the change was made, in plain words for the unasked tag, and the bridge refuses a malformed call or a path it cannot see whole unasked (T-57).</summary>
     [Fact]
     public async Task An_item_change_says_whether_it_was_made_and_a_path_out_of_view_never_reaches_the_owner()
     {
@@ -406,7 +406,13 @@ public sealed class ServerToolsTests
 
         var changed = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "move_to_recycle_bin", ["reason"] = "the key was revoked" });
         harness.Approver.ChangeAnswer = new ItemChangeReply(AuditDecision.Denied, AuditMethod.Prompt, "a person did not allow the change");
-        var denied = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "mark_needs_update", ["reason"] = "rotate it" });
+        var denied = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "mark_expired", ["reason"] = "rotate it" });
+        harness.Approver.ChangeAnswer = new ItemChangeReply(AuditDecision.Granted, AuditMethod.Allowed, "unasked") { Item = "env/dev/stripe" };
+        var tagged = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "mark_needs_update", ["reason"] = "rotate it" });
+        var untagged = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "clear_needs_update", ["reason"] = "rotated" });
+        harness.Approver.ChangeAnswer = new ItemChangeReply(AuditDecision.Denied, AuditMethod.Failed, "the audit log could not be written, so nothing was changed");
+        harness.Approver.Records = false;
+        var unrecorded = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "mark_needs_update", ["reason"] = "rotate it" });
         var malformed = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "rename", ["reason"] = "x" });
         var dated = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "delete", ["expires"] = "2026-12-01", ["reason"] = "x" });
         var outside = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "personal/bank", ["change"] = "delete", ["reason"] = "x" });
@@ -416,11 +422,16 @@ public sealed class ServerToolsTests
         Assert.Contains("env/dev/stripe", TextOf(changed), StringComparison.Ordinal);
         Assert.True(denied.IsError);
         Assert.Contains("NOT CHANGED", TextOf(denied), StringComparison.Ordinal);
+        Assert.False(tagged.IsError, TextOf(tagged));
+        Assert.Equal("Done: env/dev/stripe now has the needs-update tag. The person sees this change in keypaste and in its log.", TextOf(tagged));
+        Assert.Equal("Done: env/dev/stripe no longer has the needs-update tag. The person sees this change in keypaste and in its log.", TextOf(untagged));
+        Assert.True(unrecorded.IsError);
+        Assert.Contains("nothing was changed", TextOf(unrecorded), StringComparison.Ordinal);
         Assert.True(malformed.IsError);
         Assert.True(dated.IsError);
         Assert.True(outside.IsError);
-        Assert.Equal(["move_to_recycle_bin", "mark_needs_update"], harness.Approver.ChangesReceived.Select(change => change.Change));
-        Assert.Equal(3, harness.AuditLines().Length);
+        Assert.Equal(["move_to_recycle_bin", "mark_expired", "mark_needs_update", "clear_needs_update", "mark_needs_update"], harness.Approver.ChangesReceived.Select(change => change.Change));
+        Assert.Equal(4, harness.AuditLines().Length);
     }
 
     [Fact]

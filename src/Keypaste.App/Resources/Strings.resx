@@ -160,6 +160,10 @@
   <data name="Environments" xml:space="preserve"><value>Environments</value></data>
   <data name="EverythingRunInThatTerminalCanReadX8c42c2" xml:space="preserve"><value>Everything run in that terminal can read these values.</value></data>
   <data name="Expires" xml:space="preserve"><value>Expires</value></data>
+  <data name="ExpiryReminderFourteenDays" xml:space="preserve"><value>14 days</value></data>
+  <data name="ExpiryReminderOff" xml:space="preserve"><value>Off</value></data>
+  <data name="ExpiryReminderSevenDays" xml:space="preserve"><value>7 days</value></data>
+  <data name="ExpiryReminderThirtyDays" xml:space="preserve"><value>30 days</value></data>
   <data name="Export" xml:space="preserve"><value>Export</value></data>
   <data name="ExportAnEncryptedCopy" xml:space="preserve"><value>Export an encrypted copy…</value></data>
   <data name="ExportAnEncryptedCopyOfThisVault" xml:space="preserve"><value>Export an encrypted copy of this vault</value></data>
@@ -231,7 +235,7 @@
   <data name="KeypasteRemembersThePathsOfVaultsYouXb13291" xml:space="preserve"><value>keypaste remembers the paths of vaults you have opened on this machine, where the key file each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material.</value></data>
   <data name="KeypasteWasAskedToOpenThisFileX50ed11" xml:space="preserve"><value>keypaste was asked to open this file. Nothing changes unless you say so.</value></data>
   <data name="KeysLeftInNotes" xml:space="preserve"><value>Keys left in notes</value></data>
-  <data name="KeysLeftInNotesPasswordsThatAreXc4a5b0" xml:space="preserve"><value>Keys left in notes, passwords that are weak, reused or past their expiry date, and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose.</value></data>
+  <data name="KeysLeftInNotesPasswordsThatAreXc4a5b0" xml:space="preserve"><value>Keys left in notes, passwords that are weak, reused or past their expiry date, items about to expire or marked as needing an update, and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose.</value></data>
   <data name="KindOfItem" xml:space="preserve"><value>Kind of item</value></data>
   <data name="LastUsed" xml:space="preserve"><value>Last used</value></data>
   <data name="LastUsedValue" xml:space="preserve"><value>Last used {0}</value></data>
@@ -305,7 +309,7 @@
   <data name="NoActivityYet" xml:space="preserve"><value>No activity yet</value></data>
   <data name="NoBrowserIsPairedWithThisVault" xml:space="preserve"><value>No browser is paired with this vault.</value></data>
   <data name="NoKeyFile" xml:space="preserve"><value>No key file</value></data>
-  <data name="NoKeysFoundInNotesNoWeakX50d3ee" xml:space="preserve"><value>No keys found in notes, no weak, reused or expired passwords, and no project tags dropped.</value></data>
+  <data name="NoKeysFoundInNotesNoWeakX50d3ee" xml:space="preserve"><value>No keys found in notes, no weak, reused or expired passwords, no items about to expire or needing an update, and no project tags dropped.</value></data>
   <data name="NoKeysYetAddTheFirstOneX0cbcf7" xml:space="preserve"><value>No keys yet. Add the first one to {0}.</value></data>
   <data name="NoLinksYetChooseShareInAnX8aa94b" xml:space="preserve"><value>No links yet. Choose Share… in an item's ⋯ menu to make one; it appears here with its limits, and Check status asks how many views it has left.</value></data>
   <data name="NoProjectsYet" xml:space="preserve"><value>No projects yet</value></data>
@@ -368,6 +372,9 @@
   <data name="RenameGroup" xml:space="preserve"><value>Rename group</value></data>
   <data name="RenameOrMove" xml:space="preserve"><value>Rename or move</value></data>
   <data name="Replace" xml:space="preserve"><value>Replace</value></data>
+  <data name="RemindMeBeforeAnItemExpires" xml:space="preserve"><value>Remind me before an item expires</value></data>
+  <data name="RemindMeBeforeAnItemExpiresHelp" xml:space="preserve"><value>Recommendations lists an item whose expiry date is this close, with a link to where you make a new one. keypaste changes nothing at the provider.</value></data>
+  <data name="ReplaceAnItemBeforeItExpires" xml:space="preserve"><value>Make a new key or password at the provider, then replace it on its item in Items. keypaste changes nothing at the provider and opens its page only when you ask.</value></data>
   <data name="ReplaceAWeakOrReusedPasswordOnX22ee0c" xml:space="preserve"><value>Replace a weak or reused password on its item in Items; a generated one is strong and used nowhere else. An expiry date is changed in KeePassXC or the app that set it.</value></data>
   <data name="ReplaceTheOtherKeypaste" xml:space="preserve"><value>Replace the other keypaste</value></data>
   <data name="ReplaceTheValue" xml:space="preserve"><value>Replace the value</value></data>

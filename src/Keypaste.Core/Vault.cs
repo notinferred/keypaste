@@ -3447,6 +3447,17 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Every live entry's expiry, URL, kind and needs-update tag outside keypaste's own groups, for <see cref="ItemReminderCheck"/>.</summary>
+    internal IReadOnlyList<EntryReminderFacts> ReadReminderFacts()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_state)
+        {
+            return _interop.ReadReminderFacts();
+        }
+    }
+
     /// <summary>What one entry's move writes, or null with its refusals added.</summary>
     private (List<FieldWrite> Writes, string Notes)? PlanNoteMove(
         NoteKeyCheck check,

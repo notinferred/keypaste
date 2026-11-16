@@ -179,6 +179,30 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Expiry_reminders_are_14_days_until_chosen_0_turns_them_off_and_a_year_is_the_longest()
+    {
+        Assert.Equal(AppSettings.DefaultExpiryReminderDays, AppSettings.Load(SettingsFile).ExpiryReminderDays);
+
+        foreach (var (written, kept) in new[] { (7, 7), (0, 0), (30, 30), (1000, AppSettings.MaximumExpiryReminderDays) })
+        {
+            File.WriteAllText(SettingsFile, $"[[settings]]\ntheme = \"dark\"\n\n[[recommendations]]\nexpiry_reminder_days = {written}\nnote = \"kept\"\n");
+
+            Assert.Equal(kept, AppSettings.Load(SettingsFile).ExpiryReminderDays);
+        }
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { ExpiryReminderDays = 7 }));
+        var text = File.ReadAllText(SettingsFile);
+        Assert.Equal(7, AppSettings.Load(SettingsFile).ExpiryReminderDays);
+        Assert.Equal(AppTheme.Dark, AppSettings.Load(SettingsFile).Theme);
+        Assert.Contains("note = \"kept\"", text, StringComparison.Ordinal);
+        Assert.Single(text.Split('\n'), line => line == "[[recommendations]]");
+
+        File.Delete(SettingsFile);
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default));
+        Assert.DoesNotContain("[[recommendations]]", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_file_it_writes_contains_no_true_or_false()
     {
         AppSettings.Save(SettingsFile, AppSettings.Default with { LockWhenMinimized = true });

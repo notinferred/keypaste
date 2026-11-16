@@ -152,7 +152,10 @@ public enum AuditMethod
     /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/>; keypaste approved nothing about what the command does (T-35).</remarks>
     AutomaticCommands = 32,
 
-    /// <summary>Released without asking because the field's category is Allow for every agent: a URL, a username shown, or a rule the person confirmed.</summary>
+    /// <summary>
+    /// Released without asking because the field's category is Allow for every agent: a URL, a username shown, or a rule the person
+    /// confirmed; or an item's needs-update tag added or removed, which every agent may do without asking.
+    /// </summary>
     /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/>.</remarks>
     Allowed = 33,
 

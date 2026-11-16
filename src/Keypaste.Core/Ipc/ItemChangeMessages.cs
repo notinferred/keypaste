@@ -3,8 +3,8 @@ using Keypaste.Core.Audit;
 namespace Keypaste.Core.Ipc;
 
 /// <summary>
-/// An agent's request that the person allow one change to an item it may see: moving it to Trash, marking it expired,
-/// marking it as needing an update, or deleting for good an item the same agent created through a save the person approved.
+/// An agent's request to change an item it may see: that the person allow moving it to Trash, marking it expired or deleting
+/// for good an item the same agent created through a save the person approved, or adding or removing the needs-update tag unasked.
 /// </summary>
 public sealed record ItemChangeRequest
 {

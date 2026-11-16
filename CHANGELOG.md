@@ -4,7 +4,9 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
-An agent can ask with `request_item_change` to move an item it sees whole to Trash, mark it expired with KeePass's own expiry date, tag it `needs-update`, or delete for good an item it created itself through a `request_save` you approved; each change is asked every time in the app or at `keypaste approve`, Deny or Allow, and made only once you allow it.
+Recommendations now lists an item whose KeePass expiry date is within Settings › Remind me before an item expires (off, 7, 14 or 30 days, 14 by default), and an item tagged `needs-update`, each with a button that opens in your browser the provider's page for a new key, a login's change-password page or the item's URL; keypaste makes no request and changes nothing at the provider.
+
+An agent can ask with `request_item_change` to move an item it sees whole to Trash, mark it expired with KeePass's own expiry date, or delete for good an item it created itself through a `request_save` you approved; each is asked every time in the app or at `keypaste approve`, Deny or Allow, and made only once you allow it. It can add or remove the item's `needs-update` tag without asking. Every change is recorded in the agent log before the vault is saved, and one that cannot be recorded is not made.
 
 The app and `keypaste approve` fold an agent's lookups older than 30 days into one audit line per agent per day and remove whole days older than Settings › Keep the agent log for (a year by default, never under 30 days), sealing what stays with the vault's checkpoint key; every other line keeps its bytes, and `keypaste log verify` checks the seal.
 

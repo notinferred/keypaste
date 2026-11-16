@@ -269,8 +269,8 @@ internal static class ToolSchemas
             },
             "change": {
               "type": "string",
-              "enum": ["move_to_recycle_bin", "mark_expired", "mark_needs_update", "delete"],
-              "description": "move_to_recycle_bin, mark_expired, mark_needs_update, or delete for an item you created through request_save."
+              "enum": ["move_to_recycle_bin", "mark_expired", "mark_needs_update", "clear_needs_update", "delete"],
+              "description": "move_to_recycle_bin, mark_expired, or delete for an item you created through request_save, each asked; mark_needs_update or clear_needs_update, made without asking."
             },
             "expires": {
               "type": "string",
@@ -281,7 +281,7 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 2000,
-              "description": "Shown verbatim to the human, who allows or denies the change. Say why this item needs it."
+              "description": "Shown verbatim to the human, who allows or denies an asked change, and recorded with every change. Say why this item needs it."
             }
           },
           "required": ["entry", "change", "reason"],

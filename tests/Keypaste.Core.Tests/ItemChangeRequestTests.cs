@@ -10,8 +10,9 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An agent's change to an item (THREATS.md T-57), on a real vault through the owner's own authority and log, only the person
-/// faked: each change is made only once the person allows it, is refused unasked outside what the agent sees whole, and a delete
-/// for good reaches only an item the same agent created through a save the person approved.
+/// faked: each asked change is made only once the person allows it, the needs-update tag is added or removed unasked, every change
+/// is refused unasked outside what the agent sees whole, a delete for good reaches only an item the same agent created through a
+/// save the person approved, and no change is saved without its line written first.
 /// </summary>
 public sealed class ItemChangeRequestTests : IDisposable
 {
@@ -28,6 +29,8 @@ public sealed class ItemChangeRequestTests : IDisposable
     private readonly SessionLifetime _lifetime = new("session-one");
     private readonly SessionAuthority _authority;
     private bool _logOpens = true;
+    private Action? _beforeApply;
+    private bool _saveFails;
 
     public ItemChangeRequestTests()
     {
@@ -88,13 +91,15 @@ public sealed class ItemChangeRequestTests : IDisposable
         _channel.Answer = ApprovalAnswer.Denied;
 
         var denied = await ChangeAsync(Change("work/github", ItemChangeRules.MoveToRecycleBin));
-        var again = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        var again = await ChangeAsync(Change("work/github", ItemChangeRules.MarkExpired));
+        var tagged = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
 
         Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt), (denied.Decision, denied.Method));
         Assert.Equal(AuditMethod.Cooldown, again.Method);
+        Assert.Equal(AuditDecision.Granted, tagged.Decision);
         Assert.Equal(1, _channel.Asked);
         Assert.NotNull(Reopened(vault => vault.Find(_github)));
-        Assert.Equal(2, _log.Lines().Count);
+        Assert.Equal(3, _log.Lines().Count);
     }
 
     [Fact]
@@ -117,17 +122,104 @@ public sealed class ItemChangeRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task Needs_update_is_a_tag_added_once()
+    public async Task The_needs_update_tag_is_added_and_removed_unasked_and_each_change_is_one_line()
     {
-        _channel.Answer = ApprovalAnswer.ApprovedOnce;
+        _channel.Answer = ApprovalAnswer.Denied;
 
         var tagged = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        var heldTag = Reopened(vault => vault.Tags(_github))!;
         var twice = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        var cleared = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
+        var again = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
 
-        Assert.Equal(AuditDecision.Granted, tagged.Decision);
-        Assert.Contains(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(_github))!);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed, "work/github", true), (tagged.Decision, tagged.Method, tagged.Item, tagged.Recorded));
+        Assert.Contains(ItemChangeRules.NeedsUpdateTag, heldTag);
         Assert.Equal((AuditDecision.Denied, AuditMethod.InvalidRequest), (twice.Decision, twice.Method));
-        Assert.Equal(1, _channel.Asked);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed), (cleared.Decision, cleared.Method));
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(_github))!);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.InvalidRequest), (again.Decision, again.Method));
+        Assert.Equal(0, _channel.Asked);
+        var lines = _log.Lines();
+        Assert.Equal(4, lines.Count);
+        Assert.Equal(("granted", "allowed"), (lines[0].GetProperty("decision").GetString(), lines[0].GetProperty("method").GetString()));
+        Assert.Contains(ItemChangeRules.ClearNeedsUpdate, lines[2].GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("other/**", "work/github")]
+    [InlineData("**", ".keypaste/shares/link")]
+    [InlineData("tag:env:acme:*", "env/acme/dev")]
+    public async Task A_tag_on_an_item_the_agent_does_not_see_whole_is_refused(string exposure, string entry)
+    {
+        var reply = await ChangeAsync(Change(entry, ItemChangeRules.MarkNeedsUpdate) with { Exposure = [exposure] });
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.OutOfScope), (reply.Decision, reply.Method));
+        Assert.Equal("denied", Assert.Single(_log.Lines()).GetProperty("decision").GetString());
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(new EntryName("env/acme", "dev")))!);
+    }
+
+    [Theory]
+    [InlineData("work/github")]
+    [InlineData("Recycle Bin/github")]
+    public async Task A_tag_on_an_item_in_Trash_is_refused(string entry)
+    {
+        Assert.Equal(DeletionOutcome.Recycled, _vault.RemoveEntry(_github));
+        _vault.Save();
+
+        var reply = await ChangeAsync(Change(entry, ItemChangeRules.MarkNeedsUpdate));
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal("denied", Assert.Single(_log.Lines()).GetProperty("decision").GetString());
+        Assert.NotEqual(VaultSaveStatus.Unsaved, _vault.SaveState().Status);
+    }
+
+    [Fact]
+    public async Task A_change_whose_line_cannot_be_written_before_the_save_is_made_neither_on_disk_nor_in_memory()
+    {
+        _beforeApply = () => _logOpens = false;
+
+        var reply = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (reply.Decision, reply.Method));
+        Assert.Contains("nothing was changed", reply.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, _vault.Tags(_github)!);
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(_github))!);
+        Assert.Empty(_log.Lines());
+    }
+
+    [Fact]
+    public async Task An_allowed_change_whose_line_cannot_be_written_before_the_save_is_not_made()
+    {
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
+        _beforeApply = () => _logOpens = false;
+
+        var reply = await ChangeAsync(Change("work/github", ItemChangeRules.MoveToRecycleBin));
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (reply.Decision, reply.Method));
+        Assert.NotNull(_vault.Find(_github));
+        Assert.NotNull(Reopened(vault => vault.Find(_github)));
+        Assert.Empty(_log.Lines());
+    }
+
+    [Fact]
+    public async Task A_change_whose_save_fails_after_its_line_is_followed_by_a_line_saying_it_was_not_made()
+    {
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
+        _saveFails = true;
+
+        var tag = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        var trash = await ChangeAsync(Change("work/github", ItemChangeRules.MoveToRecycleBin));
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, true), (tag.Decision, tag.Method, tag.Recorded));
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, true), (trash.Decision, trash.Method, trash.Recorded));
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, _vault.Tags(_github)!);
+        Assert.NotNull(_vault.Find(_github));
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(_github))!);
+        Assert.NotNull(Reopened(vault => vault.Find(_github)));
+        var lines = _log.Lines();
+        Assert.Equal(["granted", "denied", "granted", "denied"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.Contains("not saved", lines[1].GetProperty("reason").GetString(), StringComparison.Ordinal);
+        Assert.Contains("not saved", lines[3].GetProperty("reason").GetString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -158,8 +250,8 @@ public sealed class ItemChangeRequestTests : IDisposable
     {
         _channel.Answer = ApprovalAnswer.ApprovedOnce;
 
-        var outside = await ChangeAsync(Change(EntryHandle.For(_github), ItemChangeRules.MarkNeedsUpdate) with { Exposure = ["other/**"] });
-        var inside = await ChangeAsync(Change(EntryHandle.For(_github), ItemChangeRules.MarkNeedsUpdate));
+        var outside = await ChangeAsync(Change(EntryHandle.For(_github), ItemChangeRules.MarkExpired) with { Exposure = ["other/**"] });
+        var inside = await ChangeAsync(Change(EntryHandle.For(_github), ItemChangeRules.MarkExpired));
 
         Assert.Equal(AuditMethod.OutOfScope, outside.Method);
         Assert.Equal(("work/github", 1), (inside.Item, _channel.Asked));
@@ -303,9 +395,16 @@ public sealed class ItemChangeRequestTests : IDisposable
             return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
         }
 
+        _beforeApply?.Invoke();
+
         if (!apply(_vault))
         {
             return AgentSave.Unchanged;
+        }
+
+        if (_saveFails)
+        {
+            return new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
         }
 
         _vault.Save();

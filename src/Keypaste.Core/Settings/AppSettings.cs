@@ -100,6 +100,14 @@ public sealed record AppSettings
     internal const string WindowTableWidthsKey = "table_widths";
     internal const string LogSectionName = "log";
     internal const string LogKeepDaysKey = "keep_days";
+    internal const string RecommendationsSectionName = "recommendations";
+    internal const string ExpiryReminderDaysKey = "expiry_reminder_days";
+
+    /// <summary>How many days before an item expires Recommendations lists it, until chosen.</summary>
+    public const int DefaultExpiryReminderDays = 14;
+
+    /// <summary>The most days before an expiry a file may ask to be reminded.</summary>
+    public const int MaximumExpiryReminderDays = 365;
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
@@ -114,6 +122,7 @@ public sealed record AppSettings
 
     private readonly int _idleTimeoutSeconds;
     private readonly int _keepLogDays = AuditRetention.DefaultDays;
+    private readonly int _expiryReminderDays = DefaultExpiryReminderDays;
 
     /// <summary>What the app runs as when there is nothing usable to read.</summary>
     /// <remarks>
@@ -178,6 +187,15 @@ public sealed record AppSettings
     {
         get => _keepLogDays;
         init => _keepLogDays = AuditRetention.Clamp(value);
+    }
+
+    /// <summary>How many days before an item expires Recommendations lists it, 0 for never.</summary>
+    /// <value>Never above <see cref="MaximumExpiryReminderDays"/>; a longer period is shortened on the way in.</value>
+    /// <remarks>In its own section, <c>[[recommendations]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
+    public int ExpiryReminderDays
+    {
+        get => _expiryReminderDays;
+        init => _expiryReminderDays = Math.Clamp(value, 0, MaximumExpiryReminderDays);
     }
 
     /// <summary>Reads the preferences.</summary>
@@ -257,6 +275,12 @@ public sealed record AppSettings
             && log.TryGet(LogKeepDaysKey, out var keep) && keep.Value.Kind == TomlValueKind.Number)
         {
             settings = settings with { KeepLogDays = keep.Value.Number };
+        }
+
+        if (document.Tables.FirstOrDefault(IsRecommendationsSection) is { } recommendations
+            && recommendations.TryGet(ExpiryReminderDaysKey, out var remind) && remind.Value.Kind == TomlValueKind.Number)
+        {
+            settings = settings with { ExpiryReminderDays = remind.Value.Number };
         }
 
         if (document.Tables.FirstOrDefault(IsShareSection) is { } share)
@@ -383,6 +407,7 @@ public sealed record AppSettings
         var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
         var share = settings.ShareTermsLineShown ? existing.Tables.FirstOrDefault(IsShareSection) : null;
         var log = existing.Tables.FirstOrDefault(IsLogSection);
+        var recommendations = existing.Tables.FirstOrDefault(IsRecommendationsSection);
 
         try
         {
@@ -421,7 +446,17 @@ public sealed record AppSettings
                 }
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log)))
+            if (recommendations is not null || settings.ExpiryReminderDays != DefaultExpiryReminderDays)
+            {
+                writer.BlankLine().Table(RecommendationsSectionName).Number(ExpiryReminderDaysKey, settings.ExpiryReminderDays, "how many days before an item expires Recommendations lists it; 0 never does");
+
+                if (recommendations is not null && !TryWrite(writer, recommendations.Pairs.Where(pair => !string.Equals(pair.Key, ExpiryReminderDaysKey, StringComparison.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log) && !ReferenceEquals(other, recommendations)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -498,6 +533,8 @@ public sealed record AppSettings
     private static bool IsShareSection(TomlTable table) => string.Equals(table.Name, ShareSectionName, StringComparison.Ordinal);
 
     private static bool IsLogSection(TomlTable table) => string.Equals(table.Name, LogSectionName, StringComparison.Ordinal);
+
+    private static bool IsRecommendationsSection(TomlTable table) => string.Equals(table.Name, RecommendationsSectionName, StringComparison.Ordinal);
 
     private static string? TextOf(TomlTable table, string key) =>
         table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;

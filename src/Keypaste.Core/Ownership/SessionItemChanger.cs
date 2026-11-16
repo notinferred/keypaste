@@ -7,17 +7,20 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.Core.Ownership;
 
 /// <summary>
-/// Puts an agent's request to change an item to the person, and makes the change in the owner's own unlocked vault under the
-/// owner's claim once they allow it (THREATS.md T-57). The agent learns only whether it was made.
+/// Makes an agent's change to an item in the owner's own unlocked vault under the owner's claim: once the person allows it, or
+/// unasked for the needs-update tag (PRODUCT §2, THREATS.md T-57). The agent learns only whether it was made.
 /// </summary>
 /// <remarks>
 /// Ordered as <see cref="SessionSaver"/> is: the item is resolved and checked before anyone is asked, only where the agent's
-/// bridge reaches it whole, and checked again before it is written, so a vault that changed meanwhile changes nothing. Every
-/// change is asked about, Allow once only; a refused or unanswered request holds the same item back for a minute (T-11); a change
-/// is written only while the unlock it was asked under is live, and one whose save fails is taken back out of the open vault.
+/// bridge reaches it whole, and checked again before it is written, so a vault that changed meanwhile changes nothing. An asked
+/// change is Allow once only, and a refused or unanswered one holds the same item back for a minute (T-11); the tag puts nothing
+/// to the person, so it neither waits for a hold nor starts one. A change is written only while the unlock it was asked under is
+/// live, its line is written before the vault is saved, and one whose line or save fails is taken back out of the open vault.
 /// </remarks>
 public sealed class SessionItemChanger
 {
+    private const string _unrecorded = "the audit log could not be written, so nothing was changed";
+
     private readonly ApprovalGate _gate;
     private readonly Func<SessionLifetime, Vault?> _unlockedFor;
     private readonly Func<SessionLifetime, Func<Vault, bool>, AgentSave> _write;
@@ -38,14 +41,21 @@ public sealed class SessionItemChanger
         _narrate = narrate;
     }
 
-    /// <summary>Decides one request: resolves and checks the item, asks the person, then makes the change and saves it.</summary>
+    /// <summary>Decides one request: resolves and checks the item, asks the person unless the change is unasked, then records the change and saves it.</summary>
     /// <param name="request">The request, already admitted to <paramref name="lifetime"/>.</param>
     /// <param name="connectionId">The connection it came on, which an unlabelled agent waits its turn as.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>
+    /// <param name="record">Writes the line of a change about to be saved, answering whether it was written.</param>
     /// <param name="waiting">The lifetime's <see cref="SessionLifetime.Waiting"/> as the request began.</param>
     /// <param name="cancellationToken">Withdraws the question when the agent stops waiting, the vault is locked or it is reloaded.</param>
-    /// <returns>Whether it was made, with the item it named once resolved.</returns>
-    internal async ValueTask<Decided> DecideAsync(ItemChangeRequest request, string connectionId, SessionLifetime lifetime, CancellationToken waiting, CancellationToken cancellationToken)
+    /// <returns>Whether it was made, with the item it named once resolved, and whether its line is already written.</returns>
+    internal async ValueTask<Decided> DecideAsync(
+        ItemChangeRequest request,
+        string connectionId,
+        SessionLifetime lifetime,
+        Func<Decided, bool> record,
+        CancellationToken waiting,
+        CancellationToken cancellationToken)
     {
         if (ItemChangeRules.Check(request, out var change) is { } problem)
         {
@@ -114,29 +124,46 @@ public sealed class SessionItemChanger
             return Refused(AuditMethod.InvalidRequest, check.Refusal ?? "no item answers to that name", where);
         }
 
-        var prompt = ItemChangePrompt.For(request.ClientName, request.ClientLabel, item, change, request.Reason) with { Created = check.Created };
-        var said = await _gate.AskAsync($"change\0{EntryHandle.For(item)}", prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
+        string says;
+        Decided made;
 
-        if (!lifetime.IsLive || waiting.IsCancellationRequested)
+        if (change.Asks)
         {
-            return Withdrawn(lifetime, where, item.Uuid);
-        }
+            var prompt = ItemChangePrompt.For(request.ClientName, request.ClientLabel, item, change, request.Reason) with { Created = check.Created };
+            var said = await _gate.AskAsync($"change\0{EntryHandle.For(item)}", prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
 
-        if (said != ApprovalAnswer.ApprovedOnce)
-        {
-            var why = said switch
+            if (!lifetime.IsLive || waiting.IsCancellationRequested)
             {
-                ApprovalAnswer.Denied => "a person did not allow the change",
-                ApprovalAnswer.Cooldown => "a change to the same item was refused a moment ago",
-                ApprovalAnswer.TimedOut => "nobody answered inside the window",
-                ApprovalAnswer.Busy => "another prompt was already waiting for an answer",
-                ApprovalAnswer.Cancelled => "the agent gave up before anybody answered",
-                ApprovalAnswer.NoChannel => "there was nowhere to ask a person",
-                _ => "asking a person went wrong",
-            };
+                return Withdrawn(lifetime, where, item.Uuid);
+            }
 
-            _narrate?.Invoke($"did not {prompt.Says} for {prompt.Client}: {why}");
-            return Refused(said.ToAuditMethod(), why, where, item.Uuid);
+            if (said != ApprovalAnswer.ApprovedOnce)
+            {
+                var why = said switch
+                {
+                    ApprovalAnswer.Denied => "a person did not allow the change",
+                    ApprovalAnswer.Cooldown => "a change to the same item was refused a moment ago",
+                    ApprovalAnswer.TimedOut => "nobody answered inside the window",
+                    ApprovalAnswer.Busy => "another prompt was already waiting for an answer",
+                    ApprovalAnswer.Cancelled => "the agent gave up before anybody answered",
+                    ApprovalAnswer.NoChannel => "there was nowhere to ask a person",
+                    _ => "asking a person went wrong",
+                };
+
+                _narrate?.Invoke($"did not {prompt.Says} for {prompt.Client}: {why}");
+                return Refused(said.ToAuditMethod(), why, where, item.Uuid);
+            }
+
+            says = $"{prompt.Says} for {prompt.Client}";
+            made = new Decided(new ItemChangeReply(AuditDecision.Granted, AuditMethod.Prompt, $"a person allowed it: {prompt.Says}") { Item = where }, where, item.Uuid);
+        }
+        else
+        {
+            var shown = ApprovalPrompt.For(request.ClientName, item, SaveRequestRules.Password, request.Reason, request.ClientLabel);
+            var tag = change.Kind == ItemChangeKind.MarkNeedsUpdate ? "Tag" : "Untag";
+
+            says = $"{tag} {shown.Entry} {ItemChangeRules.NeedsUpdateTag} for {shown.Client}, unasked";
+            made = new Decided(new ItemChangeReply(AuditDecision.Granted, AuditMethod.Allowed, $"an agent may do this without asking: {tag} {shown.Entry} {ItemChangeRules.NeedsUpdateTag}") { Item = where }, where, item.Uuid);
         }
 
         if (cancellationToken.IsCancellationRequested || !lifetime.TryCommitAfter(waiting))
@@ -147,32 +174,52 @@ public sealed class SessionItemChanger
         Vault? written = null;
         VaultCheckpoint? checkpoint = null;
         string? late = null;
-        var made = false;
+        var recorded = false;
+        AgentSave saved;
 
-        var saved = _write(lifetime, open =>
+        try
         {
-            written = open;
-            checkpoint = open.Checkpoint();
-            late = ItemChanges.Apply(open, change, request.ClientLabel, check, _clock.GetUtcNow(), zone);
-            made = late is null;
-            return made;
-        });
+            // The line is written before the save, so a change never exists without its record.
+            saved = _write(lifetime, open =>
+            {
+                written = open;
+                checkpoint = open.Checkpoint();
+                late = ItemChanges.Apply(open, change, request.ClientLabel, check, _clock.GetUtcNow(), zone);
+                recorded = late is null && record(made);
+                return recorded;
+            });
+        }
+        catch
+        {
+            SessionEditor.TakeBack(written, checkpoint);
+            throw;
+        }
+
+        var allowed = change.Asks ? "a person allowed the change" : "the change was checked";
 
         if (late is not null)
         {
             SessionEditor.TakeBack(written, checkpoint);
-            return Refused(AuditMethod.VaultChanged, $"a person allowed the change, and then: {late}", where, item.Uuid);
+            return Refused(AuditMethod.VaultChanged, $"{allowed}, and then: {late}", where, item.Uuid);
         }
 
-        if (!saved.Holds || !made)
+        if (written is not null && !recorded)
         {
             SessionEditor.TakeBack(written, checkpoint);
-            _narrate?.Invoke($"did not {prompt.Says}: {saved.Reason}");
-            return Refused(SessionEditor.MethodOf(saved), $"a person allowed the change, and the vault was not saved: {saved.Reason}", where, item.Uuid);
+            _narrate?.Invoke($"did not {says}: {_unrecorded}");
+            return Refused(AuditMethod.Failed, _unrecorded, where, item.Uuid);
         }
 
-        _narrate?.Invoke($"{prompt.Says}: done for {prompt.Client}");
-        return new Decided(new ItemChangeReply(AuditDecision.Granted, AuditMethod.Prompt, $"a person allowed it: {prompt.Says}") { Item = where }, where, item.Uuid);
+        if (!saved.Holds || !recorded)
+        {
+            SessionEditor.TakeBack(written, checkpoint);
+            _narrate?.Invoke($"did not {says}: {saved.Reason}");
+            var after = recorded ? "the change was recorded and then not saved, so it was not made" : $"{allowed}, and the vault was not saved";
+            return Refused(SessionEditor.MethodOf(saved), $"{after}: {saved.Reason}", where, item.Uuid);
+        }
+
+        _narrate?.Invoke($"{says}: done");
+        return made with { Recorded = true };
     }
 
     private static Decided Withdrawn(SessionLifetime lifetime, string where, string? item) =>
@@ -187,5 +234,9 @@ public sealed class SessionItemChanger
     /// <param name="Reply">What the agent is told.</param>
     /// <param name="Resolved">The item's path once resolved, or null.</param>
     /// <param name="Item">The item's UUID as hex once resolved, or null.</param>
-    internal sealed record Decided(ItemChangeReply Reply, string? Resolved = null, string? Item = null);
+    internal sealed record Decided(ItemChangeReply Reply, string? Resolved = null, string? Item = null)
+    {
+        /// <summary>Whether its line was written before the save it records, so no other is written for it.</summary>
+        public bool Recorded { get; init; }
+    }
 }

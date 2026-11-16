@@ -23,6 +23,11 @@ internal sealed record IdleChoice(int Seconds, string Label);
 /// <param name="Label">How it reads in the list.</param>
 internal sealed record LogKeepChoice(int Days, string Label);
 
+/// <summary>One offered number of days before an item expires that Recommendations lists it.</summary>
+/// <param name="Days">The value written to <c>app.toml</c>, 0 for off.</param>
+/// <param name="Label">How it reads in the list.</param>
+internal sealed record ExpiryReminderChoice(int Days, string Label);
+
 /// <summary>
 /// Settings, with the way to Advanced, which leads to the screens the everyday ones leave out.
 /// </summary>
@@ -45,6 +50,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     private AppSettings _settings;
     private IdleChoice _idle;
     private LogKeepChoice _keepLog;
+    private ExpiryReminderChoice _expiryReminder;
     private AppTheme _theme;
     private bool _lockWhenMinimized;
     private bool _stayInTray;
@@ -82,6 +88,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
         KeepLogChoices = KeepChoicesFor(_settings.KeepLogDays);
         _keepLog = KeepLogChoices.Single(choice => choice.Days == _settings.KeepLogDays);
+        ExpiryReminderChoices = ReminderChoicesFor(_settings.ExpiryReminderDays);
+        _expiryReminder = ExpiryReminderChoices.Single(choice => choice.Days == _settings.ExpiryReminderDays);
 
         UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
@@ -213,6 +221,31 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             if (value is not null && SetProperty(ref _keepLog, value))
             {
                 Persist(_settings with { KeepLogDays = value.Days });
+            }
+        }
+    }
+
+    /// <summary>How many days before an item expires Recommendations may list it.</summary>
+    internal static IReadOnlyList<ExpiryReminderChoice> OfferedExpiryReminders { get; } =
+    [
+        new(0, Strings.ExpiryReminderOff),
+        new(7, Strings.ExpiryReminderSevenDays),
+        new(AppSettings.DefaultExpiryReminderDays, Strings.ExpiryReminderFourteenDays),
+        new(30, Strings.ExpiryReminderThirtyDays),
+    ];
+
+    /// <summary>What this screen's list shows: <see cref="OfferedExpiryReminders"/>, plus the days in force when <c>app.toml</c> names others.</summary>
+    internal IReadOnlyList<ExpiryReminderChoice> ExpiryReminderChoices { get; }
+
+    /// <summary>How many days before an item expires Recommendations lists it, applied at once.</summary>
+    internal ExpiryReminderChoice ExpiryReminder
+    {
+        get => _expiryReminder;
+        set
+        {
+            if (value is not null && SetProperty(ref _expiryReminder, value))
+            {
+                Persist(_settings with { ExpiryReminderDays = value.Days });
             }
         }
     }
@@ -730,6 +763,12 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
                 .ThenBy(choice => choice.Days),
         ];
     }
+
+    /// <summary>The offered reminders, widened by the one in force if it is not among them.</summary>
+    private static IReadOnlyList<ExpiryReminderChoice> ReminderChoicesFor(int days) =>
+        OfferedExpiryReminders.Any(choice => choice.Days == days)
+            ? OfferedExpiryReminders
+            : [.. OfferedExpiryReminders.Append(new ExpiryReminderChoice(days, Counted(days, "day"))).OrderBy(choice => choice.Days)];
 
     /// <summary>The offered timeouts, widened by the one in force if it is not among them.</summary>
     private static IReadOnlyList<IdleChoice> ChoicesFor(int seconds)

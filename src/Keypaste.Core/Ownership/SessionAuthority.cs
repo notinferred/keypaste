@@ -702,7 +702,8 @@ public sealed class SessionAuthority : IApproverHandler
     /// <inheritdoc/>
     /// <remarks>
     /// Recorded under the client that asked, naming the item and the change, as every agent request is. The log is asked for
-    /// before anything is decided, as a save's is, so a change is never put to the person while its line could not follow.
+    /// before anything is decided, as a save's is, so a change is never put to the person while its line could not follow. A
+    /// change's line is written before the vault is saved, and a save that then fails writes a second line saying it was not made.
     /// </remarks>
     public async ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -711,10 +712,11 @@ public sealed class SessionAuthority : IApproverHandler
 
         var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
 
+        AuditRecord LineOf(SessionItemChanger.Decided decided) =>
+            RequestRecords.ItemChange(client, request, decided.Reply.Decision, decided.Reply.Method, decided.Reply.Reason, decided.Resolved, decided.Item, request.Session, VaultNamed(request.Vault));
+
         ItemChangeReply Answer(SessionItemChanger.Decided decided) =>
-            _recorder.Recorded(
-                decided.Reply,
-                RequestRecords.ItemChange(client, request, decided.Reply.Decision, decided.Reply.Method, decided.Reply.Reason, decided.Resolved, decided.Item, request.Session, VaultNamed(request.Vault)));
+            decided.Recorded ? decided.Reply with { Recorded = true } : _recorder.Recorded(decided.Reply, LineOf(decided));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
@@ -731,7 +733,7 @@ public sealed class SessionAuthority : IApproverHandler
         Withdrawals.AddOwner(waiting);
 
         var decided = await Decided(
-            token => _changer.DecideAsync(request, connectionId, lifetime, waiting, token),
+            token => _changer.DecideAsync(request, connectionId, lifetime, decided => _recorder.Recorded(LineOf(decided)), waiting, token),
             lifetime,
             (method, reason) => new SessionItemChanger.Decided(new ItemChangeReply(AuditDecision.Denied, method, reason)),
             waiting,

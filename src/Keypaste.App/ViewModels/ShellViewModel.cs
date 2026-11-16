@@ -155,7 +155,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                 authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
         }
 
-        Recommendations = new RecommendationsViewModel(session, home, OpenEntry, post);
+        Recommendations = new RecommendationsViewModel(session, home, OpenEntry, post, Preferences, web);
         Recommendations.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(RecommendationsViewModel.NeedsReview) or nameof(RecommendationsViewModel.IsEmpty))

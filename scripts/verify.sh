@@ -43,7 +43,7 @@ command. test and compile take the SDK global.json pins from ~/.dotnet when the 
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 On Windows and macOS each profile that builds, but compile, first builds the libargon2 the app and the
 CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
-backend, and test for a Keypaste.Browser.Tests class, first build the libsodium those tests load with
+backend, and test for a Browser.Tests or Processes.Tests.BrowserHostTests class, first build the libsodium those tests load with
 scripts/build-libsodium.sh, which needs curl, OpenSSL 3, and make with a C compiler or Visual Studio's.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli (or KPXC_CLI).
 Native AOT, packaging, other operating systems and live install checks stay in CI.
@@ -168,14 +168,25 @@ build_libsodium() {
   run bash scripts/build-libsodium.sh
 }
 
-# Each test project builds the programs its tests start through its own references.
+# Each test project builds the programs its tests start through its own references, but Processes.Tests, which
+# references none and starts what its Built.cs names.
+processes_programs=(src/Keypaste.Cli src/Keypaste.App tests/Keypaste.AppDriver tests/Keypaste.FakeBrowser tests/Keypaste.FakeMcpClient)
 prepare_projects() {
-  local dir
-  for dir in "${projects[@]}"; do
-    if [ "$dir" = tests/Keypaste.Browser.Tests ]; then build_libsodium; fi
+  local i programs=()
+  for i in "${!projects[@]}"; do
+    case "${projects[$i]}" in
+      tests/Keypaste.Browser.Tests) build_libsodium ;;
+      tests/Keypaste.Processes.Tests)
+        programs=("${processes_programs[@]}")
+        # The CLI's relay loads the shared libsodium only in the browser host tests.
+        case " ${project_classes[$i]} " in
+          "  "|*" Keypaste.Processes.Tests.BrowserHostTests "*) build_libsodium ;;
+        esac
+        ;;
+    esac
   done
   build_argon2
-  for dir in "${projects[@]}"; do prepare "$(project_file "$dir")"; done
+  for dir in ${programs[@]+"${programs[@]}"} "${projects[@]}"; do prepare "$(project_file "$dir")"; done
 }
 test_projects() {
   local i=0 options

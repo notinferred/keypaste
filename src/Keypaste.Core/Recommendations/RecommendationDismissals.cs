@@ -6,8 +6,8 @@ namespace Keypaste.Core.Recommendations;
 /// <summary>One dismissed recommendation: which vault, which entry and which key, never a value.</summary>
 /// <param name="Vault">The vault's non-secret identity (<see cref="Ownership.VaultIdentity.Key"/>).</param>
 /// <param name="Entry">The entry's KDBX identifier as hex, which survives a rename.</param>
-/// <param name="Kind">The kind of recommendation: <see cref="RecommendationDismissals.NoteKey"/>, <see cref="RecommendationDismissals.LostProjectTag"/> or <see cref="RecommendationDismissals.Password"/>.</param>
-/// <param name="Key">The field a key in notes names, a lost tag with when it was lost (<see cref="LostProjectTag.Key"/>), or a password's problem (<see cref="PasswordFinding.Key"/>).</param>
+/// <param name="Kind">The kind of recommendation: <see cref="RecommendationDismissals.NoteKey"/>, <see cref="RecommendationDismissals.LostProjectTag"/>, <see cref="RecommendationDismissals.Password"/> or <see cref="RecommendationDismissals.Reminder"/>.</param>
+/// <param name="Key">The field a key in notes names, a lost tag with when it was lost (<see cref="LostProjectTag.Key"/>), a password's problem (<see cref="PasswordFinding.Key"/>), or a reminder's reason and time (<see cref="ItemReminder.Key"/>).</param>
 public sealed record Dismissal(string Vault, string Entry, string Kind, string Key);
 
 /// <summary>
@@ -28,6 +28,9 @@ public static class RecommendationDismissals
 
     /// <summary>The kind a weak, reused or expired password is dismissed under (V.9).</summary>
     public const string Password = "password";
+
+    /// <summary>The kind an item expiring soon or marked as needing an update is dismissed under.</summary>
+    public const string Reminder = "reminder";
 
     /// <summary>The kind a warning about a key file keyed by its exact bytes is dismissed under (T-28).</summary>
     public const string FragileKeyFile = "fragile-key-file";

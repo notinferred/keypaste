@@ -265,6 +265,65 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <!-- Reminders before an item expires and of the needs-update tag: the page opens only when pressed, and keypaste changes nothing at the provider. -->
+      <ItemsControl Name="ReminderGroups" ItemsSource="{Binding ReminderGroups}" IsVisible="{Binding HasReminders}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="12" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ReminderGroup">
+            <StackPanel Spacing="6">
+              <StackPanel Orientation="Horizontal" Spacing="8" Classes="kind-head">
+                <TextBlock Name="ReminderReason" Classes="th" AutomationProperties.HeadingLevel="2" VerticalAlignment="Center" Text="{Binding Heading}" />
+                <Button Classes="link" Content="{x:Static res:Strings.LearnMore}"
+                        AutomationProperties.Name="{Binding Heading, StringFormat={x:Static res:Strings.LearnMoreAboutValue}}">
+                  <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                      <StackPanel MaxWidth="320" Spacing="8">
+                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{Binding Reason}" />
+                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ReplaceAnItemBeforeItExpires}" />
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </StackPanel>
+              <Border Classes="group">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReminderRow">
+                      <ctl:FieldRow Classes="wide">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
+                              AutomationProperties.Name="{Binding Description}">
+                          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Name="ReminderItem" Classes="mono size-13" TextWrapping="Wrap" Text="{Binding Line}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />
+                            <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
+                              <TextBlock Text="{x:Static res:Strings.Dismissed}" />
+                            </Border>
+                          </StackPanel>
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Name="OpenReminderPage" Classes="sm ghost" Content="{Binding PageLabel}" Command="{Binding OpenPageCommand}" IsVisible="{Binding HasPage}"
+                                    ToolTip.Tip="{Binding PageAddress}" AutomationProperties.Name="{Binding PageDescription}" />
+                            <Button Classes="sm ghost" Content="{x:Static res:Strings.OpenItem}" Command="{Binding OpenCommand}"
+                                    AutomationProperties.Name="{Binding OpenLabel}" />
+                            <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                            <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                          </StackPanel>
+                        </Grid>
+                      </ctl:FieldRow>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
   </ScrollViewer>
 

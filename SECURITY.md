@@ -85,7 +85,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
 - A search names at most 25 items it reaches, with their origins, usernames while Settings shows them and the links among them, never a value (unreleased) [T-55].
 - An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
-- An agent may ask the person to move an item it sees whole to Trash, mark it expired or tag it `needs-update`, and to delete for good only an item it created through an approved save; each change is asked every time and made only once the person allows it (unreleased) [T-57].
+- An agent may ask the person to move an item it sees whole to Trash or mark it expired, and to delete for good only an item it created through an approved save; each of these is asked every time and made only once the person allows it. It may add or remove the item's `needs-update` tag without asking. Every change's line is written before the vault is saved, and a change whose line cannot be written is not made (unreleased) [T-57].
 - Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
 - One prompt at a time; 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].

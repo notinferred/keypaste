@@ -119,6 +119,22 @@
                       </ComboBox.ItemTemplate>
                     </ComboBox>
                   </ctl:FieldRow>
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.RemindMeBeforeAnItemExpires}">
+                    <ComboBox Name="ExpiryReminder"
+                              ItemsSource="{Binding ExpiryReminderChoices}"
+                              AutomationProperties.Name="{x:Static res:Strings.RemindMeBeforeAnItemExpires}"
+                              AutomationProperties.HelpText="{x:Static res:Strings.RemindMeBeforeAnItemExpiresHelp}"
+                              ToolTip.Tip="{x:Static res:Strings.RemindMeBeforeAnItemExpiresHelp}"
+                              SelectedItem="{Binding ExpiryReminder}"
+                              MinWidth="160"
+                              HorizontalAlignment="Left">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ExpiryReminderChoice">
+                          <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </ctl:FieldRow>
                   <ctl:FieldRow Label="{x:Static res:Strings.LockWhenMinimized}" IsVisible="{Binding MinimizeLockSupported}">
                     <ctl:FieldRow.Actions>
                       <ToggleSwitch Name="LockWhenMinimized"

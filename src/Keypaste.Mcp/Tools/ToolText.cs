@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Mcp.Tools;
@@ -268,23 +269,36 @@ internal static class ToolText
 
     /// <summary>The description a client shows for <c>request_item_change</c>.</summary>
     internal const string ItemChangeDescription = """
-        Asks the user to allow one change to one item you can see: move_to_recycle_bin moves it to the
-        vault's Trash, where the user can restore it; mark_expired sets KeePass's own expiry, today or on
-        the day you give as `expires` (yyyy-MM-dd); mark_needs_update adds the tag needs-update; delete
-        removes it for good, and only an item you created yourself through request_save, with this same
-        agent label, can be deleted. A human sees the item, the change and your stated reason, and allows
-        it or denies it, every time. Default is deny. Nothing is changed until they allow it.
+        Changes one item you can see. Asks the user to allow move_to_recycle_bin, which moves it to the
+        vault's Trash, where the user can restore it; mark_expired, which sets KeePass's own expiry, today
+        or on the day you give as `expires` (yyyy-MM-dd); and delete, which removes it for good, and only
+        an item you created yourself through request_save, with this same agent label, can be deleted. A
+        human sees the item, the change and your stated reason, and allows it or denies it, every time.
+        Default is deny. Nothing is changed until they allow it.
+
+        mark_needs_update adds the tag needs-update and clear_needs_update removes it, without asking. The
+        user sees the tag on the item and the change in keypaste's log.
 
         Pass the `handle` from list_entry_names or find_access as `entry` where you have one. Write
         `reason` for the person reading it: it is shown to them verbatim.
         """;
 
-    /// <summary>What the agent is told once the person allowed the change.</summary>
+    /// <summary>What the agent is told once the change was made.</summary>
     /// <param name="item">The item changed.</param>
     /// <param name="change">The change as the agent named it.</param>
     /// <returns>The sentence.</returns>
-    internal static string ItemChanged(string item, string change) =>
-        $"keypaste: CHANGED. The user allowed {change} on {item}, and the vault holds it. This call was recorded in the audit log.";
+    internal static string ItemChanged(string item, string change) => change switch
+    {
+        ItemChangeRules.MarkNeedsUpdate => $"Done: {item} now has the {ItemChangeRules.NeedsUpdateTag} tag. The person sees this change in keypaste and in its log.",
+        ItemChangeRules.ClearNeedsUpdate => $"Done: {item} no longer has the {ItemChangeRules.NeedsUpdateTag} tag. The person sees this change in keypaste and in its log.",
+        _ => $"keypaste: CHANGED. The user allowed {change} on {item}, and the vault holds it. This call was recorded in the audit log.",
+    };
+
+    /// <summary>What the agent is told when the owner could not write the change's line, so it made nothing.</summary>
+    internal const string ItemChangeUnrecorded = """
+        keypaste: NOT CHANGED. The audit log could not be written, so nothing was changed. keypaste
+        does not make a change it cannot record.
+        """;
 
     /// <summary>What the agent is told when the person did not allow the change.</summary>
     internal const string ItemNotChanged = """

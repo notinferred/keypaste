@@ -131,6 +131,7 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _noteKeyMenu;
     private readonly IReadOnlyList<AppMenuEntry> _lostTagMenu;
     private readonly IReadOnlyList<AppMenuEntry> _weakPasswordMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _reminderMenu;
     private readonly IReadOnlyList<AppMenuEntry> _pairingMenu;
     private readonly IReadOnlyList<AppMenuEntry> _browserHostMenu;
 
@@ -362,7 +363,11 @@ internal sealed class AppCommands
         var removeTag = Routed(Strings.RemoveTag, () => Items() is not null ? Target<EntryTagChip>() : null, chip => chip.RemoveCommand) with { Says = () => Target<EntryTagChip>()?.RemoveLabel ?? Strings.RemoveTag };
         var moveNoteKey = Routed(Strings.MoveToAField, () => Recommendations() is not null && Target<RecommendationRow>() is { NeedsReview: true } row ? row : null, row => row.MoveCommand);
         var restoreLostTag = Routed(Strings.RestoreTag, () => Recommendations() is not null && Target<LostTagRow>() is { NeedsReview: true } row ? row : null, row => row.RestoreCommand);
-        var openWeakPassword = Routed(Strings.OpenItem, () => Recommendations() is not null ? Target<PasswordRow>() : null, row => row.OpenCommand);
+        var openFindingItem = Routed(
+            Strings.OpenItem,
+            () => Recommendations() is null ? null : (Target<PasswordRow>()?.OpenCommand ?? Target<ReminderRow>()?.OpenCommand),
+            open => open);
+        var openReminderPage = Routed(Strings.OpenUrl, () => Recommendations() is not null ? Target<ReminderRow>() : null, row => row.OpenPageCommand) with { Says = () => Target<ReminderRow>()?.PageLabel ?? Strings.OpenUrl };
         var dismissFinding = Routed(Strings.Dismiss, () => Finding() is { NeedsReview: true } finding ? finding : null, finding => finding.DismissCommand);
         var reviewFindingAgain = Routed(Strings.ReviewAgain, () => Finding() is { IsDismissed: true } finding ? finding : null, finding => finding.ReviewAgainCommand);
         var selectAllFindings = Routed(Strings.SelectAll, () => Recommendations() is { HasNoteKeys: true } recommendations ? recommendations : null, recommendations => recommendations.SelectAllCommand);
@@ -387,7 +392,8 @@ internal sealed class AppCommands
         _tagMenu = [removeTag];
         _noteKeyMenu = [moveNoteKey, _line, dismissFinding, reviewFindingAgain];
         _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
-        _weakPasswordMenu = [openWeakPassword, _line, dismissFinding, reviewFindingAgain];
+        _weakPasswordMenu = [openFindingItem, _line, dismissFinding, reviewFindingAgain];
+        _reminderMenu = [openReminderPage, openFindingItem, _line, dismissFinding, reviewFindingAgain];
         _pairingMenu = [removePairing];
         _browserHostMenu = [changeBrowserHost];
         NewProject = newProject;
@@ -406,7 +412,7 @@ internal sealed class AppCommands
             Folder(Strings.Group, renameGroup, moveGroup, _line, deleteGroup),
             Folder(Strings.Trash, restore, purge, _line, emptyTrash),
             Folder(Strings.ShareLinks, checkLinks, revokeLink),
-            Folder(Strings.Recommendations, moveNoteKey, restoreLostTag, openWeakPassword, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
+            Folder(Strings.Recommendations, moveNoteKey, restoreLostTag, openFindingItem, openReminderPage, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
         ]);
 
         var projects = new AppMenuGroup(Strings.Project,
@@ -638,7 +644,7 @@ internal sealed class AppCommands
     internal static bool HasContextMenu(object? row) =>
         row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
             or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow
-            or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or PairingItem or BrowserHostRow;
+            or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or ReminderRow or PairingItem or BrowserHostRow;
 
     /// <summary>
     /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
@@ -679,6 +685,8 @@ internal sealed class AppCommands
                 return Bound(_lostTagMenu, row);
             case PasswordRow when Recommendations() is not null:
                 return Bound(_weakPasswordMenu, row);
+            case ReminderRow when Recommendations() is not null:
+                return Bound(_reminderMenu, row);
             case PairingItem when Settings() is not null:
                 return Bound(_pairingMenu, row);
             case BrowserHostRow when Settings() is not null:

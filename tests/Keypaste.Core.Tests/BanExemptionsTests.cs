@@ -28,6 +28,7 @@ public sealed class BanExemptionsTests
         ["src/Keypaste.App/ViewModels/EntryAttachmentRow.cs"] = 1,
         ["src/Keypaste.App/ViewModels/EntryAttachmentsViewModel.cs"] = 9,
         ["src/Keypaste.App/ViewModels/EntryDetailViewModel.cs"] = 1,
+        ["src/Keypaste.App/ViewModels/RecommendationsViewModel.cs"] = 1,
         ["src/Keypaste.App/ViewModels/ShellViewModel.cs"] = 3,
         ["src/Keypaste.App/Views/OpenerProcess.cs"] = 1,
         ["src/Keypaste.App/Views/PlatformWebLauncher.cs"] = 1,

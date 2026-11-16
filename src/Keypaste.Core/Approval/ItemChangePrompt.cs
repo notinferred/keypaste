@@ -45,10 +45,9 @@ public sealed record ItemChangePrompt
         ItemChangeKind.MoveToTrash => $"Move {Item} to Trash",
         ItemChangeKind.MarkExpired when Expires is { } day => $"Mark {Item} as expired on {Day(day)}",
         ItemChangeKind.MarkExpired => $"Mark {Item} as expired now",
-        ItemChangeKind.MarkNeedsUpdate => $"Mark {Item} as needing an update, with the tag {ItemChangeRules.NeedsUpdateTag}",
-        _ => Created is { } created
-            ? $"Delete {Item} for good. An agent created it on {Day(created)}"
-            : $"Delete {Item} for good. An agent created it",
+        ItemChangeKind.Delete when Created is { } created => $"Delete {Item} for good. An agent created it on {Day(created)}",
+        ItemChangeKind.Delete => $"Delete {Item} for good. An agent created it",
+        _ => throw new InvalidOperationException($"{Change} is made without asking, so no person is shown it."),
     };
 
     /// <summary>The prompt for one request, sanitizing everything untrusted on the way in.</summary>
@@ -58,10 +57,16 @@ public sealed record ItemChangePrompt
     /// <param name="change">The change.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
+    /// <exception cref="ArgumentException">The change is made without asking.</exception>
     public static ItemChangePrompt For(string? client, string? label, EntryName item, ItemChange change, string reason)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(reason);
+
+        if (!change.Asks)
+        {
+            throw new ArgumentException($"{change.Kind} is made without asking, so no person is shown it.", nameof(change));
+        }
 
         var asked = ApprovalPrompt.For(client, item, SaveRequestRules.Password, reason, label);
 
