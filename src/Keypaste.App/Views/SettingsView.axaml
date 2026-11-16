@@ -103,6 +103,22 @@
                       </ComboBox.ItemTemplate>
                     </ComboBox>
                   </ctl:FieldRow>
+                  <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.KeepTheAgentLogFor}">
+                    <ComboBox Name="KeepLog"
+                              ItemsSource="{Binding KeepLogChoices}"
+                              AutomationProperties.Name="{x:Static res:Strings.KeepTheAgentLogFor}"
+                              AutomationProperties.HelpText="{x:Static res:Strings.KeepTheAgentLogForHelp}"
+                              ToolTip.Tip="{x:Static res:Strings.KeepTheAgentLogForHelp}"
+                              SelectedItem="{Binding KeepLog}"
+                              MinWidth="160"
+                              HorizontalAlignment="Left">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogKeepChoice">
+                          <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </ctl:FieldRow>
                   <ctl:FieldRow Label="{x:Static res:Strings.LockWhenMinimized}" IsVisible="{Binding MinimizeLockSupported}">
                     <ctl:FieldRow.Actions>
                       <ToggleSwitch Name="LockWhenMinimized"

@@ -19,9 +19,10 @@ namespace Keypaste.Core.Audit;
 /// THREATS.md T-6 states it as a property of the product.
 /// </para>
 /// <para>
-/// <b>What "append-only" claims.</b> Records are only ever added, one whole record at a time, at the
-/// end of the file; no code path in keypaste truncates, rewrites, or deletes it, and the only seek
-/// is to the end immediately before a write. That is a statement about keypaste's own behaviour and
+/// <b>What "append-only" claims.</b> This class only ever adds records, one whole record at a time, at the
+/// end of the file, and its only seek is to the end immediately before a write. The one code path that
+/// rewrites the file is the vault's owner's <see cref="AuditCompaction"/>, which keeps every line but old
+/// lookups and expired days byte for byte and seals the result. That is a statement about keypaste's own behaviour and
 /// nothing more: the file belongs to the user's account, so anything running as that user can
 /// rewrite it. Since Stage 2.4 every record also carries a <see cref="AuditChain"/> link to the one
 /// before it, so a rewrite that does not recompute the chain is detectable. Append-only by
@@ -38,12 +39,12 @@ namespace Keypaste.Core.Audit;
 /// lock load-bearing twice over: it now also serialises <em>reading</em> the line a record links to.
 /// </para>
 /// <para>
-/// <b>Why the log is opened twice.</b> Deriving a record's <c>prev</c> means reading the end of the
-/// file, and <see cref="FileMode.Append"/> forbids <see cref="FileAccess.Read"/>. Rather than give
-/// that up, the log keeps a second, read-only handle on the same file. Keeping the writer in append
-/// mode is worth a handle: .NET itself throws on a seek before the append start, so "no code path in
-/// keypaste rewrites the log" is a runtime invariant rather than a claim about the code — and it is
-/// the sentence THREATS.md T-5's mitigation rests on.
+/// <b>Why the log is opened twice, and for each append.</b> Deriving a record's <c>prev</c> means reading the end of the
+/// file, and <see cref="FileMode.Append"/> forbids <see cref="FileAccess.Read"/>, so each append opens a writer in append
+/// mode and a read-only handle on the same file. .NET throws on a seek before the append start, so an append cannot
+/// rewrite a line. Both are opened under the sidecar lock rather than held for the process's life, because the vault's
+/// owner replaces the file in one rename under that lock when it compacts the log (<see cref="AuditCompaction"/>):
+/// a handle held across that rename would append to the file it replaced, and the line would be lost.
 /// </para>
 /// <para>
 /// <b>Reading it while a server is running.</b> The file is opened <see cref="FileShare.ReadWrite"/>
@@ -113,18 +114,12 @@ public sealed class AuditLog : IDisposable
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
     private readonly Lock _gate = new();
-    private readonly FileStream _stream;
-    private readonly FileStream _tail;
     private readonly TimeProvider _clock;
-    private readonly string _lockPath;
     private bool _disposed;
 
-    private AuditLog(string path, FileStream stream, FileStream tail, TimeProvider clock, bool tightened)
+    private AuditLog(string path, TimeProvider clock, bool tightened)
     {
         Path = path;
-        _lockPath = path + LockSuffix;
-        _stream = stream;
-        _tail = tail;
         _clock = clock;
         TightenedPermissions = tightened;
     }
@@ -154,13 +149,11 @@ public sealed class AuditLog : IDisposable
     /// <returns><see langword="true"/> if the log is open, writable, and can be chained onto.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> or <paramref name="clock"/> is null.</exception>
     /// <remarks>
-    /// Opened once and held for the process's lifetime, which makes "the log is writable" a startup
-    /// invariant rather than a surprise on the first call, and keeps a file open off the latency
-    /// budget of every tool invocation. Since 2.4 the end of the file is inspected here too, for the
-    /// same reason: the rare log that cannot be chained onto at all — one written by a newer
+    /// Opened and inspected here, so "the log is writable" is a startup invariant rather than a surprise
+    /// on the first call: the rare log that cannot be chained onto at all — one written by a newer
     /// keypaste — should stop the server at startup rather than surface as a mysterious denial an
     /// hour later. Everything else the end of the file might hold is recorded around rather than
-    /// refused; <see cref="TryReadTail"/> says why.
+    /// refused; <see cref="TryReadTail"/> says why. Each append opens the file again.
     /// </remarks>
     public static bool TryOpen(
         string path,
@@ -172,50 +165,25 @@ public sealed class AuditLog : IDisposable
         ArgumentNullException.ThrowIfNull(clock);
 
         log = null;
-        FileStream? stream = null;
-        FileStream? tail = null;
 
         try
         {
             var full = System.IO.Path.GetFullPath(path);
             CreateDirectory(System.IO.Path.GetDirectoryName(full));
 
-            var options = new FileStreamOptions
+            using (OpenWriter(full))
             {
-                Mode = FileMode.Append,
-                Access = FileAccess.Write,
-
-                // Readable while we hold it, so `keypaste log` works on a live file — including on
-                // Windows, where the default share mode would lock other readers out.
-                Share = FileShare.ReadWrite,
-            };
-
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = _ownerOnlyFile;
             }
 
-            stream = new FileStream(full, options);
-
-            // The same file, for reading the line a new record links to. FileShare.ReadWrite is not
-            // optional: a share mode is checked against every existing handle including this
-            // process's own writer, so asking for less collides with ourselves on Windows.
-            // Unbuffered, so there is no second copy of the end of the file to reason about.
-            tail = new FileStream(full, new FileStreamOptions
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Share = FileShare.ReadWrite,
-                BufferSize = 0,
-            });
-
             var tightened = Tighten(full);
-            var opened = new AuditLog(full, stream, tail, clock, tightened);
+            var opened = new AuditLog(full, clock, tightened);
 
-            if (!opened.TryReadTail(out _, out error))
+            using (var tail = OpenTail(full))
             {
-                opened.Dispose();
-                return false;
+                if (!opened.TryReadTail(tail, out _, out error))
+                {
+                    return false;
+                }
             }
 
             log = opened;
@@ -225,12 +193,68 @@ public sealed class AuditLog : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                                        or NotSupportedException or ArgumentException)
         {
-            stream?.Dispose();
-            tail?.Dispose();
             error = $"the audit log at '{path}' could not be opened: {ex.Message}";
             return false;
         }
     }
+
+    /// <summary>Takes the sidecar lock every keypaste writer of the log at <paramref name="path"/> takes, or returns null when another process will not let go.</summary>
+    /// <param name="path">The log's full path.</param>
+    /// <returns>The held lock, released by disposing it.</returns>
+    /// <remarks>
+    /// Exclusion comes from holding the handle open, not from the file existing, so a lock file left
+    /// behind by a killed process blocks nothing: the operating system closes its handles. That is
+    /// what keeps this free of the stale-lock problem every "delete the lock file on exit" scheme
+    /// eventually has. It excludes other keypaste processes and nothing else — a text editor or a
+    /// `sed -i` writing at the same moment is a case the chain reports rather than prevents.
+    /// </remarks>
+    internal static FileStream? AcquireWriteLock(string path)
+    {
+        try
+        {
+            return _lockRetries.Execute(static lockPath => new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None), path + LockSuffix);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The writer an append uses: append mode, so it cannot seek back over a line.</summary>
+    /// <remarks>
+    /// Readable and deletable while it is held, so `keypaste log` works on a live file — including on
+    /// Windows, where the default share mode would lock other readers out.
+    /// </remarks>
+    private static FileStream OpenWriter(string path)
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.Append,
+            Access = FileAccess.Write,
+            Share = FileShare.ReadWrite | FileShare.Delete,
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = _ownerOnlyFile;
+        }
+
+        return new FileStream(path, options);
+    }
+
+    /// <summary>The same file, for reading the line a new record links to.</summary>
+    /// <remarks>
+    /// FileShare.ReadWrite is not optional: a share mode is checked against every existing handle including this
+    /// process's own writer, so asking for less collides with ourselves on Windows. Unbuffered, so there is no
+    /// second copy of the end of the file to reason about.
+    /// </remarks>
+    private static FileStream OpenTail(string path) => new(path, new FileStreamOptions
+    {
+        Mode = FileMode.Open,
+        Access = FileAccess.Read,
+        Share = FileShare.ReadWrite | FileShare.Delete,
+        BufferSize = 0,
+    });
 
     /// <summary>Appends one record.</summary>
     /// <param name="record">What happened.</param>
@@ -307,14 +331,17 @@ public sealed class AuditLog : IDisposable
                     return false;
                 }
 
-                writeLock = AcquireWriteLock();
+                writeLock = AcquireWriteLock(Path);
                 if (writeLock is null)
                 {
                     error = $"the audit log at '{Path}' is locked by another keypaste process";
                     return false;
                 }
 
-                if (!TryReadTail(out var tail, out error))
+                using var stream = OpenWriter(Path);
+                using var tailStream = OpenTail(Path);
+
+                if (!TryReadTail(tailStream, out var tail, out error))
                 {
                     return false;
                 }
@@ -340,21 +367,20 @@ public sealed class AuditLog : IDisposable
                     previous = hash;
                 }
 
-                // Seek first: another process may have appended since this stream last wrote, and
-                // FileStream would otherwise write at its own stale idea of the end and destroy
-                // that record. Then one write and a flush, so the lines land whole.
-                _stream.Seek(0, SeekOrigin.End);
+                // Seek first: FileStream writes at its own idea of the end, which the read above may not share. Then one
+                // write and a flush, so the lines land whole.
+                stream.Seek(0, SeekOrigin.End);
 
                 // The one byte keypaste ever writes that is not part of a record. A crash between a
                 // record and its newline leaves a fragment; without this the next record is glued
                 // onto it and both are lost. It adds bytes at the end and modifies none.
                 if (tail.NeedsNewline)
                 {
-                    _stream.Write("\n"u8);
+                    stream.Write("\n"u8);
                 }
 
-                _stream.Write(lines.GetBuffer().AsSpan(0, (int)lines.Length));
-                _stream.Flush();
+                stream.Write(lines.GetBuffer().AsSpan(0, (int)lines.Length));
+                stream.Flush();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -380,8 +406,6 @@ public sealed class AuditLog : IDisposable
         }
 
         _disposed = true;
-        _stream.Dispose();
-        _tail.Dispose();
     }
 
     /// <summary>What the end of the file says the next record must link to.</summary>
@@ -417,7 +441,7 @@ public sealed class AuditLog : IDisposable
     /// wants to happen.
     /// </para>
     /// </remarks>
-    private bool TryReadTail(out Tail tail, out string error)
+    private bool TryReadTail(FileStream stream, out Tail tail, out string error)
     {
         tail = new Tail(AuditChain.Genesis, 0, NeedsNewline: false);
         error = string.Empty;
@@ -426,7 +450,7 @@ public sealed class AuditLog : IDisposable
         {
             // Never cached: FileStream caches a length only when the share mode excludes other
             // writers, and this one does not.
-            var length = _tail.Length;
+            var length = stream.Length;
             if (length == 0)
             {
                 return true;
@@ -435,8 +459,8 @@ public sealed class AuditLog : IDisposable
             var window = (int)Math.Min(length, TailWindowBytes);
             var buffer = new byte[window];
 
-            _tail.Seek(length - window, SeekOrigin.Begin);
-            _tail.ReadExactly(buffer, 0, window);
+            stream.Seek(length - window, SeekOrigin.Begin);
+            stream.ReadExactly(buffer, 0, window);
 
             var span = buffer.AsSpan();
             var needsNewline = span[^1] != (byte)'\n';
@@ -502,28 +526,6 @@ public sealed class AuditLog : IDisposable
         $"the audit log at '{Path}' cannot be appended to because {because}. "
         + "Run 'keypaste log verify' to see what is in it, or move the file aside to start a new "
         + "log — the old one stays readable and stays verifiable.";
-
-    /// <summary>
-    /// Takes the sidecar lock, or returns null when another process will not let go.
-    /// </summary>
-    /// <remarks>
-    /// Exclusion comes from holding the handle open, not from the file existing, so a lock file left
-    /// behind by a killed process blocks nothing: the operating system closes its handles. That is
-    /// what keeps this free of the stale-lock problem every "delete the lock file on exit" scheme
-    /// eventually has. It excludes other keypaste processes and nothing else — a text editor or a
-    /// `sed -i` writing at the same moment is a case the chain reports rather than prevents.
-    /// </remarks>
-    private FileStream? AcquireWriteLock()
-    {
-        try
-        {
-            return _lockRetries.Execute(static path => new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None), _lockPath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
 
     private static void CreateDirectory(string? directory)
     {
@@ -608,7 +610,7 @@ public sealed class AuditLog : IDisposable
     /// reason and once without — and hashing anything but the composition that is actually chosen
     /// would give every oversized record a hash that does not match itself.
     /// </remarks>
-    private static byte[] Compose(
+    internal static byte[] Compose(
         AuditRecord record,
         string timestamp,
         long sequence,
@@ -725,7 +727,12 @@ public sealed class AuditLog : IDisposable
 
             WriteOptional(writer, "command", record.Command);
             WriteOptional(writer, "command_sha256", record.CommandSha256);
+            WriteSummary(writer, record.Summary);
+            WriteRemoval(writer, record.Removal);
             WriteOptional(writer, "checkpoint", record.Checkpoint);
+
+            // Next to the vault and the chain footer, where AuditCompaction reads it by position.
+            WriteOptional(writer, "compaction", record.Compaction);
 
             // Last, so the bytes the hash covers include the link. The other order would let a
             // line's link be re-pointed without disturbing its hash.
@@ -747,6 +754,47 @@ public sealed class AuditLog : IDisposable
         return buffer.ToArray();
     }
 
+    private static void WriteSummary(Utf8JsonWriter writer, AuditSummary? summary)
+    {
+        if (summary is null)
+        {
+            return;
+        }
+
+        writer.WriteStartObject("summary");
+        writer.WriteString("day", summary.Day);
+        writer.WriteString("first", summary.First);
+        writer.WriteString("last", summary.Last);
+        writer.WriteStartArray("counts");
+        foreach (var count in summary.Counts)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("tool", count.Tool);
+            writer.WriteString("decision", Wire(count.Decision));
+            writer.WriteNumber("count", count.Count);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteString("sha256", summary.Sha256);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteRemoval(Utf8JsonWriter writer, AuditRemoval? removal)
+    {
+        if (removal is null)
+        {
+            return;
+        }
+
+        writer.WriteStartObject("removed");
+        writer.WriteString("from", removal.From);
+        writer.WriteString("to", removal.To);
+        writer.WriteNumber("count", removal.Count);
+        writer.WriteString("sha256", removal.Sha256);
+        writer.WriteEndObject();
+    }
+
     private static void WriteOptional(Utf8JsonWriter writer, string name, string? value)
     {
         if (value is not null)
@@ -755,7 +803,7 @@ public sealed class AuditLog : IDisposable
         }
     }
 
-    private static string Wire(AuditDecision decision) => decision switch
+    internal static string Wire(AuditDecision decision) => decision switch
     {
         AuditDecision.Granted => "granted",
         _ => "denied",
@@ -805,6 +853,9 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Blocked => "blocked",
         AuditMethod.RulesChanged => "rules-changed",
         AuditMethod.Checkpoint => AuditCheckpoint.Method,
+        AuditMethod.Folded => "folded",
+        AuditMethod.Expired => "expired",
+        AuditMethod.Compaction => AuditCompaction.Method,
         _ => "unknown",
     };
 

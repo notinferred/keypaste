@@ -69,6 +69,12 @@ When more than one item answers to the name an agent asked for, such as two logi
 
 An agent's `request_linked_set` asks for two to four fields together, of one item and of items `find_access` links to it. The prompt lists every item and field under the agent's reason and offers only Deny and Allow once; at the terminal, `y` allows the set once and anything else denies it. A set is asked about every time, even when your settings allow each of its fields, and a field you block, one refused in the last minute or an item the agent cannot see or that is not linked refuses the whole set without asking. Allow once sends every value; Deny sends none, and holds each of its fields back for a minute.
 
+<a id="item-changes"></a>
+
+### Item changes
+
+An agent's `request_item_change` asks you to allow one change to an item its bridge shows whole, never one it reaches only through a project tag: moving it to Trash, marking it expired with KeePass's own expiry date, now or on a day it names, or adding the tag `needs-update`. The prompt says the change in keypaste's words, such as "Move work/github to Trash" or "Mark cloud/aws-prod as expired on 2026-12-01", under the agent's reason, and offers only Deny and Allow; at the terminal, `y` allows it and anything else denies it. A change is asked about every time and no setting allows one. An agent may also ask to delete an item for good, which only an item that same agent created through a `request_save` you approved can be; the prompt says "Delete work/scratch-token for good. An agent created it on 2026-11-15", and its Allow reads Delete for good. A change is refused without asking when the item already carries it, when Trash is off for a move, and for a delete of any other item. Deny changes nothing and holds the item back for a minute, whatever change the agent asks for next. An expired item and a weak or reused password appear in Items › Recommendations; a `needs-update` tag shows on the item and in a search for it.
+
 <a id="approving-in-the-desktop-app"></a>
 
 ### In the desktop app
@@ -211,13 +217,15 @@ Records after the last checkpoint are unsigned, and deleting the last records le
 keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
 ```
 
+**How long lines stay.** A request for a value, a command, a save or a change to an item keeps its own line. An agent's lookups, a listing or a search, keep theirs for 30 days; then the app or `keypaste approve`, while the vault is unlocked, folds them into one `log_summary` line per agent per day with counts by tool and decision. Settings › Keep the agent log for sets how long the log is kept, 90 days, 1 year (the default), 2 years or forever; older days are removed whole behind one `log_removed` line saying which days and how many requests. The rewritten file starts with a `log_compaction` line signed with the vault's checkpoint key, so `keypaste log verify` reports `Compacted: …` and `--checkpoints` checks that signature. A vault with no checkpoint key yet is not compacted until a save gives it one. An anchor to a line that was folded or removed is reported missing.
+
 [THREATS](../THREATS.md) T-5 covers these limits. Records from a newer keypaste stop new lines being appended, so the chain does not fork; upgrade, or move the file aside to start a new log.
 
 <a id="archiving-it"></a>
 
 ### Archiving it
 
-keypaste never rotates, trims or moves the log. To start a new one:
+keypaste never moves the log; it shortens it only as [how long lines stay](#the-audit-log) says. To start a new one:
 
 1. Quit the app, stop `keypaste approve` and quit every AI tool that runs keypaste's bridge, so nothing has the file open. Windows cannot move a file in use.
 2. Run `keypaste log verify` and keep the `Latest` hash somewhere other than this computer.

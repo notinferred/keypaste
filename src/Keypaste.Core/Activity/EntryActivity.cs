@@ -94,10 +94,11 @@ public sealed class EntryActivity
 
         foreach (var entry in audit)
         {
-            // A terminal's edit and a merge name items but release nothing, so neither is a use.
+            // A terminal's edit, an agent's item change and a merge name items but release nothing, so none is a use.
             if (!entry.Granted
                 || entry.At is not { } at
                 || string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
+                || string.Equals(entry.Tool, AuditTools.ItemChange, StringComparison.Ordinal)
                 || string.Equals(entry.Tool, AuditTools.Merge, StringComparison.Ordinal)
                 || (entry.Vault.Length > 0 && !string.Equals(entry.Vault, vaultKey, StringComparison.Ordinal)))
             {
@@ -145,6 +146,21 @@ public sealed class EntryActivity
         foreach (var env in live.WaitingEnvs)
         {
             activity._waiting.UnionWith(env.Prompt.Entries.Select(Key));
+        }
+
+        foreach (var set in live.WaitingSets)
+        {
+            activity._waiting.UnionWith(set.Prompt.Fields.Select(field => Key(field.Entry)));
+        }
+
+        foreach (var save in live.WaitingSaves.Where(save => !save.Prompt.ForProject))
+        {
+            activity._waiting.Add(Key(save.Prompt.Where));
+        }
+
+        foreach (var change in live.WaitingChanges)
+        {
+            activity._waiting.Add(Key(change.Prompt.Item));
         }
 
         return activity;

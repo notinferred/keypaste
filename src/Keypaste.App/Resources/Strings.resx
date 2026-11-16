@@ -248,6 +248,12 @@
   <data name="LockNow" xml:space="preserve"><value>Lock now</value></data>
   <data name="LockAfter" xml:space="preserve"><value>Lock after</value></data>
   <data name="LockWhenMinimized" xml:space="preserve"><value>Lock when minimized</value></data>
+  <data name="KeepTheAgentLogFor" xml:space="preserve"><value>Keep the agent log for</value></data>
+  <data name="KeepTheAgentLogForHelp" xml:space="preserve"><value>An agent's lookups of names keep their own lines for 30 days, then become one line per agent per day. Older days are removed whole, behind a sealed line saying what was removed. Value requests, saves and changes keep their own lines until then.</value></data>
+  <data name="LogKeptNinetyDays" xml:space="preserve"><value>90 days</value></data>
+  <data name="LogKeptOneYear" xml:space="preserve"><value>1 year</value></data>
+  <data name="LogKeptTwoYears" xml:space="preserve"><value>2 years</value></data>
+  <data name="LogKeptForever" xml:space="preserve"><value>Forever</value></data>
   <data name="KeepInMenuBar" xml:space="preserve"><value>Keep in menu bar</value></data>
   <data name="KeepInTray" xml:space="preserve"><value>Keep in tray</value></data>
   <data name="Locked" xml:space="preserve"><value>Locked</value></data>
@@ -591,6 +597,11 @@
   <data name="AgentsSeeUsernames" xml:space="preserve"><value>Agents see usernames</value></data>
   <data name="EachKindOfValueIsAskedAllowedOrBlocked" xml:space="preserve"><value>These hold for every agent on this computer. Ask puts each request to you, Allow releases without asking, and Block refuses without asking. Passkeys are always blocked.</value></data>
   <data name="EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere" xml:space="preserve"><value>Each release is recorded in the log. Set Ask here to be asked again.</value></data>
+  <data name="EveryAgentWillSeeEachItemsUsername" xml:space="preserve"><value>Every agent will see each item's username in its searches and receive it without asking. What an agent sees reaches its AI tool's provider.</value></data>
+  <data name="EveryAgentsSearchesWillShowHostsAndReferences" xml:space="preserve"><value>Every agent's searches will show the host in each item's Host field and which items its fields reference. What an agent sees reaches its AI tool's provider.</value></data>
+  <data name="ShowUsernamesToAgents" xml:space="preserve"><value>Show usernames</value></data>
+  <data name="ShowHostsAndReferencesToAgents" xml:space="preserve"><value>Show hosts and references</value></data>
+  <data name="TurnTheSwitchOffHereToStopIt" xml:space="preserve"><value>Turn the switch off here to stop it.</value></data>
   <data name="AlwaysAnswers" xml:space="preserve"><value>Always answers</value></data>
   <data name="NoAlwaysAnswersYet" xml:space="preserve"><value>None yet. Always allow and Always block on a prompt keep an answer for one item here.</value></data>
   <data name="TheValueToSave" xml:space="preserve"><value>The value to save</value></data>

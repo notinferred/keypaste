@@ -4,21 +4,27 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+An agent can ask with `request_item_change` to move an item it sees whole to Trash, mark it expired with KeePass's own expiry date, tag it `needs-update`, or delete for good an item it created itself through a `request_save` you approved; each change is asked every time in the app or at `keypaste approve`, Deny or Allow, and made only once you allow it.
+
+The app and `keypaste approve` fold an agent's lookups older than 30 days into one audit line per agent per day and remove whole days older than Settings › Keep the agent log for (a year by default, never under 30 days), sealing what stays with the vault's checkpoint key; every other line keeps its bytes, and `keypaste log verify` checks the seal.
+
 An agent can ask with `request_linked_set` for up to four fields of one item and the items `find_access` links to it, such as a database's host, username and password, in one prompt that you allow once or deny; a set is always asked about, a blocked field refuses it whole, and each released field is its own audit line.
 
 Each audit line the app or `keypaste approve` writes for a request names the program that connected, its process id, path and whether its code signature checks out, in a new `caller` object; nothing is refused because of it.
 
 An agent can search the items it may see with `find_access`, by text, host, kind, project or a related item, and gets each item's handle, origin, username when Settings shows it, the items it shares a site, a project or an account with, and the projects the items found belong to with their environments, never a value. Hosts and references, a new switch beside Usernames in Agents, off by default, adds the host in a `Host` field and links between items one of whose fields references the other.
 
-The app and `keypaste approve` sign the audit log every 64 lines they write and when the vault locks, with a key kept in the vault, and `keypaste log verify --checkpoints` checks those signatures, so rewriting the log before the last one needs the unlocked vault.
+Turning on Usernames or Hosts and references in Agents first asks you to confirm, saying what every agent will then see and that it reaches their AI tool's provider; Cancel leaves the switch off, and turning one off still takes effect at once.
 
-On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command; the desktop packages leave out .NET's `createdump`, the app opens no diagnostics socket on macOS and Linux, and secret buffers stay out of swap where the system allows.
+The app and `keypaste approve` sign the audit log every 64 lines they write and when the vault locks, with a key kept in the vault, and `keypaste log verify --checkpoints` and Activity's Verify chain check those signatures, so rewriting the log before the last one needs the unlocked vault.
+
+On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command; the desktop packages leave out .NET's `createdump`, the app opens no .NET diagnostics port, and secret buffers stay out of swap where the system allows.
 
 keypaste has its own browser extension, a simplified fork of KeePassXC-Browser for Chrome, Chromium, Edge, Brave and Firefox that pairs with keypaste and fills logins, in keypaste's design; it is not in the stores yet ([8.1f](docs/steps/8.1f.md)).
 
 Settings › Browser fill and `keypaste browser` turn keypaste on and off as Chrome's, Chromium's, Edge's, Brave's and Firefox's host for keypaste's own browser extension, and show which program each browser starts and whether the extension is installed in it. keypaste no longer answers KeePassXC-Browser ([8.1e](docs/steps/8.1e.md)).
 
-keypaste.com's pages come from InfernoCMS and are published from there, and each page has an Ask button that answers from the site's pages with links to them, structured data for search engines and a Markdown version for AI tools.
+keypaste.com's pages carry structured data for search engines.
 
 Quitting the desktop app just after its window moved no longer ends it with a crash report ([F.110](docs/steps/F.110.md)).
 

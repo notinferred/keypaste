@@ -310,6 +310,15 @@ internal sealed class FakeChannel : IApprovalChannel
         return new SaveAnswer(answer, SaveValue);
     }
 
+    /// <summary>The last change to an item asked about.</summary>
+    internal ItemChangePrompt? LastChangePrompt { get; private set; }
+
+    public ValueTask<ApprovalAnswer> AskAsync(ItemChangePrompt prompt, CancellationToken cancellationToken)
+    {
+        LastChangePrompt = prompt;
+        return AnswerAsync(cancellationToken);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         LastEnvPrompt = prompt;

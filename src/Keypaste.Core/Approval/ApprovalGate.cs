@@ -22,6 +22,21 @@ public sealed record WaitingEnv(EnvReleasePrompt Prompt, TimeSpan Remaining);
 /// <param name="Remaining">How long is left before the gate answers for them.</param>
 public sealed record WaitingEdit(TerminalEditPrompt Prompt, TimeSpan Remaining);
 
+/// <summary>An agent's linked set in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingSet(SetPrompt Prompt, TimeSpan Remaining);
+
+/// <summary>An agent's request to save a value in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingSave(SavePrompt Prompt, TimeSpan Remaining);
+
+/// <summary>An agent's request to change an item in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingChange(ItemChangePrompt Prompt, TimeSpan Remaining);
+
 /// <summary>
 /// Puts one request in front of a human, enforces the deadline, and denies everything else.
 /// </summary>
@@ -86,19 +101,31 @@ public sealed class ApprovalGate : IDisposable
 
     /// <summary>The request a person is being asked about now, or null when nobody is being asked.</summary>
     public WaitingRequest? Waiting =>
-        _asking is { Prompt: { } prompt } asking ? new WaitingRequest(prompt, asking.Window.Remaining(_clock)) : null;
+        _asking is { Listed.Prompt: { } prompt } asking ? new WaitingRequest(prompt, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>The agent's run a person is being asked about now, or null.</summary>
     public WaitingRun? WaitingRun =>
-        _asking is { Run: { } run } asking ? new WaitingRun(run, asking.Window.Remaining(_clock)) : null;
+        _asking is { Listed.Run: { } run } asking ? new WaitingRun(run, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>The <c>keypaste run --session</c> request a person is being asked about now, or null.</summary>
     public WaitingEnv? WaitingEnv =>
-        _asking is { Env: { } env } asking ? new WaitingEnv(env, asking.Window.Remaining(_clock)) : null;
+        _asking is { Listed.Env: { } env } asking ? new WaitingEnv(env, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>The terminal's edit a person is being asked about now, or null.</summary>
     public WaitingEdit? WaitingEdit =>
-        _asking is { Edit: { } edit } asking ? new WaitingEdit(edit, asking.Window.Remaining(_clock)) : null;
+        _asking is { Listed.Edit: { } edit } asking ? new WaitingEdit(edit, asking.Window.Remaining(_clock)) : null;
+
+    /// <summary>The agent's linked set a person is being asked about now, or null.</summary>
+    public WaitingSet? WaitingSet =>
+        _asking is { Listed.Set: { } set } asking ? new WaitingSet(set, asking.Window.Remaining(_clock)) : null;
+
+    /// <summary>The agent's request to save a value a person is being asked about now, or null.</summary>
+    public WaitingSave? WaitingSave =>
+        _asking is { Listed.Save: { } save } asking ? new WaitingSave(save, asking.Window.Remaining(_clock)) : null;
+
+    /// <summary>The agent's request to change an item a person is being asked about now, or null.</summary>
+    public WaitingChange? WaitingChange =>
+        _asking is { Listed.Change: { } change } asking ? new WaitingChange(change, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>Why a terminal's edit was not put to the person, and when it can be asked again.</summary>
     /// <param name="otherwise">What the person can do instead, said after "or".</param>
@@ -197,7 +224,7 @@ public sealed class ApprovalGate : IDisposable
 
         var answer = await AskThroughAsync(
             [cooldownKey],
-            new Asked(null, null, null, null),
+            new Asked(null, null, null, null, Save: prompt),
             async token =>
             {
                 var said = await _channel.AskToSaveAsync(prompt, token).ConfigureAwait(false);
@@ -208,6 +235,20 @@ public sealed class ApprovalGate : IDisposable
             asker: asker).ConfigureAwait(false);
 
         return new SaveAnswer(answer, answer == ApprovalAnswer.ApprovedOnce ? value : null);
+    }
+
+    /// <summary>Asks a human to allow an agent's change to an item, under the same window, slot and cooldown, Allow once alone counting as yes.</summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal: the item, whatever change is asked next.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <param name="asker">The agent asking, from <see cref="Asker"/>, whose request waits its turn; null takes the turn now or is busy.</param>
+    /// <returns>The answer; an always is a denial, since no rule allows a change.</returns>
+    public ValueTask<ApprovalAnswer> AskAsync(string cooldownKey, ItemChangePrompt prompt, CancellationToken cancellationToken, string? asker = null)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync([cooldownKey], new Asked(null, null, null, null, Change: prompt), token => _channel.AskAsync(prompt, token), cancellationToken, asker: asker);
     }
 
     /// <summary>Asks a human about an agent's linked set, under the same window, slot and cooldown, Allow once alone counting as yes.</summary>
@@ -226,7 +267,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKeys);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken, asker: asker);
+        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, null, Set: prompt), token => _channel.AskAsync(prompt, token), cancellationToken, asker: asker);
     }
 
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
@@ -362,7 +403,7 @@ public sealed class ApprovalGate : IDisposable
                 return ApprovalAnswer.Cooldown;
             }
 
-            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, listed.Edit, Deadline.Starting(_clock, Limits.Window));
+            _asking = new Asking(listed, Deadline.Starting(_clock, Limits.Window));
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
@@ -564,7 +605,7 @@ public sealed class ApprovalGate : IDisposable
 
     }
 
-    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, TerminalEditPrompt? Edit, Deadline Window);
+    private sealed record Asking(Asked Listed, Deadline Window);
 
-    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, TerminalEditPrompt? Edit);
+    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, TerminalEditPrompt? Edit, SetPrompt? Set = null, SavePrompt? Save = null, ItemChangePrompt? Change = null);
 }

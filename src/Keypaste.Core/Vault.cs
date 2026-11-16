@@ -2597,6 +2597,40 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.AddImported(entries), names => VaultEdit.Of(names));
     }
 
+    /// <summary>Sets an entry's KeePass expiry as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="expires">When it expires.</param>
+    /// <returns>Whether there was such an entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool SetExpiry(EntryName name, DateTimeOffset expires) =>
+        Change(() => _interop.SetExpiry(name, expires), set => set ? VaultEdit.Of(name) : null);
+
+    /// <summary>Removes an entry and its history for good, Trash or not. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Whether there was such an entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool DeleteForGood(EntryName name) =>
+        Change(() => _interop.DeleteForGood(name), deleted => deleted ? VaultEdit.Of(name) : null);
+
+    /// <summary>Marks an entry an approved save just created as that agent's, which lets that agent alone ask to delete it for good. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="agent">The agent's label.</param>
+    /// <exception cref="VaultException">No entry, or more than one, answers to that name.</exception>
+    internal void MarkAgentCreated(EntryName name, string agent) =>
+        Change(() => _interop.MarkAgentCreated(name, agent), VaultEdit.Of(name));
+
+    /// <summary>The label of the agent whose approved save created this entry, or null when no agent's save did.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>The label, or null.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal string? AgentThatCreated(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.AgentThatCreated(name);
+    }
+
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
         Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));

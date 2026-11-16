@@ -78,6 +78,20 @@ public sealed class AtomicFile : IDisposable
         return new AtomicFile(target, staged);
     }
 
+    /// <summary>Adds <paramref name="contents"/> to the end of the staged file and flushes it to disk.</summary>
+    /// <param name="contents">The bytes to add.</param>
+    /// <exception cref="InvalidOperationException">It was already committed or disposed.</exception>
+    /// <exception cref="IOException">The bytes could not be written; the target is unchanged.</exception>
+    /// <exception cref="UnauthorizedAccessException">The same, for want of permission.</exception>
+    public void Append(ReadOnlySpan<byte> contents)
+    {
+        var staged = _staged ?? throw new InvalidOperationException("the file was already committed or discarded");
+
+        using var stream = new FileStream(staged, FileMode.Append, FileAccess.Write, FileShare.None);
+        stream.Write(contents);
+        stream.Flush(flushToDisk: true);
+    }
+
     /// <summary>Moves the staged file over the target.</summary>
     /// <exception cref="InvalidOperationException">It was already committed or disposed.</exception>
     /// <exception cref="IOException">The move failed; the target is unchanged.</exception>

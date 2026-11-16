@@ -406,12 +406,18 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             var activity = _authority!.Activity;
             Unavailable = string.Empty;
             var asked = activity.Waiting.Count;
-            var run = asked + activity.WaitingRuns.Count;
+            var set = asked + activity.WaitingSets.Count;
+            var save = set + activity.WaitingSaves.Count;
+            var change = save + activity.WaitingChanges.Count;
+            var run = change + activity.WaitingRuns.Count;
             var env = run + activity.WaitingEnvs.Count;
             waiting =
             [
                 .. activity.Waiting.Select((request, i) => ActivityRow.Waiting(i + 1, request)),
-                .. activity.WaitingRuns.Select((request, i) => ActivityRow.WaitingRun(asked + i + 1, request)),
+                .. activity.WaitingSets.Select((request, i) => ActivityRow.WaitingSet(asked + i + 1, request)),
+                .. activity.WaitingSaves.Select((request, i) => ActivityRow.WaitingSave(set + i + 1, request)),
+                .. activity.WaitingChanges.Select((request, i) => ActivityRow.WaitingChange(save + i + 1, request)),
+                .. activity.WaitingRuns.Select((request, i) => ActivityRow.WaitingRun(change + i + 1, request)),
                 .. activity.WaitingEnvs.Select((request, i) => ActivityRow.WaitingEnv(run + i + 1, request)),
                 .. activity.WaitingEdits.Select((request, i) => ActivityRow.WaitingEdit(env + i + 1, request)),
             ];

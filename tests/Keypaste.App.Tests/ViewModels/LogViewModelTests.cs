@@ -14,6 +14,8 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </remarks>
 public sealed class LogViewModelTests : IDisposable
 {
+    private const string _vault = "0123456789abcdef";
+    private static readonly byte[] _vaultKey = [.. Enumerable.Range(1, 32).Select(i => (byte)i)];
     private readonly TempAuditHome _home = new();
 
     public void Dispose() => _home.Dispose();
@@ -161,6 +163,62 @@ public sealed class LogViewModelTests : IDisposable
         Assert.False(model.VerdictShown);
     }
 
+    [Fact]
+    public void Verify_checks_the_checkpoints_this_vaults_key_signed_and_counts_the_unsigned_tail()
+    {
+        _home.Append("env/dev/STRIPE_KEY");
+        _home.Checkpoint(Key(_vaultKey, _vault));
+        _home.Append("env/prod/GITHUB_TOKEN");
+
+        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+
+        Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
+        Assert.Contains("1 checkpoint found, 1 signed by this vault's key. Unsigned tail: 1 record after the last signed checkpoint.", model.Verdict.Paragraphs);
+        Assert.Contains(model.Verdict.Paragraphs, paragraph => paragraph.StartsWith("A rewrite that recomputed the chain is caught only before the last checkpoint", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_checkpoint_naming_another_vault_is_counted_and_not_checked()
+    {
+        _home.Append("env/dev/STRIPE_KEY");
+        _home.Checkpoint(Key(_vaultKey, "fedcba9876543210"));
+
+        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+
+        Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
+        Assert.Contains(
+            "1 checkpoint found, 0 signed by this vault's key. Not checked: 1 checkpoint naming another vault. No checkpoint is signed by this vault's key, so no record is signed.",
+            model.Verdict.Paragraphs);
+    }
+
+    [Fact]
+    public void A_checkpoint_this_vaults_key_did_not_sign_breaks_the_chain()
+    {
+        _home.Append("env/dev/STRIPE_KEY");
+        _home.Checkpoint(Key(new byte[32], _vault));
+
+        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+
+        Assert.True(model.IsBroken);
+        Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
+        Assert.Equal("Chain broken at seq 2", model.Verdict.Headline);
+        Assert.Contains(AuditText.Describe(AuditChainFault.Forged), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
+        Assert.Contains("1 checkpoint found, 0 signed by this vault's key. No checkpoint is signed by this vault's key, so no record is signed.", model.Verdict.Paragraphs);
+    }
+
+    [Fact]
+    public void Without_a_checkpoint_key_no_checkpoint_is_checked_and_Verify_says_so()
+    {
+        _home.Append("env/dev/STRIPE_KEY");
+        _home.Checkpoint(Key(_vaultKey, _vault));
+
+        using var model = new LogViewModel(_home.Home, checkpointKey: () => null);
+
+        Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
+        Assert.Contains("1 checkpoint found, not checked: this vault holds no checkpoint key yet, so the log is not compacted until a save gives it one.", model.Verdict.Paragraphs);
+        Assert.Contains(model.Verdict.Paragraphs, paragraph => paragraph.Contains("because no checkpoint was checked", StringComparison.Ordinal));
+    }
+
     /// <summary>
     /// An edited file says so on load, still shows its records, and marks the ones the chain cannot vouch for.
     /// </summary>
@@ -284,4 +342,7 @@ public sealed class LogViewModelTests : IDisposable
         Method = method,
         Reason = TempAuditHome.Reason,
     };
+
+    /// <summary>A fresh copy each time, since the screen zeroes the key it was handed once it has checked.</summary>
+    private static AuditCheckpointKey Key(byte[] key, string vault) => new([.. key], vault);
 }

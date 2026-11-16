@@ -7,7 +7,7 @@
              x:DataType="vm:AgentRulesViewModel">
 
   <!-- What every agent gets: the rules each request is decided by on this computer, in Every other agent's detail. No amber:
-       the confirmation's Allow is a secondary button, so the screen keeps its one. -->
+       the confirmation's button, for an Allow or a switch turned on, is a secondary one, so the screen keeps its one. -->
   <StackPanel Name="AgentRulesCard" Spacing="12">
     <Border Name="AgentRulesIgnored" Classes="group" Padding="16,12" IsVisible="{Binding IsIgnored}">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
@@ -81,14 +81,14 @@
       </Border>
     </StackPanel>
 
-    <Border Name="AllowConfirmation" Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True"
-            ctl:FormKeys.Cancel="{Binding CancelAllowCommand}">
+    <Border Name="GrantConfirmation" Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True"
+            ctl:FormKeys.Cancel="{Binding CancelGrantCommand}">
       <StackPanel Spacing="8">
-        <TextBlock Name="AllowConfirmationText" Text="{Binding ConfirmText}" TextWrapping="Wrap" Classes="primary size-13" />
-        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{x:Static res:Strings.EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere}" />
+        <TextBlock Name="GrantConfirmationText" Text="{Binding ConfirmText}" TextWrapping="Wrap" Classes="primary size-13" />
+        <TextBlock Name="GrantConfirmationCaption" Classes="caption" TextWrapping="Wrap" Text="{Binding ConfirmCaption}" />
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Name="CancelAllow" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAllowCommand}" />
-          <Button Name="ConfirmAllow" Classes="sm" Content="{Binding ConfirmAction}" Command="{Binding ConfirmAllowCommand}" />
+          <Button Name="CancelGrant" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGrantCommand}" />
+          <Button Name="ConfirmGrant" Classes="sm" Content="{Binding ConfirmAction}" Command="{Binding ConfirmGrantCommand}" />
         </StackPanel>
       </StackPanel>
     </Border>

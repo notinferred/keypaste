@@ -440,6 +440,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The custom-data item KeePassXC rewrites on every save, so a new value of it is no change to its owner.</summary>
     private const string _keePassXcStamp = "_LAST_MODIFIED";
 
+    // An entry's custom data, which KeePassXC keeps and shows nowhere, naming its UUID and the agent whose approved save created it (T-57).
+    private const string _agentCreated = "keypaste.agent-created";
+
     /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
     internal Func<byte[], byte[]>? AfterSerializing { get; set; }
 
@@ -2003,6 +2006,72 @@ internal sealed class KeePassInterop : IDisposable
 
         MarkEdited(found.Entry);
         return 1;
+    }
+
+    /// <summary>Sets an entry's expiry as an edit with one history revision.</summary>
+    /// <returns>Whether there was such an entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool SetExpiry(EntryName name, DateTimeOffset expires)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return false;
+        }
+
+        found.Entry.CreateBackup(_database);
+        found.Entry.Expires = true;
+        found.Entry.ExpiryTime = expires.UtcDateTime;
+        MarkEdited(found.Entry);
+        return true;
+    }
+
+    /// <summary>Removes an entry and its history for good, whether or not the vault's Trash is on, and tombstones it for a merge.</summary>
+    /// <returns>Whether there was such an entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool DeleteForGood(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return false;
+        }
+
+        found.Group.Entries.Remove(found.Entry);
+        _database.DeletedObjects.Add(new PwDeletedObject(found.Entry.Uuid, DateTime.UtcNow));
+        return true;
+    }
+
+    /// <summary>Records on an entry an approved save just created that the agent named asked for it, bound to the entry's own UUID so a copy is not marked.</summary>
+    /// <exception cref="VaultException">No entry, or more than one, answers to that name.</exception>
+    internal void MarkAgentCreated(EntryName name, string agent)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            throw new VaultException($"'{name.Title}' is not in this vault.");
+        }
+
+        found.Entry.CustomData.Set(_agentCreated, $"{found.Entry.Uuid.ToHexString()} {agent}");
+    }
+
+    /// <summary>The agent whose approved save created this entry, or null when its mark is missing or belongs to another entry's UUID.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal string? AgentThatCreated(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found || found.Entry.CustomData.Get(_agentCreated) is not { } mark)
+        {
+            return null;
+        }
+
+        var uuid = found.Entry.Uuid.ToHexString();
+
+        return mark.Length > uuid.Length + 1 && mark.StartsWith(uuid + " ", StringComparison.Ordinal) ? mark[(uuid.Length + 1)..] : null;
     }
 
     /// <summary>Sets an entry's expiry, which only KeePassXC writes, for a fixture to hold one.</summary>

@@ -156,6 +156,15 @@ jobs:
         shell: bash
         run: bash scripts/verify.sh desktop
 
+      - name: Keep the desktop tests' logs and hang dumps
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-test-logs-${{ matrix.os }}
+          path: artifacts/test-logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
   # The app, the CLI and an agent as real processes: approvals, locks, saves and the session's lifecycle.
   desktop-gates:
     name: desktop gates (${{ matrix.os }})
@@ -305,6 +314,15 @@ jobs:
       - name: Restore, build and test desktop and consistency
         shell: bash
         run: bash scripts/verify.sh desktop
+
+      - name: Keep the desktop tests' logs and hang dumps
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-test-logs-macos-15
+          path: artifacts/test-logs/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Drive the desktop gates
         shell: bash

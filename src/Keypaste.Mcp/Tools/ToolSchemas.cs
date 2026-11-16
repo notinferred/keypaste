@@ -255,6 +255,40 @@ internal static class ToolSchemas
         }
         """;
 
+    /// <summary>The arguments of <c>request_item_change</c>: which item, which change, the day an expiry names, and why.</summary>
+    /// <remarks>The bounds are <c>ItemChangeRules</c>'s, which the owner applies again.</remarks>
+    internal const string ItemChangeInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "The item: its handle from list_entry_names or find_access, or its full path, such as work/github."
+            },
+            "change": {
+              "type": "string",
+              "enum": ["move_to_recycle_bin", "mark_expired", "mark_needs_update", "delete"],
+              "description": "move_to_recycle_bin, mark_expired, mark_needs_update, or delete for an item you created through request_save."
+            },
+            "expires": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+              "description": "With mark_expired: the day it expires, as yyyy-MM-dd. Leave it out to mark it expired now."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the human, who allows or denies the change. Say why this item needs it."
+            }
+          },
+          "required": ["entry", "change", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
     /// <summary>The arguments of <c>request_attachment</c>: which item, which attachment by name, and why.</summary>
     /// <remarks>The bounds are <c>CredentialRequestRules</c>'s, which the owner applies again.</remarks>
     internal const string AttachmentInputJson = """
@@ -368,6 +402,9 @@ internal static class ToolSchemas
 
     /// <summary><see cref="SaveInputJson"/>, parsed once.</summary>
     internal static readonly JsonElement SaveInput = Parse(SaveInputJson);
+
+    /// <summary><see cref="ItemChangeInputJson"/>, parsed once.</summary>
+    internal static readonly JsonElement ItemChangeInput = Parse(ItemChangeInputJson);
 
     /// <summary><see cref="AttachmentInputJson"/>, parsed once.</summary>
     internal static readonly JsonElement AttachmentInput = Parse(AttachmentInputJson);

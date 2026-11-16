@@ -145,6 +145,22 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void The_agent_log_is_kept_a_year_until_chosen_and_a_choice_reaches_the_file_the_owner_reads()
+    {
+        using var fixture = new TempVault();
+        var preferences = new DesktopPreferences(fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), preferences.IdleTimeout);
+        using var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
+
+        Assert.Equal(["90 days", "1 year", "2 years", "Forever"], model.KeepLogChoices.Select(choice => choice.Label));
+        Assert.Equal(AuditRetention.DefaultDays, model.KeepLog.Days);
+
+        model.KeepLog = model.KeepLogChoices.Single(choice => choice.Days == AuditRetention.Forever);
+
+        Assert.Equal(AuditRetention.Forever, AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home)).KeepLogDays);
+    }
+
+    [Fact]
     public void An_offered_timeout_adds_nothing_to_the_list()
     {
         using var fixture = new TempVault();

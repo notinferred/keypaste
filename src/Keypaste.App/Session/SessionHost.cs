@@ -575,7 +575,8 @@ internal sealed class SessionHost : IDisposable
             Action auditWritten,
             Action<Exception>? unexpected)
         {
-            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home), auditWritten);
+            var auditPath = KeypasteHome.AuditPath(session.Home);
+            AuditOpener? audit = new(auditPath, auditWritten);
             SessionServer? server = null;
             LaunchEndpoint? launches = null;
 
@@ -593,6 +594,8 @@ internal sealed class SessionHost : IDisposable
                         () => session.UnlockedFor(lifetime),
                         edit => Saved(session.WriteFor(lifetime, edit, changed => changed))),
                     Audit = audit.Open,
+                    AuditPath = auditPath,
+                    KeepLogDays = () => Core.Settings.AppSettings.Load(KeypasteHome.SettingsPath(session.Home)).KeepLogDays,
                     LockNow = requestLock,
                     Clock = session.Clock,
 

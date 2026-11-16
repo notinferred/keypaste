@@ -215,6 +215,8 @@ public static class Strings
     public static string Environments => Manager.GetString("Environments", CultureInfo.CurrentUICulture)!;
     public static string EveryAIToolFoundIsConnected => Manager.GetString("EveryAIToolFoundIsConnected", CultureInfo.CurrentUICulture)!;
     public static string EveryAgentOnThisComputer => Manager.GetString("EveryAgentOnThisComputer", CultureInfo.CurrentUICulture)!;
+    public static string EveryAgentWillSeeEachItemsUsername => Manager.GetString("EveryAgentWillSeeEachItemsUsername", CultureInfo.CurrentUICulture)!;
+    public static string EveryAgentsSearchesWillShowHostsAndReferences => Manager.GetString("EveryAgentsSearchesWillShowHostsAndReferences", CultureInfo.CurrentUICulture)!;
     public static string EverythingRunInThatTerminalCanReadX8c42c2 => Manager.GetString("EverythingRunInThatTerminalCanReadX8c42c2", CultureInfo.CurrentUICulture)!;
     public static string ExampleItemPath => Manager.GetString("ExampleItemPath", CultureInfo.CurrentUICulture)!;
     public static string ExampleProjectDirectory => Manager.GetString("ExampleProjectDirectory", CultureInfo.CurrentUICulture)!;
@@ -295,6 +297,8 @@ public static class Strings
     public static string KeepEditingThisFileInPlaceSoX072ed7 => Manager.GetString("KeepEditingThisFileInPlaceSoX072ed7", CultureInfo.CurrentUICulture)!;
     public static string KeepInMenuBar => Manager.GetString("KeepInMenuBar", CultureInfo.CurrentUICulture)!;
     public static string KeepInTray => Manager.GetString("KeepInTray", CultureInfo.CurrentUICulture)!;
+    public static string KeepTheAgentLogFor => Manager.GetString("KeepTheAgentLogFor", CultureInfo.CurrentUICulture)!;
+    public static string KeepTheAgentLogForHelp => Manager.GetString("KeepTheAgentLogForHelp", CultureInfo.CurrentUICulture)!;
     public static string KeepTheKeyFileAsItIs => Manager.GetString("KeepTheKeyFileAsItIs", CultureInfo.CurrentUICulture)!;
     public static string KeepTheYubiKeyAsItIs => Manager.GetString("KeepTheYubiKeyAsItIs", CultureInfo.CurrentUICulture)!;
     public static string KeyFile => Manager.GetString("KeyFile", CultureInfo.CurrentUICulture)!;
@@ -340,6 +344,10 @@ public static class Strings
     public static string LogDayToday => Manager.GetString("LogDayToday", CultureInfo.CurrentUICulture)!;
     public static string LogDayUndated => Manager.GetString("LogDayUndated", CultureInfo.CurrentUICulture)!;
     public static string LogDayYesterday => Manager.GetString("LogDayYesterday", CultureInfo.CurrentUICulture)!;
+    public static string LogKeptForever => Manager.GetString("LogKeptForever", CultureInfo.CurrentUICulture)!;
+    public static string LogKeptNinetyDays => Manager.GetString("LogKeptNinetyDays", CultureInfo.CurrentUICulture)!;
+    public static string LogKeptOneYear => Manager.GetString("LogKeptOneYear", CultureInfo.CurrentUICulture)!;
+    public static string LogKeptTwoYears => Manager.GetString("LogKeptTwoYears", CultureInfo.CurrentUICulture)!;
     public static string Login => Manager.GetString("Login", CultureInfo.CurrentUICulture)!;
     public static string LookalikesTip => Manager.GetString("LookalikesTip", CultureInfo.CurrentUICulture)!;
     public static string LookingForAIToolsOnThisComputer => Manager.GetString("LookingForAIToolsOnThisComputer", CultureInfo.CurrentUICulture)!;
@@ -564,10 +572,12 @@ public static class Strings
     public static string ShowAll => Manager.GetString("ShowAll", CultureInfo.CurrentUICulture)!;
     public static string ShowGroupsAndProjects => Manager.GetString("ShowGroupsAndProjects", CultureInfo.CurrentUICulture)!;
     public static string ShowHistory => Manager.GetString("ShowHistory", CultureInfo.CurrentUICulture)!;
+    public static string ShowHostsAndReferencesToAgents => Manager.GetString("ShowHostsAndReferencesToAgents", CultureInfo.CurrentUICulture)!;
     public static string ShowSidebar => Manager.GetString("ShowSidebar", CultureInfo.CurrentUICulture)!;
     public static string ShowTheMenu => Manager.GetString("ShowTheMenu", CultureInfo.CurrentUICulture)!;
     public static string ShowThePrompt => Manager.GetString("ShowThePrompt", CultureInfo.CurrentUICulture)!;
     public static string ShowThePromptFromValue => Manager.GetString("ShowThePromptFromValue", CultureInfo.CurrentUICulture)!;
+    public static string ShowUsernamesToAgents => Manager.GetString("ShowUsernamesToAgents", CultureInfo.CurrentUICulture)!;
     public static string SkipThem => Manager.GetString("SkipThem", CultureInfo.CurrentUICulture)!;
     public static string Slot1 => Manager.GetString("Slot1", CultureInfo.CurrentUICulture)!;
     public static string Slot2 => Manager.GetString("Slot2", CultureInfo.CurrentUICulture)!;
@@ -631,6 +641,7 @@ public static class Strings
     public static string TurnOff => Manager.GetString("TurnOff", CultureInfo.CurrentUICulture)!;
     public static string TurnOn => Manager.GetString("TurnOn", CultureInfo.CurrentUICulture)!;
     public static string TurnOnForThisBrowser => Manager.GetString("TurnOnForThisBrowser", CultureInfo.CurrentUICulture)!;
+    public static string TurnTheSwitchOffHereToStopIt => Manager.GetString("TurnTheSwitchOffHereToStopIt", CultureInfo.CurrentUICulture)!;
     public static string URL => Manager.GetString("URL", CultureInfo.CurrentUICulture)!;
     public static string Undo => Manager.GetString("Undo", CultureInfo.CurrentUICulture)!;
     public static string Unlock => Manager.GetString("Unlock", CultureInfo.CurrentUICulture)!;

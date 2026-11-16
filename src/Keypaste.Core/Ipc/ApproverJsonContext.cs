@@ -32,6 +32,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(RulesChangeReplyFrame))]
 [JsonSerializable(typeof(SaveRequestFrame))]
 [JsonSerializable(typeof(SaveReplyFrame))]
+[JsonSerializable(typeof(ItemChangeRequestFrame))]
+[JsonSerializable(typeof(ItemChangeReplyFrame))]
 [JsonSerializable(typeof(TokenEnvRequestFrame))]
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
@@ -613,5 +615,33 @@ internal sealed class SaveReplyFrame(SaveReply reply)
     public string Reason => reply.Reason;
     public bool Recorded => reply.Recorded;
     public string? Where => reply.Where;
+    public string? Session => reply.Session;
+}
+
+internal sealed class ItemChangeRequestFrame(ItemChangeRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.ItemChangeKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Entry => request.Entry;
+    public string Change => request.Change;
+    public string Expires => request.Expires;
+    public string Reason => request.Reason;
+    public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? Client => request.ClientName;
+    public string? ClientVersion => request.ClientVersion;
+    public string? ClientLabel => request.ClientLabel;
+}
+
+internal sealed class ItemChangeReplyFrame(ItemChangeReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.ItemChangeKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
+    public string? Item => reply.Item;
     public string? Session => reply.Session;
 }

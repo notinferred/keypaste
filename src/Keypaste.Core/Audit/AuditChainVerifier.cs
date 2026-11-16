@@ -47,8 +47,30 @@ public enum AuditChainFault
     /// <summary>A record from a newer schema. Nothing here can check it, so nothing here vouches for it.</summary>
     Unverifiable = 8,
 
-    /// <summary>A checkpoint naming the vault whose key was given, which that key did not sign. The chain was rewritten without the vault.</summary>
+    /// <summary>A checkpoint or compaction record naming the vault whose key was given, which that key did not sign. The chain was rewritten without the vault.</summary>
     Forged = 9,
+
+    /// <summary>A compaction record whose sealed lines are not the lines it sealed: one was changed, removed or inserted.</summary>
+    Unsealed = 10,
+}
+
+/// <summary>What the check of a compaction record found.</summary>
+public enum AuditCompactionCheck
+{
+    /// <summary>The log was never compacted.</summary>
+    None = 0,
+
+    /// <summary>The sealed lines match the record, whose signature was not checked because no key was given.</summary>
+    NotChecked = 1,
+
+    /// <summary>The sealed lines match the record, which names a vault other than the one whose key was given.</summary>
+    OtherVault = 2,
+
+    /// <summary>The sealed lines match the record, and the vault's key signed it.</summary>
+    Verified = 3,
+
+    /// <summary>The record does not answer for its lines, or the key did not sign it: a break, among the findings.</summary>
+    Failed = 4,
 }
 
 /// <summary>One thing the verifier found, and where.</summary>
@@ -123,6 +145,15 @@ public sealed record AuditChainReport
 
     /// <summary>How many chained records follow the last checkpoint the vault's key signed, or all of them when none was.</summary>
     public int UnsignedRecords { get; init; }
+
+    /// <summary>What the check of the log's compaction record found.</summary>
+    public AuditCompactionCheck Compaction { get; init; }
+
+    /// <summary>How many chained lines the compaction record seals, itself excluded.</summary>
+    public int SealedRecords { get; init; }
+
+    /// <summary>How many physical lines the log held before it was last compacted.</summary>
+    public long CompactedFrom { get; init; }
 
     /// <summary>Why the file could not be read, when that is the verdict.</summary>
     public string Error { get; init; } = string.Empty;
@@ -309,6 +340,26 @@ public static class AuditChainVerifier
         private bool _anchored;
         private long _sequence;
         private string _hash = string.Empty;
+        private Sealed? _seal;
+        private AuditCompactionCheck _compaction;
+        private int _sealedRecords;
+        private long _compactedFrom;
+
+        /// <summary>A compaction record whose lines are still being walked, and the findings its seal may answer for.</summary>
+        private sealed class Sealed(AuditSeal seal, int line, AuditLine record)
+        {
+            internal AuditSeal Seal { get; } = seal;
+
+            internal int Line { get; } = line;
+
+            internal AuditLine Record { get; } = record;
+
+            internal AuditCompaction.Digest Digest { get; } = new();
+
+            internal List<AuditChainFinding> Deferred { get; } = [];
+
+            internal int Records { get; set; }
+        }
 
         /// <summary>The last line of a file that does not end with a newline.</summary>
         /// <remarks>
@@ -366,6 +417,11 @@ public static class AuditChainVerifier
 
         public AuditChainReport Report()
         {
+            if (_seal is { } open)
+            {
+                Unseal(open);
+            }
+
             var broken = _findings.Exists(f => f.IsBreak);
 
             var verdict = broken
@@ -388,7 +444,10 @@ public static class AuditChainVerifier
                 Checkpoints = _checkpoints,
                 SignedCheckpoints = key is null ? null : _signed,
                 UnsignedRecords = _unsigned,
-                Findings = _findings,
+                Findings = [.. _findings.OrderBy(f => f.Line)],
+                Compaction = _compaction,
+                SealedRecords = _sealedRecords,
+                CompactedFrom = _compactedFrom,
             };
         }
 
@@ -470,10 +529,80 @@ public static class AuditChainVerifier
                 Found(AuditChainFault.SequenceGap, inspected);
             }
 
+            var first = !_chained;
+
             _records++;
             _chained = true;
             _sequence = inspected.Sequence;
             _hash = inspected.Hash;
+
+            if (_seal is { } open)
+            {
+                Walked(open, inspected);
+            }
+            else if (first && intact && AuditCompaction.TryRead(line, out var seal)
+                && string.Equals(inspected.Previous, AuditChain.Genesis, StringComparison.Ordinal))
+            {
+                _seal = new Sealed(seal, _number, inspected);
+                _compactedFrom = seal.PreviousLines;
+            }
+        }
+
+        /// <summary>Adds a sealed line to its record's digest, and closes the seal at the line it ends with.</summary>
+        private void Walked(Sealed open, AuditLine inspected)
+        {
+            open.Digest.Add(inspected.Hash);
+            open.Records++;
+
+            if (!string.Equals(inspected.Hash, open.Seal.Head, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _seal = null;
+            var digest = open.Digest.Finish();
+            open.Digest.Dispose();
+
+            if (!string.Equals(digest, open.Seal.Digest, StringComparison.Ordinal))
+            {
+                Unseal(open);
+                return;
+            }
+
+            _sealedRecords = open.Records;
+
+            if (key is null)
+            {
+                _compaction = AuditCompactionCheck.NotChecked;
+                return;
+            }
+
+            if (!string.Equals(open.Seal.Vault, key.Vault, StringComparison.Ordinal))
+            {
+                _compaction = AuditCompactionCheck.OtherVault;
+                return;
+            }
+
+            if (!AuditCompaction.Verifies(key, open.Seal))
+            {
+                _compaction = AuditCompactionCheck.Failed;
+                _findings.AddRange(open.Deferred);
+                _findings.Add(new AuditChainFinding(open.Line, AuditChainFault.Forged, open.Record.Sequence, open.Record.Timestamp));
+                return;
+            }
+
+            // The key vouches for every sealed line, so none of them is unsigned.
+            _compaction = AuditCompactionCheck.Verified;
+            _unsigned = 0;
+        }
+
+        /// <summary>A seal that does not answer for its lines: what it deferred is a break after all.</summary>
+        private void Unseal(Sealed open)
+        {
+            _seal = null;
+            _compaction = AuditCompactionCheck.Failed;
+            _findings.AddRange(open.Deferred);
+            _findings.Add(new AuditChainFinding(open.Line, AuditChainFault.Unsealed, open.Record.Sequence, open.Record.Timestamp));
         }
 
         private bool Signs(ReadOnlySpan<byte> line, AuditLine inspected, bool intact)
@@ -500,7 +629,21 @@ public static class AuditChainVerifier
             return true;
         }
 
-        private void Found(AuditChainFault fault, AuditLine inspected) =>
-            _findings.Add(new AuditChainFinding(_number, fault, inspected.Sequence, inspected.Timestamp));
+        /// <remarks>
+        /// Inside a compaction record's sealed lines a broken link or a position gap is where folded or removed lines
+        /// were, so it waits for the seal: kept when the seal does not answer for its lines, dropped when it does.
+        /// </remarks>
+        private void Found(AuditChainFault fault, AuditLine inspected)
+        {
+            var finding = new AuditChainFinding(_number, fault, inspected.Sequence, inspected.Timestamp);
+
+            if (_seal is { } open && fault is AuditChainFault.Unlinked or AuditChainFault.SequenceGap)
+            {
+                open.Deferred.Add(finding);
+                return;
+            }
+
+            _findings.Add(finding);
+        }
     }
 }

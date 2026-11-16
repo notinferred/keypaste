@@ -394,6 +394,12 @@ public sealed partial class PlainWordsTests
             Item = "env/billing/.env",
             Changes = ["Adds STRIPE_KEY to billing/dev on env/billing/.env with the value the terminal sent."],
         })));
+        yield return ("an agent's change to an item", new ItemChangeWindow(new ItemChangeViewModel(ItemChangePrompt.For(
+            "claude-code",
+            "work laptop",
+            new EntryName("env/billing", "webhook"),
+            new ItemChange(ItemChangeKind.MoveToTrash, null),
+            "The webhook was removed from the dashboard."))));
         yield return ("the locked notice", new LockedNoticeWindow("billing.kdbx", () => { }, TimeProvider.System));
         yield return ("a browser's pairing", new PairingWindow(new PairingViewModel(new PairingPrompt
         {

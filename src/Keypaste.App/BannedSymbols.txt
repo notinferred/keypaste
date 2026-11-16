@@ -4,13 +4,13 @@ M:Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(Avalonia.Input.Pla
 // The app hands another program only a web address, through one launcher (D-0534).
 T:Avalonia.Platform.Storage.ILauncher;only PlatformWebLauncher hands an address to another program
 T:Avalonia.Platform.Storage.LauncherExtensions;the app opens no file or folder in another program
-M:System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo);only OpenerProcess starts a program
-M:System.Diagnostics.Process.Start(System.String);only OpenerProcess starts a program
-M:System.Diagnostics.Process.Start(System.String,System.String);only OpenerProcess starts a program
-M:System.Diagnostics.Process.Start(System.String,System.Collections.Generic.IEnumerable{System.String});only OpenerProcess starts a program
-M:System.Diagnostics.Process.Start(System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess starts a program
-M:System.Diagnostics.Process.Start(System.String,System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess starts a program
-T:System.Diagnostics.ProcessStartInfo;only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo);only OpenerProcess and DiagnosticsRelaunch start a program
+M:System.Diagnostics.Process.Start(System.String);only OpenerProcess and DiagnosticsRelaunch start a program
+M:System.Diagnostics.Process.Start(System.String,System.String);only OpenerProcess and DiagnosticsRelaunch start a program
+M:System.Diagnostics.Process.Start(System.String,System.Collections.Generic.IEnumerable{System.String});only OpenerProcess and DiagnosticsRelaunch start a program
+M:System.Diagnostics.Process.Start(System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess and DiagnosticsRelaunch start a program
+M:System.Diagnostics.Process.Start(System.String,System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess and DiagnosticsRelaunch start a program
+T:System.Diagnostics.ProcessStartInfo;only OpenerProcess and DiagnosticsRelaunch start a program
 T:Keypaste.App.Views.OpenerProcess;only PlatformWebLauncher hands an address to another program
 M:Keypaste.App.Session.IWebLauncher.OpenAsync(System.Uri);a web address is opened only where a person asked for one
 

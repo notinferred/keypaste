@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Globalization;
 using Keypaste.App.Resources;
@@ -30,7 +31,8 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// <remarks>
 /// <para>
 /// <b>It needs no unlocked vault.</b> The audit log is machine state, plaintext by design, and <c>keypaste log</c>
-/// reads it without a master password.
+/// reads it without a master password. The unlocked vault's checkpoint key, when it is given one, also checks the
+/// checkpoints the vault's owner signed, as <c>keypaste log verify --checkpoints</c> does.
 /// </para>
 /// <para>
 /// <b>The records are the core's.</b> <see cref="AuditHistory"/> reads them through <see cref="AuditReader"/> and
@@ -51,6 +53,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     private readonly string _path;
     private readonly TimeProvider _clock;
     private readonly ClipboardCountdown? _clipboard;
+    private readonly Func<AuditCheckpointKey?>? _checkpointKey;
 
     private AuditHistory _history = new(AuditReadKind.Missing, [], [], string.Empty);
     private IReadOnlyList<LogRow> _all = [];
@@ -70,7 +73,8 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     /// <param name="clipboard">Where the chain's hash is copied.</param>
     /// <param name="openAgents">Goes to Agents, the next step from an empty log.</param>
     /// <param name="table">How the table is sorted and sized, or null for its own way.</param>
-    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, Action? openAgents = null, TableState? table = null)
+    /// <param name="checkpointKey">Reads the unlocked vault's checkpoint key for each check, or null when there is none.</param>
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, Action? openAgents = null, TableState? table = null, Func<AuditCheckpointKey?>? checkpointKey = null)
     {
         OpenAgentsCommand = new RelayCommand(() => openAgents?.Invoke(), () => openAgents is not null);
         Table = table ?? TableStates.NewLog();
@@ -78,6 +82,7 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
         _path = KeypasteHome.AuditPath(home);
         _clock = clock ?? TimeProvider.System;
         _clipboard = clipboard;
+        _checkpointKey = checkpointKey;
         _filter = Filters[0];
 
         VerifyCommand = new RelayCommand(ToggleVerdict, () => _verdict is not null);
@@ -235,7 +240,20 @@ internal sealed partial class LogViewModel : ObservableObject, IDisposable
     [RelayCommand]
     internal void Refresh()
     {
-        _history = AuditHistory.Read(_path);
+        var key = _checkpointKey?.Invoke();
+
+        try
+        {
+            _history = AuditHistory.Read(_path, key);
+        }
+        finally
+        {
+            if (key is not null)
+            {
+                CryptographicOperations.ZeroMemory(key.Key);
+            }
+        }
+
         _verdict = _history.Report is { } report ? ChainVerdict.From(report, _clock.LocalTimeZone) : null;
         _verdictShown = false;
         _message = _history.Kind switch

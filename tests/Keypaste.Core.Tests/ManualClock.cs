@@ -157,6 +157,9 @@ internal sealed class ManualClock : TimeProvider
 
         public bool Change(TimeSpan dueTime, TimeSpan period)
         {
+            // Read before the timer's gate: a move holds the clock's gate while it asks each timer whether it is due.
+            var now = clock.GetTimestamp();
+
             lock (_gate)
             {
                 if (_disposed)
@@ -167,7 +170,7 @@ internal sealed class ManualClock : TimeProvider
                 _period = period;
                 _dueAt = dueTime == Timeout.InfiniteTimeSpan
                     ? null
-                    : clock.GetTimestamp() + (long)(dueTime.TotalSeconds * clock.TimestampFrequency);
+                    : now + (long)(dueTime.TotalSeconds * clock.TimestampFrequency);
             }
 
             if (_dueAt is null)

@@ -50,6 +50,14 @@ public interface IApprovalChannel
     ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(SaveAnswer.NoChannel);
 
+    /// <summary>Shows an agent's request to change an item and waits for the person to allow it once or deny it.</summary>
+    /// <param name="prompt">The item, the change and why. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the person said, or why they were not asked.</returns>
+    /// <remarks>Deny and Allow only, the allow armed a moment after the prompt is up. A channel that cannot show this has asked nobody, which is a no.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(ItemChangePrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
+
     /// <summary>Shows an agent's linked set to a human and waits for their answer.</summary>
     /// <param name="prompt">What to show: each item and field. Already sanitized; render it as inert text.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>

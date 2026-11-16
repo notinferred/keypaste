@@ -659,6 +659,9 @@ public sealed partial class ApproverHandler
         new(_gate.Waiting is { } waiting ? [waiting] : [])
         {
             WaitingEdits = _gate.WaitingEdit is { } edit ? [edit] : [],
+            WaitingSets = _gate.WaitingSet is { } set ? [set] : [],
+            WaitingSaves = _gate.WaitingSave is { } save ? [save] : [],
+            WaitingChanges = _gate.WaitingChange is { } change ? [change] : [],
         };
 
     /// <summary>Hands back a release the peer can actually be sent, or a refusal saying why not.</summary>

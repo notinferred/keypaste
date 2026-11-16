@@ -88,16 +88,23 @@ internal sealed class RenderedShell : IDisposable
         Window.Show();
 
         // The unlock's check lands on the UI thread whenever its scan ends, and changes Settings when it does: a test starts once it has.
-        Assert.True(
-            SpinWait.SpinUntil(
-                () =>
-                {
-                    Drain();
-                    return _shell.Recommendations.Checking.IsCompleted;
-                },
-                TimeSpan.FromSeconds(10)),
-            "the unlock's recommendations check did not finish");
+        Assert.True(RunUntil(_shell.Recommendations.Checking, TimeSpan.FromSeconds(30)), "the unlock's recommendations check did not finish");
         Drain();
+    }
+
+    /// <summary>Runs the window's work, idle between jobs rather than spinning, until <paramref name="task"/> completes or <paramref name="limit"/> passes.</summary>
+    private static bool RunUntil(Task task, TimeSpan limit)
+    {
+        // Read here, on the session's thread: read on a pool thread between tests, UIThread binds a new dispatcher to that thread.
+        var dispatcher = Dispatcher.UIThread;
+        var frame = new DispatcherFrame();
+        void Stop(Task _) => dispatcher.Post(() => frame.Continue = false);
+        using var timeout = new CancellationTokenSource();
+        _ = task.ContinueWith(Stop, TaskScheduler.Default);
+        _ = Task.Delay(limit, timeout.Token).ContinueWith(Stop, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+        dispatcher.PushFrame(frame);
+        timeout.Cancel();
+        return task.IsCompleted;
     }
 
     /// <summary>Every secret in the vault, for a frame that should hold none of them.</summary>

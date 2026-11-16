@@ -54,6 +54,9 @@ public enum ApproverMessageKind
 
     /// <summary>An agent's linked set: fields of one item and of the items linked to it, released whole after one approval.</summary>
     Set = 22,
+
+    /// <summary>An agent's request that the person allow a change to an item it may see, such as moving it to Trash.</summary>
+    ItemChange = 23,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>

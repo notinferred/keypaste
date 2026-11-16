@@ -60,6 +60,12 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>Every save request that arrived.</summary>
     internal ConcurrentQueue<SaveRequest> SavesReceived { get; } = [];
 
+    /// <summary>What an item change is answered with.</summary>
+    internal ItemChangeReply ChangeAnswer { get; set; } = new(AuditDecision.Denied, AuditMethod.Prompt, "a person did not allow the change");
+
+    /// <summary>Every item change request that arrived.</summary>
+    internal ConcurrentQueue<ItemChangeRequest> ChangesReceived { get; } = [];
+
     /// <summary>Set to refuse every attachment with this reply instead.</summary>
     internal AttachReply? AttachRefusal { get; set; }
 
@@ -321,6 +327,12 @@ internal sealed class FakeApprover : IAsyncDisposable
         {
             approver.SavesReceived.Enqueue(request);
             return ValueTask.FromResult(approver.SaveAnswer with { Recorded = approver.Records, Session = approver.Session });
+        }
+
+        public ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.ChangesReceived.Enqueue(request);
+            return ValueTask.FromResult(approver.ChangeAnswer with { Recorded = approver.Records, Session = approver.Session });
         }
 
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>

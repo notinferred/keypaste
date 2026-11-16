@@ -22,6 +22,9 @@ internal static class ToolText
     /// <summary>The tool that asks the person to save a value the agent never receives.</summary>
     internal const string SaveToolName = AuditTools.Save;
 
+    /// <summary>The tool that asks the person to allow a change to an item, named as the other requests a person answers are.</summary>
+    internal const string ItemChangeToolName = AuditTools.ItemChange;
+
     internal const string FindToolName = AuditTools.Find;
 
     /// <summary>The tool that asks for a linked set, released whole after one approval.</summary>
@@ -261,6 +264,40 @@ internal static class ToolText
     internal const string NotSaved = """
         keypaste: NOT SAVED. The user did not save a value there. Do not ask again for the same place
         unless they tell you to. This call was recorded in the audit log.
+        """;
+
+    /// <summary>The description a client shows for <c>request_item_change</c>.</summary>
+    internal const string ItemChangeDescription = """
+        Asks the user to allow one change to one item you can see: move_to_recycle_bin moves it to the
+        vault's Trash, where the user can restore it; mark_expired sets KeePass's own expiry, today or on
+        the day you give as `expires` (yyyy-MM-dd); mark_needs_update adds the tag needs-update; delete
+        removes it for good, and only an item you created yourself through request_save, with this same
+        agent label, can be deleted. A human sees the item, the change and your stated reason, and allows
+        it or denies it, every time. Default is deny. Nothing is changed until they allow it.
+
+        Pass the `handle` from list_entry_names or find_access as `entry` where you have one. Write
+        `reason` for the person reading it: it is shown to them verbatim.
+        """;
+
+    /// <summary>What the agent is told once the person allowed the change.</summary>
+    /// <param name="item">The item changed.</param>
+    /// <param name="change">The change as the agent named it.</param>
+    /// <returns>The sentence.</returns>
+    internal static string ItemChanged(string item, string change) =>
+        $"keypaste: CHANGED. The user allowed {change} on {item}, and the vault holds it. This call was recorded in the audit log.";
+
+    /// <summary>What the agent is told when the person did not allow the change.</summary>
+    internal const string ItemNotChanged = """
+        keypaste: NOT CHANGED. The user did not allow this change. Do not ask again for the same item
+        unless they tell you to. This call was recorded in the audit log.
+        """;
+
+    /// <summary>Why a change keypaste will not put to the person was refused, such as a delete of an item this agent did not create.</summary>
+    internal const string ItemChangeRefused = """
+        keypaste: DENIED. keypaste does not put this change to the user: the item may already carry it,
+        the vault's Trash may be off, more than one item may have that path, so name it by its handle, or,
+        for delete, the item is not one you created through request_save under this agent label. Nothing
+        was changed. This call was recorded in the audit log.
         """;
 
     /// <summary>Why a call was refused when no approver is running.</summary>

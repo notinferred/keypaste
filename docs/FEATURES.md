@@ -51,7 +51,7 @@ A source feature is not in a downloaded binary until a release publishes it.
 | Client setup: `keypaste setup` registers Claude Code and Codex through their own commands and prints configuration for Cursor and Claude Desktop | Published `v0.3.0` | |
 | Client setup for Gemini CLI, Devin, VS Code, Cursor and Claude Desktop (macOS and Windows), keeping the tool's original file beside it; the desktop's Add an agent | Implemented (unreleased) | CI checks VS Code's and Claude Desktop's registrations at the file level only, and Cursor's through its own CLI only on Linux and macOS. On Windows a tool installed with pnpm or yarn is refused; the macOS app started from Finder misses tools installed through a Node version manager |
 | One vault, one holder: the desktop or `keypaste approve` claims the vault before its password is read, and the second is refused naming the first | Implemented (unreleased) | `keypaste approve` has no idle lock. KeePassXC can still save behind the holder, which then refuses agents until it has merged or been restarted |
-| Audit log: every call, allowed or refused, is a line in `~/.keypaste/audit.jsonl`, hash-chained, never holding the released value; a failed write refuses the release | Published `v0.3.0` | Agent-written arguments can hold sensitive text |
+| Audit log: every call, allowed or refused, is a line in `~/.keypaste/audit.jsonl`, hash-chained, never holding the released value; a failed write refuses the release | Published `v0.3.0` | Agent-written arguments can hold sensitive text; unreleased, the vault's owner folds lookups older than 30 days into a summary per agent per day and removes days past the period kept |
 
 ## Desktop app
 

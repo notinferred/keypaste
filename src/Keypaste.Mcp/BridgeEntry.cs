@@ -115,6 +115,9 @@ public static class BridgeEntry
         // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one (F.79).
         serverOptions.ToolCollection.Add(new SaveValueTool(options, approver, audit));
 
+        // Offered to every agent: each change is asked about every time and made only once the person allows it (T-57).
+        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, approver, audit));
+
         if (options.AllowRun)
         {
             // Every child of this process is a run's, so orphans a run leaves behind can be found.

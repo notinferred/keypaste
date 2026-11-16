@@ -33,11 +33,23 @@ public static class AuditTools
     /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
     public const string Save = "request_save";
 
+    /// <summary>An agent's request that the person allow a change to an item, such as moving it to Trash.</summary>
+    public const string ItemChange = "request_item_change";
+
     /// <summary>An agent's search of the items it may be shown.</summary>
     public const string Find = "find_access";
 
     /// <summary>An agent's linked set: one line per field released, or one for the set refused.</summary>
     public const string Set = "request_linked_set";
+
+    /// <summary>One agent's lookups of one UTC day, folded by the vault's owner.</summary>
+    public const string Summary = "log_summary";
+
+    /// <summary>Whole days the vault's owner removed from the log.</summary>
+    public const string Removed = "log_removed";
+
+    /// <summary>The first line of a log the vault's owner compacted, sealing what it kept.</summary>
+    public const string Compaction = "log_compaction";
 }
 
 /// <summary>What a browser's line is about, written as its field.</summary>
@@ -340,6 +352,25 @@ public static class RequestRecords
 
         var record = Credential(client, request.Where, request.Named, request.Reason, decision, method, reason, request.Where, request.Exposure, session, vault);
         return record with { Tool = AuditTools.Save };
+    }
+
+    /// <summary>The line for an agent's request to change an item, which names the item and the change, and never a value.</summary>
+    /// <param name="client">Who asked.</param>
+    /// <param name="request">The item, the change and why.</param>
+    /// <param name="decision">Granted once the vault holds the change.</param>
+    /// <param name="method">How it was decided.</param>
+    /// <param name="reason">keypaste's own sentence.</param>
+    /// <param name="resolved">The item's path once the owner resolved it, or null.</param>
+    /// <param name="item">The item's UUID as hex once resolved, or null.</param>
+    /// <param name="session">The unlocked session that answered.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord ItemChange(AuditClient client, Ipc.ItemChangeRequest request, AuditDecision decision, AuditMethod method, string reason, string? resolved, string? item, string? session, string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var record = Credential(client, request.Entry, request.Change, request.Reason, decision, method, reason, resolved, request.Exposure, session, vault, item);
+        return record with { Tool = AuditTools.ItemChange };
     }
 
     /// <summary>The line for an agent's request to run a command.</summary>

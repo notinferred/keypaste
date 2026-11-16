@@ -227,8 +227,9 @@ test_desktop() {
   mkdir -p artifacts/test-logs
   for i in "${!app_test_shards[@]}"; do
     read -r -a shard <<<"${app_test_shards[$i]}"
-    run_tests dotnet test tests/Keypaste.App.Tests/Keypaste.App.Tests.csproj --no-build -c Release -- \
-      "${shard[@]}" --hangdump --hangdump-timeout 10m --results-directory "$PWD/artifacts/test-logs/app-$i" \
+    # Run directly: under dotnet test the test program starts no hang-dump controller, so --hangdump never fires.
+    run_tests dotnet artifacts/bin/Keypaste.App.Tests/release/Keypaste.App.Tests.dll \
+      "${shard[@]}" --hangdump --hangdump-timeout 20m --hangdump-type mini --results-directory "$PWD/artifacts/test-logs/app-$i" \
       >"artifacts/test-logs/app-$i.log" 2>&1 &
     pids+=("$!")
   done

@@ -98,6 +98,8 @@ public sealed record AppSettings
     internal const string ShareTermsLineShownKey = "terms_line_shown";
     internal const string WindowTableSortsKey = "table_sorts";
     internal const string WindowTableWidthsKey = "table_widths";
+    internal const string LogSectionName = "log";
+    internal const string LogKeepDaysKey = "keep_days";
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
@@ -111,6 +113,7 @@ public sealed record AppSettings
     ];
 
     private readonly int _idleTimeoutSeconds;
+    private readonly int _keepLogDays = AuditRetention.DefaultDays;
 
     /// <summary>What the app runs as when there is nothing usable to read.</summary>
     /// <remarks>
@@ -167,6 +170,15 @@ public sealed record AppSettings
     /// Only true is written, so a copy read before the line was printed, such as the running desktop app's, cannot take it back.
     /// </remarks>
     public bool ShareTermsLineShown { get; init; }
+
+    /// <summary>How many days the vault's owner keeps the agent log for, or <see cref="AuditRetention.Forever"/>; a year until chosen.</summary>
+    /// <value>Never below <see cref="AuditRetention.MinimumDays"/>; a shorter period is lengthened on the way in.</value>
+    /// <remarks>In its own section, <c>[[log]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
+    public int KeepLogDays
+    {
+        get => _keepLogDays;
+        init => _keepLogDays = AuditRetention.Clamp(value);
+    }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -239,6 +251,12 @@ public sealed record AppSettings
         if (document.Tables.FirstOrDefault(IsWindowSection) is { } window)
         {
             settings = settings with { Window = ReadWindow(window) };
+        }
+
+        if (document.Tables.FirstOrDefault(IsLogSection) is { } log
+            && log.TryGet(LogKeepDaysKey, out var keep) && keep.Value.Kind == TomlValueKind.Number)
+        {
+            settings = settings with { KeepLogDays = keep.Value.Number };
         }
 
         if (document.Tables.FirstOrDefault(IsShareSection) is { } share)
@@ -364,6 +382,7 @@ public sealed record AppSettings
         // With no layout to write, a [[window]] whose bounds did not read stays as a hand edit left it, among the other sections.
         var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
         var share = settings.ShareTermsLineShown ? existing.Tables.FirstOrDefault(IsShareSection) : null;
+        var log = existing.Tables.FirstOrDefault(IsLogSection);
 
         try
         {
@@ -392,7 +411,17 @@ public sealed record AppSettings
                 }
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share)))
+            if (log is not null || settings.KeepLogDays != AuditRetention.DefaultDays)
+            {
+                writer.BlankLine().Table(LogSectionName).Number(LogKeepDaysKey, settings.KeepLogDays, "how many days the agent log keeps its lines, at least 30; 0 keeps them forever");
+
+                if (log is not null && !TryWrite(writer, log.Pairs.Where(pair => !string.Equals(pair.Key, LogKeepDaysKey, StringComparison.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -467,6 +496,8 @@ public sealed record AppSettings
     private static bool IsWindowSection(TomlTable table) => string.Equals(table.Name, WindowSectionName, StringComparison.Ordinal);
 
     private static bool IsShareSection(TomlTable table) => string.Equals(table.Name, ShareSectionName, StringComparison.Ordinal);
+
+    private static bool IsLogSection(TomlTable table) => string.Equals(table.Name, LogSectionName, StringComparison.Ordinal);
 
     private static string? TextOf(TomlTable table, string key) =>
         table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;

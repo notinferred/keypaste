@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 using Keypaste.Core.Agents;
 
 namespace Keypaste.App.ViewModels;
@@ -17,8 +18,9 @@ internal sealed record CategoryRow(FieldCategory Category, string Name, IReadOnl
 
 /// <summary>Settings › Agents: what every agent gets of each kind of value on this computer, the username and the hosts and references switches, and each category's rule.</summary>
 /// <remarks>
-/// Each change goes through the authority that answers agents, which seals it with the vault's key and records it. Allow takes
-/// the person's confirmation first, since it releases values nobody is asked about; Ask and Block take effect at once.
+/// Each change goes through the authority that answers agents, which seals it with the vault's key and records it. Allow and
+/// turning a switch on take the person's confirmation first, since they give agents what nobody is asked about; Ask, Block and
+/// turning a switch off take effect at once.
 /// </remarks>
 internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposable
 {
@@ -28,7 +30,7 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
     private IReadOnlyList<CategoryRow> _rows = [];
     private bool _showsUsername = true;
     private bool _showsLinkedHosts;
-    private FieldCategory? _confirming;
+    private Confirmation? _confirming;
 
     /// <param name="authority">The authority that answers agents, which reads and seals the rules.</param>
     internal AgentRulesViewModel(Session.AppAuthority authority)
@@ -37,8 +39,8 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
 
         _authority = authority;
         ChooseCommand = new RelayCommand<CategoryChoice>(choice => Choose(choice!), choice => choice is not null && !HasProblem);
-        ConfirmAllowCommand = new RelayCommand(ConfirmAllow);
-        CancelAllowCommand = new RelayCommand(() => Confirming = null);
+        ConfirmGrantCommand = new RelayCommand(Confirm);
+        CancelGrantCommand = new RelayCommand(() => Confirming = null);
 
         Read();
     }
@@ -61,7 +63,16 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
                 return;
             }
 
-            Change(rules => rules with { ShowsUsername = value }, value ? "Agents see usernames again." : "Agents are asked before they get a username.");
+            if (value)
+            {
+                Ask(
+                    nameof(ShowsUsername),
+                    new Confirmation(Strings.EveryAgentWillSeeEachItemsUsername, Strings.ShowUsernamesToAgents, Strings.TurnTheSwitchOffHereToStopIt, rules => rules with { ShowsUsername = true }, "Agents see usernames again."));
+                return;
+            }
+
+            Confirming = null;
+            Change(rules => rules with { ShowsUsername = false }, "Agents are asked before they get a username.");
         }
     }
 
@@ -76,9 +87,16 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
                 return;
             }
 
-            Change(
-                rules => rules with { ShowsLinkedHosts = value },
-                value ? "Agents' searches show hosts and references." : "Agents' searches no longer show hosts or references.");
+            if (value)
+            {
+                Ask(
+                    nameof(ShowsLinkedHosts),
+                    new Confirmation(Strings.EveryAgentsSearchesWillShowHostsAndReferences, Strings.ShowHostsAndReferencesToAgents, Strings.TurnTheSwitchOffHereToStopIt, rules => rules with { ShowsLinkedHosts = true }, "Agents' searches show hosts and references."));
+                return;
+            }
+
+            Confirming = null;
+            Change(rules => rules with { ShowsLinkedHosts = false }, "Agents' searches no longer show hosts or references.");
         }
     }
 
@@ -103,34 +121,38 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
 
     internal bool HasMessage => Message.Length > 0;
 
-    /// <summary>The category whose Allow waits on the person's confirmation, or null.</summary>
-    internal FieldCategory? Confirming
+    private Confirmation? Confirming
     {
         get => _confirming;
-        private set
+        set
         {
             if (SetProperty(ref _confirming, value))
             {
                 OnPropertyChanged(nameof(IsConfirming));
                 OnPropertyChanged(nameof(ConfirmText));
                 OnPropertyChanged(nameof(ConfirmAction));
+                OnPropertyChanged(nameof(ConfirmCaption));
             }
         }
     }
 
+    /// <summary>Whether a category's Allow or a switch turned on waits on the person's confirmation.</summary>
     internal bool IsConfirming => Confirming is not null;
 
-    /// <summary>What the person confirms before Allow holds.</summary>
-    internal string ConfirmText => Confirming is { } category ? AgentRules.AllowConfirmation(category) : string.Empty;
+    /// <summary>What the person confirms agents will then get.</summary>
+    internal string ConfirmText => Confirming?.Text ?? string.Empty;
 
     /// <summary>The confirming button's words, naming its result.</summary>
-    internal string ConfirmAction => Confirming is { } category ? $"Allow {FieldCategories.Shown(category)}" : string.Empty;
+    internal string ConfirmAction => Confirming?.Action ?? string.Empty;
+
+    /// <summary>Where the person undoes it once confirmed.</summary>
+    internal string ConfirmCaption => Confirming?.Caption ?? string.Empty;
 
     internal IRelayCommand<CategoryChoice> ChooseCommand { get; }
 
-    internal IRelayCommand ConfirmAllowCommand { get; }
+    internal IRelayCommand ConfirmGrantCommand { get; }
 
-    internal IRelayCommand CancelAllowCommand { get; }
+    internal IRelayCommand CancelGrantCommand { get; }
 
     /// <inheritdoc/>
     public void Dispose()
@@ -191,27 +213,41 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
 
         if (choice.Rule == CategoryRule.Allow)
         {
+            var shown = FieldCategories.Shown(choice.Category);
             Message = string.Empty;
-            Confirming = choice.Category;
+            Confirming = new Confirmation(
+                AgentRules.AllowConfirmation(choice.Category),
+                $"Allow {shown}",
+                Strings.EachReleaseIsRecordedInTheLogAndYouCanSetAskAgainHere,
+                rules => rules.Allowing(choice.Category, confirmed: true),
+                $"Every agent gets {shown} without asking. Each release is recorded in the log.");
             return;
         }
 
         Confirming = null;
-        var shown = FieldCategories.Shown(choice.Category);
+        var asked = FieldCategories.Shown(choice.Category);
         Change(
             rules => rules.With(choice.Category, choice.Rule),
-            choice.Rule == CategoryRule.Block ? $"Agents are refused {shown} without you being asked." : $"You're asked before an agent gets {shown}.");
+            choice.Rule == CategoryRule.Block ? $"Agents are refused {asked} without you being asked." : $"You're asked before an agent gets {asked}.");
     }
 
-    private void ConfirmAllow()
+    /// <summary>Puts a switch's turning on to the person, leaving the switch drawn off until they confirm it.</summary>
+    private void Ask(string property, Confirmation confirmation)
     {
-        if (Confirming is not { } category)
+        Message = string.Empty;
+        Confirming = confirmation;
+        OnPropertyChanged(property);
+    }
+
+    private void Confirm()
+    {
+        if (Confirming is not { } confirmation)
         {
             return;
         }
 
         Confirming = null;
-        Change(rules => rules.Allowing(category, confirmed: true), $"Every agent gets {FieldCategories.Shown(category)} without asking. Each release is recorded in the log.");
+        Change(confirmation.Change, confirmation.Made);
     }
 
     private void Change(Func<AgentRules, AgentRules> change, string made)
@@ -220,4 +256,12 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
         Message = reply.Changed ? made : $"Not changed: {reply.Reason}";
         Read();
     }
+
+    /// <summary>A change that gives agents more, waiting on the person's confirmation.</summary>
+    /// <param name="Text">What agents will then get.</param>
+    /// <param name="Action">The confirming button's words.</param>
+    /// <param name="Caption">Where the person undoes it.</param>
+    /// <param name="Change">The change once confirmed.</param>
+    /// <param name="Made">What the message says once it holds.</param>
+    private sealed record Confirmation(string Text, string Action, string Caption, Func<AgentRules, AgentRules> Change, string Made);
 }

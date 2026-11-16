@@ -36,6 +36,19 @@ public sealed class EntryActivityTests
         EntryActivity.Build(audit ?? [], _vault, live ?? ApproverActivity.None, session ?? [], _now);
 
     [Fact]
+    public void Each_item_of_a_waiting_linked_set_and_the_item_a_waiting_save_names_are_in_use()
+    {
+        var set = new WaitingSet(SetPrompt.For("claude", null, [(_github, "username"), (_stripe, "password")], "why"), TimeSpan.FromSeconds(30));
+        var save = new WaitingSave(SavePrompt.For("claude", null, "personal/github", "API_TOKEN", "why"), TimeSpan.FromSeconds(30));
+        var variable = new WaitingSave(SavePrompt.For("claude", null, "env/acme-api/STRIPE_KEY", "STRIPE_KEY", "why") with { ForProject = true }, TimeSpan.FromSeconds(30));
+
+        var setting = Build(live: ApproverActivity.None with { WaitingSets = [set] });
+        Assert.Equal((EntryUseState.InUse, EntryUseState.InUse), (setting.Use(_github).State, setting.Use(_stripe).State));
+        Assert.Equal(EntryUseState.InUse, Build(live: ApproverActivity.None with { WaitingSaves = [save] }).Use(_github).State);
+        Assert.NotEqual(EntryUseState.InUse, Build(live: ApproverActivity.None with { WaitingSaves = [variable] }).Use(_stripe).State);
+    }
+
+    [Fact]
     public void AWaitingCredentialEnvOrRun_IsInUse()
     {
         var credential = new WaitingRequest(ApprovalPrompt.For("claude", _github, "password", "why"), TimeSpan.FromSeconds(30));

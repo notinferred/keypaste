@@ -53,6 +53,52 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
+    public async Task A_waiting_linked_set_is_listed_with_each_field()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Hold = true;
+
+        var pending = app.RequestSetAsync();
+        await app.Person.Waiting.WaitAsync(_connect, Token);
+
+        using var model = app.Model();
+
+        var waiting = Assert.Single(model.Waiting);
+        Assert.Equal("example · password, example · url", waiting.Asked);
+        Assert.Equal("claude-code · label ci-probe", waiting.Who);
+        Assert.Equal("45s left", waiting.LeftText);
+
+        app.Clock.Advance(TimeSpan.FromSeconds(45));
+        await pending.WaitAsync(_connect, Token);
+        model.Refresh();
+
+        Assert.Empty(model.Waiting);
+    }
+
+    [Fact]
+    public async Task A_waiting_save_is_listed_with_its_place()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Hold = true;
+
+        var pending = app.SaveAsync();
+        await app.Person.Waiting.WaitAsync(_connect, Token);
+
+        using var model = app.Model();
+
+        var waiting = Assert.Single(model.Waiting);
+        Assert.Equal("Save API_TOKEN in example", waiting.Asked);
+        Assert.Equal("claude-code · label ci-probe", waiting.Who);
+        Assert.Equal("45s left", waiting.LeftText);
+
+        app.Clock.Advance(TimeSpan.FromSeconds(45));
+        await pending.WaitAsync(_connect, Token);
+        model.Refresh();
+
+        Assert.Empty(model.Waiting);
+    }
+
+    [Fact]
     public void Without_an_authority_nothing_is_read_and_the_screen_says_so()
     {
         using var home = new TempAuditHome();
@@ -390,6 +436,35 @@ public sealed class AgentActivityViewModelTests
                 },
                 Token).AsTask();
 
+        internal Task<SetReply?> RequestSetAsync() =>
+            _client.RequestSetAsync(
+                new SetRequest
+                {
+                    Items = [new("example", "password"), new("example", "url")],
+                    Reason = "deploy",
+                    Exposure = ["**"],
+                    ClientName = "claude-code",
+                    ClientLabel = "ci-probe",
+                    Vault = Fixture.Path_,
+                    Session = Session,
+                },
+                Token).AsTask();
+
+        internal Task<SaveReply?> SaveAsync() =>
+            _client.SaveAsync(
+                new SaveRequest
+                {
+                    Item = "example",
+                    Field = "API_TOKEN",
+                    Reason = "keep the new token",
+                    Exposure = ["**"],
+                    ClientName = "claude-code",
+                    ClientLabel = "ci-probe",
+                    Vault = Fixture.Path_,
+                    Session = Session,
+                },
+                Token).AsTask();
+
         /// <summary>Appends a prompted grant naming <paramref name="session"/>, as the bridge writes one.</summary>
         internal void Audit(string entry, string session)
         {
@@ -435,6 +510,10 @@ public sealed class AgentActivityViewModelTests
         internal Task Waiting => _waiting.Task;
 
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(SetPrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
+
+        public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken) => new(await HoldAsync(cancellationToken), null);
 
 
         private async ValueTask<ApprovalAnswer> HoldAsync(CancellationToken cancellationToken)

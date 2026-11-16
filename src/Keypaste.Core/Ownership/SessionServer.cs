@@ -33,6 +33,12 @@ public sealed record SessionServerOptions
     /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
     public required Func<AuditLog?> Audit { get; init; }
 
+    /// <summary>Where that audit log is, which the owner compacts without opening it, or null to compact nothing.</summary>
+    public string? AuditPath { get; init; }
+
+    /// <summary>How many days the person keeps the agent log for, as <c>app.toml</c> says, read each time the owner compacts it.</summary>
+    public Func<int> KeepLogDays { get; init; } = () => AuditRetention.DefaultDays;
+
     /// <summary>What <c>keypaste lock</c> runs, or null to refuse it.</summary>
     public Action? LockNow { get; init; }
 
@@ -73,17 +79,20 @@ public sealed class SessionServer : IDisposable
 {
     private readonly ApprovalGate _gate;
     private readonly AuditCheckpoints _checkpoints;
+    private readonly AuditCompactions _compactions;
     private ApproverListener? _listener;
     private bool _disposed;
 
     private SessionServer(
         SessionAuthority authority,
         ApprovalGate gate,
-        AuditCheckpoints checkpoints)
+        AuditCheckpoints checkpoints,
+        AuditCompactions compactions)
     {
         Authority = authority;
         _gate = gate;
         _checkpoints = checkpoints;
+        _compactions = compactions;
     }
 
     /// <summary>What answers each request.</summary>
@@ -127,6 +136,10 @@ public sealed class SessionServer : IDisposable
                 ? new SessionSaver(gate, options.UnlockedFor, save, options.Clock, options.Narrate)
                 : null;
 
+            var changer = options.WriteEdit is { } change
+                ? new SessionItemChanger(gate, options.UnlockedFor, change, options.Clock, options.Narrate)
+                : null;
+
             var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
                 ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, checkpoints.Watched, uses, options.Clock, options.Narrate)
                 : null;
@@ -141,7 +154,8 @@ public sealed class SessionServer : IDisposable
                 options.Clock,
                 editor,
                 browsers,
-                saver)
+                saver,
+                changer)
             {
                 Unexpected = options.Unexpected,
             };
@@ -151,7 +165,9 @@ public sealed class SessionServer : IDisposable
                 browsers.Removed += (_, pairing) => authority.Unbind(pairing);
             }
 
-            return new SessionServer(authority, gate, checkpoints) { Browsers = browsers };
+            var compactions = new AuditCompactions(options.AuditPath, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id, options.KeepLogDays, options.Clock);
+            compactions.Start();
+            return new SessionServer(authority, gate, checkpoints, compactions) { Browsers = browsers };
         }
         catch
         {
@@ -223,6 +239,7 @@ public sealed class SessionServer : IDisposable
 
         _disposed = true;
         _listener?.Dispose();
+        _compactions.Dispose();
         _checkpoints.Seal();
         _gate.Dispose();
     }

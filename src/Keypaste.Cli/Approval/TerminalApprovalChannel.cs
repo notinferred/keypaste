@@ -207,6 +207,78 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>Shows an agent's change to an item, in keypaste's words, and reads <c>y</c> to allow it once; anything else denies it.</summary>
+    public async ValueTask<ApprovalAnswer> AskAsync(ItemChangePrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+
+        char? choice;
+
+        try
+        {
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), request.DeletesForGood ? "delete for good" : "allow"), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return Withdrawn("Nothing was changed.");
+        }
+
+        var answer = choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
+
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            answer == ApprovalAnswer.ApprovedOnce
+                ? _console.Paint(Tone.Ok, "keypaste: allowed. Saving the change in the vault.")
+                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was changed."),
+            RuleLine));
+
+        return answer;
+    }
+
+    /// <summary>An agent's change to an item: who asks, the item, the change in keypaste's words and the agent's reason as its claim.</summary>
+    internal static string Render(ItemChangePrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            "keypaste: an agent asks you to change an item. Nothing changes unless you allow it.",
+            string.Empty,
+            $"  agent    {Named(request.Client, request.Label)}",
+            $"  item     {request.Item}",
+            $"  change   {request.Says}",
+        ];
+
+        if (request.DeletesForGood)
+        {
+            lines.Add("           Trash will not hold it, and nothing can bring it back.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  the agent says it needs this because:");
+        lines.Add($"    {request.Reason}");
+
+        if (request.ReasonWasTruncated)
+        {
+            lines.Add("    (cut short — the full text is hashed in the audit log)");
+        }
+
+        if (request.WasAltered)
+        {
+            lines.Add(string.Empty);
+            lines.Add("  The item or the reason above is not what the agent sent: it was scrubbed.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+        lines.Add(string.Empty);
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
     public async ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

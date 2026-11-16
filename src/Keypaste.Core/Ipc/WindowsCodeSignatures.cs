@@ -30,7 +30,7 @@ internal sealed class WindowsCodeSignatures : ICodeSignatures
     private static readonly Guid _genericVerifyV2 = new("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");
 
     /// <inheritdoc/>
-    public (CallerSignature State, string? Signer) Check(string executable)
+    public (CallerSignature State, string? Signer) Check(string executable, MacAuditToken? running)
     {
         ArgumentNullException.ThrowIfNull(executable);
 

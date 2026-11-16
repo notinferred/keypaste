@@ -10,9 +10,9 @@ namespace Keypaste.Core.Ipc;
 /// <remarks>
 /// <para>
 /// The process id is the operating system's: <c>GetNamedPipeClientProcessId</c> on Windows, and on the Unix
-/// socket .NET's pipe is built on, <c>SO_PEERCRED</c> on Linux and <c>LOCAL_PEERPID</c> on macOS. The path is
-/// read from that id afterwards, so a process that exits and has its id reused in between is misnamed; the
-/// audit token macOS also offers would close that gap but is not read here.
+/// socket .NET's pipe is built on, <c>SO_PEERCRED</c> on Linux. There the path is read from that id afterwards,
+/// so a process that exits and has its id reused in between is misnamed. macOS gives the socket's audit token,
+/// <c>LOCAL_PEERTOKEN</c>, which the path and signature are read through, so a reused id names nothing.
 /// </para>
 /// <para>
 /// <c>DllImport</c> rather than <c>LibraryImport</c> for the reason <c>NativeSignals</c> gives: every
@@ -24,7 +24,7 @@ internal static class PipeCaller
     private const int _solSocket = 1;
     private const int _soPeerCredentials = 17;
     private const int _solLocal = 0;
-    private const int _localPeerPid = 2;
+    private const int _localPeerToken = 6;
     private const int _macPathBytes = 4096;
     private const uint _queryLimitedInformation = 0x1000;
 
@@ -54,11 +54,25 @@ internal static class PipeCaller
 
         int? pid = null;
         string? path = null;
+        MacAuditToken? token = null;
 
         try
         {
-            pid = PidOf(pipe.SafePipeHandle);
-            path = pid is { } known ? PathOf(known) : null;
+            if (OperatingSystem.IsMacOS())
+            {
+                token = TokenOf(pipe.SafePipeHandle);
+
+                if (token is { } peer)
+                {
+                    pid = audit_token_to_pid(peer);
+                    path = MacPathOf(peer);
+                }
+            }
+            else
+            {
+                pid = PidOf(pipe.SafePipeHandle);
+                path = pid is { } known ? PathOf(known) : null;
+            }
         }
         catch (Exception)
         {
@@ -77,7 +91,7 @@ internal static class PipeCaller
 
         try
         {
-            var (state, signer) = signatures.Check(path);
+            var (state, signer) = signatures.Check(path, token);
             return AuditCaller.Of(pid, path, state, signer);
         }
         catch (Exception)
@@ -101,13 +115,20 @@ internal static class PipeCaller
             return getsockopt(socket, _solSocket, _soPeerCredentials, out PeerCredentials credentials, ref length) == 0 ? credentials.Pid : null;
         }
 
-        if (OperatingSystem.IsMacOS())
-        {
-            var length = (uint)sizeof(int);
-            return getsockopt(socket, _solLocal, _localPeerPid, out int pid, ref length) == 0 ? pid : null;
-        }
-
         return null;
+    }
+
+    private static MacAuditToken? TokenOf(SafePipeHandle handle)
+    {
+        var length = (uint)Marshal.SizeOf<MacAuditToken>();
+        return getsockopt((int)handle.DangerousGetHandle(), _solLocal, _localPeerToken, out MacAuditToken token, ref length) == 0 ? token : null;
+    }
+
+    private static string? MacPathOf(MacAuditToken token)
+    {
+        var buffer = new byte[_macPathBytes];
+        var length = proc_pidpath_audittoken(ref token, buffer, (uint)buffer.Length);
+        return length > 0 ? System.Text.Encoding.UTF8.GetString(buffer, 0, length) : null;
     }
 
     private static string? PathOf(int pid)
@@ -120,13 +141,6 @@ internal static class PipeCaller
         if (OperatingSystem.IsLinux())
         {
             return new FileInfo(Invariant($"/proc/{pid}/exe")).LinkTarget;
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            var buffer = new byte[_macPathBytes];
-            var length = proc_pidpath(pid, buffer, (uint)buffer.Length);
-            return length > 0 ? System.Text.Encoding.UTF8.GetString(buffer, 0, length) : null;
         }
 
         return null;
@@ -166,10 +180,13 @@ internal static class PipeCaller
     private static extern int getsockopt(int socket, int level, int option, out PeerCredentials value, ref uint length);
 
     [DllImport("libc", EntryPoint = "getsockopt", SetLastError = true)]
-    private static extern int getsockopt(int socket, int level, int option, out int value, ref uint length);
+    private static extern int getsockopt(int socket, int level, int option, out MacAuditToken value, ref uint length);
 
-    [DllImport("libc", EntryPoint = "proc_pidpath", SetLastError = true)]
-    private static extern int proc_pidpath(int pid, [Out] byte[] buffer, uint size);
+    [DllImport("libc", EntryPoint = "proc_pidpath_audittoken", SetLastError = true)]
+    private static extern int proc_pidpath_audittoken(ref MacAuditToken token, [Out] byte[] buffer, uint size);
+
+    [DllImport("/usr/lib/libbsm.0.dylib", EntryPoint = "audit_token_to_pid")]
+    private static extern int audit_token_to_pid(MacAuditToken token);
 
     [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

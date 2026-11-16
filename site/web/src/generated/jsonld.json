@@ -1,0 +1,1292 @@
+{
+  "acaf/v1": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": "https://keypaste.com/acaf/v1/#article",
+        "headline": "Agent Credential Access Format, version 1",
+        "description": "How a KeePass file keeps a vault's projects and what each AI agent may see, receive and run, so that any KeePass app can read, keep and apply them.",
+        "url": "https://keypaste.com/acaf/v1/",
+        "mainEntityOfPage": "https://keypaste.com/acaf/v1/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Agent Credential Access Format, version 1",
+            "item": "https://keypaste.com/acaf/v1/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": "https://keypaste.com/compare/#article",
+        "headline": "keypaste and the alternatives",
+        "description": "How fifteen password managers and secrets tools are built, side by side.",
+        "url": "https://keypaste.com/compare/",
+        "mainEntityOfPage": "https://keypaste.com/compare/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/1password": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/1password/#article",
+        "headline": "keypaste and 1Password",
+        "description": "1Password covers logins, project secrets and agents from its cloud; keypaste does it from a file you own.",
+        "url": "https://keypaste.com/compare/1password/",
+        "mainEntityOfPage": "https://keypaste.com/compare/1password/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and 1Password",
+            "item": "https://keypaste.com/compare/1password/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/bitwarden": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/bitwarden/#article",
+        "headline": "keypaste and Bitwarden",
+        "description": "Bitwarden asks a person for agent requests from its cloud or your server; keypaste does it on your KeePass file.",
+        "url": "https://keypaste.com/compare/bitwarden/",
+        "mainEntityOfPage": "https://keypaste.com/compare/bitwarden/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Bitwarden",
+            "item": "https://keypaste.com/compare/bitwarden/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/doppler": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/doppler/#article",
+        "headline": "keypaste and Doppler",
+        "description": "Doppler is a hosted control plane for team secrets; keypaste keeps them in a file you own.",
+        "url": "https://keypaste.com/compare/doppler/",
+        "mainEntityOfPage": "https://keypaste.com/compare/doppler/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Doppler",
+            "item": "https://keypaste.com/compare/doppler/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/infisical": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/infisical/#article",
+        "headline": "keypaste and Infisical",
+        "description": "Infisical runs a secrets platform for teams from a server; keypaste keeps secrets in a file and plans an end-to-end relay for teams.",
+        "url": "https://keypaste.com/compare/infisical/",
+        "mainEntityOfPage": "https://keypaste.com/compare/infisical/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Infisical",
+            "item": "https://keypaste.com/compare/infisical/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/keepassdx": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/keepassdx/#article",
+        "headline": "keypaste and KeePassDX",
+        "description": "KeePassDX carries your vault on Android; keypaste adds projects and agents on the desktop.",
+        "url": "https://keypaste.com/compare/keepassdx/",
+        "mainEntityOfPage": "https://keypaste.com/compare/keepassdx/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and KeePassDX",
+            "item": "https://keypaste.com/compare/keepassdx/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/keepassxc": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/keepassxc/#article",
+        "headline": "keypaste and KeePassXC",
+        "description": "Two apps on the same KeePass file. KeePassXC for the desktop and the browser, keypaste for projects and AI agents.",
+        "url": "https://keypaste.com/compare/keepassxc/",
+        "mainEntityOfPage": "https://keypaste.com/compare/keepassxc/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and KeePassXC",
+            "item": "https://keypaste.com/compare/keepassxc/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/keepassium": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/keepassium/#article",
+        "headline": "keypaste and KeePassium",
+        "description": "KeePassium carries your vault on an iPhone, iPad or Mac; keypaste adds projects and agents on the desktop.",
+        "url": "https://keypaste.com/compare/keepassium/",
+        "mainEntityOfPage": "https://keypaste.com/compare/keepassium/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and KeePassium",
+            "item": "https://keypaste.com/compare/keepassium/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/keeper": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/keeper/#article",
+        "headline": "keypaste and Keeper",
+        "description": "Keeper serves security teams from its cloud; keypaste serves a developer from a file they own.",
+        "url": "https://keypaste.com/compare/keeper/",
+        "mainEntityOfPage": "https://keypaste.com/compare/keeper/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Keeper",
+            "item": "https://keypaste.com/compare/keeper/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/phase": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/phase/#article",
+        "headline": "keypaste and Phase",
+        "description": "Phase shares end-to-end encrypted secrets with a team; keypaste keeps them in your KeePass file and asks you about agents.",
+        "url": "https://keypaste.com/compare/phase/",
+        "mainEntityOfPage": "https://keypaste.com/compare/phase/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Phase",
+            "item": "https://keypaste.com/compare/phase/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/proton-pass": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/proton-pass/#article",
+        "headline": "keypaste and Proton Pass",
+        "description": "Proton Pass injects vault items by reference from its cloud; keypaste asks you before an agent gets one.",
+        "url": "https://keypaste.com/compare/proton-pass/",
+        "mainEntityOfPage": "https://keypaste.com/compare/proton-pass/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Proton Pass",
+            "item": "https://keypaste.com/compare/proton-pass/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/strongbox": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/strongbox/#article",
+        "headline": "keypaste and Strongbox",
+        "description": "Strongbox is a KeePass app for Apple devices with its own MCP server; keypaste gives agents one approved field at a time.",
+        "url": "https://keypaste.com/compare/strongbox/",
+        "mainEntityOfPage": "https://keypaste.com/compare/strongbox/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Strongbox",
+            "item": "https://keypaste.com/compare/strongbox/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/varlock": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/varlock/#article",
+        "headline": "keypaste and Varlock",
+        "description": "Varlock reads a schema and pulls values from providers, KeePass included; keypaste holds the vault and asks you.",
+        "url": "https://keypaste.com/compare/varlock/",
+        "mainEntityOfPage": "https://keypaste.com/compare/varlock/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Varlock",
+            "item": "https://keypaste.com/compare/varlock/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/vault-openbao": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/vault-openbao/#article",
+        "headline": "keypaste and Vault or OpenBao",
+        "description": "Vault and OpenBao are infrastructure secrets engines for platform teams; keypaste is for a developer's own machine.",
+        "url": "https://keypaste.com/compare/vault-openbao/",
+        "mainEntityOfPage": "https://keypaste.com/compare/vault-openbao/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and Vault or OpenBao",
+            "item": "https://keypaste.com/compare/vault-openbao/"
+          }
+        ]
+      }
+    ]
+  },
+  "compare/dotenvx": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/compare/dotenvx/#article",
+        "headline": "keypaste and dotenvx",
+        "description": "dotenvx commits an encrypted .env and decrypts it with a private key; keypaste commits references and keeps values in your vault.",
+        "url": "https://keypaste.com/compare/dotenvx/",
+        "mainEntityOfPage": "https://keypaste.com/compare/dotenvx/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "keypaste and the alternatives",
+            "item": "https://keypaste.com/compare/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste and dotenvx",
+            "item": "https://keypaste.com/compare/dotenvx/"
+          }
+        ]
+      }
+    ]
+  },
+  "docs": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": "https://keypaste.com/docs/#article",
+        "headline": "Documentation",
+        "description": "Where to start, the guides for each task, and the reference documents behind them.",
+        "url": "https://keypaste.com/docs/",
+        "mainEntityOfPage": "https://keypaste.com/docs/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Documentation",
+            "item": "https://keypaste.com/docs/"
+          }
+        ]
+      }
+    ]
+  },
+  "acaf/v1.1": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/acaf/v1.1/#article",
+        "headline": "Agent Credential Access Format, version 1.1",
+        "description": "How a KeePass file keeps a vault's projects and what each AI agent may see, receive and run, so that any KeePass app can read, keep and apply them.",
+        "url": "https://keypaste.com/acaf/v1.1/",
+        "mainEntityOfPage": "https://keypaste.com/acaf/v1.1/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Agent Credential Access Format, version 1.1",
+            "item": "https://keypaste.com/acaf/v1.1/"
+          }
+        ]
+      }
+    ]
+  },
+  "how-it-works": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": "https://keypaste.com/how-it-works/#article",
+        "headline": "How keypaste works",
+        "description": "One KeePass file, one process that holds it unlocked, and agents that have to ask.",
+        "url": "https://keypaste.com/how-it-works/",
+        "mainEntityOfPage": "https://keypaste.com/how-it-works/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "How keypaste works",
+            "item": "https://keypaste.com/how-it-works/"
+          }
+        ]
+      }
+    ]
+  },
+  "how-it-works/security": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/how-it-works/security/#article",
+        "headline": "Security model",
+        "description": "What keypaste protects, what it cannot, and where the full account lives.",
+        "url": "https://keypaste.com/how-it-works/security/",
+        "mainEntityOfPage": "https://keypaste.com/how-it-works/security/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "How keypaste works",
+            "item": "https://keypaste.com/how-it-works/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Security model",
+            "item": "https://keypaste.com/how-it-works/security/"
+          }
+        ]
+      }
+    ]
+  },
+  "products": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": "https://keypaste.com/products/#article",
+        "headline": "Products",
+        "description": "Everything keypaste offers and is building, with the state of each.",
+        "url": "https://keypaste.com/products/",
+        "mainEntityOfPage": "https://keypaste.com/products/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/agent-approvals": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/agent-approvals/#article",
+        "headline": "Agent approvals",
+        "description": "An AI agent asks for one field of one item, and you decide each time.",
+        "url": "https://keypaste.com/products/agent-approvals/",
+        "mainEntityOfPage": "https://keypaste.com/products/agent-approvals/",
+        "dateModified": "2026-11-15T00:00:00.000Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Agent approvals",
+            "item": "https://keypaste.com/products/agent-approvals/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/agent-search": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/agent-search/#article",
+        "headline": "Agent search",
+        "description": "An agent finds the login, key or server it needs by name, host, kind or project, with what each is linked to, never a value.",
+        "url": "https://keypaste.com/products/agent-search/",
+        "mainEntityOfPage": "https://keypaste.com/products/agent-search/",
+        "dateModified": "2026-11-15T00:00:00.000Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Agent search",
+            "item": "https://keypaste.com/products/agent-search/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/audit-log": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/audit-log/#article",
+        "headline": "Audit log",
+        "description": "Every agent request recorded on your machine in a hash-chained log signed with a key only your vault holds, naming the program that asked.",
+        "url": "https://keypaste.com/products/audit-log/",
+        "mainEntityOfPage": "https://keypaste.com/products/audit-log/",
+        "dateModified": "2026-11-15T00:00:00.000Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Audit log",
+            "item": "https://keypaste.com/products/audit-log/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/agents-without-values": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/agents-without-values/#article",
+        "headline": "Agents without values",
+        "description": "An agent calls an API with a credential it never holds.",
+        "url": "https://keypaste.com/products/agents-without-values/",
+        "mainEntityOfPage": "https://keypaste.com/products/agents-without-values/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Agents without values",
+            "item": "https://keypaste.com/products/agents-without-values/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/ci-and-deploys": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/ci-and-deploys/#article",
+        "headline": "CI and deploys",
+        "description": "Identities for CI jobs and deploy targets, and syncs pushed from your own machine.",
+        "url": "https://keypaste.com/products/ci-and-deploys/",
+        "mainEntityOfPage": "https://keypaste.com/products/ci-and-deploys/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "CI and deploys",
+            "item": "https://keypaste.com/products/ci-and-deploys/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/cloud-vault": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/cloud-vault/#article",
+        "headline": "Cloud vault",
+        "description": "Your vault synced free across your devices, encrypted on each one so keypaste can never read it.",
+        "url": "https://keypaste.com/products/cloud-vault/",
+        "mainEntityOfPage": "https://keypaste.com/products/cloud-vault/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Cloud vault",
+            "item": "https://keypaste.com/products/cloud-vault/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/daily-driver": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/daily-driver/#article",
+        "headline": "Daily driver",
+        "description": "Touch ID and Windows Hello, TOTP codes, browser fill, merging a synced file and importers.",
+        "url": "https://keypaste.com/products/daily-driver/",
+        "mainEntityOfPage": "https://keypaste.com/products/daily-driver/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Daily driver",
+            "item": "https://keypaste.com/products/daily-driver/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/desktop-app": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/desktop-app/#article",
+        "headline": "Desktop app",
+        "description": "Your KeePass file in a simple app for Windows, macOS and Linux, with approvals and project runs under one unlock.",
+        "url": "https://keypaste.com/products/desktop-app/",
+        "mainEntityOfPage": "https://keypaste.com/products/desktop-app/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Desktop app",
+            "item": "https://keypaste.com/products/desktop-app/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/organizations": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/organizations/#article",
+        "headline": "Organizations",
+        "description": "Single sign-on, SCIM, approval for production changes and audit export.",
+        "url": "https://keypaste.com/products/organizations/",
+        "mainEntityOfPage": "https://keypaste.com/products/organizations/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Organizations",
+            "item": "https://keypaste.com/products/organizations/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/project-environments": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/project-environments/#article",
+        "headline": "Project environments",
+        "description": "A project's variables live in your vault and reach a program's environment, never a .env file.",
+        "url": "https://keypaste.com/products/project-environments/",
+        "mainEntityOfPage": "https://keypaste.com/products/project-environments/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Project environments",
+            "item": "https://keypaste.com/products/project-environments/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/ci-tokens": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/ci-tokens/#article",
+        "headline": "Scoped CI tokens",
+        "description": "A token that releases one project's environment to a CI job, with a scope and an expiry.",
+        "url": "https://keypaste.com/products/ci-tokens/",
+        "mainEntityOfPage": "https://keypaste.com/products/ci-tokens/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Scoped CI tokens",
+            "item": "https://keypaste.com/products/ci-tokens/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/server-access": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/server-access/#article",
+        "headline": "Server access",
+        "description": "A team project can let a server hold its key, for agents in the cloud, CI without a stored secret and syncs.",
+        "url": "https://keypaste.com/products/server-access/",
+        "mainEntityOfPage": "https://keypaste.com/products/server-access/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Server access",
+            "item": "https://keypaste.com/products/server-access/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/share-links": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/share-links/#article",
+        "headline": "Share links",
+        "description": "One field or one login, sealed on your machine and opened a set number of times.",
+        "url": "https://keypaste.com/products/share-links/",
+        "mainEntityOfPage": "https://keypaste.com/products/share-links/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Share links",
+            "item": "https://keypaste.com/products/share-links/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/team-projects": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/team-projects/#article",
+        "headline": "Team projects",
+        "description": "A project's secrets shared with your team through a relay that stores only ciphertext.",
+        "url": "https://keypaste.com/products/team-projects/",
+        "mainEntityOfPage": "https://keypaste.com/products/team-projects/",
+        "dateModified": "2026-11-13T02:24:44.223Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Team projects",
+            "item": "https://keypaste.com/products/team-projects/"
+          }
+        ]
+      }
+    ]
+  },
+  "products/cli": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/products/cli/#article",
+        "headline": "keypaste CLI",
+        "description": "The vault, project environments and agent approvals from your terminal.",
+        "url": "https://keypaste.com/products/cli/",
+        "mainEntityOfPage": "https://keypaste.com/products/cli/",
+        "dateModified": "2026-11-13T14:35:43.074Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Products",
+            "item": "https://keypaste.com/products/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "keypaste CLI",
+            "item": "https://keypaste.com/products/cli/"
+          }
+        ]
+      }
+    ]
+  },
+  "vision": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://keypaste.com/vision/#article",
+        "headline": "Where keypaste is going",
+        "description": "From one person's KeePass file to a free cloud vault and teams, without a server that can read your personal vault.",
+        "url": "https://keypaste.com/vision/",
+        "mainEntityOfPage": "https://keypaste.com/vision/",
+        "dateModified": "2026-11-15T00:00:00.000Z",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "keypaste",
+          "url": "https://keypaste.com/"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Where keypaste is going",
+            "item": "https://keypaste.com/vision/"
+          }
+        ]
+      }
+    ]
+  }
+}

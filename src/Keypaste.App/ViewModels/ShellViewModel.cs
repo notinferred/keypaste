@@ -938,6 +938,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         return false;
     }
 
+    private Core.Audit.AuditCheckpointKey? CheckpointKey() =>
+        _session.Unlocked is { } vault && _session.Identity is { } identity ? Core.Audit.AuditCheckpointKey.Read(vault, identity) : null;
+
     /// <summary>Builds the current destination's content.</summary>
     private void Show(Destination destination)
     {
@@ -961,7 +964,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log, CheckpointKey),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post), BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
@@ -1419,7 +1422,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         if (status is AuthorityStatus.Serving)
         {
             var activity = Authority!.Activity;
-            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingEdits.Count;
+            var waiting = activity.Waiting.Count + activity.WaitingSets.Count + activity.WaitingSaves.Count + activity.WaitingChanges.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingEdits.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             AgentsRefusing = Authority.LastAuditFailure is not null;

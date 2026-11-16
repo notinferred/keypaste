@@ -166,7 +166,38 @@ public enum AuditMethod
     /// <summary>The vault's owner signed the chain up to this line with the vault's checkpoint key.</summary>
     /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
     Checkpoint = 36,
+
+    /// <summary>One agent's lookups of one UTC day, folded into one line by the vault's owner once they were 30 days old.</summary>
+    Folded = 37,
+
+    /// <summary>Whole UTC days older than the period the person keeps the log for, removed by the vault's owner.</summary>
+    Expired = 38,
+
+    /// <summary>The vault's owner sealed the log it compacted with the vault's checkpoint key.</summary>
+    /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
+    Compaction = 39,
 }
+
+/// <summary>How many lookups of one tool with one decision a summary line folds.</summary>
+/// <param name="Tool">The tool, <see cref="AuditTools.List"/> or <see cref="AuditTools.Find"/>.</param>
+/// <param name="Decision">Whether they named anything.</param>
+/// <param name="Count">How many lines.</param>
+public sealed record AuditFoldCount(string Tool, AuditDecision Decision, int Count);
+
+/// <summary>One agent's lookups on one UTC day, folded into one line.</summary>
+/// <param name="Day">The UTC day, <c>yyyy-MM-dd</c>.</param>
+/// <param name="First">The first folded line's timestamp.</param>
+/// <param name="Last">The last folded line's timestamp.</param>
+/// <param name="Counts">The folded lines by tool and decision.</param>
+/// <param name="Sha256">SHA-256 over the folded lines' hashes, each followed by a newline, in file order.</param>
+public sealed record AuditSummary(string Day, string First, string Last, IReadOnlyList<AuditFoldCount> Counts, string Sha256);
+
+/// <summary>Whole UTC days removed from the log.</summary>
+/// <param name="From">The first removed day, <c>yyyy-MM-dd</c>.</param>
+/// <param name="To">The last removed day.</param>
+/// <param name="Count">How many requests the removed lines recorded, a summary's folded lookups each counted.</param>
+/// <param name="Sha256">SHA-256 over the removed lines' hashes, each followed by a newline, in file order.</param>
+public sealed record AuditRemoval(string From, string To, int Count, string Sha256);
 
 /// <summary>Who asked.</summary>
 /// <remarks>
@@ -441,6 +472,15 @@ public sealed record AuditRecord
 
     /// <summary>On a checkpoint line, the HMAC-SHA256 its owner wrote over the chain up to it, as lowercase hex; otherwise null.</summary>
     public string? Checkpoint { get; init; }
+
+    /// <summary>On a summary line, the lookups it folds; otherwise null.</summary>
+    public AuditSummary? Summary { get; init; }
+
+    /// <summary>On a removal line, the days it removed; otherwise null.</summary>
+    public AuditRemoval? Removal { get; init; }
+
+    /// <summary>On a compaction record, its seal as <see cref="AuditCompaction"/> writes it; otherwise null.</summary>
+    public string? Compaction { get; init; }
 
     /// <summary>The longest command head a line keeps.</summary>
     public const int CommandLength = 256;

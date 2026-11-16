@@ -119,7 +119,7 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlySixTools()
+    public async Task TheServerExposes_ExactlySevenTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
@@ -128,13 +128,14 @@ public sealed class ServerToolsTests
 
         // The count matters as much as the names: another tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(6, tools.Count);
+        Assert.Equal(7, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.SetToolName);
         Assert.Contains(tools, t => t.Name == ToolText.FindToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
         Assert.Contains(tools, t => t.Name == ToolText.AttachmentToolName);
         Assert.Contains(tools, t => t.Name == ToolText.SaveToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.ItemChangeToolName);
     }
 
     /// <summary>
@@ -153,7 +154,9 @@ public sealed class ServerToolsTests
             var annotations = tool.ProtocolTool.Annotations;
 
             Assert.NotNull(annotations);
-            Assert.False(annotations.DestructiveHint, $"{tool.Name} is marked destructive");
+
+            // An item change can delete an item for good once the person allows it, and says so.
+            Assert.Equal(tool.Name == ToolText.ItemChangeToolName, annotations.DestructiveHint);
             Assert.False(annotations.OpenWorldHint, $"{tool.Name} is marked open-world");
         }
     }
@@ -390,6 +393,34 @@ public sealed class ServerToolsTests
         Assert.Contains("NOT SAVED", TextOf(refused), StringComparison.Ordinal);
         Assert.True(both.IsError);
         Assert.Equal(2, harness.Approver.SavesReceived.Count);
+    }
+
+    /// <summary>request_item_change says whether the person allowed the change, and the bridge refuses a malformed call or a path it cannot see whole unasked (T-57).</summary>
+    [Fact]
+    public async Task An_item_change_says_whether_it_was_made_and_a_path_out_of_view_never_reaches_the_owner()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Start();
+        var client = await harness.StartAsync();
+        harness.Approver.ChangeAnswer = new ItemChangeReply(AuditDecision.Granted, AuditMethod.Prompt, "changed") { Item = "env/dev/stripe" };
+
+        var changed = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "move_to_recycle_bin", ["reason"] = "the key was revoked" });
+        harness.Approver.ChangeAnswer = new ItemChangeReply(AuditDecision.Denied, AuditMethod.Prompt, "a person did not allow the change");
+        var denied = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "mark_needs_update", ["reason"] = "rotate it" });
+        var malformed = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "rename", ["reason"] = "x" });
+        var dated = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "env/dev/stripe", ["change"] = "delete", ["expires"] = "2026-12-01", ["reason"] = "x" });
+        var outside = await CallAsync(client, ToolText.ItemChangeToolName, new Dictionary<string, object?> { ["entry"] = "personal/bank", ["change"] = "delete", ["reason"] = "x" });
+
+        Assert.False(changed.IsError, TextOf(changed));
+        Assert.Contains("CHANGED", TextOf(changed), StringComparison.Ordinal);
+        Assert.Contains("env/dev/stripe", TextOf(changed), StringComparison.Ordinal);
+        Assert.True(denied.IsError);
+        Assert.Contains("NOT CHANGED", TextOf(denied), StringComparison.Ordinal);
+        Assert.True(malformed.IsError);
+        Assert.True(dated.IsError);
+        Assert.True(outside.IsError);
+        Assert.Equal(["move_to_recycle_bin", "mark_needs_update"], harness.Approver.ChangesReceived.Select(change => change.Change));
+        Assert.Equal(3, harness.AuditLines().Length);
     }
 
     [Fact]

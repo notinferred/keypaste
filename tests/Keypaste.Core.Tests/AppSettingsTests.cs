@@ -1,3 +1,4 @@
+using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
 using Keypaste.Infrastructure;
 using Xunit;
@@ -158,6 +159,25 @@ public sealed class AppSettingsTests : IDisposable
     /// The reason the flag is a number: the reader refuses <c>true</c> and <c>false</c> so that a
     /// policy file cannot say yes in a shape keypaste had to guess at.
     /// </summary>
+    [Fact]
+    public void The_agent_log_is_kept_a_year_until_chosen_never_under_30_days_and_0_keeps_it_forever()
+    {
+        Assert.Equal(AuditRetention.DefaultDays, AppSettings.Load(SettingsFile).KeepLogDays);
+
+        foreach (var (written, kept) in new[] { (90, 90), (7, AuditRetention.MinimumDays), (0, AuditRetention.Forever), (730, 730) })
+        {
+            File.WriteAllText(SettingsFile, $"[[settings]]\ntheme = \"dark\"\n\n[[log]]\nkeep_days = {written}\nnote = \"kept\"\n");
+
+            Assert.Equal(kept, AppSettings.Load(SettingsFile).KeepLogDays);
+        }
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { KeepLogDays = AuditRetention.DefaultDays }));
+        var text = File.ReadAllText(SettingsFile);
+        Assert.Equal(AuditRetention.DefaultDays, AppSettings.Load(SettingsFile).KeepLogDays);
+        Assert.Contains("note = \"kept\"", text, StringComparison.Ordinal);
+        Assert.Single(text.Split('\n'), line => line == "[[log]]");
+    }
+
     [Fact]
     public void The_file_it_writes_contains_no_true_or_false()
     {

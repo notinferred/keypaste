@@ -18,6 +18,11 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Label">How it reads in the list.</param>
 internal sealed record IdleChoice(int Seconds, string Label);
 
+/// <summary>One offered period the agent log is kept for.</summary>
+/// <param name="Days">The value written to <c>app.toml</c>, <see cref="AuditRetention.Forever"/> for forever.</param>
+/// <param name="Label">How it reads in the list.</param>
+internal sealed record LogKeepChoice(int Days, string Label);
+
 /// <summary>
 /// Settings, with the way to Advanced, which leads to the screens the everyday ones leave out.
 /// </summary>
@@ -39,6 +44,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     private AppSettings _settings;
     private IdleChoice _idle;
+    private LogKeepChoice _keepLog;
     private AppTheme _theme;
     private bool _lockWhenMinimized;
     private bool _stayInTray;
@@ -74,6 +80,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
         IdleChoices = ChoicesFor(_settings.IdleTimeoutSeconds);
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
+        KeepLogChoices = KeepChoicesFor(_settings.KeepLogDays);
+        _keepLog = KeepLogChoices.Single(choice => choice.Days == _settings.KeepLogDays);
 
         UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
@@ -180,6 +188,31 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             {
                 _session.IdleTimeout = TimeSpan.FromSeconds(value.Seconds);
                 Persist(_settings with { IdleTimeoutSeconds = value.Seconds });
+            }
+        }
+    }
+
+    /// <summary>The periods the agent log may be kept for, never under 30 days.</summary>
+    internal static IReadOnlyList<LogKeepChoice> OfferedLogKeeps { get; } =
+    [
+        new(90, Strings.LogKeptNinetyDays),
+        new(AuditRetention.DefaultDays, Strings.LogKeptOneYear),
+        new(2 * AuditRetention.DefaultDays, Strings.LogKeptTwoYears),
+        new(AuditRetention.Forever, Strings.LogKeptForever),
+    ];
+
+    /// <summary>What this screen's list shows: <see cref="OfferedLogKeeps"/>, plus the period in force when <c>app.toml</c> names another.</summary>
+    internal IReadOnlyList<LogKeepChoice> KeepLogChoices { get; }
+
+    /// <summary>How long the vault's owner keeps the agent log, applied at its next compaction.</summary>
+    internal LogKeepChoice KeepLog
+    {
+        get => _keepLog;
+        set
+        {
+            if (value is not null && SetProperty(ref _keepLog, value))
+            {
+                Persist(_settings with { KeepLogDays = value.Days });
             }
         }
     }
@@ -679,6 +712,23 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         Message = _preferences.Update(settings)
             ? string.Empty
             : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
+    }
+
+    /// <summary>The offered periods, widened by the one in force if it is not among them, forever last.</summary>
+    private static IReadOnlyList<LogKeepChoice> KeepChoicesFor(int days)
+    {
+        if (OfferedLogKeeps.Any(choice => choice.Days == days))
+        {
+            return OfferedLogKeeps;
+        }
+
+        return
+        [
+            .. OfferedLogKeeps
+                .Append(new LogKeepChoice(days, Counted(days, "day")))
+                .OrderBy(choice => choice.Days == AuditRetention.Forever)
+                .ThenBy(choice => choice.Days),
+        ];
     }
 
     /// <summary>The offered timeouts, widened by the one in force if it is not among them.</summary>

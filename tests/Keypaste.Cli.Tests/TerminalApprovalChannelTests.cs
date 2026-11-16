@@ -718,6 +718,33 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("keypaste: denied. Nothing was written.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
+    private static ItemChangePrompt ItemChange(ItemChangeKind kind) =>
+        ItemChangePrompt.For("Claude Code", "claude-code", new EntryName("work", "scratch-token"), new ItemChange(kind, null), "the token was revoked") with
+        {
+            Created = kind == ItemChangeKind.Delete ? new DateOnly(2026, 11, 15) : null,
+        };
+
+    /// <summary>An agent's change to an item names the item and the change in keypaste's words; y alone allows it, and a delete says it is for good (T-57).</summary>
+    [Theory]
+    [InlineData("y", ApprovalAnswer.ApprovedOnce)]
+    [InlineData("", ApprovalAnswer.Denied)]
+    [InlineData("a", ApprovalAnswer.Denied)]
+    [InlineData("o", ApprovalAnswer.Denied)]
+    public async Task An_item_change_shows_the_change_and_is_allowed_by_y_alone(string answer, ApprovalAnswer expected)
+    {
+        var trash = Build(answer);
+        var delete = Build(answer);
+
+        Assert.Equal(expected, await trash.Channel.AskAsync(ItemChange(ItemChangeKind.MoveToTrash), Token));
+        Assert.Equal(expected, await delete.Channel.AskAsync(ItemChange(ItemChangeKind.Delete), Token));
+
+        Assert.Contains("  change   Move work/scratch-token to Trash", trash.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  change   Delete work/scratch-token for good. An agent created it on 2026-11-15", delete.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("[y] delete for good", Assert.Single(delete.Prompt.PromptsSeen), StringComparison.Ordinal);
+        Assert.DoesNotContain("[a]", Assert.Single(trash.Prompt.PromptsSeen), StringComparison.Ordinal);
+        Assert.Contains("    the token was revoked", trash.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
     private static SetPrompt LinkedSet() =>
         SetPrompt.For(
             "claude-code",

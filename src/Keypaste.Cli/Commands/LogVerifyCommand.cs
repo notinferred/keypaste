@@ -75,7 +75,7 @@ internal static class LogVerifyCommand
 
             if (key is null)
             {
-                context.Stderr.WriteLine("keypaste log verify: this vault holds no checkpoint key yet, so no checkpoint was checked");
+                context.Stderr.WriteLine("keypaste log verify: this vault holds no checkpoint key yet, so no checkpoint was checked and its owner compacts no log until a save gives it one");
             }
 
             var report = AuditChainVerifier.Verify(path, expected, key);

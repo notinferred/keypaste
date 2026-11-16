@@ -23,6 +23,7 @@ public sealed class BanExemptionsTests
         ["src/Keypaste.App/App.axaml.cs"] = 1,
         ["src/Keypaste.App/Clipboard/AvaloniaClipboard.cs"] = 2,
         ["src/Keypaste.App/CrashReporting.cs"] = 2,
+        ["src/Keypaste.App/DiagnosticsRelaunch.cs"] = 1,
         ["src/Keypaste.App/ViewModels/ConnectClientViewModel.cs"] = 1,
         ["src/Keypaste.App/ViewModels/EntryAttachmentRow.cs"] = 1,
         ["src/Keypaste.App/ViewModels/EntryAttachmentsViewModel.cs"] = 9,

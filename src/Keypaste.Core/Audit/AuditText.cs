@@ -94,7 +94,7 @@ public static class AuditText
                 doubted && unverified!.Contains(entry.Line) ? UnverifiedMark : " ",
                 When(entry),
                 Or(entry.Client),
-                Or(entry.Entry),
+                Folded(entry) is { Length: > 0 } folded ? folded : Or(entry.Entry),
                 Or(entry.Decision),
                 entry.ReasonUnread ? $"{Or(entry.Method)} {UnreadMark}" : Or(entry.Method),
             ]);
@@ -129,6 +129,42 @@ public static class AuditText
         }
 
         return lines;
+    }
+
+    /// <summary>What a summary or removal line stands for, in words, for the CLI and the app alike.</summary>
+    /// <param name="entry">A line of the log.</param>
+    /// <returns>The lookups a summary folds or the days a removal removed, or empty for any other line.</returns>
+    public static string Folded(AuditEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.Summary is { } summary)
+        {
+            int Of(string tool) => summary.Counts.Where(count => string.Equals(count.Tool, tool, StringComparison.Ordinal)).Sum(count => count.Count);
+            var refused = summary.Counts.Where(count => count.Decision == AuditDecision.Denied).Sum(count => count.Count);
+            var parts = new List<string>();
+
+            if (Of(AuditTools.List) is > 0 and var listings)
+            {
+                parts.Add(Count(listings, "listing"));
+            }
+
+            if (Of(AuditTools.Find) is > 0 and var searches)
+            {
+                parts.Add(Count(searches, "search"));
+            }
+
+            if (refused > 0)
+            {
+                parts.Add(Invariant($"{refused} refused"));
+            }
+
+            return $"{Count(entry.Requests, "lookup")} on {summary.Day}: {string.Join(", ", parts)}";
+        }
+
+        return entry.Removal is { } removal
+            ? $"{Count(removal.Count, "request")} from {removal.From} to {removal.To} removed"
+            : string.Empty;
     }
 
     /// <summary>States what a table is and is not showing.</summary>
@@ -212,6 +248,7 @@ public static class AuditText
                 lines.Add("Every record before the first break is still intact and still verified.");
                 lines.Add("What this means is that the file is not the file keypaste wrote.");
                 AddCheckpoints(lines, report);
+                AddCompaction(lines, report);
 
                 // Said on a broken file too. The observations below are precisely the ones that
                 // explain which rows of `keypaste log` cannot be believed, and withholding them
@@ -231,6 +268,7 @@ public static class AuditText
                 }
 
                 AddCheckpoints(lines, report);
+                AddCompaction(lines, report);
                 AddForgiven(lines, report);
                 AddAnchor(lines, report);
                 lines.Add(string.Empty);
@@ -253,16 +291,30 @@ public static class AuditText
 
     private static void AddCheckpoints(List<string> lines, AuditChainReport report)
     {
-        if (report.SignedCheckpoints is not { } signed)
+        if (report.SignedCheckpoints is null)
         {
             lines.Add($"{Count(report.Checkpoints, "checkpoint")} found, not checked: --checkpoints opens the vault to check them.");
             return;
         }
 
+        lines.AddRange(CheckedCheckpoints(report));
+    }
+
+    /// <summary>What a check under the vault's checkpoint key found, one unwrapped sentence each, for the CLI and the app alike.</summary>
+    /// <param name="report">A report made with the vault's key; a forged checkpoint is among its breaks.</param>
+    /// <returns>The checkpoints found and signed, those naming another vault, and the unsigned tail; nothing without a key.</returns>
+    public static IReadOnlyList<string> CheckedCheckpoints(AuditChainReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (report.SignedCheckpoints is not { } signed)
+        {
+            return [];
+        }
+
         var forged = report.Findings.Count(f => f.Fault == AuditChainFault.Forged);
         var elsewhere = report.Checkpoints - signed - forged;
-
-        lines.Add(Invariant($"{Count(report.Checkpoints, "checkpoint")} found, {signed} signed by this vault's key."));
+        List<string> lines = [Invariant($"{Count(report.Checkpoints, "checkpoint")} found, {signed} signed by this vault's key.")];
 
         if (elsewhere > 0)
         {
@@ -272,6 +324,34 @@ public static class AuditText
         lines.Add(signed == 0
             ? "No checkpoint is signed by this vault's key, so no record is signed."
             : $"Unsigned tail: {Count(report.UnsignedRecords, "record")} after the last signed checkpoint.");
+
+        return lines;
+    }
+
+    private static void AddCompaction(List<string> lines, AuditChainReport report)
+    {
+        if (Compacted(report) is { Length: > 0 } sentence)
+        {
+            lines.Add(sentence);
+        }
+    }
+
+    /// <summary>What the log's compaction record says, in one unwrapped sentence for the CLI and the app alike.</summary>
+    /// <param name="report">What the verifier found.</param>
+    /// <returns>The sentence, or empty when the log was never compacted or its record is among the breaks.</returns>
+    public static string Compacted(AuditChainReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        var sealedLines = Invariant($"Compacted: the first line seals {Count(report.SealedRecords, "record")} kept from a log of {Count((int)Math.Min(report.CompactedFrom, int.MaxValue), "line")}");
+
+        return report.Compaction switch
+        {
+            AuditCompactionCheck.Verified => $"{sealedLines}, signed by this vault's key.",
+            AuditCompactionCheck.OtherVault => $"{sealedLines}, signed under another vault's key, not checked.",
+            AuditCompactionCheck.NotChecked => $"{sealedLines}; its signature is not checked without the vault's key (--checkpoints).",
+            _ => string.Empty,
+        };
     }
 
     private static void AddAnchor(List<string> lines, AuditChainReport report)
@@ -372,7 +452,8 @@ public static class AuditText
         AuditChainFault.Altered => "its own bytes have changed since it was written.",
         AuditChainFault.Unlinked => "it does not follow the record before it. One was removed or inserted.",
         AuditChainFault.Restarted => "the chain starts again here. The records before it were cut off.",
-        AuditChainFault.Forged => "a checkpoint this vault's key did not sign. The chain was rewritten without the vault.",
+        AuditChainFault.Forged => "a checkpoint or compaction record this vault's key did not sign. The chain was rewritten without the vault.",
+        AuditChainFault.Unsealed => "a compaction record whose sealed lines are not the lines it sealed. One was changed, removed or inserted.",
         _ => "it is not a record keypaste wrote. Something else wrote into the log.",
     };
 
@@ -384,5 +465,5 @@ public static class AuditText
     private static string Or(string text) => text.Length == 0 ? Blank : text;
 
     private static string Count(int n, string noun) =>
-        string.Create(CultureInfo.InvariantCulture, $"{n} {noun}{(n == 1 ? string.Empty : "s")}");
+        string.Create(CultureInfo.InvariantCulture, $"{n} {noun}{(n == 1 ? string.Empty : noun.EndsWith('h') ? "es" : "s")}");
 }

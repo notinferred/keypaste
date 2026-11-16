@@ -81,15 +81,31 @@ public sealed record AuditEntry
     /// <summary>Whether this record was granted.</summary>
     public bool Granted => string.Equals(Decision, "granted", StringComparison.Ordinal);
 
+    /// <summary>On a summary line, one agent's lookups of one UTC day the vault's owner folded into it; otherwise null.</summary>
+    public AuditSummary? Summary { get; init; }
+
+    /// <summary>On a removal line, the whole days the vault's owner removed; otherwise null.</summary>
+    public AuditRemoval? Removal { get; init; }
+
+    /// <summary>How many requests the line records: a summary's folded lookups, a removal's removed requests, otherwise one.</summary>
+    public int Requests => Summary is { } summary ? summary.Counts.Sum(count => count.Count) : Removal?.Count ?? 1;
+
     /// <summary>Whether this is the owner's checkpoint rather than a request, which no listing shows.</summary>
     public bool IsCheckpoint => string.Equals(Method, AuditCheckpoint.Method, StringComparison.Ordinal);
+
+    /// <summary>Whether this is the record sealing a compacted log rather than a request, which no listing shows.</summary>
+    public bool IsCompaction => string.Equals(Method, AuditCompaction.Method, StringComparison.Ordinal);
 }
 
 /// <summary>Where an incremental read of the log stopped.</summary>
 /// <param name="Offset">The byte just past the last complete line read.</param>
 /// <param name="Line">The number of physical lines read so far.</param>
-public readonly record struct AuditPosition(long Offset, int Line)
+/// <param name="Head">The file's first bytes when it was read, which a compacted file's new first line changes.</param>
+public readonly record struct AuditPosition(long Offset, int Line, string Head = "")
 {
+    /// <summary>How many of the file's first bytes tell one file from the one that replaced it: past the first line's timestamp.</summary>
+    internal const int HeadBytes = 64;
+
     /// <summary>The start of the file.</summary>
     public static AuditPosition Start { get; } = new(0, 0);
 }
@@ -139,7 +155,7 @@ public static class AuditReader
 
         try
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
 
             var number = 0;
@@ -154,7 +170,7 @@ public static class AuditReader
 
                 if (Parse(line, number) is { } entry)
                 {
-                    if (!entry.IsCheckpoint)
+                    if (!entry.IsCheckpoint && !entry.IsCompaction)
                     {
                         read.Add(entry);
                     }
@@ -190,8 +206,9 @@ public static class AuditReader
     /// <returns><see langword="false"/> when the file could not be read at all; a missing file reads as empty.</returns>
     /// <remarks>
     /// A tail with no newline yet is left for the next read, because it may be a record still being
-    /// written. A file shorter than <paramref name="from"/> was replaced, so it is read again from its
-    /// start, which a caller sees as <paramref name="next"/> numbering lines from one again.
+    /// written. A file shorter than <paramref name="from"/>, or one that no longer begins with the bytes it began
+    /// with, was replaced, as compacting it does, so it is read again from its start, which a caller sees as
+    /// <paramref name="next"/> numbering lines from one again.
     /// <see cref="AuditEntry.ReasonUnread"/> is not computed here: it needs the whole file.
     /// </remarks>
     public static bool TryReadFrom(
@@ -211,6 +228,7 @@ public static class AuditReader
 
         byte[] bytes;
         var start = from;
+        string head;
 
         try
         {
@@ -221,8 +239,11 @@ public static class AuditReader
             }
 
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var first = new byte[(int)Math.Min(stream.Length, AuditPosition.HeadBytes)];
+            stream.ReadExactly(first);
+            head = Convert.ToHexStringLower(first);
 
-            if (stream.Length < start.Offset)
+            if (stream.Length < start.Offset || (start.Offset > 0 && !head.StartsWith(start.Head, StringComparison.Ordinal)))
             {
                 start = AuditPosition.Start;
             }
@@ -256,7 +277,7 @@ public static class AuditReader
 
             if (Parse(line, number) is { } entry)
             {
-                if (!entry.IsCheckpoint)
+                if (!entry.IsCheckpoint && !entry.IsCompaction)
                 {
                     read.Add(entry);
                 }
@@ -268,7 +289,7 @@ public static class AuditReader
         }
 
         entries = read;
-        next = new AuditPosition(start.Offset + complete, number);
+        next = new AuditPosition(start.Offset + complete, number, head);
         unreadable = skipped;
         return true;
     }
@@ -364,6 +385,8 @@ public static class AuditReader
                 Vault = Text(root, "vault"),
                 Entries = EntryPaths(root, "entries"),
                 Command = Text(root, "command"),
+                Summary = SummaryOf(root),
+                Removal = RemovalOf(root),
             };
         }
         catch (JsonException)
@@ -371,6 +394,37 @@ public static class AuditReader
             return null;
         }
     }
+
+    private static AuditSummary? SummaryOf(JsonElement root)
+    {
+        if (!root.TryGetProperty("summary", out var summary) || summary.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var counts = summary.TryGetProperty("counts", out var array) && array.ValueKind == JsonValueKind.Array
+            ? array.EnumerateArray()
+                .Where(count => count.ValueKind == JsonValueKind.Object)
+                .Select(count => new AuditFoldCount(
+                    Text(count, "tool"),
+                    string.Equals(Raw(count, "decision"), "granted", StringComparison.Ordinal) ? AuditDecision.Granted : AuditDecision.Denied,
+                    Number(count, "count")))
+                .ToList()
+            : [];
+
+        return new AuditSummary(Text(summary, "day"), Text(summary, "first"), Text(summary, "last"), counts, Text(summary, "sha256"));
+    }
+
+    private static AuditRemoval? RemovalOf(JsonElement root) =>
+        root.TryGetProperty("removed", out var removed) && removed.ValueKind == JsonValueKind.Object
+            ? new AuditRemoval(Text(removed, "from"), Text(removed, "to"), Number(removed, "count"), Text(removed, "sha256"))
+            : null;
+
+    /// <summary>A count, or zero when the line does not hold one that fits; never negative.</summary>
+    private static int Number(JsonElement parent, string name) =>
+        parent.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) && number > 0
+            ? number
+            : 0;
 
     private static DateTimeOffset? When(string timestamp) =>
         DateTimeOffset.TryParse(

@@ -911,7 +911,7 @@ public sealed class ScreenRenderer
         rules.ChooseCommand.Press(rules.Rows.Single(row => row.Category == Core.Agents.FieldCategory.Password).Choices.Single(choice => choice.Rule == Core.Agents.CategoryRule.Allow));
         WindowInput.Drain();
         Save(window, output, "04-settings-agent-rules-allow");
-        rules.CancelAllowCommand.Press();
+        rules.CancelGrantCommand.Press();
         SetDrawnState(rules, nameof(rules.Ignored), "Agent rules were changed outside keypaste and are ignored until you set them again. Until then every value is asked about and no agent may run commands.");
         WindowInput.Drain();
         Save(window, output, "04-settings-agent-rules-ignored");

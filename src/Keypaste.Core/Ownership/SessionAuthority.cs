@@ -82,6 +82,7 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly SessionEnvironments? _environments;
     private readonly SessionEditor? _editor;
     private readonly SessionSaver? _saver;
+    private readonly SessionItemChanger? _changer;
     private readonly IBrowserRequests? _browsers;
     private readonly Action? _lockNow;
     private readonly TimeProvider _clock;
@@ -104,6 +105,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="editor">What a terminal's edit is put to the person and made with, or null to refuse every one.</param>
     /// <param name="browsers">What decides a browser's pairing, pairing check and fill, or null to refuse every one.</param>
     /// <param name="saver">Saves a value an agent asks the person to save; null where this owner saves none.</param>
+    /// <param name="changer">Makes a change to an item an agent asks the person to allow; null where this owner changes none.</param>
     public SessionAuthority(
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
@@ -114,7 +116,8 @@ public sealed class SessionAuthority : IApproverHandler
         TimeProvider? clock = null,
         SessionEditor? editor = null,
         IBrowserRequests? browsers = null,
-        SessionSaver? saver = null)
+        SessionSaver? saver = null,
+        SessionItemChanger? changer = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -128,6 +131,7 @@ public sealed class SessionAuthority : IApproverHandler
         _environments = environments;
         _editor = editor;
         _saver = saver;
+        _changer = changer;
         _browsers = browsers;
         _lockNow = lockNow;
         _clock = clock ?? TimeProvider.System;
@@ -693,6 +697,47 @@ public sealed class SessionAuthority : IApproverHandler
             withdrawn.Token).ConfigureAwait(false);
 
         return Answer(decided with { Session = lifetime.Id });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Recorded under the client that asked, naming the item and the change, as every agent request is. The log is asked for
+    /// before anything is decided, as a save's is, so a change is never put to the person while its line could not follow.
+    /// </remarks>
+    public async ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
+
+        ItemChangeReply Answer(SessionItemChanger.Decided decided) =>
+            _recorder.Recorded(
+                decided.Reply,
+                RequestRecords.ItemChange(client, request, decided.Reply.Decision, decided.Reply.Method, decided.Reply.Reason, decided.Resolved, decided.Item, request.Session, VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(new(new ItemChangeReply(AuditDecision.Denied, refusal.Method, refusal.Reason)));
+        }
+
+        if (_changer is null)
+        {
+            return Answer(new(new ItemChangeReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not change items agents ask about")));
+        }
+
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
+
+        var decided = await Decided(
+            token => _changer.DecideAsync(request, connectionId, lifetime, waiting, token),
+            lifetime,
+            (method, reason) => new SessionItemChanger.Decided(new ItemChangeReply(AuditDecision.Denied, method, reason)),
+            waiting,
+            withdrawn.Token).ConfigureAwait(false);
+
+        return Answer(decided with { Reply = decided.Reply with { Session = lifetime.Id } });
     }
 
     /// <summary>

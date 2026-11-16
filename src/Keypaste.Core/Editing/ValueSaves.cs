@@ -1,3 +1,4 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 
@@ -128,6 +129,12 @@ public static class ValueSaves
             {
                 return result;
             }
+        }
+
+        // Only a named agent's save is marked, so that agent alone may later ask to delete the item for good (T-57).
+        if (now.Creates && now.Holder is { } created && AgentNames.IsNamed(request.ClientLabel))
+        {
+            vault.MarkAgentCreated(created, request.ClientLabel);
         }
 
         return result;

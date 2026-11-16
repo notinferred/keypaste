@@ -73,6 +73,17 @@ internal sealed class TempAuditHome : IDisposable
         }
     }
 
+    /// <summary>Appends a checkpoint signed with <paramref name="key"/>, as the vault's owner writes one.</summary>
+    internal void Checkpoint(AuditCheckpointKey key)
+    {
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(AppClock.Start), out var log, out var error), error);
+
+        using (log)
+        {
+            Assert.True(log.TryCheckpoint(key, "session-one", out var failure), failure);
+        }
+    }
+
     /// <summary>
     /// Changes the first record's text without touching its hash — a careless edit, which is the
     /// thing the chain exists to detect.

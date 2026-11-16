@@ -650,7 +650,7 @@ public sealed class ApproverListenerTests
 
     private sealed class FailingSignatures : ICodeSignatures
     {
-        public (CallerSignature State, string? Signer) Check(string executable) => throw new IOException("the program could not be read");
+        public (CallerSignature State, string? Signer) Check(string executable, MacAuditToken? running) => throw new IOException("the program could not be read");
     }
 
     private sealed class RecordingHandler : IApproverHandler

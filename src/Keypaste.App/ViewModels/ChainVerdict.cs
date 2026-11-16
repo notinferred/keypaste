@@ -4,13 +4,14 @@ using Keypaste.Core.Audit;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The hash chain's verdict as the Activity screen states it: a one-line status, the latest hash, the breaks, and
-/// what the check does and does not prove.
+/// The hash chain's verdict as the Activity screen states it: a one-line status, the latest hash, the breaks, what the
+/// signed checkpoints say, and what the check does and does not prove.
 /// </summary>
 /// <remarks>
 /// It reads the same <see cref="AuditChainReport"/> that <see cref="AuditText.Verdict"/> renders for
-/// <c>keypaste log verify</c>. That rendering is hard-wrapped for a terminal and points at the command's flags, so the
-/// window states the report in its own sentences; the one sentence per fault is still the core's.
+/// <c>keypaste log verify --checkpoints</c>, checked under the unlocked vault's checkpoint key, so a forged checkpoint is
+/// one of its breaks. That rendering is hard-wrapped for a terminal and points at the command's flags, so the window states
+/// the report in its own sentences; the one sentence per fault and the checkpoints' sentences are still the core's.
 /// </remarks>
 internal sealed class ChainVerdict
 {
@@ -66,7 +67,11 @@ internal sealed class ChainVerdict
                 [
                     .. Forgiven(report),
                     "This catches careless edits: a record changed, removed, inserted, or written by something else. A row it cannot check at all is marked rather than vouched for.",
-                    "It cannot catch a rewrite that recomputed the chain, because the chain holds no secret, or records deleted from the end, because nothing follows them. Copy the latest hash and keep it somewhere else; checking a later log against it with keypaste log verify --expect on the command line closes that second gap.",
+                    Checkpoints(report),
+                    .. Compacted(report),
+                    report.SignedCheckpoints is null
+                        ? "It cannot catch a rewrite that recomputed the chain, because no checkpoint was checked, or records deleted from the end, because nothing follows them. Copy the latest hash and keep it somewhere else; checking a later log against it with keypaste log verify --expect on the command line closes that second gap."
+                        : "A rewrite that recomputed the chain is caught only before the last checkpoint this vault's key signed; the records after it are unsigned. Records deleted from the end leave nothing behind them, so copy the latest hash and keep it somewhere else; checking a later log against it with keypaste log verify --expect on the command line closes that gap.",
                 ],
             },
         };
@@ -90,6 +95,8 @@ internal sealed class ChainVerdict
             Paragraphs =
             [
                 "Every record before the first break is still intact and verified. This file is not the file keypaste wrote.",
+                Checkpoints(report),
+                .. Compacted(report),
                 "Treat the rows from the first break on as unproven. If you kept a hash from an earlier check, run keypaste log verify --expect with it on the command line to see whether that record is still in the file.",
                 .. Forgiven(report),
             ],
@@ -110,6 +117,23 @@ internal sealed class ChainVerdict
             : finding.Timestamp;
 
         return Invariant($"Line {finding.Line} · seq {finding.Sequence} · {when} · {fault}");
+    }
+
+    /// <summary>What the checkpoints say under this vault's key, or that none was checked because the vault holds no key yet.</summary>
+    private static string Checkpoints(AuditChainReport report) =>
+        report switch
+        {
+            { SignedCheckpoints: not null } => string.Join(' ', AuditText.CheckedCheckpoints(report)),
+            { Checkpoints: 0 } => "This vault holds no checkpoint key yet, so no checkpoint was checked and the log is not compacted until a save gives it one.",
+            _ => $"{Count(report.Checkpoints, "checkpoint")} found, not checked: this vault holds no checkpoint key yet, so the log is not compacted until a save gives it one.",
+        };
+
+    private static IEnumerable<string> Compacted(AuditChainReport report)
+    {
+        if (AuditText.Compacted(report) is { Length: > 0 } sentence)
+        {
+            yield return sentence;
+        }
     }
 
     private static IEnumerable<string> Forgiven(AuditChainReport report)

@@ -1,0 +1,98 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.ItemChangeWindow"
+                    x:DataType="vm:ItemChangeViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: an agent asks you to change an item"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Every block has a fixed height, so nothing the agent writes can move the item, the change or the buttons
+       (THREATS.md T-2). The reason is one plain TextBlock in a box that scrolls, and no button is the default:
+       Enter changes nothing, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title size-16" Text="{Binding Client}"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="prompt-title size-16" Text=" asks you to change an item" />
+          </Grid>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="prompt-sub size-13" Text="via MCP · label " />
+            <TextBlock Name="LabelText" Classes="prompt-sub size-13" Text="{Binding Label}"
+                       MaxWidth="200" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call size-12" Padding="12,8">
+        <StackPanel>
+          <TextBlock Text="tool: keypaste.request_item_change" />
+          <TextBlock Name="ItemText" Classes="value" Text="{Binding Item}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="It would" />
+        <Border Classes="prompt-reason" Height="58">
+          <TextBlock Name="ChangeText" Margin="12,8" Classes="change size-13" Text="{Binding Change}" TextWrapping="Wrap"
+                     MaxLines="2" TextTrimming="CharacterEllipsis" LineHeight="19.5" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="The agent says it needs this because" />
+        <Border Classes="prompt-reason" Height="77">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,8" Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
+                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
+                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding Attribution}" />
+      </StackPanel>
+
+      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="Allow" Classes="prompt" Classes.primary="{Binding !DeletesForGood}"
+                Classes.danger="{Binding DeletesForGood}" Content="{Binding AllowLabel}"
+                HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

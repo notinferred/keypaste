@@ -95,6 +95,15 @@ internal sealed class WindowApprovalChannel(
         }
     }
 
+    /// <summary>Asks the person to allow an agent's change to an item once or deny it, in a prompt window of its own.</summary>
+    public ValueTask<ApprovalAnswer> AskAsync(ItemChangePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new ItemChangeViewModel(prompt);
+        return ShowAsync(request, () => new ItemChangeWindow(request), cancellationToken);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);

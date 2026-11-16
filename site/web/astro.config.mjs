@@ -55,7 +55,6 @@ export default defineConfig({
       customCss: ['./src/styles/brand.css'],
       components: {
         Head: './src/components/Head.astro',
-        Search: './src/components/Search.astro',
         SocialIcons: './src/components/SocialIcons.astro',
       },
       lastUpdated: false,

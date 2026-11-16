@@ -9,6 +9,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Settings;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -210,6 +211,8 @@ internal static class ApproveCommand
                 Limits = limits,
                 Rules = rules,
                 Audit = () => audit,
+                AuditPath = audit.Path,
+                KeepLogDays = () => AppSettings.Load(KeypasteHome.SettingsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable))).KeepLogDays,
 
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
                 LockNow = () => Stop(lifetime, stop),

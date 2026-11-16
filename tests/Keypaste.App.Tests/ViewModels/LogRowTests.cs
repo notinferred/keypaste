@@ -204,4 +204,21 @@ public sealed class LogRowTests
 
         public override TimeZoneInfo LocalTimeZone => zone;
     }
+
+    [Fact]
+    public void A_days_folded_lookups_and_removed_days_read_as_counts()
+    {
+        var summary = Row(Entry(AuditTools.Summary, "denied", "folded") with
+        {
+            Summary = new AuditSummary("2026-06-01", "2026-06-01T09:00:00.000Z", "2026-06-01T17:00:00.000Z", [new AuditFoldCount(AuditTools.List, AuditDecision.Denied, 4)], new string('a', 64)),
+        });
+        var removal = Row(Entry(AuditTools.Removed, "denied", "expired") with
+        {
+            Client = string.Empty,
+            Removal = new AuditRemoval("2025-01-01", "2025-07-27", 120, new string('b', 64)),
+        });
+
+        Assert.Equal(("Looked up, in one line for the day", "4 lookups on 2026-06-01: 4 listings, 4 refused", "Summary", LogTone.Muted), (summary.Action, summary.Secrets, summary.Result, summary.Tone));
+        Assert.Equal(("keypaste", "Removed older days", "120 requests from 2025-01-01 to 2025-07-27 removed", "Removed"), (removal.Actor, removal.Action, removal.Secrets, removal.Result));
+    }
 }

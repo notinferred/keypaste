@@ -12,6 +12,18 @@
     "summary": "An AI agent asks for one field of one entry, and you decide each time."
   },
   {
+    "slug": "agent-search",
+    "name": "Agent search",
+    "status": "building",
+    "summary": "An agent finds the login, key or server it needs by name, host, kind or project, with what each is linked to, never a value."
+  },
+  {
+    "slug": "audit-log",
+    "name": "Audit log",
+    "status": "building",
+    "summary": "Every agent request recorded on your machine in a hash-chained log signed with a key only your vault holds."
+  },
+  {
     "slug": "project-environments",
     "name": "Project environments",
     "status": "beta",

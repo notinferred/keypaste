@@ -129,6 +129,14 @@ public interface IApproverHandler
     ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new SaveReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not save values agents ask for"));
 
+    /// <summary>Asks the person to allow one change an agent names to an item it may see.</summary>
+    /// <param name="request">The item, the change and why.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether it was made; a handler that changes nothing refuses.</returns>
+    ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new ItemChangeReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not change items agents ask about"));
+
     /// <summary>Pairs the browser attached on this connection (D-0627).</summary>
     /// <param name="request">The extension's identification key, and the attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>

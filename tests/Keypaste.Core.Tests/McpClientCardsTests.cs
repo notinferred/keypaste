@@ -105,6 +105,17 @@ public sealed class McpClientCardsTests
         Assert.Equal(_now.AddHours(-2), card.LastSeen);
     }
 
+    [Theory]
+    [InlineData(AuditTools.Find)]
+    [InlineData(AuditTools.Save)]
+    [InlineData(AuditTools.Set)]
+    public void A_search_a_save_or_a_linked_set_is_a_use(string tool)
+    {
+        var card = Assert.Single(Agents([], [Line("cursor", "Cursor", 3, tool: tool)]));
+
+        Assert.Equal(("cursor", _now.AddHours(-3)), (card.Key, card.LastSeen));
+    }
+
     [Fact]
     public void AnotherVaultsLines_AndOldOnes_AreIgnored()
     {

@@ -1,0 +1,26 @@
+---
+title: CI and deploys
+description: Identities for CI jobs and deploy targets, and syncs pushed from your own machine.
+---
+
+import Status from '../../../components/Status.astro';
+
+<Status id="ci-and-deploys" />
+
+Once a team shares projects, its builds and deploys need the same values without a member's key. A CI job or a deploy target gets an identity the relay verifies, and a GitHub Action fetches a project's set for a workflow. Hosting platforms such as GitHub, Vercel and Cloudflare receive values pushed from an approved member's machine, so the relay never decrypts them.
+
+## How it works
+
+```mermaid
+flowchart LR
+  member["An approved member's keypaste"] e1@-->|pushes values| platform["Vercel, GitHub or Cloudflare settings"]
+  relay["Relay: ciphertext only"] --> action["GitHub Action with a verified identity"]
+  action e2@--> build["the build, with its variables"]
+  e1@{ animate: true }
+  e2@{ animate: true }
+```
+
+## Read more
+
+- [Team projects](/products/team-projects/), which this builds on
+- [Scoped CI tokens](/products/ci-tokens/), the single-user version

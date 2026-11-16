@@ -45,6 +45,13 @@ internal static class Program
     {
         ArgumentNullException.ThrowIfNull(args);
 
+        if (OperatingSystem.IsWindows()
+            && DiagnosticsRelaunch.IsNeeded(Environment.GetEnvironmentVariable(DiagnosticsRelaunch.Variable), Environment.ProcessPath)
+            && DiagnosticsRelaunch.Run(Environment.ProcessPath!, args) is { } relaunched)
+        {
+            return relaunched;
+        }
+
         IcuFallback.Apply();
         _ = MemoryDumps.TryPrevent();
 

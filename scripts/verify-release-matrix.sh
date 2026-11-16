@@ -917,8 +917,15 @@ PROJECTS
 
 }
 
-# The steps of a workflow, one per NUL-free record, split on a step's leading dash.
-workflow_steps() { code_of "$1" | awk '/^      - / { if (step != "") printf "%s\035", step; step = "" } { step = step $0 " " } END { printf "%s\035", step }'; }
+# The steps of a workflow, one per NUL-free record, split on a step's leading dash, each led by its job's id.
+workflow_steps() {
+  code_of "$1" | awk '
+    /^jobs:/ { jobs = 1 }
+    jobs && /^  [A-Za-z0-9_-]+:/ { job = $1; sub(/:.*/, "", job) }
+    /^      - / { if (step != "") printf "%s\035", step; step = "job=" job " " }
+    { step = step $0 " " }
+    END { printf "%s\035", step }'
+}
 
 # A Windows build signs only through sign-windows.sh, which reads the policy from the definition;
 # a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b, D-0204).
@@ -944,17 +951,21 @@ validate_signing() {
         *) note "$workflow never resolves the $c signing policy from the definition" ;;
       esac
       # A refused signature must stop the job before a package exists, and an installer is signed before anything leaves the job.
-      local logins=0 index=0 payload_signed=0 packaged=0 installer_signed=0 published=0
+      # Only an upload in the installer's own job can carry it, since nothing else leaves a job.
+      local logins=0 index=0 payload_signed=0 packaged=0 installer_signed=0 signed_after_upload=0 job="" uploaded_jobs=" "
       while IFS= read -r -d $'\035' step; do
         index=$((index + 1))
+        job="${step%% *}"
         case "$step" in
-          *"scripts/sign-windows.sh --component $c "*"artifacts/dist/"*) installer_signed="$index" ;;
+          *"scripts/sign-windows.sh --component $c "*"artifacts/dist/"*)
+            installer_signed="$index"
+            case "$uploaded_jobs" in *" $job "*) signed_after_upload=1 ;; esac ;;
           *"scripts/sign-windows.sh --component $c "*) payload_signed="$index" ;;
         esac
         case "$step" in *"name: Package and hash"*) [ "$packaged" -gt 0 ] || packaged="$index" ;; esac
         case "$step" in
           *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*)
-            [ "$published" -gt 0 ] || published="$index" ;;
+            uploaded_jobs="$uploaded_jobs$job " ;;
         esac
         case "$step" in *"uses: azure/login@"*) ;; *) continue ;; esac
         logins=$((logins + 1))
@@ -973,7 +984,7 @@ validate_signing() {
         *".msi"*)
           if [ "$installer_signed" -eq 0 ]; then
             note "$workflow builds an installer and never signs it through sign-windows.sh --component $c"
-          elif [ "$published" -gt 0 ] && [ "$installer_signed" -gt "$published" ]; then
+          elif [ "$signed_after_upload" -eq 1 ]; then
             note "$workflow signs the $c installer after an upload or attestation step"
           fi ;;
       esac
@@ -984,7 +995,13 @@ validate_signing() {
         if [ "$workflow" != ".github/workflows/app.yml" ]; then
           note "$workflow rehearses signing, which only app.yml's dispatch may do"
         else
+          # A rehearsal signature exists only in the job that makes it, so only that job's uploads can carry one.
+          local rehearsing_jobs=" "
           while IFS= read -r -d $'\035' step; do
+            case "$step" in *"--rehearsal"* | *"rehearse-windows-signing.sh"* | *"signing_rehearsal"* | *"steps.rehearsal."*) rehearsing_jobs="$rehearsing_jobs${step%% *} " ;; esac
+          done < <(workflow_steps "$root/$workflow")
+          while IFS= read -r -d $'\035' step; do
+            case "$rehearsing_jobs" in *" ${step%% *} "*) ;; *) continue ;; esac
             case "$step" in
               *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*)
                 case "$step" in

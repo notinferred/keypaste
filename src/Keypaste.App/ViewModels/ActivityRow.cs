@@ -63,7 +63,7 @@ internal sealed partial class ActivityRow : ObservableObject
     /// <summary>The entry and field on one line.</summary>
     internal string What => $"{Entry} · {Field}";
 
-    /// <summary>What a waiting row says was asked for: the item and field, a run's command, or a change to an agent's settings.</summary>
+    /// <summary>What a waiting row says was asked for: the item and field, a run's command, a linked set's fields, a save's place, or a terminal's change.</summary>
     internal string Asked => Detail.Length > 0 ? Detail : What;
 
     /// <summary>Takes the place and time left of the same request read again.</summary>
@@ -114,6 +114,43 @@ internal sealed partial class ActivityRow : ObservableObject
         return new(number, prompt.Command, "none configured", what, "edit", "answered for you in " + Seconds(waiting.Remaining))
         {
             Detail = what,
+            LeftText = Humanized(waiting.Remaining),
+        };
+    }
+
+    /// <summary>An agent's linked set a person is being asked about, naming each item and field.</summary>
+    internal static ActivityRow WaitingSet(int number, WaitingSet waiting)
+    {
+        var prompt = waiting.Prompt;
+        var fields = string.Join(", ", prompt.Fields.Select(field => $"{field.Entry} · {field.Field}"));
+
+        return new(number, prompt.Client, prompt.Label ?? "none configured", fields, "linked set", "answered for you in " + Seconds(waiting.Remaining))
+        {
+            Detail = fields,
+            LeftText = Humanized(waiting.Remaining),
+        };
+    }
+
+    /// <summary>An agent's request that the person save a value at the place it names.</summary>
+    internal static ActivityRow WaitingSave(int number, WaitingSave waiting)
+    {
+        var prompt = waiting.Prompt;
+
+        return new(number, prompt.Client, prompt.Label ?? "none configured", prompt.Where, prompt.Field, "answered for you in " + Seconds(waiting.Remaining))
+        {
+            Detail = $"Save {prompt.Field} in {prompt.Where}",
+            LeftText = Humanized(waiting.Remaining),
+        };
+    }
+
+    /// <summary>An agent's request that the person allow a change to an item.</summary>
+    internal static ActivityRow WaitingChange(int number, WaitingChange waiting)
+    {
+        var prompt = waiting.Prompt;
+
+        return new(number, prompt.Client, prompt.Label ?? "none configured", prompt.Item, "change", "answered for you in " + Seconds(waiting.Remaining))
+        {
+            Detail = prompt.Says,
             LeftText = Humanized(waiting.Remaining),
         };
     }

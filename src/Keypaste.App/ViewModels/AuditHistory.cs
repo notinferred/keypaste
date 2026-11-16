@@ -60,7 +60,8 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
 
     /// <summary>Reads the log at <paramref name="path"/>.</summary>
     /// <param name="path">The log.</param>
-    internal static AuditHistory Read(string path)
+    /// <param name="checkpoints">The unlocked vault's checkpoint key, to check the checkpoints naming it, or null.</param>
+    internal static AuditHistory Read(string path, AuditCheckpointKey? checkpoints = null)
     {
         if (!Path.Exists(path))
         {
@@ -72,7 +73,7 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
             return new AuditHistory(AuditReadKind.Unreadable, [], [], error);
         }
 
-        var report = AuditChainVerifier.Verify(path);
+        var report = AuditChainVerifier.Verify(path, checkpoints: checkpoints);
 
         // A table drawn from a file nothing checked must not be handed over as though something had.
         if (report.Verdict == AuditChainVerdict.Unreadable)

@@ -59,7 +59,7 @@ public static class McpClientCards
     /// <summary>What the card whose settings every agent without its own gets is called.</summary>
     public const string EveryOtherAgent = "Every other agent";
 
-    private static readonly HashSet<string> _bridgeTools = new([AuditTools.List, AuditTools.Credential, AuditTools.Run], StringComparer.Ordinal);
+    private static readonly HashSet<string> _bridgeTools = new([AuditTools.List, AuditTools.Find, AuditTools.Credential, AuditTools.Set, AuditTools.Save, AuditTools.ItemChange, AuditTools.Run], StringComparer.Ordinal);
 
     /// <summary>Builds the cards: each agent, each tool found on this computer, and every other agent.</summary>
     /// <param name="connected">The clients attached to the live session.</param>

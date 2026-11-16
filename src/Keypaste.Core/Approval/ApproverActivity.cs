@@ -15,4 +15,13 @@ public sealed record ApproverActivity(IReadOnlyList<WaitingRequest> Waiting)
 
     /// <summary>The terminal's edit in front of a person; at most one.</summary>
     public IReadOnlyList<WaitingEdit> WaitingEdits { get; init; } = [];
+
+    /// <summary>The agent's linked set in front of a person; at most one.</summary>
+    public IReadOnlyList<WaitingSet> WaitingSets { get; init; } = [];
+
+    /// <summary>The agent's request to save a value in front of a person; at most one.</summary>
+    public IReadOnlyList<WaitingSave> WaitingSaves { get; init; } = [];
+
+    /// <summary>The agent's request to change an item in front of a person; at most one.</summary>
+    public IReadOnlyList<WaitingChange> WaitingChanges { get; init; } = [];
 }

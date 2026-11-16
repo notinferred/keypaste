@@ -85,6 +85,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
 - A search names at most 25 items it reaches, with their origins, usernames while Settings shows them and the links among them, never a value (unreleased) [T-55].
 - An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
+- An agent may ask the person to move an item it sees whole to Trash, mark it expired or tag it `needs-update`, and to delete for good only an item it created through an approved save; each change is asked every time and made only once the person allows it (unreleased) [T-57].
 - Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
 - One prompt at a time; 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].
@@ -142,12 +143,13 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 ### Audit
 
-- The log is append-only within keypaste and hash-chained; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
+- The log is hash-chained and appended to; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
+- Only the vault's owner rewrites it: lookups older than 30 days become one summary line per agent per day, days older than the period you keep it for (a year by default) are removed whole, every other line keeps its bytes, and a first line signed with the vault's key seals the result (unreleased) [T-5].
 - The vault's owner signs the chain with a key the vault holds every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so a rewrite before the last one needs the unlocked vault (unreleased) [T-5].
 - Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
 - Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.
 - Limit: lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
-- Limit: the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)) and can hold sensitive agent-written text.
+- Limit: kept forever, the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)); it can hold sensitive agent-written text.
 
 ## Maintainer note
 
@@ -192,3 +194,4 @@ The reporting mailbox has been tested from an external address. GitHub private v
 [T-51]: THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
 [T-55]: THREATS.md#t-55--a-search-maps-the-persons-infrastructure
+[T-57]: THREATS.md#t-57--an-agent-asks-the-person-to-change-an-item

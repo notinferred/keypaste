@@ -154,6 +154,11 @@ internal sealed record LogRow
             return TokenAuditReason.TryName(entry.Reason, out var name) ? name : "token";
         }
 
+        if (Is(entry.Tool, AuditTools.Removed))
+        {
+            return "keypaste";
+        }
+
         return entry.Client.Length > 0 ? entry.Client : "unknown agent";
     }
 
@@ -172,6 +177,8 @@ internal sealed record LogRow
         return entry.Tool switch
         {
             "list_entry_names" => "Listed names",
+            AuditTools.Summary => "Looked up, in one line for the day",
+            AuditTools.Removed => "Removed older days",
             "run" => entry.Granted ? "Ran with" : "Requested",
             "access_change" => entry.Granted ? "Changed settings" : "Asked to change settings",
             "terminal_edit" => entry.Granted ? "Changed from a terminal" : "Asked to change from a terminal",
@@ -201,6 +208,11 @@ internal sealed record LogRow
             1 => SetLabel(sets[0]),
             _ => $"{sets.Length} sets",
         };
+
+        if (AuditText.Folded(entry) is { Length: > 0 } folded)
+        {
+            return (folded, _none);
+        }
 
         if (entry.Entries.Count > 0)
         {
@@ -235,6 +247,11 @@ internal sealed record LogRow
 
     private static (string Result, LogTone Tone) Outcome(AuditEntry entry)
     {
+        if (entry.Summary is not null || entry.Removal is not null)
+        {
+            return (entry.Summary is not null ? "Summary" : "Removed", LogTone.Muted);
+        }
+
         if (!entry.Granted)
         {
             // Nobody answered, so nobody refused: still a refusal, but not one a person gave. A terminal's

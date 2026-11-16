@@ -56,6 +56,17 @@ internal static class ToolResults
         StructuredContent = StructuredSaved(where),
     };
 
+    /// <summary>A change to an item the person allowed, which the result says.</summary>
+    /// <param name="item">The item changed.</param>
+    /// <param name="change">The change as the agent named it.</param>
+    /// <returns>A success result saying so, with <c>changed</c> in its structured content.</returns>
+    internal static CallToolResult ItemChanged(string item, string change) => new()
+    {
+        IsError = false,
+        Content = [new TextContentBlock { Text = ToolText.ItemChanged(item, change) }],
+        StructuredContent = StructuredChanged(item, change),
+    };
+
     /// <summary>The one result in keypaste that carries a credential.</summary>
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
@@ -268,6 +279,23 @@ internal static class ToolResults
             writer.WriteStartObject();
             writer.WriteBoolean("saved", true);
             writer.WriteString("where", where);
+            writer.WriteEndObject();
+        }
+
+        using var parsed = JsonDocument.Parse(buffer.ToArray());
+        return parsed.RootElement.Clone();
+    }
+
+    private static JsonElement StructuredChanged(string item, string change)
+    {
+        using var buffer = new MemoryStream(128);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteBoolean("changed", true);
+            writer.WriteString("item", item);
+            writer.WriteString("change", change);
             writer.WriteEndObject();
         }
 
