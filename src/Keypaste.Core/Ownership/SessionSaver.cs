@@ -13,8 +13,8 @@ namespace Keypaste.Core.Ownership;
 /// <remarks>
 /// The place is checked before anyone is asked, and only where the agent's bridge can see it, and checked again before it is
 /// written, so a vault that changed meanwhile saves nothing. A refused or unanswered request holds the same place back for a
-/// minute (THREATS.md T-11); a value is written only while the unlock it was asked under is live, and one whose save fails is
-/// taken back out of the open vault.
+/// minute (THREATS.md T-11); a value is written only while the unlock it was asked under is live, its line is written before the
+/// vault is saved, and one whose line or save fails is taken back out of the open vault.
 /// </remarks>
 public sealed class SessionSaver
 {
@@ -42,10 +42,17 @@ public sealed class SessionSaver
     /// <param name="request">The request, already admitted to <paramref name="lifetime"/>.</param>
     /// <param name="connectionId">The connection it came on, which an unlabelled agent waits its turn as.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>
+    /// <param name="record">Writes the line of a save about to be made, answering whether it was written.</param>
     /// <param name="waiting">The lifetime's <see cref="SessionLifetime.Waiting"/> as the request began.</param>
     /// <param name="cancellationToken">Withdraws the question when the agent stops waiting, the vault is locked or it is reloaded.</param>
-    /// <returns>Whether it was saved.</returns>
-    internal async ValueTask<SaveReply> DecideAsync(SaveRequest request, string connectionId, SessionLifetime lifetime, CancellationToken waiting, CancellationToken cancellationToken)
+    /// <returns>Whether it was saved, and whether its line is already written.</returns>
+    internal async ValueTask<SaveReply> DecideAsync(
+        SaveRequest request,
+        string connectionId,
+        SessionLifetime lifetime,
+        Func<SaveReply, bool> record,
+        CancellationToken waiting,
+        CancellationToken cancellationToken)
     {
         if (SaveRequestRules.Check(request) is { } problem)
         {
@@ -132,33 +139,34 @@ public sealed class SessionSaver
             return Withdrawn(lifetime);
         }
 
-        Vault? written = null;
-        VaultCheckpoint? checkpoint = null;
         EditResult? result = null;
+        var made = new SaveReply(AuditDecision.Granted, AuditMethod.Prompt, "a person entered a value and the vault holds it; the agent was not given it") { Where = where };
+        var written = LoggedWrite.Run(
+            _write,
+            lifetime,
+            open => (result = ValueSaves.Apply(open, request, check, value, scene)).Done is not null,
+            () => record(made));
 
-        var saved = _write(lifetime, open =>
+        if (written.Late && result?.Refusal is { } late)
         {
-            written = open;
-            checkpoint = open.Checkpoint();
-            result = ValueSaves.Apply(open, request, check, value, scene);
-            return result.Done is not null;
-        });
-
-        if (result?.Refusal is { } late)
-        {
-            SessionEditor.TakeBack(written, checkpoint);
             return Refused(AuditMethod.VaultChanged, $"a person entered a value, and then: {SessionEditor.Said(late)}");
         }
 
-        if (!saved.Holds || result?.Done is null)
+        if (written.Unrecorded)
         {
-            SessionEditor.TakeBack(written, checkpoint);
-            _narrate?.Invoke($"saved nothing at {prompt.Where}: {saved.Reason}");
-            return Refused(SessionEditor.MethodOf(saved), $"a person entered a value, and the vault was not saved: {saved.Reason}");
+            _narrate?.Invoke($"saved nothing at {prompt.Where}: {LoggedWrite.Unrecorded}");
+            return Refused(AuditMethod.Failed, LoggedWrite.Unrecorded);
+        }
+
+        if (!written.Made)
+        {
+            _narrate?.Invoke($"saved nothing at {prompt.Where}: {written.Saved.Reason}");
+            var after = written.Recorded ? "a person entered a value, and it was recorded and then not saved, so it was not made" : "a person entered a value, and the vault was not saved";
+            return Refused(SessionEditor.MethodOf(written.Saved), $"{after}: {written.Saved.Reason}");
         }
 
         _narrate?.Invoke($"saved {prompt.Field} at {prompt.Where} for {prompt.Client}; the agent was not given it");
-        return new SaveReply(AuditDecision.Granted, AuditMethod.Prompt, "a person entered a value and the vault holds it; the agent was not given it") { Where = where };
+        return made with { Recorded = true };
     }
 
     private static SaveReply Withdrawn(SessionLifetime lifetime) =>

@@ -8,7 +8,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Puts a terminal's edit to the person and makes it in the owner's own unlocked vault, saving it under
-/// the owner's claim (D-0464).
+/// the owner's claim.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,8 +20,8 @@ namespace Keypaste.Core.Ownership;
 /// Any program can type a terminal command, so a refused or unanswered edit holds back the next one, and
 /// every request for more access from an agent or a terminal, for a minute (THREATS.md T-11). A vault
 /// that differs from its file is refused before anyone is asked, and an edit is written only while the
-/// unlock it was asked under is live; one whose save fails is taken back out of the open vault, so no
-/// later save writes what the reply says was not made.
+/// unlock it was asked under is live. Its line is written before the vault is saved, and one whose line
+/// or save fails is taken back out of the open vault, so no later save writes what the reply says was not made.
 /// </para>
 /// </remarks>
 public sealed class SessionEditor
@@ -59,12 +59,14 @@ public sealed class SessionEditor
     /// <summary>Decides one edit: checks it, asks the person, then writes and saves it.</summary>
     /// <param name="request">The edit, already admitted to <paramref name="lifetime"/>.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>
+    /// <param name="record">Writes the line of an edit about to be saved, answering whether it was written.</param>
     /// <param name="waiting">The lifetime's <see cref="SessionLifetime.Waiting"/> as the request began, which a lock or a reload withdraws.</param>
     /// <param name="cancellationToken">Withdraws the question when the terminal stops waiting, the vault is locked or it is reloaded.</param>
-    /// <returns>What became of it.</returns>
+    /// <returns>What became of it, and whether its line is already written.</returns>
     internal async ValueTask<EditReply> DecideAsync(
         EditRequest request,
         SessionLifetime lifetime,
+        Func<EditReply, bool> record,
         CancellationToken waiting,
         CancellationToken cancellationToken)
     {
@@ -149,38 +151,44 @@ public sealed class SessionEditor
             return Withdrawn(lifetime);
         }
 
-        Vault? written = null;
-        VaultCheckpoint? checkpoint = null;
         EditResult? result = null;
-
-        var saved = _write(lifetime, open =>
-        {
-            written = open;
-            checkpoint = open.Checkpoint();
-            result = TerminalEdits.Apply(open, made, scene, preview);
-            return result.Done is { Outcome: not EditOutcome.Unchanged };
-        });
+        const string allowed = "a person allowed it, and the vault holds it";
+        var written = LoggedWrite.Run(
+            _write,
+            lifetime,
+            open => (result = TerminalEdits.Apply(open, made, scene, preview)).Done is { Outcome: not EditOutcome.Unchanged },
+            () => record(new EditReply(AuditDecision.Granted, AuditMethod.Prompt, allowed)));
 
         if (result?.Refusal is { } late)
         {
-            TakeBack(written, checkpoint);
             return Refused(AuditMethod.VaultChanged, $"a person allowed it, and then: {Said(late)}", late.Kind);
         }
 
-        if (!saved.Holds || result?.Done is not { } done)
+        if (written.Unrecorded)
         {
-            TakeBack(written, checkpoint);
-            _narrate?.Invoke($"did not change {prompt.Item}: {saved.Reason}");
-            return Refused(MethodOf(saved), $"a person allowed it, and the vault was not saved: {saved.Reason}");
+            _narrate?.Invoke($"did not change {prompt.Item}: {LoggedWrite.Unrecorded}");
+            return Refused(AuditMethod.Failed, LoggedWrite.Unrecorded);
+        }
+
+        if (written.Late && result?.Done is { Outcome: EditOutcome.Unchanged } held)
+        {
+            return new EditReply(AuditDecision.Denied, AuditMethod.Unchanged, "the vault came to hold this while a person was asked; nothing was written") { Done = held };
+        }
+
+        if (!written.Made || result?.Done is not { } done)
+        {
+            _narrate?.Invoke($"did not change {prompt.Item}: {written.Saved.Reason}");
+            var after = written.Recorded ? "a person allowed it, and it was recorded and then not saved, so it was not made" : "a person allowed it, and the vault was not saved";
+            return Refused(MethodOf(written.Saved), $"{after}: {written.Saved.Reason}");
         }
 
         _narrate?.Invoke($"changed {prompt.Item} for keypaste {edit.Verb}");
         _edited?.Invoke(done);
 
-        return new EditReply(AuditDecision.Granted, AuditMethod.Prompt, "a person allowed it, and the vault holds it") { Done = done };
+        return new EditReply(AuditDecision.Granted, AuditMethod.Prompt, allowed) { Done = done, Recorded = true };
     }
 
-    /// <summary>The refusal of an edit a lock, a reload or a merge withdrew before it was saved (D-0412, D-0542).</summary>
+    /// <summary>The refusal of an edit a lock, a reload or a merge withdrew before it was saved.</summary>
     /// <remarks>Told apart by the lifetime, since a reload or a merge replaces the wait before it cancels the one it replaced.</remarks>
     private static EditReply Withdrawn(SessionLifetime lifetime) =>
         lifetime.IsLive

@@ -442,7 +442,7 @@ internal sealed class KeePassInterop : IDisposable
     private const string _keePassXcStamp = "_LAST_MODIFIED";
 
     // An entry's custom data, which KeePassXC keeps and shows nowhere, naming its UUID and the agent whose approved save created it (T-57).
-    private const string _agentCreated = "keypaste.agent-created";
+    private const string _agentCreated = "acaf.agent-created";
 
     /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
     internal Func<byte[], byte[]>? AfterSerializing { get; set; }

@@ -56,7 +56,7 @@ At the terminal, `keypaste approve` draws the request between two rules: who is 
 The answers:
 
 - `o` allows this request once and keeps nothing.
-- `a` (Always allow) and `b` (Always block) appear only for an agent whose bridge has a label. Each asks you to confirm with `y`, then keeps that answer for that agent and that item's field until you remove it on the agent's page in Agents or with `keypaste clients <agent> --forget <key>` ([agent settings](policy.md#one-agents-own-rules)). They are not offered once an agent has 128 kept answers and picks.
+- `a` (Always allow) and `b` (Always block) appear only for an agent whose bridge has a label. Each asks you to confirm with `y`, then keeps that answer for that agent and that item's field until you remove it on the agent's page in Agents or with `keypaste clients <agent> --forget <key>` ([agent settings](policy.md#one-agents-own-rules)). They are not offered once an agent has 128 kept answers and picks, nor for an item in a protected environment, which is asked about every time.
 - Anything else, Enter included, is a no, and so is no answer within 45 seconds. The countdown shows the seconds left.
 
 An allow counts only once the choices have been on screen for a second, and keys typed before they appeared are discarded, so a key meant for the last prompt cannot answer this one.
@@ -112,7 +112,7 @@ There is no pause button for an agent that keeps asking; your settings are the p
 
 The prompt names the project, the variable names, the item each value comes from, the command and the directory, and for an agent's run the exact program and command line and the agent's reason; a loader such as `NODE_OPTIONS` is marked as changing how programs start. It never shows a value. A run offers Deny and Allow once only, every time, and no setting releases a set without asking. Allow once, or `o`, starts the command once. Refusing a run refuses the same project, command and directory for a minute. An agent runs nothing until you turn run on for it, and a run whose set holds a blocked value is refused without asking.
 
-An item tagged into a protected environment, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, is asked about at every run that names it and refused to a scoped token's run.
+An item tagged into a protected environment, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, is asked about at every run that names it and refused to a scoped token's run. A single request for one of its values is asked about every time too, whatever Agents allows, with Deny and Allow once only.
 
 The command shown is what the run says it will start; approve only a run you started or a command whose behaviour you know ([THREATS](../THREATS.md) T-30, T-34, T-35).
 

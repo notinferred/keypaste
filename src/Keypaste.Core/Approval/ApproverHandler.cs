@@ -19,7 +19,7 @@ namespace Keypaste.Core.Approval;
 /// <para>
 /// <b>The order is the security property.</b> Resolve, then re-check what the bridge lets the agent
 /// see, then refuse a Blocked category, then honour a refusal a person just gave, then release under
-/// Allow, and only then ask a person; read the field last of all. Reading earlier would put a secret
+/// Allow unless the entry is in a protected environment, and only then ask a person; read the field last of all. Reading earlier would put a secret
 /// in memory for requests that are about to be refused, and asking earlier would let an agent raise a
 /// prompt for an entry it was never allowed to name.
 /// </para>
@@ -44,7 +44,7 @@ public sealed partial class ApproverHandler
     /// <param name="rules">The rules every agent's request is decided by; <see cref="IAgentRules.Defaults"/> asks about every value.</param>
     /// <param name="narrate">Optional: a line of running commentary for the operator's terminal.</param>
     /// <param name="requiresLiveApproval">
-    /// Which entries a scoped token may never release, a protected environment's; null means the
+    /// Which entries are asked about every time and a scoped token may never release, a protected environment's; null means the
     /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>).
     /// </param>
     /// <exception cref="ArgumentNullException">Any of the four seams is null.</exception>
@@ -351,7 +351,10 @@ public sealed partial class ApproverHandler
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
-        if (decided.Rule == CategoryRule.Allow)
+        // A protected environment's value is asked about every time, as a run of its set is: no rule or always answer releases it.
+        var live = RequiresLiveApproval(name);
+
+        if (decided.Rule == CategoryRule.Allow && !live)
         {
             return Unasked(request, name, itemId, display, cooldownKey, Allowed(category, decided.Level), AllowedBy(category, decided.Level), cancellationToken);
         }
@@ -359,7 +362,7 @@ public sealed partial class ApproverHandler
         var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with
         {
             Item = itemId,
-            OffersAlways = agent is not null && itemId is not null && rules.HasRoom,
+            OffersAlways = !live && agent is not null && itemId is not null && rules.HasRoom,
         };
         var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
         var unremembered = answer switch
@@ -440,7 +443,8 @@ public sealed partial class ApproverHandler
         if (agent is not null
             && rules.PickFor(agent, request.Entry, subject) is { } kept
             && seen.FirstOrDefault(item => string.Equals(item.Name.Uuid, kept, StringComparison.OrdinalIgnoreCase)) is { } always
-            && rules.DecidePicked(agent, kept, subject, Category(always.Name, request.Field)) == CategoryRule.Allow)
+            && rules.DecidePicked(agent, kept, subject, Category(always.Name, request.Field)) == CategoryRule.Allow
+            && !RequiresLiveApproval(always.Name))
         {
             return Unasked(
                 request,
@@ -457,7 +461,7 @@ public sealed partial class ApproverHandler
         var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with
         {
             Candidates = candidates,
-            OffersAlways = agent is not null && rules.HasRoom,
+            OffersAlways = agent is not null && rules.HasRoom && !offered.Any(item => RequiresLiveApproval(item.Name)),
         };
         var pick = await _gate.AskPickingAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
         var picked = pick.Picked is { } index ? candidates[index] : null;

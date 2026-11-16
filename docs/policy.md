@@ -37,7 +37,7 @@ Every value an agent asks for falls in one kind, and each kind is Ask, Allow or 
 - **Allow** releases without asking you and records each release. It takes effect only once you confirm, in the app, that every agent will receive every value of that kind without asking.
 - **Block** refuses without asking you.
 
-A passkey's fields are always blocked, since its private key signs in wherever it is registered. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and on whether the field is protected, never on the field's name. keypaste's Bitwarden and 1Password 1PUX imports tag cards `Credit Card` and identities `Identity`, and its LastPass import tags a card `Credit Card`; tag one you made yourself the same way.
+A passkey's fields are always blocked, since its private key signs in wherever it is registered. A value of an item tagged into a protected environment, such as `env:billing:prod`, is asked about every time under Allow, and its prompt offers no Always allow ([Approvals](approvals.md#runs)); Block still refuses it without asking. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and on whether the field is protected, never on the field's name. keypaste's Bitwarden and 1Password 1PUX imports tag cards `Credit Card` and identities `Identity`, and its LastPass import tags a card `Credit Card`; tag one you made yourself the same way.
 
 After you refuse a request, the same field is refused for a minute without asking you again. Changing that field's kind ends the wait at once.
 

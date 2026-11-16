@@ -129,6 +129,7 @@ public sealed class ItemChangeRequestTests : IDisposable
         var tagged = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
         var heldTag = Reopened(vault => vault.Tags(_github))!;
         var twice = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        _clock.Advance(TimeSpan.FromMinutes(1));
         var cleared = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
         var again = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
 
@@ -143,6 +144,47 @@ public sealed class ItemChangeRequestTests : IDisposable
         Assert.Equal(4, lines.Count);
         Assert.Equal(("granted", "allowed"), (lines[0].GetProperty("decision").GetString(), lines[0].GetProperty("method").GetString()));
         Assert.Contains(ItemChangeRules.ClearNeedsUpdate, lines[2].GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_second_tag_change_on_an_item_within_the_minute_is_refused_unasked_and_recorded_once()
+    {
+        _clock.Zone = TimeZoneInfo.Utc;
+
+        var tagged = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        _clock.Advance(TimeSpan.FromSeconds(10));
+        var cleared = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
+        _clock.Advance(TimeSpan.FromSeconds(10));
+        var repeated = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate), "cursor");
+        _clock.Advance(TimeSpan.FromSeconds(40));
+        var later = await ChangeAsync(Change("work/github", ItemChangeRules.ClearNeedsUpdate));
+
+        Assert.Equal(AuditDecision.Granted, tagged.Decision);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cooldown, true), (cleared.Decision, cleared.Method, cleared.Recorded));
+        Assert.Equal("needs-update on work/github changed less than a minute ago; try again after 14:05", cleared.Reason);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cooldown, false), (repeated.Decision, repeated.Method, repeated.Recorded));
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed), (later.Decision, later.Method));
+        Assert.DoesNotContain(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(_github))!);
+        Assert.Equal(0, _channel.Asked);
+        Assert.Equal(["granted", "denied", "granted"], _log.Lines().Select(line => line.GetProperty("decision").GetString()));
+    }
+
+    [Fact]
+    public async Task The_tag_minute_is_each_items_own_and_a_change_not_made_does_not_take_it()
+    {
+        var gitlab = new EntryName("work", "gitlab");
+        _vault.AddEntry(new VaultEntry { GroupPath = gitlab.GroupPath, Title = gitlab.Title, Password = "gitlab-password" });
+        _vault.Save();
+        _saveFails = true;
+
+        var failed = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        _saveFails = false;
+        var github = await ChangeAsync(Change("work/github", ItemChangeRules.MarkNeedsUpdate));
+        var other = await ChangeAsync(Change("work/gitlab", ItemChangeRules.MarkNeedsUpdate));
+
+        Assert.Equal(AuditDecision.Denied, failed.Decision);
+        Assert.Equal((AuditDecision.Granted, AuditDecision.Granted), (github.Decision, other.Decision));
+        Assert.Contains(ItemChangeRules.NeedsUpdateTag, Reopened(vault => vault.Tags(gitlab))!);
     }
 
     [Theory]

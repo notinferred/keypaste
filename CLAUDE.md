@@ -36,7 +36,7 @@ Documents fall into four layers. A base document describes the product and how t
 | Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, Unreleased apart from published versions |
 | Public | Guides in `docs/`: desktop, mcp-setup, policy, approvals, safe-agents, replace-dotenv, demo, keepass-and-agents, launch | How to use or present one surface |
 | Public | keypaste.com's pages, in `site/web/src/content/docs/` | How keypaste works, the products and their labels (`site/web/src/data/products.json`), comparisons, the vision and the docs hub ([site/README](site/README.md#content-pages)) |
-| Public | Topic map, InfernoCMS's graph for site `keypaste` | Which page owns each question keypaste.com answers, the searches it targets and the questions no page answers yet |
+| Public | Topic map, [site/TOPICS.md](site/TOPICS.md) | Which page owns each question keypaste.com answers, the searches it targets and the questions no page answers yet |
 | Public | [ACAF](https://keypaste.com/acaf/v1/) v1 and v1.1, in `site/web/src/content/docs/acaf/` | The Agent Credential Access Format and keypaste's status in RELEASE's terms; a format change is a new version |
 
 ### What a step writes

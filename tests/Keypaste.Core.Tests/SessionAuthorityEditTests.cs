@@ -46,6 +46,12 @@ public sealed class SessionAuthorityEditTests : IDisposable
     /// <summary>What the owner's save does instead of saving, when a test makes it fail.</summary>
     private AgentSave? FailSaveWith { get; set; }
 
+    /// <summary>Whether the owner's log opens, which a test closes partway through an edit.</summary>
+    private bool LogOpens { get; set; } = true;
+
+    /// <summary>Runs as the owner reaches the open vault to make the edit.</summary>
+    private Action? BeforeApply { get; set; }
+
     public void Dispose()
     {
         _vault.Dispose();
@@ -69,6 +75,8 @@ public sealed class SessionAuthorityEditTests : IDisposable
         {
             return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
         }
+
+        BeforeApply?.Invoke();
 
         if (!apply(_vault))
         {
@@ -211,6 +219,41 @@ public sealed class SessionAuthorityEditTests : IDisposable
     }
 
     [Fact]
+    public async Task AnEditWhoseLineCannotBeWrittenBeforeTheSave_IsMadeNeitherOnDiskNorInMemory()
+    {
+        _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
+        BeforeApply = () => LogOpens = false;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.EditAsync(Edit(new SetPassword(_github, NewSecret.Of(_sentinel))), Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, false), (reply!.Decision, reply.Method, reply.Recorded));
+        Assert.Contains("nothing was changed", reply.Reason, StringComparison.Ordinal);
+        Assert.Equal("old-password", _vault.Find(_github)!.Password);
+        Assert.Equal("old-password", Password(_github));
+        Assert.Empty(_log.Lines());
+        Assert.Empty(Edited);
+    }
+
+    [Fact]
+    public async Task AnEditWhoseSaveFailsAfterItsLine_IsFollowedByALineSayingItWasNotMade()
+    {
+        _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
+        FailSaveWith = new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.EditAsync(Edit(new SetPassword(_github, NewSecret.Of(_sentinel))), Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, true), (reply!.Decision, reply.Method, reply.Recorded));
+        Assert.Equal("old-password", _vault.Find(_github)!.Password);
+        Assert.Equal("old-password", Password(_github));
+        Assert.Equal(["granted", "denied"], _log.Lines().Select(line => line.GetProperty("decision").GetString()));
+        Assert.DoesNotContain(_sentinel, _log.Text(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ALockWhileThePersonIsAsked_WritesNothing()
     {
         _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
@@ -345,7 +388,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
                     VaultIdentity.Of(test._directory, test.VaultPath),
                     () => test._lifetime,
                     test._fixture.Handler,
-                    audit ?? (() => test._log.Log),
+                    audit ?? (() => test.LogOpens ? test._log.Log : null),
                     clock: test._fixture.Clock,
                     editor: editor),
                 test.VaultPath);

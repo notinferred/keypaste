@@ -569,15 +569,38 @@ public sealed class ApproverHandlerTests
     }
 
     [Fact]
-    public async Task AProtectedEnvironment_IsDecidedByItsFieldsRule_LikeAnyOther()
+    public async Task AProtectedEnvironment_IsAskedEveryTime_UnderAnAllowOrAnAlwaysAllow_AndOffersNoAlways()
     {
         using var fixture = new ApproverFixture();
-        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
+        var stripe = new EntryName("env/dev", "STRIPE_KEY");
+        fixture.Rules.Rules = AgentRules.Defaults
+            .Allowing(FieldCategory.Password, confirmed: true)
+            .Remembering(new RememberedAnswer(ApproverFixture.Agent, fixture.Source.ItemId(stripe)!, "password", CategoryRule.Allow), confirmed: true);
+        fixture.Source.Protected.Add(stripe);
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        var first = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var offered = fixture.Channel.LastPrompt!.OffersAlways;
+        fixture.Channel.Answer = ApprovalAnswer.AlwaysAllowed;
+        var always = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (first.Decision, first.Method));
+        Assert.False(offered);
+        Assert.Equal((AuditDecision.Denied, null), (always.Decision, always.Value));
+        Assert.Equal(2, fixture.Channel.Asked);
+        Assert.Single(fixture.Rules.Rules.Answers);
+    }
+
+    [Fact]
+    public async Task AProtectedEnvironment_UnderBlock_IsRefusedUnasked()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Rules.Rules = AgentRules.Defaults.With(ApproverFixture.Agent, FieldCategory.Password, CategoryRule.Block);
         fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
 
-        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
-        Assert.Equal((AuditDecision.Granted, AuditMethod.Allowed), (released.Decision, released.Method));
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Blocked), (refused.Decision, refused.Method));
         Assert.Equal(0, fixture.Channel.Asked);
     }
 

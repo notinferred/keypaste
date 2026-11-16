@@ -27,6 +27,9 @@ public sealed class ValueSaveRequestTests : IDisposable
     private readonly OwnerLog _log;
     private readonly SessionLifetime _lifetime = new("session-one");
     private readonly SessionAuthority _authority;
+    private bool _logOpens = true;
+    private Action? _beforeApply;
+    private bool _saveFails;
 
     public ValueSaveRequestTests()
     {
@@ -41,7 +44,7 @@ public sealed class ValueSaveRequestTests : IDisposable
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             new ApproverHandler(new VaultCredentialSource(() => _lifetime.IsLive ? _vault : null, _clock), new VaultEntryNameLister(() => _vault), _gate, IAgentRules.Defaults),
-            () => _log.Log,
+            () => _logOpens ? _log.Log : null,
             clock: _clock,
             saver: new SessionSaver(_gate, lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null, Write, _clock, narrate: null));
     }
@@ -136,6 +139,38 @@ public sealed class ValueSaveRequestTests : IDisposable
         Assert.Equal("arrived-meanwhile", _vault.ReadField(_github, "NEW_TOKEN"));
     }
 
+    [Fact]
+    public async Task A_save_whose_line_cannot_be_written_before_the_vault_is_saved_is_made_neither_on_disk_nor_in_memory()
+    {
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
+        _beforeApply = () => _logOpens = false;
+
+        var reply = await SaveAsync(new SaveRequest { Item = "work/github", Field = "password", Reason = "rotate", Exposure = ["**"] });
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, false), (reply.Decision, reply.Method, reply.Recorded));
+        Assert.Contains("nothing was changed", reply.Reason, StringComparison.Ordinal);
+        Assert.Equal("old-password", _vault.Find(_github)!.Password);
+        Assert.Equal("old-password", Reopened(vault => vault.Find(_github)!.Password));
+        Assert.Empty(_log.Lines());
+    }
+
+    [Fact]
+    public async Task A_save_that_fails_after_its_line_is_followed_by_a_line_saying_it_was_not_made()
+    {
+        _channel.Answer = ApprovalAnswer.ApprovedOnce;
+        _saveFails = true;
+
+        var reply = await SaveAsync(new SaveRequest { Item = "work/stripe", Field = "STRIPE_KEY", Reason = "new key", Exposure = ["**"] });
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed, true), (reply.Decision, reply.Method, reply.Recorded));
+        Assert.Null(_vault.Find(new EntryName("work", "stripe")));
+        Assert.Null(Reopened(vault => vault.Find(new EntryName("work", "stripe"))));
+        var lines = _log.Lines();
+        Assert.Equal(["granted", "denied"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.Contains("not saved", lines[1].GetProperty("reason").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(_value, _log.Text(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("other/**", AuditMethod.OutOfScope)]
     [InlineData("**", AuditMethod.InvalidRequest)]
@@ -172,9 +207,16 @@ public sealed class ValueSaveRequestTests : IDisposable
             return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
         }
 
+        _beforeApply?.Invoke();
+
         if (!apply(_vault))
         {
             return AgentSave.Unchanged;
+        }
+
+        if (_saveFails)
+        {
+            return new AgentSave(AgentSaveOutcome.Failed, "the disk is full");
         }
 
         _vault.Save();

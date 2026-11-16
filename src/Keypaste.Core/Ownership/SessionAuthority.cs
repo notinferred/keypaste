@@ -627,8 +627,9 @@ public sealed class SessionAuthority : IApproverHandler
     /// <inheritdoc/>
     /// <remarks>
     /// Recorded under the command that asked, <c>keypaste &lt;verb&gt;</c>, naming only what the terminal
-    /// typed (D-0464). The log is asked for before anything is decided, so an edit is never made that its
-    /// line could not follow, and the question is withdrawn by a lock as a credential request's is.
+    /// typed. The log is asked for before anything is decided, so an edit is never put to the person while
+    /// its line could not follow, and the question is withdrawn by a lock as a credential request's is. An
+    /// edit's line is written before the vault is saved, and a save that then fails writes a second line saying it was not made.
     /// </remarks>
     public async ValueTask<EditReply> EditAsync(EditRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -637,9 +638,10 @@ public sealed class SessionAuthority : IApproverHandler
 
         var client = AuditClient.Of($"keypaste {request.Edit.Verb}", CoreInfo.Version, null);
 
-        EditReply Answer(EditReply reply) => _recorder.Recorded(
-            reply,
-            RequestRecords.Edit(client, request.Edit, reply.Decision, reply.Method, request.Session, VaultNamed(request.Vault)));
+        AuditRecord LineOf(EditReply reply) =>
+            RequestRecords.Edit(client, request.Edit, reply.Decision, reply.Method, request.Session, VaultNamed(request.Vault));
+
+        EditReply Answer(EditReply reply) => reply.Recorded ? reply : _recorder.Recorded(reply, LineOf(reply));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
@@ -656,7 +658,7 @@ public sealed class SessionAuthority : IApproverHandler
         Withdrawals.AddOwner(waiting);
 
         return Answer(await Decided(
-            token => _editor.DecideAsync(request, lifetime, waiting, token),
+            token => _editor.DecideAsync(request, lifetime, made => _recorder.Recorded(LineOf(made)), waiting, token),
             lifetime,
             (method, reason) => new EditReply(AuditDecision.Denied, method, reason),
             waiting,
@@ -664,7 +666,10 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>Recorded under the client that asked, naming the place and never the value, as every agent request is.</remarks>
+    /// <remarks>
+    /// Recorded under the client that asked, naming the place and never the value, as every agent request is. A save's line is
+    /// written before the vault is saved, and a save that then fails writes a second line saying it was not made.
+    /// </remarks>
     public async ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -672,8 +677,10 @@ public sealed class SessionAuthority : IApproverHandler
 
         var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
 
-        SaveReply Answer(SaveReply reply) =>
-            _recorder.Recorded(reply, RequestRecords.Save(client, request, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
+        AuditRecord LineOf(SaveReply reply) =>
+            RequestRecords.Save(client, request, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault));
+
+        SaveReply Answer(SaveReply reply) => reply.Recorded ? reply : _recorder.Recorded(reply, LineOf(reply));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
@@ -690,7 +697,7 @@ public sealed class SessionAuthority : IApproverHandler
         Withdrawals.AddOwner(waiting);
 
         var decided = await Decided(
-            token => _saver.DecideAsync(request, connectionId, lifetime, waiting, token),
+            token => _saver.DecideAsync(request, connectionId, lifetime, made => _recorder.Recorded(LineOf(made)), waiting, token),
             lifetime,
             (method, reason) => new SaveReply(AuditDecision.Denied, method, reason),
             waiting,
@@ -704,6 +711,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// Recorded under the client that asked, naming the item and the change, as every agent request is. The log is asked for
     /// before anything is decided, as a save's is, so a change is never put to the person while its line could not follow. A
     /// change's line is written before the vault is saved, and a save that then fails writes a second line saying it was not made.
+    /// A tag change refused because the item's tag changed in the last minute is recorded once in that minute, so refusals cannot fill the log.
     /// </remarks>
     public async ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -716,7 +724,9 @@ public sealed class SessionAuthority : IApproverHandler
             RequestRecords.ItemChange(client, request, decided.Reply.Decision, decided.Reply.Method, decided.Reply.Reason, decided.Resolved, decided.Item, request.Session, VaultNamed(request.Vault));
 
         ItemChangeReply Answer(SessionItemChanger.Decided decided) =>
-            decided.Recorded ? decided.Reply with { Recorded = true } : _recorder.Recorded(decided.Reply, LineOf(decided));
+            decided.Recorded ? decided.Reply with { Recorded = true }
+            : decided.Unrecorded ? decided.Reply
+            : _recorder.Recorded(decided.Reply, LineOf(decided));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {

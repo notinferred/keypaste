@@ -63,6 +63,20 @@ public sealed class ApproverHandlerSetTests
     }
 
     [Fact]
+    public async Task ASetHoldingAProtectedEnvironment_IsAskedUnderAnAllow()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
+        fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        var reply = await fixture.Handler.RequestSetAsync(Set(), "conn-1", Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (reply.Decision, reply.Method));
+        Assert.Equal(1, fixture.Channel.SetsAsked);
+    }
+
+    [Fact]
     public async Task ADeniedSet_ReadsAndReleasesNothing_AndHoldsEachFieldBack()
     {
         using var fixture = new ApproverFixture();

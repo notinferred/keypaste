@@ -29,7 +29,7 @@ public sealed class AgentChangesTests
         var seconds = BitConverter.ToInt64(Convert.FromBase64String(entry.Element("Times")!.Element("ExpiryTime")!.Value));
         Assert.Equal(expires.UtcDateTime, DateTime.MinValue.AddSeconds(seconds));
         Assert.Contains("needs-update", entry.Element("Tags")!.Value, StringComparison.Ordinal);
-        var mark = Assert.Single(entry.Element("CustomData")!.Elements("Item"), data => data.Element("Key")!.Value == "keypaste.agent-created");
+        var mark = Assert.Single(entry.Element("CustomData")!.Elements("Item"), data => data.Element("Key")!.Value == "acaf.agent-created");
         Assert.EndsWith(" claude-code", mark.Element("Value")!.Value, StringComparison.Ordinal);
 
         KeePassXcCli.Run("edit", file.Path_, "-u", "edited-in-keepassxc", $"{_group}/SCRATCH");

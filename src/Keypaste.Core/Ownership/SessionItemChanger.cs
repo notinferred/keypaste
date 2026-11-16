@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
@@ -8,7 +9,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Makes an agent's change to an item in the owner's own unlocked vault under the owner's claim: once the person allows it, or
-/// unasked for the needs-update tag (PRODUCT §2, THREATS.md T-57). The agent learns only whether it was made.
+/// unasked for the needs-update tag, at most once a minute for each item (PRODUCT §2, THREATS.md T-57). The agent learns only whether it was made.
 /// </summary>
 /// <remarks>
 /// Ordered as <see cref="SessionSaver"/> is: the item is resolved and checked before anyone is asked, only where the agent's
@@ -19,13 +20,15 @@ namespace Keypaste.Core.Ownership;
 /// </remarks>
 public sealed class SessionItemChanger
 {
-    private const string _unrecorded = "the audit log could not be written, so nothing was changed";
+    private static readonly TimeSpan _tagInterval = TimeSpan.FromMinutes(1);
 
     private readonly ApprovalGate _gate;
     private readonly Func<SessionLifetime, Vault?> _unlockedFor;
     private readonly Func<SessionLifetime, Func<Vault, bool>, AgentSave> _write;
     private readonly TimeProvider _clock;
     private readonly Action<string>? _narrate;
+    private readonly Lock _tagTurnsLock = new();
+    private readonly Dictionary<string, TagTurn> _tagTurns = new(StringComparer.OrdinalIgnoreCase);
 
     internal SessionItemChanger(
         ApprovalGate gate,
@@ -159,6 +162,18 @@ public sealed class SessionItemChanger
         }
         else
         {
+            if (!TryTakeTagTurn(EntryHandle.For(item), out var until, out var recordsRefusal))
+            {
+                var held = $"{ItemChangeRules.NeedsUpdateTag} on {where} changed less than a minute ago; try again after {MinuteAfter(until, zone)}";
+
+                if (recordsRefusal)
+                {
+                    _narrate?.Invoke($"did not change {where} for {request.ClientLabel ?? request.ClientName}: {held}");
+                }
+
+                return Refused(AuditMethod.Cooldown, held, where, item.Uuid) with { Unrecorded = !recordsRefusal };
+            }
+
             var shown = ApprovalPrompt.For(request.ClientName, item, SaveRequestRules.Password, request.Reason, request.ClientLabel);
             var tag = change.Kind == ItemChangeKind.MarkNeedsUpdate ? "Tag" : "Untag";
 
@@ -166,60 +181,103 @@ public sealed class SessionItemChanger
             made = new Decided(new ItemChangeReply(AuditDecision.Granted, AuditMethod.Allowed, $"an agent may do this without asking: {tag} {shown.Entry} {ItemChangeRules.NeedsUpdateTag}") { Item = where }, where, item.Uuid);
         }
 
-        if (cancellationToken.IsCancellationRequested || !lifetime.TryCommitAfter(waiting))
-        {
-            return Withdrawn(lifetime, where, item.Uuid);
-        }
-
-        Vault? written = null;
-        VaultCheckpoint? checkpoint = null;
-        string? late = null;
-        var recorded = false;
-        AgentSave saved;
+        Decided? decided = null;
 
         try
         {
-            // The line is written before the save, so a change never exists without its record.
-            saved = _write(lifetime, open =>
+            return decided = Commit();
+        }
+        finally
+        {
+            if (!change.Asks && decided?.Recorded != true)
             {
-                written = open;
-                checkpoint = open.Checkpoint();
-                late = ItemChanges.Apply(open, change, request.ClientLabel, check, _clock.GetUtcNow(), zone);
-                recorded = late is null && record(made);
-                return recorded;
-            });
+                GiveBackTagTurn(EntryHandle.For(item));
+            }
         }
-        catch
+
+        Decided Commit()
         {
-            SessionEditor.TakeBack(written, checkpoint);
-            throw;
+            if (cancellationToken.IsCancellationRequested || !lifetime.TryCommitAfter(waiting))
+            {
+                return Withdrawn(lifetime, where, item.Uuid);
+            }
+
+            string? late = null;
+            var written = LoggedWrite.Run(
+                _write,
+                lifetime,
+                open => (late = ItemChanges.Apply(open, change, request.ClientLabel, check, _clock.GetUtcNow(), zone)) is null,
+                () => record(made));
+            var allowed = change.Asks ? "a person allowed the change" : "the change was checked";
+
+            if (written.Late)
+            {
+                return Refused(AuditMethod.VaultChanged, $"{allowed}, and then: {late}", where, item.Uuid);
+            }
+
+            if (written.Unrecorded)
+            {
+                _narrate?.Invoke($"did not {says}: {LoggedWrite.Unrecorded}");
+                return Refused(AuditMethod.Failed, LoggedWrite.Unrecorded, where, item.Uuid);
+            }
+
+            if (!written.Made)
+            {
+                _narrate?.Invoke($"did not {says}: {written.Saved.Reason}");
+                var after = written.Recorded ? "the change was recorded and then not saved, so it was not made" : $"{allowed}, and the vault was not saved";
+                return Refused(SessionEditor.MethodOf(written.Saved), $"{after}: {written.Saved.Reason}", where, item.Uuid);
+            }
+
+            _narrate?.Invoke($"{says}: done");
+            return made with { Recorded = true };
         }
+    }
 
-        var allowed = change.Asks ? "a person allowed the change" : "the change was checked";
+    /// <summary>Takes the item's one tag change of the minute, or says until when another holds it and whether this refusal is the minute's one recorded.</summary>
+    /// <remarks>Held per item, not per agent, since a bridge's label is its own claim and two agents would otherwise take turns.</remarks>
+    private bool TryTakeTagTurn(string item, out DateTimeOffset until, out bool recordsRefusal)
+    {
+        var now = _clock.GetUtcNow();
 
-        if (late is not null)
+        lock (_tagTurnsLock)
         {
-            SessionEditor.TakeBack(written, checkpoint);
-            return Refused(AuditMethod.VaultChanged, $"{allowed}, and then: {late}", where, item.Uuid);
-        }
+            foreach (var (held, turn) in _tagTurns)
+            {
+                if (turn.Taken + _tagInterval <= now)
+                {
+                    _tagTurns.Remove(held);
+                }
+            }
 
-        if (written is not null && !recorded)
+            if (_tagTurns.TryGetValue(item, out var taken))
+            {
+                until = taken.Taken + _tagInterval;
+                recordsRefusal = !taken.RefusalRecorded;
+                _tagTurns[item] = taken with { RefusalRecorded = true };
+                return false;
+            }
+
+            _tagTurns[item] = new TagTurn(now, RefusalRecorded: false);
+            until = now;
+            recordsRefusal = false;
+            return true;
+        }
+    }
+
+    private void GiveBackTagTurn(string item)
+    {
+        lock (_tagTurnsLock)
         {
-            SessionEditor.TakeBack(written, checkpoint);
-            _narrate?.Invoke($"did not {says}: {_unrecorded}");
-            return Refused(AuditMethod.Failed, _unrecorded, where, item.Uuid);
+            _tagTurns.Remove(item);
         }
+    }
 
-        if (!saved.Holds || !recorded)
-        {
-            SessionEditor.TakeBack(written, checkpoint);
-            _narrate?.Invoke($"did not {says}: {saved.Reason}");
-            var after = recorded ? "the change was recorded and then not saved, so it was not made" : $"{allowed}, and the vault was not saved";
-            return Refused(SessionEditor.MethodOf(saved), $"{after}: {saved.Reason}", where, item.Uuid);
-        }
-
-        _narrate?.Invoke($"{says}: done");
-        return made with { Recorded = true };
+    /// <summary>The first whole minute, in the person's time, at or after <paramref name="until"/>, as <c>HH:mm</c>.</summary>
+    private static string MinuteAfter(DateTimeOffset until, TimeZoneInfo zone)
+    {
+        var local = TimeZoneInfo.ConvertTime(until, zone);
+        var minute = new DateTimeOffset(local.Year, local.Month, local.Day, local.Hour, local.Minute, 0, local.Offset);
+        return (minute < local ? minute.AddMinutes(1) : minute).ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 
     private static Decided Withdrawn(SessionLifetime lifetime, string where, string? item) =>
@@ -230,6 +288,9 @@ public sealed class SessionItemChanger
     private static Decided Refused(AuditMethod method, string reason, string? where = null, string? item = null) =>
         new(new ItemChangeReply(AuditDecision.Denied, method, reason), where, item);
 
+    /// <summary>When an item's tag change of the minute was taken, and whether a refusal it held back is recorded yet.</summary>
+    private readonly record struct TagTurn(DateTimeOffset Taken, bool RefusalRecorded);
+
     /// <summary>The reply, and the item it resolved to for the owner's line.</summary>
     /// <param name="Reply">What the agent is told.</param>
     /// <param name="Resolved">The item's path once resolved, or null.</param>
@@ -238,5 +299,8 @@ public sealed class SessionItemChanger
     {
         /// <summary>Whether its line was written before the save it records, so no other is written for it.</summary>
         public bool Recorded { get; init; }
+
+        /// <summary>Whether no line is written for it, as for a tag refusal repeated within the minute of the one recorded.</summary>
+        public bool Unrecorded { get; init; }
     }
 }
