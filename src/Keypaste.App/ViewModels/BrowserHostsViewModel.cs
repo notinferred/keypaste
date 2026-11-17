@@ -92,7 +92,7 @@ internal sealed partial class BrowserHostsViewModel : ObservableObject
 
     internal string UnavailableText { get; }
 
-    /// <summary>On Windows, that Brave reads Chrome's manifest, said once.</summary>
+    /// <summary>That Brave reads another browser's manifest, Chrome's on Windows and macOS, said once.</summary>
     internal string SharedText => Rows.FirstOrDefault(row => row.SharesWith.Count > 0) is { } shared
         ? $"{Names(shared.SharesWith.Prepend(shared.Browser).Order())} read one setting, so they turn on and off together."
         : string.Empty;

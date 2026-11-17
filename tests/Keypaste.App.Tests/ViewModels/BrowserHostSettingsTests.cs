@@ -40,7 +40,7 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         Assert.All(screen.Rows, row => Assert.Equal($"Not set up. Turn on so {row.Name} can start keypaste for its extension.", row.Answer));
         Assert.All(screen.Rows, row => Assert.Equal($"{row.Name} isn't installed.", row.Extension));
         Assert.All(screen.Rows, row => Assert.Equal(("Turn on", $"Turn on for {row.Name}"), (row.ActionLabel, row.ActionName)));
-        Assert.Equal(OperatingSystem.IsWindows() ? "Chrome and Brave read one setting, so they turn on and off together." : string.Empty, screen.SharedText);
+        Assert.Equal(OperatingSystem.IsLinux() ? string.Empty : "Chrome and Brave read one setting, so they turn on and off together.", screen.SharedText);
         Assert.False(screen.HasMessage);
     }
 
@@ -66,9 +66,9 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
     }
 
     [Fact]
-    public void On_Windows_turning_on_Brave_says_Chrome_is_on_too()
+    public void Off_Linux_turning_on_Brave_says_Chrome_is_on_too()
     {
-        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows has Brave read Chrome's manifest.");
+        Assert.SkipWhen(OperatingSystem.IsLinux(), "Brave reads its own manifest on Linux.");
 
         var screen = Screen();
         screen.ChangeCommand.Press(Row(screen, HostBrowser.Brave));

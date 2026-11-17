@@ -182,7 +182,7 @@ public sealed class BrowserHostTests
             Assert.Equal($"on=false other=false answer=Not set up. Turn on so {Name(browser)} can start keypaste for its extension. extension={Name(browser)} isn't installed.", status[browser]);
         }
 
-        Assert.Equal(OperatingSystem.IsWindows(), app.Driver.Output.Contains("browser-shared Chrome and Brave read one setting, so they turn on and off together."));
+        Assert.Equal(!OperatingSystem.IsLinux(), app.Driver.Output.Contains("browser-shared Chrome and Brave read one setting, so they turn on and off together."));
 
         // The extension is found in a profile of the browser's own folder; a profile without it is a browser it isn't installed in.
         Directory.CreateDirectory(Path.Combine(roots.ProfileFolder("chrome"), "Default", "Extensions", _chrome));
@@ -196,7 +196,7 @@ public sealed class BrowserHostTests
         var manifests = new Dictionary<string, string>();
         foreach (var browser in _browsers)
         {
-            var sharing = !OperatingSystem.IsWindows() ? string.Empty
+            var sharing = OperatingSystem.IsLinux() ? string.Empty
                 : browser == "brave" ? " Chrome reads the same setting, so it is on too."
                 : browser == "chrome" ? " Brave reads the same setting, so it is on too."
                 : string.Empty;

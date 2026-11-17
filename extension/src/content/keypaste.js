@@ -17,6 +17,8 @@ const sendMessage = async function(action, args) {
 const kpxc = {};
 kpxc.combinations = [];
 kpxc.credentials = [];
+// Whether kpxc.credentials came from the person asking, rather than only what the page's load was always filled with.
+kpxc.credentialsAsked = false;
 kpxc.databaseState = DatabaseState.DISCONNECTED;
 kpxc.detectedFields = 0;
 kpxc.improvedFieldDetectionEnabledForPage = false;
@@ -29,6 +31,7 @@ kpxc.url = null;
 // Clears all from the content and background scripts, including autocomplete
 kpxc.clearAllFromPage = function() {
     kpxc.credentials = [];
+    kpxc.credentialsAsked = false;
     kpxc.inputs = [];
     kpxcUserAutocomplete.clear();
     _called.retrieveCredentials = false;
@@ -407,22 +410,24 @@ kpxc.retrieveCredentials = async function(force = false) {
     if (kpxc.settings.autoRetrieveCredentials && kpxc.url && kpxc.submitUrl) {
         await kpxc.retrieveCredentialsCallback(
             await sendMessage('retrieve_credentials', [ kpxc.url, kpxc.submitUrl, force ]),
+            force,
         );
     }
 };
 
 // Handles credentials from 'retrieve_credentials' response
-kpxc.retrieveCredentialsCallback = async function(credentials) {
+kpxc.retrieveCredentialsCallback = async function(credentials, asked = false) {
     _called.retrieveCredentials = true;
     if (credentials?.length > 0) {
         kpxc.credentials = credentials;
+        kpxc.credentialsAsked = asked;
         await kpxc.prepareCredentials();
     }
 };
 
-// If credentials are not received, request them again
+// Asks keypaste unless the person already has: logins the page's load was always filled with leave others to ask about.
 kpxc.receiveCredentialsIfNecessary = async function() {
-    if (kpxc.credentials.length === 0) {
+    if (kpxc.credentials.length === 0 || !kpxc.credentialsAsked) {
         if (!await isIframeAllowed()) {
             return [];
         }
@@ -435,13 +440,13 @@ kpxc.receiveCredentialsIfNecessary = async function() {
         const credentials = await sendMessage('retrieve_credentials', [ kpxc.url, kpxc.submitUrl, true ]);
         if (credentials.length === 0) {
             logDebug('Error: No credentials found.');
-            return [];
+            return kpxc.credentials;
         }
 
         // If the database was locked, this is scope never met.
         // In these cases the response is met at kpxc.detectDatabaseChange
         await sendMessage('page_set_manual_fill', ManualFill.NONE);
-        await kpxc.retrieveCredentialsCallback(credentials);
+        await kpxc.retrieveCredentialsCallback(credentials, true);
 
         kpxcIcons.switchIcons();
         return credentials;

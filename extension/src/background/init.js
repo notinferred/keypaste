@@ -12,9 +12,6 @@ const initListeners = async function() {
         }
     });
 
-    // Main event listener
-    browser.runtime.onMessage.addListener(kpxcEvent.onMessage);
-
     // Listen for keyboard shortcuts specified by user
     browser.commands.onCommand.addListener(async (command) => {
         if (contextMenuItems.some(e => e.action === command)) {
@@ -61,7 +58,7 @@ const initContextMenuItems = async function() {
     }
 };
 
-(async () => {
+const initialized = (async () => {
     try {
         await keepass.migrateKeyRing();
         await page.initBrowser();
@@ -69,6 +66,20 @@ const initContextMenuItems = async function() {
         await tabs.initListeners();
         await initListeners();
         await initContextMenuItems();
+    } catch (e) {
+        logError(`init.js failed: ${e}`);
+    }
+})();
+
+// Registered at once, since the browser delivers the message that starts this worker only to listeners added in its first turn.
+browser.runtime.onMessage.addListener(async (request, sender) => {
+    await initialized;
+    return kpxcEvent.onMessage(request, sender);
+});
+
+(async () => {
+    await initialized;
+    try {
         await keepass.reconnect(null, 5000); // 5 second timeout for the first connect
         await keepass.updateDatabase();
     } catch (e) {

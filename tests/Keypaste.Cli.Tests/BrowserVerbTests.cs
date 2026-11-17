@@ -138,7 +138,7 @@ public sealed partial class BrowserVerbTests : IDisposable
         Assert.All(rows, row => Assert.Equal(["browser", "state", "program", "extension", "shares_with"], row.EnumerateObject().Select(property => property.Name)));
         Assert.Equal(("not-set-up", JsonValueKind.Null, "browser-not-found"), (rows[0].GetProperty("state").GetString(), rows[0].GetProperty("program").ValueKind, rows[0].GetProperty("extension").GetString()));
         Assert.Equal(("keypaste", _program), (rows[2].GetProperty("state").GetString(), rows[2].GetProperty("program").GetString()));
-        Assert.Equal(OperatingSystem.IsWindows() ? ["brave"] : [], rows[0].GetProperty("shares_with").EnumerateArray().Select(name => name.GetString()));
+        Assert.Equal(OperatingSystem.IsLinux() ? [] : ["brave"], rows[0].GetProperty("shares_with").EnumerateArray().Select(name => name.GetString()));
     }
 
     [Fact]
@@ -155,25 +155,28 @@ public sealed partial class BrowserVerbTests : IDisposable
     }
 
     [Fact]
-    public void On_Windows_Brave_turns_with_Chrome_and_elsewhere_alone()
+    public void Brave_turns_with_Chrome_on_Windows_and_macOS_and_alone_on_Linux()
     {
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("browser", "on", "brave"));
 
-        if (OperatingSystem.IsWindows())
+        if (BravesPartner is { } partner)
         {
             Assert.Contains("Brave · now starts", _harness.Err, StringComparison.Ordinal);
-            Assert.Contains("; Chrome reads the same manifest, so it is on too", _harness.Err, StringComparison.Ordinal);
+            Assert.Contains($"; {partner} reads the same manifest, so it is on too", _harness.Err, StringComparison.Ordinal);
             _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("browser"));
-            Assert.Contains("keypaste browser: Brave reads Chrome's manifest, so they turn on and off together", _harness.Err, StringComparison.Ordinal);
-            Assert.EndsWith($"keypaste at {_program}", Row(HostBrowser.Chrome), StringComparison.Ordinal);
+            Assert.Contains($"keypaste browser: Brave reads {partner}'s manifest, so they turn on and off together", _harness.Err, StringComparison.Ordinal);
+            Assert.EndsWith($"keypaste at {_program}", Row(partner), StringComparison.Ordinal);
         }
         else
         {
             Assert.DoesNotContain("same manifest", _harness.Err, StringComparison.Ordinal);
             _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("browser"));
             Assert.EndsWith("not set up", Row(HostBrowser.Chrome), StringComparison.Ordinal);
+            Assert.EndsWith("not set up", Row(HostBrowser.Chromium), StringComparison.Ordinal);
         }
     }
+
+    private static HostBrowser? BravesPartner => OperatingSystem.IsLinux() ? null : HostBrowser.Chrome;
 
     /// <summary>A browser's last row in the list, its margin dropped and its columns two spaces apart.</summary>
     private string Row(HostBrowser browser) =>

@@ -5,6 +5,9 @@ name: dev
 #
 # R.1a: acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
 # the install exercise and R.1a's acts with this branch's scripts, to iterate on them without a new package build.
+#
+# 8.3a3: browsers mode fills logins in the runner's own branded browsers (verify-browser-fill.sh --branded), whose versions
+# change with the runner's image, so it is evidence for a record and never a gate.
 
 on:
   workflow_dispatch:
@@ -26,9 +29,9 @@ on:
         type: string
         default: ''
       mode:
-        description: profile runs profile, acts installs app_run's packages and performs R.1a's acts
+        description: profile runs profile, acts installs app_run's packages and performs R.1a's acts, browsers fills in branded browsers
         type: choice
-        options: [profile, acts]
+        options: [profile, acts, browsers]
         default: profile
 
 run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.profile }}${{ inputs.app_run }} ${{ inputs.os }} ${{ inputs.nonce }}
@@ -91,6 +94,45 @@ jobs:
             backend|integration|desktop|desktop-gates) bash scripts/verify.sh "$PROFILE" ;;
             *) echo "::error::profile must be backend, integration, desktop or desktop-gates"; exit 1 ;;
           esac
+
+  browsers:
+    name: browser fill (${{ matrix.os }})
+    if: inputs.mode == 'browsers'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os == 'all' && '["ubuntu-24.04","windows-2025","macos-15"]' || format('["{0}"]', inputs.os)) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
+      - name: Install the extension's locked dependencies and build it
+        shell: bash
+        working-directory: extension
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          node build.js
+
+      - name: Fill logins in the runner's Chrome, Edge and Firefox, and Brave
+        shell: bash
+        run: bash scripts/verify-browser-fill.sh --branded
 
   # install-desktop.yml's install exercise and R.1a's acts on app_run's packages, with this branch's scripts (R.1a).
   acts:

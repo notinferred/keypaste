@@ -94,8 +94,11 @@ page.retrieveCredentials = async function(tab, args = []) {
     }
 
     const [ url, submitUrl, force ] = args;
+    const origin = originOf(url);
     const currentTab = tabs.getTabFromId(tab.id);
-    if (currentTab?.credentials?.length > 0 && !force) {
+    // Logins keypaste released for a page serve only its origin: a tab that has moved to another site asks again, even
+    // before the browser reports its new address.
+    if (currentTab?.credentials?.length > 0 && !force && origin && currentTab.credentialsOrigin === origin) {
         return currentTab.credentials;
     }
 
@@ -112,8 +115,16 @@ page.retrieveCredentials = async function(tab, args = []) {
     }
 
     const credentials = await keepass.retrieveCredentials(tab, args);
-    tabs.updateTabValues(tab.id, { credentials: credentials });
+    tabs.updateTabValues(tab.id, { credentials: credentials, credentialsOrigin: origin });
     return credentials;
+};
+
+const originOf = function(url) {
+    try {
+        return new URL(url).origin;
+    } catch {
+        return '';
+    }
 };
 
 page.getLoginId = async function(tab, returnSingle = true) {

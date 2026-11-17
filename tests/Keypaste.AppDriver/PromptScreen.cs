@@ -201,7 +201,8 @@ internal sealed class PromptScreen : IDisposable
                 $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             FillWindow when window.DataContext is FillViewModel fill =>
                 $"fill-prompt origin={fill.Origin} pairing={fill.Pairing} logins={string.Join('|', fill.Rows.Select(row => row.Spoken))} " +
-                $"always={(window.FindControl<CheckBox>("AlwaysBox")?.IsVisible == true ? "offered" : "none")}",
+                $"always={(window.FindControl<CheckBox>("AlwaysBox")?.IsVisible == true ? "offered" : "none")}" +
+                (fill.HasFormNote ? $" note={fill.FormNote}" : string.Empty),
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",

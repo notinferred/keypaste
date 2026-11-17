@@ -100,6 +100,19 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - Limit: there is no prompt limit across entries [T-11].
 - Limit: nothing recalls a client's copies or revokes a credential at its issuer [T-12].
 
+### Browser fill (unreleased)
+
+- keypaste answers only its own extension's three builds, under its own host name, and never writes KeePassXC's [T-48] [T-49] [T-60].
+- A browser pairs only while you armed pairing in Settings or with `keypaste approve --pair-browser`, and only once you confirm it [T-48] [T-50].
+- A login fills only on your answer to a prompt that names the site, or on the exact site where you chose to always fill it; a page's own load asks nobody [T-59] [T-61].
+- An item matches a page only on its own host or a subdomain, on the same scheme and port, within one registrable domain by the Public Suffix List; a lookalike or another tenant of a shared host gets nothing, and an `http` page or a form posting to another site is asked every time with no Always [T-58].
+- The extension refuses a login form in a frame from another origin before keypaste is asked [T-58].
+- A release carries the item's username and password, title and UUID, nothing else [T-60].
+- Checked in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux with keypaste's test build (8.3a3).
+- Limit: whoever holds a pairing's key gets the always-filled logins on those sites unasked, and anything able to start keypaste as the browser can ask to pair [T-48] [T-50] [T-61].
+- Limit: a filled password belongs to the page and the extension, whose scripts or updates can send it anywhere [T-60].
+- Limit: whoever controls a subdomain of an item's site is offered its login there [T-58].
+
 ### What unlocks a vault
 
 - A master password; unreleased, also a keyfile, with or without a password, in every KeePass form; keypaste never creates a keyfile that is any file at all [T-27] [T-28].
@@ -149,6 +162,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
 - Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.
 - Limit: lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
+- Limit: a browser fill's line names the site, as its origin, where each item was filled or refused (unreleased).
 - Limit: kept forever, the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)); it can hold sensitive agent-written text.
 
 ## Maintainer note
@@ -191,7 +205,14 @@ The reporting mailbox has been tested from an external address. GitHub private v
 [T-37]: THREATS.md#t-37--a-yubikey-protects-a-copied-vault-not-an-unlocked-one-and-a-lost-key-locks-it
 [T-43]: THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
 [T-44]: THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
+[T-48]: THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
+[T-49]: THREATS.md#t-49--another-program-answers-keypastes-host-name
+[T-50]: THREATS.md#t-50--a-pairing-is-a-bearer-key
 [T-51]: THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
 [T-55]: THREATS.md#t-55--a-search-maps-the-persons-infrastructure
 [T-57]: THREATS.md#t-57--an-agent-asks-the-person-to-change-an-item
+[T-58]: THREATS.md#t-58--a-page-that-is-not-the-items-site
+[T-59]: THREATS.md#t-59--keypaste-believes-the-extension-about-which-page-asks-and-whether-the-person-clicked
+[T-60]: THREATS.md#t-60--the-extension-someone-elses-code-receives-passwords
+[T-61]: THREATS.md#t-61--an-allowance-is-a-standing-rule

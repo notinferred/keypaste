@@ -81,11 +81,14 @@ public sealed record HostPlaces(
         };
     }
 
-    /// <summary>The browser whose manifest <paramref name="browser"/> reads: Chrome's for Brave on Windows, which reads no key of its own, else itself.</summary>
+    /// <summary>
+    /// The browser whose manifest <paramref name="browser"/> reads, else itself: Brave reads Chrome's, the key on Windows, having none
+    /// of its own, and the folder on macOS, as Brave 1.99 was seen to in 8.3a3.
+    /// </summary>
     /// <param name="browser">The browser.</param>
     /// <returns>The browser that owns the manifest.</returns>
     public HostBrowser Slot(HostBrowser browser) =>
-        Platform == McpClientPlatform.Windows && browser == HostBrowser.Brave ? HostBrowser.Chrome : browser;
+        Platform != McpClientPlatform.Linux && browser == HostBrowser.Brave ? HostBrowser.Chrome : browser;
 
     /// <summary>The browsers that read one manifest with <paramref name="browser"/>.</summary>
     /// <param name="browser">The browser.</param>

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+keypaste's extension fills in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux. On a site where you always fill one login, clicking the key icon still offers the site's other logins; a click or Connect made while the extension is starting is no longer lost; a page of another site you move to in the same tab no longer gets the last site's logins; and on macOS, turning on Brave writes the file Brave reads, which is Chrome's, so Chrome turns on and off with it, as on Windows ([8.3a3](docs/steps/8.3a3.md)).
+
 keypaste fills a login in the browser through its own extension: when you click the key icon in a sign-in field, keypaste asks you which matching login to fill, naming the site, and you can tick Always fill to skip the question on that exact site; a page that just loads asks you nothing. Settings › Browser fill lists the logins you always fill and removes them, `keypaste approve` asks the same question in its terminal, and every login filled is recorded in Activity ([8.3a2](docs/steps/8.3a2.md)).
 
 An agent's request for a value of an item tagged into a protected environment, such as `env:billing:prod`, is now asked every time with Deny or Allow once, whatever Agents allows or an Always allow kept, as a run of its set already is.

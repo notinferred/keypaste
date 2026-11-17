@@ -46,7 +46,7 @@ public sealed class BrowserHostsTests : IDisposable
     }
 
     [Fact]
-    public void Each_browser_reads_its_manifest_where_KeePassXC_writes_its_own_under_keypastes_host_name()
+    public void Each_browser_reads_its_manifest_where_KeePassXC_writes_its_own_but_Brave_on_macOS_reads_Chromes()
     {
         string[] expected = McpClientMachine.CurrentPlatform switch
         {
@@ -63,7 +63,7 @@ public sealed class BrowserHostsTests : IDisposable
                 "home/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.keypaste.browser.json",
                 "home/Library/Application Support/Chromium/NativeMessagingHosts/com.keypaste.browser.json",
                 "home/Library/Application Support/Microsoft Edge/NativeMessagingHosts/com.keypaste.browser.json",
-                "home/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.keypaste.browser.json",
+                "home/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.keypaste.browser.json",
                 "home/Library/Application Support/Mozilla/NativeMessagingHosts/com.keypaste.browser.json",
             ],
             _ =>

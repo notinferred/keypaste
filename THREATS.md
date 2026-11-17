@@ -680,7 +680,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Status.** Implemented (unreleased); not in v0.3.0.
 
-**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. `verify-extension-load.sh` has Chromium and Firefox start the relay for keypaste's extension and pair it. Unverified: a fill in a real browser (planned, step 8.3a3).
+**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. `verify-extension-load.sh` has Chromium and Firefox start the relay for keypaste's extension and pair it, and `verify-browser-fill.sh` has Chromium, Edge, Brave and Firefox, and with `--branded` each runner's own Chrome, Edge and Firefox, pair and fill through it.
 
 ### T-49 — Another program answers keypaste's host name
 
@@ -814,13 +814,13 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Attacker.** A page made to look like the item's site: a lookalike or longer domain, another tenant of a shared host, a subdomain someone else controls, the site over `http`, or a form that posts to another site.
 
-**Mitigation.** An item matches a page only on its own host or a subdomain of it at a label boundary, within one registrable domain by the vendored Public Suffix List, both sections read, and on the same scheme and port; an IP address, `localhost` and a single label such as `nas` match only themselves. A host that is not ASCII, a URL naming a user, a wildcard and HTTP authentication get no logins. A page's own load asks nobody and releases only what the person always fills on its exact origin; a request the extension says the person made puts the matching items to them by title and username, the origin with its site emphasised and, where the form posts to another site, that site named. An `http` page, a single-label host and a form posting to another site are asked about every time and offer no Always. KeePassXC's hide, HTTP-authentication-only and connection-only settings on an item or its groups, its deny list, an expired item and the Trash keep an item out. Each item released is recorded with the page's origin before the reply, never its path or query.
+**Mitigation.** An item matches a page only on its own host or a subdomain of it at a label boundary, within one registrable domain by the vendored Public Suffix List, both sections read, and on the same scheme and port; an IP address, `localhost` and a single label such as `nas` match only themselves. A host that is not ASCII, a URL naming a user, a wildcard and HTTP authentication get no logins. A page's own load asks nobody and releases only what the person always fills on its exact origin; a request the extension says the person made puts the matching items to them by title and username, the origin with its site emphasised and, where the form posts to another site, that site named. An `http` page, a single-label host and a form posting to another site are asked about every time and offer no Always. KeePassXC's hide, HTTP-authentication-only and connection-only settings on an item or its groups, its deny list, an expired item and the Trash keep an item out. Each item released is recorded with the page's origin before the reply, never its path or query. The extension reuses the logins a tab holds only for a page of the origin they were released for.
 
 **Limit.** Whoever controls any subdomain of the item's site is offered its login there. The list ages until it is refreshed, and a release refuses a copy more than 60 days old. Anyone on the network can answer to a single-label host, so it is asked every time. A person can fill a lookalike they misread; the prompt names the origin and cannot make them read it.
 
 **Status.** Implemented (unreleased); not in v0.3.0.
 
-**Tests.** `LoginLookupTests`, `LoginCandidatesTests`, `SessionBrowsersTests`, `BrowserHostTests`. Unverified: a fill in a real browser (planned, step 8.3a3).
+**Tests.** `LoginLookupTests`, `LoginCandidatesTests`, `SessionBrowsersTests`, `BrowserHostTests`, and `verify-browser-fill.sh`, where real browsers fill the item's site and its subdomain and are offered nothing on a lookalike name or another tenant of `github.io`, an `http` page and a form posting to another site are asked with no Always, and the extension refuses a cross-origin frame before keypaste is asked.
 
 ### T-59 — keypaste believes the extension about which page asks, and whether the person clicked
 

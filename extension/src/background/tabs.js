@@ -2,6 +2,7 @@
 
 const TAB_OBJECT = {
     credentials: [],
+    credentialsOrigin: '',
     errorMessage: null,
     iframeDetected: false,
     loginList: [],

@@ -7,6 +7,7 @@ usage() {
 Usage: bash scripts/dev.sh [--full [--tools]] [--wait]
        bash scripts/dev.sh --profile P [--os O] [--wait]
        bash scripts/dev.sh --acts APP_RUN_ID [--os O] [--wait]
+       bash scripts/dev.sh --browsers [--os O] [--wait]
 
 Pushes the current branch and follows GitHub's verdict on it. Needs only git and gh; nothing builds
 on this machine.
@@ -23,7 +24,9 @@ The first failure ends the wait with that job's log; the runs carry on until the
           failure only one runner showed
 --acts    install a successful app.yml run's packages, built at any commit, through install-desktop.yml, and do
           the install exercise and R.1a's acts with this branch's scripts; never evidence
---os      the runner for --profile or --acts: linux (default), windows, macos or all
+--browsers fill logins in the runner's own Chrome, Edge and Firefox, and a pinned Brave, through dev.yml
+          (verify-browser-fill.sh --branded), for a record's evidence
+--os      the runner for --profile, --acts or --browsers: linux (default), windows, macos or all
 --wait    wait for every job and print each failed one's log, rather than stopping at the first
 USAGE
 }
@@ -31,13 +34,14 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-profile='' os='' acts='' wait_all=false tools=false full=false
+profile='' os='' acts='' wait_all=false tools=false full=false browsers=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --full) full=true ;;
     --tools) tools=true ;;
     --wait) wait_all=true ;;
+    --browsers) browsers=true ;;
     --profile|--os|--acts)
       [ "$#" -ge 2 ] || bad_usage "$1 needs a value"
       case "$1" in
@@ -51,7 +55,9 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-[ -z "$os" ] || [ -n "$profile" ] || [ -n "$acts" ] || bad_usage '--os chooses the runner for --profile or --acts'
+[ -z "$os" ] || [ -n "$profile" ] || [ -n "$acts" ] || [ "$browsers" = true ] || bad_usage '--os chooses the runner for --profile, --acts or --browsers'
+[ "$browsers" = false ] || { [ -z "$profile" ] && [ -z "$acts" ] && [ "$tools" = false ] && [ "$full" = false ]; } \
+  || bad_usage '--browsers is a run of its own; it cannot accompany --profile, --acts, --full or --tools'
 [ -z "$acts" ] || { [ -z "$profile" ] && [ "$tools" = false ]; } \
   || bad_usage '--acts is a run of its own; it cannot accompany --profile or --tools'
 case "$acts" in *[!0-9]*) bad_usage "--acts takes an app.yml run ID, not $acts" ;; esac
@@ -69,6 +75,7 @@ esac
 mode=''
 [ -z "$profile" ] || mode=profile
 [ -z "$acts" ] || mode=acts
+[ "$browsers" = false ] || mode=browsers
 
 branch="$(git symbolic-ref --short -q HEAD)" || die 'HEAD is detached; check out a branch'
 [ "$branch" != main ] || die 'refusing to run on main; work on a branch'

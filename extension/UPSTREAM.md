@@ -46,6 +46,9 @@ Permissions go from `activeTab`, `clipboardWrite`, `contextMenus`, `cookies`, `n
 ### Changed
 
 - `background/keepass.js` sends `triggerUnlock` with `get-logins` when the person asked, by the field's key icon or Connect, as upstream sends it with `get-databasehash`, so keypaste asks the person only then and a page's own load asks nobody.
+- `background/init.js` adds its message listener in the worker's first turn and has it wait for the worker's start, since the browser delivers the message that starts a stopped worker only to listeners added then; upstream adds it after reading storage, so a press of Connect, or any page's message, sent while the worker was starting was dropped.
+- `background/page.js` reuses the logins a tab holds only for a page of the origin keypaste released them for; upstream reused them for any page of the tab until the browser reported its new address, so a page of another site that asked first got the last site's logins.
+- `content/keypaste.js` asks keypaste again on a click of the field's key icon when the logins the page holds came only from its own load, which carries just those the person always fills there, so the click can still offer the site's other logins; upstream asks only when the page holds none.
 - `background/client.js` times a request from when every request sent before it on the native port is answered, since keypaste answers one at a time: a status check queued behind a pairing the person is still confirming is no longer taken for keypaste being unreachable, which cleared the database hash the pairing's answer is verified against.
 
 ### Restyled

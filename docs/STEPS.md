@@ -10,10 +10,7 @@ A row is detailed further when it is selected. A task split into children keeps 
 
 - [ ] **8.1g — Publish the extension in the three stores.** Needs: none. Input: H-0029.
   - The founder submits the builds to the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons; each passes its store's review, and the IDs the stores show are the ones `BrowserIdentity.cs` names.
-- [ ] **8.3a3 — Prove fill in real browsers.** Needs: 8.3a2.
-  - `scripts/verify-browser-fill.sh`, in one new app job on `ubuntu-24.04`, runs Chromium and Firefox with the extension's builds, as `scripts/verify-extension-load.sh` does. Chromium's copy carries the Web Store item's public key as its manifest key, so its ID is the store's, and Firefox loads it as a temporary add-on under its own ID. A local HTTPS server with a throwaway CA serves pages for 8.3a1's rules, a cross-origin frame and a cross-site form, its names mapped by Chromium's `--host-resolver-rules` and `/etc/hosts`; Playwright drives Chromium and geckodriver Firefox, both pinned by lockfile.
-  - SECURITY gains its Browser fill subsection and an Audit limits sentence saying browser fill lines name the sites where items were filled.
-  - Accepted when the gate passes in that job, showing filled and refused pages and the extension refusing a cross-origin frame, and the founder's hand check of keypaste's store-installed extension in branded Chrome, Edge and Firefox on each platform is recorded.
+  - Accepted when, by the founder's direction of 2026-11-16, a login is filled from each store's install in branded Chrome, Edge and Firefox on Windows, macOS and Linux, and the Chromium copy `verify-browser-fill.sh` loads carries the Web Store item's public key as its manifest key ([8.3a3](steps/8.3a3.md)).
 - [ ] **F.112 — Close the fixes still marked For 1.0.0.** Needs: none.
   - The founder's direction of 2026-11-10. Each record's limits own the detail: [V.1b](steps/V.1b.md), [G.4a](steps/G.4a.md), [G.4b](steps/G.4b.md), [G.9](steps/G.9.md), [C.5a1](steps/C.5a1.md), [U.2](steps/U.2.md), [F.43](steps/F.43.md), [F.53](steps/F.53.md), [N.5](steps/N.5.md), [N.6](steps/N.6.md), [L.2a](steps/L.2a.md) and [V.9](steps/V.9.md).
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
