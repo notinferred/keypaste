@@ -39,7 +39,8 @@ tools          Prepare the backend, and connect keypaste to the real AI tools in
 
 --list prints the selection and commands without executing them. Backend, desktop, desktop-gates
 and integration accept --prepare-only and --test-only for CI or a build already prepared by this
-command. test and compile take the SDK global.json pins from ~/.dotnet when the dotnet on PATH lacks it.
+command; compat --test-only takes a backend this job built and tested with KEYPASTE_KEEPASSXC=required, so it runs
+only the scripts and the app driver. test and compile take the SDK global.json pins from ~/.dotnet when the dotnet on PATH lacks it.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 On Windows and macOS each profile that builds, but compile, first builds the libargon2 the app and the
 CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
@@ -89,8 +90,8 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 case "$phase:$profile" in
-  all:*|*:backend|*:desktop|*:desktop-gates|*:integration) ;;
-  *) bad_usage 'phase selection is only supported for backend, desktop, desktop-gates and integration' ;;
+  all:*|*:backend|*:desktop|*:desktop-gates|*:integration|test-only:compat) ;;
+  *) bad_usage 'phase selection is only supported for backend, desktop, desktop-gates, integration and compat --test-only' ;;
 esac
 if [ -n "$profile" ] && [ -n "$from" ]; then bad_usage '--from resumes a full run; it cannot accompany a named profile'; fi
 project_file() {
@@ -442,12 +443,14 @@ profile_integration() {
   if [ "$phase" != prepare-only ]; then check_integration; fi
 }
 profile_compat() {
-  prepare_backend
+  if [ "$phase" != test-only ]; then prepare_backend; fi
   export KP_COMPAT_PASSWORD=keypaste-local-compat-fixture
   run bash scripts/make-compat-fixture.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
-  KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
+  if [ "$phase" != test-only ]; then
+    KEYPASTE_KEEPASSXC=required run_tests dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-build -c Release -- --filter-namespace Keypaste.Core.Tests.KeePassXC
+  fi
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach

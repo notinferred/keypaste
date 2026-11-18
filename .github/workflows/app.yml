@@ -136,14 +136,16 @@ jobs:
           echo "$kept of $n targets: $targets"
 
   # ci.yml's format job checks this solution's format too, since ci.yml runs on every source change.
+  # One build per runner: the desktop tests, then the app, the CLI and an agent as real processes: approvals, locks, saves
+  # and the session's lifecycle.
   desktop:
-    name: desktop tests (${{ matrix.os }})
+    name: desktop tests and gates (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 24
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -172,31 +174,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The app, the CLI and an agent as real processes: approvals, locks, saves and the session's lifecycle.
-  desktop-gates:
-    name: desktop gates (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
-
-      - name: Restore, build and drive the desktop gates
+      - name: Drive the desktop gates
         shell: bash
         run: bash scripts/verify.sh desktop-gates
 
@@ -723,7 +701,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [targets, desktop, desktop-gates, clipboard-markers, extension, macos, package]
+    needs: [targets, desktop, clipboard-markers, extension, macos, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

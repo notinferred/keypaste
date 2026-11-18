@@ -1,28 +1,10 @@
 name: ci
 
 on:
-  # A branch push runs the fast tier, Linux only; main's push adds Windows; every other run adds macOS.
+  # A branch push runs the fast tier, Linux only; main's push adds Windows; every other run adds macOS. The workflow runs on
+  # every push so that ci ok reports on every commit, as main's ruleset requires; the changes job filters within it.
   push:
     branches: ['**']
-    # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
-    paths-ignore:
-      - 'docs/ARCHITECTURE.md'
-      - 'docs/FEATURES.md'
-      - 'docs/screenshots/**'
-      - 'docs/demo/**'
-      - 'CHANGELOG.md'
-      - 'THREATS.md'
-      - 'SECURITY.md'
-      - 'THIRD_PARTY_NOTICES.md'
-      - 'CONTRIBUTING.md'
-      - 'LICENSE'
-      - 'docs/mcp-setup.md'
-      - 'docs/replace-dotenv.md'
-      - 'docs/policy.md'
-      - 'docs/approvals.md'
-      - 'docs/desktop.md'
-      - 'docs/safe-agents.md'
-      - '.claude/**'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -58,6 +40,38 @@ jobs:
   # Every run but a push runs every job on every runner but tools, which runs on the schedule and on a dispatch that asks
   # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs.
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
+  # checks runs first, and the jobs that build and test start only once it passes; format runs beside them.
+  # A push that changes only documents no job reads, or only the extension, which app.yml tests, runs checks alone. Every
+  # other event runs every job, because a release counts only a ci run that skipped none.
+  changes:
+    name: what changed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Keep pages verify-demo.sh checks out of this list.
+      - name: Decide whether the push changed what the build reads
+        id: classify
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          UNREAD: '^(docs/(ARCHITECTURE|FEATURES|mcp-setup|replace-dotenv|policy|approvals|desktop|safe-agents)\.md|docs/(screenshots|demo)/.*|(CHANGELOG|THREATS|SECURITY|THIRD_PARTY_NOTICES|CONTRIBUTING)\.md|LICENSE|\.claude/.*|extension|extension/.*)$'
+        run: |
+          set -euo pipefail
+          code=true
+          # A new branch's push names no commit before it, and a rewritten one may name a commit this clone lacks.
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ -n "${BEFORE//0/}" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            changed="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+            if [ -n "$changed" ] && ! grep -qvE "$UNREAD" <<< "$changed"; then code=false; fi
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   checks:
     name: scripts + workflows
     if: ${{ !inputs.only_tools }}
@@ -94,7 +108,8 @@ jobs:
 
   # dotnet format reports what the build cannot, import order and this. qualification, once for every project.
   format:
-    if: ${{ !inputs.only_tools }}
+    needs: changes
+    if: ${{ !inputs.only_tools && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
@@ -116,15 +131,18 @@ jobs:
         shell: bash
         run: bash scripts/verify.sh format
 
+  # One build per runner: the backend's tests, KeePassXC's namespace among them, then real CLI, agent and bridge processes and
+  # the demo pages against what the binaries print, then what KeePassXC reads of what the built CLI and app write.
   test:
     name: test (${{ matrix.os }})
-    if: ${{ !inputs.only_tools }}
+    needs: [changes, checks]
+    if: ${{ !inputs.only_tools && needs.changes.outputs.code == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         os: ${{ fromJSON((github.event_name != 'push' || github.ref == 'refs/heads/main') && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -140,90 +158,38 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      # Every branch push checks what KeePassXC reads of what keypaste writes (SECURITY.md law 14).
-      - name: Install keepassxc-cli (Linux)
-        if: runner.os == 'Linux'
+      # Every push checks what KeePassXC reads of what keypaste writes (SECURITY.md law 14). A stalled apt mirror
+      # otherwise holds the job for its whole limit.
+      - name: Install keepassxc-cli
+        shell: bash
         timeout-minutes: 10
-        run: cli="$(bash scripts/install-keepassxc.sh)"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
+        run: cli="$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP/keepassxc")"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
 
       - name: Build and test the backend solution
         shell: bash
         env:
-          KEYPASTE_KEEPASSXC: ${{ runner.os == 'Linux' && 'required' || '' }}
+          KEYPASTE_KEEPASSXC: required
         run: bash scripts/verify.sh backend
+
+      - name: Run the integration gate
+        shell: bash
+        run: bash scripts/verify.sh integration --test-only
+
+      # SECURITY.md law 14 requires this blocking gate on all three operating systems.
+      - name: Verify what keypaste writes against real KeePassXC
+        if: ${{ !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+        shell: bash
+        run: bash scripts/verify.sh compat --test-only
 
       - name: Verify the Windows PowerShell launcher selects Git Bash
         if: runner.os == 'Windows'
         shell: powershell
         run: ./scripts/verify.ps1 --list
 
-  # Real CLI, agent and bridge processes, and the demo pages against what the binaries print.
-  integration:
-    name: integration (${{ matrix.os }})
-    if: ${{ !inputs.only_tools }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON((github.event_name != 'push' || github.ref == 'refs/heads/main') && '["ubuntu-24.04", "windows-2025"]' || '["ubuntu-24.04"]') }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
-
-      - name: Run the integration gate
-        shell: bash
-        run: bash scripts/verify.sh integration
-
-  compat:
-    name: compat (${{ matrix.os }})
-    if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 21
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
-
-      # SECURITY.md law 14 requires this blocking gate on all three operating systems.
-      # A stalled apt mirror otherwise holds the job for its whole limit.
-      - name: Install keepassxc-cli
-        shell: bash
-        timeout-minutes: 10
-        run: cli="$(bash scripts/install-keepassxc.sh)"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
-
-      - name: Verify what keypaste writes against real KeePassXC
-        shell: bash
-        run: bash scripts/verify.sh compat
-
   # Hosted macOS runners are scarce and a job left queued is cancelled, so each workflow keeps its macOS work in one job.
   macos:
     name: backend, integration and compat (macos-15)
+    needs: [changes, checks]
     if: ${{ !inputs.only_tools && github.event_name != 'push' }}
     runs-on: macos-15
     timeout-minutes: 30
@@ -264,11 +230,12 @@ jobs:
 
       - name: Verify what keypaste writes against real KeePassXC
         shell: bash
-        run: bash scripts/verify.sh compat
+        run: bash scripts/verify.sh compat --test-only
 
   aot:
     name: aot publish (linux-x64)
-    if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+    needs: [changes, checks]
+    if: ${{ !inputs.only_tools && needs.changes.outputs.code == 'true' && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 19
@@ -425,7 +392,7 @@ jobs:
   ok:
     name: ci ok
     if: always()
-    needs: [checks, format, test, integration, compat, macos, aot, tools]
+    needs: [changes, checks, format, test, macos, aot, tools]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:

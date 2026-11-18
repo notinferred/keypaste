@@ -38,16 +38,17 @@ A runner-only probe is iterated on a branch with `gh workflow run <workflow> --r
 
 ## CI
 
-`ci.yml` runs on qualifying pushes to any branch, every pull request, dispatch and a weekly schedule; its push-level `paths-ignore` skips the documents it lists. `app.yml` has a push allowlist for desktop, CLI, core and shared build and test inputs, runs on every pull request and dispatch, and packages matching version tags. The workflow files own the exact triggers.
+`ci.yml` runs on every push to any branch, every pull request, dispatch and a weekly schedule, so `ci ok` reports on every commit; on a push that changes only the documents its `changes` job lists or the extension, every job but `checks` is skipped. `app.yml` has a push allowlist for desktop, CLI, core and shared build and test inputs, runs on every pull request and dispatch, and packages matching version tags. The workflow files own the exact triggers.
 
 - A push to any branch but `main` runs ci's fast tier alone: scripts, workflows, format, and backend tests and integration on Linux. A branch's Windows, macOS, compatibility, desktop and packaging evidence takes `dev.sh --full`.
 - `main`'s push runs every job on Linux and Windows, and every other run adds macOS, nothing skipped or cached, except two things. ci's `tools` jobs run only on the weekly schedule, on a dispatch with `-f tools=true`, and on a dispatch with `-f only_tools=true`, which runs nothing else and never counts toward a release. NuGet restores are cached by the lock files' hash in the verification jobs, while `release.yml` and `app.yml`'s package job restore fresh.
+- ci's `checks` runs first, and the jobs that build and test start only once it passes, beside `format`; each of those builds once per runner and runs everything that build serves, as `app.yml`'s desktop job does.
 - Runs on `main` and tags are never cancelled, and each commit and event there has its own concurrency group; on any other branch a newer run cancels the one before it.
 - `ci ok` and `app ok` aggregate each workflow's jobs and fail unless every job succeeded or was skipped, so a job no runner acquired fails them; they are the checks a pull request needs green.
 
 CI spends nothing that cannot change a verdict. A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, and is then diagnosed, since a passing retry does not close an intermittent defect. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
 
-`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/demo.md` and `docs/keepass-and-agents.md` against the built binaries, so those pages must trigger `ci.yml`. Never add `docs/**` to `paths-ignore`; a new documentation path triggers backend CI unless it is listed there.
+`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/demo.md` and `docs/keepass-and-agents.md` against the built binaries, so those pages stay out of the `changes` job's list. Never add `docs/**` to it; a new documentation path runs the backend jobs unless it is listed there.
 
 ## Commits
 
