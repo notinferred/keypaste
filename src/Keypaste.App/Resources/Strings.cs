@@ -135,6 +135,7 @@ public static class Strings
     public static string ConnectValueAgain => Manager.GetString("ConnectValueAgain", CultureInfo.CurrentUICulture)!;
     public static string Connection => Manager.GetString("Connection", CultureInfo.CurrentUICulture)!;
     public static string Continue => Manager.GetString("Continue", CultureInfo.CurrentUICulture)!;
+    public static string ContinuingAgreesToTheTermsAndTurnsCrashReportsOn => Manager.GetString("ContinuingAgreesToTheTermsAndTurnsCrashReportsOn", CultureInfo.CurrentUICulture)!;
     public static string ContinuingAgreesToTheTermsOfUse => Manager.GetString("ContinuingAgreesToTheTermsOfUse", CultureInfo.CurrentUICulture)!;
     public static string Copy => Manager.GetString("Copy", CultureInfo.CurrentUICulture)!;
     public static string CopyGroupValue => Manager.GetString("CopyGroupValue", CultureInfo.CurrentUICulture)!;

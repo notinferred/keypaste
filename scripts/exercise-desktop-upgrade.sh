@@ -53,7 +53,7 @@
 #              REHEARSAL  1 when <cli-dir> holds a CLI/MCP built from this commit, not a published release
 set -euo pipefail
 
-# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+# A run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
 export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"

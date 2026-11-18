@@ -182,7 +182,7 @@ public sealed partial class PlainWordsTests
         var said = new List<(string Where, string Text)>();
         var picker = new FakeVaultFilePicker();
 
-        var notice = Show(new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, () => { }) });
+        var notice = Show(new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, _ => { }) });
         said.AddRange(Shown(notice, "the first-launch screen"));
         notice.Close();
 

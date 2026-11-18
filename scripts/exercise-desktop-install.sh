@@ -31,7 +31,7 @@
 # Environment: REHEARSAL  the app.yml run whose -dryrun package <candidate-file> is, for a rehearsal
 set -euo pipefail
 
-# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+# A run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
 export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"

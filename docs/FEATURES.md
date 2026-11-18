@@ -78,7 +78,7 @@ Every row is Implemented (unreleased) and in the internal packages; none is Publ
 | Import from another app: KeePass files and other password managers' exports, with a plan you edit | Checked in headless tests, not observed in an installed app |
 | System notifications for a request while keypaste is in the background | No person has seen one; macOS posts them only from a signed build, which does not exist yet |
 | Drag and drop, and Open With for `.kdbx` | No real drag or Open With has been run |
-| Crash reports: on once you press Continue on the first-launch screen; Settings' Send crash reports turns them off | The terms are a draft until approved |
+| Crash reports: off unless you check Send crash reports on the first-launch screen, apart from accepting the terms; Settings' Send crash reports turns them on or off | The terms are a draft until approved |
 
 Each screen is checked in headless tests and frames rendered without a display; the installed packages were driven on Windows, macOS and Linux runners, not on a person's computer ([RELEASE](RELEASE.md#installation-verification)).
 

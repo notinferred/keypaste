@@ -50,9 +50,6 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
 - [ ] **H-0029 — Make the extension's store listings.** Human. Needs: none.
   - Developer accounts with the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons as keypaste; the Firefox add-on ID, chosen; the Chrome item's signing key, made and kept as a secret, from which its ID follows; and the ID Edge assigns at the first submission. Store review can take days per store and holds 8.1g.
-- [ ] **J.2 — Ask a separate yes for crash reports at first launch.** Needs: none.
-  - The first-launch screen asks for crash reports on their own, apart from accepting the terms of use, as [law 5](../SECURITY.md#security-laws) requires; nothing is sent without that yes, and Settings' switch still turns them off.
-  - Accepted when tests show no report sent after the terms are accepted alone, reports sent once the person says yes, and none after the switch is off.
 - [ ] **Y.4 — Pin the KeePassXC version CI tests against on Linux.** Needs: none.
   - Accepted when Linux CI installs one named KeePassXC version, and changing it takes a commit.
   - Upstream's 2.8.0 AppImage needs glibc 2.38, which the `ubuntu-22.04` jobs that build and check the CLI release lack, and macOS's `keepassxc-cli --version` answers `KeePassXC 2.8.0`; the first attempt was reverted for both on 2026-11-18. Law 14 also names KeePassXC 2.7, which a single 2.8.0 pin stops testing.

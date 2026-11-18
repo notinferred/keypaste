@@ -134,12 +134,12 @@ public sealed class CrashReportTests
 
         var older = setup.Home("older");
         Directory.CreateDirectory(older);
-        File.WriteAllText(Path.Combine(older, "app.toml"), "[[settings]]\ncrash_reports = 1\nterms = \"2020-01-01\"\n");
+        File.WriteAllText(Path.Combine(older, "app.toml"), "[[settings]]\nsend_crash_reports = 1\nterms = \"2020-01-01\"\n");
         using (var app = Launch(setup, older, endpoint.Url))
         {
             app.WaitForOutput("^screen first-launch");
             Assert.False(File.Exists(Path.Combine(older, "crash-reports", "running")), "the run marker was set before the new terms were agreed to");
-            app.Send("continue");
+            app.Send("continue send");
             app.WaitForOutput("^screen unlock");
             AssertChose(older, 1);
             Assert.DoesNotContain("terms = \"2020-01-01\"", File.ReadAllText(Path.Combine(older, "app.toml")), StringComparison.Ordinal);
@@ -212,7 +212,7 @@ public sealed class CrashReportTests
         if (!switchedOn)
         {
             Directory.CreateDirectory(home);
-            File.WriteAllText(Path.Combine(home, "app.toml"), "[[settings]]\ncrash_reports = 0\nterms = \"2020-01-01\"\n");
+            File.WriteAllText(Path.Combine(home, "app.toml"), "[[settings]]\nsend_crash_reports = 0\nterms = \"2020-01-01\"\n");
         }
 
         using var app = Launch(setup, home, url);
@@ -222,7 +222,7 @@ public sealed class CrashReportTests
         }
 
         app.WaitForOutput("^screen unlock");
-        Assert.False(!switchedOn && app.Output.Contains("screen first-launch"), "the first-launch screen showed over a kept crash_reports = 0");
+        Assert.False(!switchedOn && app.Output.Contains("screen first-launch"), "the first-launch screen showed over a kept send_crash_reports = 0");
         app.Send($"unlock {setup.Vault}");
         app.WaitForOutput("^screen shell");
         app.Send($"copy {_entry}");
@@ -248,7 +248,7 @@ public sealed class CrashReportTests
     private static void Agree(RunningProcess app)
     {
         app.WaitForOutput("^screen first-launch");
-        app.Send("continue");
+        app.Send("continue send");
     }
 
     private static void Quit(RunningProcess app)
@@ -260,7 +260,7 @@ public sealed class CrashReportTests
     private static void AssertChose(string home, int reports)
     {
         var settings = File.ReadAllText(Path.Combine(home, "app.toml"));
-        Assert.Contains($"crash_reports = {reports}", settings, StringComparison.Ordinal);
+        Assert.Contains($"\nsend_crash_reports = {reports}", settings, StringComparison.Ordinal);
         Assert.Matches("(?m)^terms = \"[0-9]{4}-[0-9]{2}-[0-9]{2}\"", settings);
     }
 

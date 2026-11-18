@@ -41,7 +41,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void The_switch_shows_the_state_and_turning_it_off_deletes_what_waits_and_saves_zero()
     {
-        _crashes.Agree();
+        _crashes.Agree(send: true);
         _crashes.Crash(Thrown());
         using var settings = Settings();
 
@@ -66,7 +66,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void A_preference_changed_after_the_switch_keeps_it()
     {
-        _crashes.Agree();
+        _crashes.Agree(send: true);
         _crashes.SetSending(false);
         using var settings = Settings();
 
@@ -82,7 +82,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void Turned_on_under_terms_not_agreed_to_the_switch_asks_and_only_Continue_starts_reports()
     {
-        File.WriteAllText(SettingsFile, "[[settings]]\ncrash_reports = 0\nterms = \"2020-01-01\"\n");
+        File.WriteAllText(SettingsFile, "[[settings]]\nsend_crash_reports = 0\nterms = \"2020-01-01\"\n");
         var preferences = new DesktopPreferences(_fixture.Home);
         using var crashes = new CrashReporting(_fixture.Home, preferences, endpoint: null, _clock);
         using var settings = new SettingsViewModel(_session, _fixture.Home, preferences, _ => { }) { Crashes = crashes };
@@ -135,7 +135,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void Diagnostics_lists_each_waiting_report_as_its_exact_json_and_delete_removes_it()
     {
-        _crashes.Agree();
+        _crashes.Agree(send: true);
         _crashes.Crash(Thrown());
         _crashes.Unexpected(Thrown(), CrashReporting.PromptSite);
         var waiting = _crashes.Waiting();
@@ -170,7 +170,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void Diagnostics_says_when_the_switch_is_off_and_where_nothing_is_composed_shows_no_list()
     {
-        _crashes.Agree();
+        _crashes.Agree(send: true);
         _crashes.SetSending(false);
 
         Assert.Equal("Send crash reports is off in Settings, so none are kept.", new DiagnosticsViewModel(_session, _fixture.Home, _crashes).ReportsSummary);
@@ -184,7 +184,7 @@ public sealed class CrashReportScreensTests : IDisposable
     public void Diagnostics_names_reports_a_sending_build_has_waiting_with_nothing_more()
     {
         using var sending = new CrashReporting(_fixture.Home, _preferences, CrashSender.KeypasteCom, _clock, () => new HttpClientHandler());
-        sending.Agree();
+        sending.Agree(send: true);
         sending.Crash(Thrown());
 
         Assert.Equal(

@@ -124,7 +124,7 @@ Settings also says where the backups are kept, and Export an encrypted copy writ
 
 Open a vault by dragging a `.kdbx` onto the window, with Open a vault… or `Ctrl/Cmd+O`, from the recent list, or by passing its path to `keypaste-app`. The packages offer keypaste as an Open With choice for `.kdbx` without taking the default from KeePassXC (an AppImage only through an integration tool); a file opened this way is only selected. The file's header is read first, so a file that was never a vault is refused before you type.
 
-The first start shows one screen: continuing agrees to the terms of use for keypaste's online services and to sending crash reports, and the software itself stays under AGPL-3.0. Nothing is sent before Continue. Crash reports are on from then until you turn off Settings' Send crash reports, which also deletes reports waiting to be sent. After it comes the unlock screen. With no vault and no KeePassXC database, its first action is Create a vault…. With KeePassXC databases, it lists the ones KeePassXC last opened on this machine, read from KeePassXC's local settings, which keypaste never writes.
+The first start shows one screen: continuing agrees to the terms of use for keypaste's online services, and the software itself stays under AGPL-3.0. Crash reports are a separate choice on that screen, Send crash reports, off unless you check it; nothing is sent without that yes. Settings' Send crash reports turns them on or off later, and turning it off deletes reports waiting to be sent. An earlier build counted Continue as that yes, so a home it set up sees the screen once more. After it comes the unlock screen. With no vault and no KeePassXC database, its first action is Create a vault…. With KeePassXC databases, it lists the ones KeePassXC last opened on this machine, read from KeePassXC's local settings, which keypaste never writes.
 
 A vault that needs a key file takes it from Unlock with a key file too. All four KeePass key file forms work, and a vault a key file alone protects opens with the password empty. An unusable file is refused when you choose it. A vault keyed to an ordinary file, rather than a KeePass key file, opens with a warning that editing that file loses the vault. The app remembers each vault's key file location.
 
@@ -206,7 +206,7 @@ The app keeps this computer's settings in `~/.keypaste` (or `KEYPASTE_HOME`), be
 | | |
 |---|---|
 | `recent.toml` | The vaults opened here (at most ten, recorded only after one opens), where each one's key file is, and its YubiKey slot. Paths and slot numbers only |
-| `app.toml` | Idle timeout, theme, lock-on-minimize, whether closing the window keeps the app in the menu bar or tray, the vault agents and the CLI use when nothing names one, the window's place and size, zoom, and whether crash reports are sent with the date of the terms you agreed to |
+| `app.toml` | Idle timeout, theme, lock-on-minimize, whether closing the window keeps the app in the menu bar or tray, the vault agents and the CLI use when nothing names one, the window's place and size, zoom, and your answer on crash reports with the date of the terms you agreed to |
 | `crash-reports/` | Reports waiting to be sent while Send crash reports is on, each as Settings › Advanced › Diagnostics shows it. Turning the switch off deletes the folder |
 | `projects.json` | Each project's saved directory and command. No variable names or values |
 | `recommendations.json` | Dismissed recommendations, by vault, entry ID and key name. No titles or values |

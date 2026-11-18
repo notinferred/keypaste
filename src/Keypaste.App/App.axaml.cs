@@ -917,13 +917,13 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _window.FindControl<ContentControl>("Root")!.Content = Crashes is { AsksTerms: true } asking
-            ? new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, () => AgreeToTerms(asking)) }
+            ? new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, send => AgreeToTerms(asking, send)) }
             : new UnlockView { DataContext = _unlock };
     }
 
-    private void AgreeToTerms(CrashReporting crashes)
+    private void AgreeToTerms(CrashReporting crashes, bool sendCrashReports)
     {
-        _ = crashes.Agree();
+        _ = crashes.Agree(sendCrashReports);
         ShowUnlockScreen();
     }
 

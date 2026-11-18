@@ -40,7 +40,7 @@
 #              PACKAGE_COMMIT   the commit the candidate was built from
 set -euo pipefail
 
-# Continue turns reports on, and a run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
+# A run this exercise kills must not reach keypaste.com's route: no loopback here, so nothing sends.
 export KEYPASTE_CRASH_URL=none
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
@@ -135,8 +135,8 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  elif [ "$crash" != 1 ]; then contradict "after Continue, app.toml says crash_reports = ${crash:-nothing}"
-  else pass "the first-launch screen showed, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Continue wrote crash_reports = 1"
+  elif [ "$crash" != 0 ]; then contradict "after Continue alone, app.toml says send_crash_reports = ${crash:-nothing}"
+  else pass "the first-launch screen showed, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Continue alone wrote send_crash_reports = 0"
   fi
 }
 
@@ -1078,7 +1078,7 @@ act_first_run() {
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
   attempt unlocked drive find 'Lock now' || return 1
   fact chosen_vault "$(chosen_vault)"
-  fact crash_reports "$(sed -n 's/^crash_reports = \([0-9]*\).*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1)"
+  fact crash_reports "$(sed -n 's/^send_crash_reports = \([0-9]*\).*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1)"
   # Diagnostics says no report waits.
   attempt settings shortcut 4 || return 1
   attempt advanced drive invoke 'Open Advanced' || return 1
@@ -1375,7 +1375,7 @@ selftest() {
         '{"act":"setup","fact":"value2_sha256","value":"b2"}' \
         '{"act":"setup","fact":"note_sha256","value":"c3"}' \
         '{"act":"first-run","fact":"chosen_vault","value":"/home/runner/work/acts/vault/acts.kdbx"}' \
-        '{"act":"first-run","fact":"crash_reports","value":"1"}' \
+        '{"act":"first-run","fact":"crash_reports","value":"0"}' \
         '{"act":"first-run","fact":"unlock_ms","value":"2100"}' \
         '{"act":"first-run","fact":"database","value":"Cipher: AES 256-bit KDF: Argon2d (8 rounds, 65536 KB) Recycle bin is enabled."}' \
         '{"act":"field","fact":"save_ms","value":"420"}' \
@@ -1461,8 +1461,8 @@ selftest() {
   set_fact windows-spelling run platform windows
   set_fact windows-spelling setup vault 'D:\a\keypaste\keypaste\acts\vault\acts.kdbx'
   set_fact windows-spelling first-run chosen_vault 'd:/a/keypaste/keypaste/acts/vault/acts.kdbx'
-  passing crash-off
-  set_fact crash-off first-run crash_reports 0
+  passing crash-on
+  set_fact crash-on first-run crash_reports 1
   passing crash-unwritten
   drop_fact crash-unwritten first-run crash_reports
   passing field-other
@@ -1525,8 +1525,8 @@ selftest() {
   expect driver-gap timing unreached 'first-run did not pass'
   expect chose-other first-run contradiction 'other.kdbx'
   expect windows-spelling first-run pass
-  expect crash-off first-run contradiction 'crash_reports = 0'
-  expect crash-unwritten first-run contradiction 'crash_reports = nothing'
+  expect crash-on first-run contradiction 'send_crash_reports = 1'
+  expect crash-unwritten first-run contradiction 'send_crash_reports = nothing'
   expect field-other field contradiction 'not the typed'
   expect field-other project-run unreached 'field did not pass'
   expect field-other edit-rerun unreached 'project-run did not pass'

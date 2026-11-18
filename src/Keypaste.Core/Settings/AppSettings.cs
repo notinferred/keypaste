@@ -87,7 +87,10 @@ public sealed record AppSettings
     /// <inheritdoc cref="IdleTimeoutKey"/>
     internal const string StayInTrayKey = "stay_in_tray";
     internal const string VaultKey = "vault";
-    internal const string CrashReportsKey = "crash_reports";
+    internal const string CrashReportsKey = "send_crash_reports";
+
+    // Continue on the terms screen once wrote 1 here, which is no yes of its own; a 0 was the person's no.
+    internal const string EarlierCrashReportsKey = "crash_reports";
     internal const string TermsKey = "terms";
     internal const string WindowBoundsKey = "bounds";
     internal const string WindowStateKey = "state";
@@ -116,7 +119,7 @@ public sealed record AppSettings
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
     private const string _accountVaultComment = "a vault the local account holds";
 
-    private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
+    private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, EarlierCrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
 
     private static readonly string[] _header =
@@ -168,8 +171,11 @@ public sealed record AppSettings
     /// <remarks>A full path and never anything read from the vault.</remarks>
     public string? Vault { get; init; }
 
-    /// <summary>Whether the desktop app's crash reports are sent: agreeing to the terms of use sets it, and Settings' switch changes it; null until either has.</summary>
-    /// <remarks>Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/>.</remarks>
+    /// <summary>Whether the desktop app's crash reports are sent: the person's own answer on the first-launch screen or Settings' switch, never the terms of use; null until given.</summary>
+    /// <remarks>
+    /// Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/>. An earlier
+    /// <c>crash_reports</c> key reads as an answer only when it is 0, and a save drops it.
+    /// </remarks>
     public bool? SendCrashReports { get; init; }
 
     /// <summary>The version of the terms of use the person last agreed to or changed crash reports under, or null.</summary>
@@ -643,7 +649,9 @@ public sealed record AppSettings
             : null,
         SendCrashReports = table.TryGet(CrashReportsKey, out var crashReports) && crashReports.Value.Kind == TomlValueKind.Number
             ? crashReports.Value.Number == 1
-            : null,
+            : table.TryGet(EarlierCrashReportsKey, out var earlier) && earlier.Value.Kind == TomlValueKind.Number && earlier.Value.Number != 1
+                ? false
+                : null,
         TermsAgreed = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
     };
 

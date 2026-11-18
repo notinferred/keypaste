@@ -55,6 +55,7 @@ public sealed class CrashJourneyTests
             Assert.False(crashes.IsOn);
             Assert.False(File.Exists(KeypasteHome.SettingsPath(fixture.Home)));
 
+            ((FirstLaunchViewModel)((FirstLaunchView)root.Content!).DataContext!).SendCrashReports = true;
             Key(main, PhysicalKey.Enter);
 
             Assert.IsType<UnlockView>(root.Content);
@@ -126,7 +127,7 @@ public sealed class CrashJourneyTests
         {
             File.WriteAllText(
                 KeypasteHome.SettingsPath(crashed.Fixture.Home),
-                $"[[settings]]\ncrash_reports = {(send ? 1 : 0)}\nterms = \"{TermsOfUse.Carried.Version}\"\n");
+                $"[[settings]]\nsend_crash_reports = {(send ? 1 : 0)}\nterms = \"{TermsOfUse.Carried.Version}\"\n");
 
             crashed.Launch();
             var root = crashed.Main.FindControl<ContentControl>("Root")!;

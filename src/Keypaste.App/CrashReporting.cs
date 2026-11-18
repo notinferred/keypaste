@@ -10,7 +10,7 @@ namespace Keypaste.App;
 
 /// <summary>
 /// The desktop app's crash reports for one run: the hooks that catch what nothing else did, the reports kept once the
-/// person has agreed to the terms of use and while Settings' switch is on, the run marker and the sender.
+/// person has agreed to the terms of use and said yes to reports, until Settings' switch is off, the run marker and the sender.
 /// </summary>
 /// <remarks>
 /// Nothing is kept or sent unless <c>app.toml</c>, read whole, says 1 under the terms this build carries. Every report is
@@ -87,14 +87,15 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>The outbox's folder.</summary>
     internal string Folder => _outbox.Folder;
 
-    /// <summary>Whether reports are kept and sent: the person agreed to the terms this build carries and the switch is on.</summary>
+    /// <summary>Whether reports are kept and sent: the person agreed to the terms this build carries and said yes to reports.</summary>
     internal bool IsOn => IsSending(_preferences.Current, _terms);
 
     /// <summary>
-    /// Whether the terms screen stands before the unlock screen: <c>app.toml</c> reads whole and would have the app send under terms the person has not agreed to.
-    /// Reports switched off send nothing, so a new date asks nothing of that person.
+    /// Whether the first-launch screen stands before the unlock screen: <c>app.toml</c> reads whole and holds no answer on
+    /// crash reports, or a yes under terms the person has not agreed to. Reports switched off send nothing, so a new date asks
+    /// nothing of that person.
     /// </summary>
-    internal bool AsksTerms => _preferences.Readable && _preferences.Current.SendCrashReports != false && !HasAgreed;
+    internal bool AsksTerms => _preferences.Readable && _preferences.Current.SendCrashReports != false && !IsOn;
 
     /// <summary>Whether the person agreed to the terms this build carries, without which no switch starts reports.</summary>
     internal bool HasAgreed => _preferences.Current.TermsAgreed == _terms;
@@ -151,16 +152,17 @@ internal sealed class CrashReporting : IDisposable
         _ => "other",
     };
 
-    /// <summary>Takes Continue on the terms screen: the person agreed to the terms this build carries, sending reports included.</summary>
+    /// <summary>Takes Continue on the terms screen: the person agreed to the terms this build carries and gave their own answer on reports.</summary>
+    /// <param name="send">Whether the person said yes to sending reports.</param>
     /// <returns>Whether <c>app.toml</c> took it; the agreement holds for this run either way.</returns>
-    internal bool Agree()
+    internal bool Agree(bool send)
     {
-        var saved = _preferences.Record(settings => settings with { SendCrashReports = true, TermsAgreed = _terms });
+        var saved = _preferences.Record(settings => settings with { SendCrashReports = send, TermsAgreed = _terms });
         Apply(takeEnded: true);
         return saved;
     }
 
-    /// <summary>Takes Settings' switch, which never agrees to anything: reports start only under terms <see cref="Agree"/> took.</summary>
+    /// <summary>Takes Settings' switch, which never agrees to the terms: reports start only under terms <see cref="Agree"/> took.</summary>
     /// <param name="send">Whether to send reports.</param>
     /// <returns>Whether <c>app.toml</c> took it; the switch holds for this run either way.</returns>
     internal bool SetSending(bool send)
@@ -235,7 +237,7 @@ internal sealed class CrashReporting : IDisposable
 
             StopSending();
 
-            // Off under terms still to be agreed to, the marker is an earlier run's, which Continue reports.
+            // Off under terms still to be agreed to, the marker is an earlier run's, which a yes on Continue reports.
             if (IsOn)
             {
                 _outbox.ClearRunning();

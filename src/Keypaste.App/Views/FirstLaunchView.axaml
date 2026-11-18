@@ -8,7 +8,7 @@
              x:DataType="vm:FirstLaunchViewModel"
              Background="{DynamicResource KpBgApp}">
 
-  <!-- The lock screen's column on its hairline grid: the mark, what continuing means, the terms and one amber action. -->
+  <!-- The lock screen's column on its hairline grid: the mark, what continuing means, the terms, crash reports' own yes and one amber action. -->
   <UserControl.Resources>
     <DrawingBrush x:Key="FirstLaunchGrid" TileMode="Tile" DestinationRect="0,0,16,16" Stretch="None">
       <DrawingBrush.Drawing>
@@ -29,22 +29,27 @@
                   Spacing="16">
         <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
 
-        <StackPanel Spacing="8">
-          <TextBlock Name="AgreementText"
-                     Classes="primary size-14"
-                     TextAlignment="Center"
-                     TextWrapping="Wrap"
-                     LineHeight="21"
-                     ctl:Announcer.Says="{Binding Opening}"
-                     Text="{x:Static res:Strings.ContinuingAgreesToTheTermsOfUse}" />
+        <TextBlock Name="AgreementText"
+                   Classes="primary size-14"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   LineHeight="21"
+                   ctl:Announcer.Says="{Binding Opening}"
+                   Text="{Binding Agreement}" />
+
+        <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Center" />
+
+        <StackPanel Spacing="4">
+          <CheckBox Name="SendCrashReports"
+                    HorizontalAlignment="Center"
+                    Content="{x:Static res:Strings.SendCrashReports}"
+                    IsChecked="{Binding SendCrashReports}" />
           <TextBlock Classes="caption"
                      TextAlignment="Center"
                      TextWrapping="Wrap"
                      LineHeight="18"
                      Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
         </StackPanel>
-
-        <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Center" />
 
         <Button Name="Continue"
                 Classes="primary lg"

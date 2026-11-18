@@ -388,7 +388,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
             if (value && !crashes.HasAgreed)
             {
-                AskTerms?.Invoke(new FirstLaunchViewModel(TermsOfUse.Carried, () => TookAgreement(crashes)));
+                AskTerms?.Invoke(FirstLaunchViewModel.ForSwitch(TermsOfUse.Carried, () => TookAgreement(crashes)));
                 return;
             }
 
@@ -400,7 +400,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     private void TookAgreement(CrashReporting crashes)
     {
-        var saved = crashes.Agree();
+        var saved = crashes.Agree(send: true);
         CrashSwitchMoved();
         Message = saved ? string.Empty : "Crash reports are on until you quit, because keypaste could not keep this in its settings file, app.toml.";
     }

@@ -129,7 +129,7 @@ public sealed class AppSettingsTests : IDisposable
         AppSettings.Save(SettingsFile, AppSettings.Default with { SendCrashReports = send, TermsAgreed = "2026-10-28" });
 
         var text = File.ReadAllText(SettingsFile);
-        Assert.Contains($"crash_reports = {(send ? 1 : 0)}", text, StringComparison.Ordinal);
+        Assert.Contains($"\nsend_crash_reports = {(send ? 1 : 0)}", text, StringComparison.Ordinal);
         Assert.Contains("terms = \"2026-10-28\"", text, StringComparison.Ordinal);
         Assert.Equal((send, "2026-10-28"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsAgreed));
     }
@@ -163,17 +163,34 @@ public sealed class AppSettingsTests : IDisposable
         Assert.False(Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.SectionName, StringComparison.Ordinal)).TryGet("terms_line_shown", out _));
     }
 
-    /// <summary>Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer.</summary>
+    /// <summary>
+    /// Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer. The earlier key's 1
+    /// came with agreeing to the terms, so it is no answer, while its other numbers stay a no.
+    /// </summary>
     [Theory]
-    [InlineData("crash_reports = 1", true)]
+    [InlineData("send_crash_reports = 1", true)]
+    [InlineData("send_crash_reports = 0", false)]
+    [InlineData("send_crash_reports = 2", false)]
+    [InlineData("send_crash_reports = \"1\"", null)]
+    [InlineData("crash_reports = 1", null)]
     [InlineData("crash_reports = 0", false)]
-    [InlineData("crash_reports = 2", false)]
-    [InlineData("crash_reports = \"1\"", null)]
+    [InlineData("crash_reports = 1\nsend_crash_reports = 1", true)]
     public void Only_a_one_sends_crash_reports(string line, bool? send)
     {
         File.WriteAllText(SettingsFile, $"[[settings]]\n{line}\n");
 
         Assert.Equal(send, AppSettings.Load(SettingsFile).SendCrashReports);
+    }
+
+    [Fact]
+    public void A_save_drops_the_earlier_crash_reports_key()
+    {
+        File.WriteAllText(SettingsFile, "[[settings]]\ncrash_reports = 1\nterms = \"2026-11-06\"\n");
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { SendCrashReports = false }));
+
+        Assert.DoesNotContain("\ncrash_reports", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.False(AppSettings.Load(SettingsFile).SendCrashReports);
     }
 
     /// <summary>

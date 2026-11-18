@@ -30,7 +30,7 @@
                    Classes="primary size-14"
                    TextWrapping="Wrap"
                    LineHeight="21"
-                   Text="{x:Static res:Strings.ContinuingAgreesToTheTermsOfUse}" />
+                   Text="{Binding Agreement}" />
         <TextBlock Classes="prompt-note size-13" Text="{x:Static res:Strings.AReportHoldsTheVersionSystemScreenX3de709}" />
       </StackPanel>
 

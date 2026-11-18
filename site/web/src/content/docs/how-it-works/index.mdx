@@ -80,7 +80,7 @@ Agent approvals use the first: one approved field goes back to the agent. Projec
 - Agents never get the vault. Each release is one field, one attachment or, for a command you approve, one project's set, after your answer or a setting you confirmed. The default is no.
 - Every agent request is logged on your machine, allowed or refused.
 - keypaste never writes a secret to disk unencrypted, unless you ask it to with `keypaste env export --dotenv`.
-- Crash reports and any usage counts never include a secret, an item or vault name, a file path or a value. Usage counts are opt-in. The desktop app sends crash reports once you press Continue on its first-launch screen, which says so, until you turn them off in Settings.
+- Crash reports and any usage counts never include a secret, an item or vault name, a file path or a value. Usage counts are opt-in. The desktop app sends crash reports only if you say yes to them, on its first-launch screen apart from accepting the terms or later in Settings, until you turn them off.
 - The file format is standard KDBX through KeePass's own library; keypaste writes no cryptography of its own.
 - The code is open source.
 

@@ -1692,7 +1692,7 @@ public sealed class ScreenRenderer
         Save(terms, output, "00e-terms-window");
         terms.Close();
 
-        var asked = new TermsAgreementWindow { DataContext = new FirstLaunchViewModel(Terms.TermsOfUse.Carried, () => { }) };
+        var asked = new TermsAgreementWindow { DataContext = FirstLaunchViewModel.ForSwitch(Terms.TermsOfUse.Carried, () => { }) };
         asked.Show();
         Save(asked, output, "00h-settings-terms-asked");
         asked.Close();
@@ -2006,7 +2006,7 @@ public sealed class ScreenRenderer
         using var hello = new UnlockViewModel(helloSession, withRecents.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual);
 
         var firstLaunch = new MainWindow { Width = WindowChrome.DefaultWidth, Height = WindowChrome.DefaultHeight };
-        firstLaunch.FindControl<ContentControl>("Root")!.Content = new FirstLaunchView { DataContext = new FirstLaunchViewModel(Terms.TermsOfUse.Carried, () => { }) };
+        firstLaunch.FindControl<ContentControl>("Root")!.Content = new FirstLaunchView { DataContext = new FirstLaunchViewModel(Terms.TermsOfUse.Carried, _ => { }) };
         firstLaunch.Show();
         Save(firstLaunch, output, "00-first-launch");
         firstLaunch.Width = 720;
@@ -2039,7 +2039,7 @@ public sealed class ScreenRenderer
         // Settings' plain switch, and a waiting report's Delete asking first.
         var preferences = new DesktopPreferences(empty.Path);
         using var crashes = new CrashReporting(empty.Path, preferences, endpoint: null);
-        crashes.Agree();
+        crashes.Agree(send: true);
         crashes.Crash(new InvalidOperationException("demo"));
         using var settings = new SettingsViewModel(session, empty.Path, preferences, _ => { }) { Crashes = crashes };
         var settingsWindow = new MainWindow { Width = _width, Height = 2600 };

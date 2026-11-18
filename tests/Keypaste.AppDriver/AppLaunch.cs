@@ -132,7 +132,10 @@ internal static class AppLaunch
                         Act(() => PressOpenAsync(app));
                         break;
                     case ["continue"]:
-                        Act(() => ContinueAsync(root));
+                        Act(() => ContinueAsync(root, sendCrashReports: false));
+                        break;
+                    case ["continue", "send"]:
+                        Act(() => ContinueAsync(root, sendCrashReports: true));
                         break;
                     case ["unlock", var vault]:
                         Act(() => UnlockAsync(root, vault));
@@ -233,13 +236,14 @@ internal static class AppLaunch
         PromptScreen.Click(notice, open);
     }
 
-    private static Task ContinueAsync(ContentControl root)
+    private static Task ContinueAsync(ContentControl root, bool sendCrashReports)
     {
         if (root.Content is not FirstLaunchView { DataContext: FirstLaunchViewModel screen })
         {
             throw new DriverException("the first-launch screen is not on screen");
         }
 
+        screen.SendCrashReports = sendCrashReports;
         Press(screen.ContinueCommand, "continue");
         return Task.CompletedTask;
     }

@@ -109,7 +109,7 @@ public sealed partial class SessionLifecycleTests
     public void One_app_runs_per_home_and_a_killed_one_leaves_its_home_to_the_next_start()
     {
         using var workspace = new Workspace();
-        File.WriteAllText(Path.Combine(workspace.Home, "app.toml"), "[[settings]]\nstay_in_tray = 1\ncrash_reports = 0\n");
+        File.WriteAllText(Path.Combine(workspace.Home, "app.toml"), "[[settings]]\nstay_in_tray = 1\nsend_crash_reports = 0\n");
 
         using (var first = Launch(workspace))
         {
@@ -135,7 +135,7 @@ public sealed partial class SessionLifecycleTests
         const string before = "nothing holds this vault unlocked";
         const string locked = "keypaste app is open on this computer";
         using var workspace = Seeded();
-        File.WriteAllText(Path.Combine(workspace.Home, "app.toml"), "[[settings]]\nstay_in_tray = 1\ncrash_reports = 0\n");
+        File.WriteAllText(Path.Combine(workspace.Home, "app.toml"), "[[settings]]\nstay_in_tray = 1\nsend_crash_reports = 0\n");
         var other = Path.Combine(Path.GetDirectoryName(workspace.Vault)!, "other.kdbx");
         var chosen = Path.Combine(Path.GetDirectoryName(workspace.Vault)!, "chosen.kdbx");
         workspace.Keypaste("init", Workspace.Master, Workspace.Master, other);
