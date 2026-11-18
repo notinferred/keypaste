@@ -242,7 +242,7 @@ public sealed class ApproverListener : IDisposable
             // else the handler throws: a narrower filter misses something reachable from a peer's
             // bytes, and ServeAsync is fire-and-forget, so it surfaces at shutdown instead of here.
             // One connection's problem and never the approver's — this is the outermost boundary
-            // between a peer and the process holding the unlocked vault (law 3.7).
+            // between a peer and the process holding the unlocked vault (law 7).
         }
         finally
         {

@@ -6,17 +6,8 @@ on:
     branches: ['**']
     # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
     paths-ignore:
-      - 'docs/PRODUCT.md'
-      - 'CLAUDE.md'
-      - 'ROADMAP.md'
-      - 'docs/STEPS.md'
-      - 'docs/steps/**'
       - 'docs/ARCHITECTURE.md'
-      - 'docs/BACKLOG.md'
-      - 'docs/DESIGN.md'
-      - 'docs/DESIGN-PRINCIPLES.md'
       - 'docs/FEATURES.md'
-      - 'docs/design/**'
       - 'docs/screenshots/**'
       - 'docs/demo/**'
       - 'CHANGELOG.md'
@@ -149,7 +140,7 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      # Every branch push checks what KeePassXC reads of what keypaste writes (PRODUCT law 4.6).
+      # Every branch push checks what KeePassXC reads of what keypaste writes (SECURITY.md law 14).
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         timeout-minutes: 10
@@ -219,7 +210,7 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
+      # SECURITY.md law 14 and D-0008 require this blocking gate on all three operating systems.
       # A stalled apt mirror otherwise holds the job for its whole limit.
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'

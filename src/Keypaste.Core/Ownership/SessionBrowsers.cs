@@ -190,7 +190,7 @@ public sealed record AllowanceRow(BrowserAllowance Allowance, string Item);
 /// <para>
 /// A page's list carries the names of its logins in every vault unlocked in this process and never a password; a pick then
 /// releases that one login, at once where this pairing filled it on that exact origin before, otherwise once the person allows
-/// it in keypaste (PRODUCT.md §3.2, THREATS.md T-59, T-61). Each list that names a login and each release is recorded with the
+/// it in keypaste (SECURITY.md law 2, THREATS.md T-59, T-61). Each list that names a login and each release is recorded with the
 /// page's origin before the reply.
 /// </para>
 /// </remarks>

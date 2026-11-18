@@ -485,7 +485,7 @@ public sealed class ApproverProtocolTests
     /// <summary>
     /// A method number from a newer approver becomes <see cref="AuditMethod.Failed"/> rather than
     /// refusing the whole reply, so the exchange still produces a denial <em>and</em> an audit line.
-    /// Refusing outright would lose the line, which is the one thing law 3.3 will not have.
+    /// Refusing outright would lose the line, which is the one thing law 3 will not have.
     /// </summary>
     [Fact]
     public void AnUnknownMethod_BecomesAFailureRatherThanLosingTheReply()

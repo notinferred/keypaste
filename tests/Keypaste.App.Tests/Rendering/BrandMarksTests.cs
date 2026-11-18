@@ -10,8 +10,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// The wordmark alone at the top of the sidebar and the icon alone on the lock screen, never both
-/// (DESIGN), each drawn in the palette's ink with its amber dot at the end (N.7).
+/// The wordmark alone at the top of the sidebar and the icon alone on the lock screen, never both,
+/// each drawn in the palette's ink with its amber dot at the end (N.7).
 /// </summary>
 public sealed class BrandMarksTests
 {

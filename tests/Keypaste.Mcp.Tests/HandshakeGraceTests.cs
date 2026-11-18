@@ -4,7 +4,7 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// A tool call that arrives while the handshake is still being processed waits for it instead of
-/// being told the client never introduced itself (docs/STEPS.md F.5).
+/// being told the client never introduced itself (task F.5).
 /// </summary>
 /// <remarks>
 /// <para>

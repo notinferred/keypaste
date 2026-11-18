@@ -61,7 +61,7 @@ public sealed record TerminalOpen(
 /// <c>keypaste run --session</c> runs the same fixed script and asks the app for the set.
 /// </para>
 /// <para>
-/// A terminal started this way hands the set to everything run in it (PRODUCT §2).
+/// A terminal started this way hands the set to everything run in it.
 /// </para>
 /// </remarks>
 public sealed class TerminalLaunch

@@ -21,9 +21,9 @@ public enum ExposureReach
 /// </summary>
 /// <remarks>
 /// <para>
-/// docs/PRODUCT.md law 3.2 says the default is deny. That is usually read as being about credentials, but
+/// SECURITY.md law 2 says the default is deny. That is usually read as being about credentials, but
 /// entry names are themselves an asset — a complete inventory of a personal vault is what turns a
-/// vague request into a targeted one, even with no secret attached (law 3.5, THREATS.md T-4). So
+/// vague request into a targeted one, even with no secret attached (law 5, THREATS.md T-4). So
 /// the listing surface gets the same treatment: <see cref="Default"/> covers the project variables
 /// the product is actually about, and anything wider has to be written down by a human in the MCP
 /// client's configuration.

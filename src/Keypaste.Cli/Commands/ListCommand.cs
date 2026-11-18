@@ -27,7 +27,7 @@ namespace Keypaste.Cli.Commands;
 /// ordinary names prints exactly what it printed before. <c>--flat</c> never takes the mark, because
 /// it is the form something else parses; it is told on stderr instead, which a parser does not read.
 /// A scrubbed row is still listed, because keypaste does not get to pretend the vault holds
-/// something other than what KeePassXC shows (docs/PRODUCT.md law 4.6).
+/// something other than what KeePassXC shows (SECURITY.md law 14).
 /// </para>
 /// <para>
 /// <b>The recycle bin is the one thing this listing leaves out, and it is not concealment.</b> A

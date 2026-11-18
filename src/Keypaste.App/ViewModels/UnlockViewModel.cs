@@ -786,7 +786,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// Selects a path that holds no readable vault, for restoring only, when backups sit beside it.
     /// </summary>
     /// <remarks>
-    /// A damaged or missing vault is the case backups exist for (docs/PRODUCT.md law 5.7), and
+    /// A damaged or missing vault is the case backups exist for, and
     /// refusing to select one would leave its backups unreachable from the only screen that can
     /// restore them. Nothing here can be unlocked, and <see cref="Offer(string)"/> still answers false.
     /// </remarks>

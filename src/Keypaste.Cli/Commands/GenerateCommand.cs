@@ -13,7 +13,7 @@ namespace Keypaste.Cli.Commands;
 /// <b>This is the one verb whose output is a fresh secret on stdout, and the exception is
 /// argued rather than assumed.</b> Everywhere else keypaste refuses to
 /// print a secret without <c>--reveal</c>, because stdout is shell history, scrollback and CI logs.
-/// A share passphrase (STEPS 5.4a) is the case that rule does not fit: it exists to travel to
+/// A share passphrase (task 5.4a) is the case that rule does not fit: it exists to travel to
 /// another person by a second channel, and no vault holds it, so there is nothing for the
 /// discipline to protect and no other way to obtain it.
 /// </para>

@@ -147,7 +147,7 @@ public readonly record struct PasswordRecipe
 /// <para>
 /// <b>Uniformity comes from <see cref="RandomNumberGenerator"/> and not from arithmetic here.</b>
 /// <c>GetItems</c> is documented as cryptographically strong and free of modulo bias. Writing the
-/// rejection sampling by hand is exactly the sort of thing docs/PRODUCT.md law 3.6 says never to write, so
+/// rejection sampling by hand is exactly the sort of thing SECURITY.md law 6 says never to write, so
 /// the <c>%</c> operator appears nowhere in this file outside <see cref="Symbols"/>, which is a
 /// character it generates rather than an operation it performs, and this sentence is why.
 /// </para>
@@ -190,7 +190,7 @@ public static class PasswordGenerator
 
     /// <summary>The fewest words this will generate.</summary>
     /// <remarks>
-    /// Six is the share passphrase docs/PRODUCT.md §1 ratifies and THREATS.md T-26 assumes, so the
+    /// Six is the share passphrase's length, which THREATS.md T-26 assumes, so the
     /// generator cannot hand out anything weaker than the figure the threat model already rests
     /// on. Six words over a 7,776-word list is log2(7776) × 6, about 78 bits — lower than the
     /// character default's 128, which is why the KDF matters and why every statement of the
@@ -308,7 +308,7 @@ public static class PasswordGenerator
     /// <para>
     /// <b>The draw is the one the character generator makes, with <c>T</c> as
     /// <see cref="string"/>.</b> <c>GetItems</c> is generic and documented as free of modulo bias,
-    /// so law 3.6 is satisfied here for the same reason and by the same call: no index arithmetic
+    /// so law 6 is satisfied here for the same reason and by the same call: no index arithmetic
     /// of ours stands between the entropy source and the word.
     /// </para>
     /// <para>

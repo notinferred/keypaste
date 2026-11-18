@@ -11,7 +11,7 @@ namespace Keypaste.Core.Tests;
 /// <para>
 /// <b>The defect this exists for is modulo bias</b> — an index taken as
 /// <c>random % list.Length</c>, which is the obvious way to write this and is wrong.
-/// docs/PRODUCT.md law 3.6 is why the shipped draw is <c>RandomNumberGenerator.GetItems</c>
+/// SECURITY.md law 6 is why the shipped draw is <c>RandomNumberGenerator.GetItems</c>
 /// instead, and V-V.6 asks for a check that fails on the biased version and passes on the one
 /// keypaste uses.
 /// </para>
@@ -129,7 +129,7 @@ public sealed class PassphraseDistributionTests
     }
 
     /// <summary>
-    /// The generator law 3.6 forbids, written here so the check above can be shown to catch it.
+    /// The generator law 6 forbids, written here so the check above can be shown to catch it.
     /// </summary>
     /// <remarks>
     /// This is the only <c>%</c> on the passphrase path anywhere in the repository, and

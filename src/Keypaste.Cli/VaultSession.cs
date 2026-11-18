@@ -285,7 +285,7 @@ internal static class VaultSession
     /// <remarks>
     /// <para>
     /// Only on the save that creates the directory. A directory of encrypted vaults appearing next to
-    /// somebody's file without a word is the kind of discovery docs/PRODUCT.md §6.1 calls a risk to
+    /// somebody's file without a word is the kind of discovery that risks a user's
     /// trust; saying so on every later command would be noise on a command whose job is something
     /// else, and the first thing anyone scripting keypaste would want silenced.
     /// </para>
@@ -367,7 +367,7 @@ internal static class VaultSession
     /// <para>
     /// <b>It asks; it does not judge.</b> Whether the two match, and whether either is empty, are
     /// creation rules and live in <see cref="VaultCreation"/> so the desktop applies the same ones
-    /// (docs/PRODUCT.md law 4.2). Only "nothing was typed at all" is answered here, because that is
+    /// (the one-core rule in docs/ARCHITECTURE.md). Only "nothing was typed at all" is answered here, because that is
     /// a fact about the prompt rather than about the vault.
     /// </para>
     /// </remarks>

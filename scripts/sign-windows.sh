@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Authenticode-signs and timestamps the Windows files keypaste compiles, as the definition's signing
-# policy says (docs/STEPS.md 3.6b).
+# policy says (task 3.6b).
 #
 # Usage:
 #   sign-windows.sh --component <cli|app> [--rehearsal <thumbprint>] <file-or-directory>...

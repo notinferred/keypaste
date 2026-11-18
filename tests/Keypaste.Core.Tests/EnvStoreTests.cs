@@ -11,7 +11,7 @@ namespace Keypaste.Core.Tests;
 /// itself. Every one of them describes something a user can do in KeePassXC — an untagged entry
 /// titled like a key, two entries holding one key, an untagged home entry — and keypaste has to
 /// have an answer for each that does not involve pretending the file says something other than
-/// what it says (docs/PRODUCT.md law 4.6).
+/// what it says (SECURITY.md law 14).
 /// </remarks>
 public sealed class EnvStoreTests : IDisposable
 {

@@ -72,7 +72,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 ## Security laws
 
-These laws stand above every other rule of keypaste's and change only by [PRODUCT](docs/PRODUCT.md)'s dated re-ratification. Laws 1 to 10 keep the numbers they had as PRODUCT §3, so a citation of §3.4 means law 4.
+These laws stand above every other rule of keypaste's and change only by the founder's dated re-ratification. Laws 1 to 10 keep their earlier numbers, so an older citation of §3.4 means law 4.
 
 1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.
 2. Agents never get the vault. Each release contains one credential with one scope, or a linked set the person approves whole in one prompt, following explicit human approval or a pre-approved policy the human wrote, of which a category's Allow the human confirmed on this computer is one. A set is never released by a rule alone. Default is deny. A browser gets one login at a time, and only at the person's pick in keypaste's own in-page list, drawn apart from the page, which lists names and no password: the pick counts as their answer for a login already filled through that browser's pairing on that exact site, and a first fill of a login on a site, and every fill on a site keypaste asks about each time, is asked in keypaste.

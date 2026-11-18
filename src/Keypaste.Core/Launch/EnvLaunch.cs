@@ -17,7 +17,7 @@ public sealed record LaunchTarget(
 /// </summary>
 /// <remarks>
 /// Only a set <see cref="EnvResolution"/> released whole gets here, and its values go into the
-/// child's environment and nowhere else: not its arguments, not a file (PRODUCT §3.4).
+/// child's environment and nowhere else: not its arguments, not a file (SECURITY.md law 4).
 /// </remarks>
 public static class EnvLaunch
 {

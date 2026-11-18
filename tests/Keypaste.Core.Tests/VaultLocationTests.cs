@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The rule the CLI and the MCP bridge both answer the same way (docs/PRODUCT.md law 4.3):
+/// The rule the CLI and the MCP bridge both answer the same way (the one-core rule in docs/ARCHITECTURE.md):
 /// <c>--vault</c>, then <c>KEYPASTE_VAULT</c>, then the chosen vault, then nothing.
 /// </summary>
 public sealed class VaultLocationTests

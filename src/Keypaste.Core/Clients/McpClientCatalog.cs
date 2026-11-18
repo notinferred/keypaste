@@ -346,7 +346,7 @@ public sealed record McpServerRegistration(
 /// <summary>Every client keypaste knows about, and nothing about this machine.</summary>
 /// <remarks>
 /// Pure on purpose: it holds the knowledge, and <see cref="McpClientSetup"/> does the probing and
-/// the running for both <c>keypaste setup</c> and the desktop's Connect (docs/PRODUCT.md law 4.2).
+/// the running for both <c>keypaste setup</c> and the desktop's Connect (the one-core rule in docs/ARCHITECTURE.md).
 /// </remarks>
 public static class McpClientCatalog
 {

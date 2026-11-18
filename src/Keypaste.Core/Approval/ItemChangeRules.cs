@@ -3,7 +3,7 @@ using Keypaste.Core.Ipc;
 
 namespace Keypaste.Core.Approval;
 
-/// <summary>A change an agent may make to an item, asking the person first unless it is the needs-update tag (PRODUCT §2, THREATS.md T-57).</summary>
+/// <summary>A change an agent may make to an item, asking the person first unless it is the needs-update tag (THREATS.md T-57).</summary>
 public enum ItemChangeKind
 {
     /// <summary>Move the item to Trash, which only a vault whose Trash is on holds.</summary>

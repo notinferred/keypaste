@@ -8,7 +8,7 @@ namespace Keypaste.Core;
 /// <para>
 /// Deliberately not enforced by <see cref="EnvResolution.List"/>. Reading stays permissive so that
 /// <c>env ls</c> and <c>env rm</c> can still show and clear whatever KeePassXC put in the file
-/// (docs/PRODUCT.md law 4.6); it is the moment a name becomes a real environment variable, or a line in a
+/// (SECURITY.md law 14); it is the moment a name becomes a real environment variable, or a line in a
 /// <c>.env</c>, that a wrong answer turns into a program running with the wrong credentials.
 /// </para>
 /// <para>

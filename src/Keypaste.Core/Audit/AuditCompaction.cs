@@ -54,7 +54,7 @@ public sealed record AuditCompactionResult(AuditCompactionOutcome Outcome, int F
 
 /// <summary>
 /// Folds an agent's old lookups into one summary line per agent per UTC day, removes whole days older than the period
-/// the log is kept for, and seals what it kept under the vault's checkpoint key (PRODUCT §3.3).
+/// the log is kept for, and seals what it kept under the vault's checkpoint key (SECURITY.md law 3).
 /// </summary>
 /// <remarks>
 /// <para>

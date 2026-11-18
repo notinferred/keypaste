@@ -60,7 +60,7 @@ public enum VaultCreationOutcome
 /// path and a password, build a vault object. These are the product's rules about when a person is
 /// allowed to ask for one, and they were the CLI's alone until the desktop grew a Create button.
 /// Two copies of "refuse an occupied path" is exactly the shape of bug where one front end quietly
-/// destroys a vault the other protects, so docs/PRODUCT.md law 4.2 puts them here and leaves each
+/// destroys a vault the other protects, so the one-core rule in docs/ARCHITECTURE.md puts them here and leaves each
 /// surface to say what it likes about them.
 /// </para>
 /// <para>

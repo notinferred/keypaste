@@ -4,7 +4,7 @@
 # Everything else in the suite checks behaviour. This checks a document against that behaviour, and
 # nothing in-process can: what goes stale is a Markdown transcript, which no unit test reads, and
 # the approval dialog it reproduces exists only on the stderr of a second process that a human is
-# supposed to be looking at. docs/demo.md is the marketing (docs/PRODUCT.md law 5.1), and the first thing a
+# supposed to be looking at. docs/demo.md is the marketing, and the first thing a
 # stranger does with a demo page is type it in - so a page that has quietly drifted costs more than
 # no page at all.
 #
@@ -51,11 +51,9 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 # The README is here because a public page is exactly where a stale transcript survives longest,
 # and docs/keepass-and-agents.md is here for the same reason again.
 #
-# docs/launch.md holds the block every launch post pastes, which is the copy most likely to be read by
-# someone who has never run the binary. Note the dialog extraction below is a sed range, so a page
-# in this list must carry exactly one copy of the block: a second, shortened one would be extracted
-# too and the diff would fail. That is why docs/launch.md keeps one copy and its posts reference it.
-readonly TRANSCRIPT_PAGES='docs/demo.md README.md docs/keepass-and-agents.md docs/launch.md'
+# The dialog extraction below is a sed range, so a page in this list must carry exactly one copy of
+# the block: a second, shortened one would be extracted too and the diff would fail.
+readonly TRANSCRIPT_PAGES='docs/demo.md README.md docs/keepass-and-agents.md'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AGENT_ERR OUT ERR DIFF'

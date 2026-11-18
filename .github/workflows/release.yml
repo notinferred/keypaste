@@ -316,7 +316,7 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
-      # Every packaged RID must pass the real KeePassXC compatibility gate (PRODUCT law 4.6).
+      # Every packaged RID must pass the real KeePassXC compatibility gate (SECURITY.md law 14).
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
         run: bash scripts/apt-install.sh --no-install-recommends keepassxc

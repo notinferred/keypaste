@@ -99,7 +99,7 @@ internal static class EntryKinds
         _ => Strings.Password,
     };
 
-    /// <summary>The Lucide icon the row draws, as DESIGN's icon table gives each kind one.</summary>
+    /// <summary>The Lucide icon the row draws, as the design system's icon table gives each kind one.</summary>
     internal static string Icon(EntryKind kind) => kind switch
     {
         EntryKind.Login => "globe",

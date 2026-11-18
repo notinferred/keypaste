@@ -2,11 +2,11 @@
 #
 # verify-keepassxc-compat.sh
 #
-# PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6:
-#   "Compatibility is sacred: any KDBX file keypaste writes must open correctly in
-#    KeePassXC. This is tested in CI against real KeePassXC."
+# PERMANENT COMPATIBILITY GATE — SECURITY.md law 14:
+#   "Every release opens every earlier release's vaults, and KeePassXC 2.7 or later opens what
+#    keypaste writes."
 #
-# docs/PRODUCT.md cannot change, so neither can the existence of this gate. If it is failing,
+# The law changes only by re-ratification, so neither can the existence of this gate. If it is failing,
 # keypaste's vault writer is wrong. Do NOT relax an assertion, add a skip, mark the job
 # continue-on-error, or drop an operating system to make it green.
 #
@@ -143,7 +143,7 @@ diff -u <(printf '%s\n' "$expected_uni") <(printf '%s\n' "$actual_uni") \
 # Everything above only means something if this gate is still capable of failing. Without
 # this step, a keepassxc-cli that silently degraded to a no-op — or an assertion that ended
 # up comparing two empty strings — would report green forever. That, not deletion, is the
-# most likely way docs/PRODUCT.md law 4.6 actually dies. This is the cheapest insurance in the
+# most likely way SECURITY.md law 14 actually dies. This is the cheapest insurance in the
 # repository. Never remove it.
 step "NEGATIVE CONTROL: a wrong password must be rejected"
 set +e

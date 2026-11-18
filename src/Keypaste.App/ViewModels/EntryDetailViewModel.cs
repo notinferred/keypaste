@@ -1053,7 +1053,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <remarks>
     /// The pane used to reach for <see cref="Path"/>, and two entries can answer to one of those —
     /// so a copy served a secret the person had not selected and an edit wrote to its neighbour
-    /// (docs/STEPS.md F.1e). Every vault access below goes through this instead.
+    /// (task F.1e). Every vault access below goes through this instead.
     /// </remarks>
     internal EntryName Name => new(_groupPath, _title) { Uuid = _uuid };
 

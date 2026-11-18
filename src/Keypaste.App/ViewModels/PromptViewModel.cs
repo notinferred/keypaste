@@ -24,7 +24,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// A claim card answers Return with its primary, Allow once or the confirmation, only once that is armed, and Escape with
-/// Deny or, while confirming, Cancel (DESIGN § Interaction, rule 8). A destructive primary takes no Return.
+/// Deny or, while confirming, Cancel. A destructive primary takes no Return.
 /// </para>
 /// </remarks>
 internal abstract partial class PromptViewModel : ObservableObject

@@ -19,7 +19,7 @@ namespace Keypaste.Core.Approval;
 /// </para>
 /// <para>
 /// Every failure path returns <see langword="false"/>. Nothing here throws for a request it cannot
-/// satisfy, and nothing here guesses (docs/PRODUCT.md law 3.7).
+/// satisfy, and nothing here guesses (SECURITY.md law 7).
 /// </para>
 /// </remarks>
 /// <param name="unlockedVault">
@@ -370,7 +370,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         }
         catch (Exception)
         {
-            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 7).
             failure = CredentialFailure.Failed;
             return false;
         }
@@ -415,7 +415,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         }
         catch (Exception)
         {
-            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 7).
             failure = CredentialFailure.Failed;
         }
 
@@ -448,7 +448,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         }
         catch (Exception)
         {
-            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 7).
             failure = CredentialFailure.Failed;
         }
 
@@ -522,7 +522,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         {
             // Anything at all. A narrower filter lets an IOException or a cryptographic failure out
             // of the vault escape the approver and reach the bridge as an unlogged failure; failing
-            // closed here is what makes the caller's refusal a decision (law 3.7).
+            // closed here is what makes the caller's refusal a decision (law 7).
             failure = CredentialFailure.Failed;
             return false;
         }

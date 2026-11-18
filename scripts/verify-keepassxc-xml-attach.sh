@@ -2,7 +2,7 @@
 #
 # verify-keepassxc-xml-attach.sh
 #
-# PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6.
+# PERMANENT COMPATIBILITY GATE — SECURITY.md law 14.
 #
 # `keypaste access --new-keyfile` attaches a KeePass XML keyfile that KeePassXC wrote, and KeePassXC
 # then opens the vault with that keyfile and refuses it without. A build whose XML keyfile loader

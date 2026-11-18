@@ -191,7 +191,7 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     /// It fires from <see cref="ReadLine"/> as well as <see cref="ReadSecret"/>, because the
     /// confirmations are where a person is standing still: <c>env pull</c> asks whether to import
     /// and then whether to delete the file it read, and the seconds spent answering either one are
-    /// seconds in which that file can be edited (docs/STEPS.md F.1c). This is a prompt seam and not
+    /// seconds in which that file can be edited (task F.1c). This is a prompt seam and not
     /// a filesystem one — <c>File.Delete</c> is still the real thing, which is the half of the delete-source rule
     /// that matters.
     /// </para>

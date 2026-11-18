@@ -547,7 +547,7 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// docs/STEPS.md V.5a: fresh resolution uses the resulting path. The exposure matcher is the
+    /// Task V.5a: fresh resolution uses the resulting path. The exposure matcher is the
     /// seam that actually decides what a bridge may name, so the claim is asserted there rather
     /// than inferred from the entry list.
     /// </summary>

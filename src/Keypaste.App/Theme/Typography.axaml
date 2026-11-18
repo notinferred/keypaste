@@ -102,7 +102,7 @@
     <Setter Property="FontSize" Value="12.5" />
   </Style>
 
-  <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (DESIGN).
+  <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size.
        A variable's key is machine text and stays mono. -->
   <Style Selector=":is(TextBlock).title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />

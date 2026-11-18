@@ -579,7 +579,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A channel that throws is an error path, and law 3.7 makes an error path a denial. Separate
+    /// A channel that throws is an error path, and law 7 makes an error path a denial. Separate
     /// from the table above because an exception is the shape most likely to skip the checks the
     /// other answers go through.
     /// </summary>

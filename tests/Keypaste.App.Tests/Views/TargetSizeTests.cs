@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>A control's target is at least 20 by 20 (DESIGN rule 7, Q.8).</summary>
+/// <summary>A control's target is at least 20 by 20 (Q.8).</summary>
 public sealed class TargetSizeTests
 {
     private const double _minimum = 20;

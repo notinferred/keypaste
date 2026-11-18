@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A linked set is asked about whole, every time, and released whole or not at all: each field is still decided by its category, an
-/// item must be the anchor or one find_access links to it, and nothing is read until the person allowed it once (PRODUCT §2, §3.2).
+/// item must be the anchor or one find_access links to it, and nothing is read until the person allowed it once (SECURITY.md law 2).
 /// </summary>
 public sealed class ApproverHandlerSetTests
 {

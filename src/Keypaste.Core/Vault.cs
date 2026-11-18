@@ -65,7 +65,7 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// Exists so one caller can say, once, that keypaste has started keeping copies beside somebody's
     /// vault. A directory of encrypted vaults appearing next to their file without a word is the
-    /// discovery docs/PRODUCT.md §6.1 calls a risk to trust.
+    /// kind of discovery that risks a user's trust.
     /// </remarks>
     public VaultBackupReport? LastBackup { get; private set; }
 
@@ -1273,7 +1273,7 @@ public sealed class Vault : IDisposable
     /// <param name="failure">What the filesystem said, when the outcome is <see cref="AttachmentSaveOutcome.Failed"/>; empty otherwise.</param>
     /// <returns>What happened.</returns>
     /// <remarks>
-    /// PRODUCT §3.4's exception for an attachment the person asks keypaste to save, written as
+    /// SECURITY.md law 4's exception for an attachment the person asks keypaste to save, written as
     /// <see cref="VaultKeyfile.Create"/> writes a key file: staged beside the path and moved into place without replacing
     /// anything, so a file that arrives meanwhile is kept and the stage is deleted. The bytes are this vault's as it holds
     /// them, saved or not, and the copy they are read into is zeroed.
@@ -2072,11 +2072,11 @@ public sealed class Vault : IDisposable
     /// <see cref="EntryName"/>, a <see cref="MatchedFields"/> and the tags matched, none of which is a
     /// value. The password and the notes are not compared at all: notes routinely hold recovery
     /// codes, connection strings and second passwords, so matching them would make a query a way to
-    /// confirm a secret without ever opening the entry that holds it (docs/STEPS.md V.5b).
+    /// confirm a secret without ever opening the entry that holds it (task V.5b).
     /// </para>
     /// <para>
     /// Here rather than in a front end because it is a rule about what may be read out of a vault,
-    /// which docs/PRODUCT.md law 4.2 puts in the core. A screen that did its own matching would have
+    /// which the one-core rule in docs/ARCHITECTURE.md puts in the core. A screen that did its own matching would have
     /// to hold every username it compared, and the desktop's hygiene gate exists to stop exactly
     /// that.
     /// </para>
@@ -2238,7 +2238,7 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// For a caller that offers to undo the delete it just made. The identity comes from here
     /// rather than from a reading of the bin taken afterwards, because which row a delete produced
-    /// is the vault's answer and not something a screen should work out (docs/PRODUCT.md §4.2).
+    /// is the vault's answer and not something a screen should work out (the one-core rule in docs/ARCHITECTURE.md).
     /// The path overload has no counterpart: nothing addressing an entry by path offers an undo.
     /// </remarks>
     public DeletionOutcome RemoveEntry(EntryName name, out RecycledEntryId recycled)
@@ -3200,7 +3200,7 @@ public sealed class Vault : IDisposable
     /// Saves, resolving a conflict from inside the retry wait rather than on a timer.
     /// </summary>
     /// <remarks>
-    /// Exists so the regression for docs/STEPS.md F.7 can hold the vault's name, and then release
+    /// Exists so the regression for task F.7 can hold the vault's name, and then release
     /// or commit at the one instant that makes the outcome deterministic: after an attempt has been
     /// refused and before the vault is re-read. A timer cannot do it — an attempt is nearly all key
     /// derivation and the move is its last act, so a commit landing mid-attempt lets that attempt

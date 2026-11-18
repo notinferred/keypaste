@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 /// <para>
 /// <c>PasswordGenerator</c> has said since 4.2 that uniformity comes from
 /// <c>RandomNumberGenerator.GetItems</c> and that the <c>%</c> operator does not appear in the
-/// file, citing docs/PRODUCT.md law 3.6. Nothing held it to that, and as written it was not even
+/// file, citing SECURITY.md law 6. Nothing held it to that, and as written it was not even
 /// checkable as text: <c>Symbols</c> is a string literal with a <c>%</c> in it, because a
 /// per-cent sign is a character keypaste generates.
 /// </para>

@@ -10,7 +10,7 @@ namespace Keypaste.Mcp.Tools;
 
 /// <summary>
 /// The tool an agent uses to ask for a linked set: two to four fields of one item and of the items <c>find_access</c> links to it,
-/// which the person allows once or denies whole (PRODUCT §2, §3.2).
+/// which the person allows once or denies whole (SECURITY.md law 2).
 /// </summary>
 /// <remarks>
 /// It holds no vault and decides nothing, as <see cref="RequestCredentialTool"/> does not: it checks the arguments and what this
@@ -81,7 +81,7 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, BridgeVaults v
             }
             catch (Exception)
             {
-                // Denying is already the answer; the line below is what has to survive a failure nobody predicted (law 3.7).
+                // Denying is already the answer; the line below is what has to survive a failure nobody predicted (law 7).
                 verdict = new Verdict(AuditMethod.Failed, "the request could not be completed");
             }
         }

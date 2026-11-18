@@ -8,7 +8,7 @@
   <!-- keypaste says who is asking, as it checked it with the system, before the agent says anything. One line each:
        an agent's name or app trims rather than pushing the question down. -->
   <StackPanel Spacing="8">
-    <!-- The wordmark alone, never beside the icon, at the 64-wide floor DESIGN allows a prompt's header. -->
+    <!-- The wordmark alone, never beside the icon, at the 64-wide floor a prompt's header allows. -->
     <ctl:BrandWordmark Height="13" HorizontalAlignment="Left" />
     <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
       <ctl:KpIcon Classes="claim-muted" Icon="bot" Size="14" VerticalAlignment="Center" />

@@ -34,7 +34,7 @@ public sealed record SanitizedName(string Text, bool WasAltered);
 /// everywhere a person or a model reads them — the tool result, the approval dialog,
 /// <c>keypaste log</c>, <c>keypaste ls</c>, <c>keypaste env ls</c>, the <c>env pull</c> rejection
 /// message, and the app's entry list, group tree, detail pane and env tables — and
-/// docs/PRODUCT.md law 4.3 does not allow that rule to be written down once per surface. The list is
+/// the one-core rule in docs/ARCHITECTURE.md does not allow that rule to be written down once per surface. The list is
 /// deliberately exhaustive rather than "at least four": it was four, the other surfaces were drawing
 /// raw text, and an undercount is how that went unnoticed.
 /// </para>
@@ -177,7 +177,7 @@ public static class EntryNameSanitizer
     /// <c>/</c> as one of the ten structural characters and would replace every one of them with a
     /// space, flattening <c>env/dev/STRIPE_KEY</c> into <c>env dev STRIPE_KEY</c> — which is
     /// unreadable in a listing and useless in an audit line, where naming the entry is the point
-    /// (docs/PRODUCT.md law 3.3).
+    /// (SECURITY.md law 3).
     /// </para>
     /// <para>
     /// The separator is safe to keep here precisely because it is being kept as a separator: what

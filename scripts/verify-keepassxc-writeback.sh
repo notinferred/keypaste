@@ -2,7 +2,7 @@
 #
 # verify-keepassxc-writeback.sh
 #
-# PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6, the write-back half.
+# PERMANENT COMPATIBILITY GATE — SECURITY.md law 14, the write-back half.
 #
 # verify-keepassxc-compat.sh proves that a vault keypaste CREATES opens correctly in
 # KeePassXC. That is one direction, and one moment in a file's life. This script covers the
@@ -16,10 +16,10 @@
 #      entry and list it as no variable of the project.
 #   D. KeePassXC titles an entry with a SEPARATOR in it -> while it shares a path with another
 #      entry, keypaste get must refuse that path rather than release either secret, keypaste
-#      add must refuse to put a third entry on it (docs/STEPS.md F.1e), and keypaste rm must
+#      add must refuse to put a third entry on it (task F.1e), and keypaste rm must
 #      remove neither.
 #
-# B, C and D are law 4.6 in the direction compat cannot see: what KeePassXC writes into a vault
+# B, C and D are law 14 in the direction compat cannot see: what KeePassXC writes into a vault
 # keypaste uses is read as KeePassXC means it. Do NOT relax an assertion, add a skip, mark the
 # job continue-on-error, or drop an operating system.
 #
@@ -150,7 +150,7 @@ diff -u <(printf '%s\n' "$project" '  dev' "    ${home}") <(printf '%s\n' "$proj
 #
 # `nested/TOKEN` sitting directly in env/<project> and `TOKEN` sitting in
 # env/<project>/nested are two entries with one path between them. keypaste used to list the
-# first and delete the second, reporting success (docs/STEPS.md F.1a).
+# first and delete the second, reporting success (task F.1a).
 #
 # The collision is authored HERE, by KeePassXC, rather than by the code under test: `add`
 # splits its argument on the last slash and would make the group, so the entry is added under

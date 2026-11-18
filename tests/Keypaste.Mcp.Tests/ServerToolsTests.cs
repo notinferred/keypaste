@@ -162,14 +162,14 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// An access attempt that ends in an exception is still an access attempt, and law 3.3 makes no
+    /// An access attempt that ends in an exception is still an access attempt, and law 3 makes no
     /// exception for it.
     /// </summary>
     /// <remarks>
     /// The catch around the source only names <see cref="OperationCanceledException"/>, so anything
     /// else — an <see cref="IOException"/> out of a vault on a failing disk or a share that went
     /// away, a cryptographic failure out of KeePassLib — escapes before the audit line is appended.
-    /// Nothing is released, so law 3.7 holds; the bridge fails silently rather than open, and this
+    /// Nothing is released, so law 7 holds; the bridge fails silently rather than open, and this
     /// file's own documentation claims the opposite: "Log first, answer second, always."
     /// </remarks>
     [Fact]
@@ -744,14 +744,14 @@ public sealed class ServerToolsTests
         Assert.DoesNotContain(Sentinel, refusal, StringComparison.Ordinal);
 
         // The agent named it itself in the second call, so the bridge's line for that refusal records
-        // the argument - which is law 3.3 working, not a leak. The listing was the owner's to record.
+        // the argument - which is law 3 working, not a leak. The listing was the owner's to record.
         using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));
         Assert.Equal(ToolText.CredentialToolName, parsed.RootElement.GetProperty("tool").GetString());
         Assert.Equal("out-of-scope", parsed.RootElement.GetProperty("method").GetString());
     }
 
     /// <summary>
-    /// A malformed call is still an access, and law 3.3 does not carve out an exception for calls
+    /// A malformed call is still an access, and law 3 does not carve out an exception for calls
     /// that were refused before they were understood.
     /// </summary>
     [Fact]

@@ -13,7 +13,7 @@ namespace Keypaste.Core;
 /// a product rule, not a command-line one: the MCP bridge has to answer it identically, or Stage
 /// 2.2 will hand an agent a credential out of one file while <c>keypaste ls</c> shows another, and
 /// <c>keypaste log</c> will render history for a vault the user never opened. Two implementations
-/// of one rule is what docs/PRODUCT.md law 4.3 forbids. The CLI keeps a thin adapter that binds its own
+/// of one rule is what the one-core rule in docs/ARCHITECTURE.md forbids. The CLI keeps a thin adapter that binds its own
 /// argument parser and environment seam to this.
 /// </para>
 /// </remarks>
@@ -87,7 +87,7 @@ public static class VaultLocation
     /// </para>
     /// <para>
     /// Here beside the vault rule for the reason that rule gives: the answer has to be the same
-    /// wherever it is asked (docs/PRODUCT.md law 4.3). An empty variable counts as unset, so
+    /// wherever it is asked (the one-core rule in docs/ARCHITECTURE.md). An empty variable counts as unset, so
     /// <c>KEYPASTE_KEYFILE= keypaste ls</c> opens a vault that has no keyfile rather than failing
     /// on a keyfile called "".
     /// </para>

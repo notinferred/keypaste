@@ -3,7 +3,7 @@ namespace Keypaste.Core.Import;
 /// <summary>Reads one password manager's export into items, for <see cref="ExportImport"/>: one class per format.</summary>
 /// <remarks>
 /// A reader is handed the file's bytes, read once into memory and zeroed when it returns, and touches no file
-/// itself, so no plaintext copy of the export is written anywhere (PRODUCT §3.4). What it finds and cannot carry it
+/// itself, so no plaintext copy of the export is written anywhere (SECURITY.md law 4). What it finds and cannot carry it
 /// names, never by value: a record that is no item in <see cref="ExportContents.Unread"/>, a part of an item in
 /// <see cref="ExportItem.Omitted"/>.
 /// </remarks>

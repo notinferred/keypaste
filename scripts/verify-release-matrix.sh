@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Holds release-targets.json, the workflows, the csprojs and the download pages to one answer about
-# what keypaste ships (docs/STEPS.md R.0a, docs/RELEASE.md requirement 1).
+# what keypaste ships (task R.0a, docs/RELEASE.md requirement 1).
 #
 # Before this file there was no such answer. The four CLI targets were written down independently in
 # release.yml's build matrix, its post-transport asset count, its publication allowlist, four
@@ -41,7 +41,7 @@
 #     requirements 4 and 7, owned by R.0b/R.0c.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
 #     the bytes this project produced. That is 3.8.
-#   - ORDERING. docs/STEPS.md 3.9a-d own adding targets and each ships after R.1. A definition edit that
+#   - ORDERING. Tasks 3.9a-d own adding targets and each ships after R.1. A definition edit that
 #     adds one early contradicts the plan, and review catches that, not a script.
 #
 # Usage:
@@ -800,7 +800,7 @@ validate_source_version() {
 
 # A release candidate must keep its full prerelease version everywhere, which needs the suffix to
 # reach the build. release.yml passes it; app.yml did not, so every prerelease tag failed its own
-# version check and no desktop candidate could be built (docs/STEPS.md V-R.0a, 4.7a).
+# version check and no desktop candidate could be built (task V-R.0a, 4.7a).
 validate_prerelease_path() {
   local def="$1" root="$2" c workflow
   for c in $(jqr '.components | keys[]' "$def"); do

@@ -10,7 +10,7 @@ namespace Keypaste.App.Tests.Session;
 /// </summary>
 /// <remarks>
 /// Not one of these starts an Avalonia application. <see cref="AppVaultSession"/> names no Avalonia
-/// type precisely so that the assertions docs/PRODUCT.md law 4.5 makes mandatory run in milliseconds and
+/// type precisely so that the assertions CONTRIBUTING.md makes mandatory run in milliseconds and
 /// without a display.
 /// </remarks>
 public sealed class AppVaultSessionTests
@@ -65,7 +65,7 @@ public sealed class AppVaultSessionTests
         Assert.Equal(UnlockOutcome.NotAKdbx, Unlock(session, fixture.ImposterPath, TempVault.Password));
     }
 
-    // ---- the secret path (docs/PRODUCT.md law 4.5) --------------------------------------------------
+    // ---- the secret path, whose tests CONTRIBUTING.md requires --------------------------------------------------
 
     /// <summary>
     /// The caller owns the buffer, so what has to be true is that disposing it zeroes the password

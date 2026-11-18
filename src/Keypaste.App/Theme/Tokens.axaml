@@ -6,7 +6,7 @@
   <sys:Boolean x:Key="KpScrollBarsAutoHide">True</sys:Boolean>
 
   <!--
-    DESIGN's Native palette, in light and dark, each with a high-contrast variant; the app follows the system's
+    The design system's Native palette, in light and dark, each with a high-contrast variant; the app follows the system's
     light or dark setting, and only a Linux desktop that reports none lets Settings choose. Depth is lightness, and
     shadows are for overlays only.
 

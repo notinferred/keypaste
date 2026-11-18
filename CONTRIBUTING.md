@@ -2,9 +2,9 @@
 
 ## Changes and review
 
-[CLAUDE.md](CLAUDE.md) holds the working rules and says which document owns what; [PRODUCT](docs/PRODUCT.md) owns scope and [SECURITY](SECURITY.md#security-laws) the security laws, and proposals override neither. Rows in [BACKLOG](docs/BACKLOG.md) are not instructions to build them.
+[SECURITY](SECURITY.md#security-laws) holds the security laws, and no proposal overrides them.
 
-Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. A new dependency needs its one-line reason beside it in `Directory.Packages.props` ([PRODUCT §4.9](docs/PRODUCT.md#4-engineering-laws)), a pinned version and regenerated lock files.
+Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. A new dependency needs its one-line reason beside it in `Directory.Packages.props`, a pinned version and regenerated lock files.
 
 Use KDBX4 through the vendored library. Do not implement cryptography. Only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC, which CI checks in both directions.
 
@@ -45,9 +45,9 @@ A runner-only probe is iterated on a branch with `gh workflow run <workflow> --r
 - Runs on `main` and tags are never cancelled, and each commit and event there has its own concurrency group; on any other branch a newer run cancels the one before it.
 - `ci ok` and `app ok` aggregate each workflow's jobs and fail unless every job succeeded or was skipped, so a job no runner acquired fails them; they are the checks a pull request needs green.
 
-CI spends nothing that cannot change a verdict. A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, and is then diagnosed as CLAUDE.md says. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
+CI spends nothing that cannot change a verdict. A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, and is then diagnosed, since a passing retry does not close an intermittent defect. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
 
-`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/launch.md`, `docs/demo.md` and `docs/keepass-and-agents.md` against the built binaries, so those pages must trigger `ci.yml`. Never add `docs/**` to `paths-ignore`; a new documentation path triggers backend CI unless it is listed there.
+`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/demo.md` and `docs/keepass-and-agents.md` against the built binaries, so those pages must trigger `ci.yml`. Never add `docs/**` to `paths-ignore`; a new documentation path triggers backend CI unless it is listed there.
 
 ## Commits
 
@@ -57,7 +57,7 @@ Sign off every commit, including maintainer and agent commits:
 git commit -s -m "your subject line"
 ```
 
-The `Signed-off-by` trailer certifies the [Developer Certificate of Origin 1.1](https://developercertificate.org/): you wrote the change or have the right to submit it under the project's licence. `dco.yml` checks commits added by each pull request. There is no CLA. Use a subject of at most 72 characters and the required trailer, with no other body unless requested. Follow CLAUDE.md's project identity rule and merge locally.
+The `Signed-off-by` trailer certifies the [Developer Certificate of Origin 1.1](https://developercertificate.org/): you wrote the change or have the right to submit it under the project's licence. `dco.yml` checks commits added by each pull request. There is no CLA. Use a subject of at most 72 characters and the required trailer, with no other body unless requested. Project commits are authored as `keypaste <contact@keypaste.com>` and merged locally.
 
 ## Security and licence
 

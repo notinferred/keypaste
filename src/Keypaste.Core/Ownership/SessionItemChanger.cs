@@ -9,7 +9,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Makes an agent's change to an item in the owner's own unlocked vault under the owner's claim: once the person allows it, or
-/// unasked for the needs-update tag, at most once a minute for each item (PRODUCT §2, THREATS.md T-57). The agent learns only whether it was made.
+/// unasked for the needs-update tag, at most once a minute for each item (THREATS.md T-57). The agent learns only whether it was made.
 /// </summary>
 /// <remarks>
 /// Ordered as <see cref="SessionSaver"/> is: the item is resolved and checked before anyone is asked, only where the agent's

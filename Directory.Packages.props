@@ -41,7 +41,7 @@
 
   <!-- The desktop shell (Stage 4.1). This is the largest single change to this repository's
        supply chain — four direct packages and roughly twenty transitive ones, in the process that
-       holds the unlocked vault — so docs/PRODUCT.md law 3.9 governs it.
+       holds the unlocked vault — so SECURITY.md law 9 governs it.
 
        What Avalonia is trusted with: rendering the window and delivering the keystrokes of the
        master password. What it is NOT trusted with: it never touches the KDBX file, never derives
@@ -65,7 +65,7 @@
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
   </ItemGroup>
 
-  <!-- Hardware-key unlocking in the desktop app (P.1), under docs/PRODUCT.md law 3.9 because a YubiKey's response is key material.
+  <!-- Hardware-key unlocking in the desktop app (P.1), under SECURITY.md law 9 because a YubiKey's response is key material.
 
        Yubico's own .NET SDK (Apache-2.0) is the one maintained driver for YubiKey OTP HMAC-SHA1
        challenge-response over USB HID on Windows, macOS and Linux; the alternative is three

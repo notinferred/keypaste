@@ -151,7 +151,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     /// <summary>
     /// A command sent to the background still runs in the directory with the set, though the
-    /// terminal's own command has returned (PRODUCT §2).
+    /// terminal's own command has returned.
     /// </summary>
     /// <remarks>
     /// The child outlives its terminal and, after the test hangs up, lingers longer than disposal

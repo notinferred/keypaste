@@ -14,7 +14,7 @@ namespace Keypaste.Mcp.Tools;
 /// </summary>
 /// <remarks>
 /// <para>
-/// docs/PRODUCT.md law 3.2: an agent gets one credential, one scope, one TTL, after one explicit human
+/// SECURITY.md law 2: an agent gets one credential, one scope, one TTL, after one explicit human
 /// approval, and the default is deny. This file validates the request, checks it against what the
 /// server was configured to expose, forwards it to whoever can ask a person, and answers the agent.
 /// </para>
@@ -30,7 +30,7 @@ namespace Keypaste.Mcp.Tools;
 /// the result is returned: a call refused before it was understood, one nothing answered, one the
 /// client abandoned before it was sent, and one whose reply says it was not recorded, which is
 /// refused whatever it carried. An unlogged denial is still an access that happened without a record
-/// (law 3.3, THREATS.md T-6). If the log refuses, so does the call.
+/// (law 3, THREATS.md T-6). If the log refuses, so does the call.
 /// </para>
 /// </remarks>
 /// <param name="options">What this bridge was started with.</param>
@@ -56,7 +56,7 @@ internal sealed class RequestCredentialTool(
         Annotations = new ToolAnnotations
         {
             // ReadOnlyHint is false although the tool only reads: clients treat it as "safe to run
-            // without asking the user", which is the auto-approval law 3.2 exists to prevent. Idempotent
+            // without asking the user", which is the auto-approval law 2 exists to prevent. Idempotent
             // is false for the same reason — each call is a separate approval event.
             ReadOnlyHint = false,
             DestructiveHint = false,
@@ -82,7 +82,7 @@ internal sealed class RequestCredentialTool(
 
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
-        // audit record than the request deserves (law 3.3).
+        // audit record than the request deserves (law 3).
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
 
         Verdict verdict;
@@ -112,8 +112,8 @@ internal sealed class RequestCredentialTool(
             {
                 // Everything else, for the same reason and one stronger. An exception is the shape
                 // most likely to skip the append below, and skipping it is how an access happens
-                // with no record of it (law 3.3). Denying is already the answer; being seen to deny
-                // is the part that has to survive a failure nobody predicted (law 3.7).
+                // with no record of it (law 3). Denying is already the answer; being seen to deny
+                // is the part that has to survive a failure nobody predicted (law 7).
                 verdict = new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the request could not be completed");
             }
         }

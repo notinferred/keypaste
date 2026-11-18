@@ -217,7 +217,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 : new EntryNameListing(VaultAvailability.Failed, [], ToolText.NoApproverForListing, true);
         }
 
-        // Nothing an unrecorded reply named is shown: entry names are an asset too (law 3.5, T-6).
+        // Nothing an unrecorded reply named is shown: entry names are an asset too (law 5, T-6).
         if (!answer.Recorded)
         {
             return new EntryNameListing(VaultAvailability.Unrecorded, [], ToolText.AuditUnavailable, true)

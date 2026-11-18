@@ -33,7 +33,7 @@ public enum SourceCleanup
 /// editor can save, or a <c>git checkout</c> can replace the file. Deleting whatever is at that
 /// path afterwards loses bytes that were never imported, and there is nowhere to recover them
 /// from: this command's offer is a trap unless it is bound to what was read,
-/// and it was bound only to the path (docs/STEPS.md F.1c).
+/// and it was bound only to the path (task F.1c).
 /// </para>
 /// <para>
 /// Identity here is two rules, not one. <see cref="PathIdentity"/> answers whether the path still

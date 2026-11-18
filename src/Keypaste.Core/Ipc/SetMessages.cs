@@ -9,7 +9,7 @@ public sealed record SetItem(string Entry, string Field);
 
 /// <summary>
 /// An agent's request for a linked set: fields of one item it may see, its anchor, and of the items <c>find_access</c> links to it,
-/// which the person allows once or denies whole (PRODUCT §2, §3.2).
+/// which the person allows once or denies whole (SECURITY.md law 2).
 /// </summary>
 /// <remarks>The exposure travels with the request, as <see cref="CredentialRequest"/>'s does, so the owner re-checks every item after it resolves it.</remarks>
 public sealed record SetRequest

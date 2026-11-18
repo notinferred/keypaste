@@ -48,7 +48,7 @@ internal sealed class DesktopPreferences
     /// <summary>The idle timeout in the shape the session takes it.</summary>
     /// <remarks>
     /// Always locks: <see cref="AppSettings.IdleTimeoutSeconds"/> clamps into its range on the way
-    /// in, so there is no file that produces a session which stays open (docs/PRODUCT.md law 3.7).
+    /// in, so there is no file that produces a session which stays open (SECURITY.md law 7).
     /// </remarks>
     internal TimeSpan IdleTimeout => TimeSpan.FromSeconds(Current.IdleTimeoutSeconds);
 

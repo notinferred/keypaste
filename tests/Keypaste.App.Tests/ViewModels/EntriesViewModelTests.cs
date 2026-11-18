@@ -258,7 +258,7 @@ public sealed class EntriesViewModelTests : IDisposable
     /// The same collision, on the read side. The pane resolved its entry by the joined path, so
     /// selecting <c>TOKEN</c> in <c>env/dev/nested</c> and editing it wrote to whichever of the two
     /// the file listed first — which could be <c>nested/TOKEN</c> in <c>env/dev</c>, an entry the
-    /// person never selected (docs/STEPS.md F.1e).
+    /// person never selected (task F.1e).
     /// </summary>
     [Fact]
     public void An_inline_edit_writes_the_selected_identity_and_not_its_colliding_neighbour()

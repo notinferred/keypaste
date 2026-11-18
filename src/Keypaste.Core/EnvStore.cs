@@ -19,7 +19,7 @@ public sealed record EnvProfileInfo(string Name, bool IsProtected);
 /// <remarks>
 /// <para>
 /// The writes live here rather than in a front end because the CLI and the desktop write projects
-/// in exactly the same shape, and docs/PRODUCT.md law 4.2 does not allow that rule to be written
+/// in exactly the same shape, and the one-core rule in docs/ARCHITECTURE.md does not allow that rule to be written
 /// down twice. Reading a project is <see cref="EnvResolution"/>'s and <see cref="ProjectCatalog"/>'s.
 /// </para>
 /// <para>

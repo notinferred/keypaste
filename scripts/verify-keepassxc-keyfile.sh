@@ -2,13 +2,13 @@
 #
 # verify-keepassxc-keyfile.sh
 #
-# PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6, and the unlock half of law 2.
+# PERMANENT COMPATIBILITY GATE — SECURITY.md law 14, for a vault unlocked with a key file.
 #
 # verify-keepassxc-compat.sh proves a vault keypaste CREATES opens in KeePassXC,
 # verify-keepassxc-writeback.sh proves a vault keypaste MODIFIES still does,
 # Keypaste.Core.Tests.KeePassXC proves restored revisions, recovered deletions, kept backups and renamed
 # entries are what KeePassXC reads.
-# This one covers what docs/STEPS.md V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
+# This one covers what task V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
 # keypaste opens, writes and hands back, in every form such a keyfile can take. It also covers
 # V.1a2: `keypaste access` changes a vault's password and keyfile, and KeePassXC opens the result
 # with the new factors and refuses the old ones. Last, the one keyfile keypaste makes: the desktop's

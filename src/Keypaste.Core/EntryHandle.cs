@@ -37,14 +37,14 @@ public enum EntryAddressKind
 /// and an entry titled <c>c</c> in group <c>a/b</c> have the same path and are genuinely
 /// indistinguishable by it. Hashing the two parts with a separator that cannot occur in either
 /// gives them different handles, so each remains uniquely addressable. Addressing by path stays
-/// available and stays ambiguous — a colliding path is refused rather than guessed at (docs/PRODUCT.md law
-/// 3.7).
+/// available and stays ambiguous — a colliding path is refused rather than guessed at (SECURITY.md law
+/// 7).
 /// </para>
 /// <para>
 /// <b>What a handle is not.</b> It is not a secret, and knowing one is not evidence of
 /// authorization. It is a stable name and nothing more; every request that carries one is still
 /// subject to the same approval. It is also not a privacy measure — it happens to hash a name, but
-/// the reason is addressability, and law 3.5 is satisfied by the audit log never leaving the
+/// the reason is addressability, and law 5 is satisfied by the audit log never leaving the
 /// machine rather than by anything here.
 /// </para>
 /// </remarks>

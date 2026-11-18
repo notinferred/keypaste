@@ -24,7 +24,7 @@ internal readonly record struct Caller(bool Initialized, AuditClient Client);
 /// instead of a hunt.
 /// </para>
 /// <para>
-/// It also means law 3.3's "every access is logged with who" survives identity becoming optional:
+/// It also means law 3's "every access is logged with who" survives identity becoming optional:
 /// a client that says nothing is recorded as having said nothing, and <c>--client-label</c> gives
 /// the human a name of their own choosing that no connecting client can overwrite.
 /// </para>

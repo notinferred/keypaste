@@ -4,7 +4,7 @@ namespace Keypaste.Core;
 
 /// <summary>An entry as a search names it to an agent: its listing, its kind, its web origin and, when Settings shows it, its username.</summary>
 /// <remarks>
-/// Its origin and username are the only values it holds, and only ones an agent sees without asking (PRODUCT §2), or that the
+/// Its origin and username are the only values it holds, and only ones an agent sees without asking (THREATS.md T-4), or that the
 /// person chose to show with hosts and references. <see cref="References"/> stays with the vault's owner: only the links it makes leave.
 /// </remarks>
 /// <param name="Listing">The entry as a listing names it, with its UUID.</param>

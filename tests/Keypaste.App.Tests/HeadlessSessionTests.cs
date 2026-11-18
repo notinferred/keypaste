@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests;
 /// to it as <c>async void</c>: the returned task completes at the body's first <c>await</c>, so
 /// every assertion after that point runs outside the lifetime xunit observes. Four tests in
 /// <c>MaskedInputAutomationTests</c> were written that way, two of them D-0099 differentials, and
-/// they had been reported green without their assertions ever being watched (STEPS F.16).
+/// they had been reported green without their assertions ever being watched (task F.16).
 /// </para>
 /// <para>
 /// <b>Two shapes were tried and rejected before this one, because a regression that does not

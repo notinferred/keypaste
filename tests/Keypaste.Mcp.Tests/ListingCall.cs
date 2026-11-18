@@ -24,7 +24,7 @@ namespace Keypaste.Mcp.Tests;
 /// <b>There is no constructor a caller can reach, and <see cref="ReadAsync"/> names the tool
 /// itself.</b> That is what keeps <see cref="Report"/> off the credential path: a
 /// <c>request_credential</c> result carries a live value in both its text and its structured content
-/// (docs/PRODUCT.md law 3.5), and a diagnostic that quotes a result's text must be unable to receive
+/// (SECURITY.md law 5), and a diagnostic that quotes a result's text must be unable to receive
 /// one. A helper taking a <see cref="CallToolResult"/> would be one argument away from printing a
 /// credential into a run log, and a comment saying not to would not survive the first overload.
 /// </para>

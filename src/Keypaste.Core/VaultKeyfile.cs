@@ -95,7 +95,7 @@ public readonly record struct KeyfileInspection(KeyfileOutcome Outcome, KeyfileF
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This derives nothing.</b> docs/PRODUCT.md law 3.6 forbids writing cryptography, and all four
+/// <b>This derives nothing.</b> SECURITY.md law 6 forbids writing cryptography, and all four
 /// forms are already implemented by the vendored <c>KeePassLib.Keys.KcpKeyFile</c>, which is what
 /// actually turns the file into key material. What is here is classification and refusal: which
 /// shape the bytes are, and whether they are usable at all. The two must agree, so the rules below

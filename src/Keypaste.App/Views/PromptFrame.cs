@@ -8,7 +8,7 @@ namespace Keypaste.App.Views;
 /// Scales a prompt as a whole, until it opens: at the interface's zoom, or smaller where that would not fit its screen,
 /// so its layout stays fixed and no part of it, Deny and the agent's reason included, starts past a screen's edge.
 /// </summary>
-/// <remarks>The prompt's security rules win over rule 7's 200% (DESIGN § Interaction): a scrolling prompt could hide what the person is answering. Zooming while it is open moves nothing under the pointer.</remarks>
+/// <remarks>The prompt's security rules win over the 200% zoom the other screens follow: a scrolling prompt could hide what the person is answering. Zooming while it is open moves nothing under the pointer.</remarks>
 internal sealed class PromptFrame : LayoutTransformControl
 {
     private readonly Func<ScreenArea?> _screen;

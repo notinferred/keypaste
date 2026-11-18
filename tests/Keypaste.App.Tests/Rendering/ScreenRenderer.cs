@@ -34,7 +34,7 @@ namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
 /// Draws every screen of the app to a PNG with a demo vault, for comparing against
-/// docs/DESIGN.md. It runs only when KEYPASTE_SCREENS_OUT names a folder, and is skipped otherwise:
+/// the design. It runs only when KEYPASTE_SCREENS_OUT names a folder, and is skipped otherwise:
 /// <code>
 /// KEYPASTE_SCREENS_OUT=/tmp/screens bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer
 /// </code>

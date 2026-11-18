@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.KeePassXC;
 
-/// <summary>The real <c>keepassxc-cli</c>, which reads every vault these tests have keypaste write (PRODUCT law 4.6).</summary>
+/// <summary>The real <c>keepassxc-cli</c>, which reads every vault these tests have keypaste write (SECURITY.md law 14).</summary>
 /// <remarks>
 /// Found at <c>KPXC_CLI</c>, then on <c>PATH</c>, then in the macOS app. Where none is found the tests skip, unless
 /// <c>KEYPASTE_KEEPASSXC</c> is <c>required</c>, as CI's compatibility jobs set it, where they fail: a check that passes

@@ -42,7 +42,7 @@ public enum AuditMethod
     /// only; releasing a credential always needs a person or a mode the person set.</summary>
     Exposure = 4,
 
-    /// <summary>A person was shown this specific request and answered it (docs/PRODUCT.md law 3.2).</summary>
+    /// <summary>A person was shown this specific request and answered it (SECURITY.md law 2).</summary>
     Prompt = 5,
 
     /// <summary>Released without asking by an Always allow row a person confirmed, never a person's
@@ -64,7 +64,7 @@ public enum AuditMethod
     /// <summary>The same request was refused a moment ago and has not served its cooldown.</summary>
     Cooldown = 11,
 
-    /// <summary>Asking, resolving or reading went wrong. Fail closed (docs/PRODUCT.md law 3.7).</summary>
+    /// <summary>Asking, resolving or reading went wrong. Fail closed (SECURITY.md law 7).</summary>
     Failed = 12,
 
     /// <summary>A tool was called before the <c>initialize</c> handshake completed, so nothing is

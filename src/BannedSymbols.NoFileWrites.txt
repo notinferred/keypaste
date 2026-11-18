@@ -1,4 +1,4 @@
-// The front ends write no file themselves, so every vault and backup they write goes through Core's VaultFiles and the writer the KeePassXC gate covers (PRODUCT §4.6).
+// The front ends write no file themselves, so every vault and backup they write goes through Core's VaultFiles and the writer the KeePassXC gate covers (SECURITY.md law 14).
 M:System.IO.File.WriteAllBytes(System.String,System.Byte[]);front ends write files only through Core
 M:System.IO.File.WriteAllBytes(System.String,System.ReadOnlySpan{System.Byte});front ends write files only through Core
 M:System.IO.File.WriteAllText(System.String,System.String);front ends write files only through Core

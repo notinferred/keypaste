@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refuses a version that has no section of its own in the changelog.
 #
-# docs/PRODUCT.md law 4.7 pairs small releases with real changelogs, and this is its
+# Every release carries a real changelog section, and this is its
 # gate. It lived in release.yml's guard under `if: ref_type == 'tag'`, so nothing but a tag ran it -
 # a decision no fixture can drive. It is here so a fixture can drive it.
 #

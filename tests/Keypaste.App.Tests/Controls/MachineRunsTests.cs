@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Controls;
 
-/// <summary>What a machine reads, set inside a sentence, is drawn in the system's monospace and the rest stays the sentence's own face (DESIGN Rule 5).</summary>
+/// <summary>What a machine reads, set inside a sentence, is drawn in the system's monospace and the rest stays the sentence's own face.</summary>
 public sealed class MachineRunsTests
 {
     [Fact]

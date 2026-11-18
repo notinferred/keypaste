@@ -2,8 +2,7 @@ name: dco
 
 # CONTRIBUTING.md requires the Developer Certificate of Origin. Every other
 # rule in this repository names an enforcer; until this file existed that one named none, which
-# made it aspiration rather than a rule - the same shape docs/launch.md already flags for branch
-# protection, where "a red build blocks the merge" is a habit because nothing consults a check.
+# made it aspiration rather than a rule.
 #
 # WHAT IT COSTS ON EVERY PUSH: nothing. There is no `push` trigger. A pull request already pays
 # for ci.yml, and this adds one bash step of a few seconds to that.

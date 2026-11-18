@@ -9,7 +9,7 @@ public static class SetRequestRules
     /// <summary>The fewest fields a set names; one field is <c>request_credential</c>'s.</summary>
     public const int MinimumFields = 2;
 
-    /// <summary>The most fields one prompt releases (PRODUCT §2).</summary>
+    /// <summary>The most fields one prompt releases (SECURITY.md law 2).</summary>
     public const int MaximumFields = 4;
 
     /// <summary>Finds the first argument a set breaks the rules with.</summary>

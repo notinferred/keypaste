@@ -127,7 +127,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
         {
             // Anything at all. A narrower filter lets an IOException or a cryptographic failure out
             // of the vault escape the approver and reach the bridge as an unlogged failure; failing
-            // closed here is what makes the caller's refusal a decision (law 3.7).
+            // closed here is what makes the caller's refusal a decision (law 7).
             failure = CredentialFailure.Failed;
             return false;
         }
@@ -168,7 +168,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
         }
         catch (Exception)
         {
-            // Anything at all, failing closed as TryList does (law 3.7).
+            // Anything at all, failing closed as TryList does (law 7).
             failure = CredentialFailure.Failed;
             return false;
         }

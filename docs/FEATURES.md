@@ -1,6 +1,6 @@
 # Capabilities
 
-Each capability by surface, with its state in [RELEASE](RELEASE.md)'s terms and the version it belongs to, reviewed against source and tests on 2026-11-12. [PRODUCT](PRODUCT.md) owns scope, [ROADMAP](../ROADMAP.md) what comes next, [CHANGELOG](../CHANGELOG.md) each change, and [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) the guarantees and limits.
+Each capability by surface, with its state in [RELEASE](RELEASE.md)'s terms and the version it belongs to, reviewed against source and tests on 2026-11-12. [CHANGELOG](../CHANGELOG.md) owns each change, and [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) the guarantees and limits.
 
 Two states appear below:
 

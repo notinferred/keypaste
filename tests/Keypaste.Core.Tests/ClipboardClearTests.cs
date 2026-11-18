@@ -11,12 +11,12 @@ namespace Keypaste.Core.Tests;
 /// <para>
 /// This rule had no test of its own while it lived inside the CLI's blocking strategy — it was
 /// reached only through <c>keypaste get</c>, whose tests are about exit codes and output. It is now
-/// on the path of two front ends, and docs/PRODUCT.md law 4.5 makes a test of it mandatory rather than
+/// on the path of two front ends, and CONTRIBUTING.md makes a test of it mandatory rather than
 /// tidy.
 /// </para>
 /// <para>
 /// The case worth staring at is <see cref="A_read_back_that_failed_clears_anyway"/>. It is the
-/// fail-closed branch (law 3.7), it is the one a reader assumes is the other way round, and
+/// fail-closed branch (law 7), it is the one a reader assumes is the other way round, and
 /// inverting it is a one-character edit that no other test in this repository would notice.
 /// </para>
 /// </remarks>

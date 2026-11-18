@@ -73,7 +73,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
     /// <summary>
     /// The identity comes back from the delete that produced it, so a caller offering to undo one
-    /// does not have to work out which row it just made (docs/PRODUCT.md §4.2).
+    /// does not have to work out which row it just made (the one-core rule in docs/ARCHITECTURE.md).
     /// </summary>
     [Fact]
     public void RemoveEntry_HandsBackTheIdentityTheBinNowListsForThatEntry()

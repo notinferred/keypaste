@@ -9,7 +9,7 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// The concurrency refusal is asserted through a real MCP connection in
-/// <see cref="ConcurrentRequestsTests"/>, because that is where STEPS V-F.3b says the evidence has
+/// <see cref="ConcurrentRequestsTests"/>, because that is where task V-F.3b says the evidence has
 /// to come from. What is left here is the pair of properties an MCP client cannot reach from the
 /// far end: the SDK does not carry a client's cancellation through to the server's token, so
 /// cancellation and disconnection have to be driven at this seam or not at all.

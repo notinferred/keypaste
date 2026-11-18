@@ -7,7 +7,7 @@ namespace Keypaste.Core;
 /// <para>
 /// Enforced on write and never on read. A name KeePassXC put in the file is always listed, because
 /// keypaste and KeePassXC disagreeing about the contents of one file is the failure
-/// docs/PRODUCT.md law 4.6 exists to prevent — the same split <see cref="EnvConvention.IsValidKey"/>
+/// SECURITY.md law 14 exists to prevent — the same split <see cref="EnvConvention.IsValidKey"/>
 /// already describes for variable names.
 /// </para>
 /// <para>

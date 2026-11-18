@@ -120,7 +120,7 @@ public static class TerminalEdits
 
         // An entry is its group and its title. Asking the joined form whether one exists said
         // "already exists" about identities nothing had — a title of `b/c` in `a` refused a
-        // genuinely different `c` in `a/b` (docs/STEPS.md F.1e).
+        // genuinely different `c` in `a/b` (task F.1e).
         if (vault.Find(add.Name) is not null)
         {
             return Refused(EditRefusalKind.Invalid, $"'{path}' already exists");

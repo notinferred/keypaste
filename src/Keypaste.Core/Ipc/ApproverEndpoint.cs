@@ -14,7 +14,7 @@ namespace Keypaste.Core.Ipc;
 /// when it accepts it and a client refuses a listener running as another user when it connects.
 /// That is one code path, no
 /// <c>System.IO.Pipes.AccessControl</c> dependency, no hand-rolled <c>PipeSecurity</c>, and no
-/// <c>sun_path</c> length problem to discover on somebody's long home directory (docs/PRODUCT.md law 3.9).
+/// <c>sun_path</c> length problem to discover on somebody's long home directory (SECURITY.md law 9).
 /// </para>
 /// <para>
 /// <b>The name carries a per-user, per-vault discriminator</b> (<see cref="VaultIdentity.Key"/>)
@@ -25,7 +25,7 @@ namespace Keypaste.Core.Ipc;
 /// <b>Residual, for THREATS.md T-10.</b> That path is predictable, so another local user can
 /// pre-create it and stop your approver binding — a denial of service. What they cannot do is be
 /// connected to, because the client's peer check refuses. Denial of service against the approver means
-/// keypaste denies every request, which is the direction law 3.7 asks for.
+/// keypaste denies every request, which is the direction law 7 asks for.
 /// </para>
 /// </remarks>
 public static class ApproverEndpoint

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>The order DESIGN gives every confirmation, read from what a window draws.</summary>
+/// <summary>The order of every confirmation's buttons, read from what a window draws.</summary>
 internal static class ConfirmationButtons
 {
     /// <summary>Asserts a Cancel is drawn beside an action, and that each drawn Cancel comes before the buttons beside it.</summary>

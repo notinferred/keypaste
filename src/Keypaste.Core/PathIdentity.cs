@@ -16,7 +16,7 @@ namespace Keypaste.Core;
 /// mounted twice, a UNC path against a mapped drive letter, a Windows 8.3 short name, or the
 /// Unicode normalisation and non-ASCII case folding a filesystem does for itself. Reaching those
 /// means asking the operating system for a file's identity, which is a P/Invoke on a path
-/// docs/PRODUCT.md law 3.9 keeps free of them. A caller that must fail closed needs a second check
+/// SECURITY.md law 9 keeps free of them. A caller that must fail closed needs a second check
 /// of its own; <see cref="KdbxHeader.IsVaultFile"/> is the one <c>env export</c> uses.
 /// </para>
 /// </remarks>

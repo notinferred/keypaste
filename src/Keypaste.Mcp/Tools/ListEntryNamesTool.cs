@@ -50,7 +50,7 @@ internal sealed class ListEntryNamesTool(
         ArgumentNullException.ThrowIfNull(request);
 
         // Before the vault is touched. Listing names is the cheaper call, but entry names are an
-        // asset in their own right (law 3.5) and handing them to a caller whose identity the log
+        // asset in their own right (law 5) and handing them to a caller whose identity the log
         // cannot record is the same mistake as releasing a value to one.
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
 
@@ -62,7 +62,7 @@ internal sealed class ListEntryNamesTool(
         }
 
         // Still audited when the client stops waiting or a source throws: a listing nobody collected is still an access
-        // that was attempted, and law 3.3 makes no exception for it.
+        // that was attempted, and law 3 makes no exception for it.
         var answers = await BridgeVaults.EachAsync(vaults.Routes, names => names.ListAsync(cancellationToken)).ConfigureAwait(false);
         List<(VaultRoute Route, List<ListedEntry> Names, bool Complete)> shown = [];
 
@@ -151,7 +151,7 @@ internal sealed class ListEntryNamesTool(
     /// <remarks>
     /// Log-then-answer, not answer-then-log. If the record cannot be written the call is refused,
     /// because otherwise breaking the logger becomes the way to obtain access that leaves no trace
-    /// (docs/PRODUCT.md laws 3.3 and 3.7, THREATS.md T-6). A crash between the two over-reports an access
+    /// (SECURITY.md laws 3 and 7, THREATS.md T-6). A crash between the two over-reports an access
     /// rather than under-reporting one, which is the safe direction. A listing the owner recorded
     /// before replying is answered with no line here.
     /// </remarks>

@@ -303,7 +303,7 @@ public sealed class EnvPullTests
     /// <summary>
     /// The seconds a person spends answering a prompt are seconds their editor can save in, and
     /// keypaste offered to delete the file at the end of them without ever looking again
-    /// (docs/STEPS.md F.1c). Each of these plants the second writer at a different prompt.
+    /// (task F.1c). Each of these plants the second writer at a different prompt.
     /// </summary>
     /// <remarks>
     /// The refusal comes before the deletion question rather than after it, so nobody is asked

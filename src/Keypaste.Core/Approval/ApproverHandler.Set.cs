@@ -15,7 +15,7 @@ public sealed partial class ApproverHandler
     /// <remarks>
     /// The order is the single request's, for every field: resolve, re-check what the agent may see, check each item is the anchor or
     /// one <see cref="AccessIndex.LinksOf"/> links to it among the items the exposure admits, refuse the whole set for any field a
-    /// category blocks or a refusal holds back, then ask, whatever the rules allow, and read last. No rule releases a set (PRODUCT §3.2).
+    /// category blocks or a refusal holds back, then ask, whatever the rules allow, and read last. No rule releases a set (SECURITY.md law 2).
     /// </remarks>
     public async ValueTask<SetReply> RequestSetAsync(SetRequest request, string connectionId, CancellationToken cancellationToken)
     {

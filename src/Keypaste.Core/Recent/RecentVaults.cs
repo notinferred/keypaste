@@ -24,7 +24,7 @@ public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? K
 /// <para>
 /// <b>It holds paths and nothing else</b>: each vault's, and the keyfile it last opened with, whose
 /// location the desktop remembers as KeePassXC does (T-27), and which hardware key slot it opened with. No entry names, no counts, no
-/// fingerprints of the contents, and never key material. docs/PRODUCT.md law 3.5 is about
+/// fingerprints of the contents, and never key material. SECURITY.md law 5 is about
 /// telemetry and this file never leaves the machine, but a vault path is still information about a person — <c>~/work/acme-prod.kdbx</c> says something — which is
 /// why it is capped, written owner-only, and forgettable from the UI in one click.
 /// </para>

@@ -7,7 +7,7 @@ namespace Keypaste.App.Controls;
 /// One row of a <see cref="GroupedRows"/>: a label on the left, the value after it, and quiet actions on the right.
 /// </summary>
 /// <remarks>
-/// <c>Classes="stacked"</c> puts the label above the value, as a field a person types in keeps it (DESIGN Interaction rule 5).
+/// <c>Classes="stacked"</c> puts the label above the value, as a field a person types in keeps it.
 /// A custom field's name takes <c>Classes="mono-label"</c>. The value is the row's content; a row without one gives its label the value's room.
 /// <c>Classes="adaptive"</c> keeps the label at the left and puts it above while the row is under <see cref="NarrowBelow"/> wide.
 /// </remarks>

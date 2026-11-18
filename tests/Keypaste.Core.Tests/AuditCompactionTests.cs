@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>The vault's owner folds old lookups, removes whole expired days and seals what it kept (PRODUCT §3.3).</summary>
+/// <summary>The vault's owner folds old lookups, removes whole expired days and seals what it kept (SECURITY.md law 3).</summary>
 public sealed class AuditCompactionTests : IDisposable
 {
     private const string _vault = "0123456789abcdef";

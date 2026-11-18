@@ -26,7 +26,7 @@
 # S3 documents and Cloudflare's R2 compatibility page describes, not bytes captured from the real
 # bucket - this machine has no aws CLI and this gate is not given a credential. If R2 answers in
 # some other shape, the positive control below turns that into a refused release rather than an
-# overwrite, which is the direction law 3.7 asks for; only a real dispatch or tag can observe it.
+# overwrite, which is the direction law 7 asks for; only a real dispatch or tag can observe it.
 #
 # NEGATIVE CONTROL: phase G writes F.4a's defect back out verbatim - `aws s3 ls ... 2>/dev/null ||
 # true` and an unguarded `cp` - and requires it to reach an upload on the denied-quiet and

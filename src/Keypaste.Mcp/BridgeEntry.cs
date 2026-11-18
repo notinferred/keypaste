@@ -62,7 +62,7 @@ public static class BridgeEntry
         }
 
         // The audit log is a precondition, so an unwritable one stops the server rather than
-        // surfacing later as a mysterious per-call refusal (docs/PRODUCT.md laws 3.3 and 3.7).
+        // surfacing later as a mysterious per-call refusal (SECURITY.md laws 3 and 7).
         if (!AuditLog.TryOpen(options.AuditPath, TimeProvider.System, out var audit, out var auditError))
         {
             await Console.Error.WriteLineAsync($"keypaste mcp: {auditError}").ConfigureAwait(false);

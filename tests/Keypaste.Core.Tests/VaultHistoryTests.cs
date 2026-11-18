@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Reading and restoring entry history (docs/STEPS.md V.2a).
+/// Reading and restoring entry history (task V.2a).
 /// </summary>
 /// <remarks>
 /// Retaining a replaced value has long been the promise; until now nothing could read one
@@ -308,7 +308,7 @@ public sealed class VaultHistoryTests : IDisposable
 
     /// <summary>
     /// Two entries in one group can share a title, and KeePassXC will make them. Neither reading
-    /// history nor restoring it may guess which was meant (docs/PRODUCT.md law 3.7).
+    /// history nor restoring it may guess which was meant (SECURITY.md law 7).
     /// </summary>
     [Fact]
     public void ReadHistoryAndRestoreRevision_RefuseANameTwoEntriesAnswerTo()

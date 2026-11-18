@@ -27,7 +27,7 @@ namespace Keypaste.Core.Internal;
 /// <para>
 /// <b>This is the only file in the repository permitted to reference KeePassLib.</b>
 /// Everything above it speaks in <see cref="VaultEntry"/> and <see cref="VaultException"/>.
-/// That rule is what keeps docs/PRODUCT.md law 4.3 honest — one core library, with the format
+/// That rule is what keeps the one-core rule in docs/ARCHITECTURE.md honest — one core library, with the format
 /// dependency behind a seam narrow enough that replacing it is a single-file change rather
 /// than an archaeology project.
 /// </para>
@@ -255,7 +255,7 @@ internal sealed class KeePassInterop : IDisposable
 
             // KeePassLib reports an unreadable container, a failed HMAC, and a bad key through
             // several exception types. Anything that is not plainly an I/O problem is treated
-            // as "this did not open" and nothing partial is handed back (docs/PRODUCT.md law 3.7).
+            // as "this did not open" and nothing partial is handed back (SECURITY.md law 7).
             throw ex is IOException or UnauthorizedAccessException
                 ? new VaultException($"Could not read '{path}'.", ex)
                 : new VaultException($"'{path}' could not be opened as a KeePass database.", ex);
@@ -735,7 +735,7 @@ internal sealed class KeePassInterop : IDisposable
 
         PwEntry pwEntry = found.Entry;
 
-        // Mutated in place: re-adding mints a new UUID and drops what keypaste does not model (law 4.6).
+        // Mutated in place: re-adding mints a new UUID and drops what keypaste does not model (law 14).
         pwEntry.CreateBackup(_database);
 
         SetField(pwEntry, PwDefs.TitleField, entry.Title);
@@ -3638,7 +3638,7 @@ internal sealed class KeePassInterop : IDisposable
         // Only the password is marked protected, matching KeePass's own default. The flag
         // controls in-memory protection and the KDBX inner-stream encryption of that field;
         // marking Title or URL protected would make the file open oddly in other KeePass
-        // clients for no security gain (docs/PRODUCT.md law 4.6, compatibility is sacred).
+        // clients for no security gain (SECURITY.md law 14, compatibility is sacred).
         bool protect = string.Equals(field, PwDefs.PasswordField, StringComparison.Ordinal);
         entry.Strings.Set(field, new ProtectedString(protect, value));
     }
@@ -4415,7 +4415,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <para>
     /// A name carrying a UUID finds the item holding it alone, for a screen showing it. Otherwise,
     /// two entries answering to one name are refused rather than resolved to whichever came first,
-    /// because there is no answer that is not a guess (docs/PRODUCT.md law 3.7). KDBX permits that
+    /// because there is no answer that is not a guess (SECURITY.md law 7). KDBX permits that
     /// within one group and KeePassXC will make it; <see cref="EntryHandle"/> is what keeps each of
     /// them individually addressable.
     /// </para>

@@ -51,9 +51,9 @@ public sealed class DotEnvText
 /// </summary>
 /// <remarks>
 /// <para>
-/// It lives beside the reader, in the core, for the same reason the reader does (docs/PRODUCT.md law 4.3):
+/// It lives beside the reader, in the core, for the same reason the reader does (the one-core rule in docs/ARCHITECTURE.md):
 /// a second serialiser in a frontend would disagree with this one about exactly the values that are
-/// hard to write, and two keypaste frontends writing different files from one vault is law 4.6's
+/// hard to write, and two keypaste frontends writing different files from one vault is law 14's
 /// failure with both parties in-house.
 /// </para>
 /// <para>

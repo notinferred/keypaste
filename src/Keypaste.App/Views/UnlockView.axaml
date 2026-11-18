@@ -608,7 +608,7 @@
           </StackPanel>
         </StackPanel>
 
-        <!-- Waiting is an amber dot with its halo (DESIGN). -->
+        <!-- Waiting is an amber dot with its halo. -->
         <StackPanel x:Name="TouchPrompt"
                     Orientation="Horizontal"
                     Spacing="8"

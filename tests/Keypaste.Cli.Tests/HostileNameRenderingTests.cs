@@ -32,7 +32,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// Every case asserts twice, and the second matters as much as the first: the trickery is gone,
 /// <b>and</b> the row is still listed. Dropping it would be its own defect: keypaste does not get to
-/// pretend the file says something other than what KeePassXC shows (docs/PRODUCT.md law 4.6).
+/// pretend the file says something other than what KeePassXC shows (SECURITY.md law 14).
 /// Sanitizing renders a name safely; it does not hide it.
 /// </para>
 /// </remarks>

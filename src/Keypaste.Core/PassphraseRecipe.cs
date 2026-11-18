@@ -35,7 +35,7 @@ public readonly record struct PassphraseRecipe
 
     /// <summary>Six words separated by a full stop.</summary>
     /// <remarks>
-    /// Six because that is the share passphrase docs/PRODUCT.md §1 ratifies, so nothing can be
+    /// Six because that is the share passphrase's length, so nothing can be
     /// generated weaker than what THREATS.md T-26 assumes. A full stop rather than a hyphen
     /// because the word list holds four hyphenated words, so a hyphen would make the passphrase
     /// unsplittable and its word count unreadable.
@@ -85,7 +85,7 @@ public readonly record struct PassphraseRecipe
 /// <summary>Either kind of recipe, and which kind it is.</summary>
 /// <remarks>
 /// <para>
-/// This is what docs/STEPS.md V.6 means by the recipe recording which kind produced a value.
+/// This is what task V.6 means by the recipe recording which kind produced a value.
 /// Nothing in keypaste persists a recipe — a <see cref="VaultEntry"/> has no field for one — so
 /// the kind travels with the recipe to the surface that stores the value, which is what lets
 /// <c>keypaste add</c> say it generated a six-word passphrase rather than a password.

@@ -28,8 +28,8 @@ namespace Keypaste.App.Session;
 /// before the listeners stop.
 /// </para>
 /// <para>
-/// A failure to listen does not stop the unlock. The app is a password manager without MCP
-/// (docs/PRODUCT.md law 5.6); the failure is reported instead of the endpoint.
+/// A failure to listen does not stop the unlock. The app is a password manager without MCP,
+/// which is opt-in; the failure is reported instead of the endpoint.
 /// </para>
 /// <para>
 /// Where the app's Runs go through Terminal, each unlock is also served on a <see cref="LaunchEndpoint"/>,

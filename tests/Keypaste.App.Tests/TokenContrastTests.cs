@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// Enabled text keeps 4.5:1, and focus rings, control edges and status marks 3:1, on the grounds they sit on, in each palette (DESIGN rule 7, Q.8).
+/// Enabled text keeps 4.5:1, and focus rings, control edges and status marks 3:1, on the grounds they sit on, in each palette (Q.8).
 /// </summary>
 public sealed class TokenContrastTests
 {

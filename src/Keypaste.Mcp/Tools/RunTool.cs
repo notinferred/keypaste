@@ -97,7 +97,7 @@ internal sealed class RunTool(ServerOptions options, BridgeVaults vaults, AuditL
         }
         catch (Exception)
         {
-            // An exception is the shape most likely to skip the append (law 3.3); denying is the answer (law 3.7).
+            // An exception is the shape most likely to skip the append (law 3); denying is the answer (law 7).
             return Finish(client, line, Verdict.Denied(AuditMethod.Failed, "the request could not be completed"), null);
         }
         finally

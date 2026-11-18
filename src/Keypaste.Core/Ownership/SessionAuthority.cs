@@ -1283,7 +1283,7 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <summary>
     /// Decides a request once its line can be written, turning a withdrawal or a failure while deciding
-    /// into a refusal that is recorded and answered like any other (law 3.7).
+    /// into a refusal that is recorded and answered like any other (law 7).
     /// </summary>
     /// <remarks>
     /// A log that will not open refuses the request at once, so a person is never asked about one this

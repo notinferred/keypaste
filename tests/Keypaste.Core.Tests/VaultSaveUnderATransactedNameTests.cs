@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// What a save does when the vault's own name is held by somebody else's transaction
-/// (docs/STEPS.md F.7).
+/// (task F.7).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -53,7 +53,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
     private const string _noTransactions =
         "this volume does not support transactions, so KeePassLib's transacted save path is not taken here either.";
 
-    // docs/STEPS.md F.7 records the refusal on the Windows 10 floor this project advertises and
+    // Task F.7 records the refusal on the Windows 10 floor this project advertises and
     // leaves it unobserved on Server 2025, so this asks the running machine rather than assuming
     // it. A runner that allows the move must skip rather than pass having exercised nothing.
     private const string _noRefusal =

@@ -20,7 +20,7 @@ public sealed record SetPromptField(string Entry, string Field, bool EntryWasAlt
 /// A linked set in front of a person: the agent, each item and field, and the agent's reason, already sanitized and capped,
 /// with nowhere to express a default, a deadline or a layout, as <see cref="ApprovalPrompt"/> has none (THREATS.md T-2).
 /// </summary>
-/// <remarks>It offers Deny and Allow once and nothing else: no answer is ever kept for a set (PRODUCT §2).</remarks>
+/// <remarks>It offers Deny and Allow once and nothing else: no answer is ever kept for a set (SECURITY.md law 2).</remarks>
 public sealed record SetPrompt
 {
     /// <summary>What the requesting client calls itself, sanitized. Never proof of anything.</summary>

@@ -23,7 +23,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>Every read is a <c>Try</c>.</b> A malformed frame is a refusal, never an exception: the peer
 /// on the other end of this pipe is a process, and the approver holds the unlocked vault, so a
-/// parse failure must cost that connection and nothing more (docs/PRODUCT.md law 3.7).
+/// parse failure must cost that connection and nothing more (SECURITY.md law 7).
 /// </para>
 /// <para>
 /// <b>One transport is not one seam.</b> Nothing may fuse the listing path and
@@ -177,7 +177,7 @@ public static partial class ApproverProtocol
         var fitted = kept == reply.Names.Count ? reply : reply with { Names = [.. reply.Names.Take(kept)], Complete = false };
 
         // Belt and braces. Everything above says this cannot happen; this is what stops an error in
-        // that reasoning costing a connection rather than a listing (law 3.7).
+        // that reasoning costing a connection rather than a listing (law 7).
         return WriteNames(fitted).Length <= MessageFramer.MaximumPayloadBytes
             ? fitted
             : reply with { Names = [], Reason = Undersized, Complete = false };
@@ -257,7 +257,7 @@ public static partial class ApproverProtocol
         var refusal = WriteCredential(Bounded(reply, reply.Entry));
 
         // Belt and braces: the entry is capped by EntryNameSanitizer long before it gets here, and
-        // this stops an error in that reasoning costing a connection (law 3.7).
+        // this stops an error in that reasoning costing a connection (law 7).
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
             ? refusal
             : WriteCredential(Bounded(reply, entry: null));

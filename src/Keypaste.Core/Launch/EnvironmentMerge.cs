@@ -5,7 +5,7 @@ namespace Keypaste.Core.Launch;
 /// inherited, plus the project's variables on top.
 /// </summary>
 /// <remarks>
-/// This is the code that decides which credential a program receives, so docs/PRODUCT.md law 4.5
+/// This is the code that decides which credential a program receives, so CONTRIBUTING.md
 /// attaches here more than anywhere else, and it is written to be asserted directly rather than
 /// inferred from what a child printed.
 /// </remarks>

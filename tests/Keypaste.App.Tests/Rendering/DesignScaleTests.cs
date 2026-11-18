@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// Every spacing, radius, type size and icon size written in the app is one DESIGN § Type, § Shape and motion or § Icons names.
+/// Every spacing, radius, type size and icon size written in the app is on the design system's type, shape or icon scales.
 /// </summary>
 /// <remarks>
 /// The compiler takes any number, and a frame off by a pixel or two reads as fine, so the numbers drift unless something reads them. A binding or a resource
@@ -18,7 +18,7 @@ public sealed partial class DesignScaleTests
     private static readonly HashSet<double> _radii = [0, 4, 6, 7, 8, 10, 12, 14];
     private static readonly HashSet<double> _icons = [14, 16, 20, 26];
 
-    // Display, heading, list header, dialog title, body and mono, label and helper line, and table header. The half sizes are inside DESIGN's ranges.
+    // Display, heading, list header, dialog title, body and mono, label and helper line, and table header. The half sizes are inside the design system's ranges.
     private static readonly HashSet<double> _typeSizes = [54, 24, 20, 16, 15, 14, 13.5, 13, 12.5, 12, 11];
 
     private static readonly HashSet<string> _spacingProperties = ["Margin", "Padding", "Spacing", "RowSpacing", "ColumnSpacing", "ItemSpacing", "LineSpacing"];
@@ -41,13 +41,13 @@ public sealed partial class DesignScaleTests
         ["NewItemSheet -20,8,-20,0"] = "The template grid's foot rule runs through the sheet's padding to its edges.",
     };
 
-    /// <summary>Doubles that are not on any of DESIGN's lists because Fluent's own control defines what they mean.</summary>
+    /// <summary>Doubles that are not on any of the design system's lists because Fluent's own control defines what they mean.</summary>
     private static readonly Dictionary<string, string> _chromeSizes = new()
     {
-        ["ScrollBarSize"] = "The width of Fluent's scroll bar track, which no list of DESIGN's sizes.",
+        ["ScrollBarSize"] = "The width of Fluent's scroll bar track, which none of the design system's sizes lists.",
     };
 
-    /// <summary>The mono text above 13: DESIGN's masks draw at 14 or larger, and a pairing code the person compares with the browser's is drawn large.</summary>
+    /// <summary>The mono text above 13: the design system's masks draw at 14 or larger, and a pairing code the person compares with the browser's is drawn large.</summary>
     private static readonly HashSet<string> _masks = ["{Binding PasswordMask}", "{Binding Code}"];
 
     [Fact]

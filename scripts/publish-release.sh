@@ -9,7 +9,7 @@
 # Three suppressions on one line: the diagnostic was discarded, the exit code was discarded, and
 # *emptiness* was the only signal. So AccessDenied, an unreachable endpoint, a throttle and a
 # genuinely absent prefix were one answer, and all but the last reached a recursive upload over a
-# published, immutable version on a bucket the world can read (docs/PRODUCT.md laws 3.7 and 4.7).
+# published, immutable version on a bucket the world can read (SECURITY.md law 7 and docs/RELEASE.md).
 #
 # Two things follow, and the second is the one that matters.
 #
@@ -171,7 +171,7 @@ echo "the positive control sees $probe object(s) at $PROBE_PREFIX, so an empty a
 occupied="$(keys_at "$target_prefix")" || exit 1
 if [ "$occupied" -ne 0 ]; then
   echo "::error::${target_prefix} already holds $occupied object(s) and a published version is immutable"
-  echo "::error::re-releasing means a new version number (docs/PRODUCT.md law 4.7)"
+  echo "::error::re-releasing means a new version number (docs/RELEASE.md)"
   listing "$target_prefix" 2>/dev/null | jq -r '.Contents[]?.Key' | sed -n '1,20p' || true
   exit 1
 fi

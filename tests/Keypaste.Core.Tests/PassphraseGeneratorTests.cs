@@ -174,7 +174,7 @@ public sealed class PassphraseGeneratorTests
     /// The entropy figure is the word count times the list's bits, and nothing else.
     /// </summary>
     /// <remarks>
-    /// PRODUCT §1 and THREATS T-26 rest on six words being about 78 bits, so the
+    /// The share passphrase and THREATS T-26 rest on six words being about 78 bits, so the
     /// arithmetic is asserted rather than described. The band is what fails if the minimum moves
     /// without the documents that quote it moving too.
     /// </remarks>

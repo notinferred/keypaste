@@ -95,7 +95,7 @@ for id in 3 4; do
     || die "call $id did not return isError=true"
 done
 
-# 5. Every call left a line, because an unlogged access is a law 3.3 violation whether or not it
+# 5. Every call left a line, because an unlogged access is a law 3 violation whether or not it
 #    was granted.
 [ -f "$AUDIT" ] || die "no audit log was written"
 lines="$(grep -c . "$AUDIT")"
@@ -114,8 +114,8 @@ grep -q '"password"' "$AUDIT" || die "the requested field name was not recorded"
 #
 #    The client's name is read off `initialize`, so a call that overtakes it would otherwise be
 #    answered for "an unnamed agent" - putting a request to a person, or releasing it under an
-#    agent's settings, with the caller missing from both the dialog and the log. That is a law 3.3 gap
-#    and a law 3.7 error path, so it denies (THREATS.md T-3).
+#    agent's settings, with the caller missing from both the dialog and the log. That is a law 3 gap
+#    and a law 7 error path, so it denies (THREATS.md T-3).
 #
 #    This lives here rather than in a unit test on purpose: the in-process tests drive a real
 #    McpClient, which performs the handshake and waits for the response, so the ordering this

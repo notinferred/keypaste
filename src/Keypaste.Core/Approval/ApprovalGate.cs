@@ -46,7 +46,7 @@ public sealed record WaitingChange(ItemChangePrompt Prompt, TimeSpan Remaining);
 /// own timeout, throws, answers twice, or answers late cannot turn any of those into a release: the
 /// deadline is measured here, and anything that is not a clean <see cref="ApprovalAnswer.ApprovedOnce"/>
 /// arriving inside the window is a denial
-/// (docs/PRODUCT.md laws 3.2 and 3.7).
+/// (SECURITY.md laws 2 and 7).
 /// </para>
 /// <para>
 /// <b>One request in front of a human at a time.</b> The MCP SDK dispatches tool calls
@@ -524,7 +524,7 @@ public sealed class ApprovalGate : IDisposable
         catch (Exception)
         {
             // A channel spawns processes and reads terminals. Anything it can throw has to become
-            // a denial here rather than an exception out of a tool call (docs/PRODUCT.md law 3.7).
+            // a denial here rather than an exception out of a tool call (SECURITY.md law 7).
             return ApprovalAnswer.Failed;
         }
     }

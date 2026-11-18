@@ -116,7 +116,7 @@ A sandbox confines the agent's own commands. Everything outside it still runs as
 
 ## How keypaste checks this
 
-ci's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. It does not try a project's `.mcp.json` or `.cursor/mcp.json`, which Codex's sandbox does not protect. That the bridge keeps its access rests on each tool's documentation. Nothing else in this guide is checked by keypaste: Claude Code has no command that runs a shell command in its sandbox without a model, Cursor's Agent CLI lists one only as hidden, and Codex's Windows sandbox is not driven ([L.3](steps/L.3.md)).
+ci's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. It does not try a project's `.mcp.json` or `.cursor/mcp.json`, which Codex's sandbox does not protect. That the bridge keeps its access rests on each tool's documentation. Nothing else in this guide is checked by keypaste: Claude Code has no command that runs a shell command in its sandbox without a model, Cursor's Agent CLI lists one only as hidden, and Codex's Windows sandbox is not driven (L.3).
 
 ## Sources
 

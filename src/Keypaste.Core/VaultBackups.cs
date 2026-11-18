@@ -32,14 +32,14 @@ public enum VaultBackupOutcome
 /// <remarks>
 /// <para>
 /// Entry history and the recycle bin both live <em>inside</em> the vault, so neither survives the
-/// file being truncated, overwritten by something else or deleted. docs/PRODUCT.md law 5.7 requires
-/// the four recovery paths to be proved apart, and this is the third of them: a damaged vault file.
+/// file being truncated, overwritten by something else or deleted. Recovery distinguishes an
+/// earlier entry value, a deleted entry, a damaged vault file and a lost unlock secret, each proved apart, and this is the third of them: a damaged vault file.
 /// It is not the fourth — a backup opens with the credentials it was made under, and nothing here
 /// recovers a lost unlock secret.
 /// </para>
 /// <para>
 /// <b>A backup is the existing file's bytes, copied.</b> Nothing is decrypted, re-encrypted or
-/// re-serialised: law 3.6 forbids touching the format, and a copy cannot get it wrong. It also means
+/// re-serialised: law 6 forbids touching the format, and a copy cannot get it wrong. It also means
 /// a backup carries whatever reader floor its source carried — a vault that has recycled anything is
 /// KDBX 4.1, and so is its backup.
 /// </para>
@@ -47,8 +47,8 @@ public enum VaultBackupOutcome
 /// <b>The vocabulary collides and the two meanings must not.</b> KeePassLib calls an entry's history
 /// revisions "backups" — <c>CreateBackup</c>, <c>RestoreFromBackup</c>, <c>MaintainBackups</c>, which
 /// has an evict-the-oldest rule of its own. That sense is confined to <c>KeePassInterop</c> and stays
-/// there. Here "backup" means the whole file, which is what law 5.7 means by "entry history is not a
-/// whole-vault backup".
+/// there. Here "backup" means the whole file, because entry history is not a
+/// whole-vault backup.
 /// </para>
 /// <para>
 /// This lives in the core rather than in either front end because two implementations

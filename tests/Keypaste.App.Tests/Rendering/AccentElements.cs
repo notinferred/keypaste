@@ -12,7 +12,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// The filled accent buttons in a frame the app drew: what DESIGN rule 4 allows once per view.
+/// The filled accent buttons in a frame the app drew: which a view shows at most once.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,7 +32,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// as macOS does and are not counted.
 /// </para>
 /// <para>
-/// <b>Not counted</b> either, because DESIGN's Colour section gives them the accent as state rather than as a signal:
+/// <b>Not counted</b> either, because the design system's Colour section gives them the accent as state rather than as a signal:
 /// the keyboard's focus ring, a focused field's border and glow and the lock field's caret. The marks' dot is the brand's amber, never the accent.
 /// </para>
 /// </remarks>

@@ -8,7 +8,7 @@ namespace Keypaste.Core.Audit;
 /// <remarks>
 /// <para>
 /// It lives in the core because <c>keypaste log</c> and the GUI's activity feed must say the same
-/// thing about the same file, and docs/PRODUCT.md law 4.3 does not allow that sentence to be written twice.
+/// thing about the same file, and the one-core rule in docs/ARCHITECTURE.md does not allow that sentence to be written twice.
 /// </para>
 /// <para>
 /// <b>ASCII only, and no colour.</b> The output survives every terminal, code page and CI log, and
@@ -376,7 +376,7 @@ public static class AuditText
     /// <summary>What a passing check does not prove, said on every pass rather than never.</summary>
     /// <remarks>
     /// Not over-claiming on green is the mirror of not crying wolf on red, and it is what makes the
-    /// answer worth anything to the person docs/PRODUCT.md section 2 says keypaste is for. THREATS.md T-5
+    /// answer worth anything to the person keypaste is for. THREATS.md T-5
     /// carries the same two sentences.
     /// </remarks>
     public static IReadOnlyList<string> Limits { get; } =

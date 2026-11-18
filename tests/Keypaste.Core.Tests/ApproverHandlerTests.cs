@@ -241,7 +241,7 @@ public sealed class ApproverHandlerTests
 
     /// <summary>
     /// The gap between saying yes and reading: the entry can be deleted, or the vault can be
-    /// locked, in between. That is an error path, and law 3.7 says an error path denies.
+    /// locked, in between. That is an error path, and law 7 says an error path denies.
     /// </summary>
     [Fact]
     public async Task AVaultThatFailsAfterTheApproval_StillDenies()

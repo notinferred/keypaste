@@ -33,7 +33,7 @@ public sealed class Win32ClipboardFormatNameTests
             // Not a silent pass: there is no clipboard here to ask, and asserting anything about
             // one would be inventing a result. Reported as a skip rather than a green, because a
             // test that cannot fail off Windows is an assertion that does not count.
-            Assert.Skip("Registering a clipboard format needs the real Win32 API. Step 1.5a in docs/STEPS.md is the observation this cannot make, and it calls itself BLOCKED rather than green.");
+            Assert.Skip("Registering a clipboard format needs the real Win32 API. Task 1.5a is the observation this cannot make, and it calls itself BLOCKED rather than green.");
             return;
         }
 

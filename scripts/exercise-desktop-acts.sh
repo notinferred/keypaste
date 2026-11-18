@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# R.1a: performs R.1a's acts (docs/STEPS.md) in the desktop app exercise-desktop-install.sh installed on this runner,
+# R.1a: performs R.1a's acts in the desktop app exercise-desktop-install.sh installed on this runner,
 # on a disposable vault KeePassXC made, with a real AI tool's registration, a real MCP client and a real child
 # process, and classifies each act from what the app, the vault, the child, the client and the audit log recorded.
 #

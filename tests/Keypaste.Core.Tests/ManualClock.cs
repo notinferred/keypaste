@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 /// <remarks>
 /// <para>
 /// Hand-rolled rather than <c>FakeTimeProvider</c> because a test-only package still enters
-/// <c>packages.lock.json</c> and turns CI red on its first low-severity advisory (docs/PRODUCT.md law 3.9).
+/// <c>packages.lock.json</c> and turns CI red on its first low-severity advisory (SECURITY.md law 9).
 /// </para>
 /// <para>
 /// <see cref="GetTimestamp"/> is overridden because the base returns <c>Stopwatch.GetTimestamp()</c>,
