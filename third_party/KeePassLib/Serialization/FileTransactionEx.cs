@@ -22,6 +22,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+#if KEYPASTE_DURABLE_REPLACE
+using System.Runtime.InteropServices;
+#endif
 using System.Text;
 
 #if (!KeePassLibSD && !KeePassUAP)
@@ -254,7 +257,11 @@ namespace KeePassLib.Serialization
 			{
 #if KEYPASTE_ATOMIC_REPLACE
 				if(m_iocBase.IsLocalFile() && m_iocTemp.IsLocalFile())
+#if KEYPASTE_DURABLE_REPLACE
+					MoveWritingThrough(m_iocTemp.Path, m_iocBase.Path);
+#else
 					File.Move(m_iocTemp.Path, m_iocBase.Path, true);
+#endif
 				else
 				{
 #endif
@@ -374,6 +381,21 @@ namespace KeePassLib.Serialization
 			catch(Exception) { Debug.Assert(false); m_iocTxfMidFallback = null; }
 		}
 
+#if KEYPASTE_DURABLE_REPLACE
+		private static void MoveWritingThrough(string strFrom, string strTo)
+		{
+			if(NativeLib.IsUnix()) { File.Move(strFrom, strTo, true); return; }
+
+			if(!NativeMethods.MoveFileEx(strFrom, strTo, NativeMethods.MOVEFILE_REPLACE_EXISTING |
+				NativeMethods.MOVEFILE_WRITE_THROUGH))
+			{
+				int iError = Marshal.GetLastWin32Error();
+				throw new IOException(new Win32Exception(iError).Message,
+					unchecked((int)0x80070000) | iError);
+			}
+		}
+#endif
+
 		private bool TxfMove()
 		{
 			if(m_iocTxfMidFallback == null) return false;
@@ -384,7 +406,11 @@ namespace KeePassLib.Serialization
 			// such that it cannot happen that both the base file and
 			// the temporary file are deleted/corrupted
 			const uint f = (NativeMethods.MOVEFILE_COPY_ALLOWED |
-				NativeMethods.MOVEFILE_REPLACE_EXISTING);
+				NativeMethods.MOVEFILE_REPLACE_EXISTING
+#if KEYPASTE_DURABLE_REPLACE
+				| NativeMethods.MOVEFILE_WRITE_THROUGH
+#endif
+				);
 			bool b = NativeMethods.MoveFileEx(m_iocTemp.Path, m_iocTxfMidFallback.Path, f);
 			if(b) b = NativeMethods.MoveFileEx(m_iocTxfMidFallback.Path, m_iocBase.Path, f);
 			if(!b) throw new Win32Exception();

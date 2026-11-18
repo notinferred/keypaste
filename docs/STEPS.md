@@ -6,9 +6,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Track 1 — Everyday vault use and recovery
 
-- [ ] **Y.3 — Read back hardware-key vaults, and flush backups and renames to disk.** Needs: none.
-  - A save of a vault that needs a hardware key reads the new file back as other saves do ([law 12](../SECURITY.md#security-laws)), and a backup and the rename that replaces the vault are flushed to disk before the save counts as made.
-  - Accepted when a test shows a hardware-key vault's save refused when its read-back fails, with the file unchanged, and the backup and the rename flushed on Windows, macOS and Linux.
 - [ ] **A.4 — Write vault files and backups through one Core class.** Needs: none.
   - One class in `Keypaste.Core` owns writing a vault file and its backups, and a banned-API list, as `BannedSymbols.NoFileWrites.txt` is for the app, blocks a raw write to them anywhere else.
   - Accepted when every vault and backup write goes through that class and a raw write elsewhere fails the build.

@@ -34,7 +34,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Outcome | Open tasks |
 |---|---|
 | Worked next, before release work: browser fill is finished, from installing the host per browser and keypaste's own extension in the three stores to filling in real browsers, and the fixes still marked For 1.0.0 are closed. | 8.1g, F.112 |
-| Before release work, by the founder's decisions of 2026-11-18: saves that refuse to lose items and longer backups, sample vaults from every release, the read-back for hardware-key vaults, a pinned KeePassXC, a flat list in the app, a separate yes for crash reports, compile-time bans on the network and on raw vault writes, no retired decision numbers, automated package updates, a product in its own repository, and CI that runs by trigger. | Y.3, J.1, J.2, A.2, A.4, A.5, A.7 |
+| Before release work, by the founder's decisions of 2026-11-18: saves that refuse to lose items and longer backups, sample vaults from every release, the read-back for hardware-key vaults, a pinned KeePassXC, a flat list in the app, a separate yes for crash reports, compile-time bans on the network and on raw vault writes, no retired decision numbers, automated package updates, a product in its own repository, and CI that runs by trigger. | J.1, J.2, A.2, A.4, A.5, A.7 |
 | The Mac app is signed and notarized, and Touch ID quick unlock follows as soon as it is. | 3.5b, 4.10b |
 | Signed, notarized and verified packages for three platforms are published as 1.0.0, with guidance a new user can follow and the phone apps checked by hand, and the installed product is accepted. | 4.7c2, R.1b, L.1, R.1 |
 | `keypaste approve` merges another program's save as the app does; it does not hold the release. | 1.4b4 |

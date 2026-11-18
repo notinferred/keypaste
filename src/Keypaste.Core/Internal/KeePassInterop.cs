@@ -468,7 +468,7 @@ internal sealed class KeePassInterop : IDisposable
     internal Func<byte[], byte[]>? AfterSerializing { get; set; }
 
     /// <summary>The vault as KDBX bytes, proven to open again before they can replace the file.</summary>
-    /// <remarks>A hardware key is not proven with: a save asks it once, and opening the bytes would ask it again.</remarks>
+    /// <remarks>A hardware key is asked once: the bytes open on the answer it gave the save, which <see cref="HardwareKey"/> keeps for the same challenge.</remarks>
     /// <exception cref="VaultException">The bytes did not open.</exception>
     private byte[] SerializeAndProve()
     {
@@ -477,11 +477,6 @@ internal sealed class KeePassInterop : IDisposable
         if (AfterSerializing is { } change)
         {
             bytes = change(bytes);
-        }
-
-        if (HardwareKey is not null)
-        {
-            return bytes;
         }
 
         PwDatabase check = new();
@@ -649,6 +644,7 @@ internal sealed class KeePassInterop : IDisposable
                 transaction.CommitWrite();
             }
 
+            _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(_database.IOConnectionInfo.Path))!);
             _written = SHA256.HashData(bytes);
         }
         finally

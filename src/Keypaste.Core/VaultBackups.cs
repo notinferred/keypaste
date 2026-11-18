@@ -273,11 +273,10 @@ public static class VaultBackups
 
         try
         {
-            File.Copy(vaultPath, reserved, overwrite: false);
-            RestrictToOwner(reserved);
+            VaultFiles.Copy(vaultPath, reserved);
 
             var kept = Name(directory, vaultPath, now);
-            File.Move(reserved, kept);
+            VaultFiles.Move(reserved, kept, overwrite: false);
 
             var utc = now.ToUniversalTime();
             return new VaultBackup(kept, utc.AddTicks(-(utc.Ticks % TimeSpan.TicksPerSecond)));
@@ -576,7 +575,7 @@ public static class VaultBackups
 
         try
         {
-            File.Move(staged, vaultPath, overwrite: true);
+            VaultFiles.Move(staged, vaultPath, overwrite: true);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
@@ -811,17 +810,6 @@ public static class VaultBackups
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
         }
-    }
-
-    /// <summary>Makes a backup readable by its owner alone, where the platform says so.</summary>
-    private static void RestrictToOwner(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        Restrict(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     /// <summary>Makes the backup directory reachable by its owner alone, where the platform says so.</summary>

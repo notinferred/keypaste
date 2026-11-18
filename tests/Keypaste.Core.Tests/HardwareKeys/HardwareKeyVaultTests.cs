@@ -189,6 +189,50 @@ public sealed class HardwareKeyVaultTests : IDisposable
     }
 
     [Fact]
+    public void A_save_reads_its_bytes_back_on_the_answer_the_key_gave_it()
+    {
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+
+        using (var key = new HardwareKey(device, 2))
+        using (var vault = Vault.Open(path, _master, null, key))
+        {
+            vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
+            vault.AfterSerializing = bytes =>
+            {
+                device.Connected = false;
+                return bytes;
+            };
+
+            vault.Save();
+        }
+
+        using var again = new HardwareKey(new SoftwareYubiKey(_secret), 2);
+        using var reopened = Vault.Open(path, _master, null, again);
+        Assert.Equal(2, reopened.ReadEntries().Count);
+    }
+
+    [Fact]
+    public void A_save_whose_bytes_do_not_open_again_is_refused_and_writes_nothing()
+    {
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+
+        using var key = new HardwareKey(device, 2);
+        using var vault = Vault.Open(path, _master, null, key);
+        var bytes = File.ReadAllBytes(path);
+        vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
+        vault.AfterSerializing = written =>
+        {
+            written[^1] ^= 1;
+            return written;
+        };
+
+        Assert.Throws<VaultException>(vault.Save);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    }
+
+    [Fact]
     public void A_save_the_key_does_not_answer_writes_nothing()
     {
         var device = new SoftwareYubiKey(_secret);

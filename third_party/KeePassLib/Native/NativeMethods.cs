@@ -35,6 +35,9 @@ namespace KeePassLib.Native
 
 		internal const uint MOVEFILE_REPLACE_EXISTING = 0x00000001;
 		internal const uint MOVEFILE_COPY_ALLOWED = 0x00000002;
+#if KEYPASTE_DURABLE_REPLACE
+		internal const uint MOVEFILE_WRITE_THROUGH = 0x00000008;
+#endif
 
 		internal const uint FILE_SUPPORTS_TRANSACTIONS = 0x00200000;
 		internal const int MAX_TRANSACTION_DESCRIPTION_LENGTH = 64;
