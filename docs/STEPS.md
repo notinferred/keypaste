@@ -1,8 +1,33 @@
 # Build plan
 
-Open tasks by product track, each with its dependencies, detail and acceptance; [CLAUDE.md](../CLAUDE.md#documents) names the owner of everything else. The license remains AGPL-3.0.
+Open tasks by product track, each with its dependencies, detail and acceptance; [CLAUDE.md](../CLAUDE.md#documents) names the owner of everything else.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
+
+## Track 1 — Everyday vault use and recovery
+
+- [ ] **Y.1 — Refuse a save that loses items, and keep backups longer.** Needs: none.
+  - A save compares the new file's contents with the vault's on read-back and refuses one that loses items without an explained cause, such as a deletion the person made.
+  - Backups keep the five most recent copies, plus one a day for a week and one a week for a month.
+  - Accepted when tests show a save that would lose an item without a cause refused with the file unchanged, a save that removes an item the person deleted made, and the backups kept on that schedule as days pass.
+- [ ] **Y.2 — Open frozen sample vaults from every release in each test run.** Needs: none.
+  - Each release adds sample vaults it wrote, never changed afterwards, and every test run opens all of them, holding the format-compatibility law ([law 14](../SECURITY.md#security-laws)).
+  - Accepted when every test run opens a sample vault written by each published release and fails when one no longer opens.
+- [ ] **Y.3 — Read back hardware-key vaults, and flush backups and renames to disk.** Needs: none.
+  - A save of a vault that needs a hardware key reads the new file back as other saves do ([law 12](../SECURITY.md#security-laws)), and a backup and the rename that replaces the vault are flushed to disk before the save counts as made.
+  - Accepted when a test shows a hardware-key vault's save refused when its read-back fails, with the file unchanged, and the backup and the rename flushed on Windows, macOS and Linux.
+- [ ] **A.4 — Write vault files and backups through one Core class.** Needs: none.
+  - One class in `Keypaste.Core` owns writing a vault file and its backups, and a banned-API list, as `BannedSymbols.NoFileWrites.txt` is for the app, blocks a raw write to them anywhere else.
+  - Accepted when every vault and backup write goes through that class and a raw write elsewhere fails the build.
+- [ ] **J.1 — Show each vault as a flat list in the desktop app.** Needs: none.
+  - The desktop app treats groups as [PRODUCT §2](PRODUCT.md#2-scope-boundaries) sets: each vault a flat list organized by vaults and tags, a new item at the vault's top level, the groups already in a file preserved untouched, and the CLI, search and agents keeping group paths. DESIGN changes with it.
+  - Accepted when the app shows no group, a new item is saved at the top level, and a file with groups that the app saved opens in KeePassXC with every group and item where it was.
+
+## Track 3 — AI requests in the app
+
+- [ ] **A.3 — Ban the network at compile time in the bridge, the browser relay and the CLI.** Needs: none.
+  - `BannedSymbols.NoNetwork.txt`, which Core and the app carry, also binds `Keypaste.Mcp`, `Keypaste.Browser` and `Keypaste.Cli`, with `keypaste share`'s upload the one exemption.
+  - Accepted when a network call added to any of the three fails the build and share's upload still builds.
 
 ## Track 6 — Daily driver
 
@@ -12,7 +37,7 @@ A row is detailed further when it is selected. A task split into children keeps 
   - The founder submits the builds to the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons; each passes its store's review, and the IDs the stores show are the ones `BrowserIdentity.cs` names.
   - Accepted when, by the founder's direction of 2026-11-16, a login is filled from each store's install in branded Chrome, Edge and Firefox on Windows, macOS and Linux, and the Chromium copy `verify-browser-fill.sh` loads carries the Web Store item's public key as its manifest key ([8.3a3](steps/8.3a3.md)).
 - [ ] **F.112 — Close the fixes still marked For 1.0.0.** Needs: none.
-  - The founder's direction of 2026-11-10. Each record's limits own the detail: [V.1b](steps/V.1b.md), [G.4a](steps/G.4a.md), [G.4b](steps/G.4b.md), [G.9](steps/G.9.md), [C.5a1](steps/C.5a1.md), [U.2](steps/U.2.md), [F.43](steps/F.43.md), [F.53](steps/F.53.md), [N.5](steps/N.5.md), [N.6](steps/N.6.md), [L.2a](steps/L.2a.md) and [V.9](steps/V.9.md).
+  - The founder's direction of 2026-11-10. Each record's limits own the detail: [G.4a](steps/G.4a.md), [G.4b](steps/G.4b.md), [G.9](steps/G.9.md), [C.5a1](steps/C.5a1.md), [U.2](steps/U.2.md), [F.43](steps/F.43.md), [N.5](steps/N.5.md), [L.2a](steps/L.2a.md) and [V.9](steps/V.9.md).
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **1.4b4 — `keypaste approve` merges another program's save.** Needs: 1.4b2.
@@ -39,14 +64,36 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **H-0017 — Make the Windows signing identity.** Human. Needs: none.
   - A Microsoft Artifact Signing identity verified as keypaste, which `app.yml` and `release.yml` sign with, in place before 4.7c2; Microsoft's validation can take up to 20 business days.
 - [ ] **H-0027 — Approve the terms of use.** Human. Needs: none.
-  - The founder or a lawyer approves the draft of 2026-11-06, filling in the legal entity, governing law and place of establishment. Agreement by continuing past one first-launch screen, with no separate opt-in for crash reports, needs the lawyer's check for EU consent; it is the founder's decision of 2026-11-06 ([Q.19](steps/Q.19.md)). The lawyer also checks whether requiring that agreement before the app opens sits with AGPL §10's bar on further restrictions, and whether README's 'no account and no network' stays true with reports sending by default.
+  - The founder or a lawyer approves the draft of 2026-11-06, filling in the legal entity, governing law and place of establishment. Crash reports take a yes of their own (J.2). The lawyer also checks whether requiring agreement to the terms before the app opens sits with AGPL §10's bar on further restrictions.
   - Settle this with the terms, as the founder directed on 2026-11-05 (Q.11): "We post changes at keypaste.com/terms", where no such page exists.
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
 - [ ] **H-0029 — Make the extension's store listings.** Human. Needs: none.
   - Developer accounts with the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons as keypaste; the Firefox add-on ID, chosen; the Chrome item's signing key, made and kept as a secret, from which its ID follows; and the ID Edge assigns at the first submission. Store review can take days per store and holds 8.1g.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 3.5b, 4.7a2, 4.7e, G.5. Ships after: every Track 6 task but 1.4b4, F.112, and the two person's checks [ROADMAP](../ROADMAP.md#100-the-first-public-release) says hold the release. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **J.2 — Ask a separate yes for crash reports at first launch.** Needs: none.
+  - The first-launch screen asks for crash reports on their own, apart from accepting the terms of use, as [law 5](../SECURITY.md#security-laws) requires; nothing is sent without that yes, and Settings' switch still turns them off.
+  - Accepted when tests show no report sent after the terms are accepted alone, reports sent once the person says yes, and none after the switch is off.
+- [ ] **Y.4 — Pin the KeePassXC version CI tests against on Linux.** Needs: none.
+  - Accepted when Linux CI installs one named KeePassXC version, and changing it takes a commit.
+- [ ] **A.1 — Build, test and release the product without `site/`.** Needs: none.
+  - The test vectors the product shares with the site are owned by the product, and the release checks no longer read the site's pages.
+  - Accepted when the product's build, tests and release checks pass in a checkout without `site/`.
+- [ ] **A.2 — Split the repository.** Needs: A.1. Input: the founder creates the repositories and re-points Cloudflare's deployment.
+  - The extension, keypaste.com (private), KeePassLib with Twofish and `Keypaste.Infrastructure` each move to their own repository with their Git history; the product links KeePassLib, Infrastructure and the extension as submodules pinned to a commit, at their current paths.
+  - A private workspace repository links every repository and holds the internal documents: ROADMAP, STEPS, BACKLOG, the step records, CLAUDE.md, PRODUCT, DESIGN, DESIGN-PRINCIPLES, launch and `site/TOPICS.md`.
+  - Each repository's CI runs only what a change in it can affect, its cheapest checks first, and never depends on another repository's CI; the product tests a linked repository at the commit it pins.
+  - Accepted when each repository's own CI passes, the product builds and releases from a clone with its submodules, and keypaste.com deploys from its own repository.
+- [ ] **A.5 — Replace the retired D- and O- references.** Needs: none.
+  - Each reference in code, configuration and messages becomes a one-line reason where one is needed, or is deleted; a package's reason in `Directory.Packages.props` is one line beside it ([law 9](../SECURITY.md#security-laws)).
+  - Accepted when no source, configuration, script or message outside `docs/steps/` names a D- or O- number.
+- [ ] **A.6 — Update NuGet and npm packages automatically.** Needs: none.
+  - An update is proposed once its version is seven days old, a security fix at once, and each merges only after passing the vault-safety tests.
+  - Accepted when a version younger than seven days is not proposed, a security fix is, and an update that fails the vault-safety tests does not merge.
+- [ ] **A.7 — Run the product's CI by trigger.** Needs: A.2.
+  - The founder's direction of 2026-11-18: a push runs only the checks its change can affect, cheapest first, and stops at the first failure; main runs the whole suite and smoke checks of the critical journeys; the schedule runs the full matrix of systems, browsers and real tools. Work is built once and reused, never repeated across jobs, and a flaky test is fixed rather than retried.
+  - Accepted when each workflow's triggers and jobs are recorded against these rules with their timings, and no job repeats another's build or tests.
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 3.5b, 4.7a2, 4.7e, G.5. Ships after: every Track 6 task but 1.4b4, F.112, the tasks ROADMAP's outcome of 2026-11-18 names, and the two person's checks [ROADMAP](../ROADMAP.md#100-the-first-public-release) says hold the release. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package.
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.

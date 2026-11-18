@@ -21,7 +21,8 @@ Documents fall into four layers. A base document describes the product and how t
 | Base | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws, which conflicting decisions do not override; changes only by dated re-ratification with an updated plan |
 | Base | This file | Working rules and document ownership, by founder direction |
 | Base | [ARCHITECTURE](docs/ARCHITECTURE.md) | Code map: projects, entry points, processes and where each concern lives |
-| Base | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
+| Base | [SECURITY](SECURITY.md) | The security laws, changed only with PRODUCT's re-ratification; reporting and security guarantees |
+| Base | [THREATS](THREATS.md) | Threat model and known limits |
 | Base | [DESIGN-PRINCIPLES](docs/DESIGN-PRINCIPLES.md) | The eight design principles and their tests, changed with PRODUCT's re-ratification |
 | Base | [DESIGN](docs/DESIGN.md) | The design system, the voice and its glossary, by founder direction |
 | Base | [CONTRIBUTING](CONTRIBUTING.md) | Contributing, local verification, CI and sign-off |
@@ -45,9 +46,9 @@ Finishing a task writes its record as `docs/steps/<ID>.md` from the [template](d
 
 ### Records
 
-Each fact has one owner; other documents link to it rather than restating it. User direction authorizes amendments within its scope. Product scope changes require dated re-ratification and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence. Rewrite outdated text instead of appending another account, and keep history in Git. Published claims require supporting evidence.
+Each fact has one owner; other documents link to it rather than restating it. User direction authorizes amendments within its scope. Product scope changes require dated re-ratification and an updated plan; preserve the security laws in [SECURITY](SECURITY.md#security-laws). Editorial changes preserve requirements and evidence. Rewrite outdated text instead of appending another account, and keep history in Git. Published claims require supporting evidence.
 
-Records are proportional to the risk they retire (PRODUCT §6.6): a record says what changed and why without restating the diff, and a low-risk step's is a few lines. It names no run IDs and tells no rerun story. Never write a document whose subject is another document. Tests on the secret, injection, sync and bridge paths stay mandatory (PRODUCT §4.5): what gets cut is ceremony, never coverage.
+Records are proportional to the risk they retire (PRODUCT §6.6): a record is a few lines saying what changed and why, without restating the diff, and a finding the session cannot close goes to BACKLOG. It names no run IDs and tells no rerun story. Never write a document whose subject is another document. Tests on the secret, injection, sync and bridge paths stay mandatory (PRODUCT §4.5): what gets cut is ceremony, never coverage.
 
 Use RELEASE's four states, Implemented, Packaged, Published and Installation-verified, with version, platform and evidence. Source, a local demo or a green pipeline cannot establish an unfinished journey or a release, and documentation authorizes no publication, messages or customer-data changes.
 

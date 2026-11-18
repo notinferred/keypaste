@@ -11,6 +11,8 @@ Records begin with V.3a; earlier steps' history is in Git. The [rescope of 2026-
 
 Completed <date> in `<sha>`, source only.
 
+What changed and why, in a few lines.
+
 ## Amendments
 Changes to the row as selected, with the founder's direction that made each; the row itself is in Git at the selecting commit.
 
@@ -18,5 +20,5 @@ Changes to the row as selected, with the founder's direction that made each; the
 The tests and gates that hold the outcome, by name.
 
 ## Limits and follow-ups
-Gaps, defects found and their STEPS rows, BACKLOG options.
+Gaps left open, and each finding this step could not close with its BACKLOG entry.
 ```

@@ -16,8 +16,8 @@ namespace Keypaste.Cli.Commands;
 /// is safe to commit, and <c>keypaste run</c> resolves it (D-0349).
 /// </para>
 /// <para>
-/// <b><c>--dotenv</c> is the one command that puts plaintext on disk.</b> docs/PRODUCT.md law 3.4 forbids a secret touching
-/// disk unencrypted <em>by keypaste's doing</em>; here the user names the format, names the
+/// <b><c>--dotenv</c> is the one command that puts plaintext on disk.</b> SECURITY.md's law 4 allows
+/// it as a file the person explicitly asks to export: here the user names the format, names the
 /// destination, and answers for it, which is the same distinction that lets <c>get --reveal</c> exist
 /// beside a clipboard that is otherwise the only way out. It is an escape hatch, and a vault you
 /// cannot leave is a vault nobody should adopt — but it is loud, and it says what it just did.

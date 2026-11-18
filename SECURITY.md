@@ -11,7 +11,7 @@ Email `security@keypaste.com` with the affected version or commit, a description
 | Fix or mitigation plan | Communicated when available, with a timeline |
 | Coordinated disclosure | Up to 90 days, shortened by agreement or active exploitation |
 
-Security reports receive the highest priority. Credit in advisories and the changelog is optional; there is no bug bounty. Breaches and serious shipped bugs receive prompt, full disclosure covering the incident, exposure and changes, as required by PRODUCT §3.10. All security-relevant fixes are disclosed.
+Security reports receive the highest priority. Credit in advisories and the changelog is optional; there is no bug bounty. Breaches and serious shipped bugs receive prompt, full disclosure covering the incident, exposure and changes, as [law 10](#security-laws) requires. All security-relevant fixes are disclosed.
 
 Reports cover this repository, its build and release pipeline, and dependencies on the secret path. The signup endpoint at `site/src/worker.js` is also in scope because it stores email addresses. Static site content and third-party deployments are outside this reporting scope. Report upstream dependency vulnerabilities upstream and here; vendored patches must be merged manually.
 
@@ -70,9 +70,28 @@ Substitute any other asset name. A changed byte, another repository or another w
 
 An attestation shows which repository, workflow, tag and commit produced the bytes. It does not show that the source is safe, that the build is reproducible (it is not) or that the release workflow was uncompromised ([THREATS.md](THREATS.md) [T-21]). README documents building from source with dependencies pinned by content hash in `packages.lock.json`.
 
+## Security laws
+
+These laws stand above every other rule of keypaste's and change only by [PRODUCT](docs/PRODUCT.md)'s dated re-ratification. Laws 1 to 10 keep the numbers they had as PRODUCT §3, so a citation of §3.4 means law 4.
+
+1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.
+2. Agents never get the vault. Each release contains one credential with one scope, or a linked set the person approves whole in one prompt, following explicit human approval or a pre-approved policy the human wrote, of which a category's Allow the human confirmed on this computer is one. A set is never released by a rule alone. Default is deny. A browser gets one login at a time, and only at the person's pick in keypaste's own in-page list, drawn apart from the page, which lists names and no password: the pick counts as their answer for a login already filled through that browser's pairing on that exact site, and a first fill of a login on a site, and every fill on a site keypaste asks about each time, is asked in keypaste.
+3. Every agent request for a value, a command, a save or a change to an item, and every login released to a browser with the page's origin, is recorded as its own line in a local, human-readable log before keypaste answers, recording who or what asked for which item, when, and whether it was granted or denied; nothing rewrites a line. An agent's lookups of names, a listing or a search, keep their own lines for 30 days and are then folded into one sealed summary line per agent per day. The person sets how long the log is kept, one year by default; older lines are removed only as whole days, behind a sealed line recording what was removed.
+4. Keypaste never writes secrets to disk unencrypted, except a key file the person asks keypaste to create, an attachment the person asks it to save and a file the person explicitly asks to export, such as `env export --dotenv`, each written once where they choose. Injection uses process environment memory only.
+5. Analytics and telemetry never include secret content or entry names. Only opt-in anonymous usage counts are permitted, and the desktop app's crash reports once the person says yes to them on its first launch, a yes of its own apart from accepting the terms of use, until they turn them off in Settings; a report holds no exception message, secret content, entry or vault name, file path or value.
+6. Use the KDBX4 specification (Argon2; AES-256, ChaCha20 or Twofish, the ciphers KeePassXC writes) through mature audited libraries. Never write custom cryptography or modify the format.
+7. Fail closed: every error path in the bridge denies access.
+8. The code is open source under AGPL-3.0 and stays open: the desktop app, the CLI, the bridge, the browser relay, the browser extension, which keeps the GPL-3.0 of the KeePassXC-Browser it is forked from, and all code that encrypts or handles vault data. keypaste's hosted services and separately sold add-ons may be closed. Auditable code establishes trust in an unknown founder.
+9. Dependencies are minimized and pinned. Every new dependency on the secret path is justified in one line beside the package in `Directory.Packages.props`.
+10. Provide a security policy, a private vulnerability-reporting contact and honest responses. Disclose breaches and serious shipped bugs promptly and fully.
+11. The bridge and the browser relay never open a vault; each forwards requests to the process holding it.
+12. A save never replaces a vault without keeping a backup and reading the new file back successfully.
+13. The trust boundary is the person's OS account: other processes running as the same user are outside keypaste's protection, as [THREATS](THREATS.md#assumptions-and-scope) says.
+14. Every release opens every earlier release's vaults, and KeePassXC 2.7 or later opens what keypaste writes.
+
 ## Guarantees and limits
 
-[PRODUCT §3](docs/PRODUCT.md) owns the security laws, and [THREATS.md](THREATS.md) each guarantee's detail and tests. **v0.3.0** marks what the published CLI and bridge have (the source build keeps it); **unreleased** marks the source build headed for 1.0.0, which includes all of the desktop app. A line with neither mark holds for both.
+The [security laws](#security-laws) govern these guarantees, and [THREATS.md](THREATS.md) holds each one's detail and tests. **v0.3.0** marks what the published CLI and bridge have (the source build keeps it); **unreleased** marks the source build headed for 1.0.0, which includes all of the desktop app. A line with neither mark holds for both.
 
 ### Agent access
 

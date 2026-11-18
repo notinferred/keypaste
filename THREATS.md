@@ -1,6 +1,6 @@
 # Threat model
 
-This file is keypaste's threat model. For each way keypaste can be attacked or misused it says what is at stake, who the attacker is, what keypaste does about it, what stays true afterwards, which release has it and which tests hold it. [SECURITY.md](SECURITY.md) has the reporting policy and a one-line summary of each guarantee and limit. [PRODUCT §3](docs/PRODUCT.md) governs both.
+This file is keypaste's threat model. For each way keypaste can be attacked or misused it says what is at stake, who the attacker is, what keypaste does about it, what stays true afterwards, which release has it and which tests hold it. [SECURITY.md](SECURITY.md) has the reporting policy and a one-line summary of each guarantee and limit. The [security laws](SECURITY.md#security-laws) govern both.
 
 It covers every surface that exists: the vault, the `keypaste` CLI, the MCP bridge an AI tool starts (`keypaste mcp`), the process holding an unlocked vault, the desktop app, the browser relay, share links and setup. Planned surfaces, such as an end-to-end-encrypted cloud vault and team projects, get no guarantee here until they exist.
 

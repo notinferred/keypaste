@@ -2,9 +2,9 @@
 
 ## Changes and review
 
-[CLAUDE.md](CLAUDE.md) holds the working rules and says which document owns what; [PRODUCT](docs/PRODUCT.md) owns scope and the security laws, and proposals do not override it. Rows in [BACKLOG](docs/BACKLOG.md) are not instructions to build them.
+[CLAUDE.md](CLAUDE.md) holds the working rules and says which document owns what; [PRODUCT](docs/PRODUCT.md) owns scope and [SECURITY](SECURITY.md#security-laws) the security laws, and proposals override neither. Rows in [BACKLOG](docs/BACKLOG.md) are not instructions to build them.
 
-Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. New secret-path dependencies require written justification, pinned versions and regenerated lock files.
+Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. A new dependency needs its one-line reason beside it in `Directory.Packages.props` ([PRODUCT §4.9](docs/PRODUCT.md#4-engineering-laws)), a pinned version and regenerated lock files.
 
 Use KDBX4 through the vendored library. Do not implement cryptography. Only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC, which CI checks in both directions.
 
