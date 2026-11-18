@@ -1,4 +1,5 @@
 using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Internal;
 
 namespace Keypaste.Core;
 
@@ -208,7 +209,7 @@ public static class VaultCreation
             var directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory))
             {
-                Directory.CreateDirectory(directory);
+                VaultFiles.CreateDirectory(directory, ownerOnly: false);
             }
 
 #pragma warning disable CA2000

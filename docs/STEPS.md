@@ -6,9 +6,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Track 1 — Everyday vault use and recovery
 
-- [ ] **A.4 — Write vault files and backups through one Core class.** Needs: none.
-  - One class in `Keypaste.Core` owns writing a vault file and its backups, and a banned-API list, as `BannedSymbols.NoFileWrites.txt` is for the app, blocks a raw write to them anywhere else.
-  - Accepted when every vault and backup write goes through that class and a raw write elsewhere fails the build.
 - [ ] **J.1 — Show each vault as a flat list in the desktop app.** Needs: none.
   - The desktop app treats groups as [PRODUCT §2](PRODUCT.md#2-scope-boundaries) sets: each vault a flat list organized by vaults and tags, a new item at the vault's top level, the groups already in a file preserved untouched, and the CLI, search and agents keeping group paths. DESIGN changes with it.
   - Accepted when the app shows no group, a new item is saved at the top level, and a file with groups that the app saved opens in KeePassXC with every group and item where it was.

@@ -1,18 +1,29 @@
-// The app writes no file itself, so every vault it writes comes from the writer the KeePassXC gate covers (PRODUCT §4.6).
-M:System.IO.File.WriteAllBytes(System.String,System.Byte[]);the app writes files only through Core
-M:System.IO.File.WriteAllBytes(System.String,System.ReadOnlySpan{System.Byte});the app writes files only through Core
-M:System.IO.File.WriteAllText(System.String,System.String);the app writes files only through Core
-M:System.IO.File.WriteAllText(System.String,System.String,System.Text.Encoding);the app writes files only through Core
-M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char});the app writes files only through Core
-M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char},System.Text.Encoding);the app writes files only through Core
-M:System.IO.File.Create(System.String);the app writes files only through Core
-M:System.IO.File.Create(System.String,System.Int32);the app writes files only through Core
-M:System.IO.File.Create(System.String,System.Int32,System.IO.FileOptions);the app writes files only through Core
-M:System.IO.File.Copy(System.String,System.String);the app writes files only through Core
-M:System.IO.File.Copy(System.String,System.String,System.Boolean);the app writes files only through Core
-M:System.IO.File.Move(System.String,System.String);the app writes files only through Core
-M:System.IO.File.Move(System.String,System.String,System.Boolean);the app writes files only through Core
-M:System.IO.Directory.CreateDirectory(System.String);the app writes files only through Core
-M:System.IO.Directory.CreateDirectory(System.String,System.IO.UnixFileMode);the app writes files only through Core
-T:System.IO.FileStream;the app writes files only through Core
+// The front ends write no file themselves, so every vault and backup they write goes through Core's VaultFiles and the writer the KeePassXC gate covers (PRODUCT §4.6).
+M:System.IO.File.WriteAllBytes(System.String,System.Byte[]);front ends write files only through Core
+M:System.IO.File.WriteAllBytes(System.String,System.ReadOnlySpan{System.Byte});front ends write files only through Core
+M:System.IO.File.WriteAllText(System.String,System.String);front ends write files only through Core
+M:System.IO.File.WriteAllText(System.String,System.String,System.Text.Encoding);front ends write files only through Core
+M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char});front ends write files only through Core
+M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char},System.Text.Encoding);front ends write files only through Core
+M:System.IO.File.Create(System.String);front ends write files only through Core
+M:System.IO.File.Create(System.String,System.Int32);front ends write files only through Core
+M:System.IO.File.Create(System.String,System.Int32,System.IO.FileOptions);front ends write files only through Core
+M:System.IO.File.Copy(System.String,System.String);front ends write files only through Core
+M:System.IO.File.Copy(System.String,System.String,System.Boolean);front ends write files only through Core
+M:System.IO.File.Move(System.String,System.String);front ends write files only through Core
+M:System.IO.File.Move(System.String,System.String,System.Boolean);front ends write files only through Core
+M:System.IO.File.Delete(System.String);front ends write files only through Core
+M:System.IO.File.Replace(System.String,System.String,System.String);front ends write files only through Core
+M:System.IO.File.Replace(System.String,System.String,System.String,System.Boolean);front ends write files only through Core
+M:System.IO.File.OpenWrite(System.String);front ends write files only through Core
+M:System.IO.File.Open(System.String,System.IO.FileMode,System.IO.FileAccess);front ends write files only through Core
+M:System.IO.File.Open(System.String,System.IO.FileMode,System.IO.FileAccess,System.IO.FileShare);front ends write files only through Core
+M:System.IO.File.Open(System.String,System.IO.FileStreamOptions);front ends write files only through Core
+M:System.IO.File.AppendAllText(System.String,System.String);front ends write files only through Core
+M:System.IO.File.AppendAllBytes(System.String,System.Byte[]);front ends write files only through Core
+M:System.IO.Directory.Delete(System.String,System.Boolean);front ends write files only through Core
+M:System.IO.Directory.Move(System.String,System.String);front ends write files only through Core
+M:System.IO.Directory.CreateDirectory(System.String);front ends write files only through Core
+M:System.IO.Directory.CreateDirectory(System.String,System.IO.UnixFileMode);front ends write files only through Core
+T:System.IO.FileStream;front ends write files only through Core
 M:Keypaste.Core.Vault.Create(System.String,System.ReadOnlySpan{System.Char});the app creates a vault only through VaultCreation, as keypaste init does

@@ -3157,39 +3157,12 @@ public sealed class Vault : IDisposable
 
     private static void WriteNew(string destination, byte[] bytes)
     {
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.Write,
-            Share = FileShare.None,
-        };
-
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
-        var created = false;
         try
         {
-            using var stream = new FileStream(destination, options);
-            created = true;
-            stream.Write(bytes);
-            stream.Flush(flushToDisk: true);
+            VaultFiles.WriteNew(destination, bytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            if (created)
-            {
-                try
-                {
-                    File.Delete(destination);
-                }
-                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
-                {
-                }
-            }
-
             throw new VaultException($"Could not write '{destination}': {ex.Message}", ex);
         }
     }

@@ -7,9 +7,9 @@
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">NoNetwork;OneUpperCase</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">OneUpperCase</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.App'">NoKeePassLib;NoNetwork;NoFileWrites</KeypasteBans>
-    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Cli'">NoKeePassLib;NoNetwork;NoCrashReports</KeypasteBans>
-    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Mcp'">NoKeePassLib;NoNetwork;NoCrashReports;NoVault</KeypasteBans>
-    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">NoKeePassLib;NoNetwork;NoCrashReports;NoVault</KeypasteBans>
+    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Cli'">NoKeePassLib;NoNetwork;NoCrashReports;NoFileWrites</KeypasteBans>
+    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Mcp'">NoKeePassLib;NoNetwork;NoCrashReports;NoVault;NoFileWrites</KeypasteBans>
+    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">NoKeePassLib;NoNetwork;NoCrashReports;NoVault;NoFileWrites</KeypasteBans>
   </PropertyGroup>
 
   <!-- The desktop process has a real culture, and Core and Infrastructure run in it; .editorconfig turns on the culture rules this package adds to the SDK's. -->

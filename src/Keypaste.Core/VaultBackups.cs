@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Runtime.Versioning;
 using Keypaste.Core.Internal;
 using Polly;
 
@@ -42,7 +41,7 @@ public enum VaultBackupOutcome
 /// <b>A backup is the existing file's bytes, copied.</b> Nothing is decrypted, re-encrypted or
 /// re-serialised: law 3.6 forbids touching the format, and a copy cannot get it wrong. It also means
 /// a backup carries whatever reader floor its source carried — a vault that has recycled anything is
-/// KDBX 4.1 (D-0247), and so is its backup.
+/// KDBX 4.1, and so is its backup.
 /// </para>
 /// <para>
 /// <b>The vocabulary collides and the two meanings must not.</b> KeePassLib calls an entry's history
@@ -52,7 +51,7 @@ public enum VaultBackupOutcome
 /// whole-vault backup".
 /// </para>
 /// <para>
-/// This lives in the core rather than in either front end for D-0222's reason: two implementations
+/// This lives in the core rather than in either front end because two implementations
 /// of a rule that replaces a vault file are two chances to destroy one.
 /// </para>
 /// </remarks>
@@ -128,7 +127,7 @@ public static class VaultBackups
         ArgumentNullException.ThrowIfNull(copyPath);
 
         var folder = DirectoryFor(vaultPath);
-        Directory.CreateDirectory(folder);
+        VaultFiles.CreateDirectory(folder, ownerOnly: true);
         var name = Path.GetFileNameWithoutExtension(copyPath);
         var target = Path.Combine(folder, Path.GetFileName(copyPath));
 
@@ -137,12 +136,8 @@ public static class VaultBackups
             target = Path.Combine(folder, $"{name}.{counter.ToString(CultureInfo.InvariantCulture)}{Path.GetExtension(copyPath)}");
         }
 
-        File.Move(copyPath, target);
-
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(target, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
+        VaultFiles.Move(copyPath, target, overwrite: false);
+        VaultFiles.RestrictToOwner(target);
 
         return target;
     }
@@ -283,7 +278,7 @@ public static class VaultBackups
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            Discard(reserved);
+            VaultFiles.Discard(reserved);
 
             throw new VaultBackupException(
                 $"Could not back '{vaultPath}' up to '{directory}': {ex.Message}", ex);
@@ -428,7 +423,7 @@ public static class VaultBackups
         }
         catch
         {
-            Discard(staged);
+            VaultFiles.Discard(staged);
             throw;
         }
     }
@@ -471,29 +466,13 @@ public static class VaultBackups
             Path.GetDirectoryName(vaultPath)!,
             $".{Path.GetFileName(vaultPath)}.keypaste-restore-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}.tmp");
 
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.Write,
-            Share = FileShare.None,
-        };
-
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
         try
         {
-            using var stream = new FileStream(staged, options);
-            stream.Write(bytes);
-            stream.Flush(flushToDisk: true);
+            VaultFiles.WriteNew(staged, bytes);
             return staged;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
-            Discard(staged);
-
             throw new VaultRestoreException($"Could not stage the backup beside '{vaultPath}': {ex.Message}", ex);
         }
     }
@@ -505,7 +484,7 @@ public static class VaultBackups
     /// <summary>The vault as it is before anything is done to it, waiting out a file that cannot be read.</summary>
     /// <remarks>
     /// A vault another process is in the middle of saving refuses a read for a moment, and a file that
-    /// cannot be read is not a change (D-0017). One that stays unreadable cannot be kept, so it is not
+    /// cannot be read is not a change. One that stays unreadable cannot be kept, so it is not
     /// replaced.
     /// </remarks>
     private static (bool Exists, byte[]? Digest) ObserveReadable(string vaultPath, Action<int>? waitBetweenAttempts)
@@ -538,7 +517,7 @@ public static class VaultBackups
 
     /// <summary>Renames the staged file onto the vault, which must still be what was observed.</summary>
     /// <remarks>
-    /// The vault is looked at again before every attempt, the way D-0119 has a save do: a wait is where
+    /// The vault is looked at again before every attempt, the way a save does: a wait is where
     /// another writer lands, and the bytes replaced must be the bytes kept. A vault that appears where
     /// there was none is a change too.
     /// </remarks>
@@ -610,7 +589,7 @@ public static class VaultBackups
 
         foreach (var path in stale)
         {
-            Discard(path);
+            VaultFiles.Discard(path);
         }
     }
 
@@ -694,8 +673,7 @@ public static class VaultBackups
 
         try
         {
-            Directory.CreateDirectory(directory);
-            RestrictDirectoryToOwner(directory);
+            VaultFiles.CreateDirectory(directory, ownerOnly: true);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
@@ -721,7 +699,7 @@ public static class VaultBackups
         {
             try
             {
-                File.Delete(backup.Path);
+                VaultFiles.Delete(backup.Path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -772,7 +750,7 @@ public static class VaultBackups
     /// <summary>Removes temporaries a killed process left in the backup directory.</summary>
     /// <remarks>
     /// Opened at one exact path with <see cref="FileShare.None"/> and
-    /// <see cref="FileOptions.DeleteOnClose"/> rather than deleted by name, which is D-0120's
+    /// <see cref="FileOptions.DeleteOnClose"/> rather than deleted by name, which is the save's
     /// discipline: a temporary another process is still writing refuses us, and a refusal is where
     /// this stops. Best effort throughout — failing to tidy up must never fail a backup.
     /// </remarks>
@@ -795,45 +773,7 @@ public static class VaultBackups
 
         foreach (var path in stale)
         {
-            Discard(path);
-        }
-    }
-
-    /// <summary>Removes one temporary, if nobody else holds it.</summary>
-    private static void Discard(string path)
-    {
-        try
-        {
-            using var _ = new FileStream(
-                path, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
-    /// <summary>Makes the backup directory reachable by its owner alone, where the platform says so.</summary>
-    private static void RestrictDirectoryToOwner(string directory)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        Restrict(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-    }
-
-    [UnsupportedOSPlatform("windows")]
-    private static void Restrict(string path, UnixFileMode mode)
-    {
-        try
-        {
-            File.SetUnixFileMode(path, mode);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // The copy exists and is encrypted; a mode this filesystem will not hold does not make
-            // it worthless. Windows inherits the profile's permissions, as recent.toml does (T-24).
+            VaultFiles.Discard(path);
         }
     }
 }
@@ -861,7 +801,7 @@ public sealed record VaultFileFacts(string Path, long Length, DateTimeOffset Mod
 /// Only <see cref="VaultBackups.Inspect"/> can make one, and the digest it carries is not public, so
 /// a restore cannot be aimed at bytes nobody opened or at another vault. A class rather than a record
 /// so the digest stays out of <c>ToString</c>, which T-24 holds <see cref="VaultBackupReport"/> to as
-/// well. The counts are of live items: the recycle bin is left out, as it is from every read (D-0248).
+/// well. The counts are of live items: the recycle bin is left out, as it is from every read.
 /// </remarks>
 public sealed class VaultBackupSummary
 {

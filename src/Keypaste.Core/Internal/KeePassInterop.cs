@@ -605,17 +605,6 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    /// <summary>Gives the file about to replace the vault the vault's own permissions, which the rename would otherwise lose.</summary>
-    private void KeepVaultFileMode(FileStream replacement)
-    {
-        var vault = _database.IOConnectionInfo.Path;
-
-        if (!OperatingSystem.IsWindows() && File.Exists(vault))
-        {
-            File.SetUnixFileMode(replacement.SafeFileHandle, File.GetUnixFileMode(vault));
-        }
-    }
-
     /// <summary>Replaces the vault with what <paramref name="serialize"/> returns, flushed to disk before the rename that commits it.</summary>
     /// <remarks>
     /// The file is opened before <paramref name="serialize"/> runs, as <c>PwDatabase.Save</c> opened it, so an
@@ -636,7 +625,7 @@ internal sealed class KeePassInterop : IDisposable
 
                     if (target is FileStream file)
                     {
-                        KeepVaultFileMode(file);
+                        VaultFiles.KeepMode(file, _database.IOConnectionInfo.Path);
                         file.Flush(flushToDisk: true);
                     }
                 }
@@ -3485,30 +3474,14 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// <para>
     /// The window this does not close is that writer's close-then-rename, where the file is shut
-    /// and the vault already deleted. D-0120 records it as accepted rather than solved.
+    /// and the vault already deleted, which is accepted rather than solved.
     /// </para>
     /// <para>
     /// Best effort throughout. The caller is on its way to reporting why the save failed, and
     /// failing to tidy up must never replace that message.
     /// </para>
     /// </remarks>
-    private void SweepStrandedTemporary()
-    {
-        try
-        {
-            using FileStream doomed = new(
-                _database.IOConnectionInfo.Path + StrandedTemporarySuffix,
-                FileMode.Open,
-                FileAccess.ReadWrite,
-                FileShare.None,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose);
-        }
-        catch (Exception ex) when (
-            ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
-        {
-        }
-    }
+    private void SweepStrandedTemporary() => VaultFiles.Discard(_database.IOConnectionInfo.Path + StrandedTemporarySuffix);
 
     /// <inheritdoc/>
     public void Dispose()
