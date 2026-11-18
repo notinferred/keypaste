@@ -18,7 +18,8 @@ internal static class VaultFiles
     /// <exception cref="IOException">The destination exists, or either file could not be used.</exception>
     internal static void Copy(string source, string destination)
     {
-        using var from = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // Shares as File.Copy did, so a vault another program holds open can still be backed up.
+        using var from = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var to = new FileStream(destination, NewOwnerOnlyFile());
         from.CopyTo(to);
         to.Flush(flushToDisk: true);
