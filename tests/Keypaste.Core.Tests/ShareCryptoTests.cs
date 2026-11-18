@@ -196,13 +196,13 @@ public sealed class ShareCryptoTests
     }
 
     /// <summary>
-    /// The vector <c>site/test/share-crypto.test.mjs</c> opens with WebCrypto. Sealing it again here
+    /// The vector <c>tests/vectors/share-vector.json</c>, which keypaste.com's viewer opens with WebCrypto. Sealing it again here
     /// with the same inputs must give the same bytes, so the two halves cannot drift apart.
     /// </summary>
     [Fact]
     public void MatchesTheCrossLanguageVector()
     {
-        var path = Path.Combine(VendoredWordList.RepoRoot(), "site", "test", "share-vector.json");
+        var path = Path.Combine(VendoredWordList.RepoRoot(), "tests", "vectors", "share-vector.json");
         using var vector = JsonDocument.Parse(File.ReadAllText(path));
 
         var cases = vector.RootElement.GetProperty("cases").EnumerateArray().ToList();

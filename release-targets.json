@@ -31,7 +31,6 @@
         ],
         "disclosed_in": [
           "README.md",
-          "site/public/download/index.html",
           "CHANGELOG.md",
           "SECURITY.md",
           "docs/RELEASE.md"
@@ -39,12 +38,10 @@
       },
       "defects_disclosed_in": [
         "README.md",
-        "site/public/download/index.html",
         "SECURITY.md"
       ],
       "upgrade_notice_on": [
-        "SECURITY.md",
-        "site/public/download/index.html"
+        "SECURITY.md"
       ],
       "targets": [
         {
@@ -57,8 +54,7 @@
           "floor_evidence": "container-check",
           "install_check": "linux",
           "advertised_on": [
-            "README.md",
-            "site/public/download/index.html"
+            "README.md"
           ],
           "install_runner": "ubuntu-24.04"
         },
@@ -73,8 +69,7 @@
           "floor_caveat": "the equivalent container check is not implemented for arm64",
           "install_check": "linux-arm64",
           "advertised_on": [
-            "README.md",
-            "site/public/download/index.html"
+            "README.md"
           ],
           "install_runner": "ubuntu-22.04-arm",
           "install_block": "linux",
@@ -90,8 +85,7 @@
           "floor_evidence": "cited",
           "install_check": "macos",
           "advertised_on": [
-            "README.md",
-            "site/public/download/index.html"
+            "README.md"
           ],
           "install_runner": "macos-15",
           "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",

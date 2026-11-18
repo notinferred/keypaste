@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Asks keypaste.com whether the disclosure is actually on it.
 #
-# verify-release-matrix.sh reads site/public/download/index.html at the checked-out ref, and says so, so it
+# site.yml reads site/public/download/index.html at the checked-out ref with KEYPASTE_SITE_BODY, which
 # goes green the moment a commit lands and says nothing about what the origin serves. What sits on
 # the far side of that gap is the list of ways the advertised download can destroy somebody's vault.
-# So this one asks the origin instead of the working tree.
+# So by default this one asks the origin instead of the working tree.
 #
 # NOTHING RUNS THIS AGAINST THE ORIGIN BUT A PERSON. keypaste.com deploys from Cloudflare's Git
 # integration (D-0127), so no workflow here publishes the page or is positioned to check what was

@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "name": "no passphrase",
+      "key": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+      "passphrase": "",
+      "iterations": 1000,
+      "salt": "yMnKy8zNzs_Q0dLT1NXW1w",
+      "iv": "ZGVmZ2hpamtsbW5v",
+      "check_iv": "lpeYmZqbnJ2en6Ch",
+      "payload": {
+        "title": "STRIPE_SECRET_KEY",
+        "fields": [
+          {
+            "name": "password",
+            "value": "sk_test_4eC39HqLyjWDarjtT1zdp7dc"
+          }
+        ],
+        "created": "2026-09-24T14:40:00Z"
+      },
+      "envelope": "{\"v\":1,\"alg\":\"A256GCM\",\"kdf\":null,\"iv\":\"ZGVmZ2hpamtsbW5v\",\"ct\":\"9kBS7CaJJBo0AhxWHrk35skx8VouWl4M7QS5JvjpB9uZ7DvuoXBpayVSaty2_eTagLokOK5omM3bY_2u_2-NpqTpvg5EWMFgfcxfh3H-kywYYstteDhA54DSvVD7ATAB9I-OGIUAjogL2C15DbxMJ9APpH5SORCMgk4dJ3J3GMuAlIxdDtVqb54m6vf-NGMoNwxqy6KCB-55Jx2O1IU\",\"check_iv\":\"lpeYmZqbnJ2en6Ch\",\"check\":\"8nn-LVpInSiQolh60O2tvw\"}"
+    },
+    {
+      "name": "passphrase",
+      "key": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A",
+      "passphrase": "correct horse battery",
+      "iterations": 1000,
+      "salt": "ycrLzM3Oz9DR0tPU1dbX2A",
+      "iv": "ZWZnaGlqa2xtbm9w",
+      "check_iv": "l5iZmpucnZ6foKGi",
+      "payload": {
+        "title": "Chase",
+        "fields": [
+          {
+            "name": "username",
+            "value": "sam@acme.dev"
+          },
+          {
+            "name": "password",
+            "value": "pässwörd ✓ \"q\" \\ \n"
+          },
+          {
+            "name": "url",
+            "value": "https://chase.com/"
+          }
+        ],
+        "created": "2026-09-24T14:40:00Z"
+      },
+      "envelope": "{\"v\":1,\"alg\":\"A256GCM\",\"kdf\":{\"name\":\"PBKDF2-SHA256\",\"iterations\":1000,\"salt\":\"ycrLzM3Oz9DR0tPU1dbX2A\"},\"iv\":\"ZWZnaGlqa2xtbm9w\",\"ct\":\"W2OTB1JIWVMjBfOOzi3tZVds5hVEtfBUf9pRhBAWyxXjkfYnWDgCFVQGb1F4fdrc7BpvxjeV5Yd6e10LCROfPjdadlRAJ1zeoIF3Z0T6bq5U9Qw0UN_7d3_RGE_5x4-IlczlexF_Rs4xHmdh-Gfdi-SOYu-XzL5ogwIMctXGHDYV0waFjH6Vko05tWGS5kLkmsVlO6ikewhcm2uu8NiGBTUIRO2JiqvI_kkXV7PxMgctqqk4mlIjQsv89CM3OX_2p-UmDTbijsaW-jlCgFD_Y6iOSzqnPRufVseqmnr0sKOWGcnvu8qhNmvQqWfj6IRazelKqOem\",\"check_iv\":\"l5iZmpucnZ6foKGi\",\"check\":\"y1_JiqLkv1w84FI869OcFg\"}"
+    }
+  ]
+}

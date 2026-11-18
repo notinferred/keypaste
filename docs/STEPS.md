@@ -76,10 +76,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Accepted when tests show no report sent after the terms are accepted alone, reports sent once the person says yes, and none after the switch is off.
 - [ ] **Y.4 — Pin the KeePassXC version CI tests against on Linux.** Needs: none.
   - Accepted when Linux CI installs one named KeePassXC version, and changing it takes a commit.
-- [ ] **A.1 — Build, test and release the product without `site/`.** Needs: none.
-  - The test vectors the product shares with the site are owned by the product, and the release checks no longer read the site's pages.
-  - Accepted when the product's build, tests and release checks pass in a checkout without `site/`.
-- [ ] **A.2 — Split the repository.** Needs: A.1. Input: the founder creates the repositories and re-points Cloudflare's deployment.
+- [ ] **A.2 — Split the repository.** Needs: none. Input: the founder creates the repositories and re-points Cloudflare's deployment.
   - The extension, keypaste.com (private), KeePassLib with Twofish and `Keypaste.Infrastructure` each move to their own repository with their Git history; the product links KeePassLib, Infrastructure and the extension as submodules pinned to a commit, at their current paths.
   - A private workspace repository links every repository and holds the internal documents: ROADMAP, STEPS, BACKLOG, the step records, CLAUDE.md, PRODUCT, DESIGN, DESIGN-PRINCIPLES, launch and `site/TOPICS.md`.
   - Each repository's CI runs only what a change in it can affect, its cheapest checks first, and never depends on another repository's CI; the product tests a linked repository at the commit it pins.

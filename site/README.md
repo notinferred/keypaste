@@ -142,7 +142,7 @@ npx wrangler dev --config .wrangler/wrangler.json --ip 127.0.0.1 --port 8787 --l
 
 The share routes use `SHARE_DB` whenever it is bound, so the memory store is reached only without it, and only for `localhost` and `127.0.0.1`; `--local-upstream` keeps the request URL on `127.0.0.1` instead of the routed `keypaste.com`. With a local Postgres, run `npx wrangler dev` on `wrangler.jsonc` itself, with `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` set.
 
-`npm test` runs the share and crash route tests and the share cryptography tests on Node 22.13 or later, which the crash tests' stand-in for D1 needs for `node:sqlite`, and ci's checks job runs them. `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
+`npm test` runs the share and crash route tests and the share cryptography tests on Node 22.13 or later, which the crash tests' stand-in for D1 needs for `node:sqlite`, and `site.yml` runs them. `test/share-vector.json` holds vectors the .NET core sealed, a copy of the product's `tests/vectors/` that `site.yml` holds byte-identical, which the viewer's code must open.
 
 ## Crash reports
 

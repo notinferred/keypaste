@@ -45,7 +45,7 @@ A runner-only probe is iterated on a branch with `gh workflow run <workflow> --r
 
 CI spends nothing that cannot change a verdict. A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, and is then diagnosed as CLAUDE.md says. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
 
-`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/download/index.html` against the built binaries, so those pages must trigger `ci.yml`. Never add `docs/**` to `paths-ignore`; a new documentation path triggers backend CI unless it is listed there.
+`scripts/verify-demo.sh` checks the transcripts in `README.md`, `docs/launch.md`, `docs/demo.md` and `docs/keepass-and-agents.md` against the built binaries, so those pages must trigger `ci.yml`. Never add `docs/**` to `paths-ignore`; a new documentation path triggers backend CI unless it is listed there.
 
 ## Commits
 

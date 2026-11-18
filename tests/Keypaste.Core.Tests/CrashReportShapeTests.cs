@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: a crash report holds exactly the fields D-0556 names, in one order, and <c>site/test/crash-vector.json</c>, which
+/// 4.11a: a crash report holds exactly the fields D-0556 names, in one order, and <c>tests/vectors/crash-vector.json</c>, which
 /// keypaste.com's route is to accept, is byte for byte what the scrubber writes and reads back (D-0558).
 /// </summary>
 /// <remarks>
@@ -189,7 +189,7 @@ public sealed class CrashReportShapeTests
 
     private static List<string> VectorReports()
     {
-        using var vector = JsonDocument.Parse(File.ReadAllText(Path.Combine(VendoredWordList.RepoRoot(), "site", "test", "crash-vector.json")));
+        using var vector = JsonDocument.Parse(File.ReadAllText(Path.Combine(VendoredWordList.RepoRoot(), "tests", "vectors", "crash-vector.json")));
 
         return [.. vector.RootElement.GetProperty("cases").EnumerateArray().Select(sample => sample.GetProperty("report").GetString()!)];
     }
