@@ -54,9 +54,6 @@ Package managers and agent marketplaces carry a version only after it is publish
   - A private workspace repository links every repository and holds the internal documents: ROADMAP, STEPS, BACKLOG, the step records, CLAUDE.md, PRODUCT, DESIGN, DESIGN-PRINCIPLES, launch and `site/TOPICS.md`.
   - Each repository's CI runs only what a change in it can affect, its cheapest checks first, and never depends on another repository's CI; the product tests a linked repository at the commit it pins.
   - Accepted when each repository's own CI passes, the product builds and releases from a clone with its submodules, and keypaste.com deploys from its own repository.
-- [ ] **A.5 — Replace the retired D- and O- references.** Needs: none.
-  - Each reference in code, configuration and messages becomes a one-line reason where one is needed, or is deleted; a package's reason in `Directory.Packages.props` is one line beside it ([law 9](../SECURITY.md#security-laws)).
-  - Accepted when no source, configuration, script or message outside `docs/steps/` names a D- or O- number.
 - [ ] **A.7 — Run the product's CI by trigger.** Needs: A.2.
   - The founder's direction of 2026-11-18: a push runs only the checks its change can affect, cheapest first, and stops at the first failure; main runs the whole suite and smoke checks of the critical journeys; the schedule runs the full matrix of systems, browsers and real tools. Work is built once and reused, never repeated across jobs, and a flaky test is fixed rather than retried.
   - Accepted when each workflow's triggers and jobs are recorded against these rules with their timings, and no job repeats another's build or tests.

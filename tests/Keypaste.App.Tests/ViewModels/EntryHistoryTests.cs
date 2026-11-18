@@ -21,7 +21,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <para>
 /// The seeded entry is changed three times rather than once, because the order of revisions is the
 /// thing most easily got wrong: a reopened KDBX stores times to the second, so several revisions
-/// can share one and a list sorted by time alone comes back backwards (DECISIONS.md D-0229).
+/// can share one and a list sorted by time alone comes back backwards.
 /// </para>
 /// </remarks>
 public sealed class EntryHistoryTests : IDisposable

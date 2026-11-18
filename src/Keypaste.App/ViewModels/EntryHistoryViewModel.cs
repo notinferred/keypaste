@@ -21,7 +21,7 @@ namespace Keypaste.App.ViewModels;
 /// each reveal rather than on every click in the list.
 /// </para>
 /// <para>
-/// <b>An index is only good for the reading that produced it (DECISIONS.md D-0229).</b> Every use
+/// <b>An index is only good for the reading that produced it.</b> Every use
 /// re-reads and checks the reading still agrees about that position — the same count, time, title
 /// and length — and refuses rather than acting on a number that now names a different revision.
 /// </para>

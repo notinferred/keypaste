@@ -10,7 +10,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// Shared by the new-entry form and the new-variable form rather than written twice: the drift
 /// worth preventing is two screens that disagree about what the generator does, and that lives in
-/// the recipe, not in the layout (DECISIONS.md D-0238). Both views keep their own markup, because
+/// the recipe, not in the layout. Both views keep their own markup, because
 /// <c>Controls/</c> holds no <c>.axaml</c> control and this feature is not the place to invent the
 /// first one.
 /// </para>

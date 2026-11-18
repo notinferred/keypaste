@@ -39,7 +39,7 @@
       mode is a runtime NotSupportedException rather than a build error, and turning it on before
       the shell is proven would make every Avalonia problem look like an AOT problem. The
       repo-wide IsAotCompatible in Directory.Build.props still runs the analyzers over this
-      project's own code, which is the part worth gating today. See DECISIONS.md D-0044.
+      project's own code, which is the part worth gating today.
     -->
 
     <!-- The one project with a real culture; everything else stays invariant under Directory.Build.props (Q.16). Globalization/IcuFallback.cs covers a Linux machine with no ICU. -->

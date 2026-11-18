@@ -21,8 +21,8 @@ namespace Keypaste.App.ViewModels;
 /// would hand the characters to any sweep that stringifies what it finds.
 /// </para>
 /// <para>
-/// <see cref="Index"/> is an ordinal within the reading that built this row and not an identifier
-/// (DECISIONS.md D-0229). <see cref="EntryHistoryViewModel"/> re-reads before using one, and
+/// <see cref="Index"/> is an ordinal within the reading that built this row and not an identifier.
+/// <see cref="EntryHistoryViewModel"/> re-reads before using one, and
 /// <see cref="ModifiedUtc"/>, <see cref="Title"/> and <see cref="MaskedLength"/> are what it checks
 /// the reading against.
 /// </para>
