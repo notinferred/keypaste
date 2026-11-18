@@ -7,7 +7,7 @@ using Avalonia.Media;
 namespace Keypaste.App.Controls;
 
 /// <summary>
-/// Sets what is machine-readable inside a sentence in Fragment Mono, as runs of the same text (DESIGN Rule 5).
+/// Sets what is machine-readable inside a sentence in the system's monospace, as runs of the same text (DESIGN Rule 5).
 /// </summary>
 /// <remarks>
 /// <see cref="InTextProperty"/> finds what has a machine's shape, for sentences that come from core and the system: a path, a flag, a scope, a tag or a

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
@@ -12,11 +13,57 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>New item is a sheet over the whole window, whichever way it is opened, holding the kind, the title and the open item's rows, with Add field… at its foot.</summary>
+/// <summary>New item is a sheet over the whole window: the grid of templates, whose tile opens its form, and the form's rows, custom fields and Save.</summary>
 public sealed class NewItemSheetTests
 {
     [Fact]
-    public Task Every_way_to_new_item_opens_the_sheet_over_the_window_with_its_kind_chosen() => HeadlessSession.On(() =>
+    public Task The_sidebars_New_and_the_shifted_chord_open_the_grid_and_a_tile_opens_its_form_in_the_same_sheet() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-new-item-grid-");
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        var file = shell.Commands.Menus.Single(group => group.Header == Strings.FileMenu).Entries;
+        var fromTemplate = file.OfType<AppCommand>().Single(command => command.Header == Strings.NewItemFromTemplateLabel);
+
+        Assert.Equal(new KeyGesture(Key.N, (OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control) | KeyModifiers.Shift), fromTemplate.Keys[0]);
+
+        foreach (var open in new Action[] { () => shell.Shell.NewItemCommand.Execute(null), () => shell.Commands.ForChord(fromTemplate.Keys[0].Key, fromTemplate.Keys[0].KeyModifiers)!.Run() })
+        {
+            open();
+            RenderedShell.Drain();
+
+            var grid = shell.Named<Border>("TemplateSheet");
+            Assert.True(grid.IsEffectivelyVisible);
+            Assert.False(shell.Named<Border>("NewItemDialog").IsEffectivelyVisible);
+            var tiles = shell.Named<ItemsControl>("TemplateTiles").GetVisualDescendants().OfType<Button>().ToList();
+            Assert.Equal(TemplateChoice.All.Select(choice => choice.Label), tiles.Select(Avalonia.Automation.AutomationProperties.GetName));
+            Assert.Same(tiles[0], shell.Window.FocusManager?.GetFocusedElement());
+            Assert.Equal(26, tiles[0].GetVisualDescendants().OfType<KpIcon>().Single().Size);
+
+            var backdrop = grid.GetVisualAncestors().OfType<Border>().First(border => border.Classes.Contains("backdrop"));
+            Assert.Equal(shell.Window.GetVisualDescendants().OfType<ShellView>().Single().Bounds.Size, backdrop.Bounds.Size);
+
+            shell.Tap(tiles.Single(tile => Equals(tile.CommandParameter, ItemTemplate.ApiKey)));
+            RenderedShell.Drain();
+
+            Assert.False(grid.IsEffectivelyVisible);
+            Assert.True(shell.Named<Border>("NewItemDialog").IsEffectivelyVisible);
+            Assert.Equal(ItemTemplate.ApiKey, items.NewItem!.Template);
+            Assert.True(shell.Named<TextBox>("NewItemKeyName").IsEffectivelyVisible);
+
+            shell.Tap(shell.Named<Button>("CancelNewItem"));
+            RenderedShell.Drain();
+            Assert.Null(items.NewItem);
+        }
+
+        shell.Shell.NewItemCommand.Execute(null);
+        RenderedShell.Drain();
+        shell.Tap(shell.Named<Button>("CancelTemplate"));
+        RenderedShell.Drain();
+        Assert.False(items.IsAdding);
+    });
+
+    [Fact]
+    public Task Every_direct_way_to_a_form_opens_it_over_the_window_with_its_template() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-new-item-sheet-");
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -30,8 +77,8 @@ public sealed class NewItemSheetTests
             {
                 shell.Named<ToggleButton>("AddEntry").IsChecked = true;
                 RenderedShell.Drain();
-                shell.Tap(shell.Named<Border>("AddMenuPanel").GetVisualDescendants().OfType<Button>().Single(button => Equals(button.CommandParameter, ItemTemplate.Database)));
-            }, ItemTemplate.Database),
+                shell.Tap(shell.Named<Border>("AddMenuPanel").GetVisualDescendants().OfType<Button>().Single(button => Equals(button.CommandParameter, ItemTemplate.Card)));
+            }, ItemTemplate.Card),
             (newItem.Run, ItemTemplate.Login),
             (() => shell.Commands.ForChord(newItem.Keys[0].Key, newItem.Keys[0].KeyModifiers)!.Run(), ItemTemplate.Login),
             (byKind[^1].Run, TemplateChoice.All[^1].Template),
@@ -51,12 +98,8 @@ public sealed class NewItemSheetTests
             var sheet = shell.Named<Border>("NewItemDialog");
             Assert.True(sheet.IsEffectivelyVisible);
             Assert.Equal(kind, items.NewItem!.Template);
-            Assert.Equal(kind, Assert.IsType<TemplateChoice>(shell.Named<ListBox>("NewItemTemplate").SelectedItem).Template);
+            Assert.Equal(TemplateChoice.Of(kind).NewTitle, shell.Named<TextBox>("NewItemTitle").Text);
             Assert.Null(shell.Shell.GeneratorDialog);
-
-            // The backdrop takes the whole window, the sidebar included, as every other sheet's does.
-            var backdrop = sheet.GetVisualAncestors().OfType<Border>().First(border => border.Classes.Contains("backdrop"));
-            Assert.Equal(shell.Window.GetVisualDescendants().OfType<ShellView>().Single().Bounds.Size, backdrop.Bounds.Size);
 
             items.CancelAddCommand.Execute(null);
             RenderedShell.Drain();
@@ -65,7 +108,7 @@ public sealed class NewItemSheetTests
     });
 
     [Fact]
-    public Task The_sheets_rows_are_as_tall_as_the_open_items_and_add_field_sits_at_its_foot() => HeadlessSession.On(() =>
+    public Task A_login_form_has_its_rows_custom_fields_with_add_field_and_the_browser_footnote() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-new-item-rows-");
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -81,23 +124,60 @@ public sealed class NewItemSheetTests
         RenderedShell.Drain();
 
         Assert.Equal(editing, shell.Named<UsernameBox>("NewEntryUsername").Bounds.Height);
-        var addField = shell.Named<ToggleButton>("AddFieldMenu");
-        var create = shell.Named<Button>("CreateItem");
-        Assert.Equal(Strings.AddAField, Avalonia.Automation.AutomationProperties.GetName(addField));
-        Assert.True(Math.Abs(Centre(addField, shell) - Centre(create, shell)) < 4, "Add field… and Create share the sheet's foot");
+        Assert.Same(shell.Named<TextBox>("NewItemTitle"), shell.Window.FocusManager?.GetFocusedElement());
+        Assert.Equal(Strings.Save, shell.Named<Button>("CreateItem").Content);
+        Assert.True(shell.Named<StackPanel>("FillsInBrowserNote").IsEffectivelyVisible);
+        Assert.True(shell.Named<ComboBox>("NewItemSaveIn").IsEffectivelyVisible);
 
+        var addField = shell.Named<ToggleButton>("AddFieldMenu");
+        Assert.Equal(Strings.AddAField, Avalonia.Automation.AutomationProperties.GetName(addField));
         addField.IsChecked = true;
         RenderedShell.Drain();
         var menu = shell.Named<Border>("AddFieldMenuPanel");
         Assert.True(menu.IsEffectivelyVisible);
-        var option = items.NewItem!.FieldOptions[0].Field;
-        shell.Tap(menu.GetVisualDescendants().OfType<Button>().First(button => Equals(button.CommandParameter, option)));
+        Assert.True(Within(menu, shell.Named<Border>("NewItemDialog")), "Add field…'s menu lies inside the sheet");
+        shell.Tap(menu.GetVisualDescendants().OfType<Button>().Single(button => Equals(button.CommandParameter, NewItemField.CustomField)));
         RenderedShell.Drain();
 
         Assert.False(addField.IsChecked);
-        Assert.DoesNotContain(items.NewItem.FieldOptions, offered => offered.Field == option);
+        Assert.Single(items.NewItem!.CustomFields);
+        Assert.True(shell.Named<ItemsControl>("NewItemCustomFields").IsEffectivelyVisible);
+
+        items.NewItem.RemoveFieldCommand.Execute(NewItemField.Url);
+        RenderedShell.Drain();
+        Assert.False(shell.Named<StackPanel>("FillsInBrowserNote").IsEffectivelyVisible);
     });
 
-    private static double Centre(Visual control, RenderedShell shell) =>
-        control.TranslatePoint(new Point(0, control.Bounds.Height / 2), shell.Window)!.Value.Y;
+    [Fact]
+    public Task A_rows_label_is_at_its_left_and_goes_above_while_the_form_is_too_narrow_for_both() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-new-item-labels-");
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        items.BeginAddCommand.Execute(null);
+        RenderedShell.Drain();
+
+        var field = shell.Named<UsernameBox>("NewEntryUsername");
+        var row = field.FindAncestorOfType<FieldRow>()!;
+        var label = row.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Name == "Label");
+
+        Assert.True(Left(label, shell) + label.Bounds.Width <= Left(field, shell), "the label stands left of its field");
+        Assert.True(Math.Abs(Top(label, shell) - Top(field, shell)) < field.Bounds.Height, "the label is on its field's line");
+        Assert.Empty(LabelledFields.Problems(shell.Window));
+
+        shell.Named<Border>("NewItemDialog").Width = FieldRow.NarrowBelow;
+        RenderedShell.Drain();
+
+        Assert.True(Top(label, shell) + label.Bounds.Height <= Top(field, shell), "a narrow row puts the label above its field");
+        Assert.Empty(LabelledFields.Problems(shell.Window));
+    });
+
+    private static double Left(Visual control, RenderedShell shell) => control.TranslatePoint(default, shell.Window)!.Value.X;
+
+    private static double Top(Visual control, RenderedShell shell) => control.TranslatePoint(default, shell.Window)!.Value.Y;
+
+    private static bool Within(Visual inner, Visual outer)
+    {
+        var topLeft = inner.TranslatePoint(default, outer)!.Value;
+        return topLeft.X >= 0 && topLeft.Y >= 0 && topLeft.X + inner.Bounds.Width <= outer.Bounds.Width && topLeft.Y + inner.Bounds.Height <= outer.Bounds.Height;
+    }
 }

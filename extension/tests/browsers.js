@@ -150,21 +150,18 @@ class HeldApp {
     }
 }
 
-// Arms pairing, presses Connect through press(), allows the prompt the driver shows and returns the pairing's name.
+// Presses Connect through press(), which brings keypaste's confirmation straight away, allows it once it shows a six-digit
+// code and returns the pairing's name.
 const pair = async function(app, build, press) {
-    const armed = await app.act('pair', /^pairing (armed|not armed)/);
-    if (armed !== 'pairing armed') {
-        throw new Error(armed);
-    }
     const prompt = app.next(/^pair-prompt identity=/);
     await press();
     const shown = await prompt;
-    const match = /^pair-prompt identity=(.*) name=(.*)$/.exec(shown);
+    const match = /^pair-prompt identity=(.*) code=(\d{3} \d{3}) name=(.*)$/.exec(shown);
     if (!match || match[1] !== build) {
         throw new Error(`the prompt names ${match ? match[1] : shown}, not ${build}`);
     }
     await app.act('allow', /^pair-prompt withdrawn/);
-    return match[2];
+    return match[3];
 };
 
 const requirePaired = async function(app, build, name, shown) {
@@ -294,6 +291,15 @@ class Gecko {
                     { type: 'pointerUp', button: 0 },
                 ],
             } ],
+        });
+        await this.session('DELETE', '/actions');
+    }
+
+    // A trusted key press, sent to whatever has focus, as a person's keyboard makes one.
+    async press(key) {
+        const value = { Enter: '\uE007', ArrowDown: '\uE015' }[key];
+        await this.session('POST', '/actions', {
+            actions: [ { type: 'key', id: 'keyboard', actions: [ { type: 'keyDown', value }, { type: 'keyUp', value } ] } ],
         });
         await this.session('DELETE', '/actions');
     }

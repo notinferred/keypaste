@@ -189,15 +189,15 @@ for renamed in serve=approve setup=setup policy=clients; do
   done
 done
 
-policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json)" || die "keypaste clients --json exited non-zero"
+policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json --vault "$WORK/vault.kdbx")" || die "keypaste clients --json exited non-zero"
 printf '%s' "$policies" | jq -e '(map(select(.kind == "category")) | all(.rule == (if .category == "passkeys" then "block" else "ask" end))) and (map(select(.kind == "agent")) == [])' >/dev/null \
-  || die "keypaste clients --json printed '$policies' for a home with no agents.toml, not every value asked and no agent"
+  || die "keypaste clients --json printed '$policies' for a vault with no rules, not every value asked and no agent"
 
 # With nothing holding a vault, nothing can be sealed: run on is refused, and run off is written unsealed.
-if KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run on 2>/dev/null; then die "keypaste clients turned run on with nothing holding a vault"; fi
-KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run off 2>/dev/null \
+if KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run on --vault "$WORK/vault.kdbx" 2>/dev/null; then die "keypaste clients turned run on with nothing holding a vault"; fi
+KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --run off --vault "$WORK/vault.kdbx" 2>/dev/null \
   || die "keypaste clients did not turn cursor's run off with nothing holding a vault"
-grep -q '^\[\[seal\]\]' "$HOME_DIR/agents.toml" && die "a change made with nothing holding a vault left agents.toml looking sealed"
+cat "$HOME_DIR/agents/"*.toml | grep -q '^\[\[seal\]\]' && die "a change made with nothing holding a vault left its rules looking sealed"
 
 echo "ok: keypaste mcp speaks MCP over stdio, exposes seven tools, denies every call, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"

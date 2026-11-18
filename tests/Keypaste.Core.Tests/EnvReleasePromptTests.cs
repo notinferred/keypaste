@@ -48,4 +48,14 @@ public sealed class EnvReleasePromptTests
         Assert.Null(EnvReleasePrompt.Problem("dev", ["echo", atLimit], "/d"));
         Assert.NotNull(EnvReleasePrompt.Problem("dev", ["echo", atLimit + "a"], "/d"));
     }
+
+    /// <summary>The requester line names the run, or the token that asks for it, and outside a connection verifies neither.</summary>
+    [Fact]
+    public void The_requester_is_the_run_or_its_token_and_is_not_verified_outside_a_connection()
+    {
+        var prompt = EnvReleasePrompt.For(_preview, ["make"], "/d");
+
+        Assert.Equal(new RequesterIdentity(EnvReleasePrompt.RunnerName, null, false), prompt.Identity);
+        Assert.Equal("token 'ci' (kp_ab)", (prompt with { Requester = "token 'ci' (kp_ab)" }).Identity.Agent);
+    }
 }

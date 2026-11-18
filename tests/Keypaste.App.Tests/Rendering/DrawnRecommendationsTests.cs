@@ -20,7 +20,7 @@ public sealed class DrawnRecommendationsTests
     private const string _weak = "hunter2";
 
     [Fact]
-    public Task Recommendations_draws_each_key_and_no_value_and_counts_them_without_amber() => HeadlessSession.On(async () =>
+    public Task Recommendations_draws_each_key_and_no_value_and_counts_them_without_the_accent() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = _stripeLogin, Notes = $"STRIPE_SECRET_KEY={_keyValue}\n{_token}" }));
@@ -42,8 +42,8 @@ public sealed class DrawnRecommendationsTests
             AutomationSurface.AssertNothingExposes(shell.Window, value);
         }
 
-        var count = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "2");
-        Assert.DoesNotContain("amber", count.Classes);
+        var badge = shell.Named<ListBox>("RailNav").GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RailBadge" && border.IsEffectivelyVisible);
+        Assert.Equal("2", Assert.IsType<TextBlock>(badge.Child).Text);
     });
 
     [Fact]
@@ -76,8 +76,8 @@ public sealed class DrawnRecommendationsTests
             AutomationSurface.AssertNothingExposes(shell.Window, value);
         }
 
-        var count = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text == "3");
-        Assert.DoesNotContain("amber", count.Classes);
+        var badge = shell.Named<ListBox>("RailNav").GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RailBadge" && border.IsEffectivelyVisible);
+        Assert.Equal("3", Assert.IsType<TextBlock>(badge.Child).Text);
     });
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class DrawnRecommendationsTests
         await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
         Assert.NotEmpty(shell.Shell.Recommendations.Rows);
 
-        foreach (var destination in Destinations.Main)
+        foreach (var destination in Destinations.Places.Where(place => place.Kind != DestinationKind.Recommendations))
         {
             shell.Shell.Current = destination;
             RenderedShell.Drain();

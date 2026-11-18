@@ -33,13 +33,17 @@ public sealed class ItemPickViewModelTests
         Assert.Null(picker.Picked);
         Assert.Null(picker.PickedIndex);
         Assert.False(picker.AllowOnceCommand.CanExecute(null));
-        Assert.Equal("Pick an item to allow it. Nothing is picked for you.", picker.AlwaysCaption);
+        Assert.False(picker.AlwaysAllowCommand.CanExecute(null));
         Assert.Equal(["services · alice", "services · bob"], picker.Rows.Select(row => row.Details));
+        Assert.Equal(("claude-code", "Mail", "password"), (picker.RequesterAgent, picker.Item, picker.Field));
+
+        picker.Return();
+        Assert.False(picker.IsAnswered);
 
         picker.Picked = picker.Rows[0];
 
         Assert.True(picker.AllowOnceCommand.CanExecute(null));
-        Assert.NotEqual("Pick an item to allow it. Nothing is picked for you.", picker.AlwaysCaption);
+        Assert.Equal(picker.OffersAlways, picker.AlwaysAllowCommand.CanExecute(null));
     }
 
     [Fact]

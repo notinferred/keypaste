@@ -15,7 +15,7 @@ The unpublished changes, listed under Unreleased in [CHANGELOG](CHANGELOG.md), s
 The tracks are PRODUCT's, and they are worked in this order:
 
 1. Track 1, everyday vault use;
-2. Track 2, the shared unlock session;
+2. Track 2, one unlock session per vault;
 3. Track 4, project environments;
 4. Track 3, AI requests;
 5. Track 6, daily driver;
@@ -68,7 +68,7 @@ These follow 1.0.0. Local use keeps working without an account or network (PRODU
 | A project shared with members, with roles for reading, writing and production, and removal that re-wraps its key | X.4 |
 | CI and deploy targets with identities the relay verifies, a GitHub Action, and syncs pushed from a member's machine | X.5, X.6, X.7 |
 | A team project that opts in lets keypaste's server or the team's own hold its key: agents running in the cloud use it through a proxy, CI signs in with OIDC, and the server syncs to hosting platforms | X.13, X.14, X.15, X.16 |
-| Organizations with single sign-on, SCIM, approval for production changes and audit export | X.8, X.9 |
+| Organizations with work vaults the company owns, a recommendation to move company-email logins into them and hand-over of a revoked member's work access, single sign-on, SCIM, approval for production changes and audit export | X.8, X.9, X.18 |
 
 The cloud's tiers follow PRODUCT §5.4: free up to a size limit, premium for more storage and features, and business use paid as it is used.
 

@@ -31,6 +31,11 @@ public sealed class VaultItemKindTests : IDisposable
     [InlineData(ItemKind.Database)]
     [InlineData(ItemKind.Server)]
     [InlineData(ItemKind.SecureNote)]
+    [InlineData(ItemKind.Card)]
+    [InlineData(ItemKind.Identity)]
+    [InlineData(ItemKind.SshKey)]
+    [InlineData(ItemKind.Wifi)]
+    [InlineData(ItemKind.Environment)]
     public void A_kind_given_at_creation_is_read_back_after_a_save(ItemKind kind)
     {
         var path = NewVaultPath();

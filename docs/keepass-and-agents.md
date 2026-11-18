@@ -38,7 +38,7 @@ Your MCP client starts `keypaste mcp`, a bridge that holds no vault and forwards
 
 An agent cannot name an item outside what it can see. `keypaste setup` lets an agent see every item's title, group, tags and URL, and its [agent settings](policy.md) decide which values it may have: each kind of value is Ask, Allow or Block, Ask by default, and Allow takes effect only once you confirm it where the vault is unlocked. A glob in the client's configuration can only narrow what the agent sees.
 
-Each request is answered by those settings or by you: Deny, Allow once, or for a labelled agent Always allow or Always block for that item's field. Silence for 45 seconds denies it. Every call is written to a local, hash-chained audit log before the answer, without the released value, and a call is refused if the log cannot be written. [Approving an agent's request](approvals.md) explains each choice.
+Each request is answered by those settings or by you: Deny, Allow once, or for a labelled agent Always allow for that item's field. Silence for 45 seconds denies it. Every call is written to a local, hash-chained audit log before the answer, without the released value, and a call is refused if the log cannot be written. [Approving an agent's request](approvals.md) explains each choice.
 
 ## What it looks like
 
@@ -49,7 +49,8 @@ Each request is answered by those settings or by you: Deny, Allow once, or for a
 keypaste: an agent is asking for a credential.
 
   agent    claude-code (claude-code)
-  item     env/demo/.env
+  item     .env
+  group    env/demo
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -57,7 +58,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  [a] always  [b] block  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
 One keystroke later the deploy runs, and the exchange is two lines you can read back:

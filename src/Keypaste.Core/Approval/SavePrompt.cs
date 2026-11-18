@@ -13,6 +13,24 @@ public sealed record SavePrompt
     /// <summary>The bridge's label, sanitized, or null.</summary>
     public string? Label { get; init; }
 
+    /// <summary>Who is asking, as the requester line says it: verified only from what the system said of the connection, never from the label.</summary>
+    public RequesterIdentity Identity
+    {
+        get => _identity ?? new RequesterIdentity(Client, null, false);
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
+
+    /// <summary>The item's own title, sanitized, which a prompt names it by; <see cref="Where"/> is shown under Details.</summary>
+    public string ItemTitle
+    {
+        get => _itemTitle ?? Where[(Where.LastIndexOf('/') + 1)..];
+        init => _itemTitle = value;
+    }
+
+    private readonly string? _itemTitle;
+
     /// <summary>Where the value goes: the item's path, or the project and environment, sanitized.</summary>
     public required string Where { get; init; }
 
@@ -57,7 +75,9 @@ public sealed record SavePrompt
         {
             Client = asked.Client,
             Label = asked.Label,
+            Identity = asked.Identity,
             Where = asked.Entry,
+            ItemTitle = asked.ItemTitle,
             Field = shownField.Text,
             Reason = asked.Reason,
             ReasonWasTruncated = asked.ReasonWasTruncated,

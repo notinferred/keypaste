@@ -2,235 +2,235 @@
 
 const MAX_AUTOCOMPLETE_NAME_LEN = 50;
 
+// A pick counts only once the list has been on screen this long, so a list slipped under a click already on its way fills nothing.
+const LIST_SETTLE_MS = 500;
+
 function cancelEvent(e) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
 }
 
+// Whether the page has made an element or one of its ancestors see-through, hidden or filtered, as an overlay attack does.
+const isTampered = function(element) {
+    for (let node = element; node && node.nodeType === Node.ELEMENT_NODE; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (Number(style.opacity) < 1
+            || style.visibility !== 'visible' && node === element
+            || style.filter !== 'none'
+            || style.mixBlendMode !== 'normal'
+            || style.clipPath !== 'none'
+            || style.mask && style.mask !== 'none') {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+/**
+ * keypaste's list of a field's logins: drawn in a closed shadow root in the browser's top layer, answering only trusted
+ * events, and refusing a pick while the page has covered, faded or just slipped it under the pointer.
+ */
 class Autocomplete {
     constructor() {
-        this.afterFillSort = SORT_BY_MATCHING_CREDENTIALS_SETTING;
-        this.autocompleteList = [];
-        this.autoSubmit = false;
         this.elements = [];
         this.index = -1;
         this.input = undefined;
-        this.showGroup = true;
-        this.useCompactMode = false;
         this.wrapper = undefined;
         this.shadowRoot = undefined;
         this.container = undefined;
+        this.shownAt = 0;
     }
 
     clear() {
         this.elements = [];
     }
 
-    async click(e) {}
+    async itemClick(e, item) {}
 
-    async itemClick(e, input, uuid) {}
+    async itemEnter(item) {}
 
-    async itemEnter(index, item) {}
+    // The rows to draw: logins, then notes and actions, each { kind, ... }.
+    rows() {
+        return [];
+    }
 
-    async create(
-        input,
-        showListInstantly = false,
-        autoSubmit = false,
-        useCompactMode = false,
-        showGroup = true,
-        afterFillSort = SORT_BY_MATCHING_CREDENTIALS_SETTING,
-    ) {
-        if (input.readOnly) {
+    ensureContainer() {
+        if (this.wrapper) {
             return;
         }
 
-        this.autoSubmit = autoSubmit;
-        this.afterFillSort = afterFillSort;
-        this.showGroup = showGroup;
-        this.useCompactMode = useCompactMode;
+        const styleSheet = createStylesheet('css/autocomplete.css');
+        const colorStyleSheet = createStylesheet('css/colors.css');
+        this.wrapper = kpxcUI.createElement('div');
+        this.wrapper.style.all = 'unset';
+        this.wrapper.style.display = 'none';
+        styleSheet.addEventListener('load', () => (this.wrapper.style.display = 'block'));
+        this.container = kpxcUI.createElement('div', 'kpxcAutocomplete-container', {
+            id: 'kpxcAutocomplete-container',
+            popover: 'manual',
+        });
+        this.container.style.margin = 0;
 
-        if (!this.autocompleteList.includes(input)) {
-            input.addEventListener('click', e => this.click(e));
-            input.addEventListener('keydown', e => this.keyDown(e));
-            input.addEventListener('keyup', e => this.keyUp(e));
-            input.setAttribute('autocomplete', 'off');
-            this.autocompleteList.push(input);
+        this.shadowRoot = this.wrapper.attachShadow({ mode: 'closed' });
+        this.shadowRoot.append(colorStyleSheet);
+        this.shadowRoot.append(styleSheet);
+
+        this.header = kpxcUI.createElement('div', 'kpxcAutocomplete-site');
+        this.list = kpxcUI.createElement('div', 'kpxcAutocomplete-items', {
+            id: 'kpxcAutocomplete-list',
+            role: 'listbox',
+            'aria-label': tr('autocompleteListLabel')
+        });
+        this.footer = kpxcUI.createElement('div', 'kpxcAutocomplete-footer');
+        // Focus stays in the page's field, so the chosen login is announced through this line
+        this.announcer = kpxcUI.createElement('div', 'kpxcAutocomplete-announcer', { role: 'status' });
+
+        this.container.append(this.header, this.list, this.footer, this.announcer);
+        this.shadowRoot.append(this.container);
+        document.body.append(this.wrapper);
+        kpxcUI.observeWrapper(this.wrapper);
+    }
+
+    async showList(inputField) {
+        this.closeList();
+        this.ensureContainer();
+        this.input = inputField;
+
+        if (!this.input.dataset.kpxcListKeys) {
+            this.input.addEventListener('keydown', e => this.keyDown(e));
+            this.input.dataset.kpxcListKeys = 'true';
         }
 
-        if (showListInstantly) {
-            this.showList(input);
+        this.draw();
+        this.container.classList.add('kpxcAutocomplete-container--visible');
+        if (kpxcFields.popoverSupported) {
+            this.container.showPopover();
         }
+        this.updatePosition();
+        this.shownAt = performance.now();
+        inputField.focus({ preventScroll: true });
+    }
+
+    draw() {
+        for (const part of [ this.header, this.list, this.footer ]) {
+            part.replaceChildren();
+        }
+
+        this.index = -1;
+        for (const row of this.rows()) {
+            const place = row.kind === 'site' || row.warning ? this.header : row.kind === 'action' ? this.footer : this.list;
+            place.append(this.drawRow(row));
+        }
+
+        if (this.getAllItems().length > 0) {
+            this.index = 0;
+            this.selectItem();
+        }
+    }
+
+    drawRow(row) {
+        if (row.kind === 'site') {
+            const site = kpxcUI.createElement('div', 'kpxcAutocomplete-site__name', {}, row.text);
+            site.prepend(kpxcUI.createKeyMark());
+            return site;
+        }
+
+        if (row.kind === 'note') {
+            return kpxcUI.createElement('div', `kpxcAutocomplete-note${row.warning ? ' kpxcAutocomplete-note--warning' : ''}`,
+                { role: row.warning ? 'alert' : 'note' }, row.text);
+        }
+
+        if (row.kind === 'login') {
+            return this.drawLogin(row);
+        }
+
+        const action = kpxcUI.createElement('div', `kpxcAutocomplete-action${row.kind === 'locked-vault' ? ' kpxcAutocomplete-action--locked' : ''}`);
+        const label = kpxcUI.createElement('span', 'kpxcAutocomplete-action__label', {}, row.text);
+        action.append(kpxcUI.createIcon(row.icon), label);
+
+        if (row.button) {
+            const button = kpxcUI.createElement('button', `kpxcAutocomplete-button${row.primary ? ' kpxcAutocomplete-button--primary' : ''}`,
+                { type: 'button' }, row.button);
+            button.addEventListener('click', e => this.actionClick(e, row));
+            action.append(button);
+        } else {
+            action.setAttribute('role', 'button');
+            action.setAttribute('tabindex', '-1');
+            action.addEventListener('click', e => this.actionClick(e, row));
+        }
+
+        action.addEventListener('mousedown', e => e.stopPropagation());
+        return action;
+    }
+
+    drawLogin(row) {
+        const username = row.username || tr('credentialsNoUsername');
+        const item = kpxcUI.createElement('div', 'kpxcAutocomplete-item', {
+            role: 'option',
+            'aria-selected': 'false',
+            'aria-label': [ row.title, username, row.vault ].filter(Boolean).join(', '),
+        });
+        item.dataset.uuid = row.uuid;
+
+        const monogram = kpxcUI.createElement('div', 'kpxcAutocomplete-item__monogram', { 'aria-hidden': 'true' },
+            (row.title.trim()[0] ?? '?').toUpperCase());
+        const names = kpxcUI.createElement('div', 'kpxcAutocomplete-item__names');
+        const title = row.title.length < MAX_AUTOCOMPLETE_NAME_LEN ? row.title : row.title.substr(0, MAX_AUTOCOMPLETE_NAME_LEN) + '…';
+        names.append(
+            kpxcUI.createElement('div', 'kpxcAutocomplete-item__label', {}, title),
+            kpxcUI.createElement('div', 'kpxcAutocomplete-item__value', {}, username));
+        item.append(monogram, names);
+
+        if (row.vault) {
+            item.append(kpxcUI.createElement('div', 'kpxcAutocomplete-item__vault', {}, row.vault));
+        }
+
+        item.addEventListener('click', e => this.itemClick(e, row));
+        item.addEventListener('mousemove', e => this.mouseMove(e));
+        item.addEventListener('mousedown', e => e.stopPropagation());
+        item.addEventListener('mouseup', e => e.stopPropagation());
+        return item;
+    }
+
+    async actionClick(e, row) {}
+
+    /**
+     * Whether a person's act on the list may count: a trusted event, on a list that has been on screen a moment, that is opaque,
+     * unfiltered and the topmost thing where the pointer is.
+     */
+    isGenuine(e) {
+        if (!e.isTrusted || !this.input || performance.now() - this.shownAt < LIST_SETTLE_MS) {
+            return false;
+        }
+
+        const rect = this.container.getBoundingClientRect();
+        if (isTampered(this.wrapper) || isTampered(this.container) || rect.width < 40 || rect.height < 20) {
+            return false;
+        }
+
+        if (e.type === 'click' && e.detail > 0) {
+            // A closed shadow root shows its host to the page's hit test: anything else on top is the page's.
+            return document.elementFromPoint(e.clientX, e.clientY) === this.wrapper;
+        }
+
+        return true;
     }
 
     mouseMove(e) {
         if (e.movementX === 0 && e.movementY === 0) {
             return;
         }
-        this.deselectItem();
 
-        const itemContainer = e.target.classList.contains('kpxcAutocomplete-item') ? e.target : e.target.parentElement;
-        itemContainer.classList.add('kpxcAutocomplete-item--active');
-        itemContainer.setAttribute('aria-selected', 'true');
-
-        const items = this.getAllItems();
-        this.index = Array.from(items).indexOf(itemContainer);
-    }
-
-    async showList(inputField) {
-        if (this.input === inputField) {
-            return;
-        }
-
-        this.closeList();
-
-        // Return if there are no credentials
-        if (this.elements.length === 0) {
-            return;
-        }
-
-        this.input = inputField;
-
-        // Create the Autocomplete Menu if needed
-        if (!this.wrapper) {
-            const styleSheet = createStylesheet('css/autocomplete.css');
-            const colorStyleSheet = createStylesheet('css/colors.css');
-            this.wrapper = kpxcUI.createElement('div');
-            this.wrapper.style.all = 'unset';
-            this.wrapper.style.display = 'none';
-            styleSheet.addEventListener('load', () => (this.wrapper.style.display = 'block'));
-            this.container = kpxcUI.createElement('div', 'kpxcAutocomplete-container', {
-                id: 'kpxcAutocomplete-container',
-                popover: 'manual',
-            });
-            this.container.style.margin = 0;
-
-            // Apply compact mode class
-            if (kpxc.settings.useCompactMode) {
-                this.container.classList.add('kpxcAutocomplete-container--compact');
-            }
-
-            this.shadowRoot = this.wrapper.attachShadow({ mode: 'closed' });
-            this.shadowRoot.append(colorStyleSheet);
-            this.shadowRoot.append(styleSheet);
-
-            this.list = kpxcUI.createElement('div', 'kpxcAutocomplete-items', {
-                id: 'kpxcAutocomplete-list',
-                role: 'listbox',
-                'aria-label': tr('autocompleteListLabel')
-            });
-            // Focus stays in the page's field, so the chosen login is announced through this line
-            this.announcer = kpxcUI.createElement('div', 'kpxcAutocomplete-announcer', { role: 'status' });
-
-            this.container.append(this.list, this.announcer);
-            this.shadowRoot.append(this.container);
-            document.body.append(this.wrapper);
-            kpxcUI.observeWrapper(this.wrapper);
-
-            // Add a footer message for auto-submit
-            if (this.autoSubmit) {
-                const footer = kpxcUI.createElement('footer', '', {}, tr('autocompleteSubmitMessage'));
-                this.container.appendChild(footer);
-            }
-        }
-
-        this.updateList();
-        this.container.classList.add('kpxcAutocomplete-container--visible');
-        if (kpxcFields.popoverSupported) {
-            this.container.showPopover({ source: inputField });
-        }
-        this.updatePosition();
-    }
-
-    async updateList() {
-        // Try to detect a username from the webpage in order to show it first in the list
-        // This is useful when a website prompts you to enter the password again, and the username is already filled in
-        // It also helps with multi-page login flows
-        const username = kpxcSites.detectUsernameFromPage();
-
-        const pageUuid = await sendMessage('page_get_login_id');
-
-        // Clear the login items from div
-        while (this.list.hasChildNodes()) {
-            this.list.removeChild(this.list.lastChild);
-        }
-
-        // Update credentials to menu div
-        for (const c of this.elements) {
-            const item = this.generateItem(c);
-
-            const itemInput = kpxcUI.createElement('input', '', { type: 'hidden', value: c.value });
-            item.append(itemInput);
-            item.addEventListener('click', e => this.itemClick(e, this.input, c.uuid));
-
-            // These events prevent the double hover effect if both keyboard and mouse are used
-            item.addEventListener('mousemove', e => this.mouseMove(e));
-            item.addEventListener('mousedown', e => e.stopPropagation());
-            item.addEventListener('mouseup', e => e.stopPropagation());
-
-            // If this page has an associated uuid and it matches this credential, then put it on top of the list
-            if (username === c.value || (this.afterFillSort === SORT_BY_RELEVANT_ENTRY && c.uuid === pageUuid)) {
-                this.list.prepend(item);
-            } else {
-                this.list.appendChild(item);
-            }
-        }
-
-        // Use only two columns if groups are not shown
-        if (this.useCompactMode && !this.showGroup) {
-            this.list.style.gridTemplateColumns = 'repeat(2, auto)';
-        }
-
+        const items = Array.from(this.getAllItems());
+        this.index = items.indexOf(e.currentTarget);
         this.selectItem();
-    }
-
-    // Add parentElement parameter
-    generateItem(credential) {
-        // Create the DOM element for the list item wrapper.
-        const username = credential.value || tr('credentialsNoUsername');
-        const item = kpxcUI.createElement('div', 'kpxcAutocomplete-item', {
-            role: 'option',
-            'aria-selected': 'false',
-            'aria-label': `${credential.title}, ${username}`,
-            title: [ credential.title, username, credential.group ].filter(Boolean).join(' · ')
-        });
-        item.setAttribute('uuid', credential.uuid);
-
-        // Create the DOM element for the list item header.
-        const itemHeader = document.createElement('div');
-        itemHeader.classList.add('kpxcAutocomplete-item__header');
-
-        // Create the DOM element for showing the group only when the group name is available.
-        if (!this.useCompactMode) {
-            const itemGroup = kpxcUI.createElement('div', 'kpxcAutocomplete-item__group', {}, credential.group);
-            itemHeader.append(itemGroup);
-        }
-
-        // Create the DOM element for showing the credentials name.
-        const itemLabel = kpxcUI.createElement('div', 'kpxcAutocomplete-item__label', {}, credential.title);
-        itemHeader.append(itemLabel);
-
-        // Append the header to the list item.
-        item.append(itemHeader);
-
-        // Create the DOM element for showing the credentials username field.
-        const itemClassName = this.showGroup ? 'kpxcAutocomplete-item__value' : 'kpxcAutocomplete-item__value--last';
-        const itemValue = kpxcUI.createElement('div', itemClassName, {}, username);
-        item.append(itemValue);
-
-        // If compact mode is enabled, append group to the end
-        if (this.useCompactMode && this.showGroup) {
-            const itemGroup = kpxcUI.createElement('div', 'kpxcAutocomplete-item__group', {}, credential.group);
-            item.append(itemGroup);
-        }
-
-        return item;
     }
 
     selectItem() {
         this.deselectItem();
-        const items = this.getAllItems();
-        const item = items[this.index];
+        const item = this.getAllItems()[this.index];
         if (item !== undefined) {
             item.classList.add('kpxcAutocomplete-item--active');
             item.setAttribute('aria-selected', 'true');
@@ -240,8 +240,7 @@ class Autocomplete {
     }
 
     deselectItem() {
-        const items = this.list.querySelectorAll('div.kpxcAutocomplete-item--active');
-        items.forEach(item => {
+        this.list?.querySelectorAll('.kpxcAutocomplete-item--active').forEach(item => {
             item.classList.remove('kpxcAutocomplete-item--active');
             item.setAttribute('aria-selected', 'false');
         });
@@ -255,96 +254,42 @@ class Autocomplete {
 
         this.container.classList.remove('kpxcAutocomplete-container--visible');
         this.announcer.textContent = '';
-        if (kpxcFields.popoverSupported) {
+        if (kpxcFields.popoverSupported && this.container.matches(':popover-open')) {
             this.container.hidePopover();
         }
     }
 
+    isOpen() {
+        return this.input !== undefined;
+    }
+
     getAllItems() {
-        return this.list.getElementsByClassName('kpxcAutocomplete-item');
+        return this.list?.getElementsByClassName('kpxcAutocomplete-item') ?? [];
     }
 
     /**
-     * Keyboard shortcuts for autocomplete menu:
-     * - ArrowDown shows the list or selects item below, or the first item (last is active)
-     * - ArrowUp selects item above, or the last item (first is active)
-     * - Enter or Tab selects the item
-     * - Backspace and Delete shows the list if input field is empty. First item is activated
+     * Keys while the list is open, focus staying in the page's field: ArrowDown and ArrowUp choose a login, Enter fills the one
+     * chosen, Escape closes. Nothing opens the list but the key icon.
      */
     async keyDown(e) {
-        if (!e.isTrusted) {
+        if (!e.isTrusted || !this.isOpen()) {
             return;
         }
 
-        const inputField = e.target;
-        if (e.key === 'ArrowDown') {
+        const items = this.getAllItems();
+        if (e.key === 'ArrowDown' && items.length > 0) {
             cancelEvent(e);
-            // If the list is not visible, show it
-            if (!this.input) {
-                await this.showList(inputField);
-                this.index = 0;
-                if (inputField.value !== '') {
-                    this.updateSearch();
-                }
-                requestAnimationFrame(() => this.selectItem());
-            } else {
-                // Activate next item
-                const items = this.getAllItems();
-                this.index = (this.index + 1) % items.length;
-                this.selectItem();
-            }
-        } else if (e.key === 'ArrowUp' && this.list) {
+            this.index = (this.index + 1) % items.length;
+            this.selectItem();
+        } else if (e.key === 'ArrowUp' && items.length > 0) {
             cancelEvent(e);
-            const items = this.getAllItems();
             this.index = (this.index > 0 ? this.index : items.length) - 1;
             this.selectItem();
-        } else if (e.key === 'Enter' && this.input) {
-            const items = this.getAllItems();
-            if (this.index >= 0 && items[this.index] !== undefined) {
-                cancelEvent(e);
-
-                await this.itemEnter(this.index, items[this.index]);
-                this.closeList();
-            }
-        } else if (e.key === 'Tab' && this.input) {
-            // Return if value is not in the list
-            if (inputField.value !== '' && !this.elements.some(c => c.value === inputField.value)) {
-                this.closeList();
-                return;
-            }
-
-            this.index = this.elements.findIndex(c => c.value === inputField.value);
-            if (this.index >= 0) {
-                this.fillPassword(inputField.value, this.index, this.elements[this.index].uuid);
-            }
-
+        } else if (e.key === 'Enter' && items[this.index] !== undefined) {
+            cancelEvent(e);
+            await this.itemEnter(e, items[this.index].dataset.uuid);
+        } else if (e.key === 'Escape' || e.key === 'Tab') {
             this.closeList();
-        } else if (e.key === 'Escape') {
-            this.closeList();
-        } else if ((e.key === 'Backspace' || e.key === 'Delete') && inputField.value === '') {
-            // Show menu when input field has no value and backspace is pressed
-            this.showList(inputField);
-            this.index = 0;
-            this.selectItem();
-        }
-    }
-
-    keyUp(e) {
-        if (!this.input || !e.isTrusted || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            return;
-        }
-
-        this.updateSearch();
-        this.selectItem();
-    }
-
-    updateSearch() {
-        if (this.index !== -1 && this.elements[this.index]?.value?.includes(this.input.value)) {
-            return;
-        }
-        this.index = this.elements.findIndex(c => c.value.startsWith(this.input.value));
-        if (this.index === -1) {
-            this.index = this.elements.findIndex(c => c.value.includes(this.input.value));
         }
     }
 
@@ -353,32 +298,26 @@ class Autocomplete {
             return;
         }
 
-        // Set container's minimum width to the input field's width
         const rect = this.input.getBoundingClientRect();
-        this.container.style.minWidth = Pixels(this.input.offsetWidth);
-        // Extend the list's max width to input field's width or at least to the maxWidth defined in the CSS file
-        this.list.style.maxWidth = `max(${Pixels(this.input.offsetWidth)}, 600px)`;
+        this.container.style.minWidth = Pixels(Math.max(this.input.offsetWidth, 260));
+        this.list.style.maxWidth = `max(${Pixels(this.input.offsetWidth)}, 420px)`;
 
-        // Get body zoom radio
-        const zoom = kpxcUI.bodyStyle.zoom || 1;
-
-        // Calculate Y offset if menu does not fit to the bottom of the screen -> show it at the top of the input field
+        const zoom = kpxcUI.bodyStyle?.zoom || 1;
         const menuRect = this.container.getBoundingClientRect();
-        const totalHeight = menuRect.height + rect.height;
-        const menuOffset = (totalHeight + rect.y) / zoom > window.self.visualViewport.height ? totalHeight / zoom : 0;
+        const below = (rect.bottom + menuRect.height) / zoom <= window.self.visualViewport.height;
+
+        // In the top layer the list is placed against the viewport, beside the field.
+        if (kpxcFields.popoverSupported) {
+            this.container.style.top = Pixels((below ? rect.bottom + 4 : rect.top - menuRect.height - 4) / zoom);
+            this.container.style.left = Pixels(rect.left / zoom);
+            return;
+        }
 
         const scrollTop = kpxcUI.getScrollTop() / zoom;
         const scrollLeft = kpxcUI.getScrollLeft() / zoom;
-
-        if (kpxcUI.bodyStyle.position.toLowerCase() === 'relative') {
-            this.container.style.top = Pixels(
-                ((rect.top - kpxcUI.bodyRect.top) / zoom + scrollTop + this.input.offsetHeight - menuOffset)
-            );
-            this.container.style.left = Pixels((rect.left - kpxcUI.bodyRect.left) / zoom + scrollLeft);
-        } else {
-            this.container.style.top = Pixels(rect.top / zoom + scrollTop + this.input.offsetHeight - menuOffset);
-            this.container.style.left = Pixels(rect.left / zoom + scrollLeft);
-        }
+        const top = below ? rect.bottom + 4 : rect.top - menuRect.height - 4;
+        this.container.style.top = Pixels(top / zoom + scrollTop);
+        this.container.style.left = Pixels(rect.left / zoom + scrollLeft);
     }
 }
 
@@ -386,8 +325,8 @@ class Autocomplete {
 // Global handlers
 const handleOutsideClick = function(e, autocompleteMenu) {
     if (e.target !== autocompleteMenu.input
-        && !e.target.classList.contains('kpxc-username-icon')
-        && e.target !== autocompleteMenu.input) {
+        && e.target !== autocompleteMenu.wrapper
+        && !e.target.classList?.contains('kpxc-username-icon')) {
         autocompleteMenu.closeList();
     }
 };
@@ -401,20 +340,5 @@ document.addEventListener('click', function(e) {
     handleOutsideClick(e, kpxcUserAutocomplete);
 });
 
-// Handle autocomplete position on window resize
-window.addEventListener('resize', function() {
-    if (!kpxc.settings.autoCompleteUsernames) {
-        return;
-    }
-
-    kpxcUserAutocomplete.updatePosition();
-});
-
-// Handle autocomplete position on scroll
-window.addEventListener('scroll', function() {
-    if (!kpxc.settings.autoCompleteUsernames) {
-        return;
-    }
-
-    kpxcUserAutocomplete.updatePosition();
-});
+window.addEventListener('resize', () => kpxcUserAutocomplete.updatePosition());
+window.addEventListener('scroll', () => kpxcUserAutocomplete.updatePosition(), true);

@@ -31,8 +31,8 @@ namespace Keypaste.App.Tests.Rendering;
 /// </remarks>
 public sealed class DrawnRevealTests
 {
-    // The list and the detail share 1000 wide with too little left for a 32-character value beside its label and Reveal.
-    private const double _roomForValues = 1100;
+    // Beside the rail, the sidebar and the list, the detail at 1100 wide leaves too little for a 32-character value beside its label and Reveal.
+    private const double _roomForValues = 1200;
 
     public static TheoryData<string> Surfaces => ["current", "revision", "env", "field", "plain-field"];
 
@@ -152,16 +152,16 @@ public sealed class DrawnRevealTests
         AssertNoSecretIn(frame, style);
     });
 
-    /// <summary>What a click on a cell still does: another environment's cell chooses that environment, and reveals nothing.</summary>
+    /// <summary>Another stage's segment chooses that stage, and reveals nothing.</summary>
     [Fact]
-    public Task A_click_on_another_environments_cell_selects_it_and_reveals_nothing() => HeadlessSession.On(() =>
+    public Task A_click_on_another_stages_segment_selects_it_and_reveals_nothing() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => ProjectVariables.Set(vault, "billing", "staging", "STRIPE_KEY", "SENTINEL-STAGING-VALUE-c41d"));
         var project = shell.OpenProject();
         project.SelectedProfile = "dev";
         RenderedShell.Drain();
-        var other = shell.Window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.Classes.Contains("cell") && button.DataContext is EnvProfileCell { Profile: "staging" });
+        var other = shell.Window.GetVisualDescendants().OfType<ChoiceSegment>()
+            .Single(segment => segment.DataContext is EnvProfileColumn { Name: "staging" });
 
         shell.Tap(other);
 
@@ -197,7 +197,7 @@ public sealed class DrawnRevealTests
         Assert.Equal("Hide STRIPE_KEY", AutomationProperties.GetName(toggle));
 
         shell.Window.GetVisualDescendants().OfType<Button>()
-            .First(button => button.IsEffectivelyVisible && button.Focusable && !button.GetVisualAncestors().OfType<Border>().Any(border => border.Classes.Contains("matrix-row")))
+            .First(button => button.IsEffectivelyVisible && button.Focusable && !button.GetVisualAncestors().OfType<Border>().Any(border => border.Classes.Contains("variable-row")))
             .Focus();
         RenderedShell.Drain();
         Assert.False(toggle.IsFocused);
@@ -234,7 +234,7 @@ public sealed class DrawnRevealTests
     public Task A_click_on_Reveal_draws_the_value_where_the_detail_replaces_the_list() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
-        shell.Window.Width = 720;
+        shell.Window.Width = 900;
         var (cell, value) = shell.Open("current");
         var style = TextStyle.Of(cell);
         var toggle = shell.ToggleOf(cell);

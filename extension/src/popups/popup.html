@@ -60,6 +60,12 @@
         </div>
       </section>
 
+      <section id="checking-keypaste" class="pairing">
+        <p class="pairing-heading" data-i18n="popupCheckKeypaste"></p>
+        <p id="pairing-code" class="pairing-code"></p>
+        <p class="note" data-i18n="popupConfirmCode"></p>
+      </section>
+
       <section id="configured-not-associated">
         <p data-i18n="popupConfiguredNotAssociated" data-i18n-placeholder="<span class='identifier' id='unassociated-identifier'></span>"></p>
       </section>
@@ -81,8 +87,8 @@
       </section>
 
       <section id="error-encountered">
-        <p data-i18n="popupErrorEncountered"></p>
-        <p class="problem">
+        <p id="error-heading"></p>
+        <p id="error-problem" class="problem">
           <!-- Lucide triangle-alert, ISC -->
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
           <span id="error-message"></span>

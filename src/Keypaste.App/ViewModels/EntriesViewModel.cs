@@ -26,6 +26,8 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private readonly AppVaultSession _session;
+    private readonly IReadOnlyList<AppVaultSession> _alsoListed;
+    private readonly Func<AppVaultSession, string> _titleOf;
     private readonly ClipboardCountdown _clipboard;
 
     private IReadOnlyList<EntryRow> _all = [];
@@ -35,12 +37,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private readonly IVaultFilePicker? _picker;
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
+    private AppVaultSession? _selectionVault;
     private EntryName? _pinned;
+    private AppVaultSession? _pinnedVault;
     private string? _groupRefusal;
     private EntryDetailViewModel? _detail;
     private string _search = string.Empty;
     private string? _matchedQuery;
-    private Dictionary<(string Uuid, EntryName Name), EntryMatch> _matches = [];
+    private Dictionary<(AppVaultSession Vault, string Uuid, EntryName Name), EntryMatch> _matches = [];
     private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
@@ -54,24 +58,33 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         IWebLauncher? web = null,
         Action<Action>? post = null,
         IVaultFilePicker? picker = null,
-        TableState? table = null)
+        TableState? table = null,
+        IReadOnlyList<AppVaultSession>? alsoListed = null,
+        Func<AppVaultSession, string>? titleOf = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
 
         _session = session;
+        _alsoListed = [.. (alsoListed ?? []).Where(other => !ReferenceEquals(other, session))];
+        _titleOf = titleOf ?? (_ => string.Empty);
         _clipboard = clipboard;
         _activity = activity;
         _web = web;
         _post = post;
         _picker = picker;
 
-        _session.Edited += OnVaultEdited;
+        foreach (var listed in ListedVaults)
+        {
+            listed.Edited += OnVaultEdited;
+        }
+
         Table = table ?? TableStates.NewItems();
         Table.OrderChanged += OnOrderChanged;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         BeginAddOfKindCommand = new RelayCommand<ItemTemplate>(BeginAddOfKind, _ => !IsAdding);
+        ChooseTemplateCommand = new RelayCommand(ChooseTemplate, () => !IsAdding);
         DeleteCommand = new RelayCommand(
             DeleteOrAsk,
             () => Selected is not null && !IsConfirmingDelete);
@@ -80,7 +93,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             () => IsConfirmingDelete = false,
             () => IsConfirmingDelete);
 
-        OrganizeCommand = new RelayCommand(BeginOrganize, () => Selected is not null && !IsOrganizing);
+        OrganizeCommand = new RelayCommand(BeginOrganize, () => Selected is { } row && IsHome(row) && !IsOrganizing);
         ConfirmOrganizeCommand = new RelayCommand(ConfirmOrganize, () => IsOrganizing);
         CancelOrganizeCommand = new RelayCommand(() => CloseOrganize(), () => IsOrganizing);
 
@@ -154,12 +167,109 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
+    /// <summary>Which of the vault's places the list shows: every item, or one kind of them.</summary>
+    internal ItemPlace Place
+    {
+        get => _place;
+        set
+        {
+            if (SetProperty(ref _place, value))
+            {
+                OnPropertyChanged(nameof(ListTitle));
+                OnPropertyChanged(nameof(ListEmptyNote));
+                OnPropertyChanged(nameof(ListEmptyOffersImport));
+                OnPropertyChanged(nameof(AddsInPlace));
+                OnPropertyChanged(nameof(AddInPlaceTip));
+                _pinned = null;
+                Filter();
+                ClosePaneTheListHid();
+            }
+        }
+    }
+
+    private ItemPlace _place;
+
+    /// <summary>The vault's title, which the item's kind line and the list's header name.</summary>
+    internal string VaultTitle { get; init; } = string.Empty;
+
+    /// <summary>The title of the open item's vault, which the pane's kind line names.</summary>
+    internal string ItemVaultTitle => ListsSeveralVaults && _selectionVault is { } vault ? _titleOf(vault) : VaultTitle;
+
+    /// <summary>What the list's header says under its title, muted: the vault, or All Accounts.</summary>
+    [ObservableProperty]
+    internal partial string ListSubtitle { get; set; } = string.Empty;
+
+    /// <summary>Whether the list holds the items of several vaults, as All Accounts and Favorites do, each row naming its vault.</summary>
+    internal bool ListsSeveralVaults => _alsoListed.Count > 0;
+
+    /// <summary>The vaults whose items the list holds, this one first.</summary>
+    private IEnumerable<AppVaultSession> ListedVaults => [_session, .. _alsoListed];
+
+    /// <summary>The vaults whose items the list holds, this one first, which a lock of any of them makes the shell read again.</summary>
+    internal IReadOnlyList<AppVaultSession> Vaults => [.. ListedVaults];
+
+    /// <summary>The vault a row's item is in.</summary>
+    private AppVaultSession SessionOf(EntryRow row) => row.Vault ?? _session;
+
+    /// <summary>Whether a row's item is in this screen's own vault, whose groups the list's forms move it among.</summary>
+    private bool IsHome(EntryRow row) => ReferenceEquals(SessionOf(row), _session);
+
+    private bool SameVault(EntryRow row, AppVaultSession? vault) => vault is null || ReferenceEquals(SessionOf(row), vault);
+
+    private bool IsSelected(EntryRow row) => row.Is(_selection) && SameVault(row, _selectionVault);
+
+    /// <summary>The list as drawn: the rows, under a heading for each day range while it runs by when items changed.</summary>
+    internal IReadOnlyList<object> ListedRows
+    {
+        get
+        {
+            if (Table.Order?.Column != TableStates.Modified || Rows.Count == 0)
+            {
+                return [.. Rows];
+            }
+
+            var now = _session.Clock.GetLocalNow();
+            List<object> listed = [];
+            RowSection? last = null;
+
+            foreach (var row in Rows)
+            {
+                var section = RowSections.Of(row.Modified, now);
+
+                if (section != last)
+                {
+                    listed.Add(section);
+                    last = section;
+                }
+
+                listed.Add(row);
+            }
+
+            return listed;
+        }
+    }
+
+    /// <summary>Each item's tags by its group and title, which its kind reads.</summary>
+    internal static Dictionary<(string GroupPath, string Title), IReadOnlyList<string>> TagsByName(Vault vault)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+
+        Dictionary<(string, string), IReadOnlyList<string>> tags = [];
+
+        foreach (var tagged in vault.ReadTags())
+        {
+            tags.TryAdd((tagged.Name.GroupPath, tagged.Name.Title), tagged.Tags);
+        }
+
+        return tags;
+    }
+
     /// <summary>Whether a group is showing, which Rename beside its name then renames.</summary>
     internal bool CanRenameGroup => SelectedGroup is { IsEverything: false };
 
     /// <summary>What the list header names, which is what the search covers: every item, or the group showing.</summary>
     internal string ListTitle =>
-        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : "All items";
+        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : ItemPlaces.Title(Place);
 
     /// <summary>Shows every item again, which widens the search to all of them.</summary>
     internal void ShowEveryItem() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything);
@@ -169,7 +279,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>What matches the search and the selected group, in the table's order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
+    [NotifyPropertyChangedFor(nameof(ListedRows), nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
     internal partial IReadOnlyList<EntryRow> Rows { get; private set; } = [];
 
@@ -180,7 +290,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal string ListEmptyNote =>
         Search.Trim() is { Length: > 0 } query
             ? $"No items match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
-            : SelectedGroup is { IsEverything: false }
+            : Place == ItemPlace.Favorites && SelectedGroup is null or { IsEverything: true }
+                ? Strings.NoFavoritesYet
+            : SelectedGroup is { IsEverything: false } || Place != ItemPlace.All
                 ? $"No items in {ListTitle}. {Strings.NewItemAddsOneHere}"
                 : "No items in this vault yet.";
 
@@ -209,7 +321,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// Whether the empty list also offers Import .kdbx: the vault holds no item at all, as a new one
     /// does, so the first thing a KeePass user may want is to bring their database in.
     /// </summary>
-    internal bool ListEmptyOffersImport => TotalCount == 0 && !ListEmptyOffersClearSearch && SelectedGroup is null or { IsEverything: true };
+    internal bool ListEmptyOffersImport => TotalCount == 0 && !ListEmptyOffersClearSearch && Place == ItemPlace.All && SelectedGroup is null or { IsEverything: true };
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -258,7 +370,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The pane shows only what the list does, so the group or query just chosen closes an item it hid.</summary>
     private void ClosePaneTheListHid()
     {
-        if (_selection is { } item && !Rows.Any(row => row.Is(item)))
+        if (_selection is not null && !Rows.Any(IsSelected))
         {
             Select(null);
         }
@@ -284,38 +396,38 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </remarks>
     internal EntryRow? Selected
     {
-        get => _selection is { } item && !IsAdding
-            ? Rows.FirstOrDefault(row => row.Is(item))
+        get => _selection is not null && !IsAdding
+            ? Rows.FirstOrDefault(IsSelected)
             : null;
         set
         {
             // The list writes the row it was just told to show, which is no choice to act on.
-            if (value is not { } row || (!IsAdding && row.Is(_selection)))
+            if (value is not { } row || (!IsAdding && IsSelected(row)))
             {
                 return;
             }
 
             if (PaneDraft is { } draft && AskDiscard is { } ask)
             {
-                ask(draft, () => MoveSelection(row.Name), () => OnPropertyChanged(nameof(Selected)));
+                ask(draft, () => MoveSelection(row.Name, SessionOf(row)), () => OnPropertyChanged(nameof(Selected)));
                 return;
             }
 
-            MoveSelection(row.Name);
+            MoveSelection(row.Name, SessionOf(row));
         }
     }
 
     private string? _renamedGroupName;
     private bool _changeHeldOff;
 
-    private void MoveSelection(EntryName name)
+    private void MoveSelection(EntryName name, AppVaultSession vault)
     {
         if (IsAdding)
         {
             CancelAdd();
         }
 
-        Select(name);
+        Select(name, vault);
         ShowHeldChange();
     }
 
@@ -531,6 +643,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(DeletePrompt));
                 BeginAddCommand.NotifyCanExecuteChanged();
                 BeginAddOfKindCommand.NotifyCanExecuteChanged();
+                ChooseTemplateCommand.NotifyCanExecuteChanged();
                 CancelAddCommand.NotifyCanExecuteChanged();
                 ConfirmAddCommand.NotifyCanExecuteChanged();
                 DeleteCommand.NotifyCanExecuteChanged();
@@ -780,13 +893,29 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     internal RelayCommand CancelGroupCommand { get; }
 
+    /// <summary>The list's "+" and ⌘N: the form of the kind the place holds, or a login's where it holds every kind.</summary>
     internal RelayCommand BeginAddCommand { get; }
 
-    /// <summary>Opens New item with the kind it is given already chosen.</summary>
+    /// <summary>Opens the form of the template it is given.</summary>
     internal RelayCommand<ItemTemplate> BeginAddOfKindCommand { get; }
 
-    /// <summary>The kinds the add menu offers, as New item's kind choice shows them.</summary>
-    internal IReadOnlyList<TemplateChoice> Kinds { get; } = TemplateChoice.All;
+    /// <summary>The sidebar's New and ⇧⌘N: the grid of templates.</summary>
+    internal RelayCommand ChooseTemplateCommand { get; }
+
+    /// <summary>The templates the "+" menu offers where the place holds every kind.</summary>
+    internal IReadOnlyList<TemplateChoice> Kinds { get; } = TemplateChoice.Common;
+
+    /// <summary>Whether the place holds one kind, so its "+" opens that kind's form at once rather than a menu.</summary>
+    internal bool AddsInPlace => ItemPlaces.TemplateOf(Place) is not null;
+
+    /// <summary>The direct "+"'s tooltip and name: "New login in Acme".</summary>
+    internal string AddInPlaceTip => $"{TemplateChoice.Of(ItemPlaces.TemplateOf(Place) ?? ItemTemplate.Login).NewTitle} in {VaultTitle}";
+
+    /// <summary>The "+" menu's heading: "New in Acme".</summary>
+    internal string AddMenuHeading => $"New in {VaultTitle}";
+
+    /// <summary>The open vaults a new item can be saved in, the one in view first; the shell gives them, and alone the vault in view is the one.</summary>
+    internal Func<IReadOnlyList<SaveInChoice>>? SaveInPlaces { get; init; }
 
     /// <summary>Asks for confirmation. It does not delete.</summary>
     internal RelayCommand DeleteCommand { get; }
@@ -814,23 +943,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var wanted = _selection;
+        var wantedVault = _selectionVault;
 
         var wantedGroup = _selectedGroup?.Path;
 
-        var entries = vault.ReadEntries();
-        var tells = SameNameTells.Of(entries);
-        HashSet<string> heldTwice = [.. entries.GroupBy(entry => entry.Uuid!, StringComparer.Ordinal).Where(holders => holders.Count() > 1).Select(holders => holders.Key)];
-
-        _all = [.. entries
-            .Select(entry => new EntryRow(entry.Title, entry.GroupPath)
-            {
-                Uuid = entry.Uuid!,
-                SharesItsUuid = heldTwice.Contains(entry.Uuid!),
-                SharedNameTell = tells.Of(EntryName.Of(entry) with { Uuid = entry.Uuid }),
-                Kind = EntryKinds.Of(entry),
-                Username = entry.Username,
-                Url = entry.Url,
-            })];
+        _all = [.. RowsOf(_session, vault), .. _alsoListed.SelectMany(other => other.Unlocked is { } open ? RowsOf(other, open) : [])];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
         OnPropertyChanged(nameof(TotalCount));
@@ -864,9 +981,52 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Filter();
 
-        SelectIfListed(wanted);
+        SelectIfListed(wanted, wantedVault);
         TellPaneAboutItsName(Detail);
         ApplyActivity();
+    }
+
+    /// <summary>One vault's items as the list's rows, naming the vault where the list holds several; names and times, never a value.</summary>
+    private List<EntryRow> RowsOf(AppVaultSession session, Vault vault)
+    {
+        IReadOnlyList<VaultEntry> entries;
+        IReadOnlyDictionary<string, DateTimeOffset> modified;
+        HashSet<(string, string)> favorites;
+        Dictionary<(string GroupPath, string Title), IReadOnlyList<string>> tags;
+
+        try
+        {
+            entries = vault.ReadEntries();
+            modified = vault.ReadModifiedTimes();
+            tags = TagsByName(vault);
+            favorites = [.. tags.Where(tagged => tagged.Value.Contains(ItemPlaces.FavoriteTag, StringComparer.Ordinal)).Select(tagged => tagged.Key)];
+        }
+        catch (ObjectDisposedException) when (!ReferenceEquals(session, _session))
+        {
+            // Another listed vault locked as it was read; its rows go with it.
+            return [];
+        }
+
+        var tells = SameNameTells.Of(entries);
+        HashSet<string> heldTwice = [.. entries.GroupBy(entry => entry.Uuid!, StringComparer.Ordinal).Where(holders => holders.Count() > 1).Select(holders => holders.Key)];
+        var vaultName = ListsSeveralVaults ? _titleOf(session) : string.Empty;
+
+        return [.. entries
+            .Select(entry => new EntryRow(entry.Title, entry.GroupPath)
+            {
+                Uuid = entry.Uuid!,
+                Vault = session,
+                VaultName = vaultName,
+                SharesItsUuid = heldTwice.Contains(entry.Uuid!),
+                SharedNameTell = tells.Of(EntryName.Of(entry) with { Uuid = entry.Uuid }),
+                Kind = EntryKinds.Of(entry, tags.GetValueOrDefault((entry.GroupPath, entry.Title), [])),
+                Username = entry.Username,
+                Url = entry.Url,
+                Modified = modified.TryGetValue(entry.Uuid!, out var changed) ? changed : null,
+                IsFavorite = favorites.Contains((entry.GroupPath, entry.Title)),
+                InProject = tags.GetValueOrDefault((entry.GroupPath, entry.Title), []).Any(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member),
+                ChangedText = modified.TryGetValue(entry.Uuid!, out var at) ? UseText.Changed(at) : string.Empty,
+            })];
     }
 
     /// <summary>Reads the vault again after a merge or a terminal's edit, and the open item too, which <see cref="Reload"/> leaves to the pane that made the change; a draft or an edit holds this off until its form closes.</summary>
@@ -911,7 +1071,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         var now = _session.Clock.GetUtcNow();
 
-        foreach (var row in _all.Concat(Rows))
+        // The picture is this vault's own; another listed vault's items keep no dot.
+        foreach (var row in _all.Concat(Rows).Where(IsHome))
         {
             row.Apply(picture, now);
         }
@@ -966,7 +1127,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Nothing derived from the vault outlives this.</summary>
     public void Dispose()
     {
-        _session.Edited -= OnVaultEdited;
+        foreach (var listed in ListedVaults)
+        {
+            listed.Edited -= OnVaultEdited;
+        }
+
         Table.OrderChanged -= OnOrderChanged;
 
         if (_activity is not null)
@@ -984,14 +1149,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         NewItem = null;
     }
 
-    private EntryDetailViewModel? Build(EntryName name)
+    private EntryDetailViewModel? Build(EntryName name, AppVaultSession session)
     {
         VaultEntry? found;
         try
         {
             // By the row's item, not its path or its title: two rows can share either, and building
             // the pane from the wrong one is what made its copy button serve a secret nobody selected.
-            found = _session.Unlocked?.Find(name);
+            found = session.Unlocked?.Find(name);
         }
         catch (VaultException e)
         {
@@ -1006,7 +1171,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        var detail = new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange, StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close) };
+        var detail = new EntryDetailViewModel(session, _clipboard, entry, message => Error = message, moved => Reselect(moved, session), _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange, StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close) };
         TellPaneAboutItsName(detail);
         return detail;
     }
@@ -1014,7 +1179,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Tells the pane whether another item has its name now, which a write elsewhere can change while it stays open.</summary>
     private void TellPaneAboutItsName(EntryDetailViewModel? detail)
     {
-        if (detail is not null && _all.FirstOrDefault(row => row.Is(detail.Name)) is { } row)
+        if (detail is not null && _all.FirstOrDefault(row => row.Is(detail.Name) && SameVault(row, _selectionVault)) is { } row)
         {
             detail.ShowSharedName(row.SharesItsName, row.SharedNameTell is { Length: 0 });
         }
@@ -1024,25 +1189,32 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <remarks>
     /// An <see cref="EntryRow"/> is a record, so reselecting an equal row changes nothing.
     /// </remarks>
-    private void OnKindChanged(EntryName name) => Reselect(name);
+    private void OnKindChanged(EntryName name) => Reselect(name, _session);
 
-    private void Reselect(EntryName name)
+    private void Reselect(EntryName name, AppVaultSession vault)
     {
         Reload();
-        SelectIfListed(name);
+        SelectIfListed(name, vault);
         ShowHeldChange();
     }
 
     /// <summary>Selects what the vault still holds, and holds it in the list until the next query or group, because an edit or another program's save is not the person hiding it.</summary>
-    private void SelectIfListed(EntryName? name)
+    private void SelectIfListed(EntryName? name, AppVaultSession? vault)
     {
-        Select(_all.FirstOrDefault(row => row.Is(name))?.Name);
+        var row = _all.FirstOrDefault(row => row.Is(name) && SameVault(row, vault));
+        Select(row?.Name, row is null ? null : SessionOf(row));
 
-        if (_selection is { } selected && !Rows.Any(row => row.Is(selected)))
+        if (_selection is { } selected && !Rows.Any(IsSelected))
         {
-            _pinned = selected;
+            Pin(selected, _selectionVault);
             Filter();
         }
+    }
+
+    private void Pin(EntryName? name, AppVaultSession? vault)
+    {
+        _pinned = name;
+        _pinnedVault = vault;
     }
 
     /// <summary>Narrows the list to the selected group and the current query.</summary>
@@ -1063,11 +1235,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         [
             .. TableSorting.Sorted(
                 _all
-                    .Where(row => Shows(group, row.GroupPath))
-                    .Where(row => query.Length == 0 || _matches.ContainsKey((row.Uuid, row.Name)))
+                    .Where(row => Shows(group, row.GroupPath) && (Place == ItemPlace.Favorites ? row.IsFavorite : ItemPlaces.Holds(Place, row.Kind)))
+                    .Where(row => query.Length == 0 || _matches.ContainsKey((SessionOf(row), row.Uuid, row.Name)))
                     .Select(row => query.Length == 0
                         ? row
-                        : row with { Fields = _matches[(row.Uuid, row.Name)].Fields, Tags = _matches[(row.Uuid, row.Name)].Tags }),
+                        : row with { Fields = _matches[(SessionOf(row), row.Uuid, row.Name)].Fields, Tags = _matches[(SessionOf(row), row.Uuid, row.Name)].Tags }),
                 Table.Order,
                 SortValueOf,
                 TieBetween)
@@ -1075,9 +1247,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         // An entry just renamed out of its own result stays where the person is looking at it. It is
         // held only until the query changes, which is when they asked a different question.
-        if (_pinned is { } pin && !rows.Any(row => row.Is(pin)))
+        if (_pinned is { } pin && !rows.Any(row => row.Is(pin) && SameVault(row, _pinnedVault)))
         {
-            if (_all.FirstOrDefault(row => row.Is(pin)) is { } held)
+            if (_all.FirstOrDefault(row => row.Is(pin) && SameVault(row, _pinnedVault)) is { } held)
             {
                 rows.Insert(0, held);
             }
@@ -1093,6 +1265,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         TableStates.Username => new(row.DisplayUsername),
         TableStates.Url => new(row.DisplayUrl),
         TableStates.Group => new(row.GroupPath.Length == 0 ? null : row.Where),
+        TableStates.Modified => SortValue.At(row.ModifiedTicks),
         _ => SortValue.At(row.LastUsedTicks),
     };
 
@@ -1137,7 +1310,22 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         // A damaged file can hold one UUID under two names, or both under one, where the later match stands for both rows.
         foreach (var match in vault.Search(query))
         {
-            _matches[(match.Uuid, match.Name)] = match;
+            _matches[(_session, match.Uuid, match.Name)] = match;
+        }
+
+        foreach (var other in _alsoListed)
+        {
+            try
+            {
+                foreach (var match in other.Unlocked?.Search(query) ?? [])
+                {
+                    _matches[(other, match.Uuid, match.Name)] = match;
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // That vault locked as it was searched.
+            }
         }
     }
 
@@ -1149,10 +1337,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// somebody opened it. Replacing it would dispose the pane in the middle of the interaction
     /// that asked for the reload.
     /// </remarks>
-    private void Select(EntryName? name)
+    private void Select(EntryName? name, AppVaultSession? vault = null)
     {
-        var moved = _selection?.Uuid != name?.Uuid || _selection != name;
+        vault = name is null ? null : vault ?? _session;
+        var moved = _selection?.Uuid != name?.Uuid || _selection != name || !ReferenceEquals(_selectionVault, vault);
         _selection = name;
+        _selectionVault = vault;
 
         if (moved)
         {
@@ -1162,7 +1352,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 CancelAdd();
             }
 
-            Detail = name is null ? null : Build(name);
+            Detail = name is null ? null : Build(name, vault!);
 
             if (Detail is not null && _activity?.Current is { } picture)
             {
@@ -1174,15 +1364,23 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         IsOrganizing = false;
 
         OnPropertyChanged(nameof(Selected));
+        OnPropertyChanged(nameof(ItemVaultTitle));
         OnPropertyChanged(nameof(DeletePrompt));
         DeleteCommand.NotifyCanExecuteChanged();
         OrganizeCommand.NotifyCanExecuteChanged();
         DuplicateCommand.NotifyCanExecuteChanged();
     }
 
-    private void BeginAdd()
+    private void BeginAdd() => Open(ItemPlaces.TemplateOf(Place) ?? ItemTemplate.Login);
+
+    private void BeginAddOfKind(ItemTemplate kind) => Open(kind);
+
+    private void ChooseTemplate() => Open(null);
+
+    /// <summary>Opens New item in the vault in view: the template's form, or the grid when none is given.</summary>
+    private void Open(ItemTemplate? template)
     {
-        if (_session.Unlocked is not { } vault)
+        if (_session.Unlocked is null)
         {
             Error = "The vault is locked. Unlock it, then try again.";
             return;
@@ -1190,17 +1388,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Notice = null;
         Error = null;
-        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
+        NewItem = new NewItemViewModel(SaveInChoices(), _clipboard, SelectedGroup is { IsEverything: false } group ? group.Path : null, template);
     }
 
-    private void BeginAddOfKind(ItemTemplate kind)
+    private IReadOnlyList<SaveInChoice> SaveInChoices()
     {
-        BeginAdd();
-
-        if (NewItem is { } form)
-        {
-            form.Template = kind;
-        }
+        var places = SaveInPlaces?.Invoke() ?? [];
+        var inView = places.FirstOrDefault(place => ReferenceEquals(place.Session, _session)) ?? new SaveInChoice(_session, AccountSection.LocalTitle, VaultTitle);
+        return [inView, .. places.Where(place => !ReferenceEquals(place.Session, _session) && place.Session.IsUnlocked)];
     }
 
     [RelayCommand(CanExecute = nameof(IsAdding))]
@@ -1216,21 +1411,29 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     [RelayCommand(CanExecute = nameof(CanCreate))]
     private void ConfirmAdd()
     {
-        if (_newItem?.Create() is not { } name)
+        if (_newItem is not { } form || form.Create() is not { } name)
         {
             return;
         }
 
+        var savedIn = form.SaveIn;
         NewItem = null;
         Error = null;
         Reload();
-        Selected = Rows.FirstOrDefault(row => row.Name == name);
+        Selected = Rows.FirstOrDefault(row => row.Name == name && SameVault(row, savedIn.Session));
+
+        // An item saved in a vault this list leaves out, or of a kind its place does not list, is not in view to select.
+        if (Selected is null)
+        {
+            Toast?.Invoke($"Saved {EntryNameSanitizer.Sanitize(name.Title).Text} in {savedIn.Vault}.", ToastTone.Success);
+        }
+
         ShowHeldChange();
     }
 
     private void DeleteOrAsk()
     {
-        if (_session.Unlocked?.RecyclesDeletedEntries == true)
+        if (Selected is { } row && SessionOf(row).Unlocked?.RecyclesDeletedEntries == true)
         {
             Delete();
         }
@@ -1249,8 +1452,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        var firstDeleteNote = FirstDeleteNote();
-        var write = _session.Write(
+        var session = SessionOf(row);
+        var firstDeleteNote = FirstDeleteNote(session);
+        var write = session.Write(
             vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
             removal => removal.Outcome != DeletionOutcome.NothingMatched);
 
@@ -1280,8 +1484,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             outcome == DeletionOutcome.Recycled
                 ? new Undoable(
                     vault => PutBack(vault, recycled),
-                    () => Reselect(row.Name),
-                    Restores: true)
+                    () => Reselect(row.Name, session),
+                    Restores: true,
+                    Vault: session)
                 : null,
             outcome == DeletionOutcome.Recycled
                 ? $"Moved {name} to the Trash.{firstDeleteNote}"
@@ -1292,8 +1497,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         vault.RestoreRecycled(recycled) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot;
 
     /// <summary>The format's one mention, for a first delete, which saves the file as KDBX 4.1 (D-0247); empty for a file there already.</summary>
-    private string FirstDeleteNote() =>
-        _session.Unlocked?.RecyclesDeletedEntries == true && KdbxHeader.IsOlderThan41(_session.Unlocked.Path)
+    private static string FirstDeleteNote(AppVaultSession session) =>
+        session.Unlocked is { RecyclesDeletedEntries: true } vault && KdbxHeader.IsOlderThan41(vault.Path)
             ? $" {Strings.ThisVaultIsNowSavedInFormat41}"
             : string.Empty;
 
@@ -1306,7 +1511,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        var write = _session.Write(last.Reverse, reversed => reversed);
+        var write = (last.Vault ?? _session).Write(last.Reverse, reversed => reversed);
 
         if (write.Problem("undo this again") is { } problem)
         {
@@ -1413,7 +1618,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         ArgumentNullException.ThrowIfNull(row);
 
-        return HoldsNoForm && _session.Unlocked?.RelocationRefusal(row.Name, new EntryName(group, row.Title)) is null;
+        return HoldsNoForm && IsHome(row) && _session.Unlocked?.RelocationRefusal(row.Name, new EntryName(group, row.Title)) is null;
     }
 
     /// <summary>Moves a dragged item into a group through what Rename or move… does, so it is one write and Undo reverses it.</summary>
@@ -1467,8 +1672,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         // Held in the result even when its new name no longer answers the query that found it, so
         // the entry does not vanish from under somebody at the moment they renamed it.
-        _pinned = moved;
-        Reselect(moved);
+        Pin(moved, _session);
+        Reselect(moved, _session);
 
         // A filter the entry has just left would hide what somebody is still looking at, so the
         // filter follows the entry rather than the other way round.
@@ -1658,8 +1863,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var path = selected.Path;
-        var count = _all.Count(row => selected.Contains(row.GroupPath));
-        var firstDeleteNote = FirstDeleteNote();
+        var count = _all.Count(row => IsHome(row) && selected.Contains(row.GroupPath));
+        var firstDeleteNote = FirstDeleteNote(_session);
         var write = _session.Write(
             vault => vault.DeleteGroup(path),
             outcome => outcome is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently);
@@ -1713,7 +1918,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         CloseOtherForms();
 
-        var write = _session.Write(
+        var session = SessionOf(row);
+        var write = session.Write(
             vault => (Outcome: vault.CloneEntry(row.Name, out var copy, out var dropped), Copy: copy, Dropped: dropped),
             result => result.Outcome == OrganizeOutcome.Copied);
 
@@ -1732,10 +1938,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        _pinned = made;
-        Reselect(made);
+        Pin(made, session);
+        Reselect(made, session);
         Offer(
-            new Undoable(vault => vault.RemoveEntry(made, out _) != DeletionOutcome.NothingMatched, () => Reselect(row.Name)),
+            new Undoable(vault => vault.RemoveEntry(made, out _) != DeletionOutcome.NothingMatched, () => Reselect(row.Name, session), Vault: session),
             Duplicated(row.Title, made.Title, write.Value.Dropped));
     }
 
@@ -1947,5 +2153,5 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         UndoCommand.NotifyCanExecuteChanged();
     }
 
-    private sealed record Undoable(Func<Vault, bool> Reverse, Action? Show = null, bool Restores = false);
+    private sealed record Undoable(Func<Vault, bool> Reverse, Action? Show = null, bool Restores = false, AppVaultSession? Vault = null);
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Platform;
 using Xunit;
 
@@ -16,7 +17,10 @@ namespace Keypaste.App.Tests;
 /// </remarks>
 internal static class PlatformTheme
 {
-    internal static void Set(PlatformThemeVariant variant, ColorContrastPreference contrast = ColorContrastPreference.NoPreference)
+    /// <param name="variant">Light or dark.</param>
+    /// <param name="contrast">The contrast preference.</param>
+    /// <param name="accent">The system's accent, or null for a platform that reports none.</param>
+    internal static void Set(PlatformThemeVariant variant, ColorContrastPreference contrast = ColorContrastPreference.NoPreference, Color? accent = null)
     {
         var settings = Application.Current?.PlatformSettings;
         Assert.True(settings is not null, "the application has no platform settings yet");
@@ -27,6 +31,7 @@ internal static class PlatformTheme
             [typeof(PlatformColorValues)]);
 
         Assert.True(raise is not null, "Avalonia's platform settings no longer raise OnColorValuesChanged; raise the change another way");
-        raise.Invoke(settings, [new PlatformColorValues { ThemeVariant = variant, ContrastPreference = contrast }]);
+        var values = new PlatformColorValues { ThemeVariant = variant, ContrastPreference = contrast };
+        raise.Invoke(settings, [accent is { } reported ? values with { AccentColor1 = reported } : values]);
     }
 }

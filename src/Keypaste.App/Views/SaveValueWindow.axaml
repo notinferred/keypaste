@@ -21,91 +21,105 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- Every block has a fixed height, so nothing the agent writes can move the place, the value or the
-       buttons (THREATS.md T-2). The reason is one plain TextBlock in a box that scrolls, and no button is
-       the default: Enter saves nothing, and Escape cancels. -->
+  <!-- A claim card that asks for a value. The agent never receives what is typed. The value, the agent's words and the
+       placement keep fixed heights, so nothing the agent writes moves the field or the buttons (THREATS.md T-2). Return presses the primary only once it is armed; Escape cancels. -->
 
-  <Border Classes="prompt">
-    <StackPanel Spacing="16">
-
-      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+  <Border Classes="claim">
+    <StackPanel>
+      <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
-        <Border Grid.Column="0" Classes="prompt-tile">
-          <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
-        </Border>
-        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <Grid ColumnDefinitions="Auto,Auto">
-            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title size-16" Text="{Binding Client}"
-                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
-            <TextBlock Grid.Column="1" Classes="prompt-title size-16" Text=" asks you to save a value" />
-          </Grid>
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Classes="prompt-sub size-13" Text="via MCP · label " />
-            <TextBlock Name="LabelText" Classes="prompt-sub size-13" Text="{Binding Label}"
-                       MaxWidth="200" TextTrimming="CharacterEllipsis" />
+        <views:PromptHead />
+
+        <StackPanel Spacing="4">
+          <TextBlock Name="TitleText" Classes="claim-title size-16">
+            <Run Text="Save a new value for " /><Run Classes="claim-name size-15" Text="{Binding Field}" /><Run Text="?" />
+          </TextBlock>
+          <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
+            <ctl:KpIcon Classes="claim-muted" Icon="folder" Size="14" VerticalAlignment="Center" />
+            <TextBlock Name="ItemText" Classes="claim-muted size-12-5" Text="{Binding Item}" MaxWidth="380" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Border Classes="dot waiting" />
-          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="New value" />
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <ctl:MaskedInput x:Name="ValueInput" Grid.Column="0" AllowsPaste="True"
+                             Sink="{Binding Value}" MaskedLength="{Binding Value.MaskedLength}"
+                             AutomationProperties.Name="{x:Static res:Strings.TheValueToSave}" />
+            <Button Grid.Column="1" Name="Generate" Classes="claim" Content="Password" Command="{Binding GenerateCommand}"
+                    ToolTip.Tip="Generate a password" />
+            <Button Grid.Column="2" Name="GeneratePassphrase" Classes="claim" Content="Passphrase" Command="{Binding GeneratePassphraseCommand}"
+                    ToolTip.Tip="Generate a passphrase" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Classes="claim-muted" Icon="lock" Size="14" VerticalAlignment="Center" />
+            <TextBlock Name="NeverText" Classes="claim-muted size-12-5" Text="{Binding NeverReceives}" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Name="ValueNote" Height="18" Classes="claim-line size-12-5" Text="{Binding Value.Note}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-      </Grid>
 
-      <Border Classes="prompt-call size-12" Padding="12,8">
-        <StackPanel>
-          <TextBlock Text="tool: keypaste.request_save" />
-          <TextBlock Name="WhereText" Classes="value" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
+          <StackPanel Spacing="4">
+            <TextBlock Classes="claim-label size-11" Text="{Binding SaysLabel}" />
+            <Border Classes="claim-quote">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <DockPanel Classes="claim-quote-text">
+                  <Border Classes="claim-quote-bar" />
+                  <StackPanel Spacing="4">
+                    <TextBlock Name="ScrubbedText" Classes="claim-muted size-12-5" Text="{Binding Scrubbed}"
+                               IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="claim-muted size-12-5" Text="{Binding Truncation}"
+                               IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
+                  </StackPanel>
+                </DockPanel>
+              </ScrollViewer>
+            </Border>
+          </StackPanel>
+
+        <!-- The placement and the replace confirmation keep their place whether the prompt replaces a value or not. -->
+        <StackPanel Spacing="6" Height="48">
+          <TextBlock Name="PlacementText" Classes="claim-line size-12-5" Text="{Binding Placement}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          <CheckBox Name="ConfirmReplace" IsVisible="{Binding Replaces}" IsChecked="{Binding ConfirmsReplace}"
+                    Content="Replace the value it holds" />
         </StackPanel>
-      </Border>
 
-      <StackPanel Spacing="6">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Name="FieldText" Classes="caption" Text="{Binding Field}" TextTrimming="CharacterEllipsis" />
-          <TextBlock Grid.Column="1" Classes="caption" Text="you enter it; the agent is not given it" />
-        </Grid>
-        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-          <ctl:MaskedInput x:Name="ValueInput" Grid.Column="0" AllowsPaste="True"
-                           Sink="{Binding Value}" MaskedLength="{Binding Value.MaskedLength}"
-                           AutomationProperties.Name="{x:Static res:Strings.TheValueToSave}" />
-          <Button Grid.Column="1" Name="Generate" Classes="prompt" Content="Password" Command="{Binding GenerateCommand}"
-                  ToolTip.Tip="Generate a password" />
-          <Button Grid.Column="2" Name="GeneratePassphrase" Classes="prompt" Content="Passphrase" Command="{Binding GeneratePassphraseCommand}"
-                  ToolTip.Tip="Generate a passphrase" />
-        </Grid>
-        <TextBlock Name="ValueNote" Height="18" Classes="size-13" Text="{Binding Value.Note}" TextTrimming="CharacterEllipsis" />
+          <StackPanel Spacing="8">
+            <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+              </StackPanel>
+            </ToggleButton>
+            <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                  ColumnSpacing="12" RowSpacing="4" Margin="20,0,0,0" IsVisible="{Binding #DetailsToggle.IsChecked}">
+              <TextBlock Grid.Row="0" Classes="fact" Text="Tool" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Classes="mono" Text="{Binding Tool}" />
+              <TextBlock Grid.Row="1" Classes="fact" Text="Label" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Name="LabelText" Text="{Binding Label}" />
+              <TextBlock Grid.Row="2" Classes="fact" Text="Item" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Name="WhereText" Classes="mono" Text="{Binding Where}" />
+              <TextBlock Grid.Row="3" Classes="fact" Text="Field" />
+              <TextBlock Grid.Row="3" Grid.Column="1" Name="FieldText" Classes="mono" Text="{Binding Field}" />
+              <TextBlock Grid.Row="4" Classes="fact" Text="Calls itself" />
+              <TextBlock Grid.Row="4" Grid.Column="1" Name="ClientText" Text="{Binding Client}" />
+              <TextBlock Grid.Row="5" Classes="fact" Text="Process" />
+              <TextBlock Grid.Row="5" Grid.Column="1" Name="ProcessText" Classes="mono" Text="{Binding Process}" />
+            </Grid>
+          </StackPanel>
       </StackPanel>
 
-      <StackPanel Spacing="6">
-        <TextBlock Classes="caption" Text="The agent says it needs this because" />
-        <Border Classes="prompt-reason" Height="77">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12,8" Spacing="6">
-              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
-                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
-                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
-                         Foreground="{DynamicResource KpTextSecondary}" />
-            </StackPanel>
-          </ScrollViewer>
-        </Border>
-        <TextBlock Classes="caption" Text="{Binding Attribution}" />
-      </StackPanel>
+      <Border Classes="claim-rule" />
 
-      <!-- The placement and the replace confirmation keep their place whether the prompt replaces a value or not. -->
-      <StackPanel Spacing="6" Height="52">
-        <TextBlock Name="PlacementText" Classes="prompt-note size-13" Text="{Binding Placement}" TextTrimming="CharacterEllipsis" />
-        <CheckBox Name="ConfirmReplace" IsVisible="{Binding Replaces}" IsChecked="{Binding ConfirmsReplace}"
-                  Content="Replace the value it holds" />
-      </StackPanel>
-
-      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Cancel"
-                IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Save"
-                Command="{Binding AllowOnceCommand}" />
-      </Grid>
-
+      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
+        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center"
+                          TextWrapping="NoWrap" IsVisible="{Binding IsChoosing}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Name="Deny" Classes="claim keyed" Content="Cancel" Tag="esc"
+                  IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+          <Button Name="AllowOnce" Classes="claim keyed primary" Content="Save" Tag="&#x21A9;"
+                  IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+        </StackPanel>
+      </ctl:HeaderRow>
     </StackPanel>
   </Border>
 

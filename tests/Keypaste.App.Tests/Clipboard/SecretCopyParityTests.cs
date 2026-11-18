@@ -418,7 +418,7 @@ public sealed class SecretCopyParityTests
             Drain();
 
             return Window.GetVisualDescendants().OfType<Button>()
-                .Single(button => button.DataContext is EnvVariableRow row && row.Key == key && Equals(button.Content, "Copy"));
+                .Single(button => button.DataContext is EnvVariableRow row && row.Key == key && button is PressToCopy);
         }
 
         private Button FieldCopy(string title, string field)

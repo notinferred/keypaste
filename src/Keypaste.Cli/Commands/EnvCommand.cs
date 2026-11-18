@@ -12,9 +12,9 @@ internal static class EnvCommand
 {
     internal static Verb Command { get; } = new(
         "env",
-        "import, export and diff .env environments\n\n"
-            + "a variable is a field of an item tagged env:<project> (the dev environment) or env:<project>:<environment>, "
-            + "editable in KeePassXC. set and pull write a new one on --entry, or on the environment's home item "
+        "import, export and diff .env stages\n\n"
+            + "a variable is a field of an item tagged env:<project> (the dev stage) or env:<project>:<stage>, "
+            + "editable in KeePassXC. set and pull write a new one on --entry, or on the stage's home item "
             + "env/<project>/.env, created tagged. to read a value: `keypaste get <item> --field <KEY> --reveal`")
     {
         EnvListCommand.Command, EnvSetCommand.Command, EnvRemoveCommand.Command, EnvPullCommand.Command,

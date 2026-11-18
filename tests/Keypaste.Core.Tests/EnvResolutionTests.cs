@@ -204,7 +204,7 @@ public sealed class EnvResolutionTests : IDisposable
 
         Assert.Equal(EnvOutcome.NoProfile, resolved.Outcome);
         Assert.Equal("qa", resolved.Profile);
-        Assert.Equal("'acme' has no 'qa' environment", resolved.Refusal);
+        Assert.Equal("'acme' has no 'qa' stage", resolved.Refusal);
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public sealed class EnvResolutionTests : IDisposable
 
         var missing = EnvResolution.Resolve(vault, "acme", "dev", ["A", "C"], _clock);
         Assert.Equal(EnvOutcome.Unusable, missing.Outcome);
-        Assert.Equal(new EnvProblem("C", "is not in this environment's set"), Assert.Single(missing.Problems));
+        Assert.Equal(new EnvProblem("C", "is not in this stage's set"), Assert.Single(missing.Problems));
         Assert.Empty(missing.Variables);
     }
 

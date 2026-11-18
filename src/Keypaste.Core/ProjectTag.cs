@@ -62,7 +62,7 @@ public sealed record ProjectTag(string Tag, ProjectTagKind Kind, string? Project
 
         if (parts.Length > 2)
         {
-            return Malformed("a project tag is env:<project> or env:<project>:<environment>, and a project name has no ':'");
+            return Malformed("a project tag is env:<project> or env:<project>:<stage>, and a project name has no ':'");
         }
 
         if (!EnvConvention.IsValidProject(parts[0], out var projectError))

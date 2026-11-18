@@ -15,7 +15,7 @@ namespace Keypaste.Cli.Commands;
 /// an agent's run on or off, sets its own rule for a kind of value, forgets a kept Always allow or pick, and removes an agent.
 /// </summary>
 /// <remarks>
-/// The rules live in <c>agents.toml</c> under the keypaste home, sealed with a key the vault holds, so a change goes to the
+/// The rules live in the vault's file under the keypaste home, sealed with a key the vault holds, so a change goes to the
 /// process holding the vault, which makes and seals it; turning run on releases nothing unasked, since every run is asked,
 /// so it is made without a confirmation. A terminal proves no person agreed, so a set or a forget releases nothing more
 /// unasked (<see cref="AgentRules.Narrowing"/>, <see cref="AgentRules.ForgettingKey"/>). With nothing holding the vault only
@@ -38,7 +38,7 @@ internal static class ClientsCommand
     internal static CliVerb Command { get; } = new(
         "clients",
         "list agents, their rules and kept answers, and change them\n\n"
-            + "lists the rules every agent's request is decided by on this computer, kept in agents.toml, each agent it "
+            + "lists the rules every agent's request to the vault is decided by on this computer, kept for each vault, each agent it "
             + "knows by the name its bridge was given with --client-label, its own rules and the answers kept for it. with an "
             + "agent's name, turns its run on or off, sets its rule for a kind of value to ask, block or what Settings sets, "
             + "forgets an Always allow or pick, or removes it. each run is still asked; an Allow, and removing an Always block, "
@@ -53,7 +53,13 @@ internal static class ClientsCommand
         ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
 
-        var file = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+        if (!VaultLocator.TryResolve(line, context.Environment, out var vaultPath, out var locateError))
+        {
+            return Usage(context, locateError);
+        }
+
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var file = AgentRulesFile.For(home, Core.Ownership.VaultIdentity.Of(home, vaultPath));
         var run = line.GetValue(_run);
         var remove = line.GetValue(_remove);
         var set = line.GetValue(_set);

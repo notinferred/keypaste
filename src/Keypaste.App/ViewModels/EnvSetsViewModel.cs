@@ -5,7 +5,7 @@ using Keypaste.Core;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The Env Sets screen: projects as cards, one of them open, its variables masked.
+/// The Environments place: the project the sidebar chose, its stages and its variables masked.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -31,7 +31,6 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     private readonly Action<string, ToastTone>? _toast;
 
     private EnvProjectViewModel? _open;
-    private string? _askedProject;
 
     internal EnvSetsViewModel(
         AppVaultSession session,
@@ -62,14 +61,11 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     /// <inheritdoc/>
     public string? UnsavedDraft => NewProjectDraft() ?? OpenProject?.UnsavedDraft;
 
-    /// <summary>Asks about unsaved work before the header's project picker replaces it, then discards or keeps it.</summary>
-    internal Action<string, Action, Action?>? AskDiscard { get; init; }
-
     internal Func<string?> NewProjectDraft => () => IsAdding && NewProject.Trim().Length > 0 ? "this new project" : null;
 
     /// <summary>Every project in the vault, by name.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasProjects), nameof(ProjectChoices), nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(HasProjects), nameof(IsEmpty))]
     internal partial IReadOnlyList<string> Projects { get; private set; } = [];
 
     internal bool HasProjects => Projects.Count > 0;
@@ -81,43 +77,6 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
     internal bool HasMalformedTags => MalformedTags.Count > 0;
 
-    /// <summary>What the header's project picker offers: every project, and the open one while it has no variable yet.</summary>
-    internal IReadOnlyList<string> ProjectChoices =>
-        _open is { } open && !Projects.Contains(open.Name, StringComparer.Ordinal)
-            ? [.. Projects, open.Name]
-            : Projects;
-
-    /// <summary>The open project's name; setting it opens that project.</summary>
-    internal string? SelectedProject
-    {
-        get => _askedProject ?? _open?.Name;
-        set
-        {
-            if (value is null || string.Equals(value, _open?.Name, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            if (AskDiscard is { } ask && UnsavedDraft is { } draft)
-            {
-                // The picker holds the name asked about until the answer, as a binding puts back only a value that changed.
-                _askedProject = value;
-                OnPropertyChanged();
-                ask(draft, () => AnsweredAsked(() => Open(value)), () => AnsweredAsked(() => { }));
-                return;
-            }
-
-            Open(value);
-        }
-    }
-
-    private void AnsweredAsked(Action answer)
-    {
-        _askedProject = null;
-        answer();
-        OnPropertyChanged(nameof(SelectedProject));
-    }
-
     /// <summary>The project whose table is showing, or null.</summary>
     internal EnvProjectViewModel? OpenProject
     {
@@ -128,8 +87,6 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
             if (SetProperty(ref _open, value))
             {
-                OnPropertyChanged(nameof(ProjectChoices));
-                OnPropertyChanged(nameof(SelectedProject));
                 OnPropertyChanged(nameof(HasOpenProject));
                 OnPropertyChanged(nameof(IsEmpty));
                 // Disposed on the way out: it holds a reveal slot and a table read from an open

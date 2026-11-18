@@ -75,7 +75,7 @@ internal static class Program
         "       welcome [--keepassxc-config <ini>]\n" +
         "       create <vault> [--new-keyfile <keyfile>]\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
-        "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
+        "       item-new <vault> <login|apikey|environment|card|note|identity|sshkey|server|database|wifi|blank> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
         "       tag-add <vault> <entry-path> <tag> [--decline]\n" +
         "       tag-rm <vault> <entry-path> <tag> [--decline]\n" +
@@ -103,8 +103,8 @@ internal static class Program
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
-        "             pair, pairings, unpair <name>, which press Settings › Browser fill's Pair a browser, list it and Remove;\n" +
-        "             fill <n> [always], which picks a fill prompt's login and presses Fill, and allowances, which lists Always fill;\n" +
+        "             pairings, unpair <name>, which list Settings › Browser fill's pairings and press Remove;\n" +
+        "             allowances, which lists the logins filled on a site before;\n" +
         "             browser-status, browser-on <browser>, browser-off <browser>, which list Settings › Browser fill's browsers\n" +
         "             and press Turn on or Turn off, set up under the KEYPASTE_DRIVER_BROWSER_ folders;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
@@ -361,10 +361,11 @@ internal sealed class Driver(string home)
     internal Task<int> NewItemAsync(string vault, string template, string folder, string title, string[] options) =>
         WithEntriesAsync(vault, entries =>
         {
-            Press(entries.BeginAddCommand, "New item");
+            Press(entries.ChooseTemplateCommand, "New");
             var form = entries.NewItem!;
-            form.SelectedTemplate = form.Templates.SingleOrDefault(choice => string.Equals(choice.Template.ToString(), template, StringComparison.OrdinalIgnoreCase))
+            var tile = form.Templates.SingleOrDefault(choice => string.Equals(choice.Template.ToString(), template, StringComparison.OrdinalIgnoreCase))
                 ?? throw new DriverException($"there is no template '{template}'");
+            form.ChooseTemplateCommand.Execute(tile.Template);
             form.Title = title;
             form.Folder = form.Folders.SingleOrDefault(choice => choice.Path == folder)
                 ?? throw new DriverException($"the folder picker offers no '{folder}'");
@@ -1031,10 +1032,6 @@ internal sealed class Driver(string home)
                     Activity(authority);
                     break;
 
-                case ["pair"]:
-                    Pair(authority);
-                    break;
-
                 case ["pairings"]:
                     Pairings(authority);
                     break;
@@ -1092,11 +1089,6 @@ internal sealed class Driver(string home)
                     await agents.ChangeAsync(label, change).ConfigureAwait(true);
                     break;
 
-                case ["fill", var number, .. var rest]:
-                    await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
-                        .FillAsync(int.Parse(number, System.Globalization.CultureInfo.InvariantCulture), rest is ["always"]).ConfigureAwait(true);
-                    break;
-
                 case ["allowances"]:
                     Allowances(authority);
                     break;
@@ -1124,20 +1116,6 @@ internal sealed class Driver(string home)
         return 0;
     }
 
-    /// <summary>Presses Settings › Browser fill's Pair a browser, as a person does, and says whether pairing is now on.</summary>
-    private static void Pair(AppAuthority authority)
-    {
-        using var browserFill = new BrowserFillViewModel(authority);
-
-        if (!browserFill.PairCommand.CanExecute(null))
-        {
-            throw new DriverException("Pair a browser cannot be pressed");
-        }
-
-        browserFill.PairCommand.Execute(null);
-        Console.Out.WriteLine(browserFill.IsArmed ? "pairing armed" : $"pairing not armed: {browserFill.Message}");
-    }
-
     /// <summary>Prints the pairings Settings › Browser fill lists, by name and build, or <c>pairings none</c>.</summary>
     private static void Pairings(AppAuthority authority)
     {
@@ -1154,7 +1132,7 @@ internal sealed class Driver(string home)
         }
     }
 
-    /// <summary>Prints the items Settings › Browser fill lists as always filled, or <c>allowances none</c>.</summary>
+    /// <summary>Prints the logins Settings › Browser fill lists as filled on a site before, or <c>allowances none</c>.</summary>
     private static void Allowances(AppAuthority authority)
     {
         using var browserFill = new BrowserFillViewModel(authority);

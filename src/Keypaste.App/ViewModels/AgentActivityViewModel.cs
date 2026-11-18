@@ -6,6 +6,7 @@ using Keypaste.App.Session;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.App.ViewModels;
 
@@ -41,7 +42,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private readonly ClipboardCountdown? _clipboard;
     private readonly IWebLauncher? _web;
     private readonly string _auditPath;
-    private readonly AgentRulesFile _rules;
+    private readonly string? _home;
     private readonly TimeProvider _clock;
     private readonly Dictionary<string, AgentRow> _byKey = new(StringComparer.Ordinal);
     private readonly HashSet<string> _opened = new(StringComparer.Ordinal);
@@ -63,7 +64,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, or null when nothing here does.</param>
-    /// <param name="home">The keypaste home whose audit log and <c>agents.toml</c> are read.</param>
+    /// <param name="home">The keypaste home whose audit log and the vault's agent rules are read.</param>
     /// <param name="clock">What lifetimes count down on.</param>
     /// <param name="post">Runs a tick or a finished look on the UI thread.</param>
     /// <param name="connector">What finding and connecting AI tools reaches, or null to look for none.</param>
@@ -90,7 +91,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         _toast = toast ?? ((_, _) => { });
         OffersActivity = openActivity is not null;
         _auditPath = KeypasteHome.AuditPath(home);
-        _rules = new AgentRulesFile(KeypasteHome.AgentsPath(home));
+        _home = home;
         _clock = clock ?? TimeProvider.System;
         _post = post ?? (run => run());
         ConnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: false), row => row is { OffersConnect: true } && CanConnect);
@@ -104,6 +105,28 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
     }
+
+    /// <summary>The unlocked vaults the list's picker offers, or none where one vault is open.</summary>
+    internal IReadOnlyList<VaultChoice> VaultChoices { get; init; } = [];
+
+    /// <summary>Whether the list starts with a picker of the vault whose agents and rules it shows.</summary>
+    internal bool OffersVaultChoice => VaultChoices.Count > 1;
+
+    /// <summary>The vault whose agents and rules the list shows; choosing another shows that vault's through <see cref="ShowVault"/>.</summary>
+    internal VaultChoice? ShownVault
+    {
+        get => VaultChoices.FirstOrDefault(choice => ReferenceEquals(choice.Vault, _authority?.Session));
+        set
+        {
+            if (value?.Vault is { } vault && !ReferenceEquals(vault, _authority?.Session))
+            {
+                ShowVault?.Invoke(value);
+            }
+        }
+    }
+
+    /// <summary>Shows another vault's agents and rules, set by the shell.</summary>
+    internal Action<VaultChoice>? ShowVault { get; init; }
 
     /// <summary>The agent whose detail is drawn, or null while the manual configuration is.</summary>
     [ObservableProperty]
@@ -532,7 +555,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         var signature = string.Join(
             '\n',
             cards.Select(card => $"{card.Key}|{card.Presence}|{card.Run}")
-                .Append($"*|{ClientsProblem}|{Stamp(_rules.Path)}"));
+                .Append($"*|{ClientsProblem}|{Stamp(Rules?.Path)}"));
 
         if (force || !string.Equals(signature, _clientsSignature, StringComparison.Ordinal))
         {
@@ -628,7 +651,10 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             return held;
         }
 
-        if (!_rules.TryRead(out var said, out var unreadable))
+        AgentRules? said = AgentRules.Defaults;
+        var unreadable = string.Empty;
+
+        if (Rules is { } file && !file.TryRead(out said, out unreadable))
         {
             problem = $"{unreadable}. Every agent request is refused until it is fixed; deleting it asks about every value again.";
             return null;
@@ -637,6 +663,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         problem = string.Empty;
         return said;
     }
+
+    /// <summary>The rules of the vault the authority holds, or null while it holds none.</summary>
+    private AgentRulesFile? Rules => _authority?.Session.Identity is { } vault ? AgentRulesFile.For(_home, vault) : null;
 
     /// <summary>Says on each named row whether it may ask to run commands.</summary>
     private void Summarize()
@@ -708,7 +737,16 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         CloseConnection();
         Choose(row);
 
-        var pane = new ConnectClientViewModel(_authority.Session, _connector, tool, removes, ran: Look, cancelled: Cancelled, clipboard: _clipboard, web: _web);
+        var pane = new ConnectClientViewModel(
+            _authority.Session,
+            _connector,
+            tool,
+            removes,
+            ran: Look,
+            cancelled: Cancelled,
+            clipboard: _clipboard,
+            web: _web,
+            accountVaults: LocalAccount.Vaults(_authority.Session.Home));
         pane.PropertyChanged += OnConnectionChanged;
         _connecting = row;
         row.Connection = pane;

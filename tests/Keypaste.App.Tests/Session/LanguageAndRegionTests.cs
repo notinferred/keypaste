@@ -174,7 +174,7 @@ public sealed partial class LanguageAndRegionTests
         {
             "keypaste", "API_KEY", "Work/github", "~/code/acme-api", "db.example.com:5432", "env:project:prod", "https://", "OPENAI_API_KEY", "STRIPE_SECRET_KEY", "billing-api", "npm start", "staging", "STRIPE_KEY", "FIELD_NAME", "ci-staging", "read:acme-api/staging/*",
         };
-        var prompts = new[] { "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow", "SetApprovalWindow", "ItemChangeWindow", "FillWindow" };
+        var prompts = new[] { "PromptHead", "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow", "SetApprovalWindow", "ItemChangeWindow", "FillWindow" };
         var app = Path.Combine(RepoRoot(), "src", "Keypaste.App");
 
         var literals = Directory.EnumerateFiles(app, "*.axaml", SearchOption.AllDirectories)
@@ -213,7 +213,7 @@ public sealed partial class LanguageAndRegionTests
     {
         var views = Path.Combine(RepoRoot(), "src", "Keypaste.App", "Views");
 
-        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "SetApprovalWindow", "PairingWindow", "PairingNoticeWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "ItemChangeWindow" })
+        foreach (var prompt in new[] { "ApprovalWindow", "EnvApprovalWindow", "RunApprovalWindow", "SetApprovalWindow", "PairingWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "ItemChangeWindow" })
         {
             Assert.DoesNotContain("res:Strings", File.ReadAllText(Path.Combine(views, prompt + ".axaml")), StringComparison.Ordinal);
         }
@@ -285,7 +285,7 @@ public sealed partial class LanguageAndRegionTests
     });
 
     [Fact]
-    public Task A_selected_rows_bar_is_at_the_side_its_title_starts_under_right_to_left() => HeadlessSession.On(() =>
+    public Task A_selected_row_is_tinted_edge_to_edge_with_no_bar_under_right_to_left() => HeadlessSession.On(() =>
     {
         using var pseudo = PseudoLocale.RightToLeft();
         using var shell = new RenderedShell("keypaste-rtl-bar-");
@@ -296,21 +296,23 @@ public sealed partial class LanguageAndRegionTests
 
         using var bitmap = shell.Window.CaptureRenderedFrame();
         Assert.NotNull(bitmap);
-        var (pixels, width, _) = AmberElements.Read(bitmap);
+        var (pixels, width, _) = AccentElements.Read(bitmap);
         var row = shell.Window.GetVisualDescendants().OfType<ListBoxItem>().Last(item => item.IsSelected && item.IsEffectivelyVisible);
+        Assert.True(shell.Window.TryFindResource("KpAccentTint", shell.Window.ActualThemeVariant, out var found));
+        var tint = Assert.IsAssignableFrom<ISolidColorBrush>(found).Color;
         var middle = (int)(row.Bounds.Height / 2);
 
-        bool IsBar(double x)
+        bool IsTint(double x)
         {
             var physical = row.TranslatePoint(new Point(x, middle), shell.Window)!.Value;
             var scaling = shell.Window.RenderScaling;
             var pixel = 4 * (((int)(physical.Y * scaling) * width) + (int)(physical.X * scaling));
 
-            return pixels[pixel + 2] - pixels[pixel] > 60;
+            return Math.Abs(pixels[pixel + 2] - tint.R) + Math.Abs(pixels[pixel + 1] - tint.G) + Math.Abs(pixels[pixel] - tint.B) < 12;
         }
 
-        Assert.True(IsBar(1), "the bar is at the row's start");
-        Assert.False(IsBar(row.Bounds.Width - 2), "and not at its end");
+        Assert.True(IsTint(2), "the row's start is its tint");
+        Assert.True(IsTint(row.Bounds.Width - 3), "and so is its end");
     });
 
     [Theory]

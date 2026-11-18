@@ -168,7 +168,7 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_narrow_window_collapses_the_sidebar_to_the_rail_and_a_wider_one_brings_it_back() => HeadlessSession.On(() =>
+    public Task A_narrow_window_hides_the_sidebar_beside_the_rail_and_a_wider_one_brings_it_back() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-window-narrow-");
         var sidebar = shell.Named<Border>("Sidebar");
@@ -183,14 +183,15 @@ public sealed class WindowLayoutTests
         Assert.True(shell.Shell.IsNarrow);
         Assert.Equal(720, shell.Root.Bounds.Width);
 
-        shell.Window.Width = 840;
+        shell.Window.Width = 900;
         shell.Frame();
         Assert.True(sidebar.IsEffectivelyVisible);
-        Assert.False(shell.Named<Border>("Rail").IsEffectivelyVisible);
+        Assert.True(shell.Named<Border>("Rail").IsEffectivelyVisible);
+        Assert.Equal(WindowChrome.RailWidth, shell.Named<Border>("Rail").Bounds.Width);
     });
 
     [Fact]
-    public Task The_rail_opens_the_sidebar_over_a_narrow_window_and_Escape_or_a_press_outside_closes_it() => HeadlessSession.On(() =>
+    public Task The_title_bar_opens_the_sidebar_over_a_narrow_window_and_Escape_or_a_press_outside_closes_it() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-window-overlay-");
         shell.Window.Width = 720;
@@ -202,7 +203,7 @@ public sealed class WindowLayoutTests
         var pane = shell.Named<ContentControl>("EntryPane");
         var widthBefore = pane.Bounds.Width;
 
-        shell.Shell.OpenSidebarOverlay();
+        shell.Tap(shell.Named<Button>("ShowSidebar"));
         shell.Frame();
         Assert.True(sidebar.IsEffectivelyVisible);
         Assert.Equal(WindowChrome.SidebarWidth, sidebar.Bounds.Width);
@@ -231,6 +232,7 @@ public sealed class WindowLayoutTests
         shell.Frame();
 
         shell.Shell.OpenSidebarOverlay();
+        shell.Shell.ShowGroups();
         shell.Frame();
         var nav = shell.Named<ListBox>("Nav");
         var row = nav.Items.OfType<GroupRow>().First();
@@ -283,7 +285,7 @@ public sealed class WindowLayoutTests
 
         shell.Window.Width = 1000;
         shell.Frame();
-        shell.Named<ListBox>("Nav").ContainerFromIndex(0)!.Focus();
+        shell.Named<ListBox>("Nav").ContainerFromItem(shell.Shell.SelectedSidebarRow!)!.Focus();
         WindowInput.Drain();
 
         shell.Shell.ToggleSidebar();

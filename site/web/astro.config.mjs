@@ -30,7 +30,7 @@ const publicIndexes = {
 export default defineConfig({
   vite: { plugins: [publicIndexes] },
   site: 'https://keypaste.com',
-  // The home page, the share viewer and the fonts stay plain files in site/public, copied as they are.
+  // The home page and the share viewer stay plain files in site/public, copied as they are.
   publicDir: '../public',
   outDir: '../dist',
   // Sätteri, Astro's default Markdown processor, runs no remark or rehype plugins, and astro-mermaid is one.
@@ -39,7 +39,7 @@ export default defineConfig({
     mermaid({
       autoTheme: true,
       enableLog: false,
-      mermaidConfig: { fontFamily: '"Instrument Sans", system-ui, sans-serif' },
+      mermaidConfig: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif' },
     }),
     starlight({
       title: 'keypaste',

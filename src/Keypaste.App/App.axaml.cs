@@ -11,7 +11,6 @@ using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Globalization;
 using Keypaste.App.HardwareKeys;
-using Keypaste.App.Navigation;
 using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
@@ -40,6 +39,7 @@ internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
     private AppAuthority? _authority;
+    private OpenVaults? _vaults;
     private Task? _ending;
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
@@ -62,6 +62,7 @@ internal sealed partial class App : Application, IDisposable
     private int _unlockScreens;
     private bool _shuttingDown;
     private bool _quitting;
+    private bool _lockedAll;
     private bool _crashed;
     private Core.Settings.WindowLayout? _untouchedLayout;
     private const string _scrollBarsAutoHide = "KpScrollBarsAutoHide";
@@ -73,6 +74,7 @@ internal sealed partial class App : Application, IDisposable
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        Theme.FontWeights.Pin(this);
 
         if (ReadingDirection.Of(CultureInfo.CurrentUICulture) == FlowDirection.RightToLeft)
         {
@@ -121,9 +123,7 @@ internal sealed partial class App : Application, IDisposable
         var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 
         _preferences = Preferences ?? new DesktopPreferences(home);
-        _session = Compose(_preferences, TimeProvider.System);
-        _session.Locked += OnLocked;
-        _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
+        var preferences = _preferences;
         _notifications = Notifications ?? SystemNotifications.ForThisProcess();
 
         if (OperatingSystem.IsLinux())
@@ -132,22 +132,52 @@ internal sealed partial class App : Application, IDisposable
         }
 
         var requestNotices = new RequestNotices(_notifications, TimeProvider.System, () => desktop.Windows.Any(window => window.IsActive));
-        _authority = new AppAuthority(
-            _session,
-            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(
-                TimeProvider.System,
-                ApprovalLimits.Default.Window,
+        var prompts = new WindowApprovalChannel.Screen();
+
+        // Each vault is served on its own pipe, every vault's prompts share one screen and one queue, and they lock together.
+#pragma warning disable CA2000 // The open vaults own the session in view, and the authority each composes owns its session.
+        _vaults = new OpenVaults(
+            Compose(preferences, TimeProvider.System),
+            () => NewSession(preferences, TimeProvider.System),
+            (vaults, session) => new AppAuthority(
+                session,
+                Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+                () => new WindowApprovalChannel(
+                    TimeProvider.System,
+                    ApprovalLimits.Default.Window,
+                    Unexpected,
+                    requestNotices,
+                    () => _window is { } window ? Clipboards(window) : NoClipboard.Instance,
+                    prompts,
+                    () => OpenVaults.NameShown(session)),
+                AppAuthority.RequestLock(session, action => Dispatcher.UIThread.Post(action)),
                 Unexpected,
-                OpenBrowserFill,
-                requestNotices,
-                () => _window is { } window ? Clipboards(window) : NoClipboard.Instance),
-            AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
-            Unexpected);
+                vaults.Turns,
+                () => vaults.KeysBesides(session),
+                vaults.Pairings),
+            // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open.
+            session => Claim is null ? null : new LockedNotice(
+                session,
+                OpenWindow,
+                TimeProvider.System,
+                reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
+                Unexpected,
+                _notifications),
+            preferences);
+#pragma warning restore CA2000
+        _session = _vaults.InView.Session;
+        _authority = _vaults.InView.Authority;
+        _lockedNotice = _vaults.InView.Notice;
+        _vaults.Locked += OnLocked;
+
+        // A page's list asks to bring keypaste forward: the window, a locked vault's unlock, or New login in the site's vault.
+        _vaults.Pairings.Show = (what, vault, url) => Dispatcher.UIThread.Post(() => ShowAsked(what, vault, url));
+        _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
 
         InterfaceZoom.Set(_preferences.Current.Window?.ZoomPercent ?? Core.Settings.WindowLayout.ActualSizePercent);
         InterfaceZoom.Changed += KeepWindowLayout;
         _window = new MainWindow();
+        _window.AskForVibrancy(_preferences.ReduceTransparency);
         _window.Activated += (_, _) => _ = FollowScrollBarsAsync();
 
         if (_preferences.Current.Window is { } left)
@@ -159,10 +189,10 @@ internal sealed partial class App : Application, IDisposable
             _window.Opened += NoteUntouchedLayout;
         }
 
-        _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
+        _activity = Observe(_window, _vaults, TimeProvider.System, () => _shell?.ClearCountdown());
         _commands = Commands(_window, _session, home);
         _shortcuts = new Shortcuts(_window, _commands);
-        _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
+        _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore(), _vaults.LockAll);
 
         // The menus (Q.2): the menu bar and the Dock's on macOS, the titlebar's menu button elsewhere.
         if (_commands.Mac)
@@ -180,15 +210,6 @@ internal sealed partial class App : Application, IDisposable
             _window.UseMenuButton(AppMenu.Flyout(_commands));
         }
 
-        // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open.
-        _lockedNotice = Claim is null ? null : new LockedNotice(
-            _session,
-            OpenWindow,
-            TimeProvider.System,
-            reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
-            Unexpected,
-            _notifications);
-
         ShowUnlock(home);
 
         if (HandedPath is { } handed)
@@ -196,7 +217,7 @@ internal sealed partial class App : Application, IDisposable
             _unlock?.TakeHanded(handed);
         }
 
-        _tray = new AppTray(OpenWindow, () => _ = _session?.LockAsync(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
+        _tray = new AppTray(OpenWindow, () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual), () => _vaults?.Unlocked.Count > 0, Quit);
         _tray.Show(_preferences.StaysInTray);
         _preferences.Changed += OnPreferencesChanged;
         _window.Closing += OnMainWindowClosing;
@@ -240,8 +261,11 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The commands of the menus and the window's chords, as <see cref="Launch"/> composed them.</summary>
     internal AppCommands? Menus => _commands;
 
-    /// <summary>The authority <see cref="Launch"/> composed, or null before it or after quitting.</summary>
+    /// <summary>The authority of the vault in view <see cref="Launch"/> composed, or null before it or after quitting.</summary>
     internal AppAuthority? Authority => _authority;
+
+    /// <summary>The vaults open in the app, as <see cref="Launch"/> composed them, or null before it or after quitting.</summary>
+    internal OpenVaults? Vaults => _vaults;
 
     /// <summary>The menu bar or tray icon <see cref="Launch"/> composed.</summary>
     internal AppTray? Tray => _tray;
@@ -328,17 +352,6 @@ internal sealed partial class App : Application, IDisposable
         _shell?.OpenAgentSettings(agent);
     }
 
-    /// <summary>Shows the window on Settings, where Pair a browser is, as the not-paired notice asks.</summary>
-    internal void OpenBrowserFill()
-    {
-        OpenWindow();
-
-        if (_shell is { } shell)
-        {
-            shell.Current = Destinations.Of(DestinationKind.Settings);
-        }
-    }
-
     /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret.</summary>
     internal void CloseToTray()
     {
@@ -347,10 +360,11 @@ internal sealed partial class App : Application, IDisposable
             return;
         }
 
-        var unlocked = _session.IsUnlocked;
+        var unlocked = _vaults?.Unlocked.Count > 0;
 
         // Locking also stops a hardware key waiting for its touch, so an unlock under way cannot finish with a later touch.
         _ = _session.LockAsync(VaultLockReason.Closed);
+        _ = _vaults?.LockAllAsync(VaultLockReason.Closed);
 
         if (!unlocked)
         {
@@ -388,7 +402,7 @@ internal sealed partial class App : Application, IDisposable
             shell.AskOpenHanded(path, () =>
             {
                 _afterLock = unlock => unlock.TakeHanded(path);
-                _ = _session?.LockAsync(VaultLockReason.Manual);
+                _ = _vaults?.LockAllAsync(VaultLockReason.Manual);
             });
         }
         else
@@ -442,6 +456,7 @@ internal sealed partial class App : Application, IDisposable
         return new AppCommands(new AppCommandHost
         {
             Session = session,
+            Vaults = _vaults,
             Shell = () => _shell,
             Unlock = () => _unlock,
             AsksTerms = () => Crashes is { AsksTerms: true },
@@ -452,7 +467,7 @@ internal sealed partial class App : Application, IDisposable
             Quit = Quit,
             OpenAnother = OpenAnother,
             OpenWindow = OpenWindow,
-            ShowPrompt = () => _authority?.ShowPrompt() == true,
+            ShowPrompt = () => _vaults?.ShowPrompt() == true,
             OpenWeb = OpenWeb,
             Hide = mac ? MacDock.Hide : null,
             HideOthers = mac ? MacDock.HideOthers : null,
@@ -489,7 +504,7 @@ internal sealed partial class App : Application, IDisposable
     private void OpenAnother(string? path)
     {
         _afterLock = path is null ? unlock => unlock.BrowseCommand.Press() : unlock => _ = unlock.Offer(path);
-        _ = _session?.LockAsync(VaultLockReason.Manual);
+        _ = _vaults?.LockAllAsync(VaultLockReason.Manual);
     }
 
     private void Quit()
@@ -513,6 +528,7 @@ internal sealed partial class App : Application, IDisposable
         if (_preferences is { } preferences)
         {
             _tray?.Show(preferences.StaysInTray);
+            _window?.AskForVibrancy(preferences.ReduceTransparency);
         }
     }
 
@@ -553,6 +569,16 @@ internal sealed partial class App : Application, IDisposable
 
         ApplyTheme(preferences.Current.Theme);
 
+        return NewSession(preferences, clock);
+    }
+
+    /// <summary>A locked session for one vault, with its own claim, idle timer and quick unlock copies, armed for <paramref name="preferences"/>.</summary>
+    /// <param name="preferences">The preferences this process was composed from.</param>
+    /// <param name="clock">The clock the session measures idleness against.</param>
+    internal AppVaultSession NewSession(DesktopPreferences preferences, TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(preferences);
+
         return new AppVaultSession(
             clock,
             preferences.IdleTimeout,
@@ -579,6 +605,7 @@ internal sealed partial class App : Application, IDisposable
     /// <param name="preferences">The preferences this process was composed from.</param>
     /// <param name="session">The session a minimize locks.</param>
     /// <param name="whileLocked">What else a minimize drops: a restore pending on the unlock screen.</param>
+    /// <param name="lockAll">What locks every open vault, which launch gives so a minimize reaches a vault the session in view is not; null locks <paramref name="session"/>.</param>
     /// <returns>The watch, which the application owns for its lifetime.</returns>
     /// <exception cref="ArgumentNullException">A required argument is null.</exception>
     /// <remarks>
@@ -592,7 +619,8 @@ internal sealed partial class App : Application, IDisposable
         Window window,
         DesktopPreferences preferences,
         AppVaultSession session,
-        Action? whileLocked = null)
+        Action? whileLocked = null,
+        Action<VaultLockReason>? lockAll = null)
     {
         ArgumentNullException.ThrowIfNull(preferences);
         ArgumentNullException.ThrowIfNull(session);
@@ -604,7 +632,7 @@ internal sealed partial class App : Application, IDisposable
             () => preferences.LockWhenMinimized,
             () =>
             {
-                session.Lock(VaultLockReason.Minimized);
+                (lockAll ?? session.Lock)(VaultLockReason.Minimized);
                 whileLocked?.Invoke();
             });
     }
@@ -613,14 +641,14 @@ internal sealed partial class App : Application, IDisposable
     /// Arms idle-activity tracking against a window.
     /// </summary>
     /// <param name="window">The window a person uses.</param>
-    /// <param name="session">The session activity keeps open.</param>
+    /// <param name="session">What activity keeps open: launch gives every open vault.</param>
     /// <param name="clock">The clock the pointer throttle measures against.</param>
     /// <param name="onActivity">What else a keystroke, click, wheel turn or counted pointer move does.</param>
     /// <returns>The watch, which the application owns for its lifetime.</returns>
     /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
     internal static ActivityWatch Observe(
         Window window,
-        AppVaultSession session,
+        IIdleWatched session,
         TimeProvider clock,
         Action onActivity) =>
         new(window, session, clock, onActivity);
@@ -692,7 +720,8 @@ internal sealed partial class App : Application, IDisposable
     /// </summary>
     private async Task QuitAsync()
     {
-        var authority = _authority;
+        var vaults = _vaults;
+        _vaults = null;
         _authority = null;
 
         if (_window is { IsVisible: true } window)
@@ -702,26 +731,50 @@ internal sealed partial class App : Application, IDisposable
 
         Dispose();
 
-        if (authority is not null)
+        if (vaults is not null)
         {
-            _ending = authority.QuitAsync();
+            _ending = vaults.QuitAsync();
             await _ending.ConfigureAwait(true);
         }
     }
 
+    /// <summary>
+    /// Any open vault locked: with another still open the window keeps them all, built again on an open one when the one
+    /// it was built on locked, with that vault's unlock form in view; once none is open, the unlock screen.
+    /// </summary>
     private void OnLocked(object? sender, VaultLockReason reason)
     {
         Dispatcher.UIThread.Post(() =>
         {
             // An app ending after a crash builds no screen it is about to take down.
-            if (_crashed)
+            if (_crashed || _vaults is not { } vaults)
             {
                 return;
             }
 
+            _tray?.Refresh();
+
+            if (_shell is { } shell && vaults.Unlocked is [var open, ..])
+            {
+                if (ReferenceEquals(sender, shell.Anchor))
+                {
+                    KeepWindowLayout();
+                    ShowShell(open, LockMessage(reason));
+                    _shell?.ShowVaultOf(shell.Anchor);
+                }
+
+                return;
+            }
+
+            // Every vault locking together tells this once per vault; the first to arrive shows the unlock screen.
+            if (_shell is null && (_lockedAll || !ReferenceEquals(sender, _session)))
+            {
+                return;
+            }
+
+            _lockedAll = _shell is not null;
             KeepWindowLayout();
             ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable), LockMessage(reason), reason);
-            _tray?.Refresh();
         });
     }
 
@@ -796,7 +849,7 @@ internal sealed partial class App : Application, IDisposable
     private void OpenInPlace(string path, string? keyfile, int? hardwareKeySlot)
     {
         _openNext = (path, keyfile, hardwareKeySlot);
-        _ = _session?.LockAsync(VaultLockReason.Manual);
+        _ = _vaults?.LockAllAsync(VaultLockReason.Manual);
     }
 
     /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>
@@ -888,34 +941,66 @@ internal sealed partial class App : Application, IDisposable
             return;
         }
 
+        if (_vaults is { } vaults)
+        {
+            vaults.HoldAccount();
+            ShowShell(vaults.InView, _unlock?.Notice);
+        }
+    }
+
+    /// <summary>The window's shell, built on <paramref name="anchor"/>, the open vault whose own screens it shows, listing every open vault.</summary>
+    private void ShowShell(OpenVault anchor, string? notice)
+    {
+        if (_window is null)
+        {
+            return;
+        }
+
         _shell?.Dispose();
+        _lockedAll = false;
         _shell = new ShellViewModel(
-            _session,
+            anchor.Session,
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-            _authority,
+            anchor.Authority,
             ApplyTheme,
             Clipboards(_window),
             TimeProvider.System,
             action => Dispatcher.UIThread.Post(action),
             _preferences,
-            _unlock?.Notice,
+            notice,
             Pickers(_window),
             OpenInPlace,
             WebLaunchers(_window))
         {
             ShareTransport = ShareTransport,
             OffersTheme = !SystemReportsLightOrDark,
-            CalmMoment = _notifications is { } notifications ? new CalmPermission(notifications, () => _authority?.IsAsking == true).Offer : null,
+            CalmMoment = _notifications is { } notifications ? new CalmPermission(notifications, () => _vaults?.IsAsking == true).Offer : null,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
             BrowserHosts = BrowserHostsFor(),
             Tools = ClientConnector.ForThisProcess,
-            Launching = LaunchingFor(_authority),
+            Launching = LaunchingFor(anchor.Authority),
             Crashes = Crashes,
+            Vaults = _vaults,
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell, Commands = _commands };
+    }
+
+    /// <summary>What a page's list asked keypaste to show: the window forward, then a vault's unlock form or New login in the shell, or the vault on the unlock screen when every vault is locked.</summary>
+    private void ShowAsked(Core.Ipc.BrowserShow what, string vault, string url)
+    {
+        OpenWindow();
+
+        if (_shell is { } shell)
+        {
+            shell.ShowAsked(what, vault, url);
+        }
+        else if (what == Core.Ipc.BrowserShow.Unlock && _vaults?.Named(vault) is { } named && _vaults.PathOf(named.Session) is { } path)
+        {
+            _unlock?.TakeHanded(path);
+        }
     }
 
     /// <summary>
@@ -977,9 +1062,11 @@ internal sealed partial class App : Application, IDisposable
         UiThread.Post(() => SystemReportsLightOrDark = reports);
     }
 
-    /// <summary>Tracks the operating system's light or dark setting, followed unless Settings' choice counts, and its contrast preference, always followed.</summary>
+    /// <summary>Tracks the operating system's light or dark setting, followed unless Settings' choice counts, and its contrast preference and accent, always followed.</summary>
     private void FollowPlatformTheme()
     {
+        ApplyAccent(PlatformSettings?.GetColorValues().AccentColor1);
+
         if (PlatformSettings is not { } settings)
         {
             return;
@@ -994,12 +1081,32 @@ internal sealed partial class App : Application, IDisposable
         {
             _platformTheme = values.ThemeVariant;
             _platformContrast = values.ContrastPreference;
+            ApplyAccent(values.AccentColor1);
             RequestedThemeVariant = ChosenVariant();
         };
 
         if (_platformContrast == ColorContrastPreference.High)
         {
             RequestedThemeVariant = ChosenVariant();
+        }
+    }
+
+    /// <summary>Sets every accent resource, in each palette, from the system's accent, or system blue where it reports none.</summary>
+    internal void ApplyAccent(Color? system)
+    {
+        foreach (var (variant, accent) in AccentPalette.Resources(system, Resources))
+        {
+            if (Resources.ThemeDictionaries.TryGetValue(variant, out var held) && held is ResourceDictionary current)
+            {
+                foreach (var (key, value) in accent)
+                {
+                    current[key] = value;
+                }
+            }
+            else
+            {
+                Resources.ThemeDictionaries[variant] = accent;
+            }
         }
     }
 
@@ -1044,7 +1151,8 @@ internal sealed partial class App : Application, IDisposable
             _preferences.Changed -= OnPreferencesChanged;
         }
 
-        _authority?.Dispose();
+        _vaults?.Dispose();
+        _vaults = null;
         _authority = null;
         _notifications?.Dispose();
         _notifications = null;

@@ -38,6 +38,9 @@ internal sealed record EnvMemberRow(EntryName Entry, string Environment, IReadOn
         ? "No variables"
         : string.Join(", ", Keys.Select(key => EntryNameSanitizer.Sanitize(key).Text));
 
+    /// <summary>Whether another of its stage's items is listed above it, so it draws the hairline between them.</summary>
+    internal bool FollowsAnother { get; init; }
+
     internal bool HasAlso => Also.Count > 0;
 
     internal string AlsoText => HasAlso ? "also " + string.Join(", ", Also) : string.Empty;

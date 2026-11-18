@@ -69,7 +69,7 @@ public sealed class ApprovalGate : IDisposable
 
     private readonly IApprovalChannel _channel;
     private readonly TimeProvider _clock;
-    private readonly PromptQueue _turns = new(ApprovalLimits.MaximumWaiting);
+    private readonly PromptTurns _turns;
     private readonly ConcurrentDictionary<string, Deadline> _cooldowns = new(StringComparer.Ordinal);
     private volatile Asking? _asking;
     private bool _disposed;
@@ -78,8 +78,9 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="channel">Where a human is asked.</param>
     /// <param name="clock">The clock the window and the cooldown are measured on.</param>
     /// <param name="limits">The window and the cooldown.</param>
-    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public ApprovalGate(IApprovalChannel channel, TimeProvider clock, ApprovalLimits limits)
+    /// <param name="turns">The queue this gate shares with the other gates asking the same person, or null for one of its own.</param>
+    /// <exception cref="ArgumentNullException">Any required argument is null.</exception>
+    public ApprovalGate(IApprovalChannel channel, TimeProvider clock, ApprovalLimits limits, PromptTurns? turns = null)
     {
         ArgumentNullException.ThrowIfNull(channel);
         ArgumentNullException.ThrowIfNull(clock);
@@ -88,6 +89,7 @@ public sealed class ApprovalGate : IDisposable
         _channel = channel;
         _clock = clock;
         Limits = limits;
+        _turns = turns ?? new PromptTurns(ApprovalLimits.MaximumWaiting);
     }
 
     /// <summary>The window and cooldown in force.</summary>
@@ -173,8 +175,7 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <param name="asker">The agent asking, from <see cref="Asker"/>, whose request waits its turn; null takes the turn now or is busy.</param>
     /// <returns>
-    /// The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal;
-    /// a picker offers no Always block, so one is a refusal too.
+    /// The answer and the candidate picked, an allow with no pick, or with a pick that is not a candidate, read as a refusal.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
     public async ValueTask<ItemPick> AskPickingAsync(
@@ -198,7 +199,6 @@ public sealed class ApprovalGate : IDisposable
                 return said.Answer switch
                 {
                     ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed when picked is null => ApprovalAnswer.Denied,
-                    ApprovalAnswer.AlwaysBlocked => ApprovalAnswer.Denied,
                     _ => said.Answer,
                 };
             },
@@ -331,14 +331,14 @@ public sealed class ApprovalGate : IDisposable
         return AskThroughAsync(cooldownKeys, new Asked(null, null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered: true);
     }
 
-    /// <summary>Asks a human, who armed pairing, to pair a browser, under the same window and slot as every other question.</summary>
+    /// <summary>Asks a human to pair a browser whose code they compare, under the same window and slot as every other question.</summary>
     /// <param name="prompt">What the human is shown.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The answer, and the name the human gave the pairing only when it allows it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="prompt"/> is null.</exception>
     /// <remarks>
-    /// No cooldown: a pairing is asked about only after the person armed it, and each arming answers one confirmation (D-0634),
-    /// so a refusal is held back by the arming it spent rather than by a minute.
+    /// No cooldown here: <see cref="Ownership.OwnerPairings"/> holds every request to pair back after a refusal, whichever
+    /// browser it claims, since any program can claim any of them.
     /// </remarks>
     public async ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
     {
@@ -365,30 +365,25 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cooldownKey">What counts as "the same request" after a refusal or no answer: the pairing and the page's origin.</param>
     /// <param name="prompt">What the human is shown.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, with the chosen item only when it allows one the prompt listed, and Always only where the prompt offered it.</returns>
+    /// <returns>The answer: <see cref="ApprovalAnswer.ApprovedOnce"/> for Fill, any other allow counting as a refusal.</returns>
     /// <remarks>It never waits its turn: a request while another prompt is up is busy, so a browser's other requests are not held behind it.</remarks>
-    public async ValueTask<FillAnswer> AskAsync(string cooldownKey, FillPrompt prompt, CancellationToken cancellationToken)
+    public async ValueTask<ApprovalAnswer> AskAsync(string cooldownKey, FillPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        string? uuid = null;
-        var always = false;
         var answer = await AskThroughAsync(
             [cooldownKey],
             new Asked(null, null, null, null),
             async token =>
             {
                 var said = await _channel.AskAsync(prompt, token).ConfigureAwait(false);
-                (uuid, always) = (said.Uuid, said.Always);
-                return said.Answer;
+                return said == ApprovalAnswer.AlwaysAllowed ? ApprovalAnswer.Denied : said;
             },
             cancellationToken,
             coolUnanswered: true).ConfigureAwait(false);
 
-        return answer == ApprovalAnswer.ApprovedOnce && prompt.Candidates.Any(candidate => string.Equals(candidate.Uuid, uuid, StringComparison.OrdinalIgnoreCase))
-            ? new FillAnswer(answer, uuid, always && prompt.OffersAlways)
-            : new FillAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null, false);
+        return answer;
     }
 
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
@@ -437,7 +432,7 @@ public sealed class ApprovalGate : IDisposable
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
-            if (!always && answer is ApprovalAnswer.AlwaysAllowed or ApprovalAnswer.AlwaysBlocked)
+            if (!always && answer is ApprovalAnswer.AlwaysAllowed)
             {
                 answer = ApprovalAnswer.Denied;
             }
@@ -572,29 +567,6 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
 
         return _cooldowns.TryGetValue(cooldownKey, out var refusal) ? refusal.Standing(_clock) : TimeSpan.Zero;
-    }
-
-    /// <summary>Tells the person, through the channel, that a browser asked to pair while pairing was not armed.</summary>
-    /// <param name="notice">What asked.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="notice"/> is null.</exception>
-    /// <remarks>It asks nothing, so it takes no slot and waits for nothing; a channel that fails to show it changes no refusal.</remarks>
-    public void Tell(PairingNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        if (_disposed)
-        {
-            return;
-        }
-
-        try
-        {
-            _channel.Tell(notice);
-        }
-        catch (Exception)
-        {
-            // Saying it failed; the refusal and its line stand as they are.
-        }
     }
 
     /// <summary>

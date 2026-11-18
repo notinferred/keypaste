@@ -37,7 +37,8 @@ namespace Keypaste.Core.Ipc;
 /// </para>
 /// <para>
 /// Each connection's program is named once, as it is accepted, and every line written while answering it names
-/// that program (<see cref="PipeCaller"/>); nothing is refused for it.
+/// that program (<see cref="PipeCaller"/>); its prompts say whether it is keypaste's own program started by the app its
+/// label names (<see cref="RequesterIdentity"/>). Nothing is refused for either.
 /// </para>
 /// <para>
 /// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
@@ -195,8 +196,8 @@ public sealed class ApproverListener : IDisposable
 
         try
         {
-            // Off the accept loop, since a signature check reads the caller's file.
-            PipeCaller.Current = await Task.Run(() => PipeCaller.Of(pipe), cancellationToken).ConfigureAwait(false);
+            // Off the accept loop, since a signature check and the comparison with keypaste's own program read the caller's file.
+            (PipeCaller.Current, PipeCaller.Lineage) = await Task.Run(() => PipeCaller.Identify(pipe), cancellationToken).ConfigureAwait(false);
             next = framer.ReadAsync(cancellationToken).AsTask();
 
             while (await next.ConfigureAwait(false) is { } frame)
@@ -392,9 +393,17 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.CheckBrowserAsync(check, connectionId, cancellationToken).ConfigureAwait(false));
 
-            case ApproverMessageKind.BrowserFill when ApproverProtocol.TryDecode(frame, out BrowserFillRequest? fill):
+            case ApproverMessageKind.BrowserList when ApproverProtocol.TryDecode(frame, out BrowserListRequest? list):
                 return ApproverProtocol.Encode(
-                    await _handler.FillBrowserAsync(fill, connectionId, cancellationToken).ConfigureAwait(false));
+                    await _handler.ListBrowserAsync(list, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.BrowserRelease when ApproverProtocol.TryDecode(frame, out BrowserReleaseRequest? release):
+                return ApproverProtocol.Encode(
+                    await _handler.ReleaseBrowserAsync(release, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.BrowserShow when ApproverProtocol.TryDecode(frame, out BrowserShowRequest? show):
+                return ApproverProtocol.Encode(
+                    await _handler.ShowBrowserAsync(show, connectionId, cancellationToken).ConfigureAwait(false));
 
             case ApproverMessageKind.BrowserLock when ApproverProtocol.TryDecode(frame, out BrowserLockRequest? browserLock):
                 return ApproverProtocol.Encode(

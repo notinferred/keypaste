@@ -56,7 +56,7 @@ internal static class ToolSchemas
             },
             "kind": {
               "type": "string",
-              "enum": ["none", "login", "api_key", "database", "server", "secure_note"],
+              "enum": ["none", "login", "api_key", "database", "server", "secure_note", "card", "identity", "ssh_key", "wifi", "environment"],
               "description": "The kind of item; none is an item with no kind set."
             },
             "related_to": {
@@ -69,7 +69,13 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 256,
-              "description": "A project's name, exactly; finds its items in every environment."
+              "description": "A project's name, exactly; finds its items in every stage."
+            },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "Only this vault, by the name find_access gives it; every vault this agent can reach when left out."
             }
           },
           "minProperties": 1,
@@ -83,6 +89,17 @@ internal static class ToolSchemas
           "type": "object",
           "properties": {
             "vault": { "type": "string" },
+            "vaults": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "state": { "type": "string" }
+                },
+                "required": ["name", "state"]
+              }
+            },
             "truncated": { "type": "boolean" },
             "count": { "type": "integer" },
             "projects": {
@@ -91,6 +108,7 @@ internal static class ToolSchemas
                 "type": "object",
                 "properties": {
                   "name": { "type": "string" },
+                  "vault": { "type": "string" },
                   "environments": { "type": "array", "items": { "type": "string" } },
                   "items": { "type": "integer" }
                 },
@@ -103,6 +121,7 @@ internal static class ToolSchemas
                 "type": "object",
                 "properties": {
                   "handle": { "type": "string" },
+                  "vault": { "type": "string" },
                   "group": { "type": "string" },
                   "name": { "type": "string" },
                   "kind": { "type": "string" },
@@ -153,6 +172,12 @@ internal static class ToolSchemas
               "maxLength": 128,
               "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or the exact name of one of the item's custom fields, as list_entry_names gives it, such as OPENAI_API_KEY. Never more than one."
             },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault holding the item, by the name find_access gives it; needed only when its name is in more than one vault this agent can reach."
+            },
             "reason": {
               "type": "string",
               "minLength": 1,
@@ -195,6 +220,12 @@ internal static class ToolSchemas
               },
               "description": "The fields to release together. The first item is the anchor; every other item is the anchor itself or one find_access links to it."
             },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault holding every item, by the name find_access gives it; needed only when their names are in more than one vault this agent can reach."
+            },
             "reason": {
               "type": "string",
               "minLength": 1,
@@ -229,19 +260,25 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
-              "description": "A project, for a variable of one of its environments. Give it with environment and key instead of item and field."
+              "description": "A project, for a variable of one of its stages. Give it with environment and key instead of item and field."
             },
             "environment": {
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
-              "description": "With project: the environment, such as dev or prod."
+              "description": "With project: the stage, such as dev or prod."
             },
             "key": {
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
               "description": "With project: the variable's name, such as DATABASE_URL."
+            },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault the value goes in, by the name find_access gives it; needed only when this agent can reach several vaults and the item is in none of them or more than one."
             },
             "reason": {
               "type": "string",
@@ -277,6 +314,12 @@ internal static class ToolSchemas
               "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
               "description": "With mark_expired: the day it expires, as yyyy-MM-dd. Leave it out to mark it expired now."
             },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault holding the item, by the name find_access gives it; needed only when its name is in more than one vault this agent can reach."
+            },
             "reason": {
               "type": "string",
               "minLength": 1,
@@ -306,6 +349,12 @@ internal static class ToolSchemas
               "minLength": 1,
               "maxLength": 512,
               "description": "The attachment's exact name, as the item holds it."
+            },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault holding the item, by the name find_access gives it; needed only when its name is in more than one vault this agent can reach."
             },
             "reason": {
               "type": "string",
@@ -347,7 +396,7 @@ internal static class ToolSchemas
             "profile": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
-              "description": "The project's environment. Defaults to dev."
+              "description": "The project's stage. Defaults to dev."
             },
             "keys": {
               "type": "array",
@@ -363,6 +412,12 @@ internal static class ToolSchemas
               "maxProperties": 32,
               "additionalProperties": { "type": "string", "maxLength": 2048, "pattern": "^kp://" },
               "description": "Variable name to kp:// reference. Give this or project."
+            },
+            "vault": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "description": "The vault holding the project or the items env names, by the name find_access gives it; needed only when they are in more than one vault this agent can reach."
             },
             "reason": {
               "type": "string",

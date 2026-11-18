@@ -117,7 +117,7 @@ public sealed class CliAppTests
         Assert.Equal(0, harness.Clipboard.SetCount);
         Assert.Empty(harness.ProcessRunner.Calls);
         Assert.Empty(harness.ProcessLauncher.Started);
-        Assert.False(File.Exists(KeypasteHome.AgentsPath(harness.Environment[KeypasteHome.EnvironmentVariable])));
+        Assert.False(Directory.Exists(KeypasteHome.AgentsDirectory(harness.Environment[KeypasteHome.EnvironmentVariable])));
     }
 
     /// <summary>
@@ -203,7 +203,7 @@ public sealed class CliAppTests
             "  attachment  list, add, replace, remove or save an item's attachments",
             "  rotate      replace a secret with a new generated one",
             "  run         run a command with secrets in its environment",
-            "  env         import, export and diff .env environments",
+            "  env         import, export and diff .env stages",
             "",
             "AGENTS",
             "  setup       connect this computer's AI tools to your vault",

@@ -16,9 +16,9 @@ namespace Keypaste.Mcp.Tools;
 /// saved. Every call is recorded, by the owner when it answered and here otherwise, as the credential tool's are (T-6).
 /// </remarks>
 /// <param name="options">What this bridge was started with.</param>
-/// <param name="approver">The connection to the vault's owner.</param>
+/// <param name="vaults">The vaults this bridge serves, each through its own owner.</param>
 /// <param name="audit">The bridge's audit log.</param>
-internal sealed class SaveValueTool(ServerOptions options, ApproverConnection approver, AuditLog audit) : McpServerTool
+internal sealed class SaveValueTool(ServerOptions options, BridgeVaults vaults, AuditLog audit) : McpServerTool
 {
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
@@ -47,6 +47,7 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
         ArgumentNullException.ThrowIfNull(request);
 
         var arguments = request.Params?.Arguments;
+        var vault = ReadString(arguments, "vault");
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
         var asked = new SaveRequest
         {
@@ -72,7 +73,7 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
         {
             try
             {
-                verdict = await DecideAsync(asked, cancellationToken).ConfigureAwait(false);
+                verdict = await DecideAsync(asked, vault, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -84,7 +85,7 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
             }
         }
 
-        var record = RequestRecords.Save(client, asked, verdict.Decision, verdict.Method, verdict.Reason, verdict.Session, options.VaultKey);
+        var record = RequestRecords.Save(client, asked, verdict.Decision, verdict.Method, verdict.Reason, verdict.Session, verdict.Route is { } route ? route.Key : vaults.SoleKey);
 
         if (!verdict.Recorded && !audit.TryAppend(record, out _))
         {
@@ -92,12 +93,12 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
         }
 
         return verdict.Where is { } where
-            ? ToolResults.Saved(where)
-            : ToolResults.Refuse(verdict.Refusal ?? (verdict.Method == AuditMethod.Prompt ? ToolText.NotSaved : ToolText.Refusal(verdict.Method)));
+            ? ToolResults.Saved(vaults.Several && verdict.Route?.Vault is { } saved ? ToolText.InVaultPlace(where, saved.Name) : where)
+            : ToolResults.Refuse(InVault(verdict.Route, verdict.Refusal ?? (verdict.Method == AuditMethod.Prompt ? ToolText.NotSaved : ToolText.Refusal(verdict.Method))));
     }
 
     /// <summary>Checks the arguments' shape and what this bridge may see, then asks the owner, which checks both again.</summary>
-    private async ValueTask<Verdict> DecideAsync(SaveRequest asked, CancellationToken cancellationToken)
+    private async ValueTask<Verdict> DecideAsync(SaveRequest asked, string vault, CancellationToken cancellationToken)
     {
         if (Core.Approval.SaveRequestRules.Check(asked) is { } problem)
         {
@@ -109,7 +110,17 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
             return new Verdict(AuditDecision.Denied, AuditMethod.OutOfScope, "the place is outside what this agent can see through this bridge");
         }
 
-        var (reply, outcome, refusal) = await approver.SaveAsync(asked, cancellationToken).ConfigureAwait(false);
+        var routing = await vaults.RouteAsync(vault, asked.ForProject ? [] : [asked.Item], asked.ForProject ? [asked.Project] : [], cancellationToken).ConfigureAwait(false);
+
+        return routing.Route is { } route
+            ? await AskAsync(route, asked, cancellationToken).ConfigureAwait(false) with { Route = route }
+            : new Verdict(AuditDecision.Denied, routing.Method, routing.Reason, routing.Refusal);
+    }
+
+    /// <summary>Asks the owner of the vault the request went to.</summary>
+    private static async ValueTask<Verdict> AskAsync(VaultRoute route, SaveRequest asked, CancellationToken cancellationToken)
+    {
+        var (reply, outcome, refusal) = await route.Connection.SaveAsync(asked, cancellationToken).ConfigureAwait(false);
 
         if (reply is { Recorded: false })
         {
@@ -128,7 +139,7 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
                     AuditDecision.Denied,
                     AuditMethod.NoApprover,
                     "no keypaste process holds the vault unlocked",
-                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false) ? ToolText.AppLocked : null),
+                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(route.Vault, cancellationToken).ConfigureAwait(false) ? ToolText.AppLocked : null),
             };
         }
 
@@ -138,6 +149,10 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
             Where = reply.Decision == AuditDecision.Granted ? reply.Where : null,
         };
     }
+
+    /// <summary>A refusal from one of several vaults, named with its vault; the one vault's, as it is.</summary>
+    private string InVault(VaultRoute? route, string refusal) =>
+        vaults.Several && route?.Vault is { } named ? ToolText.InVault(named.Name, refusal) : refusal;
 
     private static string ReadString(IDictionary<string, JsonElement>? arguments, string name) =>
         arguments is not null && arguments.TryGetValue(name, out var element) && element.ValueKind == JsonValueKind.String
@@ -149,6 +164,9 @@ internal sealed class SaveValueTool(ServerOptions options, ApproverConnection ap
     {
         /// <summary>Whether the owner recorded this call, so the bridge writes no line of its own.</summary>
         public bool Recorded { get; init; }
+
+        /// <summary>The vault the request went to, or null when it went to none.</summary>
+        public VaultRoute? Route { get; init; }
 
         /// <summary>Where the value was saved, on the one path that saved it.</summary>
         public string? Where { get; init; }

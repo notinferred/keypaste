@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
 using Keypaste.App.Resources;
 using Keypaste.App.ViewModels;
@@ -37,8 +39,7 @@ internal sealed class RevealButton : Button
 
     private readonly KpIcon _icon = new() { Size = 14 };
 
-    // As wide as "Reveal", so its neighbours stay where they are when it says "Hide".
-    private readonly TextBlock _word = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 38 };
+    private readonly ToggleWord _word = new() { VerticalAlignment = VerticalAlignment.Center };
 
     public RevealButton()
     {
@@ -143,5 +144,24 @@ internal sealed class RevealButton : Button
         }
 
         return null;
+    }
+
+    /// <summary>The toggle's word, as wide as the wider of Reveal and Hide in the face it is drawn in, so its neighbours stay where they are when it changes.</summary>
+    private sealed class ToggleWord : TextBlock
+    {
+        protected override Type StyleKeyOverride => typeof(TextBlock);
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var said = base.MeasureOverride(availableSize);
+            var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+            var widest = new[] { Strings.Reveal, Strings.Hide }.Max(word =>
+            {
+                using var layout = new TextLayout(word, typeface, FontSize, Foreground);
+                return layout.WidthIncludingTrailingWhitespace + Padding.Left + Padding.Right;
+            });
+
+            return said.WithWidth(Math.Max(said.Width, widest));
+        }
     }
 }

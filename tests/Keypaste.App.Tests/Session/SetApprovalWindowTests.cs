@@ -15,8 +15,8 @@ using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// An agent's linked set in the app's own prompt window: the agent, each item and field, the agent's words as its claim, and only
-/// Deny and Allow once, with focus on Deny and Allow once armed a second after the prompt has focus, as the single prompt's.
+/// An agent's linked set on a claim card: the agent, each field and its item, the agent's words as its claim, and only Deny and
+/// Allow once, with focus on Deny and Allow once, and Return with it, armed a second after the prompt has focus, as the single prompt's.
 /// </summary>
 public sealed class SetApprovalWindowTests
 {
@@ -42,16 +42,16 @@ public sealed class SetApprovalWindowTests
             DrawnFrame.Capture(window);
 
             Assert.Equal("claude-code", Text(window, "ClientText"));
-            Assert.Equal(" wants 3 secrets together", Text(window, "WantsText"));
+            Assert.Equal("Give claude-code these 3 values?", Drawn(window, "TitleText"));
             Assert.Equal("billing-bot", Text(window, "LabelText"));
-            Assert.Equal("tool: keypaste.request_linked_set", Text(window, "ToolText"));
+            Assert.Equal("keypaste.request_linked_set", Text(window, "ToolText"));
+            Assert.Equal("work/db \u00b7 host, work/db \u00b7 password, work/ssh/deploy \u00b7 password", Text(window, "EntriesText"));
             Assert.Equal(
-                [new LinkedFieldRow("work/db", "host"), new LinkedFieldRow("work/db", "password"), new LinkedFieldRow("work/ssh/deploy", "password")],
+                [new LinkedFieldRow("host", "db"), new LinkedFieldRow("password", "db"), new LinkedFieldRow("password", "deploy")],
                 window.FindControl<ItemsControl>("FieldsList")!.Items.Cast<LinkedFieldRow>());
-            Assert.Equal("migrate the billing database", Text(window, "ReasonText"));
-            Assert.Equal(ApprovalViewModel.AttributionText, Text(window, "AttributionText"));
+            Assert.Equal("\u201cmigrate the billing database\u201d", Text(window, "ReasonText"));
             Assert.Equal(["Deny", "Allow once"], Buttons(window).Select(button => button.Content as string));
-            Assert.DoesNotContain(Buttons(window), button => button.IsDefault);
+            Assert.Null(window.FindControl<Button>("AlwaysAllow"));
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
 
             Click(window, "AllowOnce");
@@ -67,20 +67,29 @@ public sealed class SetApprovalWindowTests
         });
 
     [Fact]
-    public Task Enter_on_open_and_Deny_refuse_the_set() =>
+    public Task Return_allows_the_set_once_armed_and_Escape_and_Deny_refuse_it() =>
         HeadlessSession.On(async () =>
         {
             var (channel, shown) = Channel(out var clock);
 
             var entered = channel.AskAsync(Prompt(), Token).AsTask();
             await PromptedApp.UntilAsync(() => shown.Count == 1);
-            clock.Advance(PromptViewModel.ArmingDelay);
             Key(shown[0], PhysicalKey.Enter);
-            Assert.Equal(ApprovalAnswer.Denied, await entered.WaitAsync(_wait, Token));
+            await Task.Delay(100, Token);
+            Assert.False(entered.IsCompleted, "Return before the prompt was armed answered it");
+            clock.Advance(PromptViewModel.ArmingDelay);
+            await PromptedApp.UntilAsync(() => shown[0].FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            Key(shown[0], PhysicalKey.Enter);
+            Assert.Equal(ApprovalAnswer.ApprovedOnce, await entered.WaitAsync(_wait, Token));
+
+            var escaped = channel.AskAsync(Prompt(), Token).AsTask();
+            await PromptedApp.UntilAsync(() => shown.Count == 2);
+            Key(shown[1], PhysicalKey.Escape);
+            Assert.Equal(ApprovalAnswer.Denied, await escaped.WaitAsync(_wait, Token));
 
             var denied = channel.AskAsync(Prompt(), Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 2);
-            Click(shown[1], "Deny");
+            await PromptedApp.UntilAsync(() => shown.Count == 3);
+            Click(shown[2], "Deny");
             Assert.Equal(ApprovalAnswer.Denied, await denied.WaitAsync(_wait, Token));
         });
 

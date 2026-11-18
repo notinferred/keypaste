@@ -16,13 +16,13 @@ internal static class EnvDiffCommand
     private const int _keyColumn = 18;
 
     private static readonly Argument<string?> _first = Syntax.Optional("project", "the project, or the one projects.json maps this directory to");
-    private static readonly Argument<string?> _second = Syntax.Optional("environment", "an environment to compare");
-    private static readonly Argument<string?> _third = Syntax.Optional("other", "the environment to compare it with");
+    private static readonly Argument<string?> _second = Syntax.Optional("stage", "a stage to compare");
+    private static readonly Argument<string?> _third = Syntax.Optional("other", "the stage to compare it with");
 
     internal static CliVerb Command { get; } = new(
         "diff",
-        "compare environments by name, never by value\n\n"
-            + $"with no environments, compares {EnvProfileNames.Default} with every other environment.",
+        "compare stages by name, never by value\n\n"
+            + $"with no stages, compares {EnvProfileNames.Default} with every other stage.",
         Execute)
     {
         _first, _second, _third, CliOptions.Vault, CliOptions.Keyfile,
@@ -77,7 +77,7 @@ internal static class EnvDiffCommand
             {
                 if (new[] { asked.A, asked.B }.FirstOrDefault(profile => !names.Contains(profile, StringComparer.Ordinal)) is { } absent)
                 {
-                    context.Stderr.WriteLine($"keypaste env diff: '{project}' has no '{absent}' environment");
+                    context.Stderr.WriteLine($"keypaste env diff: '{project}' has no '{absent}' stage");
                     return CliApp.ExitNotFound;
                 }
 
@@ -90,7 +90,7 @@ internal static class EnvDiffCommand
 
             if (names.Count == 1)
             {
-                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {first} environment");
+                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {first} stage");
                 return CliApp.ExitSuccess;
             }
 

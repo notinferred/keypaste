@@ -8,9 +8,10 @@ namespace Keypaste.Core.Ownership;
 /// </summary>
 /// <remarks>
 /// A compaction that cannot run refuses nothing: the log stays as it is, and the next one tries again. It reads the log by its path
-/// rather than opening it as a request does, so an unlock alone creates no log.
+/// rather than opening it as a request does, so an unlock alone creates no log. The other vaults this process holds write
+/// to the same log, so their keys, read each time, let it check what their owners signed and sealed.
 /// </remarks>
-internal sealed class AuditCompactions(string? auditPath, Func<Vault?> vault, VaultIdentity identity, string session, Func<int> keepDays, TimeProvider clock) : IDisposable
+internal sealed class AuditCompactions(string? auditPath, Func<Vault?> vault, VaultIdentity identity, string session, Func<int> keepDays, TimeProvider clock, Func<IReadOnlyList<AuditCheckpointKey>>? otherKeys = null) : IDisposable
 {
     internal static readonly TimeSpan Every = TimeSpan.FromDays(1);
 
@@ -42,6 +43,7 @@ internal sealed class AuditCompactions(string? auditPath, Func<Vault?> vault, Va
         }
 
         AuditCheckpointKey? key = null;
+        IReadOnlyList<AuditCheckpointKey> others = [];
 
         try
         {
@@ -51,7 +53,8 @@ internal sealed class AuditCompactions(string? auditPath, Func<Vault?> vault, Va
             }
 
             key = new AuditCheckpointKey(saved, identity.Key);
-            return AuditCompaction.Compact(auditPath, key, keepDays(), clock.GetUtcNow(), session);
+            others = otherKeys?.Invoke() ?? [];
+            return AuditCompaction.Compact(auditPath, key, keepDays(), clock.GetUtcNow(), session, others);
         }
         catch (ObjectDisposedException)
         {
@@ -63,6 +66,11 @@ internal sealed class AuditCompactions(string? auditPath, Func<Vault?> vault, Va
             if (key is not null)
             {
                 CryptographicOperations.ZeroMemory(key.Key);
+            }
+
+            foreach (var other in others)
+            {
+                CryptographicOperations.ZeroMemory(other.Key);
             }
 
             Volatile.Write(ref _running, 0);

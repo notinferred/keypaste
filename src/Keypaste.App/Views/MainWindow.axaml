@@ -36,7 +36,7 @@
             IsVisible="False"
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
-            Margin="8,6,0,0"
+            Margin="8,12,0,0"
             ToolTip.Tip="{x:Static res:Strings.ShowTheMenu}"
             AutomationProperties.Name="{x:Static res:Strings.Menu}"
             WindowDecorationProperties.ElementRole="User">

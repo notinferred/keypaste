@@ -362,13 +362,13 @@ public sealed partial class ApproverHandler
         var prompt = ApprovalPrompt.For(request.ClientName, name, Shown(request), request.Reason, request.ClientLabel) with
         {
             Item = itemId,
+            Protected = live,
             OffersAlways = !live && agent is not null && itemId is not null && rules.HasRoom,
         };
         var answer = await _gate.AskAsync(cooldownKey, prompt, cancellationToken, ApprovalGate.Asker(request.ClientLabel, connectionId)).ConfigureAwait(false);
         var unremembered = answer switch
         {
             ApprovalAnswer.AlwaysAllowed => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Allow), confirmed: true)),
-            ApprovalAnswer.AlwaysBlocked => Remember(held => held.Remembering(new RememberedAnswer(agent!, itemId!, subject, CategoryRule.Block), confirmed: true)),
             _ => null,
         };
         var approved = answer != ApprovalAnswer.AlwaysAllowed ? "a person approved this one request"
@@ -511,15 +511,7 @@ public sealed partial class ApproverHandler
     {
         if (!answer.Releases() && answer != ApprovalAnswer.AlwaysAllowed)
         {
-            // A block that could not be kept still holds this field back as a refusal does.
-            if (answer == ApprovalAnswer.AlwaysBlocked && unremembered is not null)
-            {
-                _gate.CoolDown(cooldownKey);
-            }
-
-            var refused = answer != ApprovalAnswer.AlwaysBlocked ? Explain(answer)
-                : unremembered is null ? "a person refused this request and always refuses this item's field to this agent"
-                : $"a person refused this request; keypaste could not remember Always block: {unremembered}";
+            var refused = Explain(answer);
             _narrate?.Invoke($"refused {display} for {client}: {refused}");
             return Refused(answer.ToAuditMethod(), refused, display) with { Item = itemId };
         }

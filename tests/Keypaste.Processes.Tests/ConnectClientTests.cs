@@ -33,9 +33,8 @@ public sealed partial class ConnectClientTests
         var plan = ToolHome.Say(app, "^preview end", $"connect {_claude}").Preview();
         Assert.Equal("claude mcp remove --scope user keypaste", plan[0]);
         Assert.Equal(2, plan.Count);
-        Assert.DoesNotContain(" --vault ", plan[1], StringComparison.Ordinal);
         Assert.StartsWith("claude mcp add --scope user --transport stdio keypaste -- ", plan[1], StringComparison.Ordinal);
-        Assert.EndsWith(" --client-label claude-code --allow-run --expose **", plan[1], StringComparison.Ordinal);
+        Assert.Matches(@" mcp --vault .*vault\.kdbx --client-label claude-code --allow-run --expose \*\*$", plan[1]);
 
         Assert.Equal("Cancelled. Nothing was changed.", ToolHome.Say(app, "^message ", "cancel").Message());
         Assert.False(File.Exists(home.ClaudeConfig), "a cancelled plan wrote the tool's configuration");
@@ -78,7 +77,7 @@ public sealed partial class ConnectClientTests
             Assert.Equal(before, home.Tree());
         }
 
-        // With another vault chosen, Connect again pins this one, and that bridge still reaches the app.
+        // With another vault chosen, Connect still pins the vault in view, and that bridge still reaches the app.
         var other = Path.Combine(home.Root, "other.kdbx");
         home.Keypaste("init", Workspace.Master, Workspace.Master, other);
         home.Keypaste("use", other);

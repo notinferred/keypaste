@@ -93,7 +93,7 @@ Which page owns each question keypaste.com answers, the searches it targets and 
 | Desktop app, [`/products/desktop-app/`](web/src/content/docs/products/desktop-app.mdx) | What will the desktop app do, and on which systems? | — | published |
 | Organizations, [`/products/organizations/`](web/src/content/docs/products/organizations.mdx) | What will organizations get: SSO, SCIM, production approvals and audit export? | — | published |
 | Project environments, [`/products/project-environments/`](web/src/content/docs/products/project-environments.mdx) | How do a project's variables live in the vault and reach a program? | — | published |
-| Scoped CI tokens, [`/products/ci-tokens/`](web/src/content/docs/products/ci-tokens.mdx) | How does a CI job get one project's environment without a stored master secret? | ci secrets without env file | published |
+| Scoped CI tokens, [`/products/ci-tokens/`](web/src/content/docs/products/ci-tokens.mdx) | How does a CI job get one project's stage without a stored master secret? | ci secrets without env file | published |
 | Server access, [`/products/server-access/`](web/src/content/docs/products/server-access.mdx) | When would a team let a server hold a project's key? | — | published |
 | Share links, [`/products/share-links/`](web/src/content/docs/products/share-links.mdx) | How do I send one secret to someone so it opens a set number of times? | share a password securely one time link | published |
 | Team projects, [`/products/team-projects/`](web/src/content/docs/products/team-projects.mdx) | How will a team share a project's secrets through a relay that cannot read them? | share env variables with team securely | published |

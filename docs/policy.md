@@ -26,7 +26,7 @@ Every value an agent asks for falls in one kind, and each kind is Ask, Allow or 
 |---|---|
 | Passwords | An item's password |
 | Custom fields | A custom field of an item that is in no project and is not a card's or an identity's protected field |
-| Project variables | A custom field of an item tagged into a project, `env:<project>` or `env:<project>:<environment>` |
+| Project variables | A custom field of an item tagged into a project, `env:<project>` or `env:<project>:<stage>` |
 | Card values | A protected custom field of an item tagged `Credit Card`, such as its number or security code |
 | Identity values | A protected custom field of an item tagged `Identity`, such as a passport number |
 | TOTP codes | An item's current code, never its seed |
@@ -37,13 +37,13 @@ Every value an agent asks for falls in one kind, and each kind is Ask, Allow or 
 - **Allow** releases without asking you and records each release. It takes effect only once you confirm, in the app, that every agent will receive every value of that kind without asking.
 - **Block** refuses without asking you.
 
-A passkey's fields are always blocked, since its private key signs in wherever it is registered. A value of an item tagged into a protected environment, such as `env:billing:prod`, is asked about every time under Allow, and its prompt offers no Always allow ([Approvals](approvals.md#runs)); Block still refuses it without asking. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and on whether the field is protected, never on the field's name. keypaste's Bitwarden and 1Password 1PUX imports tag cards `Credit Card` and identities `Identity`, and its LastPass import tags a card `Credit Card`; tag one you made yourself the same way.
+A passkey's fields are always blocked, since its private key signs in wherever it is registered. A value of an item tagged into a protected stage, such as `env:billing:prod`, is asked about every time under Allow, and its prompt offers no Always allow ([Approvals](approvals.md#runs)); Block still refuses it without asking. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and on whether the field is protected, never on the field's name. keypaste's Bitwarden and 1Password 1PUX imports tag cards `Credit Card` and identities `Identity`, and its LastPass import tags a card `Credit Card`; tag one you made yourself the same way.
 
 After you refuse a request, the same field is refused for a minute without asking you again. Changing that field's kind ends the wait at once.
 
 ## One agent's own rules
 
-An agent's page in Agents can set any kind differently for that agent, and lists the answers kept for it with Remove. An answer is kept when you choose Always allow or Always block at a prompt, for that agent and that item's field. The most specific setting decides: a kept answer for the item's field, then the agent's own rule, then the setting for every agent. Passkeys stay blocked whatever is set.
+An agent's page in Agents can set any kind differently for that agent, and lists the answers kept for it with Remove. An answer is kept when you choose Always allow at a prompt, for that agent and that item's field; blocking is set here, for a kind of value. The most specific setting decides: a kept answer for the item's field, then the agent's own rule, then the setting for every agent. Passkeys stay blocked whatever is set.
 
 An agent's own rules and kept answers follow the label its bridge was started with (`--client-label`, such as `claude-code`), never the name the agent calls itself.
 
@@ -53,7 +53,7 @@ An agent may ask to run a command with values in its environment only once you t
 
 ## Where they are kept
 
-The settings are kept in `~/.keypaste/agents.toml` on this computer, never in the vault, so a synced or edited vault gives an agent nothing more. The app or `keypaste approve` holding the vault seals each change with a key the vault holds. A file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is: every kind is asked, no agent may run commands, and the app says the rules were changed outside keypaste until you set them again. A vault synced to two computers keeps a count for each, so each computer keeps its own settings.
+Each vault's settings are kept in its own file in `~/.keypaste/agents/` on this computer, never in the vault, so a synced or edited vault gives an agent nothing more, and two vaults open at once keep theirs apart. The app or `keypaste approve` holding the vault seals each change with a key the vault holds. The one `agents.toml` an earlier build kept moves to the vault whose key sealed it the next time that vault is unlocked. `keypaste clients` works on the vault `--vault`, `KEYPASTE_VAULT` or the chosen vault names. A file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is: every kind is asked, no agent may run commands, and the app says the rules were changed outside keypaste until you set them again. A vault synced to two computers keeps a count for each, so each computer keeps its own settings.
 
 From a terminal, which proves no person agreed, `keypaste clients` makes only changes that release nothing more without asking. An Allow, setting an agent's rule back to the general setting where that one is Allow, and removing an Always block are made on the agent's page in the app. With nothing holding the vault, `keypaste clients` can only turn run off, set Ask or Block, forget a kept answer or a pick, or forget an agent; it writes that unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier source build kept in the vault's `.keypaste/agents` group are ignored and left in place.
 
@@ -65,4 +65,4 @@ A release under Allow or Always allow has nobody reading the agent's reason, and
 
 ## Checking it yourself
 
-`scripts/verify-policy-e2e.sh` runs the shipped `keypaste approve`, a bridge and `keypaste clients`: an agent with no rules is asked, a hand-edited Allow in `agents.toml`, sealed before the edit or not, releases nothing unasked, `keypaste clients` turns run on only through the process holding the vault, which seals and records it, and an old `policy.toml` grants nothing.
+`scripts/verify-policy-e2e.sh` runs the shipped `keypaste approve`, a bridge and `keypaste clients`: an agent with no rules is asked, a hand-edited Allow in the vault's file, sealed before the edit or not, releases nothing unasked, `keypaste clients` turns run on only through the process holding the vault, which seals and records it, and an old `policy.toml` grants nothing.

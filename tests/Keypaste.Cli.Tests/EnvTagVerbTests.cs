@@ -69,7 +69,7 @@ public sealed class EnvTagVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("env", "tag", "billing", "services/Stripe", "-p", "prod", "--vault", _harness.VaultPath));
 
         var said = _harness.Err.ReplaceLineEndings("\n");
-        Assert.Contains("env:billing:prod puts services/Stripe in billing/prod, a protected environment whose every release is asked live.", said, StringComparison.Ordinal);
+        Assert.Contains("env:billing:prod puts services/Stripe in billing/prod, a protected stage whose every release is asked live.", said, StringComparison.Ordinal);
         Assert.Contains("Joining billing/prod: STRIPE_SECRET_KEY.", said, StringComparison.Ordinal);
         Assert.True(said.IndexOf("Joining", StringComparison.Ordinal) < said.IndexOf("Cancelled; nothing was written.", StringComparison.Ordinal));
         Assert.Contains("Tag services/Stripe? [y/N] ", _harness.Prompt.PromptsSeen);

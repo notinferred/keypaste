@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// <c>agents.toml</c> on the request path: the owner follows it only while the seal its vault's key wrote for this home
+/// A vault's rules on the request path: the owner follows them only while the seal its vault's key wrote for this home
 /// holds; anything else leaves every value asked and every run off, and the file as it is.
 /// </summary>
 public sealed class SealedAgentRulesTests : IDisposable
@@ -34,7 +34,7 @@ public sealed class SealedAgentRulesTests : IDisposable
         _vault.Save();
         _log = new OwnerLog(_directory);
         _gate = new ApprovalGate(_channel, _clock, ApprovalLimits.Default);
-        _file = new AgentRulesFile(KeypasteHome.AgentsPath(_directory));
+        _file = AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, VaultPath));
         _rules = Sealer(_file, _vault);
 
         var handler = new ApproverHandler(new VaultCredentialSource(() => _lifetime.IsLive ? _vault : null, _clock), new VaultEntryNameLister(() => _vault), _gate, _rules);
@@ -139,7 +139,7 @@ public sealed class SealedAgentRulesTests : IDisposable
     [Fact]
     public void Two_homes_sharing_a_vault_each_keep_their_rules_across_the_others_change()
     {
-        var other = Sealer(new AgentRulesFile(KeypasteHome.AgentsPath(Path.Combine(_directory, "other-home"))), _vault);
+        var other = Sealer(RulesIn(Path.Combine(_directory, "other-home")), _vault);
         Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
         Assert.True(other.TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
         Assert.True(other.TryChange(rules => rules.With(FieldCategory.Notes, CategoryRule.Block), out problem), problem);
@@ -160,7 +160,7 @@ public sealed class SealedAgentRulesTests : IDisposable
     public void A_merge_of_two_copies_each_sealing_its_own_home_keeps_both_counts()
     {
         Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
-        var otherFile = new AgentRulesFile(KeypasteHome.AgentsPath(Path.Combine(_directory, "other-home")));
+        var otherFile = RulesIn(Path.Combine(_directory, "other-home"));
         using var theirs = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(Sealer(otherFile, theirs).TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
 
@@ -195,9 +195,10 @@ public sealed class SealedAgentRulesTests : IDisposable
     public async Task A_file_copied_from_another_home_is_ignored()
     {
         var other = Path.Combine(_directory, "other-home");
-        var otherFile = new AgentRulesFile(KeypasteHome.AgentsPath(other));
+        var otherFile = RulesIn(other);
         Assert.True(Sealer(otherFile, _vault).TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
         Assert.True(_file.TryEnsureHomeId(out _, out problem), problem);
+        Directory.CreateDirectory(Path.GetDirectoryName(_file.Path)!);
         File.Copy(otherFile.Path, _file.Path);
 
         var reply = await RequestAsync();
@@ -291,6 +292,72 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Empty(held.Answers);
         Assert.Null(_rules.Ignored);
     }
+
+    /// <summary>Two vaults open in one home each seal and read their own rules, so neither's change resets the other's.</summary>
+    [Fact]
+    public void Two_vaults_in_one_home_each_keep_their_own_rules()
+    {
+        var acmePath = Path.Combine(_directory, "acme.kdbx");
+        using var acme = Vault.Create(acmePath, EnvStoreTests.MasterPassword);
+        var acmeRules = Sealer(AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, acmePath)), acme);
+
+        Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
+        Assert.True(acmeRules.TryChange(rules => rules.With(FieldCategory.Password, CategoryRule.Block).WithRun(_agent, run: true), out problem), problem);
+        Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
+
+        Assert.True(_rules.TryRead(out var personal, out _));
+        Assert.True(acmeRules.TryRead(out var work, out _));
+        Assert.Equal((CategoryRule.Allow, CategoryRule.Allow, false), (personal.RuleFor(FieldCategory.Password), personal.RuleFor(FieldCategory.Notes), personal.Runs(_agent)));
+        Assert.Equal((CategoryRule.Block, CategoryRule.Ask, true), (work.RuleFor(FieldCategory.Password), work.RuleFor(FieldCategory.Notes), work.Runs(_agent)));
+        Assert.Equal((null, null), (_rules.Ignored, acmeRules.Ignored));
+    }
+
+    /// <summary>
+    /// The home's earlier shared <c>agents.toml</c> moves, sealed as it was, to the vault whose key sealed it; another vault
+    /// read first leaves it where it is and asks about everything.
+    /// </summary>
+    [Fact]
+    public void The_shared_rules_move_to_the_vault_that_sealed_them_and_no_other()
+    {
+        var shared = AgentRulesFile.Shared(_directory);
+        Assert.True(Sealer(shared, _vault).TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
+
+        var acmePath = Path.Combine(_directory, "acme.kdbx");
+        using var acme = Vault.Create(acmePath, EnvStoreTests.MasterPassword);
+        var acmeFile = AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, acmePath));
+        var acmeRules = new SealedAgentRules(acmeFile, () => acme, _ => AgentSave.Saved, shared);
+
+        Assert.True(acmeRules.TryRead(out var work, out _));
+        Assert.Equal(CategoryRule.Ask, work.RuleFor(FieldCategory.Password));
+        Assert.True(File.Exists(shared.Path));
+        Assert.False(File.Exists(acmeFile.Path));
+
+        var personalRules = new SealedAgentRules(_file, () => _vault, _ => AgentSave.Saved, shared);
+
+        Assert.True(personalRules.TryRead(out var personal, out _));
+        Assert.Equal(CategoryRule.Allow, personal.RuleFor(FieldCategory.Password));
+        Assert.Null(personalRules.Ignored);
+        Assert.False(File.Exists(shared.Path));
+        Assert.True(File.Exists(_file.Path));
+    }
+
+    /// <summary>A shared file no open vault's key sealed, unsealed or edited, moves nowhere, and every vault asks about every value.</summary>
+    [Fact]
+    public async Task Shared_rules_no_vault_sealed_stay_and_every_value_is_asked()
+    {
+        var shared = AgentRulesFile.Shared(_directory);
+        Assert.True(shared.TryWrite(AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true), seal: null, out var problem), problem);
+        var rules = new SealedAgentRules(_file, () => _vault, _ => AgentSave.Saved, shared);
+
+        Assert.True(rules.TryRead(out var read, out _));
+
+        Assert.Equal(CategoryRule.Ask, read.RuleFor(FieldCategory.Password));
+        Assert.True(File.Exists(shared.Path));
+        Assert.False(File.Exists(_file.Path));
+        Assert.Equal(AuditMethod.Prompt, (await RequestAsync()).Method);
+    }
+
+    private static AgentRulesFile RulesIn(string home) => AgentRulesFile.For(home, VaultIdentity.Of(home, Path.Combine(home, "vault.kdbx")));
 
     private static SealedAgentRules Sealer(AgentRulesFile file, Vault vault) => new(file, () => vault, edit =>
     {

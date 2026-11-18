@@ -77,7 +77,7 @@ input:focus-visible {
   outline: none;
   border-color: var(--accent);
   border-radius: 6px;
-  box-shadow: 0 0 0 3px var(--accent-tint);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .hint,

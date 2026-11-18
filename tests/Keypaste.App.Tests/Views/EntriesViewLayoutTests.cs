@@ -89,7 +89,7 @@ public sealed class EntriesViewLayoutTests
                 controls["Search"] = search;
                 controls["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry"));
                 Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
-                Assert.Equal(ListDetail.ListWidth, shell.Named<Border>("ListColumn").Bounds.Width, 0.5);
+                Assert.Equal(shell.Named<ListDetail>("Split").ListWidth, shell.Named<Border>("ListColumn").Bounds.Width, 0.5);
                 Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
                 Assert.True(list.Right <= pane.Left, $"the list {list} is not left of the entry {pane} at {at}");
 
@@ -113,8 +113,8 @@ public sealed class EntriesViewLayoutTests
 
     /// <summary>Where both cannot fit, the list stands alone until an item is chosen, the item replaces it with a Back, and Back returns.</summary>
     [Theory]
-    [InlineData(720, 520)]
-    [InlineData(840, 680)]
+    [InlineData(900, 520)]
+    [InlineData(940, 680)]
     public Task Where_both_cannot_fit_the_entry_replaces_the_list_with_a_Back(double width, double height) =>
         HeadlessSession.On(() =>
         {

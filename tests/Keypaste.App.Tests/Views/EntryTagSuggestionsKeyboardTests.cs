@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -23,6 +24,9 @@ public sealed class EntryTagSuggestionsKeyboardTests
             var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
             entries.Selected = entries.Rows.Single(row => row.Title == "github");
             RenderedShell.Drain();
+
+            shell.Named<ToggleButton>("AddTagToggle").Focus(NavigationMethod.Tab);
+            Press(shell, PhysicalKey.Space);
 
             var box = shell.Named<AutoCompleteBox>("NewTag");
             box.GetVisualDescendants().OfType<TextBox>().First().Focus(NavigationMethod.Tab);

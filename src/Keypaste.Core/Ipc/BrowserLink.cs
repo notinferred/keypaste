@@ -5,8 +5,8 @@ namespace Keypaste.Core.Ipc;
 
 /// <summary>
 /// The browser relay's connection to the vault's owner: one exchange at a time, and the owner's next frame always being read
-/// between them, so the end of the connection, which each lock and exit of the owner brings (D-0392), is seen while the relay
-/// waits on the browser (D-0628).
+/// between them, so the end of the connection, which each lock and exit of the owner brings, is seen while the relay waits on
+/// the browser.
 /// </summary>
 /// <remarks>
 /// <see cref="ApproverClient"/> reads only while it waits for a reply, so a bridge learns of a lock at its next request; the
@@ -89,18 +89,44 @@ public sealed class BrowserLink : IAsyncDisposable
         return Reply(await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false));
     }
 
-    /// <summary>Asks the owner for a page's logins.</summary>
+    /// <summary>Asks the owner for the names of a page's logins.</summary>
     /// <param name="request">The pairing, its key and the page, and the attachment it is made under.</param>
     /// <param name="cancellationToken">Cancels the exchange, which spends the link.</param>
-    /// <returns>The reply, or null when the owner could not be reached or understood, or the request would not fit one frame.</returns>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public async ValueTask<BrowserFillReply?> FillAsync(BrowserFillRequest request, CancellationToken cancellationToken)
+    public async ValueTask<BrowserListReply?> ListAsync(BrowserListRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return ApproverProtocol.Decoded<BrowserListReply>(frame, ApproverProtocol.TryDecode);
+    }
+
+    /// <summary>Asks the owner to fill the login the person picked.</summary>
+    /// <param name="request">The pairing, its key, the page and the item, and the attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange, which spends the link.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<BrowserFillReply?> ReleaseAsync(BrowserReleaseRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
 
         return ApproverProtocol.Decoded<BrowserFillReply>(frame, ApproverProtocol.TryDecode);
+    }
+
+    /// <summary>Asks the owner to bring keypaste forward.</summary>
+    /// <param name="request">What to show, and the attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange, which spends the link.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<BrowserReply?> ShowAsync(BrowserShowRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Reply(await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>Asks the owner to lock now.</summary>

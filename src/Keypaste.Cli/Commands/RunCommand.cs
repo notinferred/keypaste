@@ -155,7 +155,7 @@ internal static class RunCommand
                     $"{OneLine(set.Label)} line {hidden.Line}: the value of {OneLine(hidden.Name)} is too long or holds characters that cannot be shown on one line");
             }
 
-            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} environment {OneLine(set.Profile)}");
+            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} stage {OneLine(set.Profile)}");
 
             foreach (var literal in file.Lines.Where(fileLine => fileLine.Reference is null))
             {
@@ -381,7 +381,7 @@ internal static class RunCommand
             && !string.Equals(reply.Set.Profile, request.Profile, StringComparison.Ordinal))
         {
             context.Stderr.WriteLine(
-                $"keypaste run: the keypaste process holding {vaultPath} released the '{Shown(reply.Set.Profile)}' environment " +
+                $"keypaste run: the keypaste process holding {vaultPath} released the '{Shown(reply.Set.Profile)}' stage " +
                 $"when '{request.Profile}' was asked for, so nothing was started");
             return (CliApp.ExitInternalError, null);
         }
@@ -422,7 +422,7 @@ internal static class RunCommand
 
         if (envs.Count == 0 || envs.Select(env => env.Profile).Distinct(StringComparer.Ordinal).Count() > 1)
         {
-            exit = Fail(context, $"{set.Label} names {(envs.Count == 0 ? "no reference" : "several environments")}; run without --session, or pass -p to choose one environment");
+            exit = Fail(context, $"{set.Label} names {(envs.Count == 0 ? "no reference" : "several stages")}; run without --session, or pass -p to choose one stage");
             return false;
         }
 
@@ -488,7 +488,7 @@ internal static class RunCommand
         if (request.Launch is null)
         {
             context.Stderr.WriteLine(profiled
-                ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' environment '{request.Profile}'; answer in its prompt"
+                ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' stage '{request.Profile}'; answer in its prompt"
                 : $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}'; answer in its prompt");
             context.Stderr.Flush();
         }
@@ -636,7 +636,7 @@ internal static class RunCommand
             ? file.Lines
             : resolved.Variables.Select(variable => new ReferenceLine(variable.Key, new EnvReference(set.Project, set.Profile, variable.Key), null, 0));
 
-        writer.WriteLine($"  resolving {OneLine(set.Label)}  {style.Paint(writer, Tone.Muted, "environment")} {OneLine(resolved.Profile)}");
+        writer.WriteLine($"  resolving {OneLine(set.Label)}  {style.Paint(writer, Tone.Muted, "stage")} {OneLine(resolved.Profile)}");
 
         var references = 0;
 

@@ -3,14 +3,15 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// New item starts from a template, takes a folder from the vault's groups, and makes the item whole
-/// in one write with no history item (N.4, D-0379); a refusal writes nothing and keeps the form open.
+/// New item starts from a template, a preset of fields any of which can be added or removed, saves in any open vault and a folder of
+/// its groups, and makes the item whole in one write with no history item; a refusal writes nothing and keeps the form open.
 /// </summary>
 public sealed class NewItemTests : IDisposable
 {
@@ -102,8 +103,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void An_API_key_is_its_env_named_key_held_as_a_protected_field()
     {
-        var form = NewItemForm.Open(_entries, "Work/OpenAI");
-        form.Template = ItemTemplate.ApiKey;
+        var form = NewItemForm.Open(_entries, "Work/OpenAI", ItemTemplate.ApiKey);
         form.KeyName = "OPENAI_API_KEY";
         Type(form.KeyValue, "sk-proj-n4");
         form.DraftTag = "env:acme";
@@ -123,8 +123,7 @@ public sealed class NewItemTests : IDisposable
     [InlineData("Server", "build.example.com")]
     public void A_database_or_server_is_its_host_username_and_password(string template, string host)
     {
-        var form = NewItemForm.Open(_entries, "Work/box");
-        form.Template = Enum.Parse<ItemTemplate>(template);
+        var form = NewItemForm.Open(_entries, "Work/box", Enum.Parse<ItemTemplate>(template));
         form.Host = host;
         form.Username = "admin";
         form.GeneratePassword = false;
@@ -139,10 +138,9 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void A_secure_note_is_its_notes_alone()
+    public void A_note_is_its_notes_alone()
     {
-        var form = NewItemForm.Open(_entries, "recovery codes");
-        form.Template = ItemTemplate.SecureNote;
+        var form = NewItemForm.Open(_entries, "recovery codes", ItemTemplate.Note);
         form.Username = "left over from the login";
         form.Notes = "1234-5678";
         _entries.ConfirmAddCommand.Press();
@@ -151,22 +149,6 @@ public sealed class NewItemTests : IDisposable
         Assert.Equal("1234-5678", item.Entry.Notes);
         Assert.Equal((string.Empty, string.Empty, string.Empty), (item.Entry.Username, item.Entry.Password, item.Entry.Url));
         Assert.Empty(item.Fields);
-    }
-
-    [Fact]
-    public void Switching_templates_keeps_the_title_folder_tags_and_notes()
-    {
-        var form = NewItemForm.Open(_entries, "Work/thing");
-        form.Notes = "kept";
-        form.DraftTag = "kept";
-        form.AddTagCommand.Press();
-
-        form.Template = ItemTemplate.Server;
-        form.SelectedTemplate = form.Templates.Single(choice => choice.Template == ItemTemplate.SecureNote);
-
-        Assert.Equal(("thing", "Work", "kept"), (form.Title, form.Folder.Path, form.Notes));
-        Assert.Equal(["kept"], form.Tags.Select(chip => chip.Tag));
-        Assert.False(form.ShowsPassword || form.ShowsHost || form.ShowsKey || form.ShowsUrl);
     }
 
     [Fact]
@@ -339,7 +321,7 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void A_choice_announces_the_fields_and_the_button_that_read_it()
+    public void Adding_a_field_announces_the_rows_and_the_buttons_that_read_it()
     {
         var form = NewItemForm.Open(_entries);
         var raised = new List<string>();
@@ -347,12 +329,10 @@ public sealed class NewItemTests : IDisposable
         var asked = 0;
         form.AddTagCommand.CanExecuteChanged += (_, _) => asked++;
 
-        form.Template = ItemTemplate.ApiKey;
+        form.AddFieldCommand.Execute(NewItemField.Tags);
 
         string[] shown =
         [
-            nameof(NewItemViewModel.Template),
-            nameof(NewItemViewModel.SelectedTemplate),
             nameof(NewItemViewModel.ShowsUsername),
             nameof(NewItemViewModel.ShowsPassword),
             nameof(NewItemViewModel.ShowsUrl),
@@ -363,6 +343,8 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.ShowsGroup),
             nameof(NewItemViewModel.ShowsTags),
             nameof(NewItemViewModel.ShowsGoesIn),
+            nameof(NewItemViewModel.FillsInBrowser),
+            nameof(NewItemViewModel.HasPresetRows),
             nameof(NewItemViewModel.FieldOptions),
             nameof(NewItemViewModel.HasFieldOptions),
         ];
@@ -376,6 +358,176 @@ public sealed class NewItemTests : IDisposable
         Assert.True(form.HasTagProblem);
     }
 
+    [Fact]
+    public void The_grid_comes_first_and_a_tile_opens_its_form_titled_and_holding_no_draft()
+    {
+        _entries.ChooseTemplateCommand.Press();
+        var form = _entries.NewItem!;
+
+        Assert.True(form.IsChoosingTemplate);
+        Assert.Null(form.Template);
+        Assert.Equal(TemplateChoice.All.Select(choice => choice.Label), form.Templates.Select(choice => choice.Label));
+        Assert.DoesNotContain(form.Templates, choice => choice.Label.Contains("Passkey", StringComparison.Ordinal));
+        Assert.Null(form.Create());
+
+        form.ChooseTemplateCommand.Press(ItemTemplate.Card);
+
+        Assert.False(form.IsChoosingTemplate);
+        Assert.Equal(ItemTemplate.Card, form.Template);
+        Assert.Equal("New card", form.Title);
+        Assert.Null(form.UnsavedDraft);
+        Assert.False(form.ChooseTemplateCommand.CanExecute(ItemTemplate.Login));
+    }
+
+    [Theory]
+    [InlineData("Login", ItemKind.Login)]
+    [InlineData("ApiKey", ItemKind.ApiKey)]
+    [InlineData("Environment", ItemKind.Environment)]
+    [InlineData("Card", ItemKind.Card)]
+    [InlineData("Note", ItemKind.SecureNote)]
+    [InlineData("Identity", ItemKind.Identity)]
+    [InlineData("SshKey", ItemKind.SshKey)]
+    [InlineData("Server", ItemKind.Server)]
+    [InlineData("Database", ItemKind.Database)]
+    [InlineData("Wifi", ItemKind.Wifi)]
+    [InlineData("Blank", ItemKind.None)]
+    public void Each_template_keeps_its_kind_and_takes_custom_fields(string template, ItemKind kind)
+    {
+        var form = NewItemForm.Open(_entries, "Work/made", Enum.Parse<ItemTemplate>(template));
+        form.KeyName = "MADE_KEY";
+        Type(form.KeyValue, "k");
+        form.AddFieldCommand.Execute(NewItemField.CustomField);
+        form.CustomFields[^1].Name = "Region";
+        form.CustomFields[^1].Value = "eu";
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.False(_entries.IsAdding);
+        var item = Reopened(new EntryName("Work", "made"));
+        Assert.Equal(kind, item.Entry.Kind);
+        Assert.Equal("eu", item.Read("Region"));
+    }
+
+    [Theory]
+    [InlineData("Card", "Credit Card", "Number", FieldCategory.Card)]
+    [InlineData("Identity", "Identity", "Passport number", FieldCategory.Identity)]
+    public void A_card_or_identity_writes_the_tag_that_makes_its_protected_fields_its_agent_category(string template, string tag, string field, FieldCategory category)
+    {
+        var form = NewItemForm.Open(_entries, "Work/mine", Enum.Parse<ItemTemplate>(template));
+
+        Assert.Equal([tag], form.Tags.Select(chip => chip.Tag));
+        Assert.True(form.ShowsTags);
+
+        Type(form.CustomFields.Single(custom => custom.Name == field).Secret, "4111");
+        _entries.ConfirmAddCommand.Press();
+
+        var item = Reopened(new EntryName("Work", "mine"));
+        Assert.Equal([tag], item.Tags);
+        Assert.Equal([new EntryField(field, true, false)], item.Fields);
+        Assert.Equal("4111", item.Read(field));
+        Assert.Equal(category, FieldCategories.Of(field, item.Tags, isProtected: true));
+    }
+
+    [Fact]
+    public void A_presets_field_is_removable_and_one_left_empty_is_neither_written_nor_a_draft()
+    {
+        var form = NewItemForm.Open(_entries, "Work/card", ItemTemplate.Card);
+
+        Assert.Equal(["Cardholder name", "Number", "Expiration date", "Security code"], form.CustomFields.Select(custom => custom.Name));
+        Assert.True(form.CustomFields.Single(custom => custom.Name == "Number").IsProtected);
+
+        form.CustomFields.Single(custom => custom.Name == "Expiration date").RemoveCommand.Press();
+        form.CustomFields.Single(custom => custom.Name == "Cardholder name").Value = "M Okafor";
+        Assert.NotNull(form.UnsavedDraft);
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.Equal([new EntryField("Cardholder name", false, false)], Reopened(new EntryName("Work", "card")).Fields);
+    }
+
+    [Theory]
+    [InlineData("Login", true)]
+    [InlineData("ApiKey", false)]
+    [InlineData("Server", false)]
+    public void Any_item_with_a_username_password_and_website_says_it_fills_in_the_browser(string template, bool fills)
+    {
+        var form = NewItemForm.Open(_entries, template: Enum.Parse<ItemTemplate>(template));
+
+        Assert.Equal(fills, form.FillsInBrowser);
+
+        foreach (var field in new[] { NewItemField.Username, NewItemField.Password, NewItemField.Url }.Where(field => form.FieldOptions.Any(option => option.Field == field)))
+        {
+            form.AddFieldCommand.Execute(field);
+        }
+
+        Assert.True(form.FillsInBrowser);
+
+        form.RemoveFieldCommand.Execute(NewItemField.Url);
+
+        Assert.False(form.FillsInBrowser);
+    }
+
+    [Fact]
+    public void Save_in_lists_every_open_vault_and_another_takes_the_item_and_its_groups()
+    {
+        var otherPath = Path.Combine(_directory, "work.kdbx");
+
+        using (var vault = Vault.Create(otherPath, _master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "aws", GroupPath = "Cloud", Password = "a" });
+            vault.Save();
+        }
+
+        using var other = new AppVaultSession(new ManualClock(AppClock.Start));
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, other.TryUnlock(otherPath, master.Value));
+        }
+
+        var toasts = new List<string>();
+        using var entries = new EntriesViewModel(_session, _countdown)
+        {
+            VaultTitle = "vault",
+            SaveInPlaces = () => [new SaveInChoice(other, "On this Mac", "work"), new SaveInChoice(_session, "On this Mac", "vault")],
+            Toast = (text, _) => toasts.Add(text),
+        };
+        var before = File.ReadAllBytes(_vaultPath);
+        var form = NewItemForm.Open(entries);
+
+        Assert.Equal(["On this Mac › vault", "On this Mac › work"], form.Places.Select(place => place.Label));
+        Assert.Same(_session, form.SaveIn.Session);
+
+        form.SaveIn = form.Places[1];
+        Assert.Equal(["", "Cloud"], form.Folders.Select(folder => folder.Path));
+        form.Title = "gcp";
+        form.Folder = form.Folders[1];
+        entries.ConfirmAddCommand.Press();
+
+        Assert.False(entries.IsAdding);
+        Assert.Equal(["Saved gcp in work."], toasts);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+        using var reopened = Vault.Open(otherPath, _master);
+        Assert.Equal(ItemKind.Login, reopened.Find(new EntryName("Cloud", "gcp"))?.Kind);
+    }
+
+    [Fact]
+    public void The_lists_plus_opens_the_places_kind_and_says_so_and_where_every_kind_is_listed_it_asks()
+    {
+        using var entries = new EntriesViewModel(_session, _countdown) { VaultTitle = "Acme", Place = ItemPlace.Cards };
+
+        Assert.True(entries.AddsInPlace);
+        Assert.Equal("New card in Acme", entries.AddInPlaceTip);
+        entries.BeginAddCommand.Press();
+        Assert.Equal(ItemTemplate.Card, entries.NewItem!.Template);
+        entries.CancelAddCommand.Press();
+
+        entries.Place = ItemPlace.All;
+
+        Assert.False(entries.AddsInPlace);
+        Assert.Equal("New in Acme", entries.AddMenuHeading);
+        Assert.Equal(["Login", "API key", "Environment", "Card", "Note"], entries.Kinds.Select(kind => kind.Label));
+        entries.BeginAddCommand.Press();
+        Assert.Equal(ItemTemplate.Login, entries.NewItem!.Template);
+    }
+
     [Theory]
     [InlineData("github", "otp", "is already in that group")]
     [InlineData("OpenAI", "otp", "Name the key as a project reads it")]
@@ -384,8 +536,7 @@ public sealed class NewItemTests : IDisposable
     public void A_refused_item_writes_nothing_and_keeps_the_form_open(string title, string key, string says)
     {
         var before = File.ReadAllBytes(_vaultPath);
-        var form = NewItemForm.Open(_entries, "Work/" + title);
-        form.Template = title == "github" ? ItemTemplate.Login : ItemTemplate.ApiKey;
+        var form = NewItemForm.Open(_entries, "Work/" + title, title == "github" ? ItemTemplate.Login : ItemTemplate.ApiKey);
         form.KeyName = key;
         Type(form.KeyValue, "sk-refused");
         _entries.ConfirmAddCommand.Press();
@@ -430,26 +581,9 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void A_template_without_a_one_time_code_clears_the_one_typed()
-    {
-        var form = NewItemForm.Open(_entries);
-        Type(form.OneTimeCode, "gezd gnbv gy3t qojq");
-
-        form.Template = ItemTemplate.Database;
-
-        Assert.True(form.OneTimeCode.HasValue);
-
-        form.Template = ItemTemplate.SecureNote;
-
-        Assert.False(form.OneTimeCode.HasValue);
-        Assert.Null(form.UnsavedDraft);
-    }
-
-    [Fact]
     public void A_one_time_code_is_a_field_any_kind_can_add_and_removing_it_clears_what_was_typed()
     {
-        var form = NewItemForm.Open(_entries, "Work/recovery");
-        form.Template = ItemTemplate.SecureNote;
+        var form = NewItemForm.Open(_entries, "Work/recovery", ItemTemplate.Note);
         Assert.False(form.ShowsOneTimeCode);
 
         form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
@@ -471,8 +605,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void Cancelling_or_locking_disposes_what_was_typed()
     {
-        var form = NewItemForm.Open(_entries);
-        form.Template = ItemTemplate.ApiKey;
+        var form = NewItemForm.Open(_entries, template: ItemTemplate.ApiKey);
         Type(form.KeyValue, "sk-typed");
 
         _entries.CancelAddCommand.Press();

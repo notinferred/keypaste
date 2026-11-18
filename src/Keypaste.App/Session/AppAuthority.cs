@@ -33,12 +33,18 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/>.</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs: launch passes <see cref="RequestLock"/>; null refuses it.</param>
     /// <param name="unexpected">Keeps a report of an exception a catch-everything block caught at a site it names, or null.</param>
+    /// <param name="turns">The prompt queue every vault open in this app shares, or null for one of this vault's own.</param>
+    /// <param name="otherKeys">The checkpoint keys of the other vaults open in this app, or null for none.</param>
+    /// <param name="pairings">This computer's browser pairings as every vault open in this app serves them, or null for this vault's alone.</param>
     internal AppAuthority(
         AppVaultSession session,
         string? approverOverride,
         Func<IApprovalChannel> approvals,
         Action? requestLock = null,
-        Action<Exception, string>? unexpected = null)
+        Action<Exception, string>? unexpected = null,
+        PromptTurns? turns = null,
+        Func<IReadOnlyList<Core.Audit.AuditCheckpointKey>>? otherKeys = null,
+        Core.Ownership.OwnerPairings? pairings = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -49,7 +55,10 @@ internal sealed class AppAuthority : IDisposable
             approvals,
             requestLock,
             servesLaunches: OperatingSystem.IsMacOS(),
-            unexpected: unexpected is null ? null : exception => unexpected(exception, CrashReporting.OwnerSite));
+            unexpected: unexpected is null ? null : exception => unexpected(exception, CrashReporting.OwnerSite),
+            turns,
+            otherKeys,
+            pairings);
     }
 
     /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, started from the thread <paramref name="post"/> runs it on and run off it.</summary>
@@ -137,6 +146,13 @@ internal sealed class AppAuthority : IDisposable
         remove => _host.TerminalEdited -= value;
     }
 
+    /// <summary>Raised, on whichever thread made it, once a browser's pairing is made or removed for this computer.</summary>
+    internal event EventHandler? PairingsChanged
+    {
+        add => _host.PairingsChanged += value;
+        remove => _host.PairingsChanged -= value;
+    }
+
     internal ApproverActivity Activity => _host.Activity;
 
     /// <summary>The rules agents are decided by here, and why the file's are ignored when they are.</summary>
@@ -157,17 +173,7 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was made, and keypaste's words.</returns>
     internal Core.Ipc.RulesChangeReply ChangeRules(string agent, Func<Core.Agents.AgentRules, Core.Agents.AgentRules> change) => _host.ChangeRules(agent, change);
 
-    /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
-    internal DateTimeOffset? PairingArmedUntil => _host.PairingArmedUntil;
-
-    /// <summary>Arms pairing a browser for two minutes and one pairing; only Settings' Pair a browser calls it.</summary>
-    /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
-    internal bool ArmPairing() => _host.ArmPairing();
-
-    /// <summary>Ends an arming before its two minutes are up.</summary>
-    internal void DisarmPairing() => _host.DisarmPairing();
-
-    /// <summary>The pairings the unlocked vault holds, with when each was last proven here.</summary>
+    /// <summary>The pairings this computer holds for the unlocked vaults, with when each was last proven.</summary>
     internal IReadOnlyList<Core.Ownership.PairingRow> Pairings() => _host.Pairings();
 
     /// <summary>Removes a pairing for the person, saving and recording it.</summary>
@@ -175,10 +181,10 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was removed, and why not.</returns>
     internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
 
-    /// <summary>The "Always fill" allowances of the pairings the unlocked vault holds.</summary>
+    /// <summary>The logins the pairings the unlocked vault holds filled on a site before.</summary>
     internal IReadOnlyList<Core.Ownership.AllowanceRow> Allowances() => _host.Allowances();
 
-    /// <summary>Removes an "Always fill" allowance for the person.</summary>
+    /// <summary>Forgets, for the person, that a login was filled on a site before, so its next fill there is asked.</summary>
     /// <param name="allowance">The allowance.</param>
     /// <param name="problem">Why it was not removed, or empty.</param>
     /// <returns>Whether it was removed.</returns>

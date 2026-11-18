@@ -1,6 +1,6 @@
 # Design principles
 
-Eight principles govern what keypaste builds and how it feels, for the desktop app, the CLI, the site and the brand. They are the eight of Apple's [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/design-principles), Purpose, Agency, Responsibility, Familiarity, Flexibility, Simplicity, Craft and Delight, which PRODUCT §7 adopts (v1.25, 2026-11-10); each is stated here in keypaste's own words with keypaste's own test. Apple ranks none of them and neither does keypaste: they are tools for weighing a choice, and when two pull apart the one that protects the person's credentials and attention wins. The security laws of [PRODUCT §3](PRODUCT.md#3-security-laws) stand above all eight, and keypaste also has to work as a business: these principles do not judge that, and business does not override them.
+Eight principles govern what keypaste builds and how it feels, for the desktop app, the CLI, the site and the brand. They are the eight of Apple's [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/design-principles), Purpose, Agency, Responsibility, Familiarity, Flexibility, Simplicity, Craft and Delight, which PRODUCT §7 adopts (v1.25, 2026-11-10; the colour line re-ratified v1.30, 2026-11-17); each is stated here in keypaste's own words with keypaste's own test. Apple ranks none of them and neither does keypaste: they are tools for weighing a choice, and when two pull apart the one that protects the person's credentials and attention wins. The security laws of [PRODUCT §3](PRODUCT.md#3-security-laws) stand above all eight, and keypaste also has to work as a business: these principles do not judge that, and business does not override them.
 
 [DESIGN](DESIGN.md) is the system they are applied through.
 
@@ -83,9 +83,9 @@ Test: every state is designed, including empty, error, loading, locked and first
 
 Make it feel calm and trustworthy.
 
-Test: the feeling is calm and trustworthy, and amber and the marks carry the character.
+Test: the feeling is calm and trustworthy, and the marks carry the character.
 
-- Volume is quiet: flat ink, one amber per view, a calm voice. A credential tool earns trust by not shouting; the one loud thing is what needs the person ([DESIGN](DESIGN.md)).
+- Volume is quiet: flat ink, the system's accent leading once per view, amber only on the marks, a calm voice. A credential tool earns trust by not shouting; the one loud thing is what needs the person ([DESIGN](DESIGN.md)).
 - Mystery is little: everything a person needs is visible or one menu away, and an approval is never a discovery.
-- Tempo is slow: the look changes only by founder direction recorded in DESIGN, and what people recognize keypaste by, the "k." icon, the wordmark, the amber and the four places' names, stays while what surrounds it changes.
+- Tempo is slow: the look changes only by founder direction recorded in DESIGN, and what people recognize keypaste by, the "k." icon, the wordmark and its amber dot, and the four places' names, stays while what surrounds it changes.
 - Delight is never decoration that gets in the way of the job.

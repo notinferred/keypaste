@@ -13,11 +13,11 @@ namespace Keypaste.Mcp.Tools;
 /// value, for the part of the vault the user chose to expose.
 /// </summary>
 /// <remarks>
-/// The names come from the vault's owner over the approver pipe (<see cref="ApproverEntryNameSource"/>);
-/// the filtering, sanitizing and formatting below are what this file adds to them.
+/// The names come from each vault's owner over its approver pipe (<see cref="ApproverEntryNameSource"/>), every vault
+/// the bridge serves asked at once; the filtering, sanitizing and formatting below are what this file adds to them.
 /// </remarks>
 internal sealed class ListEntryNamesTool(
-    IEntryNameSource source,
+    BridgeVaults vaults,
     ServerOptions options,
     AuditLog audit) : McpServerTool
 {
@@ -57,66 +57,76 @@ internal sealed class ListEntryNamesTool(
         if (!initialized)
         {
             return Record(
-                Denial(client, AuditMethod.NotInitialized, "the agent called a tool before the initialize handshake completed"),
+                Denial(client, AuditMethod.NotInitialized, "the agent called a tool before the initialize handshake completed", vaults.SoleKey),
                 ToolResults.Refuse(ToolText.NotInitialized));
         }
 
-        EntryNameListing listing;
+        // Still audited when the client stops waiting or a source throws: a listing nobody collected is still an access
+        // that was attempted, and law 3.3 makes no exception for it.
+        var answers = await BridgeVaults.EachAsync(vaults.Routes, names => names.ListAsync(cancellationToken)).ConfigureAwait(false);
+        List<(VaultRoute Route, List<ListedEntry> Names, bool Complete)> shown = [];
 
-        try
+        foreach (var (route, listing) in answers)
         {
-            listing = await source.ListAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Still audited. A listing the client stopped waiting for is still an access that was
-            // attempted, and law 3.3 does not make an exception for the ones nobody collected.
-            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true);
-        }
-        catch (Exception)
-        {
-            // Nor for the ones that failed. A vault on a disk that went away throws something this
-            // method has no business enumerating, and an exception that escapes here escapes before
-            // the append below - which would make breaking the source a way to be listed against
-            // with no record of it.
-            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked, true);
-        }
-
-        if (listing.Availability == VaultAvailability.Unrecorded)
-        {
-            return Record(Denial(client, AuditMethod.Failed, McpAudit.Unrecorded, listing.Session), ToolResults.Refuse(listing.Reason));
-        }
-
-        if (listing.Availability != VaultAvailability.Available)
-        {
-            var refusal = ToolResults.Refuse(listing.Reason);
-            return listing.Recorded ? refusal : Record(Denial(client, Method(listing.Availability), listing.AuditReason ?? listing.Reason), refusal);
-        }
-
-        // The exposure is applied twice on purpose: two things enforcing one rule that cannot
-        // disagree (THREATS.md T-4). A second *cap* is deliberately absent — that was two things
-        // authoring one claim, and this side's was wrong in both directions.
-        var exposed = new List<ListedEntry>();
-        foreach (var entry in listing.Names)
-        {
-            var reach = options.Exposure.Reach(entry.Name, entry.Tags);
-
-            if (reach != ExposureReach.None)
+            if (listing.Availability == VaultAvailability.Unrecorded)
             {
-                exposed.Add(entry.Within(reach));
+                if (!Recorded(Denial(client, AuditMethod.Failed, McpAudit.Unrecorded, route.Key, listing.Session)))
+                {
+                    return ToolResults.Refuse(ToolText.AuditUnavailable);
+                }
+
+                continue;
             }
+
+            if (listing.Availability != VaultAvailability.Available)
+            {
+                if (!listing.Recorded && !Recorded(Denial(client, Method(listing.Availability), listing.AuditReason ?? listing.Reason, route.Key)))
+                {
+                    return ToolResults.Refuse(ToolText.AuditUnavailable);
+                }
+
+                continue;
+            }
+
+            // The exposure is applied twice on purpose: two things enforcing one rule that cannot
+            // disagree (THREATS.md T-4). A second *cap* is deliberately absent — that was two things
+            // authoring one claim, and this side's was wrong in both directions.
+            var exposed = new List<ListedEntry>();
+            foreach (var entry in listing.Names)
+            {
+                var reach = options.Exposure.Reach(entry.Name, entry.Tags);
+
+                if (reach != ExposureReach.None)
+                {
+                    exposed.Add(entry.Within(reach));
+                }
+            }
+
+            if (!listing.Recorded && !Recorded(RequestRecords.Listed(client, exposed.Count, options.Exposure.Globs, listing.Session, route.Key)))
+            {
+                return ToolResults.Refuse(ToolText.AuditUnavailable);
+            }
+
+            shown.Add((route, exposed, listing.Complete));
         }
 
-        var truncated = !listing.Complete;
-        var rendered = Render(exposed, truncated, options.Exposure.Globs);
+        if (shown.Count == 0)
+        {
+            return ToolResults.Refuse(vaults.Several
+                ? string.Join("\n\n", answers.Select(answer => ToolText.InVault(answer.Route.Vault!.Name, answer.Listing.Reason)))
+                : answers[0].Listing.Reason);
+        }
 
-        return listing.Recorded
-            ? rendered
-            : Record(RequestRecords.Listed(client, exposed.Count, options.Exposure.Globs, listing.Session, options.VaultKey), rendered);
+        foreach (var (route, names, _) in shown)
+        {
+            vaults.Saw(route, names.Select(entry => entry.Name), []);
+        }
+
+        return Render(shown, answers, vaults.Several, options.Exposure.Globs);
     }
 
-    private AuditRecord Denial(AuditClient client, AuditMethod method, string reason, string? session = null) =>
-        RequestRecords.Listing(client, AuditDecision.Denied, method, reason, options.Exposure.Globs, session, options.VaultKey);
+    private AuditRecord Denial(AuditClient client, AuditMethod method, string reason, string? vaultKey, string? session = null) =>
+        RequestRecords.Listing(client, AuditDecision.Denied, method, reason, options.Exposure.Globs, session, vaultKey);
 
     /// <summary>Which word the log gets for a listing that produced no names.</summary>
     /// <remarks>
@@ -146,43 +156,60 @@ internal sealed class ListEntryNamesTool(
     /// before replying is answered with no line here.
     /// </remarks>
     private CallToolResult Record(AuditRecord record, CallToolResult answer) =>
-        audit.TryAppend(record, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
+        Recorded(record) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
+
+    private bool Recorded(AuditRecord record) => audit.TryAppend(record, out _);
 
     /// <summary>
     /// Builds the reply: a datamarked block for the model to read, and a structured payload that
     /// keeps keypaste's own trusted fields separate from the untrusted names.
     /// </summary>
     private static CallToolResult Render(
-        List<ListedEntry> names,
-        bool truncated,
+        List<(VaultRoute Route, List<ListedEntry> Names, bool Complete)> shown,
+        IReadOnlyList<VaultAnswer> answers,
+        bool several,
         IReadOnlyList<string> globs)
     {
         // A fresh nonce per call, so the untrusted payload cannot forge its own terminator and
         // pretend that whatever follows it came from keypaste.
         var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4));
+        var truncated = shown.Any(vault => !vault.Complete);
+        var count = shown.Sum(vault => vault.Names.Count);
 
         // The header says so too, not only the trailer. This is the line a model summarizes from,
         // and "812 items, within --expose env/**" reads as an inventory; whatever follows a long block
         // of untrusted names is the half most likely to be skimmed past.
         var text = new StringBuilder();
-        text.Append("keypaste: ").Append(names.Count).Append(truncated ? " item names — not all of them" : " items")
+        text.Append("keypaste: ").Append(count).Append(truncated ? " item names — not all of them" : " items")
             .Append(", within --expose ").AppendLine(string.Join(", ", globs));
 
-        var rows = new List<Row>(names.Count);
-        foreach (var entry in names)
+        if (several)
         {
-            var group = EntryNameSanitizer.SanitizePath(entry.Name.GroupPath);
-            var title = EntryNameSanitizer.Sanitize(entry.Name.Title);
-            var fields = entry.Fields.Select(field => EntryNameSanitizer.Sanitize(field)).ToList();
-            var tags = entry.Tags.Select(tag => EntryNameSanitizer.Sanitize(tag)).ToList();
+            foreach (var answer in answers)
+            {
+                text.Append("vault ").Append(answer.Route.Vault!.Name).Append(": ").AppendLine(answer.State);
+            }
+        }
 
-            rows.Add(new Row(
-                EntryHandle.For(entry.Name),
-                group.Text,
-                title.Text,
-                [.. fields.Select(field => field.Text)],
-                [.. tags.Select(tag => tag.Text)],
-                group.WasAltered || title.WasAltered || fields.Any(field => field.WasAltered) || tags.Any(tag => tag.WasAltered)));
+        var rows = new List<Row>(count);
+        foreach (var (route, names, _) in shown)
+        {
+            foreach (var entry in names)
+            {
+                var group = EntryNameSanitizer.SanitizePath(entry.Name.GroupPath);
+                var title = EntryNameSanitizer.Sanitize(entry.Name.Title);
+                var fields = entry.Fields.Select(field => EntryNameSanitizer.Sanitize(field)).ToList();
+                var tags = entry.Tags.Select(tag => EntryNameSanitizer.Sanitize(tag)).ToList();
+
+                rows.Add(new Row(
+                    EntryHandle.For(entry.Name),
+                    route.Vault?.Name ?? string.Empty,
+                    group.Text,
+                    title.Text,
+                    [.. fields.Select(field => field.Text)],
+                    [.. tags.Select(tag => tag.Text)],
+                    group.WasAltered || title.WasAltered || fields.Any(field => field.WasAltered) || tags.Any(tag => tag.WasAltered)));
+            }
         }
 
         text.AppendLine(
@@ -194,7 +221,14 @@ internal sealed class ListEntryNamesTool(
         {
             // Handle first: the easiest thing for a model to copy should be the address that is
             // unambiguous, not the display name that is lossy.
-            text.Append(row.Handle).Append("  ").Append(row.Group).Append("  ").Append(row.Name);
+            text.Append(row.Handle).Append("  ");
+
+            if (several)
+            {
+                text.Append("vault=").Append(row.Vault).Append("  ");
+            }
+
+            text.Append(row.Group).Append("  ").Append(row.Name);
 
             if (row.Fields.Count > 0)
             {
@@ -223,11 +257,11 @@ internal sealed class ListEntryNamesTool(
             // its answers were refusals.
             IsError = false,
             Content = [new TextContentBlock { Text = text.ToString() }],
-            StructuredContent = Structured(rows, truncated),
+            StructuredContent = Structured(rows, answers, truncated),
         };
     }
 
-    private static JsonElement Structured(List<Row> rows, bool truncated)
+    private static JsonElement Structured(List<Row> rows, IReadOnlyList<VaultAnswer> answers, bool truncated)
     {
         using var buffer = new MemoryStream(512);
 
@@ -235,6 +269,7 @@ internal sealed class ListEntryNamesTool(
         {
             writer.WriteStartObject();
             writer.WriteString("vault", "open");
+            WriteVaults(writer, answers);
             writer.WriteBoolean("truncated", truncated);
             writer.WriteNumber("count", rows.Count);
 
@@ -243,6 +278,7 @@ internal sealed class ListEntryNamesTool(
             {
                 writer.WriteStartObject();
                 writer.WriteString("handle", row.Handle);
+                writer.WriteString("vault", row.Vault);
                 writer.WriteString("group", row.Group);
                 writer.WriteString("name", row.Name);
                 WriteStrings(writer, "fields", row.Fields);
@@ -259,6 +295,22 @@ internal sealed class ListEntryNamesTool(
         return document.RootElement.Clone();
     }
 
+    /// <summary>Each vault asked, by name, with its state.</summary>
+    internal static void WriteVaults(Utf8JsonWriter writer, IReadOnlyList<VaultAnswer> answers)
+    {
+        writer.WriteStartArray("vaults");
+
+        foreach (var answer in answers)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("name", answer.Route.Vault?.Name ?? string.Empty);
+            writer.WriteString("state", answer.State);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
+
     private static void WriteStrings(Utf8JsonWriter writer, string name, IReadOnlyList<string> values)
     {
         writer.WriteStartArray(name);
@@ -272,5 +324,5 @@ internal sealed class ListEntryNamesTool(
     }
 
     /// <summary>One entry as the reply shows it, every string sanitized.</summary>
-    private sealed record Row(string Handle, string Group, string Name, IReadOnlyList<string> Fields, IReadOnlyList<string> Tags, bool Altered);
+    private sealed record Row(string Handle, string Vault, string Group, string Name, IReadOnlyList<string> Fields, IReadOnlyList<string> Tags, bool Altered);
 }

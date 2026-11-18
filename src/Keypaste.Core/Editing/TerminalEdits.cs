@@ -361,7 +361,7 @@ public static class TerminalEdits
         {
             return Refused(EditRefusalKind.NotFound, listing.Outcome == EnvOutcome.NoProject
                 ? $"no env set for '{remove.Project}'"
-                : $"'{remove.Project}' has no '{remove.Environment}' environment");
+                : $"'{remove.Project}' has no '{remove.Environment}' stage");
         }
 
         var holding = listing.Sources
@@ -372,7 +372,7 @@ public static class TerminalEdits
         {
             return Refused(EditRefusalKind.NotFound, string.Equals(remove.Environment, EnvProfileNames.Default, StringComparison.Ordinal)
                 ? $"'{remove.Project}' has no variable '{remove.Key}'"
-                : $"'{remove.Project}' has no variable '{remove.Key}' in its '{remove.Environment}' environment");
+                : $"'{remove.Project}' has no variable '{remove.Key}' in its '{remove.Environment}' stage");
         }
 
         if (holding.Count > 1)

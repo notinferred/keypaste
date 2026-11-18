@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Controls;
 
-/// <summary>What a machine reads, set inside a sentence, is drawn in Fragment Mono and the rest stays the sentence's own face (DESIGN Rule 5).</summary>
+/// <summary>What a machine reads, set inside a sentence, is drawn in the system's monospace and the rest stays the sentence's own face (DESIGN Rule 5).</summary>
 public sealed class MachineRunsTests
 {
     [Fact]
@@ -38,8 +38,8 @@ public sealed class MachineRunsTests
     [InlineData("Open ~/My Vaults/work vault.kdbx now.", "~/My Vaults/work vault.kdbx")]
     [InlineData("Saved to /tmp/a.kdbx. Work/linear is next.", "/tmp/a.kdbx")]
     [InlineData("Saved to /tmp/a then closed.", "/tmp/a")]
-    [InlineData("such as env:billing-api, with a value per environment.", "env:billing-api")]
-    [InlineData("tag:env:billing is every environment.", "tag:env:billing")]
+    [InlineData("such as env:billing-api, with a value per stage.", "env:billing-api")]
+    [InlineData("tag:env:billing is every stage.", "tag:env:billing")]
     [InlineData("It only feeds keypaste run and never prints a value.", "keypaste run")]
     [InlineData("Claude Code starts keypaste mcp for this vault.", "keypaste mcp")]
     public Task A_machine_word_is_its_own_mono_run_and_the_sentence_stays_whole(string sentence, string word) => HeadlessSession.On(() =>

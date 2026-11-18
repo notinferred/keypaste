@@ -157,7 +157,7 @@ public sealed class EnvResolved
     {
         EnvOutcome.Resolved => string.Empty,
         EnvOutcome.NoProject => $"no env set for '{Project}'",
-        EnvOutcome.NoProfile => $"'{Project}' has no '{Profile}' environment",
+        EnvOutcome.NoProfile => $"'{Project}' has no '{Profile}' stage",
         EnvOutcome.Unusable => $"'{Project}/{Profile}' cannot be used: " +
             string.Join("; ", Problems.Select(problem => $"{problem.Key} {problem.Reason}")),
         EnvOutcome.Unsaved => "the vault holds a change that has not been saved",
@@ -240,7 +240,7 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 /// </remarks>
 public static class EnvResolution
 {
-    private const string _notInSet = "is not in this environment's set";
+    private const string _notInSet = "is not in this stage's set";
 
     /// <summary>Resolves a project's default profile from the vault as its file holds it (D-0317).</summary>
     /// <param name="vault">The open vault.</param>

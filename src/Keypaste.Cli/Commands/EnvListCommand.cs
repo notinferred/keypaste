@@ -24,8 +24,8 @@ internal static class EnvListCommand
     /// <summary>The longest name drawn. Generous: this is a listing of the reader's own vault.</summary>
     private const int _displayLength = 512;
 
-    private static readonly Argument<string?> _project = Syntax.Optional("project", "one project's environments, items and variables");
-    private static readonly Option<bool> _profiles = Syntax.Flag("--profiles", "the project's environments only");
+    private static readonly Argument<string?> _project = Syntax.Optional("project", "one project's stages, items and variables");
+    private static readonly Option<bool> _profiles = Syntax.Flag("--profiles", "the project's stages only");
 
     internal static CliVerb Command { get; } = new("ls", "list projects and tagged items, or variables", Execute)
     {
@@ -98,7 +98,7 @@ internal static class EnvListCommand
 
         if (environments.Count == 0)
         {
-            context.Stderr.WriteLine($"keypaste env ls: '{listing.Name}' has no '{profile}' environment");
+            context.Stderr.WriteLine($"keypaste env ls: '{listing.Name}' has no '{profile}' stage");
             return CliApp.ExitNotFound;
         }
 

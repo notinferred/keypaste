@@ -8,12 +8,12 @@ using Xunit;
 namespace Keypaste.Consistency.Tests;
 
 /// <summary>
-/// A variable added to a profile on the Env Sets screen is what <c>keypaste run -p</c> injects, and
-/// a profile the CLI writes is the one the screen shows (D-0413, D-0416).
+/// A variable added to a stage in Environments is what <c>keypaste run -p</c> injects, and
+/// a stage the CLI writes is the one the screen shows (D-0413, D-0416).
 /// </summary>
 /// <remarks>
-/// The mutations this must catch: the screen writing a profile's key on an entry not tagged into
-/// it, a key landing on another profile's home entry, and an edit landing in the profile that was
+/// The mutations this must catch: the screen writing a stage's key on an entry not tagged into
+/// it, a key landing on another stage's home entry, and an edit landing in the stage that was
 /// selected before.
 /// </remarks>
 public sealed class ProfileSetInTheAppIsWhatTheCliRunsTests
@@ -34,7 +34,7 @@ public sealed class ProfileSetInTheAppIsWhatTheCliRunsTests
         var project = screen.OpenProject!;
 
         Assert.Equal(["dev", "prod"], project.Profiles.Select(profile => profile.Name));
-        project.SelectedProfile = "prod";
+        project.Columns.Single(stage => stage.Name == "prod").Select.Execute(null);
         Assert.Equal(["DATABASE_URL"], project.Variables.Select(row => row.Key));
 
         project.SelectedProfile = "staging";
@@ -48,6 +48,8 @@ public sealed class ProfileSetInTheAppIsWhatTheCliRunsTests
 
         project.ConfirmAddCommand.Execute(null);
         Assert.Null(screen.Error);
+        Assert.Equal(["dev", "staging", "prod"], project.Columns.Select(stage => stage.Name));
+        Assert.Equal("Missing in dev and prod", project.Rows.Single(row => row.Key == "STRIPE_KEY").MissingNote);
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls", "billing", "-p", "staging"));
         Assert.Equal(["staging", "env/billing/.env.staging", "STRIPE_KEY"], fixture.Cli.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

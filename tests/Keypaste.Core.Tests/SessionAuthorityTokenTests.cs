@@ -229,7 +229,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         var refused = await authority.ReleaseTokenEnvAsync(Request(plain, "staging"), _connection, Cancel);
 
         Assert.Equal(EnvOutcome.Unauthorized, refused.Set.Outcome);
-        Assert.Equal("the token's scope does not cover acme-api/staging: it holds an item of a protected environment", refused.Reason);
+        Assert.Equal("the token's scope does not cover acme-api/staging: it holds an item of a protected stage", refused.Reason);
         Assert.Empty(refused.Set.Variables);
         Assert.Equal(0, _fixture.Channel.Asked);
 

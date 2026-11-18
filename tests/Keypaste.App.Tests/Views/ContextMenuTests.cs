@@ -37,9 +37,9 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Copy the TOTP code", "Copy URL", "Copy the reference", "Open URL", "-", "Edit fields…", "Rename or move…", "Change kind", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the one-time code", "Copy website", "Copy the reference", "Open website", "-", "Add to Favorites", "Edit fields…", "Rename or move…", "Change kind", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
             Headers(menu));
-        string[] needATotp = ["Copy the TOTP code", "Replace the one-time code…", "Remove the one-time code"];
+        string[] needATotp = ["Copy the one-time code", "Replace the one-time code…", "Remove the one-time code"];
         Assert.All(menu.Items.OfType<MenuItem>().Where(item => !needATotp.Contains(item.Header as string)), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
         Assert.All(menu.Items.OfType<MenuItem>().Where(item => needATotp.Contains(item.Header as string)), item => Assert.False(item.IsEffectivelyEnabled, $"{item.Header} is on"));
         menu.Hide();
@@ -51,7 +51,7 @@ public sealed class ContextMenuTests
     });
 
     [Fact]
-    public Task Change_kind_offers_the_five_kinds_and_keeps_the_chosen_one_as_the_items_icon() => HeadlessSession.On(() =>
+    public Task Change_kind_offers_every_kind_kept_and_keeps_the_chosen_one_as_the_items_icon() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-context-kind-");
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -60,14 +60,14 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         var kinds = Item(menu, "Change kind").Items.OfType<MenuItem>().ToList();
 
-        Assert.Equal(["Login", "API key", "Database", "Server", "Secure note"], kinds.Select(item => item.Header as string));
+        Assert.Equal(["Login", "API key", "Environment", "Card", "Note", "Identity", "SSH key", "Server", "Database", "Wi-Fi"], kinds.Select(item => item.Header as string));
         kinds.Single(item => item.Header as string == "API key").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         menu.Hide();
         RenderedShell.Drain();
 
         var github = entries.Rows.Single(entry => entry.Title == "github");
         Assert.Equal(EntryKind.ApiKey, github.Kind);
-        Assert.Equal("key-round", github.Icon);
+        Assert.Equal("key", github.Icon);
     });
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class ContextMenuTests
     {
         using var shell = new RenderedShell("keypaste-context-variable-");
         var project = shell.OpenProject();
-        var row = shell.Window.GetVisualDescendants().OfType<Border>().First(border => border.DataContext is EnvKeyRow && border.Classes.Contains("matrix-row"));
+        var row = shell.Window.GetVisualDescendants().OfType<Border>().First(border => border.DataContext is EnvKeyRow && border.Classes.Contains("variable-row"));
 
         var menu = RightClick(shell.Window, row);
         Assert.Equal(["Copy value", "Replace value…", "-", "Remove key"], Headers(menu));
@@ -92,7 +92,7 @@ public sealed class ContextMenuTests
     {
         using var shell = new RenderedShell("keypaste-context-key-rows-", vault => ProjectVariables.Set(vault, "billing", "OTHER_KEY", "other"));
         var project = shell.OpenProject();
-        var rows = shell.Window.GetVisualDescendants().OfType<Border>().Where(border => border.DataContext is EnvKeyRow && border.Classes.Contains("matrix-row")).ToList();
+        var rows = shell.Window.GetVisualDescendants().OfType<Border>().Where(border => border.DataContext is EnvKeyRow && border.Classes.Contains("variable-row")).ToList();
         Assert.True(rows.Count >= 2, "the project needs two keys");
 
         rows[0].GetVisualDescendants().OfType<Button>().First(button => button.DataContext is EnvVariableRow && button.IsEffectivelyVisible).Focus();
@@ -251,7 +251,8 @@ public sealed class ContextMenuTests
     {
         using var shell = new RenderedShell("keypaste-context-group-");
         var nav = shell.Named<ListBox>("Nav");
-        var env = shell.Shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env");
+        var env = shell.Shell.GroupRowAt("env");
+        RenderedShell.Drain();
 
         var menu = RightClick(shell.Window, Container(nav, env));
         Assert.Equal(["New group…", "Rename group…", "Move group…", "-", "Delete group"], Headers(menu));
@@ -273,14 +274,15 @@ public sealed class ContextMenuTests
     {
         using var shell = new RenderedShell("keypaste-context-project-");
         var nav = shell.Named<ListBox>("Nav");
-        var billing = shell.Shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "billing");
+        var billing = shell.Shell.ProjectRowNamed("billing");
+        RenderedShell.Drain();
 
         var menu = RightClick(shell.Window, Container(nav, billing));
-        Assert.Equal(["Open project", "-", "Add a key…", "Add environment…", "Add item…", "-", "Run in a terminal", "Open terminal", "Copy the command", "Export .env.keypaste…"], Headers(menu));
+        Assert.Equal(["Open project", "-", "Add a key…", "Add stage…", "Add item…", "-", "Run in a terminal", "Open terminal", "Copy the command", "Export .env.keypaste…"], Headers(menu));
         Choose(menu, "Open project");
 
         Assert.Equal("billing", Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject?.Name);
-        Assert.Same(billing, shell.Shell.SelectedSidebarRow);
+        Assert.Equal(billing, shell.Shell.SelectedSidebarRow);
 
         var open = FromTheKeyboard(shell.Window, Container(nav, billing), PhysicalKey.ContextMenu, RawInputModifiers.None);
         Assert.False(Item(open, "Open project").IsEffectivelyEnabled);
@@ -318,7 +320,7 @@ public sealed class ContextMenuTests
 
         var disconnect = agents.Commands.Menus.Single(group => group.Header == "Agents").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect…");
         Assert.True(disconnect.CanRun());
-        agents.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav").ContainerFromIndex(0)!.Focus();
+        agents.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "LockButton").Focus();
         Assert.False(disconnect.CanRun());
 
         agents.Model.DisconnectCommand.Press(claude);

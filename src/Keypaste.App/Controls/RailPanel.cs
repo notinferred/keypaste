@@ -3,10 +3,10 @@ using Avalonia.Controls;
 
 namespace Keypaste.App.Controls;
 
-/// <summary>The rail's list: a stack with its last two rows at its foot, where the sidebar keeps Trash and Settings. A <see cref="StackPanel"/> still, because a list's arrow keys walk only a navigable panel.</summary>
+/// <summary>The rail's list: a stack with its last row, Settings, at its foot. A <see cref="StackPanel"/> still, because a list's arrow keys walk only a navigable panel.</summary>
 internal sealed class RailPanel : StackPanel
 {
-    private const int _rowsAtFoot = 2;
+    private const int _rowsAtFoot = 1;
 
     protected override Size ArrangeOverride(Size finalSize)
     {

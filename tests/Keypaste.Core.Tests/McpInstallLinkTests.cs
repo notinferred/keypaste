@@ -27,7 +27,7 @@ public sealed class McpInstallLinkTests
     private static McpServerRegistration Registration(string server, string? vault, string label)
     {
         var command = new McpServerCommand(server, [McpServerLocator.BridgeArgument]);
-        Assert.True(McpServerRegistration.TryCreate(command, new McpServerPins(vault, null, null), label, [], out var registration, out var error), error);
+        Assert.True(McpServerRegistration.TryCreate(command, new McpServerPins(vault is null ? [] : [vault], null, null), label, [], out var registration, out var error), error);
         return registration;
     }
 

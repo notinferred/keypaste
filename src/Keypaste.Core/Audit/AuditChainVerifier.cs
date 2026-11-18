@@ -47,7 +47,7 @@ public enum AuditChainFault
     /// <summary>A record from a newer schema. Nothing here can check it, so nothing here vouches for it.</summary>
     Unverifiable = 8,
 
-    /// <summary>A checkpoint or compaction record naming the vault whose key was given, which that key did not sign. The chain was rewritten without the vault.</summary>
+    /// <summary>A checkpoint or compaction record naming a vault whose key was given, which that key did not sign. The chain was rewritten without the vault.</summary>
     Forged = 9,
 
     /// <summary>A compaction record whose sealed lines are not the lines it sealed: one was changed, removed or inserted.</summary>
@@ -63,7 +63,7 @@ public enum AuditCompactionCheck
     /// <summary>The sealed lines match the record, whose signature was not checked because no key was given.</summary>
     NotChecked = 1,
 
-    /// <summary>The sealed lines match the record, which names a vault other than the one whose key was given.</summary>
+    /// <summary>The sealed lines match the record, which names a vault none of the keys given belongs to.</summary>
     OtherVault = 2,
 
     /// <summary>The sealed lines match the record, and the vault's key signed it.</summary>
@@ -140,10 +140,10 @@ public sealed record AuditChainReport
     /// <summary>How many checkpoint lines the chain holds, signed or not.</summary>
     public int Checkpoints { get; init; }
 
-    /// <summary>How many checkpoints the vault's key signed, or null when no key was given.</summary>
+    /// <summary>How many checkpoints the keys given signed, or null when none was given.</summary>
     public int? SignedCheckpoints { get; init; }
 
-    /// <summary>How many chained records follow the last checkpoint the vault's key signed, or all of them when none was.</summary>
+    /// <summary>How many chained records follow the last checkpoint a key given signed, or all of them when none was.</summary>
     public int UnsignedRecords { get; init; }
 
     /// <summary>What the check of the log's compaction record found.</summary>
@@ -264,12 +264,51 @@ public static class AuditChainVerifier
     /// <param name="checkpoints">The vault's checkpoint key, or null.</param>
     /// <returns>What was found.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stream"/> or <paramref name="path"/> is null.</exception>
-    public static AuditChainReport Verify(Stream stream, string path, string? anchor = null, AuditCheckpointKey? checkpoints = null)
+    public static AuditChainReport Verify(Stream stream, string path, string? anchor = null, AuditCheckpointKey? checkpoints = null) =>
+        Verify(stream, path, anchor, checkpoints is null ? [] : [checkpoints]);
+
+    /// <summary>Verifies the log at a path under the keys of every vault whose owners write to it.</summary>
+    /// <param name="path">The log.</param>
+    /// <param name="anchor">A hash from an earlier run to look for, or null.</param>
+    /// <param name="keys">The vaults' checkpoint keys, each checking the checkpoints and the seal naming its vault; none checks nothing.</param>
+    /// <returns>What was found. Never throws for an ordinary I/O failure.</returns>
+    /// <exception cref="ArgumentNullException">An argument but <paramref name="anchor"/> is null.</exception>
+    public static AuditChainReport Verify(string path, string? anchor, IReadOnlyCollection<AuditCheckpointKey> keys)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(keys);
+
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            return Verify(stream, path, anchor, keys);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or NotSupportedException or ArgumentException)
+        {
+            return new AuditChainReport
+            {
+                Verdict = AuditChainVerdict.Unreadable,
+                Path = path,
+                Error = ex.Message,
+            };
+        }
+    }
+
+    /// <summary>Verifies a log that is already open under the keys of every vault whose owners write to it.</summary>
+    /// <param name="stream">The bytes of the log, positioned at its start.</param>
+    /// <param name="path">The name to report, for messages.</param>
+    /// <param name="anchor">A hash from an earlier run to look for, or null.</param>
+    /// <param name="keys">The vaults' checkpoint keys, each checking the checkpoints and the seal naming its vault; none checks nothing.</param>
+    /// <returns>What was found.</returns>
+    /// <exception cref="ArgumentNullException">An argument but <paramref name="anchor"/> is null.</exception>
+    public static AuditChainReport Verify(Stream stream, string path, string? anchor, IReadOnlyCollection<AuditCheckpointKey> keys)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var walk = new Walk(path, anchor, checkpoints);
+        var walk = new Walk(path, anchor, keys);
         var buffer = new byte[8192];
 
         using var pending = new MemoryStream(1024);
@@ -325,7 +364,7 @@ public static class AuditChainVerifier
     /// A class rather than a set of locals because <see cref="Line"/> takes a span, and a span
     /// cannot cross into an iterator or a closure.
     /// </remarks>
-    private sealed class Walk(string path, string? anchor, AuditCheckpointKey? key)
+    private sealed class Walk(string path, string? anchor, IReadOnlyCollection<AuditCheckpointKey> keys)
     {
         private readonly List<AuditChainFinding> _findings = [];
         private int _number;
@@ -442,7 +481,7 @@ public static class AuditChainVerifier
                 Rewritten = _rewritten,
                 Anchored = anchor is null ? null : _anchored,
                 Checkpoints = _checkpoints,
-                SignedCheckpoints = key is null ? null : _signed,
+                SignedCheckpoints = keys.Count == 0 ? null : _signed,
                 UnsignedRecords = _unsigned,
                 Findings = [.. _findings.OrderBy(f => f.Line)],
                 Compaction = _compaction,
@@ -571,13 +610,13 @@ public static class AuditChainVerifier
 
             _sealedRecords = open.Records;
 
-            if (key is null)
+            if (keys.Count == 0)
             {
                 _compaction = AuditCompactionCheck.NotChecked;
                 return;
             }
 
-            if (!string.Equals(open.Seal.Vault, key.Vault, StringComparison.Ordinal))
+            if (KeyOf(open.Seal.Vault) is not { } key)
             {
                 _compaction = AuditCompactionCheck.OtherVault;
                 return;
@@ -614,7 +653,7 @@ public static class AuditChainVerifier
 
             _checkpoints++;
 
-            if (!intact || key is null || !string.Equals(vault, key.Vault, StringComparison.Ordinal))
+            if (!intact || KeyOf(vault) is not { } key)
             {
                 return false;
             }
@@ -628,6 +667,10 @@ public static class AuditChainVerifier
             _signed++;
             return true;
         }
+
+        /// <summary>The key given for a vault, or null when none was.</summary>
+        private AuditCheckpointKey? KeyOf(string vault) =>
+            keys.FirstOrDefault(key => string.Equals(key.Vault, vault, StringComparison.Ordinal));
 
         /// <remarks>
         /// Inside a compaction record's sealed lines a broken link or a position gap is where folded or removed lines

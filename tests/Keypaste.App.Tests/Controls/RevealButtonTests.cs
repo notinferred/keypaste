@@ -97,11 +97,14 @@ public sealed class RevealButtonTests
         WindowInput.Drain();
         var panel = Assert.IsType<StackPanel>(screen.Button.Content);
         var icon = Assert.IsType<KpIcon>(panel.Children[0]);
-        var word = Assert.IsType<TextBlock>(panel.Children[1]);
+        var word = Assert.IsAssignableFrom<TextBlock>(panel.Children[1]);
         Assert.Equal(("eye", "Reveal"), (icon.Icon, word.Text));
+        var width = screen.Button.DesiredSize.Width;
 
         screen.Cell.BeginReveal();
+        WindowInput.Drain();
         Assert.Equal(("eye-off", "Hide"), (icon.Icon, word.Text));
+        Assert.Equal(width, screen.Button.DesiredSize.Width);
     });
 
     [Fact]

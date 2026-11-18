@@ -142,21 +142,6 @@ public sealed class RememberedAnswerRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task Always_block_confirmed_on_the_prompt_refuses_now_and_then_without_asking()
-    {
-        _channel.Answer = ApprovalAnswer.AlwaysBlocked;
-
-        var first = await RequestAsync("work/github", "password");
-        _clock.Advance(TimeSpan.FromMinutes(10));
-        var second = await RequestAsync("work/github", "password");
-
-        Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt, null), (first.Decision, first.Method, first.Value));
-        Assert.Equal((AuditDecision.Denied, AuditMethod.Blocked, null), (second.Decision, second.Method, second.Value));
-        Assert.Equal("the person always refuses this item's password to this agent", second.Reason);
-        Assert.Equal(1, _channel.Asked);
-    }
-
-    [Fact]
     public void Nothing_is_kept_without_the_persons_confirmation()
     {
         var answer = new RememberedAnswer(_agent, GithubId, "password", CategoryRule.Allow);

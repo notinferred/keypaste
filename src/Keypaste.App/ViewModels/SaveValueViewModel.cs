@@ -14,11 +14,13 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class SaveValueViewModel : PromptViewModel, IDisposable
 {
     private readonly Clipboard.ClipboardCountdown _clipboard;
+    private readonly string _itemTitle;
 
     /// <param name="prompt">What the agent asked.</param>
     /// <param name="clipboard">Where a paste reads from.</param>
     /// <param name="clock">What time it is, for the clipboard.</param>
     internal SaveValueViewModel(SavePrompt prompt, Clipboard.IAppClipboard clipboard, TimeProvider clock)
+        : base(prompt?.Identity)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
@@ -31,6 +33,7 @@ internal sealed partial class SaveValueViewModel : PromptViewModel, IDisposable
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
         Where = prompt.Where;
+        _itemTitle = prompt.ItemTitle;
         Field = prompt.Field;
         Replaces = prompt.Replaces;
         Reason = prompt.Reason;
@@ -87,11 +90,23 @@ internal sealed partial class SaveValueViewModel : PromptViewModel, IDisposable
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
 
-    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
-    internal string Attribution { get; } = ApprovalViewModel.AttributionText;
+    /// <summary>The item the value goes in, as the card names it: its vault, then its title.</summary>
+    internal string Item => Vault is { } vault ? $"{vault} \u203a {_itemTitle}" : _itemTitle;
+
+    /// <summary>That the agent never gets what the person types.</summary>
+    internal string NeverReceives => $"{Agent} never receives what you type here.";
+
+    /// <summary>Whose words the quote is.</summary>
+    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+
+    /// <summary>The agent's words, quoted.</summary>
+    internal string Quoted => ApprovalViewModel.Quote(Reason);
+
+    /// <summary>The tool the request came through.</summary>
+    internal string Tool { get; } = "keypaste.request_save";
 
     /// <inheritdoc/>
-    protected override string Asks => $"{Client} asks you to save a value at {Where}";
+    protected override string Asks => $"Save a new value for {Field}, in {_itemTitle}?";
 
     /// <inheritdoc/>
     protected override bool CanAllow => Value.HasValue && (!Replaces || ConfirmsReplace);

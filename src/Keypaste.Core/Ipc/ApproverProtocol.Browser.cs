@@ -4,16 +4,18 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 
-// The four requests a browser's attachment may make, and their replies (D-0627). Typed as every other request is: the relay
-// sends the owner only what each extension message asks, never the extension's JSON.
+// The requests a browser's attachment may make, and their replies. Typed as every other request is: the relay sends the owner
+// only what each extension message asks, never the extension's JSON.
 public static partial class ApproverProtocol
 {
     internal const string BrowserPairKind = "browser-pair";
     internal const string BrowserCheckKind = "browser-check";
-    internal const string BrowserFillKind = "browser-fill";
+    internal const string BrowserListKind = "browser-list";
+    internal const string BrowserReleaseKind = "browser-release";
+    internal const string BrowserShowKind = "browser-show";
     internal const string BrowserLockKind = "browser-lock";
 
-    /// <summary>The kind of the reply to a pairing, a pairing check and a lock, which carry nothing of an item.</summary>
+    /// <summary>The kind of the reply to a pairing, a pairing check, a lock and a show, which carry nothing of an item.</summary>
     internal const string BrowserReplyKind = "browser";
 
     /// <summary>Encodes a browser's request to pair.</summary>
@@ -38,15 +40,37 @@ public static partial class ApproverProtocol
         return JsonSerializer.SerializeToUtf8Bytes(new BrowserCheckRequestFrame(request), Wire.BrowserCheckRequestFrame);
     }
 
-    /// <summary>Encodes a browser's request for a page's logins.</summary>
+    /// <summary>Encodes a browser's request for the names of a page's logins.</summary>
     /// <param name="request">The pairing, its key and the page, and the attachment it is made under.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    public static byte[] Encode(BrowserFillRequest request)
+    public static byte[] Encode(BrowserListRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return JsonSerializer.SerializeToUtf8Bytes(new BrowserFillRequestFrame(request), Wire.BrowserFillRequestFrame);
+        return JsonSerializer.SerializeToUtf8Bytes(new BrowserListRequestFrame(request), Wire.BrowserListRequestFrame);
+    }
+
+    /// <summary>Encodes a browser's request to fill the login the person picked.</summary>
+    /// <param name="request">The pairing, its key, the page and the item, and the attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(BrowserReleaseRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new BrowserReleaseRequestFrame(request), Wire.BrowserReleaseRequestFrame);
+    }
+
+    /// <summary>Encodes a browser's request to bring keypaste forward.</summary>
+    /// <param name="request">What to show, and the attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(BrowserShowRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new BrowserShowRequestFrame(request), Wire.BrowserShowRequestFrame);
     }
 
     /// <summary>Encodes a browser's request to lock now.</summary>
@@ -60,7 +84,7 @@ public static partial class ApproverProtocol
         return WriteAttached(BrowserLockKind, request.Vault, request.Session);
     }
 
-    /// <summary>Encodes the answer to a pairing, a pairing check or a lock.</summary>
+    /// <summary>Encodes the answer to a pairing, a pairing check, a lock or a show.</summary>
     /// <param name="reply">The answer.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
@@ -71,8 +95,19 @@ public static partial class ApproverProtocol
         return JsonSerializer.SerializeToUtf8Bytes(new BrowserReplyFrame(reply), Wire.BrowserReplyFrame);
     }
 
-    /// <summary>Encodes the answer to a fill.</summary>
-    /// <param name="reply">The logins released, or why none were.</param>
+    /// <summary>Encodes the answer to a list.</summary>
+    /// <param name="reply">The logins' names, or why none.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(BrowserListReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new BrowserListReplyFrame(reply), Wire.BrowserListReplyFrame);
+    }
+
+    /// <summary>Encodes the answer to a release.</summary>
+    /// <param name="reply">The login released, or why none was.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     public static byte[] Encode(BrowserFillReply reply)
@@ -82,7 +117,7 @@ public static partial class ApproverProtocol
         return JsonSerializer.SerializeToUtf8Bytes(new BrowserFillReplyFrame(reply), Wire.BrowserFillReplyFrame);
     }
 
-    /// <summary>Whether a fill's answer fits one frame, so a release that would not is refused before anything leaves.</summary>
+    /// <summary>Whether a release's answer fits one frame, so a release that would not is refused before anything leaves.</summary>
     /// <param name="reply">The answer.</param>
     /// <returns>True when it fits.</returns>
     internal static bool Fits(BrowserFillReply reply) => Encode(reply).Length <= MessageFramer.MaximumPayloadBytes;
@@ -116,31 +151,68 @@ public static partial class ApproverProtocol
         return request is not null;
     }
 
-    /// <summary>Decodes a browser's request for a page's logins.</summary>
+    /// <summary>Decodes a browser's request for the names of a page's logins.</summary>
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="request">The decoded request.</param>
-    /// <returns><see langword="true"/> when the frame was a well-formed fill request.</returns>
-    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserFillRequest? request)
+    /// <returns><see langword="true"/> when the frame was a well-formed list request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserListRequest? request)
     {
         request = null;
 
-        if (!TryAttached(frame, BrowserFillKind, out var vault, out var session, out var root)
+        if (!TryAttached(frame, BrowserListKind, out var vault, out var session, out var root)
             || !TryBrowserField(root, "pairing", out var pairing)
             || !TryBrowserField(root, "identification_key", out var key)
             || !TryString(root, "url", out var url)
-            || (root.TryGetProperty("submit_url", out _) && !TryString(root, "submit_url", out _))
-            || (root.TryGetProperty("person_asked", out var asked) && asked.ValueKind is not (JsonValueKind.True or JsonValueKind.False)))
+            || !TrySubmitUrl(root))
         {
             return false;
         }
 
-        request = new BrowserFillRequest(pairing, key, url)
+        request = new BrowserListRequest(pairing, key, url) { SubmitUrl = Optional(root, "submit_url"), Vault = vault, Session = session };
+        return true;
+    }
+
+    /// <summary>Decodes a browser's request to fill the login the person picked.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed release request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserReleaseRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, BrowserReleaseKind, out var vault, out var session, out var root)
+            || !TryBrowserField(root, "pairing", out var pairing)
+            || !TryBrowserField(root, "identification_key", out var key)
+            || !TryString(root, "url", out var url)
+            || !TryBrowserField(root, "uuid", out var uuid)
+            || !TrySubmitUrl(root))
         {
-            SubmitUrl = Optional(root, "submit_url"),
-            PersonAsked = asked.ValueKind == JsonValueKind.True,
-            Vault = vault,
-            Session = session,
-        };
+            return false;
+        }
+
+        request = new BrowserReleaseRequest(pairing, key, url, uuid) { SubmitUrl = Optional(root, "submit_url"), Vault = vault, Session = session };
+        return true;
+    }
+
+    /// <summary>Decodes a browser's request to bring keypaste forward.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed show request naming something this version shows.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserShowRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, BrowserShowKind, out var vault, out var session, out var root)
+            || !TryInteger(root, "what", out var what)
+            || !Enum.IsDefined((BrowserShow)what)
+            || !TryString(root, "vault_name", out var vaultName)
+            || vaultName.Length > AttachClient.MaximumLength
+            || !TryString(root, "url", out var url))
+        {
+            return false;
+        }
+
+        request = new BrowserShowRequest((BrowserShow)what) { VaultName = vaultName, Url = url, Vault = vault, Session = session };
         return true;
     }
 
@@ -157,7 +229,7 @@ public static partial class ApproverProtocol
         return request is not null;
     }
 
-    /// <summary>Decodes the answer to a pairing, a pairing check or a lock.</summary>
+    /// <summary>Decodes the answer to a pairing, a pairing check, a lock or a show.</summary>
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="reply">The decoded reply.</param>
     /// <returns><see langword="true"/> when the frame was a well-formed reply naming an outcome this version knows.</returns>
@@ -187,10 +259,61 @@ public static partial class ApproverProtocol
         }
     }
 
-    /// <summary>Decodes the answer to a fill.</summary>
+    /// <summary>Decodes the answer to a list.</summary>
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="reply">The decoded reply.</param>
-    /// <returns><see langword="true"/> when the frame was a well-formed fill reply, carrying logins only when it says it was done.</returns>
+    /// <returns><see langword="true"/> when the frame was a well-formed list reply, carrying names only when it says it was done.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserListReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, BrowserListKind)
+                || !TryOutcome(root, out var outcome)
+                || !TryString(root, "reason", out var reason)
+                || !TryString(root, "site", out var site)
+                || !TryString(root, "warning", out var warning)
+                || !TryStrings(root, "locked_vaults", out var locked)
+                || !root.TryGetProperty("names", out var rows)
+                || rows.ValueKind != JsonValueKind.Array
+                || (outcome != BrowserOutcome.Done && rows.GetArrayLength() > 0))
+            {
+                return false;
+            }
+
+            var names = new List<BrowserLoginName>(rows.GetArrayLength());
+
+            foreach (var row in rows.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object
+                    || !TryString(row, "uuid", out var uuid)
+                    || !TryString(row, "title", out var title)
+                    || !TryString(row, "username", out var username)
+                    || !TryString(row, "vault", out var vaultName))
+                {
+                    return false;
+                }
+
+                names.Add(new BrowserLoginName(uuid, title, username) { Vault = vaultName });
+            }
+
+            reply = new BrowserListReply(outcome, reason) { Site = site, Warning = warning, LockedVaults = locked, Names = names };
+            return true;
+        }
+    }
+
+    /// <summary>Decodes the answer to a release.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed release reply, carrying at most one login and only when it says it was done.</returns>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out BrowserFillReply? reply)
     {
         reply = null;
@@ -204,11 +327,12 @@ public static partial class ApproverProtocol
         {
             var root = document.RootElement;
 
-            if (!IsKind(root, BrowserFillKind)
+            if (!IsKind(root, BrowserReleaseKind)
                 || !TryOutcome(root, out var outcome)
                 || !TryString(root, "reason", out var reason)
                 || !root.TryGetProperty("logins", out var rows)
                 || rows.ValueKind != JsonValueKind.Array
+                || rows.GetArrayLength() > 1
                 || (outcome != BrowserOutcome.Done && rows.GetArrayLength() > 0))
             {
                 return false;
@@ -234,6 +358,10 @@ public static partial class ApproverProtocol
             return true;
         }
     }
+
+    /// <summary>A form's URL, which a request may leave out or send as null.</summary>
+    private static bool TrySubmitUrl(JsonElement root) =>
+        !root.TryGetProperty("submit_url", out var submit) || submit.ValueKind == JsonValueKind.Null || TryString(root, "submit_url", out _);
 
     /// <summary>A pairing's id or a key: a string of one to <see cref="AttachClient.MaximumLength"/> characters.</summary>
     private static bool TryBrowserField(JsonElement root, string name, [NotNullWhen(true)] out string? value) =>

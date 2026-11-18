@@ -18,9 +18,13 @@ namespace Keypaste.App.ViewModels;
 /// that brings it back from another window. Denying needs no delay.
 /// </para>
 /// <para>
-/// Where a prompt offers them, Always allow and Always block answer nothing by themselves: each turns the prompt to a
-/// question confirming what keypaste will remember, whose confirm button arms a further <see cref="ArmingDelay"/> later,
-/// and Back returns to the choices. Deny answers at every step.
+/// Where a prompt offers it, Always allow answers nothing by itself: it turns the prompt to a question confirming what
+/// keypaste will remember, whose confirm button arms a further <see cref="ArmingDelay"/> later, and Cancel returns to the
+/// choices. Deny answers at every step but that one, where Cancel is the way back.
+/// </para>
+/// <para>
+/// A claim card answers Return with its primary, Allow once or the confirmation, only once that is armed, and Escape with
+/// Deny or, while confirming, Cancel (DESIGN § Interaction, rule 8). A destructive primary takes no Return.
 /// </para>
 /// </remarks>
 internal abstract partial class PromptViewModel : ObservableObject
@@ -32,16 +36,83 @@ internal abstract partial class PromptViewModel : ObservableObject
     private int _arming;
 
     protected PromptViewModel()
+        : this(null)
     {
+    }
+
+    /// <summary>A prompt whose card names <paramref name="requester"/> on its requester line.</summary>
+    /// <param name="requester">Who is asking, as Core checked it, or null for a prompt with no requester line.</param>
+    protected PromptViewModel(RequesterIdentity? requester)
+    {
+        Requester = requester;
         AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && CanAllow && !IsAnswered && Confirming is null);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
         AlwaysAllowCommand = new RelayCommand(
             () => Confirm(ApprovalAnswer.AlwaysAllowed),
             () => IsArmed && CanAllow && OffersAlways && !IsAnswered && Confirming is null);
-        AlwaysBlockCommand = new RelayCommand(() => Confirm(ApprovalAnswer.AlwaysBlocked), () => OffersAlwaysBlock && !IsAnswered && Confirming is null);
         ConfirmAlwaysCommand = new RelayCommand(() => Decide(Confirming!.Value), () => IsArmed && Confirming is not null && !IsAnswered);
         BackCommand = new RelayCommand(() => Confirming = null, () => Confirming is not null && !IsAnswered);
     }
+
+    /// <summary>Who is asking, as Core checked it with the system, or null for a prompt with no requester line.</summary>
+    internal RequesterIdentity? Requester { get; }
+
+    /// <summary>The agent the requester line names.</summary>
+    internal string RequesterAgent => Requester?.Agent ?? string.Empty;
+
+    /// <summary>
+    /// The agent as the question and the card's sentences name it, cut to <see cref="AgentLength"/> characters: an agent names
+    /// itself, so its name may not wrap a line and move the buttons (THREATS.md T-2). The requester line trims the whole name.
+    /// </summary>
+    internal string Agent => RequesterAgent.Length > AgentLength ? string.Concat(RequesterAgent.AsSpan(0, AgentLength - 1), "…") : RequesterAgent;
+
+    /// <summary>The longest agent name a question or sentence on the card holds.</summary>
+    internal const int AgentLength = 16;
+
+    /// <summary>The app the agent runs in, with its separator, when keypaste verified it; otherwise empty.</summary>
+    internal string RequesterApp => Requester?.App is { } app ? $" \u00b7 {app}" : string.Empty;
+
+    /// <summary>Whether keypaste checked who is asking.</summary>
+    internal bool IsVerified => Requester?.Verified == true;
+
+    /// <summary>Whether the requester line says it could not check who is asking.</summary>
+    internal bool IsNotVerified => Requester is { Verified: false };
+
+    /// <summary>What pointing at Verified or Not verified says.</summary>
+    internal string VerificationExplained => Requester?.Explanation ?? string.Empty;
+
+    /// <summary>The program on the connection and its parent, for Details, or that it was not read.</summary>
+    internal string Process => Requester?.Process ?? "not read";
+
+    /// <summary>Whether Return answers with the primary: a claim card's allow or confirmation, never a destructive one.</summary>
+    internal virtual bool AnswersReturn => Requester is not null;
+
+    /// <summary>Return: presses the primary, Allow once or the confirmation, when it is armed; anything else does nothing. Called on the UI thread.</summary>
+    internal void Return()
+    {
+        var primary = Confirming is null ? AllowOnceCommand : ConfirmAlwaysCommand;
+
+        if (AnswersReturn && primary.CanExecute(null))
+        {
+            primary.Execute(null);
+        }
+    }
+
+    /// <summary>Escape: Cancel while confirming an always, otherwise Deny. Called on the UI thread.</summary>
+    internal void Escape()
+    {
+        if (Confirming is null)
+        {
+            DenyCommand.Execute(null);
+        }
+        else
+        {
+            BackCommand.Execute(null);
+        }
+    }
+
+    /// <summary>An item as a card names it: its title, and the vault it is in when one is named.</summary>
+    protected string InVault(string title) => Vault is { } vault ? $"{title} \u00b7 {vault}" : title;
 
     /// <summary>Raised when a step of the prompt disarmed its allows, so whatever shows the prompt arms them again <see cref="ArmingDelay"/> later.</summary>
     internal event EventHandler? Disarmed;
@@ -54,9 +125,6 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>Asks the person to confirm that this agent always gets what this request asks for.</summary>
     internal RelayCommand AlwaysAllowCommand { get; }
 
-    /// <summary>Asks the person to confirm that this agent is always refused what this request asks for.</summary>
-    internal RelayCommand AlwaysBlockCommand { get; }
-
     /// <summary>Answers with the always the person is confirming.</summary>
     internal RelayCommand ConfirmAlwaysCommand { get; }
 
@@ -66,12 +134,9 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>Whether the prompt offers Always allow.</summary>
     internal virtual bool OffersAlways => false;
 
-    /// <summary>Whether the prompt offers Always block.</summary>
-    internal virtual bool OffersAlwaysBlock => false;
-
     /// <summary>The always the person is confirming, or null while the prompt shows its choices.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsConfirming), nameof(IsChoosing), nameof(ShowsAlwaysAllow), nameof(ShowsAlwaysBlock), nameof(AlwaysCaption), nameof(ConfirmLabel))]
+    [NotifyPropertyChangedFor(nameof(IsConfirming), nameof(IsChoosing), nameof(ShowsAlwaysAllow), nameof(ConfirmText))]
     internal partial ApprovalAnswer? Confirming { get; private set; }
 
     partial void OnConfirmingChanged(ApprovalAnswer? value) => Refresh();
@@ -85,26 +150,25 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>Whether Always allow is on the prompt now.</summary>
     internal bool ShowsAlwaysAllow => IsChoosing && OffersAlways;
 
-    /// <summary>Whether Always block is on the prompt now.</summary>
-    internal bool ShowsAlwaysBlock => IsChoosing && OffersAlwaysBlock;
+    /// <summary>What the card says under the question confirming Always allow, or nothing while it shows its choices.</summary>
+    internal string ConfirmText => Confirming is null ? string.Empty : AlwaysKept;
 
-    /// <summary>What is said above the buttons: what an always keeps, or the question confirming one.</summary>
-    internal string AlwaysCaption => Confirming is { } always ? Confirmation(always) : Choices;
+    /// <summary>What Always allow keeps, said under its confirmation.</summary>
+    internal const string AlwaysKept = "keypaste won't ask again for this key. Change it in Settings \u203a Agents.";
 
-    /// <summary>What the confirm button says.</summary>
-    internal string ConfirmLabel => Confirming == ApprovalAnswer.AlwaysBlocked ? "Always block" : "Always allow";
+    /// <summary>What pointing at Always allow says.</summary>
+    internal virtual string AlwaysTip => string.Empty;
 
-    /// <summary>The question confirming an always.</summary>
-    /// <param name="always">Always allow or Always block.</param>
-    /// <returns>The question.</returns>
-    protected virtual string Confirmation(ApprovalAnswer always) => string.Empty;
-
-    /// <summary>What is said above the choices, or nothing.</summary>
-    protected virtual string Choices => string.Empty;
+    /// <summary>Why the card offers no Always allow, for Details, or nothing when it offers one.</summary>
+    internal virtual string NoAlways => string.Empty;
 
     /// <summary>How long is left to answer, as <c>m:ss</c>.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeniesIn))]
     internal partial string Countdown { get; private set; } = string.Empty;
+
+    /// <summary>The card's quiet footer line: how long until the prompt denies by itself.</summary>
+    internal string DeniesIn => $"Denies in {Countdown}";
 
     /// <summary>The person's answer, or a denial for every way the prompt went away without one.</summary>
     internal Task<ApprovalAnswer> Answer => _answer.Task;
@@ -140,6 +204,9 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>What the prompt asks, in the words of its heading, for a screen reader.</summary>
     protected abstract string Asks { get; }
 
+    /// <summary>The vault the request is for, which the card names beside its item, or null; set before the prompt shows.</summary>
+    internal string? Vault { get; set; }
+
     /// <summary>What a screen reader is told once as the prompt opens: what it asks and how long is left, which never ticks.</summary>
     [ObservableProperty]
     internal partial string Opening { get; private set; } = string.Empty;
@@ -166,7 +233,14 @@ internal abstract partial class PromptViewModel : ObservableObject
 
         if (Opening.Length == 0)
         {
-            Opening = $"{Asks}. {TimeLimit(seconds)} to answer.";
+            var limit = TimeLimit(seconds);
+            Opening = (Asks.EndsWith('?'), Vault) switch
+            {
+                (true, { } vault) => $"{Asks} In {vault}. {limit} to answer.",
+                (true, null) => $"{Asks} {limit} to answer.",
+                (false, { } vault) => $"{Asks}, in {vault}. {limit} to answer.",
+                _ => $"{Asks}. {limit} to answer.",
+            };
         }
 
         Countdown = string.Create(CultureInfo.InvariantCulture, $"{seconds / 60}:{seconds % 60:00}");
@@ -206,7 +280,6 @@ internal abstract partial class PromptViewModel : ObservableObject
         AllowOnceCommand.NotifyCanExecuteChanged();
         DenyCommand.NotifyCanExecuteChanged();
         AlwaysAllowCommand.NotifyCanExecuteChanged();
-        AlwaysBlockCommand.NotifyCanExecuteChanged();
         ConfirmAlwaysCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged();
         OnAllowsChanged();

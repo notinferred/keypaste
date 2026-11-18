@@ -3,9 +3,10 @@
         xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
-    Fields and choices. A focused field gets a 1px amber border and a 3px amber glow. Classes:
+    Fields and choices. A field sits on the surface with the control edge round it; focused, its border is the accent's
+    ring with a 3px glow of it outside. Classes:
       TextBox.search       28px titlebar/list search field
-      TextBox.mono         Fragment Mono for keys, values and paths
+      TextBox.mono         the system's monospace for keys, values and paths
       AutoCompleteBox.mono the same for a field that suggests, its suggestions included
       Border.segmented     the track around a segmented control; put RadioButton.segment (or
                            ToggleButton.segment) inside a horizontal StackPanel in it
@@ -101,12 +102,13 @@
   <Style Selector="ToggleSwitch:pointerover /template/ Ellipse#Knob">
     <Setter Property="Fill" Value="{DynamicResource KpTextSecondary}" />
   </Style>
+  <!-- On, a switch takes the accent with a white knob, as macOS draws it. -->
   <Style Selector="ToggleSwitch:checked /template/ Border#Track">
-    <Setter Property="Background" Value="{DynamicResource KpTextPrimary}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpAccent}" />
   </Style>
   <Style Selector="ToggleSwitch:checked /template/ Ellipse#Knob">
-    <Setter Property="Fill" Value="{DynamicResource KpBgApp}" />
+    <Setter Property="Fill" Value="{DynamicResource KpOnAccent}" />
   </Style>
   <Style Selector="ToggleSwitch:focus-visible /template/ Border#Track">
     <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
@@ -214,23 +216,18 @@
     <Setter Property="Opacity" Value="0.5" />
   </Style>
 
-  <!-- Segmented control -->
+  <!-- Segmented control, as macOS draws one: a sunken track, and the chosen segment raised on it with a soft shadow. -->
   <Style Selector="Border.segmented">
-    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusRow}" />
     <Setter Property="Padding" Value="2" />
     <Setter Property="HorizontalAlignment" Value="Left" />
-  </Style>
-  <Style Selector="Border.segmented.inset">
-    <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
   </Style>
 
   <Style Selector="RadioButton.segment, ToggleButton.segment">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="Medium" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Padding" Value="12,2" />
     <Setter Property="MinHeight" Value="0" />
@@ -255,8 +252,12 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
   <Style Selector="RadioButton.segment:checked, ToggleButton.segment:checked">
-    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgRaised}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="RadioButton.segment:checked /template/ Border#Pill, ToggleButton.segment:checked /template/ Border#Pill">
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowControl}" />
   </Style>
   <Style Selector="RadioButton.segment:focus-visible /template/ Border#Pill, ToggleButton.segment:focus-visible /template/ Border#Pill">
     <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
@@ -266,10 +267,8 @@
   </Style>
 
   <Style Selector="ListBox.segmented">
-    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusRow}" />
     <Setter Property="Padding" Value="2" />
     <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />

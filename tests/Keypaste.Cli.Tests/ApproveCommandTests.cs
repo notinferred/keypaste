@@ -87,16 +87,15 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.Contains("keypaste clients", help.Out, StringComparison.Ordinal);
     }
 
-    /// <summary>Pairing is armed only by the person who starts it, with a name a pairing can have (D-0634).</summary>
+    /// <summary>Nothing arms pairing any more: a browser's Connect brings the confirmation, so the option is gone.</summary>
     [Fact]
-    public void PairBrowser_TakesAName_AndRefusesOneNoPairingCanHave()
+    public void PairBrowser_IsNoOption()
     {
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--pair-browser", "work/laptop", "--vault", _harness.VaultPath));
-        Assert.Contains("--pair-browser: the name cannot contain '/'", _harness.Err, StringComparison.Ordinal);
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--pair-browser", "laptop", "--vault", _harness.VaultPath));
 
         using var help = new CliHarness();
         help.Run("approve", "--help");
-        Assert.Contains("--pair-browser <name>", help.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("--pair-browser", help.Out, StringComparison.Ordinal);
     }
 
     /// <summary>

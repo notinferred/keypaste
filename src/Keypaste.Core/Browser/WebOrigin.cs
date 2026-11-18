@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace Keypaste.Core.Browser;
 
-/// <summary>A page's, a form's or an item's origin as browser fill compares it: its scheme, its host and its port (D-0617, D-0618).</summary>
+/// <summary>A page's, a form's or an item's origin as browser fill compares it: its scheme, its host and its port.</summary>
 /// <remarks>
 /// Only an absolute <c>http</c> or <c>https</c> URL has one. Its host is ASCII, in lowercase: a domain name in A-labels, an IPv4
 /// address in dotted decimal, a bracketed IPv6 address or <c>localhost</c>. A URL naming a user before its host, a host that is
@@ -45,7 +45,7 @@ public sealed record WebOrigin
     internal bool IsExactHost { get; }
 
     /// <summary>Whether the host is a single label such as <c>nas</c>, which anyone on the network can answer to.</summary>
-    internal bool IsSingleLabel { get; }
+    public bool IsSingleLabel { get; }
 
     /// <summary>The origin as <c>scheme://host:port</c>, with no path, query or fragment.</summary>
     /// <returns>The origin.</returns>
@@ -117,9 +117,14 @@ public sealed record WebOrigin
         return true;
     }
 
-    /// <summary>Reads an item's web address, in which a missing scheme means <c>https</c>, as the item pane opens it (D-0378).</summary>
-    internal static bool TryReadItem(string address, [NotNullWhen(true)] out WebOrigin? origin)
+    /// <summary>Reads an item's web address, in which a missing scheme means <c>https</c>, as the item pane opens it.</summary>
+    /// <param name="address">The item's web address.</param>
+    /// <param name="origin">Its origin, or null.</param>
+    /// <returns><see langword="true"/> when it has one.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="address"/> is null.</exception>
+    public static bool TryReadItem(string address, [NotNullWhen(true)] out WebOrigin? origin)
     {
+        ArgumentNullException.ThrowIfNull(address);
         origin = null;
 
         if (!address.Contains("://", StringComparison.Ordinal))

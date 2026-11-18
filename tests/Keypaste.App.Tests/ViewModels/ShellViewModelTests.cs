@@ -47,28 +47,84 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_sidebar_lists_the_four_places_with_the_group_tree_and_the_projects_beneath_items()
+    public void The_rail_holds_the_four_places_and_access_and_the_sidebar_the_vaults_places()
     {
         using var shell = Shell();
 
-        Assert.Equal(["Items", "Agents"], shell.MainNav.Select(item => item.Title));
-        Assert.Equal(["Trash", "Settings"], shell.FooterNav.Select(item => item.Title));
+        Assert.Equal(["Items", "Agents", "Security", "Access, later", "Settings"], shell.RailPlaces.Select(item => item.Title));
+        Assert.True(shell.RailPlaces[3].IsLater);
         Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
         Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
-        Assert.Equal(["Items", "Groups", "Work", "env", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
+        Assert.False(shell.ShowsAccounts);
+        Assert.Equal(["Favorites", "All items 4", "Logins 4", "Environments 1", "Trash", "Groups"], Titles(shell));
+    }
+
+    [Fact]
+    public void Each_place_lists_its_kind_of_item_and_names_its_vault()
+    {
+        using var shell = Shell();
+
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.Logins);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("Logins", entries.ListTitle);
+        Assert.Equal("test", entries.ListSubtitle);
+        Assert.Equal(4, entries.Rows.Count);
+        Assert.Equal(shell.Place(ItemPlace.Logins), shell.SelectedSidebarRow);
+
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.Trash);
+        Assert.IsType<TrashViewModel>(shell.Content);
+        Assert.False(shell.HasBack);
+        Assert.Equal(shell.Place(ItemPlace.Trash), shell.SelectedSidebarRow);
+
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.Environments);
+        Assert.IsType<EnvSetsViewModel>(shell.Content);
+        Assert.False(shell.HasBack);
+        Assert.Contains(shell.SidebarRows, row => row is ProjectRow { Name: "billing" });
+    }
+
+    [Fact]
+    public void The_star_tags_an_item_favorite_and_Favorites_lists_and_counts_it()
+    {
+        using var shell = Shell();
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "github");
+        Assert.False(entries.Detail!.IsFavorite);
+        Assert.Equal("Add to Favorites", entries.Detail.FavoriteLabel);
+
+        entries.Detail.ToggleFavoriteCommand.Execute(null);
+
+        Assert.True(entries.Detail.IsFavorite);
+        Assert.Contains(ItemPlaces.FavoriteTag, _session.Unlocked!.Tags(new EntryName("Work", "github"))!);
+        var favorites = shell.SidebarRows.OfType<PlaceRow>().Single(row => row.IsTop && row.Place == ItemPlace.Favorites);
+        Assert.Equal("1", favorites.Count);
+
+        shell.SelectedSidebarRow = favorites;
+        var listed = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("Favorites", listed.ListTitle);
+        Assert.Equal(["github"], listed.Rows.Select(row => row.Title));
+
+        // Taken out, it stays listed while open, as an edit keeps its item, and Favorites chosen again lists nothing.
+        listed.Selected = listed.Rows.Single();
+        listed.Detail!.ToggleFavoriteCommand.Execute(null);
+        favorites = shell.SidebarRows.OfType<PlaceRow>().Single(row => row.IsTop && row.Place == ItemPlace.Favorites);
+        Assert.Equal(string.Empty, favorites.Count);
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.All);
+        shell.SelectedSidebarRow = favorites;
+        Assert.Empty(Assert.IsType<EntriesViewModel>(shell.Content).Rows);
     }
 
     [Fact]
     public void A_group_in_the_tree_folds_and_choosing_it_shows_its_items()
     {
         using var shell = Shell();
-        var env = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env");
+        Assert.DoesNotContain(shell.SidebarRows, row => row is GroupRow);
+        var env = shell.GroupRowAt("env");
 
         Assert.True(env.HasChildren);
         Assert.False(env.IsExpanded);
 
         shell.FoldCommand.Press(env);
-        Assert.Equal(["Items", "Groups", "Work", "env", "billing", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
+        Assert.Equal(["Groups", "Work", "env", "billing"], Titles(shell).SkipWhile(title => title != "Groups"));
 
         shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env/billing");
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -81,11 +137,12 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal("env", entries.SelectedGroup?.Path);
         Assert.Equal("env", Assert.IsType<GroupRow>(shell.SelectedSidebarRow).Path);
 
-        // Items folds the whole tree and shows every item.
-        shell.Fold(shell.MainNav[0], open: false);
-        Assert.Equal(["Items", "Groups", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
-        Assert.True(entries.SelectedGroup?.IsEverything);
-        Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
+        // Folding Groups folds the whole tree and shows every item.
+        var groups = shell.SidebarRows.OfType<GroupsRow>().Single();
+        shell.Fold(groups, open: false);
+        Assert.Equal("Groups", Titles(shell).Last());
+        Assert.True(Assert.IsType<EntriesViewModel>(shell.Content).SelectedGroup?.IsEverything);
+        Assert.IsType<GroupsRow>(shell.SelectedSidebarRow);
     }
 
     /// <summary>A group deleted while the sidebar shows it leaves the sidebar's tree at once.</summary>
@@ -94,21 +151,23 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "Work");
+        shell.SelectedSidebarRow = shell.GroupRowAt("Work");
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.BeginDeleteGroupCommand.Press();
 
         Assert.Null(entries.Error);
-        Assert.Equal(["Items", "Groups", "env", "Projects", "billing", "Recommendations", "Agents"], Titles(shell));
-        Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
+        Assert.Equal(["Groups", "env"], Titles(shell).SkipWhile(title => title != "Groups"));
+        Assert.Equal(shell.Place(ItemPlace.All), shell.SelectedSidebarRow);
     }
 
     private static IEnumerable<string> Titles(ShellViewModel shell) =>
         shell.SidebarRows.Select(row => row switch
         {
-            NavItem item => item.Title,
+            PlaceRow place => place.Count.Length > 0 ? $"{place.Title} {place.Count}" : place.Title,
+            AccountRow account => account.Title,
+            VaultRow vault => vault.Title,
+            GroupsRow groups => groups.Title,
             GroupRow group => group.Title,
-            SidebarHeading heading => heading.Title,
             ProjectRow project => project.Name,
             _ => "?",
         });
@@ -119,15 +178,16 @@ public sealed class ShellViewModelTests : IDisposable
         using var shell = Shell();
 
         Assert.True(shell.GoTo(3));
-        Assert.IsType<TrashViewModel>(shell.Content);
-        Assert.Equal("Trash", shell.SelectedFooter?.Title);
+        Assert.IsType<RecommendationsViewModel>(shell.Content);
+        Assert.Equal("Security", shell.SelectedRailPlace?.Title);
+        Assert.Null(shell.SelectedSidebarRow);
 
         Assert.True(shell.GoTo(4));
         Assert.IsType<SettingsViewModel>(shell.Content);
 
         Assert.True(shell.GoTo(2));
         Assert.IsType<AgentActivityViewModel>(shell.Content);
-        Assert.Equal("Agents", shell.SelectedMain?.Title);
+        Assert.Equal("Agents", shell.SelectedRailPlace?.Title);
 
         Assert.False(shell.GoTo(5));
         Assert.IsType<AgentActivityViewModel>(shell.Content);
@@ -139,7 +199,7 @@ public sealed class ShellViewModelTests : IDisposable
         using var shell = Shell();
 
         shell.Current = Destinations.Of(DestinationKind.Advanced);
-        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
         Assert.True(shell.HasBack);
         Assert.Equal("Settings", shell.BackTitle);
 
@@ -148,7 +208,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.False(shell.HasBack);
 
         shell.Current = Destinations.Of(DestinationKind.Log);
-        Assert.Equal("Agents", shell.SelectedMain?.Title);
+        Assert.Equal("Agents", shell.SelectedRailPlace?.Title);
         Assert.Equal("Agents", shell.BackTitle);
         Assert.Equal("Activity", shell.CurrentTitle);
         Assert.IsType<LogViewModel>(shell.Content);
@@ -168,7 +228,7 @@ public sealed class ShellViewModelTests : IDisposable
 
         Assert.IsType<AdvancedViewModel>(shell.Content);
         Assert.Equal("Advanced", shell.CurrentTitle);
-        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
         Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
         Assert.Equal(0, shell.Current.Shortcut);
 
@@ -199,7 +259,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.IsType<AdvancedViewModel>(shell.Content).OpenScopedTokensCommand.Press();
         Assert.IsType<ScopedTokensViewModel>(shell.Content);
         Assert.Equal("Back to Advanced", $"Back to {shell.BackTitle}");
-        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
 
         shell.BackCommand.Press();
         Assert.IsType<AdvancedViewModel>(shell.Content).OpenDiagnosticsCommand.Press();
@@ -223,7 +283,7 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        Assert.Equal("4", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).Count);
+        Assert.Equal("4", shell.Place(ItemPlace.All).Count);
         Assert.Equal([new ProjectRow("billing", 2)], shell.Projects);
     }
 
@@ -262,7 +322,7 @@ public sealed class ShellViewModelTests : IDisposable
 
         Assert.Equal([new ProjectRow("acme", 1), new ProjectRow("shop", 1)], shell.Projects);
 
-        shell.SelectedSidebarRow = shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "acme");
+        shell.SelectedSidebarRow = shell.ProjectRowNamed("acme");
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
 
         Assert.Equal(["acme", "shop"], env.Projects);
@@ -272,21 +332,38 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Choosing_a_project_row_opens_it_and_selects_that_row_until_back()
+    public void Choosing_a_project_row_opens_it_and_selects_that_row_until_another_place()
     {
         using var shell = Shell();
 
-        shell.SelectedSidebarRow = shell.SidebarRows.OfType<ProjectRow>().Single();
+        shell.SelectedSidebarRow = shell.ProjectRowNamed("billing");
 
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
         Assert.Equal("billing", env.OpenProject?.Name);
         Assert.Equal(new ProjectRow("billing", 2), shell.SelectedSidebarRow);
-        Assert.Equal("Items", shell.BackTitle);
+        Assert.False(shell.HasBack);
 
-        shell.BackCommand.Press();
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.All);
 
         Assert.IsType<EntriesViewModel>(shell.Content);
-        Assert.Equal("Items", Assert.IsType<NavItem>(shell.SelectedSidebarRow).Title);
+        Assert.Equal(shell.Place(ItemPlace.All), shell.SelectedSidebarRow);
+        Assert.DoesNotContain(shell.SidebarRows, row => row is ProjectRow);
+    }
+
+    /// <summary>Environments opens its first project itself, and the sidebar highlights that project under the vault's Environments rather than a place.</summary>
+    [Fact]
+    public void The_project_Environments_opens_is_the_row_the_sidebar_highlights()
+    {
+        using var shell = Shell();
+
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.Environments);
+
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
+        Assert.Equal("billing", env.OpenProject?.Name);
+        Assert.Equal(new ProjectRow("billing", 2), shell.SelectedSidebarRow);
+
+        env.CloseCommand.Execute(null);
+        Assert.Equal(shell.Place(ItemPlace.Environments), shell.SelectedSidebarRow);
     }
 
     [Fact]
@@ -346,13 +423,13 @@ public sealed class ShellViewModelTests : IDisposable
     public void Without_an_authority_the_agents_row_has_a_dot_that_is_not_live()
     {
         using var shell = Shell();
-        var agents = shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
+        var agents = shell.RailPlaces.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
 
         Assert.False(shell.AgentsServing);
         Assert.True(agents.HasDot);
         Assert.False(agents.DotLive);
         Assert.Equal("not serving agents", agents.Detail);
-        Assert.False(shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).HasDot);
+        Assert.False(shell.RailPlaces.Single(item => item.Destination.Kind == DestinationKind.Entries).HasDot);
     }
 
     [Fact]

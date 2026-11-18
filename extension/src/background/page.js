@@ -6,7 +6,6 @@ const defaultSettings = {
     autoCompleteUsernames: true,
     autoFillSingleEntry: false,
     autoFillRelevantCredential: false,
-    autoRetrieveCredentials: true,
     autoSubmit: false,
     clearCredentialsTimeout: 10,
     credentialSorting: SORT_BY_GROUP_AND_TITLE,
@@ -86,37 +85,38 @@ page.clearAllLogins = function() {
     });
 };
 
-// Retrieves the credentials. Returns cached values when found.
-// Page reload or tab switch clears the cache.
-page.retrieveCredentials = async function(tab, args = []) {
-    if (!tab?.active || !tab?.id) {
-        return [];
+// The tab's own address, as the browser reports it, for a frame of the tab's origin; null for a frame of another origin.
+const pageUrlOf = function(tab, sender) {
+    const tabOrigin = originOf(tab?.url);
+    const frameOrigin = sender?.url ? originOf(sender.url) : tabOrigin;
+    return tabOrigin && frameOrigin === tabOrigin ? tab.url : null;
+};
+
+// The names of the page's logins, the site taken from the browser's tab and never from the page.
+page.listLogins = async function(tab, args = [], sender) {
+    const url = pageUrlOf(tab, sender);
+    if (!url) {
+        return { state: 'frame' };
     }
 
-    const [ url, submitUrl, force ] = args;
-    const origin = originOf(url);
-    const currentTab = tabs.getTabFromId(tab.id);
-    // Logins keypaste released for a page serve only its origin: a tab that has moved to another site asks again, even
-    // before the browser reports its new address.
-    if (currentTab?.credentials?.length > 0 && !force && origin && currentTab.credentialsOrigin === origin) {
-        return currentTab.credentials;
+    const [ submitUrl ] = args;
+    const answer = await keepass.listLogins(tab, [ url, submitUrl ]);
+    return { ...answer, site: answer.site || new URL(url).hostname };
+};
+
+// The one login the person picked in the list, for the tab's own address.
+page.fillLogin = async function(tab, args = [], sender) {
+    const url = pageUrlOf(tab, sender);
+    if (!url) {
+        return {};
     }
 
-    // Ignore duplicate requests from the same tab
-    if (page.currentRequest.url === url
-        && page.currentRequest.submitUrl === submitUrl
-        && page.currentRequest.tabId === tab.id
-        && !force) {
-        return [];
-    } else {
-        page.currentRequest.url = url;
-        page.currentRequest.submitUrl = submitUrl;
-        page.currentRequest.tabId = tab.id;
-    }
+    const [ uuid, submitUrl ] = args;
+    return await keepass.getLogin(tab, [ url, submitUrl, uuid ]);
+};
 
-    const credentials = await keepass.retrieveCredentials(tab, args);
-    tabs.updateTabValues(tab.id, { credentials: credentials, credentialsOrigin: origin });
-    return credentials;
+page.openKeypaste = async function(tab, args = []) {
+    return await keepass.openKeypaste(tab, args);
 };
 
 const originOf = function(url) {

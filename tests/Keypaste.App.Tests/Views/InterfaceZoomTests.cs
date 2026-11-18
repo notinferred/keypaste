@@ -168,7 +168,7 @@ public sealed class InterfaceZoomTests
         Assert.Equal(new Size(1440, 1040), scroller.Extent);
         Assert.Empty(ReachableControls.Problems(shell.Window));
 
-        var lockButton = shell.Window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "RailLock");
+        var lockButton = shell.Window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "LockButton");
         lockButton.BringIntoView();
         WindowInput.Drain();
         shell.Frame();
@@ -248,7 +248,7 @@ public sealed class InterfaceZoomTests
         });
         shell.Window.Width = 720 * percent / 100d;
         shell.Window.Height = 520 * percent / 100d;
-        shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "billing");
+        shell.Shell.SelectedSidebarRow = shell.Shell.ProjectRowNamed("billing");
         shell.Frame();
 
         var page = shell.Window.GetVisualDescendants().OfType<ScrollViewer>().First(scroller => scroller.Extent.Height > scroller.Viewport.Height + 24);
@@ -259,7 +259,7 @@ public sealed class InterfaceZoomTests
         shell.Frame();
 
         using var bitmap = shell.Window.CaptureRenderedFrame();
-        var (pixels, width, _) = AmberElements.Read(bitmap!);
+        var (pixels, width, _) = AccentElements.Read(bitmap!);
         var area = InWindow(strip, shell.Window);
         Assert.True(InWindow(page, shell.Window).Top >= area.Bottom - 1, $"the page starts at {InWindow(page, shell.Window)}, under the link at {area}");
         var skip = InWindow(back, shell.Window).Inflate(2);
@@ -294,10 +294,10 @@ public sealed class InterfaceZoomTests
         });
         shell.Window.Width = 720 * percent / 100d;
         shell.Window.Height = 520 * percent / 100d;
-        shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<Keypaste.App.ViewModels.ProjectRow>().Single(row => row.Name == "billing");
+        shell.Shell.SelectedSidebarRow = shell.Shell.ProjectRowNamed("billing");
         shell.Frame();
 
-        var notes = shell.Window.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible && block.Text == "same as dev").ToList();
+        var notes = shell.Window.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible && block.Text?.StartsWith("Same as ", StringComparison.Ordinal) == true).ToList();
         Assert.NotEmpty(notes);
         Assert.DoesNotContain(ReachableControls.Problems(shell.Window), problem => problem.Contains("overprints", StringComparison.Ordinal));
     });

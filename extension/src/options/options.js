@@ -24,7 +24,11 @@ const showPairing = async function() {
 
 (async () => {
     document.getElementById('connect-button').addEventListener('click', async () => {
+        const { code } = await browser.runtime.sendMessage({ action: 'begin_pairing' });
+        document.getElementById('pairing-code').textContent = code;
+        document.getElementById('pairing-check').hidden = false;
         const result = await browser.runtime.sendMessage({ action: 'associate' });
+        document.getElementById('pairing-check').hidden = true;
         document.getElementById('connect-result').hidden = result !== AssociatedAction.NOT_ASSOCIATED;
         await showPairing();
     });

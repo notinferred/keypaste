@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.Browser;
 
-/// <summary>Which item a page's request for logins matches, by registrable domain, scheme and port, and which requests get none (8.3a1, D-0617, D-0618).</summary>
+/// <summary>Which item a page's request for logins matches, by registrable domain, scheme and port, and which requests get none.</summary>
 public sealed class LoginLookupTests
 {
     [Theory]

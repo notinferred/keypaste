@@ -10,10 +10,10 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A vault's owner over a real pipe, as the browser relay reaches it: a browser's attachment names one of the three
-/// KeePassXC-Browser builds, makes only a pairing, a pairing check, a fill and a lock, and no other attachment makes those;
-/// the lock locks as <c>keypaste lock</c> does, asking nobody, and a fill releases nothing across a lock (D-0627, D-0313). A
-/// browser's attachment is told the database hash, and a fill is decided only for the pairing a check or a pairing on the same
-/// connection proved (D-0635, D-0636).
+/// KeePassXC-Browser builds, makes only a pairing, a pairing check, a list, a release, a show and a lock, and no other
+/// attachment makes those; the lock locks as <c>keypaste lock</c> does, asking nobody, and a release fills nothing across a
+/// lock. A browser's attachment is told the database hash, and a list or a release is decided only for the pairing a check or a
+/// pairing on the same connection proved.
 /// </summary>
 public sealed class SessionAuthorityBrowserTests : IDisposable
 {
@@ -25,6 +25,8 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
     private SessionLifetime? _lifetime = new("session-one");
 
     public SessionAuthorityBrowserTests() => _log = new OwnerLog(_directory);
+
+    private const string _item = "0123456789abcdef0123456789abcdef";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -69,7 +71,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
 
         var paired = await link.PairAsync(new BrowserPairRequest(Key()) { Vault = VaultPath, Session = "session-one" }, Token);
         var checkedPairing = await link.CheckAsync(new BrowserCheckRequest("firefox here", Key()) { Vault = VaultPath, Session = "session-one" }, Token);
-        var fill = await link.FillAsync(new BrowserFillRequest("firefox here", Key(), "https://github.com/login") { Vault = VaultPath, Session = "session-one" }, Token);
+        var fill = await link.ReleaseAsync(new BrowserReleaseRequest("firefox here", Key(), "https://github.com/login", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = "firefox here" }, paired);
         Assert.Equal(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = "firefox here" }, checkedPairing);
@@ -77,7 +79,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         Assert.Equal(BrowserOutcome.Done, fill.Outcome);
         Assert.Equal("hunter2", Assert.Single(fill.Logins).Password);
         Assert.Equal(3, browsers.Decided.Count);
-        Assert.Equal(["pair", "check", "fill"], browsers.Decided.Select(decided => decided.Act));
+        Assert.Equal(["pair", "check", "release"], browsers.Decided.Select(decided => decided.Act));
         Assert.All(browsers.Decided, decided => Assert.Same(BrowserIdentity.FirefoxAddOns, decided.Browser));
         Assert.Single(browsers.Decided.Select(decided => decided.ConnectionId).Distinct(StringComparer.Ordinal));
     }
@@ -97,7 +99,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
             await link.CheckAsync(new BrowserCheckRequest("pairing", Key()) { Vault = VaultPath, Session = "session-one" }, Token),
             await link.LockAsync(new BrowserLockRequest { Vault = VaultPath, Session = "session-one" }, Token),
         ];
-        var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var fill = await link.ReleaseAsync(new BrowserReleaseRequest("pairing", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.All(replies, reply => Assert.Equal(new BrowserReply(BrowserOutcome.Refused, "only a browser's connection pairs, checks a pairing, fills or locks for a browser"), reply));
         Assert.Equal(BrowserOutcome.Refused, fill?.Outcome);
@@ -137,7 +139,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
 
         var paired = await link.PairAsync(new BrowserPairRequest(Key()) { Vault = VaultPath, Session = "session-one" }, Token);
-        var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var fill = await link.ReleaseAsync(new BrowserReleaseRequest("pairing", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(new BrowserReply(BrowserOutcome.Refused, "this keypaste process does not pair browsers or fill logins in them"), paired);
         Assert.Equal(BrowserOutcome.NotPaired, fill?.Outcome);
@@ -173,14 +175,35 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await using var proved = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
         await CheckAsync(proved, "laptop");
 
-        var beforeAnyCheck = await unproved.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
-        var anotherPairing = await proved.FillAsync(new BrowserFillRequest("desktop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
-        var itsOwn = await proved.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var beforeAnyCheck = await unproved.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
+        var anotherPairing = await proved.ReleaseAsync(new BrowserReleaseRequest("desktop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
+        var itsOwn = await proved.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(BrowserOutcome.NotPaired, beforeAnyCheck?.Outcome);
         Assert.Equal(BrowserOutcome.NotPaired, anotherPairing?.Outcome);
         Assert.Equal(BrowserOutcome.Done, itsOwn?.Outcome);
         Assert.Equal(2, browsers.Decided.Count);
+    }
+
+    [Fact]
+    public async Task A_list_and_a_show_are_decided_only_once_the_connection_proved_a_pairing()
+    {
+        var browsers = new FakeBrowsers();
+        await using var owner = Owner.Start(this, browsers: browsers);
+        await using var unproved = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await using var proved = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(proved, "laptop");
+
+        var listUnproved = await unproved.ListAsync(new BrowserListRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var showUnproved = await unproved.ShowAsync(new BrowserShowRequest(BrowserShow.Open) { Vault = VaultPath, Session = "session-one" }, Token);
+        var list = await proved.ListAsync(new BrowserListRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var show = await proved.ShowAsync(new BrowserShowRequest(BrowserShow.Open) { Vault = VaultPath, Session = "session-one" }, Token);
+
+        Assert.Equal(BrowserOutcome.NotPaired, listUnproved?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, showUnproved?.Outcome);
+        Assert.Equal(BrowserOutcome.Done, list?.Outcome);
+        Assert.Equal(BrowserOutcome.Done, show?.Outcome);
+        Assert.Equal(["check", "list", "show"], browsers.Decided.Select(decided => decided.Act));
     }
 
     /// <summary>The relay attaches again before each of the extension's requests; the same build on the same connection keeps its pairing, another build does not.</summary>
@@ -191,12 +214,12 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await using var owner = Owner.Start(this, browsers: browsers);
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
         await CheckAsync(link, "laptop");
-        var fill = new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" };
+        var fill = new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" };
 
         Assert.True((await link.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, Token))?.Attached);
-        var same = await link.FillAsync(fill, Token);
+        var same = await link.ReleaseAsync(fill, Token);
         Assert.True((await link.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.EdgeAddOns.Caller }, Token))?.Attached);
-        var another = await link.FillAsync(fill, Token);
+        var another = await link.ReleaseAsync(fill, Token);
 
         Assert.Equal(BrowserOutcome.Done, same?.Outcome);
         Assert.Equal(BrowserOutcome.NotPaired, another?.Outcome);
@@ -213,17 +236,17 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await CheckAsync(link, "laptop");
         browsers.CheckOutcome = BrowserOutcome.NotPaired;
         var failed = await link.CheckAsync(new BrowserCheckRequest("laptop", Key()) { Vault = VaultPath, Session = "session-one" }, Token);
-        var afterFailure = await link.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var afterFailure = await link.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         browsers.CheckOutcome = BrowserOutcome.Done;
         await CheckAsync(link, "laptop");
         authority!.Unbind("laptop");
-        var afterRemoval = await link.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var afterRemoval = await link.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(BrowserOutcome.NotPaired, failed?.Outcome);
         Assert.Equal(BrowserOutcome.NotPaired, afterFailure?.Outcome);
         Assert.Equal(BrowserOutcome.NotPaired, afterRemoval?.Outcome);
-        Assert.DoesNotContain(browsers.Decided, decided => decided.Act == "fill");
+        Assert.DoesNotContain(browsers.Decided, decided => decided.Act == "release");
     }
 
     [Fact]
@@ -254,7 +277,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
         await CheckAsync(link, "pairing");
 
-        var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var fill = await link.ReleaseAsync(new BrowserReleaseRequest("pairing", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.NotNull(fill);
         Assert.Equal(BrowserOutcome.Locked, fill.Outcome);
@@ -275,11 +298,11 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
         await CheckAsync(link, "pairing");
 
-        var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var fill = await link.ReleaseAsync(new BrowserReleaseRequest("pairing", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.NotNull(fill);
         Assert.Equal(BrowserOutcome.Refused, fill.Outcome);
-        Assert.Equal("the logins would not fit one reply", fill.Reason);
+        Assert.Equal("the login would not fit one reply", fill.Reason);
         Assert.Empty(fill.Logins);
     }
 
@@ -354,11 +377,23 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
                 : new BrowserReply(CheckOutcome, "not this browser's"));
         }
 
-        public ValueTask<BrowserFillReply> FillAsync(BrowserFillRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
+        public ValueTask<BrowserListReply> ListAsync(BrowserListRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
         {
-            Decided.Enqueue((browser, connectionId, "fill"));
+            Decided.Enqueue((browser, connectionId, "list"));
+            return ValueTask.FromResult(new BrowserListReply(BrowserOutcome.Done, string.Empty));
+        }
+
+        public ValueTask<BrowserFillReply> ReleaseAsync(BrowserReleaseRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
+        {
+            Decided.Enqueue((browser, connectionId, "release"));
             Deciding?.Invoke();
             return ValueTask.FromResult(Fill);
+        }
+
+        public ValueTask<BrowserReply> ShowAsync(BrowserShowRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
+        {
+            Decided.Enqueue((browser, connectionId, "show"));
+            return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Done, string.Empty));
         }
     }
 

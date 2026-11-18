@@ -9,10 +9,10 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// A browser pairs with the vault's owner only while the person armed pairing (8.1d), and fills a login only on the person's answer
-/// or an allowance they made (8.3a2), across real processes: tests/Keypaste.FakeBrowser
+/// A browser pairs once the person confirms the code its request carries, and fills a login only on the person's answer or an
+/// allowance they made (8.3a2), across real processes: tests/Keypaste.FakeBrowser
 /// starts the built keypaste as each browser starts KeePassXC-Browser's native messaging host and speaks the extension's protocol to it,
-/// and tests/Keypaste.AppDriver holds the vault, its pairing confirmation and notice drawn and clicked.
+/// and tests/Keypaste.AppDriver holds the vault, its pairing confirmation drawn and clicked.
 /// </summary>
 /// <remarks>
 /// Pairing's rules over a real pipe are Core.Tests' <c>SessionBrowsersTests</c>, and the relay's Browser.Tests' <c>RelayTests</c>.
@@ -24,38 +24,28 @@ public sealed class BrowserHostTests
     private const string _chrome = "fipabobollckgdobkjfkkchimlphcicg";
     private const string _edge = "iobkkhmaklkkeiadigbohfaplldmaogd";
     private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)";
-    private const string _notice = "A browser asked to pair. To pair it, press Pair a browser.";
     private const int _notFound = 20;
     private static readonly string[] _browsers = ["chrome", "chromium", "edge", "brave", "firefox"];
 
     [Fact]
-    public void A_browser_pairs_only_while_armed_its_pairing_proves_only_its_own_build_and_key_and_Remove_ends_it()
+    public void A_browser_pairs_once_the_person_confirms_its_code_its_pairing_proves_only_its_own_build_and_key_and_Remove_ends_it()
     {
         using var workspace = new Workspace();
         using var app = HeldApp.Hold(workspace);
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var otherKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var pairs = 0;
         var prompts = 0;
 
-        // Unarmed, a request to pair is refused with error 6 before anybody is asked, noticed and recorded.
-        var unarmed = Browser(workspace, "chrome", key, "get-databasehash", "associate");
-        var hash = unarmed[0].GetProperty("hash").GetString()!;
+        var hash = Assert.Single(Browser(workspace, "chrome", key, "get-databasehash")).GetProperty("hash").GetString()!;
         Assert.Matches("^[0-9a-f]{64}$", hash);
-        Assert.Equal("6", unarmed[1].GetProperty("errorCode").GetString());
-        app.WaitFor($"^pair-notice identity={Regex.Escape(_chromeBuild)} text={Regex.Escape(_notice)}");
-        Assert.DoesNotContain(app.Driver.Output, line => line.StartsWith("pair-prompt", StringComparison.Ordinal));
-        AssertLast(workspace, "pair", "denied", "not-armed", _chrome, session: app.Session);
         app.Send("pairings");
         app.WaitFor("^pairings none");
 
-        // Armed, the confirmation names the build the browser named, Pair saves the pairing, and its check passes.
-        app.Send("pair");
-        app.WaitFor("^pairing armed", ++pairs);
+        // A request to pair brings the confirmation at once, naming the build and showing the code; Pair keeps the pairing, and its check passes.
         using (var pairing = StartBrowser(workspace, "chrome", key, "associate", "test-associate"))
         {
             var prompt = app.WaitFor("^pair-prompt identity=", ++prompts);
-            Assert.StartsWith($"pair-prompt identity={_chromeBuild} name=", prompt, StringComparison.Ordinal);
+            Assert.Matches($"^pair-prompt identity={Regex.Escape(_chromeBuild)} code=[0-9]{{3}} [0-9]{{3}} name=", prompt);
             var name = prompt[(prompt.IndexOf(" name=", StringComparison.Ordinal) + " name=".Length)..];
             app.Send("allow");
             var answers = Answers(pairing);
@@ -69,20 +59,13 @@ public sealed class BrowserHostTests
             app.Send("pairings");
             app.WaitFor($"^pairing identity={Regex.Escape(_chromeBuild)} name={Regex.Escape(name)}");
 
-            // The arming answered one confirmation, so the next request to pair is refused unasked.
-            Assert.Equal("6", Assert.Single(Browser(workspace, "chrome", key, "associate")).GetProperty("errorCode").GetString());
-            Assert.Single(app.Driver.Output, line => line.StartsWith("pair-prompt identity=", StringComparison.Ordinal));
-            AssertLast(workspace, "pair", "denied", "not-armed", client: null);
-
             // A check from another build, or with another key, is refused with error 8 and recorded; the pairing's own still passes.
             Assert.Equal("8", Assert.Single(Browser(workspace, "edge", key, $"test-associate={name}")).GetProperty("errorCode").GetString());
             AssertLast(workspace, "check", "denied", "not-paired", _edge, label: name);
             Assert.Equal("8", Assert.Single(Browser(workspace, "chrome", otherKey, $"test-associate={name}")).GetProperty("errorCode").GetString());
             Assert.Equal(("true", name), Pair(Assert.Single(Browser(workspace, "chrome", key, $"test-associate={name}"))));
 
-            // Deny pairs nothing.
-            app.Send("pair");
-            app.WaitFor("^pairing armed", ++pairs);
+            // Deny pairs nothing, and holds the next request back unasked.
             using (var denied = StartBrowser(workspace, "firefox", key, "associate"))
             {
                 Assert.Contains("identity=keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", app.WaitFor("^pair-prompt identity=", ++prompts), StringComparison.Ordinal);
@@ -90,6 +73,9 @@ public sealed class BrowserHostTests
                 Assert.Equal("6", Assert.Single(Answers(denied)).GetProperty("errorCode").GetString());
             }
 
+            AssertLast(workspace, "pair", "denied", "prompt", client: null);
+            Assert.Equal("6", Assert.Single(Browser(workspace, "firefox", key, "associate")).GetProperty("errorCode").GetString());
+            Assert.Equal(prompts, app.Driver.Output.Count(line => line.StartsWith("pair-prompt identity=", StringComparison.Ordinal)));
             AssertLast(workspace, "pair", "denied", "prompt", client: null);
             app.Send("pairings");
             app.WaitFor("^pairing identity=", 2);
@@ -110,7 +96,7 @@ public sealed class BrowserHostTests
     }
 
     [Fact]
-    public void A_page_load_asks_nobody_a_click_fills_the_login_the_person_picks_and_Always_fills_that_exact_origin_alone()
+    public void A_click_lists_names_only_the_first_pick_on_a_site_is_asked_and_a_later_pick_there_fills_at_once()
     {
         using var workspace = new Workspace();
         workspace.AddLogin("GitHub", "gh-s3cret", "dana", "https://github.com");
@@ -118,8 +104,6 @@ public sealed class BrowserHostTests
         using var app = HeldApp.Hold(workspace);
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-        app.Send("pair");
-        app.WaitFor("^pairing armed");
         string name;
         using (var pairing = StartBrowser(workspace, "chrome", key, "associate"))
         {
@@ -130,33 +114,33 @@ public sealed class BrowserHostTests
             app.WaitFor("^pair-prompt withdrawn");
         }
 
-        // A page's own load with nothing always filled gets no logins, asks nobody and writes no line.
+        // The list carries the matching login's names and an empty password, asks nobody and writes one line.
         var lines = Workspace.Lines(workspace.OwnerLog).Count;
-        var load = Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/login");
-        Assert.Equal("15", load[1].GetProperty("errorCode").GetString());
+        var listed = Assert.Single(Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/login")[1].GetProperty("entries").EnumerateArray());
+        Assert.Equal(("dana", "GitHub", string.Empty), (listed.GetProperty("login").GetString(), listed.GetProperty("name").GetString(), listed.GetProperty("password").GetString()));
         Assert.DoesNotContain(app.Driver.Output, line => line.StartsWith("fill-prompt", StringComparison.Ordinal));
-        Assert.Equal(lines, Workspace.Lines(workspace.OwnerLog).Count);
+        AssertLast(workspace, "list", "granted", "exposure", _chrome, label: name);
+        Assert.Equal(lines + 1, Workspace.Lines(workspace.OwnerLog).Count);
 
-        // The person's click puts the matching login to them, never its password, and fills the one they pick, one line first.
-        using (var click = StartBrowser(workspace, "chrome", key, $"test-associate={name}", "click=https://github.com/login?next=/x"))
+        // The first pick on the site is asked in keypaste, naming the login and the site, and fills once allowed, one line first.
+        using (var pick = StartBrowser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/login?next=/x", "pick=https://github.com/login?next=/x"))
         {
-            Assert.Equal($"fill-prompt origin=https://github.com:443 pairing={name} logins=GitHub, dana · top level always=offered", app.WaitFor("^fill-prompt origin="));
-            app.Send("fill 1 always");
-            var entry = Assert.Single(Answers(click)[1].GetProperty("entries").EnumerateArray());
+            Assert.Equal($"fill-prompt question=Fill GitHub on github.com? origin=https://github.com:443 pairing={name} login=dana", app.WaitFor("^fill-prompt question="));
+            app.Send("allow");
+            var entry = Assert.Single(Answers(pick)[2].GetProperty("entries").EnumerateArray());
             Assert.Equal(["login", "name", "password", "uuid"], entry.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal));
             Assert.Equal(("dana", "GitHub", "gh-s3cret"), (entry.GetProperty("login").GetString(), entry.GetProperty("name").GetString(), entry.GetProperty("password").GetString()));
             app.WaitFor("^fill-prompt withdrawn");
         }
 
         AssertLast(workspace, "fill", "granted", "prompt", _chrome, label: name);
-        Assert.Single(Workspace.Lines(workspace.OwnerLog).Skip(lines), line => line.GetProperty("args").GetProperty("field").GetString() == "fill");
 
-        // Always fills that exact origin on a page's own load, and no other origin of the site.
-        var allowed = Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/");
-        Assert.Equal("gh-s3cret", Assert.Single(allowed[1].GetProperty("entries").EnumerateArray()).GetProperty("password").GetString());
+        // A later pick on that exact origin fills at once, and a lookalike of the site lists nothing.
+        var again = Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com/", "pick=https://github.com/");
+        Assert.Equal("gh-s3cret", Assert.Single(again[2].GetProperty("entries").EnumerateArray()).GetProperty("password").GetString());
         AssertLast(workspace, "fill", "granted", "allowed", _chrome, label: name);
-        Assert.Equal("15", Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://gist.github.com/")[1].GetProperty("errorCode").GetString());
-        Assert.Single(app.Driver.Output, line => line.StartsWith("fill-prompt origin=", StringComparison.Ordinal));
+        Assert.Empty(Browser(workspace, "chrome", key, $"test-associate={name}", "get-logins=https://github.com.evil.example/")[1].GetProperty("entries").EnumerateArray());
+        Assert.Single(app.Driver.Output, line => line.StartsWith("fill-prompt question=", StringComparison.Ordinal));
 
         app.Send("allowances");
         app.WaitFor($"^allowance item=GitHub on https://github.com:443 in {Regex.Escape(name)}$");

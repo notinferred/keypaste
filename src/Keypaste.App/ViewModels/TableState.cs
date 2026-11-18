@@ -213,6 +213,7 @@ internal sealed class TableStates
     internal const string Url = "url";
     internal const string Group = "group";
     internal const string LastUsed = "last-used";
+    internal const string Modified = "modified";
     internal const string DeletedFrom = "deleted-from";
     internal const string Deleted = "deleted";
     internal const string Time = "time";
@@ -229,6 +230,7 @@ internal sealed class TableStates
         new(Url, () => Strings.URL),
         new(Group, () => Strings.Group),
         new(LastUsed, () => Strings.LastUsed, IsTime: true),
+        new(Modified, () => Strings.DateModified, IsTime: true),
     ];
 
     internal static readonly IReadOnlyList<TableColumn> TrashColumns =
@@ -260,8 +262,8 @@ internal sealed class TableStates
 
     private IEnumerable<TableState> All => [Items, Trash, Log];
 
-    /// <summary>Items run in the vault's order until a head is pressed.</summary>
-    internal static TableState NewItems() => new("items", ItemColumns, null);
+    /// <summary>Items run newest change first, in sections by day, until another order is chosen.</summary>
+    internal static TableState NewItems() => new("items", ItemColumns, new TableOrder(Modified, Descending: true));
 
     internal static TableState NewTrash() => new("trash", TrashColumns, new TableOrder(Deleted, Descending: true));
 

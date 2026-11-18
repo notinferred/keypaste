@@ -18,7 +18,7 @@ The extension is GPL-3.0 and a separate program from keypaste's AGPL-3.0-only co
 
 ## Local modifications
 
-The wire protocol is upstream's unchanged, so keypaste's relay answers it: `change-public-keys`, `get-databasehash`, `associate`, `test-associate`, `get-logins`, `lock-database`, and the `database-locked` and `database-unlocked` signals, with the same fields and NaCl box.
+The wire protocol is upstream's, with the same NaCl box, so keypaste's relay answers `change-public-keys`, `get-databasehash`, `associate`, `test-associate`, `lock-database`, and the `database-locked` and `database-unlocked` signals as KeePassXC does. Three things are keypaste's own, which [keepassxc-protocol.md](keepassxc-protocol.md#keypastes-changes) records: `get-logins` answers each entry with an empty password, its vault, the open vaults that are locked, the page's site and why every fill there is asked, and a list matching nothing is an answer rather than error 15; `get-login` asks for the one login the person picked by its `uuid`; and `open-keypaste` brings keypaste forward.
 
 ### Removed
 
@@ -45,20 +45,21 @@ Permissions go from `activeTab`, `clipboardWrite`, `contextMenus`, `cookies`, `n
 
 ### Changed
 
-- `background/keepass.js` sends `triggerUnlock` with `get-logins` when the person asked, by the field's key icon or Connect, as upstream sends it with `get-databasehash`, so keypaste asks the person only then and a page's own load asks nobody.
+- `background/keepass.js` makes the identification key before `associate` sends it (`beginPairing`, the `begin_pairing` message) and derives six digits from it, the first four bytes of its SHA-256, big-endian, modulo a million; the popup's and the options page's Connect show them while keypaste asks, as "Check keypaste", and keypaste's confirmation shows the same digits from the key it receives, so the messages carry nothing new.
+- Nothing asks keypaste for logins as a page loads: `content/keypaste.js` and `content/observer-helper.js` only draw the key icon, and `content/username-field.js` asks for the page's logins, by name, when the person clicks it. The extension holds no password but while it fills the one picked, and `content/fill.js` fills only that one, from `get-login`; the auto-fill of a single login, the reuse of a tab's logins and filling from the page's load are gone.
+- `background/page.js` sends keypaste the tab's address as the browser reports it, never the page's own, and refuses a frame whose origin is not the tab's, as `content/keypaste.js` already did in the frame.
 - `background/init.js` adds its message listener in the worker's first turn and has it wait for the worker's start, since the browser delivers the message that starts a stopped worker only to listeners added then; upstream adds it after reading storage, so a press of Connect, or any page's message, sent while the worker was starting was dropped.
-- `background/page.js` reuses the logins a tab holds only for a page of the origin keypaste released them for; upstream reused them for any page of the tab until the browser reported its new address, so a page of another site that asked first got the last site's logins.
-- `content/keypaste.js` asks keypaste again on a click of the field's key icon when the logins the page holds came only from its own load, which carries just those the person always fills there, so the click can still offer the site's other logins; upstream asks only when the page holds none.
 - `background/client.js` times a request from when every request sent before it on the native port is answered, since keypaste answers one at a time: a status check queued behind a pairing the person is still confirming is no longer taken for keypaste being unreachable, which cleared the database hash the pairing's answer is verified against.
+- `background/client.js` answers a request still waiting on the native port a reconnect closes as not connected at once, rather than at its timeout: the worker's first connect, overtaken by a Connect pressed while it starts, otherwise resynced every page five seconds later and closed a login list the person had open.
 
 ### Restyled
 
 The popup, the login popup, the options page, the field icon, the drop-down and the page notifications follow keypaste's [design system](../docs/DESIGN.md), light and dark, in hand-written CSS: `css/colors.css` holds the palette as variables for the pages and the shadow roots, and `css/page.css` the pages' type, buttons, fields, focus ring and notes. The content scripts' UI stays in closed shadow roots, as upstream's does.
 
 - Icons are Lucide's, from `third_party/lucide/icons/`, inline in the pages and drawn by `kpxcUI.createIcon` in the content scripts.
-- The pages are set in Instrument Sans, copied unmodified into `fonts/` from the desktop app's with its OFL text; the content scripts use it only where the system has it.
+- The pages are set in Instrument Sans, copied unmodified into `fonts/` with its OFL text; the content scripts use it only where the system has it.
 - `render-icons.js` draws `icons/` from `assets/brand/`'s two tiles, the mark as SVG and PNG at 16, 32, 48, 96 and 128 px, and the locked, disconnected and unpaired toolbar states as the favicon cut with a badge whose glyph says the state.
-- The login popup's logins are buttons with the title and username on two lines, filtered by plain text; the drop-down is a `listbox` of `option`s named by title and username, and a status line announces the login the arrow keys choose, since focus stays in the page's field. A notification names keypaste, carries a status icon and a Dismiss button, and is announced as a status or, for an error or warning, an alert.
+- The login popup's logins are buttons with the title and username on two lines, filtered by plain text. The drop-down is keypaste's list (`content/autocomplete.js`, `content/credential-autocomplete.js`, `css/autocomplete.css`): opened only by the key icon, in a closed shadow root in the browser's top layer, it heads with the site, lists each login as a `listbox` `option` with a monogram, its title, its username and, while several vaults are open, its vault, then a row for each locked vault with Unlock…, and New login… and Open keypaste; it says "No logins for" the site, or "keypaste is locked" with Unlock…, when that is so. A status line announces the login the arrow keys choose, since focus stays in the page's field. A pick counts only from a trusted click or key, half a second after the list appears, while the list is the topmost element under the pointer and neither it nor its ancestors is faded, filtered, masked or clipped. A notification names keypaste, carries a status icon and a Dismiss button, and is announced as a status or, for an error or warning, an alert.
 - Button names and words follow DESIGN's voice: Reload is Try again, and no message carries an exclamation mark.
 
 ### Renamed

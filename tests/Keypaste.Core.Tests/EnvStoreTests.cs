@@ -173,7 +173,7 @@ public sealed class EnvStoreTests : IDisposable
         var untagged = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", _stripe);
         var missing = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", new EntryName("services", "Absent"));
 
-        Assert.Equal("services/Stripe is not in 'billing/dev'; tag it into the environment first", untagged.Refusal);
+        Assert.Equal("services/Stripe is not in 'billing/dev'; tag it into the stage first", untagged.Refusal);
         Assert.Equal("there is no item services/Absent", missing.Refusal);
         Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
     }

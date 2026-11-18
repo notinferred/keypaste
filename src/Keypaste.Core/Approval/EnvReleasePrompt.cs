@@ -54,6 +54,18 @@ public sealed record EnvReleasePrompt
     /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise.</summary>
     public string? Requester { get; init; }
 
+    /// <summary>What the requester line calls a person's own run.</summary>
+    public const string RunnerName = "keypaste run";
+
+    /// <summary>Who is asking: <see cref="Requester"/> or <see cref="RunnerName"/>, verified when the runner is keypaste's own program.</summary>
+    public RequesterIdentity Identity
+    {
+        get => (_identity ?? new RequesterIdentity(RunnerName, null, false)) with { Agent = Requester ?? RunnerName };
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
+
     /// <summary>The reference file's variable names and literals, each sanitized; empty outside reference-file mode.</summary>
     public IReadOnlyList<string> FileLines { get; init; } = [];
 
@@ -107,6 +119,7 @@ public sealed record EnvReleasePrompt
         {
             Project = EntryNameSanitizer.Sanitize(preview.Project).Text,
             Profile = EntryNameSanitizer.Sanitize(preview.Profile).Text,
+            Identity = RequesterIdentity.CurrentRunner(RunnerName),
             Keys = preview.Keys,
             Entries = [.. preview.Keys.Select((key, i) => ApprovalPrompt.Shown(
                 i < preview.Sources.Count ? preview.Sources[i].Entry : new EntryName(EnvProfileNames.SetName(preview.Project, preview.Profile), key)))],

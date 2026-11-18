@@ -1,0 +1,179 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+  xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.LockedVaultView"
+             x:DataType="vm:LockedVaultViewModel"
+             Background="{DynamicResource KpBgApp}">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.locked-error">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+    </Style>
+    <Style Selector="Button.wide">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- A locked vault while another stays open: only this vault's password, its key file or YubiKey as its unlock needs, and Unlock, the view's one accent. -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Name="LockedVaultForm"
+                Width="300"
+                Margin="24,40"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="14"
+                DataContext="{Binding Unlock}"
+                x:DataType="vm:UnlockViewModel">
+
+      <Border Classes="tile" Width="56" Height="56" CornerRadius="14" HorizontalAlignment="Center" Background="{DynamicResource KpBgCard}">
+        <ctl:KpIcon Icon="lock" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
+      </Border>
+
+      <!-- Opening it. -->
+      <StackPanel Spacing="14" IsVisible="{Binding IsOpening}">
+        <StackPanel Spacing="2">
+          <TextBlock Name="LockedVaultHeading"
+                     Classes="dialog-title"
+                     AutomationProperties.HeadingLevel="1"
+                     TextAlignment="Center"
+                     TextTrimming="CharacterEllipsis"
+                     Text="{Binding $parent[UserControl].((vm:LockedVaultViewModel)DataContext).Heading, FallbackValue={x:Null}}" />
+          <TextBlock Name="LockedVaultFile"
+                     Classes="caption"
+                     TextAlignment="Center"
+                     TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding SelectedLocation}"
+                     Text="{Binding $parent[UserControl].((vm:LockedVaultViewModel)DataContext).FileName, FallbackValue={x:Null}}" />
+        </StackPanel>
+
+        <Button Name="LockedVaultQuickUnlock"
+                Classes="wide"
+                Classes.primary="{Binding QuickUnlockIsPrimary}"
+                IsVisible="{Binding OffersQuickUnlock}"
+                Command="{Binding ResumeCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.UnlockWithWindowsHello}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="fingerprint" Size="16" />
+            <TextBlock Text="{x:Static res:Strings.UnlockWithWindowsHello}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="{x:Static res:Strings.MasterPassword}" />
+          <ctl:MaskedInput Name="LockedVaultPassword"
+                           AllowsPaste="True"
+                           MaskedLength="{Binding MaskedLength}"
+                           IsEnabled="{Binding CanTypePassword}"
+                           AutomationProperties.Name="{x:Static res:Strings.MasterPassword}" />
+          <TextBlock Classes="locked-error size-13" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+        </StackPanel>
+
+        <!-- The key file this vault's unlock remembers, or one chosen now. -->
+        <Panel IsVisible="{Binding CanTypePassword}">
+          <Button Classes="ghost sm"
+                  HorizontalAlignment="Center"
+                  IsVisible="{Binding !HasKeyfile}"
+                  Command="{Binding ChooseKeyfileCommand}"
+                  ToolTip.Tip="{x:Static res:Strings.UnlockWithAKeyFileTooLabel}"
+                  AutomationProperties.Name="{x:Static res:Strings.UnlockWithAKeyFileToo}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="file-key" Size="14" />
+              <TextBlock Text="{x:Static res:Strings.ChooseKeyFile}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" IsVisible="{Binding HasKeyfile}">
+            <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="mono secondary size-12" Text="{Binding KeyfileName}" ToolTip.Tip="{Binding KeyfilePath}" MaxWidth="200" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <Button Classes="icon ghost sm" Width="22" Height="22"
+                    ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAKeyFile}"
+                    Command="{Binding ClearKeyfileCommand}"
+                    AutomationProperties.Name="{x:Static res:Strings.UnlockWithoutAKeyFile}">
+              <ctl:KpIcon Icon="x" Size="14" />
+            </Button>
+          </StackPanel>
+        </Panel>
+
+        <!-- A YubiKey's slot, as the vault's recent entry remembers it or the person adds it. -->
+        <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}" IsVisible="{Binding OffersHardwareKey}">
+          <Button Classes="ghost sm"
+                  IsVisible="{Binding !UsesHardwareKey}"
+                  Command="{Binding UseHardwareKeyCommand}"
+                  AutomationProperties.Name="{x:Static res:Strings.UnlockWithAYubiKeyToo}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="usb" Size="14" />
+              <TextBlock Text="{x:Static res:Strings.UnlockWithAYubiKeyToo}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesHardwareKey}">
+            <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="secondary size-13" Text="{Binding HardwareKeyLabel}" VerticalAlignment="Center" />
+            <Button Classes="ghost sm" Content="{Binding OtherSlotLabel}" Command="{Binding SwitchSlotCommand}" />
+            <Button Classes="icon ghost sm" Width="22" Height="22"
+                    ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAYubiKey}"
+                    Command="{Binding ClearHardwareKeyCommand}"
+                    AutomationProperties.Name="{x:Static res:Strings.UnlockWithoutAYubiKey}">
+              <ctl:KpIcon Icon="x" Size="14" />
+            </Button>
+          </StackPanel>
+        </Panel>
+
+        <Button Name="LockedVaultUnlock"
+                Classes="wide"
+                Classes.primary="{Binding UnlockIsPrimary}"
+                IsDefault="True"
+                Command="{Binding UnlockCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.Unlock}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+            <TextBlock Text="{x:Static res:Strings.Unlock}" IsVisible="{Binding !Busy}" />
+            <TextBlock Text="{x:Static res:Strings.Unlocking}" IsVisible="{Binding Busy}" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
+      <!-- Creating the vault just added to the account. -->
+      <StackPanel Spacing="14" IsVisible="{Binding IsCreating}">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="dialog-title" AutomationProperties.HeadingLevel="1" TextAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding CreateHeading}" />
+          <TextBlock Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{x:Static res:Strings.ChooseAMasterPasswordThereIsNoX354515}" />
+        </StackPanel>
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="{x:Static res:Strings.NewMasterPassword}" />
+          <ctl:MaskedInput Name="LockedVaultNewPassword"
+                           AllowsPaste="True"
+                           MaskedLength="{Binding NewMaskedLength}"
+                           AutomationProperties.Name="{x:Static res:Strings.NewMasterPassword}" />
+        </StackPanel>
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="{x:Static res:Strings.ConfirmMasterPassword}" />
+          <ctl:MaskedInput Name="LockedVaultConfirmPassword"
+                           AllowsPaste="True"
+                           MaskedLength="{Binding ConfirmMaskedLength}"
+                           AutomationProperties.Name="{x:Static res:Strings.ConfirmMasterPassword}" />
+          <TextBlock Classes="locked-error size-13" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+          <Button Name="LockedVaultCancelCreate" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCreateCommand}" />
+          <Button Name="LockedVaultCreate"
+                  Classes="primary"
+                  IsDefault="True"
+                  Command="{Binding CreateCommand}"
+                  AutomationProperties.Name="{x:Static res:Strings.CreateVault}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+              <TextBlock Text="{x:Static res:Strings.CreateVault}" IsVisible="{Binding !Busy}" />
+              <TextBlock Text="{x:Static res:Strings.CreatingVault}" IsVisible="{Binding Busy}" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </StackPanel>
+
+      <TextBlock Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding Owner}" IsVisible="{Binding HasOwner}" />
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

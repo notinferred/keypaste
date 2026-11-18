@@ -2,34 +2,25 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One variable of a run as the prompt lists it: its name, where it comes from, and its tag.</summary>
-/// <param name="Name">The variable the command sees.</param>
-/// <param name="Source">The entry, and the field when it is not the password.</param>
-/// <param name="Tag"><c>inject only</c>, and a warning when the name changes how programs start.</param>
-internal sealed record RunVariableRow(string Name, string Source, string Tag);
+/// <summary>One variable a run can read, as its chip names it.</summary>
+/// <param name="Name">The variable's name.</param>
+/// <param name="Source">The item and field its value comes from.</param>
+/// <param name="ChangesHowProgramsStart">Whether setting it changes how programs start, such as <c>NODE_OPTIONS</c>.</param>
+internal sealed record RunVariableRow(string Name, string Source, bool ChangesHowProgramsStart);
 
-/// <summary>
-/// One agent's request to run a command with secrets in its environment, in front of the person at
-/// this desktop, answered once. It holds names, never a value.
-/// </summary>
-/// <remarks>
-/// The command and directory are shown whole: the request was refused before anybody was asked if
-/// either held anything a prompt would have to scrub (D-0358). A run is allowed once, never always.
-/// </remarks>
+/// <summary>An agent's request to run a command with secrets in its environment, asked every time with Allow once only (THREATS.md T-35).</summary>
 internal sealed class RunApprovalViewModel : PromptViewModel
 {
     internal RunApprovalViewModel(RunPrompt prompt)
+        : base(prompt?.Identity)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
-        var who = prompt.Label ?? prompt.Client;
-
-        Title = $"{who} wants {prompt.Variables.Count} secret{(prompt.Variables.Count == 1 ? string.Empty : "s")}";
-        Subtitle = $"via MCP · {prompt.Directory}";
+        Title = $"Let {Agent} run this command?";
         Profile = prompt.Profile;
-        Client = prompt.Label is { } label ? $"{prompt.Client} · label {label}" : prompt.Client;
-        Tool = $"tool: {RunPrompt.ToolName}";
-        Program = $"runs {prompt.Program}";
+        Client = prompt.Client;
+        Label = prompt.Label ?? "none configured";
+        Program = prompt.Program;
         Command = prompt.Command;
         Directory = prompt.Directory;
         Variables =
@@ -37,52 +28,64 @@ internal sealed class RunApprovalViewModel : PromptViewModel
             .. prompt.Variables.Select(variable => new RunVariableRow(
                 variable.Name,
                 string.Equals(variable.Field, "password", StringComparison.Ordinal) ? variable.Entry : $"{variable.Entry} · {variable.Field}",
-                variable.ChangesHowProgramsStart ? "inject only · changes how programs start" : "inject only")),
+                variable.ChangesHowProgramsStart)),
         ];
+        Sources = string.Join(", ", Variables.Select(variable => $"{variable.Name} from {variable.Source}"));
+        StartWarning = Variables.Where(variable => variable.ChangesHowProgramsStart).Select(variable => variable.Name).ToList() switch
+        {
+            [] => string.Empty,
+            [var one] => $"{one} changes how programs start.",
+            var several => $"{string.Join(", ", several)} change how programs start.",
+        };
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
     }
 
-    /// <summary>What keypaste does with the values, and what it cannot stop.</summary>
-    internal string Explainer { get; } =
-        "keypaste will add these to the command's environment and remove their literal and escaped forms from its output. "
-        + "The agent sees the names; the command itself can read the values, so allow only a command you would run yourself.";
-
-    /// <summary>Who asks and how many secrets, as the design's heading says it.</summary>
+    /// <summary>The question.</summary>
     internal string Title { get; }
 
     /// <inheritdoc/>
     protected override string Asks => Title;
 
-    internal string Subtitle { get; }
-
-    /// <summary>The environment the set comes from, which the prompt draws whole on a row of its own.</summary>
+    /// <summary>The stage the values come from, such as dev or prod.</summary>
     internal string Profile { get; }
 
-    /// <summary>What the client calls itself and its label. Never proof of anything.</summary>
+    /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
 
-    internal string Tool { get; }
+    internal string Label { get; }
 
-    /// <summary>The absolute path of the program that starts.</summary>
+    internal string Tool { get; } = RunPrompt.ToolName;
+
+    /// <summary>The program the command starts, resolved on this computer.</summary>
     internal string Program { get; }
 
-    /// <summary>The command line exactly as it runs.</summary>
     internal string Command { get; }
 
     internal string Directory { get; }
 
     internal IReadOnlyList<RunVariableRow> Variables { get; }
 
-    /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
+    /// <summary>Where each variable's value comes from, for Details.</summary>
+    internal string Sources { get; }
+
+    /// <summary>Which variables change how programs start, or nothing.</summary>
+    internal string StartWarning { get; }
+
     internal string Reason { get; }
+
+    /// <summary>Whose words the quote is.</summary>
+    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+
+    /// <summary>The agent's words, quoted.</summary>
+    internal string Quoted => ApprovalViewModel.Quote(Reason);
 
     internal string Scrubbed { get; }
 
-    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
-    internal string Attribution { get; } = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
-
-    /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
+
+    /// <summary>What allowing does, in one plain line.</summary>
+    internal string Consequence { get; } =
+        "The command can read these values; keypaste removes them from its output. Allow only a command you would run yourself.";
 }

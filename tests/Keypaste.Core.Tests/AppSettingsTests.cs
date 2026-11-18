@@ -29,6 +29,27 @@ public sealed class AppSettingsTests : IDisposable
         }
     }
 
+    /// <summary>The local account holds each vault opened once, in order, beside the chosen vault and every preference, which it leaves as they were.</summary>
+    [Fact]
+    public void The_local_account_holds_each_vault_opened_and_keeps_the_rest_of_the_file()
+    {
+        var personal = Path.Combine(_directory, "Personal.kdbx");
+        var acme = Path.Combine(_directory, "Acme.kdbx");
+        Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_directory, personal, onlyIfNone: true));
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { IdleTimeoutSeconds = 600 }));
+
+        Assert.True(LocalAccount.Hold(_directory, personal));
+        Assert.True(LocalAccount.Hold(_directory, acme));
+        Assert.True(LocalAccount.Hold(_directory, personal));
+
+        Assert.Equal([personal, acme], LocalAccount.Vaults(_directory));
+        Assert.Equal((personal, 600), (ChosenVault.Read(_directory), AppSettings.Load(SettingsFile).IdleTimeoutSeconds));
+
+        Assert.True(LocalAccount.Release(_directory, personal));
+        Assert.Equal([acme], LocalAccount.Vaults(_directory));
+        Assert.Equal(personal, ChosenVault.Read(_directory));
+    }
+
     [Fact]
     public void An_absent_file_reads_as_the_defaults()
     {

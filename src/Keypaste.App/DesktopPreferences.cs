@@ -63,6 +63,9 @@ internal sealed class DesktopPreferences
     /// <remarks>A Linux desktop may show no tray at all, so there it is off until chosen.</remarks>
     internal bool StaysInTray => Current.StayInTray ?? !OperatingSystem.IsLinux();
 
+    /// <summary>Whether the rail and the sidebar are drawn solid on macOS rather than over the system's vibrancy.</summary>
+    internal bool ReduceTransparency => Current.ReduceTransparency;
+
     /// <summary>Raised after <see cref="Update"/>, so what a setting drives follows it at once.</summary>
     internal event EventHandler? Changed;
 
@@ -73,17 +76,20 @@ internal sealed class DesktopPreferences
     /// <remarks>
     /// The in-memory copy moves whether or not the write landed: a preference that cannot reach the
     /// disk still holds for this run, and the caller says so rather than pretending it did not
-    /// happen. The chosen vault is kept as the file has it, because the first unlock and
-    /// <c>keypaste use</c> write it behind this copy, and the window's layout as this copy has it, since a
+    /// happen. The chosen vault and the local account's vaults are kept as the file has them, because the first unlock,
+    /// each vault's unlock and <c>keypaste use</c> write them behind this copy, and the window's layout as this copy has it, since a
     /// screen may hold a copy older than it. A file that does not read whole is replaced.
     /// </remarks>
     internal bool Update(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        var read = AppSettings.TryLoad(_path, out var onDisk);
+
         Current = settings with
         {
-            Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault,
+            Vault = read ? onDisk.Vault : Current.Vault,
+            AccountVaults = read ? onDisk.AccountVaults : Current.AccountVaults,
             Window = Current.Window,
         };
         var saved = AppSettings.Save(_path, Current);

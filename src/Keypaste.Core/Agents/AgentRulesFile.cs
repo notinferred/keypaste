@@ -52,16 +52,17 @@ public interface IAgentRules
 public sealed record RulesFileRead(AgentRules Rules, string? Seal, bool Present);
 
 /// <summary>
-/// <c>agents.toml</c> under the keypaste home: whether usernames, and hosts and references, are shown, each category's rule and each known
-/// agent's run switch, and the seal its owner wrote, which <see cref="SealedAgentRules"/> checks; beside it,
+/// One vault's agent rules under the keypaste home, <c>agents/&lt;vault&gt;.toml</c>: whether usernames, and hosts and references, are shown,
+/// each category's rule and each known agent's run switch, and the seal its owner wrote, which <see cref="SealedAgentRules"/> checks; and
 /// <c>agents.id</c>, this home's random identity, which the seal covers so a file copied from another home is not valid here.
 /// </summary>
 /// <remarks>
 /// A file that cannot be read or parsed refuses every agent request and is never rewritten, so a rule a person wrote is
 /// not silently lost or lifted.
 /// </remarks>
-/// <param name="path">From <see cref="Audit.KeypasteHome.AgentsPath"/>.</param>
-public sealed class AgentRulesFile(string path)
+/// <param name="path">The rules, from <see cref="Audit.KeypasteHome.AgentsPath"/>.</param>
+/// <param name="homeIdPath">This home's identity, from <see cref="Audit.KeypasteHome.HomeIdPath"/>.</param>
+public sealed class AgentRulesFile(string path, string homeIdPath)
 {
     private const string _sealTable = "seal";
     private const string _macKey = "mac";
@@ -97,8 +98,21 @@ public sealed class AgentRulesFile(string path)
     /// <summary>The file.</summary>
     public string Path { get; } = path ?? throw new ArgumentNullException(nameof(path));
 
-    /// <summary>This home's identity, beside the file.</summary>
-    public string HomeIdPath => System.IO.Path.ChangeExtension(Path, ".id");
+    /// <summary>This home's identity, which every vault's rules in the home share.</summary>
+    public string HomeIdPath { get; } = homeIdPath ?? throw new ArgumentNullException(nameof(homeIdPath));
+
+    /// <summary>A vault's rules in a home.</summary>
+    /// <param name="home"><c>KEYPASTE_HOME</c>, or null for the default home.</param>
+    /// <param name="vault">The vault.</param>
+    /// <returns>The file.</returns>
+    public static AgentRulesFile For(string? home, Ownership.VaultIdentity vault) =>
+        new(Audit.KeypasteHome.AgentsPath(home, vault), Audit.KeypasteHome.HomeIdPath(home));
+
+    /// <summary>The one <c>agents.toml</c> every vault in a home shared before each vault kept its own, read only to move its rules to the vault that sealed them.</summary>
+    /// <param name="home"><c>KEYPASTE_HOME</c>, or null for the default home.</param>
+    /// <returns>The file.</returns>
+    public static AgentRulesFile Shared(string? home) =>
+        new(Audit.KeypasteHome.SharedAgentsPath(home), Audit.KeypasteHome.HomeIdPath(home));
 
     /// <summary>The rules the file says, unverified: what <c>keypaste clients</c> lists.</summary>
     /// <param name="rules">The rules, when the file could be read.</param>
@@ -181,7 +195,7 @@ public sealed class AgentRulesFile(string path)
         try
         {
             var made = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(HomeIdPath)!);
             AtomicFile.Write(HomeIdPath, Encoding.UTF8.GetBytes(made + "\n"));
             id = made;
             return true;

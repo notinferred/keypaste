@@ -8,7 +8,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
-using Keypaste.Core.Approval;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Xunit;
@@ -17,10 +16,9 @@ using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// Pairing a browser with the app (8.1d): Settings › Browser fill's Pair a browser arms it for two minutes and one pairing; armed,
-/// the app's own window names the build the browser named, Deny focused, Pair armed after a moment and only for a name a new
-/// pairing can take; unarmed, the request is refused unasked and the app says how to pair; Settings lists each pairing and
-/// Remove ends it (D-0634, D-0456).
+/// Pairing a browser with the app: a request brings the app's own window at once, with the code the extension shows and the build
+/// the browser named, Deny focused, Pair armed after a moment and only for a name a new pairing can take; a Deny holds the next
+/// request back unasked; Settings lists each pairing as it is made and Remove ends it.
 /// </summary>
 public sealed partial class BrowserPairingTests
 {
@@ -34,22 +32,19 @@ public sealed partial class BrowserPairingTests
     private static partial Regex Retired();
 
     [Fact]
-    public Task Pair_a_browser_lets_one_browser_pair_under_the_name_typed_and_Settings_lists_it() => HeadlessSession.On(async () =>
+    public Task A_request_to_pair_shows_the_code_at_once_pairs_under_the_name_typed_and_Settings_lists_it() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync();
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
+        using var browserFill = new BrowserFillViewModel(app.Authority);
         Assert.True(browserFill.HasNoRows);
-
-        browserFill.PairCommand.Press();
-
-        Assert.True(browserFill.IsArmed);
-        Assert.False(browserFill.PairCommand.CanExecute(null));
-        Assert.StartsWith("Pairing is on for 2:00.", browserFill.ArmedText, StringComparison.Ordinal);
 
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
 
+        Assert.Equal("Pair Chrome with keypaste?", Text(window, "TitleText"));
+        Assert.Equal(PairingCode.Of(_key), Text(window, "CodeText"));
+        Assert.Equal("Pair only if Chrome shows the same code.", Text(window, "CheckText"));
         Assert.Equal("keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", Text(window, "IdentityText"));
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
@@ -64,11 +59,9 @@ public sealed partial class BrowserPairingTests
         Assert.Equal(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = "work laptop" }, reply);
         await PromptedApp.WithdrawnAsync(window);
 
-        using var listed = new BrowserFillViewModel(app.Authority, app.Clock);
-        var row = Assert.Single(listed.Rows);
+        var row = Assert.Single(browserFill.Rows);
         Assert.Equal(("work laptop", "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)"), (row.Name, row.Identity));
         Assert.Contains("last used", row.Used, StringComparison.Ordinal);
-        Assert.False(listed.IsArmed);
     });
 
     [Fact]
@@ -77,8 +70,6 @@ public sealed partial class BrowserPairingTests
         await using var app = await PromptedApp.StartAsync();
         await PairAsync(app, "work laptop");
 
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.FirefoxAddOns);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync(2));
@@ -93,27 +84,27 @@ public sealed partial class BrowserPairingTests
         Click(window, "Deny");
 
         Assert.Equal(BrowserOutcome.Refused, (await pairing.WaitAsync(_wait, Token))?.Outcome);
-        Assert.Single(new BrowserFillViewModel(app.Authority, app.Clock).Rows);
+        Assert.Single(new BrowserFillViewModel(app.Authority).Rows);
     });
 
     [Fact]
-    public Task Unarmed_a_request_to_pair_is_refused_unasked_and_the_app_says_how_to_pair() => HeadlessSession.On(async () =>
+    public Task A_Deny_holds_the_next_request_to_pair_back_and_shows_nothing() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync();
         await using var link = await AttachAsync(app, BrowserIdentity.EdgeAddOns);
 
-        var reply = await link.PairAsync(Pair(app), Token);
-        var notice = Assert.IsType<PairingNoticeWindow>(await app.PromptAsync());
-
-        Assert.Equal(BrowserOutcome.Refused, reply?.Outcome);
-        Assert.Equal(PairingNotice.AppText, Text(notice, "NoticeText"));
-        Assert.Equal("keypaste's extension from Microsoft Edge Add-ons (iobkkhmaklkkeiadigbohfaplldmaogd)", Text(notice, "IdentityText"));
-        Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Rows);
+        var pairing = link.PairAsync(Pair(app), Token).AsTask();
+        var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
+        Click(window, "Deny");
+        Assert.Equal(BrowserOutcome.Refused, (await pairing.WaitAsync(_wait, Token))?.Outcome);
+        await PromptedApp.WithdrawnAsync(window);
 
         var again = await link.PairAsync(Pair(app), Token);
+
         Assert.Equal(BrowserOutcome.Refused, again?.Outcome);
+        Assert.Contains("connect again in", again!.Reason, StringComparison.Ordinal);
         Assert.Single(app.Windows);
-        notice.Close();
+        Assert.Empty(new BrowserFillViewModel(app.Authority).Rows);
     });
 
     [Fact]
@@ -124,7 +115,7 @@ public sealed partial class BrowserPairingTests
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "work laptop"), Token))?.Outcome);
 
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
+        using var browserFill = new BrowserFillViewModel(app.Authority);
         var pairing = Assert.Single(browserFill.Rows);
         browserFill.AskRemoveCommand.Press(pairing);
         Assert.True(pairing.IsConfirmingRemove);
@@ -141,14 +132,12 @@ public sealed partial class BrowserPairingTests
 
     /// <summary>
     /// A confirmation on screen when the desktop merges another program's save is withdrawn with what else waited on the person: its
-    /// window closes, the browser is refused, and no pairing is saved (D-0542, D-0634).
+    /// window closes, the browser is refused, and no pairing is saved.
     /// </summary>
     [Fact]
     public Task A_confirmation_waiting_when_another_programs_save_is_merged_is_withdrawn_and_pairs_nothing() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync();
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
@@ -165,7 +154,7 @@ public sealed partial class BrowserPairingTests
         var reply = await pairing.WaitAsync(_wait, Token);
         Assert.Equal(BrowserOutcome.Refused, reply?.Outcome);
         Assert.EndsWith("before the pairing was saved", reply!.Reason, StringComparison.Ordinal);
-        Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Rows);
+        Assert.Empty(new BrowserFillViewModel(app.Authority).Rows);
     });
 
     /// <summary>The card says nothing in the words D-0457 retired and names every control by its words.</summary>
@@ -174,8 +163,7 @@ public sealed partial class BrowserPairingTests
     {
         await using var app = await PromptedApp.StartAsync();
         await PairAsync(app, "work laptop");
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Press();
+        using var browserFill = new BrowserFillViewModel(app.Authority);
         using var settings = new SettingsViewModel(app.Authority.Session, app.Home, new DesktopPreferences(app.Home), _ => { }) { BrowserFill = browserFill, Section = SettingsSectionChoice.Browser };
         var window = new Window { Content = new SettingsView { DataContext = settings } };
         window.Show();
@@ -187,17 +175,18 @@ public sealed partial class BrowserPairingTests
         var said = card.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text ?? string.Empty).ToList();
         Assert.Contains("Browser fill", said);
         Assert.Contains("work laptop", said);
+        Assert.Contains(Keypaste.App.Resources.Strings.PairInTheExtension, said);
         Assert.DoesNotContain(said, text => Retired().IsMatch(text));
 
         var names = card.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible)
             .Select(button => ControlAutomationPeer.CreatePeerForElement(button).GetName()).ToList();
-        Assert.Equal(["Stop pairing", "Remove the pairing work laptop"], names);
+        Assert.Equal(["Remove the pairing work laptop"], names);
 
         window.Close();
     });
 
     [Fact]
-    public Task A_click_in_a_page_opens_the_fill_window_which_shows_no_password_and_fills_the_login_picked() => HeadlessSession.On(async () =>
+    public Task A_first_pick_on_a_site_opens_a_confirmation_that_names_the_login_and_the_site_and_shows_no_password() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync(seed: vault =>
         {
@@ -208,62 +197,67 @@ public sealed partial class BrowserPairingTests
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
 
-        var filling = link.FillAsync(Fill(app, "https://github.com/login"), Token).AsTask();
+        var listed = await link.ListAsync(List(app, "https://github.com/login"), Token);
+        Assert.Equal(["GitHub", "GitHub work"], listed!.Names.Select(name => name.Title));
+        Assert.Single(app.Windows);
+
+        var filling = link.ReleaseAsync(Release(app, "https://github.com/login", listed.Names[1].Uuid), Token).AsTask();
         var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
 
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
-        Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text));
+        Assert.Equal("Fill GitHub work on github.com?", window.FindControl<TextBlock>("TitleText")!.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text));
+        Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Text);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => (text.Text ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
-        Assert.True(window.FindControl<CheckBox>("AlwaysBox")!.IsVisible);
 
-        var request = (FillViewModel)window.DataContext!;
-        app.Clock.Advance(PromptViewModel.ArmingDelay);
-        await Task.Delay(200, Token);
-        Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
-
-        request.Picked = request.Rows[1];
         await app.ArmAsync("Allow");
         Click(window, "Allow");
 
         var reply = await filling.WaitAsync(_wait, Token);
         Assert.Equal("work-s3cret", Assert.Single(reply!.Logins).Password);
         await PromptedApp.WithdrawnAsync(window);
-        Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Allowances);
+        Assert.Single(new BrowserFillViewModel(app.Authority).Allowances);
     });
 
     [Fact]
-    public Task Always_fill_is_listed_in_Settings_and_Remove_asks_again_next_time() => HeadlessSession.On(async () =>
+    public Task A_site_filled_before_fills_at_once_is_listed_in_Settings_and_forgetting_it_asks_again() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync(seed: vault =>
             vault.AddEntry(new VaultEntry { Title = "GitHub", Username = "dana", Password = "fill-s3cret", Url = "https://github.com" }));
         await PairAsync(app, "laptop");
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
+        var item = Assert.Single((await link.ListAsync(List(app, "https://github.com/login"), Token))!.Names).Uuid;
 
-        var filling = link.FillAsync(Fill(app, "https://github.com/login"), Token).AsTask();
+        var filling = link.ReleaseAsync(Release(app, "https://github.com/login", item), Token).AsTask();
         var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
-        ((FillViewModel)window.DataContext!).Always = true;
         await app.ArmAsync("Allow");
         Click(window, "Allow");
         Assert.Single((await filling.WaitAsync(_wait, Token))!.Logins);
         await PromptedApp.WithdrawnAsync(window);
 
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
+        using var browserFill = new BrowserFillViewModel(app.Authority);
         var row = Assert.Single(browserFill.Allowances);
         Assert.Equal(("GitHub", "on https://github.com:443 in laptop"), (row.Item, row.Where));
 
-        var silent = await link.FillAsync(Fill(app, "https://github.com/", personAsked: false), Token);
-        Assert.Single(silent!.Logins);
+        var atOnce = await link.ReleaseAsync(Release(app, "https://github.com/", item), Token);
+        Assert.Single(atOnce!.Logins);
+        Assert.Equal(2, app.Windows.Count);
 
         browserFill.UnallowCommand.Execute(row);
         Assert.Empty(browserFill.Allowances);
-        Assert.Empty((await link.FillAsync(Fill(app, "https://github.com/", personAsked: false), Token))!.Logins);
+        var askedAgain = link.ReleaseAsync(Release(app, "https://github.com/", item), Token).AsTask();
+        var again = Assert.IsType<FillWindow>(await app.PromptAsync(3));
+        Click(again, "Deny");
+        Assert.Empty((await askedAgain.WaitAsync(_wait, Token))!.Logins);
     });
 
-    private static BrowserFillRequest Fill(PromptedApp app, string url, bool personAsked = true) =>
-        new("laptop", _key, url) { PersonAsked = personAsked, Vault = app.Vault, Session = app.SessionId };
+    private static BrowserListRequest List(PromptedApp app, string url) =>
+        new("laptop", _key, url) { Vault = app.Vault, Session = app.SessionId };
+
+    private static BrowserReleaseRequest Release(PromptedApp app, string url, string item) =>
+        new("laptop", _key, url, item) { Vault = app.Vault, Session = app.SessionId };
 
     private static BrowserPairRequest Pair(PromptedApp app) => new(_key) { Vault = app.Vault, Session = app.SessionId };
 
@@ -282,8 +276,6 @@ public sealed partial class BrowserPairingTests
 
     private static async Task PairAsync(PromptedApp app, string name)
     {
-        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = await app.PromptAsync(app.Windows.Count + 1);

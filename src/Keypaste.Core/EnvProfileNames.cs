@@ -19,7 +19,7 @@ public static class EnvProfileNames
 
         if (profile.Length is 0 or > MaximumLength)
         {
-            error = $"an environment name has 1 to {MaximumLength} characters";
+            error = $"a stage name has 1 to {MaximumLength} characters";
             return false;
         }
 
@@ -28,7 +28,7 @@ public static class EnvProfileNames
             var c = profile[i];
             if (!(char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || (c == '-' && i > 0)))
             {
-                error = $"'{profile}' is not an environment name: use lowercase letters, digits and '-'";
+                error = $"'{profile}' is not a stage name: use lowercase letters, digits and '-'";
                 return false;
             }
         }

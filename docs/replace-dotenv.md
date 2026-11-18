@@ -1,6 +1,6 @@
 # Replace your `.env` in 5 minutes
 
-> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. In the published `v0.3.0` each variable is its own item under `env/<project>`, `get` takes `--show` rather than `--field … --reveal`, and there are no environments (`-p`), `env diff`, `kp://` references, `keypaste use` or `--session` runs. [FEATURES](FEATURES.md) lists what each version has.
+> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. In the published `v0.3.0` each variable is its own item under `env/<project>`, `get` takes `--show` rather than `--field … --reveal`, and there are no stages (`-p`), `env diff`, `kp://` references, `keypaste use` or `--session` runs. [FEATURES](FEATURES.md) lists what each version has.
 
 Import a `.env` file into an encrypted KeePassXC-compatible vault, then start your app with variables injected into its environment. Deleting the original file does not erase backups, snapshots or git history.
 
@@ -27,7 +27,7 @@ From the directory holding your `.env`:
 keypaste env pull dev --keep
 ```
 
-`dev` names the project or environment. Import reads `./.env` by default; supply another path when needed, as in `keypaste env pull prod config/.env.production`.
+`dev` names the project. Import reads `./.env` by default; supply another path when needed, as in `keypaste env pull prod config/.env.production`.
 
 ```
 note: a trailing ' #' comment was removed from: PORT. Quote the value if the '#' was part of it.
@@ -77,7 +77,7 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
-This command asks for the vault password on each invocation. `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste approve` instead: it asks for no password, either one shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Projects screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#projects)).
+This command asks for the vault password on each invocation. `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste approve` instead: it asks for no password, either one shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Environments place can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#environments)).
 
 keypaste places variables in the child's environment without writing a plaintext env file. The child can still write or forward values, so review its logging and behavior. Once delivered, the values are copies held by the child and its descendants: a `--session` run needs the vault unlocked to start, but locking the vault afterwards cannot take those copies back ([SECURITY](../SECURITY.md)).
 
@@ -85,9 +85,9 @@ The `--` separates the project from its command. Without it, `keypaste run dev n
 
 <a id="profiles-and-references"></a>
 
-## Environments and references
+## Stages and references
 
-A project holds one set per environment, named with lowercase letters, digits and `-`; everything above is the `dev` environment. An environment's keys are fields of the items tagged into it: `env set` and `env pull` add a new key to its item `env/<project>/.env`, or `.env.<profile>` for another environment, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another item tagged into it. An item kept the `v0.3.0` way, one per variable under `env/<project>`, is an ordinary item and no longer a variable. Every env verb and `run` take `-p <profile>`:
+A project holds one set per stage, named with lowercase letters, digits and `-`; everything above is the `dev` stage. A stage's keys are fields of the items tagged into it: `env set` and `env pull` add a new key to its item `env/<project>/.env`, or `.env.<stage>` for another stage, which they create tagged `env:<project>` or `env:<project>:<stage>`, unless `--entry` names another item tagged into it. An item kept the `v0.3.0` way, one per variable under `env/<project>`, is an ordinary item and no longer a variable. Every env verb and `run` take `-p <stage>`, which `--profile` also spells:
 
 ```sh
 keypaste env set acme-api DATABASE_URL -p staging
@@ -96,11 +96,11 @@ keypaste env diff acme-api dev staging
 keypaste run -p staging acme-api -- npm start
 ```
 
-`env diff` names a key one environment lacks, a key an environment holds but cannot release (an expired item, a name that cannot be exported) and a value two environments share; it never prints a value. Environments named `prod`, `production`, `prod-*` or `production-*`, in any case, are protected: a `--session` run of one is asked about live every time, allow once only.
+`env diff` names a key one stage lacks, a key a stage holds but cannot release (an expired item, a name that cannot be exported) and a value two stages share; it never prints a value. Stages named `prod`, `production`, `prod-*` or `production-*`, in any case, are protected: a `--session` run of one is asked about live every time, allow once only.
 
-`keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault item. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that environment.
+`keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault item. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that stage.
 
-Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault items or another project needs `--env-file`. Only the desktop app maps a directory to a project, so without it name the project, as in `keypaste run acme-api -- npm start`, or the reference file, as in `keypaste run --env-file .env.keypaste -- npm start`; given neither, `run` starts nothing and says which to add. A found or named reference file is always announced with its project and environment, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
+Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault items or another project needs `--env-file`. Only the desktop app maps a directory to a project, so without it name the project, as in `keypaste run acme-api -- npm start`, or the reference file, as in `keypaste run --env-file .env.keypaste -- npm start`; given neither, `run` starts nothing and says which to add. A found or named reference file is always announced with its project and stage, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
 
 <a id="minute-4--the-rest-of-the-repo"></a>
 
@@ -115,7 +115,7 @@ keypaste env pull dev
 keypaste run dev -- npm run dev
 ```
 
-Commit a `.env.keypaste` from `keypaste env export` if you want the variable names and their environment in the repository; it holds no value. One vault can hold several projects, each with its environments. Use separate vaults and master passwords when environments need different access boundaries.
+Commit a `.env.keypaste` from `keypaste env export` if you want the variable names and their stage in the repository; it holds no value. One vault can hold several projects, each with its stages. Use separate vaults and master passwords when stages need different access boundaries.
 
 ## CI
 
@@ -145,7 +145,7 @@ With non-terminal stdin, confirming verbs (`rm`, `env rm`, `env pull`, `env expo
 
 ## The escape hatch
 
-Export values with `--dotenv` when a tool requires a `.env` file or when moving credentials to another system; `-p` picks the environment:
+Export values with `--dotenv` when a tool requires a `.env` file or when moving credentials to another system; `-p` picks the stage:
 
 ```sh
 keypaste env export dev --dotenv --stdout

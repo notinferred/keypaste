@@ -340,33 +340,87 @@ public sealed class EnvProfilesTests : IDisposable
     }
 
     [Fact]
-    public void TheScreen_OpensTheFirstProject_AndThePickerSwitchesIt()
+    public void TheScreen_OpensTheFirstProject_AndTheSidebarsChoiceSwitchesIt()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
-        Assert.Equal("acme-api", screen.SelectedProject);
-        Assert.Equal(["acme-api"], screen.ProjectChoices);
+        Assert.Equal("acme-api", screen.OpenProject?.Name);
 
-        screen.SelectedProject = "billing";
+        screen.OpenCommand.Press("billing");
         Assert.Equal("billing", screen.OpenProject?.Name);
-        Assert.Equal(["acme-api", "billing"], screen.ProjectChoices);
     }
 
     [Fact]
-    public void MatrixCells_FollowTheSelectedProfile_AndHoldNoValue()
+    public void The_header_names_the_project_its_stages_and_its_vault()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        Assert.Equal("AA", project.Initials);
+        Assert.Equal($"2 stages · {Path.GetFileNameWithoutExtension(_fixture.Path_)}", project.Subtitle);
+
+        screen.OpenCommand.Press("billing");
+        Assert.Equal("BI", screen.OpenProject!.Initials);
+        Assert.StartsWith("1 stage ·", screen.OpenProject.Subtitle, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Run_with_nowhere_to_run_asks_where_and_Save_closes_the_form()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown, launching: new ProjectLaunching(new Core.Launch.TerminalLaunch("launcher"), new Core.Launch.DetachedProcessLauncher(), Core.Launch.EnvironmentMerge.Inherited));
+        var launch = Open(screen).Launch;
+
+        await launch.RunOrSetUpCommand.PressAsync();
+        Assert.True(launch.IsSettingUp);
+        Assert.Null(launch.LastStart);
+
+        launch.Directory = _fixture.Home;
+        launch.Command = "npm start";
+        launch.SaveCommand.Press();
+        Assert.False(launch.IsSettingUp);
+        Assert.True(launch.IsMapped);
+    }
+
+    [Fact]
+    public void A_value_another_stage_repeats_says_so_in_place_of_its_mask()
+    {
+        ProjectVariables.Set(_session.Unlocked!, "acme-api", "staging", "DATABASE_URL", "dev-db");
+        _session.Unlocked!.Save();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+        project.SelectedProfile = "staging";
+
+        var database = project.Rows.Single(row => row.Key == "DATABASE_URL");
+        Assert.True(database.IsSameAs);
+        Assert.Equal("Same as dev", database.SameAsNote);
+        Assert.Equal(0, database.MaskedLength);
+        Assert.Equal("acme-api .env.staging", database.From);
+        Assert.Equal("Missing in dev and staging", project.Rows.Single(row => row.Key == "SENTRY_DSN").MissingNote);
+    }
+
+    [Fact]
+    public void Rows_follow_the_selected_stage_and_flag_a_stage_missing_a_value()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
         Assert.Equal(["dev", "prod"], project.Columns.Select(column => column.Name));
         Assert.Equal([true, false], project.Columns.Select(column => column.IsSelected));
+        Assert.Equal([true, false], project.Columns.Select(column => column.HasMissing));
+        Assert.Equal("dev, missing values", project.Columns[0].Spoken);
+        Assert.Equal("prod, protected", project.Columns[1].Spoken);
 
         var sentry = project.Rows.Single(row => row.Key == "SENTRY_DSN");
         Assert.Equal(["missing", "••••••"], sentry.Cells.Select(cell => cell.Label));
         Assert.Null(sentry.Variable);
-        Assert.Equal("DATABASE_URL", project.Rows.Single(row => row.Key == "DATABASE_URL").Variable?.Key);
+        Assert.True(sentry.IsMissingHere);
+        Assert.Equal("Missing in dev", sentry.MissingNote);
+        var database = project.Rows.Single(row => row.Key == "DATABASE_URL");
+        Assert.Equal("DATABASE_URL", database.Variable?.Key);
+        Assert.False(database.IsFlagged);
+        Assert.Equal("acme-api .env", database.From);
 
-        sentry.Cells[0].Act.Press();
+        sentry.Selected.Act.Press();
         Assert.Equal("dev", project.SelectedProfile);
         Assert.True(project.IsAdding);
         Assert.Equal("SENTRY_DSN", project.NewKey);
@@ -412,7 +466,7 @@ public sealed class EnvProfilesTests : IDisposable
     }
 
     [Fact]
-    public void Each_environment_lists_its_entries_and_an_entry_several_read_is_marked_with_them()
+    public void Each_stage_lists_its_entries_and_an_entry_several_read_is_marked_with_them()
     {
         var stripe = Tagged("services", "Stripe", "STRIPE_KEY", "env:acme-api", "env:acme-api:staging", "env:billing");
         var mail = Tagged("services", "Mail", "MAIL_KEY", "env:acme-api");
@@ -429,19 +483,17 @@ public sealed class EnvProfilesTests : IDisposable
 
         var cells = project.Rows.Single(row => row.Key == "STRIPE_KEY").Cells;
         Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.FullSourceNote));
-        Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.SourceNote));
+        var stripeRow = project.Rows.Single(row => row.Key == "STRIPE_KEY");
+        Assert.Equal("Stripe", stripeRow.From);
+        Assert.Equal("services/Stripe · also staging, billing/dev", stripeRow.FromTip);
+        Assert.Equal("Missing in prod", stripeRow.MissingNote);
 
-        // Three items, one cell each: nothing is usual in that column, so each cell names its own.
-        var named = project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[0];
-        Assert.Equal("env/acme-api/.env", named.SourceNote);
-        Assert.Equal("env/acme-api/.env", named.FullSourceNote);
+        var named = project.Rows.Single(row => row.Key == "DATABASE_URL");
+        Assert.Equal("acme-api .env", named.From);
+        Assert.Equal("env/acme-api/.env", named.FromTip);
         Assert.Equal("••••••, from env/acme-api/.env", named.Spoken);
-        Assert.Contains("env/acme-api/.env", named.Tip, StringComparison.Ordinal);
-
-        // Two keys on one item: it is that column's usual one, and only the tooltip and accessible name still say it.
-        var usual = project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[2];
-        Assert.Empty(usual.SourceNote);
-        Assert.Contains("env/acme-api/.env.prod", usual.Spoken, StringComparison.Ordinal);
+        Assert.Contains("env/acme-api/.env", named.Selected.Tip, StringComparison.Ordinal);
+        Assert.Equal("Missing in staging", named.MissingNote);
 
         project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal(

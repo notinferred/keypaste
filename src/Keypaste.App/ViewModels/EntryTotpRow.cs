@@ -92,7 +92,7 @@ internal sealed partial class EntryTotpRow : ObservableObject, IRevealSource, ID
     {
         if (_owner.ReadTotpCode() is { } code)
         {
-            await _owner.Clipboard.CopyAsync(code, "TOTP code").ConfigureAwait(true);
+            await _owner.Clipboard.CopyAsync(code, "One-time code").ConfigureAwait(true);
         }
     }
 }

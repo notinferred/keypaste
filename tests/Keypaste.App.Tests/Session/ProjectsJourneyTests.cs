@@ -23,11 +23,11 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// V-C.4: through the app as launch composes it (D-0342), the Projects screen shows both projects,
-/// where each value lives, the entry two environments share and the tag that puts its entry in no
-/// project; it adds an entry to an environment, takes another out, replaces the shared value, adds a
+/// V-C.4: through the app as launch composes it (D-0342), Environments shows both projects,
+/// where each value lives, the entry two stages share and the tag that puts its entry in no
+/// project; it adds an entry to a stage, takes another out, replaces the shared value, adds a
 /// key with no entry chosen and imports a <c>.env</c>, and a declined or refused act writes nothing;
-/// Run gives a child exactly the environment's fields and writes its History line, on every platform,
+/// Run gives a child exactly the stage's fields and writes its History line, on every platform,
 /// and the project mapped in <c>projects.json</c> runs too.
 /// </summary>
 /// <remarks>
@@ -122,24 +122,25 @@ public sealed class ProjectsJourneyTests
                 var unlocked = app.Authority!.Session.Unlocked!;
                 DrawnFrame.Capture(main);
 
-                // Both projects, each value's entry, the entry two environments share and the ignored tag.
+                // Both projects under the vault's Environments, each value's entry, the entry two stages share and the ignored tag.
+                Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.Environments }));
                 Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));
                 var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
                 var names = AutomationNames(main);
                 Assert.Contains("web", names);
                 Assert.Contains("billing", names);
-                Assert.Contains("services/Stripe · also staging", names);
-                Assert.Contains("services/Mail", names);
-                Assert.Contains("Add environment", names);
-                Assert.Contains("Run with this environment", names);
+                Assert.Contains("Stripe", names);
+                Assert.Contains("Mail", names);
+                Assert.Contains("Add stage", names);
+                Assert.Contains("Run with keypaste", names);
                 Assert.Contains(names, name => name.StartsWith("services/Odd has the tag env:billing:Prod, which puts it in no project", StringComparison.Ordinal));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "a project's keys and entries");
+                AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "a project's keys and entries");
 
-                // An entry added to staging, on the Items tab: asked first, nothing written when declined.
-                Press(main, Named<ChoiceSegment>(main, "ProjectItemsTab"));
+                // An entry added to staging, under Edit's Items in each stage: asked first, nothing written when declined.
+                ChooseFromMore(main, "ProjectItems");
                 Assert.Contains("also dev", AutomationNames(main));
                 Press(main, ByName<Button>(main, "Add an item to staging"));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "the add-entry form");
+                AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "the add-entry form");
                 Fill(main, "Find an item", "Queue");
                 Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "services/Queue" }));
                 Assert.Contains("env:billing:staging puts services/Queue in billing/staging.", AutomationNames(main));
@@ -154,7 +155,7 @@ public sealed class ProjectsJourneyTests
                 // Mail taken out of dev, kept with its field; declined first.
                 Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
                 Assert.Contains("Leaving billing/dev: MAIL_KEY.", AutomationNames(main));
-                AmberElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "taking an entry out, asked");
+                AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "taking an entry out, asked");
                 Unchanged(vault, () => Press(main, Named<Button>(main, "CancelTagChange")));
                 Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
                 Press(main, Named<Button>(main, "ConfirmTagChange"));
@@ -162,8 +163,8 @@ public sealed class ProjectsJourneyTests
                 Assert.Empty(Saved(vault, mail));
                 Assert.NotNull(unlocked.ReadField(mail, "MAIL_KEY"));
 
-                // The shared value replaced, its form naming both environments; cancelled first.
-                Press(main, Named<ChoiceSegment>(main, "ProjectKeysTab"));
+                // The shared value replaced, its form naming both stages; cancelled first.
+                Press(main, Named<Button>(main, "ItemsDone"));
                 var project = screen.OpenProject!;
                 Press(main, RowAction(main, "STRIPE_KEY", "Replace"));
                 Assert.Contains(
@@ -178,7 +179,7 @@ public sealed class ProjectsJourneyTests
                 Assert.Null(screen.Error);
                 Assert.Equal(_replaced, unlocked.ReadField(stripe, "STRIPE_KEY"));
 
-                // A key with no entry chosen lands on the environment's home entry; a name no field can have is refused.
+                // A key with no entry chosen lands on the stage's home entry; a name no field can have is refused.
                 Press(main, ByName<Button>(main, "Add a key to dev"));
                 Fill(main, "New key", "api_key");
                 AssertOneRevealed(main, ByCommand(main, project.ConfirmAddCommand), "adding a key");
@@ -208,7 +209,8 @@ public sealed class ProjectsJourneyTests
                     File.ReadAllText(references),
                     StringComparison.Ordinal);
 
-                // Run gives a child exactly dev's fields, the confirmation naming where they come from.
+                // Run gives a child exactly dev's fields, the confirmation naming where they come from; where it runs is set under Edit.
+                ChooseFromMore(main, "ProjectWhereItRuns");
                 Fill(main, "Project directory", billingDirectory);
                 Fill(main, "Command", Reporter(billingPipe));
                 Press(main, ByCommand(main, project.Launch.SaveCommand));
@@ -250,6 +252,12 @@ public sealed class ProjectsJourneyTests
         var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
         var project = screen.OpenProject!;
 
+        foreach (var toast in shell.Toasts.Shown.ToList())
+        {
+            toast.CloseCommand.Execute(null);
+        }
+
+        WindowInput.Drain();
         var run = ByName<Button>(main, "Run in a terminal");
         Press(main, run);
         await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");
@@ -386,7 +394,7 @@ public sealed class ProjectsJourneyTests
     private static void AssertOneRevealed(Window window, Control primary, string at)
     {
         WindowInput.Reveal(window, primary);
-        AmberElements.AssertOne(window, ByName<Button>(window, "Run in a terminal"), at);
+        AccentElements.AssertOne(window, ByName<Button>(window, "Run in a terminal"), at);
     }
 
     private static void ChooseFromMore(Window window, string item)
@@ -413,7 +421,7 @@ public sealed class ProjectsJourneyTests
     private static Button ByCommand(Window window, System.Windows.Input.ICommand command) =>
         window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, command));
 
-    /// <summary>A matrix row's own action, which shows while the row is hovered.</summary>
+    /// <summary>A variable row's own action, which shows while the row is hovered.</summary>
     private static Button RowAction(Window window, string key, string action) =>
         window.GetVisualDescendants().OfType<Button>()
             .Single(button => button.IsEffectivelyVisible && button.DataContext is EnvVariableRow { Key: var held } && held == key && button.Content as string == action);

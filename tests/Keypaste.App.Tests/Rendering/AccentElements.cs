@@ -1,0 +1,340 @@
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.VisualTree;
+using Keypaste.App.Controls;
+using Xunit;
+
+namespace Keypaste.App.Tests.Rendering;
+
+/// <summary>
+/// The filled accent buttons in a frame the app drew: what DESIGN rule 4 allows once per view.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>An accent pixel</b> is within 15° of the hue of the window's <c>KpAccent</c>, whatever accent the system gives, and has
+/// at least half the chroma of the fainter of <c>KpAccent</c> and <c>KpAccentText</c>. That takes in the fill and its hover and
+/// press shades and the accent as text, and leaves out a selected row's tint and a focused field's glow, which the eye reads as a
+/// surface, and every status colour, whose hues are kept apart from system blue.
+/// </para>
+/// <para>
+/// <b>An element</b> is a connected region of accent pixels, joined across a word's space along a
+/// line (ten pixels) and three pixels between lines, so a label and its fill, or a line of accent text,
+/// are one; and at least eight pixels large, so an anti-aliased fleck is none. Only the topmost surface counts: with a dialog up, what the backdrop dims is not in view.
+/// </para>
+/// <para>
+/// <b>Counted</b> is an element that fills at least <see cref="_filledShare"/> of its bounds, at least <see cref="_leastButtonSide"/> pixels each way, and lies in a button: the one filled
+/// accent the rule allows. The accent as text or an icon, a switch's track, a checkbox, a badge and a waiting dot take the accent
+/// as macOS does and are not counted.
+/// </para>
+/// <para>
+/// <b>Not counted</b> either, because DESIGN's Colour section gives them the accent as state rather than as a signal:
+/// the keyboard's focus ring, a focused field's border and glow and the lock field's caret. The marks' dot is the brand's amber, never the accent.
+/// </para>
+/// </remarks>
+internal static class AccentElements
+{
+    private const double _hueWithin = 15;
+    private const double _chromaShare = 0.5;
+    private const int _joinAcross = 10;
+    private const int _joinDown = 3;
+    private const int _minimumPixels = 8;
+    private const double _filledShare = 0.4;
+    private const int _leastButtonSide = 12;
+
+    /// <summary>The bounds of each filled accent button in the frame the window draws now.</summary>
+    internal static IReadOnlyList<PixelRect> In(TopLevel window)
+    {
+        var accent = Accent(window);
+
+        // Subpixel text puts coloured fringes on white glyphs; grayscale text draws the accent only where it is.
+        // What was drawn before the switch is redrawn, since a visual's drawing is kept until invalidated.
+        if (TextOptions.GetTextRenderingMode(window) != TextRenderingMode.Antialias)
+        {
+            TextOptions.SetTextRenderingMode(window, TextRenderingMode.Antialias);
+
+            foreach (var visual in window.GetVisualDescendants())
+            {
+                visual.InvalidateVisual();
+            }
+        }
+
+        WindowInput.Drain();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick(30);
+        WindowInput.Drain();
+
+        using var bitmap = window.CaptureRenderedFrame();
+        Assert.True(bitmap is not null, "the session drew no frame; it must render with Skia");
+
+        var (pixels, width, height) = Read(bitmap);
+        var scaling = window.RenderScaling;
+        var zoom = Keypaste.App.Views.InterfaceZoom.Factor;
+        var mask = new bool[width * height];
+        var surface = Surface(window, scaling, width, height);
+
+        for (var y = surface.Y; y < surface.Bottom; y++)
+        {
+            for (var x = surface.X; x < surface.Right; x++)
+            {
+                var i = (y * width) + x;
+                mask[i] = accent.Matches(pixels[i * 4 + 2], pixels[i * 4 + 1], pixels[i * 4]);
+            }
+        }
+
+        foreach (var excluded in Excluded(window, scaling))
+        {
+            Clear(mask, width, height, excluded);
+        }
+
+        return [.. Components(mask, width, height, zoom)
+            .Where(found => found.Pixels >= _filledShare * found.Box.Width * found.Box.Height
+                && Math.Min(found.Box.Width, found.Box.Height) >= _leastButtonSide * scaling * zoom
+                && InAButton(window, found.Box))
+            .Select(found => found.Box)];
+    }
+
+    // A checkbox, a radio button and a switch are toggle buttons too, but what they fill marks a state; the nearest of them or a button decides.
+    // A fill covers most of its button, where an accent icon on a larger tile, such as New item's templates, does not.
+    private static bool InAButton(TopLevel window, PixelRect box)
+    {
+        var scaling = window.RenderScaling;
+        var centre = new Point((box.X + (box.Width / 2d)) / scaling, (box.Y + (box.Height / 2d)) / scaling);
+
+        var nearest = window.GetVisualAt(centre)?.GetSelfAndVisualAncestors().FirstOrDefault(ancestor => ancestor is Button or Avalonia.Controls.Primitives.ToggleButton);
+
+        if (nearest is null or CheckBox or RadioButton or ToggleSwitch)
+        {
+            return false;
+        }
+
+        var button = Bounds(nearest, window, scaling, inflate: 0);
+        return (double)box.Width * box.Height >= 0.5 * button.Width * button.Height;
+    }
+
+    /// <summary>
+    /// Asserts the frame holds at most one accent element and, when the view has a primary action or
+    /// live signal, that the one element is it.
+    /// </summary>
+    /// <param name="window">The window.</param>
+    /// <param name="expected">The control that should be the one accent element, or null for none.</param>
+    /// <param name="at">Which frame, for the message.</param>
+    internal static void AssertOne(TopLevel window, Control? expected, string at)
+    {
+        var found = In(window);
+
+        if (expected is null)
+        {
+            Assert.True(found.Count == 0, $"{at}: expected no accent element, found {Describe(window, found)}");
+            return;
+        }
+
+        Assert.True(found.Count == 1, $"{at}: expected one accent element, {expected.Name}, found {Describe(window, found)}");
+
+        var bounds = Bounds(expected, window, window.RenderScaling, inflate: 3);
+        Assert.True(bounds.Contains(found[0]), $"{at}: the accent element {found[0]} is not {expected.Name} at {bounds}");
+    }
+
+    /// <summary>Asserts the frame holds at most one accent element, for a frame whose one is not named.</summary>
+    internal static void AssertAtMostOne(TopLevel window, string at)
+    {
+        var found = In(window);
+        Assert.True(found.Count <= 1, $"{at}: expected at most one accent element, found {Describe(window, found)}");
+    }
+
+    /// <summary>What counts as the accent in the window's palette now.</summary>
+    internal static AccentMatch Accent(TopLevel window)
+    {
+        Color Resolve(string key) =>
+            window.TryFindResource(key, window.ActualThemeVariant, out var value) && value is ISolidColorBrush brush
+                ? brush.Color
+                : throw new InvalidOperationException($"{key} does not resolve in {window.ActualThemeVariant}");
+
+        var (fill, text) = (Resolve("KpAccent"), Resolve("KpAccentText"));
+        return new AccentMatch(HueAndChroma(fill.R, fill.G, fill.B).Hue, Math.Min(HueAndChroma(fill.R, fill.G, fill.B).Chroma, HueAndChroma(text.R, text.G, text.B).Chroma) * _chromaShare);
+    }
+
+    /// <summary>A pixel within <see cref="_hueWithin"/> of the accent's hue and at least <paramref name="MinimumChroma"/> from grey.</summary>
+    internal readonly record struct AccentMatch(double Hue, double MinimumChroma)
+    {
+        internal bool Matches(byte r, byte g, byte b)
+        {
+            var (hue, chroma) = HueAndChroma(r, g, b);
+            var apart = Math.Abs(hue - Hue) % 360;
+            return chroma >= MinimumChroma && Math.Min(apart, 360 - apart) <= _hueWithin;
+        }
+    }
+
+    internal static (double Hue, double Chroma) HueAndChroma(byte r, byte g, byte b)
+    {
+        int max = Math.Max(r, Math.Max(g, b));
+        int min = Math.Min(r, Math.Min(g, b));
+        double chroma = max - min;
+
+        if (chroma == 0)
+        {
+            return (0, 0);
+        }
+
+        var hue = max == r ? 60d * ((g - b) / chroma % 6)
+            : max == g ? 60d * (((b - r) / chroma) + 2)
+            : 60d * (((r - g) / chroma) + 4);
+
+        return (hue < 0 ? hue + 360 : hue, chroma);
+    }
+
+    private static PixelRect Surface(TopLevel window, double scaling, int width, int height)
+    {
+        var everything = new PixelRect(0, 0, width, height);
+        var dialog = window.GetVisualDescendants()
+            .OfType<Border>()
+            .Where(border => border.Classes.Contains("backdrop") && border.IsEffectivelyVisible)
+            .SelectMany(backdrop => backdrop.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("dialog")))
+            .FirstOrDefault(border => border.IsEffectivelyVisible);
+
+        return dialog is null ? everything : Bounds(dialog, window, scaling, inflate: 0).Intersect(everything);
+    }
+
+    private static IEnumerable<PixelRect> Excluded(TopLevel window, double scaling)
+    {
+        foreach (var mark in window.GetVisualDescendants().OfType<BrandOutline>().Where(mark => mark.IsEffectivelyVisible))
+        {
+            yield return Bounds(mark, window, scaling, inflate: 1);
+        }
+
+        if (window.FocusManager?.GetFocusedElement() is Control { IsEffectivelyVisible: true } focused)
+        {
+            var inner = Bounds(focused, window, scaling, inflate: 0);
+            var outer = Bounds(focused, window, scaling, inflate: 5);
+
+            // A field shows focus with its own border and glow; anything else with a ring outside it.
+            if (focused is TextBox or MaskedInput)
+            {
+                yield return outer;
+            }
+            else
+            {
+                yield return new PixelRect(outer.X, outer.Y, outer.Width, inner.Y - outer.Y);
+                yield return new PixelRect(outer.X, inner.Bottom, outer.Width, outer.Bottom - inner.Bottom);
+                yield return new PixelRect(outer.X, outer.Y, inner.X - outer.X, outer.Height);
+                yield return new PixelRect(inner.Right, outer.Y, outer.Right - inner.Right, outer.Height);
+            }
+        }
+    }
+
+    private static PixelRect Bounds(Visual control, TopLevel window, double scaling, int inflate)
+    {
+        var transform = control.TransformToVisual(window) ?? Matrix.Identity;
+        var pixels = PixelRect.FromRect(new Rect(control.Bounds.Size).TransformToAABB(transform), scaling);
+        var grow = (int)Math.Ceiling(inflate * scaling * Math.Abs(transform.M11));
+        return new PixelRect(pixels.X - grow, pixels.Y - grow, pixels.Width + (2 * grow), pixels.Height + (2 * grow));
+    }
+
+    private static void Clear(bool[] mask, int width, int height, PixelRect area)
+    {
+        var clipped = area.Intersect(new PixelRect(0, 0, width, height));
+
+        for (var y = clipped.Y; y < clipped.Bottom; y++)
+        {
+            Array.Clear(mask, (y * width) + clipped.X, clipped.Width);
+        }
+    }
+
+    /// <summary>Each connected region, joined across a word's space, of at least <see cref="_minimumPixels"/> pixels; all three measures grow with the zoom, so an element is the same element at any size.</summary>
+    private static List<(PixelRect Box, int Pixels)> Components(bool[] mask, int width, int height, double zoom)
+    {
+        var joinAcross = (int)Math.Ceiling(_joinAcross * zoom);
+        var joinDown = (int)Math.Ceiling(_joinDown * zoom);
+        var minimumPixels = (int)Math.Ceiling(_minimumPixels * zoom * zoom);
+        var seen = new bool[mask.Length];
+        var found = new List<(PixelRect Box, int Pixels)>();
+        var queue = new Queue<int>();
+
+        for (var start = 0; start < mask.Length; start++)
+        {
+            if (!mask[start] || seen[start])
+            {
+                continue;
+            }
+
+            int left = width, top = height, right = 0, bottom = 0, count = 0;
+            seen[start] = true;
+            queue.Enqueue(start);
+
+            while (queue.TryDequeue(out var at))
+            {
+                int x = at % width, y = at / width;
+                count++;
+                left = Math.Min(left, x);
+                top = Math.Min(top, y);
+                right = Math.Max(right, x);
+                bottom = Math.Max(bottom, y);
+
+                for (var dy = -joinDown; dy <= joinDown; dy++)
+                {
+                    for (var dx = -joinAcross; dx <= joinAcross; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+
+                        if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+                        {
+                            continue;
+                        }
+
+                        var next = (ny * width) + nx;
+
+                        if (mask[next] && !seen[next])
+                        {
+                            seen[next] = true;
+                            queue.Enqueue(next);
+                        }
+                    }
+                }
+            }
+
+            if (count >= minimumPixels)
+            {
+                found.Add((new PixelRect(left, top, right - left + 1, bottom - top + 1), count));
+            }
+        }
+
+        return found;
+    }
+
+    private static string Describe(TopLevel window, IReadOnlyList<PixelRect> found)
+    {
+        if (found.Count == 0)
+        {
+            return "none";
+        }
+
+        var scaling = window.RenderScaling;
+        return string.Join("; ", found.Select(box =>
+        {
+            var centre = new Point((box.X + (box.Width / 2d)) / scaling, (box.Y + (box.Height / 2d)) / scaling);
+            var named = window.GetVisualsAt(centre).OfType<Control>().Select(visual => visual.GetSelfAndVisualAncestors().OfType<Control>().FirstOrDefault(control => !string.IsNullOrEmpty(control.Name))).FirstOrDefault(control => control is not null);
+            return $"{box} ({named?.Name ?? named?.GetType().Name ?? "unnamed"})";
+        }));
+    }
+
+    internal static (byte[] Pixels, int Width, int Height) Read(Bitmap bitmap)
+    {
+        var size = bitmap.PixelSize;
+        using var copy = new WriteableBitmap(size, bitmap.Dpi, PixelFormat.Bgra8888, AlphaFormat.Premul);
+        using var buffer = copy.Lock();
+
+        bitmap.CopyPixels(buffer);
+
+        var bytes = new byte[size.Width * size.Height * 4];
+
+        for (var y = 0; y < size.Height; y++)
+        {
+            Marshal.Copy(buffer.Address + (y * buffer.RowBytes), bytes, y * size.Width * 4, size.Width * 4);
+        }
+
+        return (bytes, size.Width, size.Height);
+    }
+}

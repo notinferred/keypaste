@@ -1535,6 +1535,14 @@ public sealed class Vault : IDisposable
         return includeReserved ? entries : [.. entries.Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))];
     }
 
+    /// <summary>When each item outside the recycle bin and keypaste's own groups last changed, by its UUID as hex; no field is read.</summary>
+    public IReadOnlyDictionary<string, DateTimeOffset> ReadModifiedTimes()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.ReadModifiedTimes();
+    }
+
     /// <summary>Each distinct username an entry outside the recycle bin and keypaste's own groups holds, in ordinal order, for a username box to suggest; no other field is read.</summary>
     public IReadOnlyList<string> ReadUsernames()
     {

@@ -428,6 +428,35 @@ public sealed class KeepUnsavedWorkTests
     });
 
     [Fact]
+    public Task The_template_grid_and_a_presets_untouched_form_change_place_without_asking_and_a_typed_preset_field_asks() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell();
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.ChooseTemplateCommand.Press();
+        RenderedShell.Drain();
+
+        shell.Shell.Current = Destinations.Of(DestinationKind.Settings);
+        Assert.False(shell.Shell.HasDiscardPrompt);
+        Assert.Null(entries.NewItem);
+
+        entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.ChooseTemplateCommand.Press();
+        entries.NewItem!.ChooseTemplateCommand.Press(ItemTemplate.Card);
+        RenderedShell.Drain();
+
+        shell.Shell.Current = Destinations.Of(DestinationKind.Settings);
+        Assert.False(shell.Shell.HasDiscardPrompt);
+
+        entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        entries.BeginAddOfKindCommand.Press(ItemTemplate.Card);
+        entries.NewItem!.CustomFields[0].Value = "M Okafor";
+        RenderedShell.Drain();
+
+        shell.Shell.Current = Destinations.Of(DestinationKind.Settings);
+        Assert.Equal("Discard this new item?", shell.Shell.DiscardPrompt);
+    });
+
+    [Fact]
     public Task An_untouched_form_changes_place_without_asking() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
@@ -489,34 +518,32 @@ public sealed class KeepUnsavedWorkTests
     });
 
     [Fact]
-    public Task The_title_s_project_dropdown_asks_before_discarding_and_Cancel_puts_it_back() => HeadlessSession.On(() =>
+    public Task Choosing_another_project_asks_before_discarding_and_Cancel_keeps_it() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: vault => ProjectVariables.Set(vault, "shop", "SHOP_KEY", "value"));
         var project = shell.OpenProject();
         RenderedShell.Drain();
-        var env = Assert.IsType<EnvSetsViewModel>(shell.Shell.Content);
-        var picker = shell.Window.GetVisualDescendants().OfType<ComboBox>().Single(box => box.Classes.Contains("project") && box.Classes.Contains("title"));
+        project.Launch.SetUpCommand.Press();
         project.Launch.Command = "npm start";
 
-        picker.SelectedItem = "shop";
+        shell.Shell.OpenProjectCommand.Press("shop");
         RenderedShell.Drain();
 
         Assert.Equal("Discard this project's directory and command?", shell.Shell.DiscardPrompt);
-        Assert.Same(project, env.OpenProject);
+        Assert.Same(project, Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject);
 
         shell.Shell.KeepDraftCommand.Press();
         RenderedShell.Drain();
 
-        Assert.Same(project, env.OpenProject);
-        Assert.Equal("billing", picker.SelectedItem);
+        Assert.Same(project, Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject);
         Assert.Equal("npm start", project.Launch.Command);
 
-        picker.SelectedItem = "shop";
+        shell.Shell.OpenProjectCommand.Press("shop");
         RenderedShell.Drain();
         shell.Shell.ConfirmDiscardCommand.Press();
         RenderedShell.Drain();
 
-        Assert.Equal("shop", env.OpenProject?.Name);
+        Assert.Equal("shop", Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject?.Name);
     });
 
     [Fact]
@@ -546,13 +573,14 @@ public sealed class KeepUnsavedWorkTests
         RenderedShell.Drain();
         var chosen = shell.Shell.SelectedSidebarRow;
 
-        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.MainNav.Single(row => row.Destination.Kind == DestinationKind.AgentActivity);
+        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.Place(ItemPlace.Trash);
         RenderedShell.Drain();
         Assert.True(shell.Shell.HasDiscardPrompt);
 
         shell.Shell.KeepDraftCommand.Press();
         RenderedShell.Drain();
-        Assert.Same(chosen, shell.Named<ListBox>("Nav").SelectedItem);
+        Assert.Equal(chosen, shell.Named<ListBox>("Nav").SelectedItem);
+        Assert.IsType<EntriesViewModel>(shell.Shell.Content);
     });
 
     [Fact]
@@ -681,9 +709,8 @@ public sealed class KeepUnsavedWorkTests
 
             default:
                 var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-                entries.BeginAddCommand.Press();
+                entries.BeginAddOfKindCommand.Press(ItemTemplate.ApiKey);
                 var form = entries.NewItem!;
-                form.Template = ItemTemplate.ApiKey;
                 form.AddFieldCommand.Execute(NewItemField.Tags);
                 RenderedShell.Drain();
                 Assert.False(shell.Named<TextBlock>(error).IsEffectivelyVisible);

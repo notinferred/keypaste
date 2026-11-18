@@ -1588,6 +1588,23 @@ namespace KeePassLib.Utility
 			return strTag;
 		}
 
+#if KEYPASTE_PURE_TAG_READS
+		/// <summary>Whether <see cref="NormalizeTags"/> would leave the list as it is, so a reader can skip rewriting it.</summary>
+		internal static bool AreTagsNormalized(List<string> lTags)
+		{
+			if(lTags == null) { Debug.Assert(false); return true; }
+
+			for(int i = 0; i < lTags.Count; ++i)
+			{
+				string str = lTags[i];
+				if(string.IsNullOrEmpty(str) || (NormalizeTag(str) != str)) return false;
+				if((i > 0) && (StrUtil.CompareNaturally(lTags[i - 1], str) > 0)) return false;
+			}
+
+			return ((lTags.Count < 2) || (new HashSet<string>(lTags).Count == lTags.Count));
+		}
+#endif
+
 		internal static void NormalizeTags(List<string> lTags)
 		{
 			if(lTags == null) { Debug.Assert(false); return; }

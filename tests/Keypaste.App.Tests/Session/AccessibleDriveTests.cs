@@ -34,6 +34,7 @@ public sealed class AccessibleDriveTests
 
         Assert.Equal("edited-by-name", shell.Session.Unlocked!.Find(new EntryName(string.Empty, "github"))!.Username);
 
+        Select(shell, "Environments");
         Select(shell, "billing");
         Named<IInvokeProvider>(shell, "Add a key to dev", AutomationControlType.Button).Invoke();
         Named<IValueProvider>(shell, "New key", AutomationControlType.Edit).SetValue("APP_ADDED");

@@ -2,7 +2,6 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Audit;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -155,7 +154,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
     [Fact]
     public void Rules_changed_outside_keypaste_are_said_to_be_ignored()
     {
-        File.WriteAllText(KeypasteHome.AgentsPath(_fixture.Home), "[[rules]]\npassword = \"allow\"\n");
+        _fixture.WriteRules("[[rules]]\npassword = \"allow\"\n");
 
         using var model = new AgentRulesViewModel(_authority);
 

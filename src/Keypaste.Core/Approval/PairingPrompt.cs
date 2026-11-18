@@ -3,26 +3,26 @@ using Keypaste.Core.Browser;
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// What a person is shown before a browser is paired, while they have armed pairing: the KeePassXC-Browser build the browser
-/// named when it started keypaste, and the name the pairing will have, which they may change (D-0634).
+/// What a person is shown before a browser is paired: the code the extension shows too, the KeePassXC-Browser build the browser
+/// named when it started keypaste, and the name the pairing will have, which they may change.
 /// </summary>
 /// <remarks>
 /// The build is what the browser claims, and any program running as the person can start keypaste claiming it (THREATS.md
-/// T-48), so the prompt names it and never says the person's browser asked. It has no member for a key.
+/// T-48), so the person pairs only when the code matches the one their browser shows. It has no member for a key.
 /// </remarks>
 public sealed record PairingPrompt
 {
     /// <summary>The build the browser named.</summary>
     public required BrowserIdentity Identity { get; init; }
 
+    /// <summary>The six digits the extension shows for the key it sent, as <c>472 913</c>.</summary>
+    public required string Code { get; init; }
+
     /// <summary>The name offered, which becomes the pairing's id unless the person changes it.</summary>
     public required string SuggestedName { get; init; }
 
-    /// <summary>The names the vault's pairings already have, which a new one cannot take.</summary>
+    /// <summary>The names this computer's pairings already have, which a new one cannot take.</summary>
     public required IReadOnlyList<string> TakenNames { get; init; }
-
-    /// <summary>Whether the person chose the name when they armed pairing, so the prompt shows it rather than asks for one.</summary>
-    public bool NameChosen { get; init; }
 
     /// <summary>What the prompt says asked: <c>keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)</c>.</summary>
     public string IdentityText => Identity.Described;
@@ -40,12 +40,4 @@ public readonly record struct PairingAnswer(ApprovalAnswer Answer, string? Name)
 {
     /// <summary>A prompt nobody could be shown.</summary>
     public static PairingAnswer NoChannel { get; } = new(ApprovalAnswer.NoChannel, null);
-}
-
-/// <summary>Tells the person that a browser asked to pair while pairing was not armed, which was refused unasked (D-0634).</summary>
-/// <param name="Identity">The build the browser named.</param>
-public sealed record PairingNotice(BrowserIdentity Identity)
-{
-    /// <summary>What the app says.</summary>
-    public const string AppText = "A browser asked to pair. To pair it, press Pair a browser.";
 }

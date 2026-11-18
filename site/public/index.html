@@ -6,15 +6,13 @@
 <title>keypaste — your centralized access manager</title>
 <meta name="description" content="Passwords, environment variables, team access and AI agents in one place, on a database you own. The CLI and MCP bridge are in beta; the desktop app is being built, and team and enterprise features are planned.">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1e1e1f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="/fonts/InstrumentSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/brand.css">
 <link rel="stylesheet" href="/site.css">
 <script src="/site.js" type="module"></script>
-<script src="/hero.js" type="module"></script>
+<script src="/animations.js" type="module"></script>
 </head>
 <body>
 <header class="top">
@@ -34,148 +32,92 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
         Star<span class="count" data-github-stars hidden></span>
       </a>
-      <a class="button inverse" href="/download/">Download</a>
+      <a class="button" href="/download/">Download</a>
     </nav>
   </div>
 </header>
 
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-body">
-      <p class="eyebrow">passwords · environment variables · team access · AI agents</p>
-      <h1>Your centralized access manager.</h1>
-      <p class="tagline">Built for the AI era, ready for an enterprise.</p>
-      <p class="lead">Passwords, environment variables, team access and AI agents stop being separate products. keypaste manages them in one place, on a database you own.</p>
-      <div class="actions">
-        <a class="button primary large" href="/download/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download keypaste</a>
-        <a class="button large" href="#products">See what it does<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+<main class="story">
+  <canvas class="story-field" aria-hidden="true"></canvas>
+
+  <section class="hero" data-chapter>
+    <div class="wrap">
+      <div class="hero-body">
+        <p class="eyebrow">passwords · API keys · environments · AI agents</p>
+        <h1>Your centralized access manager.</h1>
+        <p class="lead">Secure agentic access to all your access: passwords, API keys, every project's environments and the rest, in one place you own. You and your AI agents reach what you need, and only what you allow.</p>
+        <div class="actions">
+          <a class="button primary large" href="/download/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download keypaste</a>
+          <a class="button large" href="#one-place">See what it solves<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+        </div>
       </div>
     </div>
-  </div>
-
-  <canvas id="hero-field" role="img" aria-label="Five separate groups of dots, labelled password manager, secrets platform, .env files, CI variables and team sharing, move together into one square grid labelled keypaste."></canvas>
-
-  <div class="wrap">
-    <p class="release"><span class="dot" aria-hidden="true"></span><b>CLI/MCP v0.3.0 published</b><span>· macOS, Linux, Windows · unsigned</span><span>· desktop app not yet released</span><span>· team and enterprise features planned</span></p>
-  </div>
-</section>
-
-<main>
-  <section class="band" id="products">
     <div class="wrap">
-      <div class="band-head">
-        <h2>One place for all of it</h2>
-        <p>Each of these is a separate product somewhere else. Here they are parts of one.</p>
-      </div>
-
-      <article class="feature">
-        <div>
-          <div class="labels"><span class="label beta">CLI · Beta</span><span class="label building">App · Building</span></div>
-          <h3>Every login, where you expect it.</h3>
-          <p>Logins with a username, password and URL, filed in groups, with search, copy and a generator. They live in the KeePass format, so KeePassXC opens the same file.</p>
-          <a class="more" href="/products/desktop-app/">The desktop app</a>
-        </div>
-        <figure class="shot">
-          <picture>
-            <source srcset="/app/items-light.png" media="(prefers-color-scheme: light)">
-            <img src="/app/items-dark.png" width="1280" height="800" loading="lazy"
-                 alt="keypaste's Items screen: a sidebar with groups, projects and agents, a list of items, and the selected login's fields with its password masked.">
-          </picture>
-        </figure>
-      </article>
-
-      <article class="feature flip">
-        <div>
-          <div class="labels"><span class="label beta">Beta</span></div>
-          <h3>Your project's secrets, without the .env file.</h3>
-          <p>A project's variables live in your vault. One command puts them into one program's environment, and nothing is written to disk.</p>
-          <a class="more" href="/products/project-environments/">Project environments</a>
-        </div>
-        <div class="terminal">
-          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>~/project</div>
-<pre>keypaste env pull dev            # imports ./.env
-keypaste run dev -- npm start    # nothing on disk</pre>
-        </div>
-      </article>
-
-      <article class="feature">
-        <div>
-          <div class="labels"><span class="label beta">Terminal · Beta</span><span class="label building">App · Building</span></div>
-          <h3>AI agents ask. You answer.</h3>
-          <p>An agent asks for one field. You see who is asking and why, and you approve or deny that request. Every request is logged locally, granted or refused.</p>
-          <a class="more" href="/products/agent-approvals/">Agent approvals</a>
-        </div>
-        <figure class="shot prompt">
-          <picture>
-            <source srcset="/app/approval-light.png" media="(prefers-color-scheme: light)">
-            <img src="/app/approval-dark.png" width="508" height="548" loading="lazy"
-                 alt="keypaste's approval prompt: claude-code wants one secret, DATABASE_URL, with the reason the agent gave and the answers Deny and Allow once.">
-          </picture>
-        </figure>
-      </article>
+      <p class="release"><span class="dot" aria-hidden="true"></span><b>CLI/MCP v0.3.0 published</b><span>· macOS, Linux, Windows · unsigned</span><span>· desktop app not yet released</span><span>· team and enterprise features planned</span></p>
     </div>
   </section>
 
-  <section class="band" id="enterprise">
+  <section class="chapter" id="one-place" data-chapter>
     <div class="wrap">
-      <div class="band-head">
-        <h2>The goal: ready for an enterprise</h2>
-        <p>keypaste is not there yet, and says so. The place that holds one person's access is planned to hold a team's and an organization's, with no server that can read anyone's personal vault.</p>
-      </div>
-      <div class="grid">
-        <a class="cell" href="/products/cloud-vault/">
-          <span class="label planned">Planned</span>
-          <h3>Cloud vault</h3>
-          <p>Your vault synced free across your devices, encrypted on each one so keypaste can never read it.</p>
-        </a>
-        <a class="cell" href="/products/team-projects/">
-          <span class="label planned">Planned</span>
-          <h3>Team projects</h3>
-          <p>A project's secrets shared with your team through a relay that stores only ciphertext.</p>
-        </a>
-        <a class="cell" href="/products/ci-and-deploys/">
-          <span class="label planned">Planned</span>
-          <h3>CI and deploys</h3>
-          <p>Identities for CI jobs and deploy targets, and syncs pushed from your own machine.</p>
-        </a>
-        <a class="cell" href="/products/organizations/">
-          <span class="label planned">Planned</span>
-          <h3>Organizations</h3>
-          <p>Single sign-on, SCIM, approval for production changes and audit export.</p>
-        </a>
+      <div class="copy">
+        <div class="labels"><span class="label beta">Available now</span><span class="label">Desktop app · Coming in 1.0</span></div>
+        <h2>Scattered secrets, gathered in one place you own.</h2>
+        <p>Passwords in one app, API keys in old chat threads, a <code>.env</code> file in every project. keypaste keeps them in one standard KeePass file on your computer, with no account, and runs a project with its values without writing a <code>.env</code> file. KeePassXC opens the same file.</p>
+        <a class="more" href="/how-it-works/">How keypaste works</a>
       </div>
     </div>
   </section>
 
-  <section class="band" id="own">
+  <section class="chapter end" id="agents" data-chapter>
     <div class="wrap">
-      <div class="band-head">
-        <h2>Centralized, and still yours</h2>
-      </div>
-      <div class="grid">
-        <div class="cell plain">
-          <h3>A file, not an account</h3>
-          <p>Your vault is a standard KeePass file on your disk. Local use needs no account, service or network.</p>
-        </div>
-        <div class="cell plain">
-          <h3>Open source</h3>
-          <p>AGPL, auditable by anyone. A tool that handles secrets should not ask to be trusted on faith.</p>
-        </div>
-        <div class="cell plain">
-          <h3>Nothing to migrate out of</h3>
-          <p>KeePassXC opens the same file, and CI checks that it does on Linux, macOS and Windows.</p>
-        </div>
+      <div class="copy">
+        <div class="labels"><span class="label beta">Available now</span><span class="label">Verified requesters · Coming in 1.0</span></div>
+        <h2>Agents get only what you allow.</h2>
+        <p>An AI agent asks for one field and says why. You answer, keypaste hands over that field and nothing else, and every request is logged, allowed or refused. In 1.0 keypaste also checks which program is really asking.</p>
+        <a class="more" href="/products/agent-approvals/">Agent approvals</a>
       </div>
     </div>
   </section>
 
-  <section class="band closing">
+  <section class="chapter" id="sharing" data-chapter>
+    <div class="wrap">
+      <div class="copy">
+        <div class="labels"><span class="label">Share links · Coming in 1.0</span><span class="label planned">Team projects · Planned</span></div>
+        <h2>Share with your team without passing secrets around.</h2>
+        <p>A password sent in a chat message stays in that chat. In 1.0 a share link carries one field or one login, sealed on your machine, and opens only a set number of times. Next, a project's environments are shared with your team through a relay that stores only ciphertext.</p>
+        <a class="more" href="/products/team-projects/">Team projects</a> <a class="more" href="/products/share-links/">Share links</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter end" id="organizations" data-chapter>
+    <div class="wrap">
+      <div class="copy">
+        <div class="labels"><span class="label planned">Planned</span></div>
+        <h2>Work access that belongs to the organization.</h2>
+        <p>When work credentials live in personal accounts, they leave with people. Planned for organizations: work vaults the company owns, with keypaste recommending that every login on the company's email move into them. Revoking someone's access hands their work vaults to the right person instead of losing them, and no server ever reads anyone's personal vault. Single sign-on, provisioning, approval for production changes and audit export come with it.</p>
+        <a class="more" href="/products/organizations/">Organizations</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="servers" data-chapter>
+    <div class="wrap">
+      <div class="copy">
+        <div class="labels"><span class="label planned">Exploring · not on the roadmap</span></div>
+        <h2>Reach a server without handing out VPN configs.</h2>
+        <p>Today reaching a private server usually means giving someone a WireGuard config, which keeps working until somebody remembers to revoke it. We are exploring how keypaste could grant that access to a person and take it back as simply as a shared project. It is a direction, not yet a plan.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter closing" data-chapter>
     <div class="wrap">
       <h2>All your access. One place.</h2>
-      <p>The CLI is published today. The desktop app ships as 1.0.</p>
+      <p>The CLI is published today, the desktop app ships as 1.0, and all of it is open source.</p>
       <div class="actions">
         <a class="button primary large" href="/download/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download keypaste</a>
-        <a class="button large" href="/docs/">Read the docs<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+        <a class="button large" href="/vision/">Where keypaste is going<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
       </div>
 
       <form class="signup" method="post" action="/subscribe">
@@ -226,7 +168,7 @@ keypaste run dev -- npm start    # nothing on disk</pre>
         </ul>
       </div>
     </div>
-    <p class="fine">This page sets no cookies and loads no third-party scripts. Its own scripts draw the animation and ask GitHub for the star count, so GitHub sees that request. If you enter your email it is stored for a possible desktop installation announcement.</p>
+    <p class="fine">This page sets no cookies and loads no third-party scripts. Its own scripts draw the moving dots and ask GitHub for the star count, so GitHub sees that request. If you enter your email it is stored for a possible desktop installation announcement.</p>
   </div>
 </footer>
 </body>

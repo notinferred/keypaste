@@ -36,7 +36,7 @@ internal sealed class ActivityWatch : IDisposable
     private static readonly TimeSpan _pointerThrottle = TimeSpan.FromSeconds(5);
 
     private readonly Window _window;
-    private readonly AppVaultSession _session;
+    private readonly IIdleWatched _session;
     private readonly TimeProvider _clock;
     private readonly Action _onActivity;
 
@@ -50,7 +50,7 @@ internal sealed class ActivityWatch : IDisposable
     /// <param name="clock">The clock the pointer throttle measures against.</param>
     /// <param name="onActivity">What else a keystroke, click, wheel turn or counted pointer move does.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    internal ActivityWatch(Window window, AppVaultSession session, TimeProvider clock, Action onActivity)
+    internal ActivityWatch(Window window, IIdleWatched session, TimeProvider clock, Action onActivity)
     {
         ArgumentNullException.ThrowIfNull(window);
         ArgumentNullException.ThrowIfNull(session);

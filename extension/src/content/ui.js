@@ -111,6 +111,17 @@ const LUCIDE_ICONS = {
     ],
     'info': [ [ 'circle', { cx: 12, cy: 12, r: 10 } ], [ 'path', { d: 'M12 16v-4' } ], [ 'path', { d: 'M12 8h.01' } ] ],
     'x': [ [ 'path', { d: 'M18 6 6 18' } ], [ 'path', { d: 'm6 6 12 12' } ] ],
+    'lock': [ [ 'rect', { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 } ], [ 'path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' } ] ],
+    'plus': [ [ 'path', { d: 'M5 12h14' } ], [ 'path', { d: 'M12 5v14' } ] ],
+    'external-link': [
+        [ 'path', { d: 'M15 3h6v6' } ],
+        [ 'path', { d: 'M10 14 21 3' } ],
+        [ 'path', { d: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' } ]
+    ],
+    'key-round': [
+        [ 'path', { d: 'M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z' } ],
+        [ 'circle', { cx: 16.5, cy: 7.5, r: 0.5, fill: 'currentColor' } ]
+    ],
 };
 
 const NOTIFICATION_ICONS = {
@@ -134,6 +145,11 @@ kpxcUI.createIcon = function(name) {
         svg.append(child);
     }
     return svg;
+};
+
+// The key mark that heads keypaste's list beside the page's site.
+kpxcUI.createKeyMark = function() {
+    return kpxcUI.createIcon('key-round');
 };
 
 /**

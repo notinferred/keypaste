@@ -15,6 +15,24 @@ public sealed record ItemChangePrompt
     /// <summary>The bridge's label, sanitized, or null.</summary>
     public string? Label { get; init; }
 
+    /// <summary>Who is asking, as the requester line says it: verified only from what the system said of the connection, never from the label.</summary>
+    public RequesterIdentity Identity
+    {
+        get => _identity ?? new RequesterIdentity(Client, null, false);
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
+
+    /// <summary>The item's own title, sanitized, which a prompt names it by; <see cref="Item"/> is shown under Details.</summary>
+    public string ItemTitle
+    {
+        get => _itemTitle ?? Item[(Item.LastIndexOf('/') + 1)..];
+        init => _itemTitle = value;
+    }
+
+    private readonly string? _itemTitle;
+
     /// <summary>The item's path, sanitized.</summary>
     public required string Item { get; init; }
 
@@ -74,7 +92,9 @@ public sealed record ItemChangePrompt
         {
             Client = asked.Client,
             Label = asked.Label,
+            Identity = asked.Identity,
             Item = asked.Entry,
+            ItemTitle = asked.ItemTitle,
             Change = change.Kind,
             Expires = change.Expires,
             Reason = asked.Reason,

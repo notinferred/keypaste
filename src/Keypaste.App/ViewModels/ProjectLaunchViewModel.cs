@@ -70,6 +70,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         ChooseDirectoryCommand = new AsyncRelayCommand(ChooseDirectoryAsync, () => _picker is not null);
         RunProjectCommand = new AsyncRelayCommand(() => LaunchAsync(run: true), CanLaunch);
+        RunOrSetUpCommand = new AsyncRelayCommand(RunOrSetUpAsync, () => IsSupported && !IsConfirming);
         OpenTerminalCommand = new AsyncRelayCommand(() => LaunchAsync(run: false), CanLaunch);
         ConfirmLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(true), () => IsConfirming);
         CancelLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(false), () => IsConfirming);
@@ -145,6 +146,13 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
     internal AsyncRelayCommand RunProjectCommand { get; }
 
+    /// <summary>Run…: runs the saved command, or, with none saved yet, opens the form that saves one.</summary>
+    internal AsyncRelayCommand RunOrSetUpCommand { get; }
+
+    /// <summary>Whether the form for the directory and command is open.</summary>
+    [ObservableProperty]
+    internal partial bool IsSettingUp { get; private set; }
+
     internal AsyncRelayCommand OpenTerminalCommand { get; }
 
     internal RelayCommand ConfirmLaunchCommand { get; }
@@ -162,6 +170,31 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     }
 
     private bool CanLaunch() => IsMapped && IsSupported && !IsConfirming;
+
+    private Task RunOrSetUpAsync()
+    {
+        if (IsMapped)
+        {
+            return LaunchAsync(run: true);
+        }
+
+        IsSettingUp = true;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Opens the form for the directory and command.</summary>
+    [RelayCommand]
+    private void SetUp() => IsSettingUp = true;
+
+    /// <summary>Closes the form, putting back what is saved.</summary>
+    [RelayCommand]
+    private void CancelSetUp()
+    {
+        Directory = Mapping?.Directory ?? string.Empty;
+        Command = Mapping?.Command ?? string.Empty;
+        IsSettingUp = false;
+        _report(null);
+    }
 
     private async Task ChooseDirectoryAsync()
     {
@@ -213,6 +246,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         Mapping = mapping;
         Directory = directory;
         Command = command;
+        IsSettingUp = false;
         _report(null);
         _announce("Saved. Run starts the command in a terminal there, after you confirm it.", ToastTone.Success);
     }
@@ -456,6 +490,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         _answer = answer;
         OnPropertyChanged(nameof(IsConfirming));
         RunProjectCommand.NotifyCanExecuteChanged();
+        RunOrSetUpCommand.NotifyCanExecuteChanged();
         OpenTerminalCommand.NotifyCanExecuteChanged();
         ConfirmLaunchCommand.NotifyCanExecuteChanged();
         CancelLaunchCommand.NotifyCanExecuteChanged();
@@ -473,6 +508,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         ConfirmSources = string.Empty;
         OnPropertyChanged(nameof(IsConfirming));
         RunProjectCommand.NotifyCanExecuteChanged();
+        RunOrSetUpCommand.NotifyCanExecuteChanged();
         OpenTerminalCommand.NotifyCanExecuteChanged();
         ConfirmLaunchCommand.NotifyCanExecuteChanged();
         CancelLaunchCommand.NotifyCanExecuteChanged();

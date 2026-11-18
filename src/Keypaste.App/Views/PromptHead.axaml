@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.PromptHead"
+             x:DataType="vm:PromptViewModel">
+
+  <!-- keypaste says who is asking, as it checked it with the system, before the agent says anything. One line each:
+       an agent's name or app trims rather than pushing the question down. -->
+  <StackPanel Spacing="8">
+    <!-- The wordmark alone, never beside the icon, at the 64-wide floor DESIGN allows a prompt's header. -->
+    <ctl:BrandWordmark Height="13" HorizontalAlignment="Left" />
+    <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
+      <ctl:KpIcon Classes="claim-muted" Icon="bot" Size="14" VerticalAlignment="Center" />
+      <TextBlock Name="RequesterText" Classes="claim-line size-12-5" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="300">
+        <Run Text="{Binding RequesterAgent}" FontWeight="SemiBold" Foreground="{DynamicResource KpTextPrimary}" /><Run Text="{Binding RequesterApp}" /><Run Text=" &#x00B7;" />
+      </TextBlock>
+      <StackPanel Name="Verified" Classes="claim-verified" Orientation="Horizontal" Spacing="4" Background="Transparent"
+                  IsVisible="{Binding IsVerified}" ToolTip.Tip="{Binding VerificationExplained}"
+                  AutomationProperties.Name="{Binding VerificationExplained}">
+        <ctl:KpIcon Icon="check" Size="14" VerticalAlignment="Center" />
+        <TextBlock Classes="size-12-5" Text="Verified" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Name="NotVerified" Classes="claim-muted size-12-5" Text="Not verified" VerticalAlignment="Center" Background="Transparent"
+                 IsVisible="{Binding IsNotVerified}" ToolTip.Tip="{Binding VerificationExplained}"
+                 AutomationProperties.Name="{Binding VerificationExplained}" />
+    </StackPanel>
+  </StackPanel>
+
+</UserControl>

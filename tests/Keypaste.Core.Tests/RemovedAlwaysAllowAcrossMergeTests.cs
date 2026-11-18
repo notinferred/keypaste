@@ -29,7 +29,7 @@ public sealed class RemovedAlwaysAllowAcrossMergeTests : IDisposable
         _vault.Save();
         _log = new OwnerLog(_directory);
         _gate = new ApprovalGate(_channel, _clock, ApprovalLimits.Default);
-        _file = new AgentRulesFile(KeypasteHome.AgentsPath(_directory));
+        _file = AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, VaultPath));
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

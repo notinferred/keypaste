@@ -34,12 +34,12 @@ namespace Keypaste.Mcp.Tools;
 /// </para>
 /// </remarks>
 /// <param name="options">What this bridge was started with.</param>
-/// <param name="approver">The connection to the vault's owner.</param>
+/// <param name="vaults">The vaults this bridge serves, each through its own owner.</param>
 /// <param name="audit">The bridge's audit log.</param>
 /// <param name="attachments">Whether this is <c>request_attachment</c>, which takes an attachment's <c>name</c> where the other takes a <c>field</c>.</param>
 internal sealed class RequestCredentialTool(
     ServerOptions options,
-    ApproverConnection approver,
+    BridgeVaults vaults,
     AuditLog audit,
     bool attachments = false) : McpServerTool
 {
@@ -78,6 +78,7 @@ internal sealed class RequestCredentialTool(
         var field = attachments ? CredentialFields.Attachment : ReadString(arguments, "field");
         var attachment = attachments ? ReadString(arguments, "name") : null;
         var reason = ReadString(arguments, "reason");
+        var vault = ReadString(arguments, "vault");
 
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
@@ -98,7 +99,7 @@ internal sealed class RequestCredentialTool(
         {
             try
             {
-                verdict = await DecideAsync(client, entry, field, attachment, reason, cancellationToken).ConfigureAwait(false);
+                verdict = await DecideAsync(client, entry, field, attachment, reason, vault, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -128,7 +129,7 @@ internal sealed class RequestCredentialTool(
             verdict.ResolvedEntry,
             options.Exposure.Globs,
             verdict.Session,
-            options.VaultKey);
+            verdict.Route is { } route ? route.Key : vaults.SoleKey);
 
         // No cancellation token reaches this, and there is none to forward: appending is synchronous
         // and takes none. That is what makes "every call is logged" true even for the calls nobody
@@ -139,7 +140,7 @@ internal sealed class RequestCredentialTool(
         }
 
         return verdict.Released is not { } released
-            ? ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method))
+            ? ToolResults.Refuse(InVault(verdict.Route, verdict.Refusal ?? ToolText.Refusal(verdict.Method)))
             : attachment is not null
                 ? ToolResults.ReleaseAttachment(attachment, released.Value, verdict.Method)
                 : ToolResults.Release(released.Field, released.Value, released.CodeSeconds, verdict.Method);
@@ -159,6 +160,7 @@ internal sealed class RequestCredentialTool(
         string field,
         string? attachment,
         string reason,
+        string vault,
         CancellationToken cancellationToken)
     {
         if (CredentialRequestRules.Check(entry, field, attachment, reason) is { } problem)
@@ -177,6 +179,14 @@ internal sealed class RequestCredentialTool(
                 "the item is outside what this agent can see through this bridge");
         }
 
+        var routing = await vaults.RouteAsync(vault, [entry], [], cancellationToken).ConfigureAwait(false);
+
+        if (routing.Route is not { } route)
+        {
+            return new Verdict(AuditDecision.Denied, routing.Method, routing.Reason, Refusal: routing.Refusal);
+        }
+
+        var approver = route.Connection;
         var (reply, outcome, refusal) = await approver.RequestAsync(
             new CredentialRequest
             {
@@ -206,7 +216,10 @@ internal sealed class RequestCredentialTool(
                 McpAudit.Unrecorded,
                 Refusal: ToolText.AuditUnavailable,
                 ResolvedEntry: reply.Entry,
-                Session: reply.Session);
+                Session: reply.Session)
+            {
+                Route = route,
+            };
         }
 
         // Checked after the exchange as well as before, and this is the important one: a person can
@@ -219,6 +232,7 @@ internal sealed class RequestCredentialTool(
             return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request")
             {
                 Recorded = reply is not null,
+                Route = route,
             };
         }
 
@@ -230,12 +244,15 @@ internal sealed class RequestCredentialTool(
             return new Verdict(
                 AuditDecision.Denied,
                 AuditMethod.Busy,
-                "another exchange was already in flight on this connection");
+                "another exchange was already in flight on this connection")
+            {
+                Route = route,
+            };
         }
 
         if (reply is null)
         {
-            return outcome switch
+            return (outcome switch
             {
                 ApproverOutcome.Refused when refusal?.Refusal is { } method =>
                     new Verdict(AuditDecision.Denied, method, refusal.Reason),
@@ -251,9 +268,12 @@ internal sealed class RequestCredentialTool(
                     AuditDecision.Denied,
                     AuditMethod.NoApprover,
                     "no keypaste process holds the vault unlocked",
-                    Refusal: outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                    Refusal: outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(route.Vault, cancellationToken).ConfigureAwait(false)
                         ? ToolText.AppLocked
                         : null),
+            }) with
+            {
+                Route = route,
             };
         }
 
@@ -262,6 +282,7 @@ internal sealed class RequestCredentialTool(
             return new Verdict(AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry, Session: reply.Session)
             {
                 Recorded = true,
+                Route = route,
             };
         }
 
@@ -274,8 +295,13 @@ internal sealed class RequestCredentialTool(
             Session: reply.Session)
         {
             Recorded = true,
+            Route = route,
         };
     }
+
+    /// <summary>A refusal from one of several vaults, named with its vault; the one vault's, as it is.</summary>
+    private string InVault(VaultRoute? route, string refusal) =>
+        vaults.Several && route?.Vault is { } named ? ToolText.InVault(named.Name, refusal) : refusal;
 
     /// <summary>Whether a path-shaped argument names something this server may ask about; the owner decides by the entry's tags.</summary>
     private bool InScope(string entry, string field) =>
@@ -327,5 +353,8 @@ internal sealed class RequestCredentialTool(
     {
         /// <summary>Whether the owner recorded this call, so the bridge writes no line of its own.</summary>
         public bool Recorded { get; init; }
+
+        /// <summary>The vault the request went to, or null when it went to none.</summary>
+        public VaultRoute? Route { get; init; }
     }
 }

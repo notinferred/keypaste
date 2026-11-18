@@ -13,7 +13,7 @@ namespace Keypaste.Browser;
 /// <summary>
 /// keypaste as KeePassXC-Browser's native messaging host: it ends the extension's NaCl box session, answers itself whatever
 /// keypaste refuses, and sends the vault's owner only typed requests over its pipe, as a browser's attachment. It never opens
-/// the vault and writes no audit line (D-0548, D-0625 to D-0628).
+/// the vault and writes no audit line.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,6 +34,9 @@ internal sealed class Relay : IAsyncDisposable
 {
     private const int _longestEcho = 64;
 
+    // Only the origin of the page a new login is for reaches the item, so a longer address is refused rather than carried.
+    private const int _longestNewLoginUrl = 2048;
+
     private static readonly TimeSpan _connectTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
@@ -44,6 +47,7 @@ internal sealed class Relay : IAsyncDisposable
     private BoxKeyPair? _keys;
     private byte[]? _extensionKey;
     private BrowserLink? _link;
+    private RelayVault? _reached;
     private Pairing? _paired;
     private string? _databaseHash;
     private bool _toldLocked;
@@ -53,6 +57,9 @@ internal sealed class Relay : IAsyncDisposable
         _options = options;
         _output = output;
     }
+
+    /// <summary>The vault the link's owner was attached through, which each request names; empty before any was.</summary>
+    private string VaultPath => _reached?.Path ?? string.Empty;
 
     /// <summary>Answers the browser until it closes standard input or <paramref name="stop"/> is cancelled.</summary>
     /// <param name="options">Who started the relay, and where the owner is.</param>
@@ -138,7 +145,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(action, refused, outer.GetValueOrDefault("requestID"));
         }
 
-        if (action is not (GetDatabaseHash or Associate or TestAssociate or GetLogins or LockDatabase))
+        if (action is not (GetDatabaseHash or Associate or TestAssociate or GetLogins or GetLogin or OpenKeypaste or LockDatabase))
         {
             return Error(action, ExtensionError.IncorrectAction);
         }
@@ -166,6 +173,8 @@ internal sealed class Relay : IAsyncDisposable
             Associate => await AssociateAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
             TestAssociate => await TestAssociateAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
             GetLogins => await GetLoginsAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
+            GetLogin => await GetLoginAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
+            OpenKeypaste => await OpenKeypasteAsync(inner, replyNonce, stop).ConfigureAwait(false),
             _ => await LockAsync(replyNonce, stop).ConfigureAwait(false),
         };
     }
@@ -201,7 +210,7 @@ internal sealed class Relay : IAsyncDisposable
     }
 
     /// <summary>
-    /// Opens a request's box, refusing a nonce the session has used or whose increment it has (D-0625), and reads its string
+    /// Opens a request's box, refusing a nonce the session has used or whose increment it has, and reads its string
     /// members; every other member, the extension's other pairings' keys among them, goes no further.
     /// </summary>
     private bool TryOpen(
@@ -237,7 +246,7 @@ internal sealed class Relay : IAsyncDisposable
 
     /// <summary>
     /// The hash the owner told this attachment, which the extension files keypaste's pairing under, apart from KeePassXC's; an
-    /// owner that pairs no browsers tells none, answered with error 2 (D-0636). No <c>oldHash</c> is ever sent.
+    /// owner that pairs no browsers tells none, answered with error 2. No <c>oldHash</c> is ever sent.
     /// </summary>
     private async Task<byte[]> DatabaseHashAsync(byte[] replyNonce, bool knock, CancellationToken stop)
     {
@@ -278,7 +287,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(Associate, ExtensionError.DatabaseNotOpened);
         }
 
-        var request = new BrowserPairRequest(identificationKey) { Vault = _options.VaultPath, Session = session };
+        var request = new BrowserPairRequest(identificationKey) { Vault = VaultPath, Session = session };
         var reply = await ExchangeAsync((link, token) => link.PairAsync(request, token), stop).ConfigureAwait(false);
 
         if (reply is { Outcome: BrowserOutcome.Done, Pairing: { } pairing } && IsPairing(pairing))
@@ -307,7 +316,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(TestAssociate, ExtensionError.DatabaseNotOpened);
         }
 
-        var request = new BrowserCheckRequest(pairing, key) { Vault = _options.VaultPath, Session = session };
+        var request = new BrowserCheckRequest(pairing, key) { Vault = VaultPath, Session = session };
         var reply = await ExchangeAsync((link, token) => link.CheckAsync(request, token), stop).ConfigureAwait(false);
 
         if (reply is { Outcome: BrowserOutcome.Done })
@@ -322,60 +331,33 @@ internal sealed class Relay : IAsyncDisposable
     }
 
     /// <summary>
-    /// Asks for a page's logins under the pairing the last check proved in this unlock, and that pairing alone, whatever the
-    /// request's <c>id</c> and <c>keys</c> say (D-0625).
+    /// Asks for the names of a page's logins under the pairing the last check proved in this unlock, and that pairing alone,
+    /// whatever the request's <c>id</c> and <c>keys</c> say. Each entry carries an empty password, as no password leaves keypaste
+    /// before the person picks one; a list matching nothing is an answer, not KeePassXC's error 15, so the extension can still
+    /// name the vaults that are locked.
     /// </summary>
     private async Task<byte[]> GetLoginsAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
     {
-        if (_paired is not { } paired)
+        var (page, refusal) = await PageAsync(GetLogins, inner, knock, stop).ConfigureAwait(false);
+
+        if (page is null)
         {
-            return Error(GetLogins, ExtensionError.AssociationFailed);
+            return refusal!;
         }
 
-        // HTTP authentication is refused, as D-0548 refuses it, before anything is sent.
-        if (inner.GetValueOrDefault("httpAuth") == True)
-        {
-            return Error(GetLogins, ExtensionError.NoLoginsFound);
-        }
-
-        if (inner.GetValueOrDefault("url") is not { Length: > 0 } url)
-        {
-            return Error(GetLogins, ExtensionError.NoUrlProvided);
-        }
-
-        if (await AttachAsync(knock, stop).ConfigureAwait(false) is not { } session)
-        {
-            return Error(GetLogins, ExtensionError.DatabaseNotOpened);
-        }
-
-        if (session != paired.Session)
-        {
-            _paired = null;
-            return Error(GetLogins, ExtensionError.AssociationFailed);
-        }
-
-        // The extension marks a request the person made, by the key icon or Connect, as one that may unlock: only that may ask them.
-        var request = new BrowserFillRequest(paired.Id, paired.Key, url)
-        {
-            SubmitUrl = inner.GetValueOrDefault("submitUrl"),
-            PersonAsked = knock,
-            Vault = _options.VaultPath,
-            Session = session,
-        };
+        var request = new BrowserListRequest(page.Paired.Id, page.Paired.Key, page.Url) { SubmitUrl = page.SubmitUrl, Vault = VaultPath, Session = page.Session };
 
         if (ApproverProtocol.Encode(request).Length > MessageFramer.MaximumPayloadBytes)
         {
             return Error(GetLogins, ExtensionError.NoLoginsFound);
         }
 
-        var reply = await ExchangeAsync((link, token) => link.FillAsync(request, token), stop).ConfigureAwait(false);
+        var reply = await ExchangeAsync((link, token) => link.ListAsync(request, token), stop).ConfigureAwait(false);
 
         switch (reply)
         {
-            case { Outcome: BrowserOutcome.Done, Logins: { Count: > 0 } logins }:
-                return Sealed(GetLogins, replyNonce, writer => WriteLogins(writer, logins, paired.Id));
             case { Outcome: BrowserOutcome.Done }:
-                return Error(GetLogins, ExtensionError.NoLoginsFound);
+                return Sealed(GetLogins, replyNonce, writer => WriteNames(writer, reply, page.Paired.Id));
             case { Outcome: BrowserOutcome.NotPaired }:
                 _paired = null;
                 return Error(GetLogins, ExtensionError.AssociationFailed);
@@ -386,6 +368,116 @@ internal sealed class Relay : IAsyncDisposable
         }
     }
 
+    /// <summary>Asks for the one login the person picked, which keypaste fills at once on a site it filled it on before and otherwise asks about.</summary>
+    private async Task<byte[]> GetLoginAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
+    {
+        if (inner.GetValueOrDefault("uuid") is not { } uuid || !IsPairing(uuid))
+        {
+            return Error(GetLogin, ExtensionError.NoLoginsFound);
+        }
+
+        var (page, refusal) = await PageAsync(GetLogin, inner, knock, stop).ConfigureAwait(false);
+
+        if (page is null)
+        {
+            return refusal!;
+        }
+
+        var request = new BrowserReleaseRequest(page.Paired.Id, page.Paired.Key, page.Url, uuid) { SubmitUrl = page.SubmitUrl, Vault = VaultPath, Session = page.Session };
+
+        if (ApproverProtocol.Encode(request).Length > MessageFramer.MaximumPayloadBytes)
+        {
+            return Error(GetLogin, ExtensionError.NoLoginsFound);
+        }
+
+        var reply = await ExchangeAsync((link, token) => link.ReleaseAsync(request, token), stop).ConfigureAwait(false);
+
+        switch (reply)
+        {
+            case { Outcome: BrowserOutcome.Done, Logins: [var login] }:
+                return Sealed(GetLogin, replyNonce, writer => WriteLogins(writer, [login], page.Paired.Id));
+            case { Outcome: BrowserOutcome.Done }:
+                return Error(GetLogin, ExtensionError.NoLoginsFound);
+            case { Outcome: BrowserOutcome.NotPaired }:
+                _paired = null;
+                return Error(GetLogin, ExtensionError.AssociationFailed);
+            case null or { Outcome: BrowserOutcome.Locked }:
+                return Error(GetLogin, ExtensionError.DatabaseNotOpened);
+            default:
+                return Error(GetLogin, ExtensionError.ActionCancelledOrDenied);
+        }
+    }
+
+    /// <summary>Asks the owner to bring keypaste forward for what the person pressed in a page's list, under the pairing the last check proved.</summary>
+    private async Task<byte[]> OpenKeypasteAsync(Dictionary<string, string> inner, byte[] replyNonce, CancellationToken stop)
+    {
+        BrowserShow? what = inner.GetValueOrDefault("what") switch
+        {
+            "open" => BrowserShow.Open,
+            "new-login" => BrowserShow.NewLogin,
+            "unlock" => BrowserShow.Unlock,
+            _ => null,
+        };
+
+        var vaultName = inner.GetValueOrDefault("vault") ?? string.Empty;
+        var url = inner.GetValueOrDefault("url") ?? string.Empty;
+
+        if (what is not { } shown || vaultName.Length > AttachClient.MaximumLength || url.Length > _longestNewLoginUrl)
+        {
+            return Error(OpenKeypaste, ExtensionError.IncorrectAction);
+        }
+
+        if (_paired is not { } paired)
+        {
+            return Error(OpenKeypaste, ExtensionError.AssociationFailed);
+        }
+
+        if (await AttachAsync(knock: true, stop).ConfigureAwait(false) is not { } session || session != paired.Session)
+        {
+            return Error(OpenKeypaste, ExtensionError.DatabaseNotOpened);
+        }
+
+        var request = new BrowserShowRequest(shown) { VaultName = vaultName, Url = url, Vault = VaultPath, Session = session };
+        var reply = await ExchangeAsync((link, token) => link.ShowAsync(request, token), stop).ConfigureAwait(false);
+
+        return reply is { Outcome: BrowserOutcome.Done } ? Sealed(OpenKeypaste, replyNonce) : Error(OpenKeypaste, ExtensionError.ActionCancelledOrDenied);
+    }
+
+    /// <summary>
+    /// What a list or a pick names of the page: the pairing proven in this unlock, the session and the URLs; or the error to send.
+    /// </summary>
+    private async Task<(PageRequest? Page, byte[]? Refusal)> PageAsync(string action, Dictionary<string, string> inner, bool knock, CancellationToken stop)
+    {
+        if (_paired is not { } paired)
+        {
+            return (null, Error(action, ExtensionError.AssociationFailed));
+        }
+
+        // HTTP authentication is refused before anything is sent.
+        if (inner.GetValueOrDefault("httpAuth") == True)
+        {
+            return (null, Error(action, ExtensionError.NoLoginsFound));
+        }
+
+        if (inner.GetValueOrDefault("url") is not { Length: > 0 } url)
+        {
+            return (null, Error(action, ExtensionError.NoUrlProvided));
+        }
+
+        if (await AttachAsync(knock, stop).ConfigureAwait(false) is not { } session)
+        {
+            return (null, Error(action, ExtensionError.DatabaseNotOpened));
+        }
+
+        if (session != paired.Session)
+        {
+            _paired = null;
+            return (null, Error(action, ExtensionError.AssociationFailed));
+        }
+
+        return (new PageRequest(paired, session, url, inner.GetValueOrDefault("submitUrl")), null);
+    }
+
     /// <summary>Locks as <c>keypaste lock</c> does, asking nobody; the link's end then tells the extension it is locked.</summary>
     private async Task<byte[]> LockAsync(byte[] replyNonce, CancellationToken stop)
     {
@@ -394,7 +486,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(LockDatabase, ExtensionError.DatabaseNotOpened);
         }
 
-        var request = new BrowserLockRequest { Vault = _options.VaultPath, Session = session };
+        var request = new BrowserLockRequest { Vault = VaultPath, Session = session };
         var reply = await ExchangeAsync((link, token) => link.LockAsync(request, token), stop).ConfigureAwait(false);
 
         return reply switch
@@ -406,8 +498,8 @@ internal sealed class Relay : IAsyncDisposable
     }
 
     /// <summary>
-    /// Attaches to the session holding the vault as a browser's attachment, connecting when need be, and returns it; or, with
-    /// nothing holding the vault unlocked, knocks on the locked app's pipe when the extension asked to unlock (D-0466) and
+    /// Attaches as a browser's attachment to a session holding one of the vaults, connecting when need be, and returns it; or,
+    /// with nothing holding any of them unlocked, knocks on the locked app's pipe when the extension asked to unlock and
     /// returns null.
     /// </summary>
     private async Task<string?> AttachAsync(bool knock, CancellationToken stop)
@@ -417,17 +509,52 @@ internal sealed class Relay : IAsyncDisposable
             await OwnerEndedAsync(stop).ConfigureAwait(false);
         }
 
-        var request = new AttachRequest(_options.VaultPath) { Browser = _options.Identity.Caller };
-        var pipeName = _options.PipeName;
-
-        for (var attempt = 0; attempt < 2 && pipeName is not null; attempt++)
+        // The owner the link reached last is asked first, then each other vault's, so one locked vault leaves the relay
+        // on another that is unlocked.
+        foreach (var vault in _options.Vaults.OrderBy(vault => vault == _reached ? 0 : 1))
         {
-            _link ??= await BrowserLink.TryConnectAsync(pipeName, _connectTimeout, stop).ConfigureAwait(false);
+            if (await AttachThroughAsync(vault, stop).ConfigureAwait(false) is { } session)
+            {
+                return session;
+            }
+        }
+
+        _toldLocked = true;
+
+        if (knock)
+        {
+            foreach (var vault in _options.Vaults)
+            {
+                if (await LockedAppEndpoint.TellAsync(vault.LockedAppName, stop).ConfigureAwait(false))
+                {
+                    break;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Attaches to the session holding <paramref name="vault"/>, connecting when need be, or returns null when its owner does not.</summary>
+    private async Task<string?> AttachThroughAsync(RelayVault vault, CancellationToken stop)
+    {
+        if (_link is not null && vault != _reached)
+        {
+            await DropLinkAsync().ConfigureAwait(false);
+        }
+
+        var request = new AttachRequest(vault.Path) { Browser = _options.Identity.Caller };
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            _link ??= await BrowserLink.TryConnectAsync(vault.PipeName, _connectTimeout, stop).ConfigureAwait(false);
 
             if (_link is null)
             {
-                break;
+                return null;
             }
+
+            _reached = vault;
 
             if (await _link.AttachAsync(request, stop).ConfigureAwait(false) is { Attached: true, Session: { } session } attached)
             {
@@ -448,15 +575,8 @@ internal sealed class Relay : IAsyncDisposable
 
             if (answered)
             {
-                break;
+                return null;
             }
-        }
-
-        _toldLocked = true;
-
-        if (knock && _options.LockedAppName is { } lockedApp)
-        {
-            await LockedAppEndpoint.TellAsync(lockedApp, stop).ConfigureAwait(false);
         }
 
         return null;
@@ -542,6 +662,40 @@ internal sealed class Relay : IAsyncDisposable
         {
             CryptographicOperations.ZeroMemory(plain);
         }
+    }
+
+    /// <summary>
+    /// A page's list as KeePassXC lists logins, each with its username, title and UUID, an empty password and, while several vaults
+    /// are open, its vault; then the open vaults that are locked, the page's site and why every fill there is asked, if it is.
+    /// </summary>
+    private static void WriteNames(Utf8JsonWriter writer, BrowserListReply reply, string pairing)
+    {
+        writer.WriteNumber("count", reply.Names.Count);
+        writer.WriteStartArray("entries");
+
+        foreach (var name in reply.Names)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("login", name.Username);
+            writer.WriteString("name", name.Title);
+            writer.WriteString("password", string.Empty);
+            writer.WriteString("uuid", name.Uuid);
+            writer.WriteString("vault", name.Vault);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteStartArray("lockedVaults");
+
+        foreach (var vault in reply.LockedVaults)
+        {
+            writer.WriteStringValue(vault);
+        }
+
+        writer.WriteEndArray();
+        writer.WriteString("site", reply.Site);
+        writer.WriteString("warning", reply.Warning);
+        writer.WriteString("id", pairing);
     }
 
     /// <summary>The logins as KeePassXC lists them, each with only its username, title, password and UUID, never its group, a TOTP code or another field.</summary>
@@ -670,4 +824,7 @@ internal sealed class Relay : IAsyncDisposable
 
     /// <summary>The pairing a check proved, in the unlock it was proved in.</summary>
     private sealed record Pairing(string Id, string Key, string Session);
+
+    /// <summary>What a list or a pick names of the page, under the pairing proven in this unlock.</summary>
+    private sealed record PageRequest(Pairing Paired, string Session, string Url, string? SubmitUrl);
 }

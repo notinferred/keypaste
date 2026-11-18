@@ -22,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
-FONT = ROOT / "src/Keypaste.App/Assets/Fonts/FragmentMono-Regular.ttf"
+FONT = Path(__file__).resolve().parent / "fonts/FragmentMono-Regular.ttf"
 
 SCALE = 2
 WIDTH = 960

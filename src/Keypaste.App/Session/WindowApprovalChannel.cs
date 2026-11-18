@@ -29,28 +29,37 @@ namespace Keypaste.App.Session;
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
-/// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 /// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>
 /// <param name="clipboard">Where a save prompt's value is pasted from, or null for none.</param>
+/// <param name="screen">What this channel shares with the other open vaults' channels, or null for a screen of its own.</param>
+/// <param name="vault">The vault's name each prompt shows, or null while it need not name one.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
     Action<Exception, string>? unexpected = null,
-    Action? openBrowserFill = null,
     RequestNotices? notices = null,
-    Func<Clipboard.IAppClipboard>? clipboard = null) : IApprovalChannel
+    Func<Clipboard.IAppClipboard>? clipboard = null,
+    WindowApprovalChannel.Screen? screen = null,
+    Func<string?>? vault = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly TimeSpan _answerWindow = answerWindow;
+    private readonly Screen _screen = screen ?? new Screen();
 
-    // Read and written on the UI thread only.
-    private Showing? _showing;
-    private PairingNoticeWindow? _pairingNotice;
+    /// <summary>
+    /// The prompt on screen and the notice, which every open vault's channel shares, so a prompt brought forward or
+    /// asked about is the one in front of the person, whichever vault asked.
+    /// </summary>
+    internal sealed class Screen
+    {
+        // Read and written on the UI thread only.
+        internal Showing? Showing { get; set; }
 
-    // Requests asked on any thread whose prompts the UI thread has not yet taken up.
-    private int _queued;
+        // Requests asked on any thread whose prompts the UI thread has not yet taken up.
+        internal int Queued;
+    }
 
     /// <summary>Raised on the UI thread once a prompt window, or a notice, is on screen.</summary>
     internal event EventHandler<Window>? Shown;
@@ -137,7 +146,7 @@ internal sealed class WindowApprovalChannel(
         return ShowAsync(request, () => new TerminalEditWindow(request), cancellationToken);
     }
 
-    /// <summary>Asks the person who armed pairing to pair a browser, under a name they may change, in a prompt window of its own.</summary>
+    /// <summary>Asks the person to pair a browser whose code they compare, under a name they may change, in a prompt window of its own.</summary>
     public async ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);
@@ -148,51 +157,17 @@ internal sealed class WindowApprovalChannel(
         return answer == ApprovalAnswer.ApprovedOnce ? new PairingAnswer(answer, request.Name) : new PairingAnswer(answer, null);
     }
 
-    /// <summary>Asks the person who clicked in a page to fill one of its logins, once or always there, in a prompt window of its own.</summary>
-    public async ValueTask<FillAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
+    /// <summary>Asks the person who picked a login in a page whether to fill it on a site it was not filled on before, in a prompt window of its own.</summary>
+    public async ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
         var request = new FillViewModel(prompt);
-        var answer = await ShowAsync(request, () => new FillWindow(request), cancellationToken).ConfigureAwait(false);
-
-        return answer == ApprovalAnswer.ApprovedOnce && request.PickedUuid is { } uuid
-            ? new FillAnswer(answer, uuid, request.AlwaysPicked)
-            : new FillAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null, false);
-    }
-
-    /// <summary>Tells the person a browser asked to pair while pairing was not on, in one notice at a time, which takes nothing down.</summary>
-    public void Tell(PairingNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        UiThread.Post(() =>
-        {
-            // One is enough to say it; a browser asking again while it is up adds nothing to read.
-            if (_pairingNotice is not null)
-            {
-                return;
-            }
-
-            try
-            {
-                var window = new PairingNoticeWindow(notice, openBrowserFill);
-                window.Closed += (_, _) => _pairingNotice = null;
-                _pairingNotice = window;
-                window.Show();
-                Shown?.Invoke(this, window);
-            }
-            catch (Exception ex)
-            {
-                // A notice that cannot be shown changes nothing: the request stays refused, and its line says why.
-                _pairingNotice = null;
-                unexpected?.Invoke(ex, CrashReporting.AlwaysNoticeSite);
-            }
-        });
+        return await ShowAsync(request, () => new FillWindow(request), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Whether a prompt waits for the person's answer or is on its way to the screen, which no file dropped on the main window or system dialog goes ahead of.</summary>
-    internal bool IsAsking => Volatile.Read(ref _queued) > 0 || _showing is { Request.IsAnswered: false };
+    internal bool IsAsking => Volatile.Read(ref _screen.Queued) > 0 || _screen.Showing is { Request.IsAnswered: false };
 
     /// <summary>
     /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
@@ -204,7 +179,7 @@ internal sealed class WindowApprovalChannel(
     {
         UiThread.VerifyAccess();
 
-        if (_showing is not { } showing || showing.Request.IsAnswered)
+        if (_screen.Showing is not { } showing || showing.Request.IsAnswered)
         {
             return false;
         }
@@ -235,9 +210,9 @@ internal sealed class WindowApprovalChannel(
             var shown = window;
             window = null;
 
-            if (ReferenceEquals(_showing?.Request, request))
+            if (ReferenceEquals(_screen.Showing?.Request, request))
             {
-                _showing = null;
+                _screen.Showing = null;
             }
 
             shown?.Close();
@@ -252,12 +227,13 @@ internal sealed class WindowApprovalChannel(
         using var countdown = _clock.CreateTimer(
             _ => UiThread.Post(() => request.Tick(Remaining())), null, _tick, _tick);
 
-        Interlocked.Increment(ref _queued);
+        request.Vault = vault?.Invoke();
+        Interlocked.Increment(ref _screen.Queued);
 
         UiThread.Post(() =>
         {
-            // From here _showing says so; nothing before it on this thread reads the count.
-            Interlocked.Decrement(ref _queued);
+            // From here the screen's Showing says so; nothing before it on this thread reads the count.
+            Interlocked.Decrement(ref _screen.Queued);
 
             // Withdrawn once requested: a token is marked before its callbacks run, so before the tokens linked below it are.
             if (request.IsAnswered || cancellationToken.IsCancellationRequested || withdrawals.Any(token => token.IsCancellationRequested))
@@ -281,7 +257,7 @@ internal sealed class WindowApprovalChannel(
                 };
                 shown.Deactivated += (_, _) => request.Disarm();
                 request.Disarmed += (_, _) => _ = ArmAsync(request, shown, cancellationToken);
-                _showing = new Showing(request, shown, cancellationToken);
+                _screen.Showing = new Showing(request, shown, cancellationToken);
                 Shown?.Invoke(this, shown);
                 _ = ArmAsync(request, shown, cancellationToken);
 
@@ -348,5 +324,5 @@ internal sealed class WindowApprovalChannel(
     }
 
     /// <summary>The prompt on screen, its window, and the token that withdraws it.</summary>
-    private sealed record Showing(PromptViewModel Request, PromptWindow Window, CancellationToken Withdrawn);
+    internal sealed record Showing(PromptViewModel Request, PromptWindow Window, CancellationToken Withdrawn);
 }

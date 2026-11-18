@@ -44,11 +44,7 @@ class UsernameFieldIcon extends Icon {
         this.icon.classList.add(getIconClassName(state));
         this.icon.title = getIconText(state);
 
-        if (kpxc.credentials.length === 0 && state === DatabaseState.UNLOCKED) {
-            this.icon.style.filter = 'saturate(0%)';
-        } else {
-            this.icon.style.filter = 'saturate(100%)';
-        }
+        this.icon.style.filter = state === DatabaseState.UNLOCKED ? 'saturate(100%)' : 'saturate(0%)';
     }
 }
 
@@ -122,22 +118,9 @@ const iconClicked = async function(field, icon) {
         return;
     }
 
-    // Try to reconnect if keypaste is not currently connected
-    const connected = await kpxc.reconnect();
-    if (!connected) {
-        return;
-    }
-
-    if (kpxc.databaseState !== DatabaseState.UNLOCKED) {
-        // Triggers database unlock
-        await sendMessage('page_set_manual_fill', ManualFill.BOTH);
-        await sendMessage('get_database_hash', [ false, true ]); // Set triggerUnlock to true
-        field.focus();
-    }
-
-    if (icon.className.includes('unlock')) {
-        fillCredentials(field);
-    }
+    // The person's click is the only thing that asks keypaste for this page's logins; the list says if keypaste is locked.
+    await kpxc.reconnect();
+    await kpxcUserAutocomplete.open(field);
 };
 
 const getIconClassName = function(state = DatabaseState.UNLOCKED) {
@@ -157,10 +140,5 @@ const getIconText = function(state) {
         return tr('usernameDisconnectedFieldText');
     }
 
-    return kpxc.credentials.length === 0 ? tr('usernameFieldTextNoCredentials') : tr('usernameFieldText');
-};
-
-const fillCredentials = async function(field) {
-    const combination = await kpxcFields.getCombination(field);
-    kpxcFill.fillFromUsernameIcon(combination);
+    return tr('usernameFieldText');
 };

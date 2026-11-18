@@ -113,7 +113,7 @@ public sealed class SortAndSizeTablesTests
     {
         var table = TableStates.NewItems();
 
-        Assert.Null(table.Order);
+        Assert.Equal(new TableOrder(TableStates.Modified, Descending: true), table.Order);
         Assert.True(table.IsOwnWay);
         Assert.Equal("Title, not sorted", table.HeadName(TableStates.Title));
 
@@ -131,7 +131,7 @@ public sealed class SortAndSizeTablesTests
         Assert.Equal("Last used, sorted oldest first", table.HeadName(TableStates.LastUsed));
 
         table.Reset();
-        Assert.Null(table.Order);
+        Assert.Equal(new TableOrder(TableStates.Modified, Descending: true), table.Order);
         Assert.True(table.IsOwnWay);
     }
 
@@ -145,7 +145,7 @@ public sealed class SortAndSizeTablesTests
         changes = 0;
 
         table.Show(TableStates.Username, shows: false);
-        Assert.Null(table.Order);
+        Assert.Equal(TableStates.Modified, table.Order?.Column);
         Assert.Equal(1, changes);
 
         table.Show(TableStates.Username, shows: true);
@@ -206,7 +206,7 @@ public sealed class SortAndSizeTablesTests
 
         var odd = TableStates.Read("items:password:asc,trash:title:up,nothing", "items:1,2;log:1,2,3,4,5,x");
 
-        Assert.Null(odd.Items.Order);
+        Assert.Equal(TableStates.Modified, odd.Items.Order?.Column);
         Assert.Null(odd.Items.Widths);
         Assert.Null(odd.Log.Widths);
         Assert.Equal(TableStates.Deleted, odd.Trash.Order!.Value.Column);

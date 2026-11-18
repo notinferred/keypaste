@@ -33,10 +33,10 @@ internal static class TokenCommand
     private static readonly Argument<string> _name = Syntax.Operand("name", "the token's name");
     private static readonly Argument<string> _target = Syntax.Operand("name|id", "the token's name or id");
     private static readonly Option<string> _scope = Syntax.Value(
-        "--scope", "scopes", "what it may inject: read:<project>/<environment>/<KEY or *>, several separated by commas; required");
+        "--scope", "scopes", "what it may inject: read:<project>/<stage>/<KEY or *>, several separated by commas; required");
     private static readonly Option<string> _ttl = Syntax.Value("--ttl", "n(m|h|d)", $"how long it works, {_defaultLifetime.TotalDays:0}d by default");
     private static readonly Option<string> _expires = new("--expires") { Hidden = true };
-    private static readonly Option<bool> _allowProd = Syntax.Flag("--allow-prod", "let it reach a protected environment, which then asks you live every time");
+    private static readonly Option<bool> _allowProd = Syntax.Flag("--allow-prod", "let it reach a protected stage, which then asks you live every time");
     private static readonly Option<string> _output = Syntax.Value("--output", "file", "where to write the bundle; required", "-o");
     private static readonly Option<bool> _force = Syntax.Flag("--force", "replace a file that is there");
 
@@ -53,7 +53,7 @@ internal static class TokenCommand
         },
         new CliVerb("ls", "list tokens: name, prefix, scope and expiry, never a secret", List) { CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile },
         new CliVerb("revoke", "stop a token working, for good", Revoke) { _target, CliOptions.Vault, CliOptions.Keyfile },
-        new CliVerb("bundle", "seal the token's sets into a file for CI; never a protected environment", Bundle)
+        new CliVerb("bundle", "seal the token's sets into a file for CI; never a protected stage", Bundle)
         {
             _name, _output, _force, RunWithToken.Token, CliOptions.Vault, CliOptions.Keyfile,
         },
@@ -94,7 +94,7 @@ internal static class TokenCommand
 
         if (!allowProd && scopes.FirstOrDefault(scope => scope.IsProtected) is { } protectedScope)
         {
-            return Fail(context, "create", $"{protectedScope} names a protected environment; --allow-prod lets the token ask you live for it, every time");
+            return Fail(context, "create", $"{protectedScope} names a protected stage; --allow-prod lets the token ask you live for it, every time");
         }
 
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
@@ -320,7 +320,7 @@ internal static class TokenCommand
                 if (resolved.RequiresLiveApproval)
                 {
                     context.Stderr.WriteLine(
-                        $"keypaste token bundle: {project}/{profile} holds an item of a protected environment; a bundle opens without asking anybody, so it cannot carry it");
+                        $"keypaste token bundle: {project}/{profile} holds an item of a protected stage; a bundle opens without asking anybody, so it cannot carry it");
                     return CliApp.ExitInternalError;
                 }
 

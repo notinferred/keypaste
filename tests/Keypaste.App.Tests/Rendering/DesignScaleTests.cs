@@ -15,9 +15,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// </remarks>
 public sealed partial class DesignScaleTests
 {
-    private static readonly HashSet<double> _spacing = [0, 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56];
-    private static readonly HashSet<double> _radii = [0, 4, 6, 7, 10, 14];
-    private static readonly HashSet<double> _icons = [14, 16, 20];
+    private static readonly HashSet<double> _spacing = [0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32, 40, 56];
+    private static readonly HashSet<double> _radii = [0, 4, 6, 7, 8, 10, 12, 14];
+    private static readonly HashSet<double> _icons = [14, 16, 20, 26];
 
     // Display, heading, list header, dialog title, body and mono, label and helper line, and table header. The half sizes are inside DESIGN's ranges.
     private static readonly HashSet<double> _typeSizes = [54, 24, 20, 16, 15, 14, 13.5, 13, 12.5, 12, 11];
@@ -28,19 +28,18 @@ public sealed partial class DesignScaleTests
     private static readonly Dictionary<string, string> _negativeMargins = new()
     {
         ["ShellView -2"] = "A fold's 20 by 20 target in the tree's 16 column keeps the row's height.",
-        ["ShellView 2,-2,-8,-2"] = "A place's fold, a 20 by 20 target, keeps the row's height and sits in its end padding.",
+        ["ShellView -4,0,2,0"] = "A vault's fold sits in the row's start padding, so its title lines up with the places' icons.",
+        ["ShellView 2,0,-6,0"] = "The Groups row's fold sits in the row's end padding, under the counts above it.",
         ["Surfaces 0,-2,-6,-2"] = "A chip's remove, a 20 by 20 target, keeps the chip's height.",
         ["SharingView 0,-4"] = "A row's action, 24 tall, keeps a text line's height.",
-        ["EnvSetsView 0,-4"] = "A row's actions, 28 tall, keep a text line's height.",
         ["LogView 12,-4,-6,-4"] = "Copy, 24 tall, keeps the verdict's line height and sits in the card's padding.",
-        ["EnvSetsView -6,-2"] = "A cell's hover face stands out from its text, so the text does not move.",
-        ["EnvSetsView 0,0,-32,0"] = "Fluent's ComboBox keeps a 32 column for its glyph, which the project's title hides and draws beside the name.",
-        ["EnvSetsView 0,0,0,-8"] = "The selected environment's bar lies on the head's lower edge, across the head's padding.",
+        ["EnvSetsView -6,-4"] = "A value's press face stands out from its text, so the text lines up with its column's head.",
         ["KdbxImportView -8,0,0,0"] = "A destination is text until hovered, and its field's face stands out from that text.",
         ["LogView 0,0,-12,0"] = "A result may run into the row's end padding before it trims.",
         ["ShareDialogView -4,-4,-12,-4"] = "A scroll viewer leaves a focused field its glow and takes the card's padding for its bar.",
         ["KdbxImportView -4,-4,-12,-4"] = "A scroll viewer leaves a focused field its glow and takes the card's padding for its bar.",
         ["UnlockView -56,0"] = "The quieter ways in stay on one line, wider than the form's fixed 360 column.",
+        ["NewItemSheet -20,8,-20,0"] = "The template grid's foot rule runs through the sheet's padding to its edges.",
     };
 
     /// <summary>Doubles that are not on any of DESIGN's lists because Fluent's own control defines what they mean.</summary>
@@ -49,8 +48,8 @@ public sealed partial class DesignScaleTests
         ["ScrollBarSize"] = "The width of Fluent's scroll bar track, which no list of DESIGN's sizes.",
     };
 
-    /// <summary>The mono text at 14: DESIGN's masks draw at 14 or larger.</summary>
-    private static readonly HashSet<string> _masks = ["{Binding PasswordMask}"];
+    /// <summary>The mono text above 13: DESIGN's masks draw at 14 or larger, and a pairing code the person compares with the browser's is drawn large.</summary>
+    private static readonly HashSet<string> _masks = ["{Binding PasswordMask}", "{Binding Code}"];
 
     [Fact]
     public void Spacing_is_on_the_scale() =>
@@ -88,7 +87,7 @@ public sealed partial class DesignScaleTests
             select $"{Path.GetFileName(file)}: {key} {element.Value}");
 
     [Fact]
-    public void Icons_are_the_three_sizes() =>
+    public void Icons_are_the_four_sizes() =>
         Assert.Empty(
             from file in Files()
             from element in XDocument.Load(file).Descendants()
@@ -131,10 +130,10 @@ public sealed partial class DesignScaleTests
     [Fact]
     public void Each_title_ranks_where_DESIGN_puts_it()
     {
-        Assert.Equal(24, ClassSize("h1"));
-        Assert.Equal(24, ClassSize("title"));
-        Assert.Equal(20, ClassSize("list-title"));
-        Assert.Equal(16, ClassSize("dialog-title"));
+        Assert.Equal(20, ClassSize("h1"));
+        Assert.Equal(20, ClassSize("title"));
+        Assert.Equal(15, ClassSize("list-title"));
+        Assert.Equal(15, ClassSize("dialog-title"));
     }
 
     [Fact]
@@ -148,7 +147,7 @@ public sealed partial class DesignScaleTests
             from file in Directory.EnumerateFiles(Path.Combine(App(), "Views"), "*.axaml")
             from icon in XDocument.Load(file).Descendants().Where(element => element.Name.LocalName == "KpIcon" && (string?)element.Attribute("Size") == "20")
             where !icon.Ancestors().Any(ancestor => (string?)ancestor.Attribute("Name") == "Rail" || ((string?)ancestor.Attribute("Classes"))?.Contains("tile", StringComparison.Ordinal) == true)
-                && !(Path.GetFileName(file) is "TrashView.axaml" or "LogView.axaml")
+                && !(Path.GetFileName(file) is "TrashView.axaml" or "LogView.axaml" or "EntriesView.axaml")
             select $"{Path.GetFileName(file)}: {icon}");
     }
 

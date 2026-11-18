@@ -50,6 +50,9 @@ internal sealed class TrashRow
 
     internal string DisplayTitle => EntryNameSanitizer.Sanitize(Title).Text;
 
+    /// <summary>The item's UUID as a <see cref="Guid"/>, which picks its monogram's hue, the same as it had before it was deleted.</summary>
+    internal Guid Hue => Guid.TryParseExact(Id.ToString(), "N", out var id) ? id : Guid.Empty;
+
     /// <summary>Whether the group this came from is still in the vault.</summary>
     /// <remarks>
     /// An empty path is the root, which is a group; null is the bin having no live group to name,

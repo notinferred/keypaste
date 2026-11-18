@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Keypaste.Core.Browser;
 
-/// <summary>A page's request for logins, as KeePassXC-Browser names it, and which items' web addresses it matches (D-0617).</summary>
+/// <summary>A page's request for logins, as KeePassXC-Browser names it, and which items' web addresses it matches.</summary>
 /// <remarks>
 /// <para>
 /// An item matches a page on its own host, or a subdomain of it at a label boundary, within one registrable domain, and on the

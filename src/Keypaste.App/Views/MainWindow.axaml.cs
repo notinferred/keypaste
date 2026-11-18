@@ -21,6 +21,7 @@ internal sealed partial class MainWindow : Window
 
         var strip = this.FindControl<Border>("DragStrip")!;
         var root = this.FindControl<ContentControl>("Root")!;
+        _root = root;
 
         // The shell's own titlebar is the drag area while it shows; a strip over it would take its
         // clicks.
@@ -29,6 +30,7 @@ internal sealed partial class MainWindow : Window
             if (change.Property == ContentControl.ContentProperty)
             {
                 strip.IsVisible = change.NewValue is not ShellView;
+                ShowVibrancy();
             }
         };
 
@@ -68,6 +70,43 @@ internal sealed partial class MainWindow : Window
                 }
             },
             DispatcherPriority.Background);
+    }
+
+    /// <summary>Asks macOS for its vibrancy behind the rail and the sidebar, unless the person reduced transparency or high contrast is on; elsewhere the window stays solid.</summary>
+    internal void AskForVibrancy(bool reduceTransparency)
+    {
+        _reduceTransparency = reduceTransparency;
+        var highContrast = ActualThemeVariant == HighContrast.Dark || ActualThemeVariant == HighContrast.Light;
+        var wanted = OperatingSystem.IsMacOS() && !reduceTransparency && !highContrast;
+        TransparencyLevelHint = wanted ? [WindowTransparencyLevel.AcrylicBlur] : [WindowTransparencyLevel.None];
+        ShowVibrancy();
+    }
+
+    private bool _reduceTransparency;
+
+    // Null while the base window is constructed, before the content is loaded.
+    private readonly ContentControl? _root;
+
+    // Only the shell lets the system show through, under its rail and sidebar; every other screen and the window stay solid.
+    private void ShowVibrancy()
+    {
+        if (_root is not { } root)
+        {
+            return;
+        }
+
+        var vibrant = ActualTransparencyLevel != WindowTransparencyLevel.None && root.Content is ShellView;
+
+        if (vibrant)
+        {
+            Background = Avalonia.Media.Brushes.Transparent;
+        }
+        else
+        {
+            this[!BackgroundProperty] = this.GetResourceObservable("KpBgApp").ToBinding();
+        }
+
+        (root.Content as ShellView)?.ShowVibrancy(vibrant);
     }
 
     /// <summary>Opens the window as it was left, on the screen it was on or brought back onto one, before it shows.</summary>
@@ -149,6 +188,16 @@ internal sealed partial class MainWindow : Window
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+
+        if (change.Property == ActualTransparencyLevelProperty)
+        {
+            ShowVibrancy();
+        }
+
+        if (change.Property == ActualThemeVariantProperty && _root is not null)
+        {
+            AskForVibrancy(_reduceTransparency);
+        }
 
         // A minimized window is still one that fills its screen, or not, when it comes back.
         if (change.Property == WindowStateProperty)

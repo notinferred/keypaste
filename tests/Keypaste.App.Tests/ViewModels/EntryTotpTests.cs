@@ -142,7 +142,7 @@ public sealed class EntryTotpTests : IDisposable
         Assert.Equal(_codeAt09, context.Clipboard.Content);
         Assert.True(context.Clipboard.ContentWasSetAsASecret);
         Assert.True(context.Countdown.IsCounting);
-        Assert.Equal("TOTP code", context.Countdown.Label);
+        Assert.Equal("One-time code", context.Countdown.Label);
     }
 
     [Fact]

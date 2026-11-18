@@ -55,6 +55,9 @@ internal sealed class AppCommandHost
 {
     internal required AppVaultSession Session { get; init; }
 
+    /// <summary>Every vault open in the app, which Lock locks together; null where only <see cref="Session"/> is.</summary>
+    internal OpenVaults? Vaults { get; init; }
+
     internal required Func<ShellViewModel?> Shell { get; init; }
 
     /// <summary>The unlock screen while it is the one showing.</summary>
@@ -119,6 +122,7 @@ internal sealed class AppCommands
     private readonly IReadOnlyList<AppMenuEntry> _revisionMenu;
     private readonly IReadOnlyList<AppMenuEntry> _groupMenu;
     private readonly IReadOnlyList<AppMenuEntry> _projectMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _vaultMenu;
     private readonly IReadOnlyList<AppMenuEntry> _agentMenu;
     private readonly IReadOnlyList<AppMenuEntry> _fieldMenu;
     private readonly IReadOnlyList<AppMenuEntry> _attachmentMenu;
@@ -162,7 +166,11 @@ internal sealed class AppCommands
             : [about, _line, settings, _line, quit];
 
         _openVault = new AppCommand(Strings.OpenVault, Chord(Key.O), CanOpenVault, () => OpenVault(null));
-        var lockNow = new AppCommand(Strings.LockLabel, Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
+        var lockNow = new AppCommand(
+            Strings.LockLabel,
+            Chord(Key.L),
+            () => host.Vaults is { } vaults ? vaults.Unlocked.Count > 0 : host.Session.IsUnlocked,
+            () => _ = host.Vaults is { } vaults ? vaults.LockAllAsync(VaultLockReason.Manual) : host.Session.LockAsync(VaultLockReason.Manual));
         _newGroup = new AppCommand(Strings.NewGroupLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var removePairing = Routed(Strings.RemovePairing, () => Settings()?.BrowserFill, browser => browser.AskRemoveCommand, _ => Target<PairingItem>());
         var changeBrowserHost = Routed(Strings.TurnOnForThisBrowser, () => Settings()?.BrowserHosts, hosts => hosts.ChangeCommand, _ => Target<BrowserHostRow>()) with { Says = () => Target<BrowserHostRow>()?.ActionName ?? Strings.TurnOnForThisBrowser };
@@ -173,6 +181,7 @@ internal sealed class AppCommands
         var file = new AppMenuGroup(Strings.FileMenu,
         [
             new AppCommand(Strings.NewItemLabel, Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
+            new AppCommand(Strings.NewItemFromTemplateLabel, Chord(Key.N, KeyModifiers.Shift), () => Unmodal() is not null, () => OnItems(items => items.ChooseTemplateCommand.Press())),
             Folder(Strings.NewItemByType, [.. TemplateChoice.All.Select(kind => new AppCommand(kind.MenuLabel, [], () => Unmodal() is not null, () => OnItems(items => items.BeginAddOfKindCommand.Press(kind.Template))))]),
             _newGroup,
             newProject,
@@ -180,6 +189,7 @@ internal sealed class AppCommands
             _line,
             _openVault,
             new AppSubmenu(Strings.OpenRecent, RecentEntries),
+            Routed(Strings.AddVaultLabel, () => Unmodal() is { Vaults: not null } shell ? shell : null, shell => shell.OpenVaultCommand),
             Routed(Strings.CreateAVault, OpeningScreen, unlock => unlock.StartCreateCommand),
             Routed(Strings.RestoreABackupLabel, OpeningScreen, unlock => unlock.StartRestoreCommand),
             Routed(Strings.Reload, () => Unmodal() is { HasVaultChanged: true } shell ? shell : null, shell => shell.ReloadCommand),
@@ -196,9 +206,7 @@ internal sealed class AppCommands
                 Strings.ThisComputer,
                 Routed(Strings.UseThisVaultForAgentsAndTheXb47c9a, Settings, settings => settings.UseThisVaultCommand),
                 Routed(Strings.LinkTheKeypasteCommand, Settings, settings => settings.LinkCliCommand),
-                Routed(Strings.PairABrowser, () => Settings()?.BrowserFill, browser => browser.PairCommand),
                 Routed(Strings.ReplaceTheOtherKeypaste, () => Settings() is { OffersCliReplace: true } settings ? settings : null, settings => settings.BeginReplaceCliCommand),
-                Routed(Strings.StopPairing, () => Settings()?.BrowserFill, browser => browser.StopCommand),
                 removePairing,
                 changeBrowserHost,
                 Routed(Strings.ForgetRecentVaults, () => Settings() is { IsConfirmingForgetAll: false } settings ? settings : null, settings => settings.AskForgetAllCommand)),
@@ -242,7 +250,6 @@ internal sealed class AppCommands
             Says = () => host.Shell() is { SidebarHidden: true } ? Strings.ShowSidebar : Strings.HideSidebar,
         };
 
-        var groupsAndProjects = new AppCommand(Strings.ShowGroupsAndProjects, [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
         var resetTable = new AppCommand(Strings.ResetListOrder, [], () => Unmodal()?.TableInView is { IsOwnWay: false }, () => Unmodal()?.TableInView?.Reset());
 
@@ -266,8 +273,8 @@ internal sealed class AppCommands
             Says = () => host.Window()?.WindowState == WindowState.FullScreen ? Strings.ExitFullScreen : Strings.EnterFullScreen,
         };
         var view = new AppMenuGroup(Strings.ViewMenu, Mac
-            ? [.. places, screens, back, _line, _sidebar, groupsAndProjects, resetTable, _line, .. zoom]
-            : [.. places, screens, back, _line, _sidebar, groupsAndProjects, fullScreen, resetTable, _line, .. zoom]);
+            ? [.. places, screens, back, _line, _sidebar, resetTable, _line, .. zoom]
+            : [.. places, screens, back, _line, _sidebar, fullScreen, resetTable, _line, .. zoom]);
 
         // Zoom, ⌘M and Bring All to Front are macOS's; Windows and Linux maximize a window, and have no chord for minimizing it.
         var window = new AppMenuGroup(Strings.WindowMenu, Mac
@@ -303,13 +310,14 @@ internal sealed class AppCommands
         var addTotp = Routed(Strings.AddOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: true } detail ? detail : null, detail => detail.BeginSetTotpCommand);
         var replaceTotp = Routed(Strings.ReplaceTheOneTimeCode, () => PaneOutOfEdit() is { CanAddTotp: false } detail ? detail : null, detail => detail.BeginSetTotpCommand);
         var removeTotp = Routed(Strings.RemoveTheOneTimeCode, PaneOutOfEdit, detail => detail.BeginRemoveTotpCommand);
-        var changeKind = Folder(Strings.ChangeKind, [.. TemplateChoice.All.Select(kind => Routed(kind.Label, PaneOutOfEdit, detail => detail.ChangeKindCommand, _ => kind))]);
+        var changeKind = Folder(Strings.ChangeKind, [.. TemplateChoice.Kept.Select(kind => Routed(kind.Label, PaneOutOfEdit, detail => detail.ChangeKindCommand, _ => kind))]);
         var history = Routed(Strings.ShowHistory, PaneOutOfEdit, detail => detail.History.ToggleCommand) with { Says = () => PaneOutOfEdit()?.History.ToggleLabel ?? Strings.ShowHistory };
         var addField = Routed(Strings.AddFieldLabel, PaneOutOfEdit, detail => detail.BeginAddFieldCommand);
         var addAttachment = Routed(Strings.AddAttachmentLabel, PaneOutOfEdit, detail => detail.Attachments.AddCommand);
         var editFields = Routed(Strings.EditFieldsLabel, Pane, detail => detail.EditCommand);
         var organize = Routed(Strings.RenameOrMoveLabel, ItemsInView, items => items.OrganizeCommand);
         var duplicate = Routed(Strings.Duplicate, ItemsInView, items => items.DuplicateCommand);
+        var favorite = Routed(Strings.AddToFavorites, PaneOutOfEdit, detail => detail.ToggleFavoriteCommand) with { Says = () => Pane()?.FavoriteLabel ?? Strings.AddToFavorites };
         var share = Routed(Strings.Share, Unmodal, shell => shell.ShareCommand, _ => Pane()?.Name);
         var restore = Routed(Strings.Restore, Trash, trash => trash.RestoreCommand);
         var purge = Routed(Strings.DeleteForGood, Trash, trash => trash.PurgeCommand);
@@ -330,7 +338,7 @@ internal sealed class AppCommands
         var replaceAttachment = Routed(Strings.ReplaceAttachmentLabel, Attachment, attachment => attachment.ReplaceCommand);
         var removeAttachment = Routed(Strings.RemoveAttachment, Attachment, attachment => attachment.RemoveCommand);
         var addKey = Routed(Strings.AddAKeyLabel, Project, project => project.BeginAddCommand);
-        var addEnvironment = Routed(Strings.AddEnvironmentLabel, Project, project => project.BeginAddProfileCommand);
+        var addStage = Routed(Strings.AddStageLabel, Project, project => project.BeginAddProfileCommand);
         var addItem = Routed(Strings.AddItem, EnvironmentInView, environment => environment.AddEntry);
         var copyRunCommand = Routed(Strings.CopyTheCommand, Project, project => project.CopyRunCommandCommand);
         var runInTerminal = Routed(Strings.RunInATerminal, Project, project => project.Launch.RunProjectCommand);
@@ -338,7 +346,7 @@ internal sealed class AppCommands
         var copyVariable = Routed(Strings.CopyValueMenu, Variable, variable => variable.CopyValueCommand);
         var replaceVariable = Routed(Strings.ReplaceValueLabel, Variable, variable => variable.ReplaceCommand);
         var removeVariable = Routed(Strings.RemoveKey, Variable, variable => variable.RemoveCommand);
-        var removeMember = Routed(Strings.TakeOutOfThisEnvironment, () => Project() is not null ? Target<EnvMemberRow>() : null, member => member.Remove);
+        var removeMember = Routed(Strings.TakeOutOfThisStage, () => Project() is not null ? Target<EnvMemberRow>() : null, member => member.Remove);
         var openProject = new AppCommand(
             Strings.OpenProject,
             [],
@@ -376,11 +384,12 @@ internal sealed class AppCommands
         var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
         var deleteReport = Routed(Strings.DeleteReport, () => Unmodal()?.Content is DiagnosticsViewModel ? Target<CrashReportRow>() : null, report => report.AskDeleteCommand);
 
-        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, editFields, organize, changeKind, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line, _delete];
+        _itemMenu = [copyUsername, copyPassword, copyTotp, copyUrl, copyReference, openUrl, _line, favorite, editFields, organize, changeKind, duplicate, share, rotate, generatePassword, addTotp, replaceTotp, removeTotp, history, _line, _delete];
         _trashMenu = [restore, _line, purge, emptyTrash];
         _revisionMenu = [copyRevision, restoreRevision];
         _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
-        _projectMenu = [openProject, _line, addKey, addEnvironment, addItem, _line, runInTerminal, openTerminal, copyRunCommand, exportReferences];
+        _projectMenu = [openProject, _line, addKey, addStage, addItem, _line, runInTerminal, openTerminal, copyRunCommand, exportReferences];
+        _vaultMenu = [new AppCommand(Strings.LockThisVault, [], () => Unmodal() is not null && Target<VaultRow>() is { IsLocked: false }, LockVault), _line, new AppCommand(Strings.CloseVault, [], () => Unmodal() is { Vaults: not null } && Target<VaultRow>() is not null, CloseVault)];
         _agentMenu = [agentSettings, connect, connectAgain, _line, disconnect];
         _fieldMenu = [copyField, replaceField, generateField, renameField, protectField, _line, removeField];
         _attachmentMenu = [saveAttachment, replaceAttachment, _line, removeAttachment];
@@ -397,7 +406,6 @@ internal sealed class AppCommands
         _pairingMenu = [removePairing];
         _browserHostMenu = [changeBrowserHost];
         NewProject = newProject;
-        SidebarImport = [importFromAnotherApp, importEnv];
 
         // Edit has Delete, and File has New group, so the item menu leaves them out. What acts on one row sits in its own submenu.
         var item = new AppMenuGroup(Strings.ItemMenu,
@@ -412,13 +420,13 @@ internal sealed class AppCommands
             Folder(Strings.Group, renameGroup, moveGroup, _line, deleteGroup),
             Folder(Strings.Trash, restore, purge, _line, emptyTrash),
             Folder(Strings.ShareLinks, checkLinks, revokeLink),
-            Folder(Strings.Recommendations, moveNoteKey, restoreLostTag, openFindingItem, openReminderPage, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
+            Folder(Strings.Security, moveNoteKey, restoreLostTag, openFindingItem, openReminderPage, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
         ]);
 
         var projects = new AppMenuGroup(Strings.Project,
         [
             openProject, _line,
-            addKey, addEnvironment, addItem, _line,
+            addKey, addStage, addItem, _line,
             runInTerminal, openTerminal, copyRunCommand, _line,
             Folder(Strings.KeyMenu, copyVariable, replaceVariable, _line, removeVariable),
             removeMember,
@@ -453,14 +461,11 @@ internal sealed class AppCommands
     /// <summary>File, Edit, Item, Project, Agents, View, Window and Help.</summary>
     internal IReadOnlyList<AppMenuGroup> Menus { get; }
 
-    /// <summary>New group…, which the sidebar's Groups heading runs, making the group in the one chosen.</summary>
+    /// <summary>New group…, which a vault's Groups row runs, making the group in the one chosen.</summary>
     internal AppCommand NewGroup => _newGroup;
 
-    /// <summary>New project…, which the sidebar's Projects heading runs.</summary>
+    /// <summary>New project…, which Environments offers.</summary>
     internal AppCommand NewProject { get; }
-
-    /// <summary>The sidebar's Import menu: the File menu's two imports.</summary>
-    internal IReadOnlyList<AppMenuEntry> SidebarImport { get; }
 
     /// <summary>The macOS Dock icon's menu.</summary>
     internal IReadOnlyList<AppMenuEntry> Dock { get; }
@@ -642,7 +647,7 @@ internal sealed class AppCommands
 
     /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
     internal static bool HasContextMenu(object? row) =>
-        row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow or EntryFieldRow or EntryAttachmentRow
+        row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or VaultRow or AgentRow or EntryFieldRow or EntryAttachmentRow
             or EnvKeyRow or EnvVariableRow or EnvMemberRow or ScopedTokenRow or SharingRow or CrashReportRow
             or EntryTagChip or RecommendationRow or LostTagRow or PasswordRow or ReminderRow or PairingItem or BrowserHostRow;
 
@@ -673,6 +678,8 @@ internal sealed class AppCommands
                 return _groupMenu;
             case ProjectRow:
                 return Bound(_projectMenu, row);
+            case VaultRow:
+                return Bound(_vaultMenu, row);
             case AgentRow when Agents() is not null:
                 return Bound(_agentMenu, row);
             case EntryFieldRow when Items() is not null:
@@ -799,6 +806,24 @@ internal sealed class AppCommands
         if (Unmodal() is { } shell && Target<ProjectRow>() is { } project)
         {
             shell.SelectedSidebarRow = project;
+        }
+    }
+
+    // Locks the one vault, leaving the others open, as its sidebar heading's menu offers.
+    private void LockVault()
+    {
+        if (Unmodal() is { } shell && Target<VaultRow>() is { } vault)
+        {
+            _ = shell.LockAloneAsync(vault.Vault);
+        }
+    }
+
+    // Closes the vault and takes it out of the local account; its file stays where it is.
+    private void CloseVault()
+    {
+        if (Unmodal() is { } shell && Target<VaultRow>() is { } vault)
+        {
+            shell.CloseVault(vault.Vault);
         }
     }
 

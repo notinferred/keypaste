@@ -32,7 +32,7 @@ internal static class CliOptions
         Syntax.Value("--approver", "name", $"the approver to reach, or set {ApproverEndpoint.EnvironmentVariable}");
 
     internal static Option<string> Profile { get; } =
-        Syntax.Value("--profile", "environment", $"the environment, {EnvProfileNames.Default} by default", "-p");
+        Syntax.Value("--profile", "stage", $"the stage, {EnvProfileNames.Default} by default", "-p");
 
     internal static Option<bool> Yes { get; } = Syntax.Flag("--yes", "go ahead without asking, which a piped run must say");
 
@@ -43,5 +43,5 @@ internal static class CliOptions
         $"which log to read, ~/{KeypasteHome.DirectoryName}/{KeypasteHome.AuditFileName} unless {KeypasteHome.EnvironmentVariable} moves it");
 
     internal static Option<string> Entry { get; } =
-        Syntax.Value("--entry", "item", "the item to write on, rather than the environment's home item");
+        Syntax.Value("--entry", "item", "the item to write on, rather than the stage's home item");
 }

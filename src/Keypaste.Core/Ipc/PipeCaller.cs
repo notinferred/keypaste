@@ -15,6 +15,10 @@ namespace Keypaste.Core.Ipc;
 /// <c>LOCAL_PEERTOKEN</c>, which the path and signature are read through, so a reused id names nothing.
 /// </para>
 /// <para>
+/// The processes above the caller are read by id from <see cref="SystemProcessTree"/> on every system, each kept only when
+/// it started no later than the one below it (<see cref="PeerLineage"/>).
+/// </para>
+/// <para>
 /// <c>DllImport</c> rather than <c>LibraryImport</c> for the reason <c>NativeSignals</c> gives: every
 /// signature is blittable, and the generator would need unsafe code project-wide.
 /// </para>
@@ -29,6 +33,7 @@ internal static class PipeCaller
     private const uint _queryLimitedInformation = 0x1000;
 
     private static readonly AsyncLocal<AuditCaller?> _current = new();
+    private static readonly AsyncLocal<PeerLineage?> _lineage = new();
 
     private static readonly ICodeSignatures? _signatures =
         OperatingSystem.IsWindows() ? new WindowsCodeSignatures()
@@ -42,13 +47,33 @@ internal static class PipeCaller
         set => _current.Value = value;
     }
 
+    /// <summary>
+    /// The lineage of the program on the connection whose request is being answered, which <see cref="ApproverListener"/>
+    /// sets beside <see cref="Current"/>; null outside one. A prompt's requester line is checked against it.
+    /// </summary>
+    internal static PeerLineage? Lineage
+    {
+        get => _lineage.Value;
+        set => _lineage.Value = value;
+    }
+
     /// <summary>The program connected to <paramref name="pipe"/>, as far as the system says; never throws.</summary>
     /// <param name="pipe">A connected server end.</param>
     /// <returns>The caller, its signature <see cref="CallerSignature.Unknown"/> where it could not be checked.</returns>
     internal static AuditCaller Of(NamedPipeServerStream pipe) => Of(pipe, _signatures);
 
     /// <summary>The same, checking signatures with <paramref name="signatures"/>, or with none where the system has no code signing.</summary>
-    internal static AuditCaller Of(NamedPipeServerStream pipe, ICodeSignatures? signatures)
+    internal static AuditCaller Of(NamedPipeServerStream pipe, ICodeSignatures? signatures) => Identify(pipe, signatures, tree: null, binaries: null).Caller;
+
+    /// <summary>The program connected to <paramref name="pipe"/> for its lines, and its lineage for its prompts; never throws.</summary>
+    internal static (AuditCaller Caller, PeerLineage Lineage) Identify(NamedPipeServerStream pipe) =>
+        Identify(pipe, _signatures, SystemProcessTree.Instance, KeypasteBinaries.ForThisProcess);
+
+    private static (AuditCaller Caller, PeerLineage Lineage) Identify(
+        NamedPipeServerStream pipe,
+        ICodeSignatures? signatures,
+        IProcessTree? tree,
+        KeypasteBinaries? binaries)
     {
         ArgumentNullException.ThrowIfNull(pipe);
 
@@ -79,6 +104,13 @@ internal static class PipeCaller
             // Naming the caller is advice, so a failure leaves what was read and never ends the connection.
         }
 
+        var lineage = tree is null || binaries is null ? PeerLineage.Unknown : PeerLineage.Read(pid, path, tree, binaries.Holds);
+
+        return (Signed(pid, path, token, signatures), lineage);
+    }
+
+    private static AuditCaller Signed(int? pid, string? path, MacAuditToken? token, ICodeSignatures? signatures)
+    {
         if (signatures is null)
         {
             return AuditCaller.Of(pid, path, null, null);

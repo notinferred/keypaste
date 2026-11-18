@@ -80,25 +80,25 @@ public sealed class OneHomeJourneyTests
             AssertNamesNone(main, "Settings");
             Assert.Contains("Open Advanced", AutomationNames(main));
             Assert.DoesNotContain("Open the scoped tokens", AutomationNames(main));
-            AmberElements.AssertOne(main, null, "Settings");
+            AccentElements.AssertOne(main, null, "Settings");
             Press(main, Named<Button>(main, "OpenAdvanced"));
             Assert.IsType<AdvancedViewModel>(shell.Content);
             AssertNamesNone(main, "Advanced");
             Assert.Contains("Open the scoped tokens", AutomationNames(main));
             Assert.Contains("Open diagnostics", AutomationNames(main));
-            AmberElements.AssertOne(main, null, "Advanced");
+            AccentElements.AssertOne(main, null, "Advanced");
 
             // A scoped token minted, copied and revoked, from Settings › Advanced.
             Press(main, Named<Button>(main, "OpenScopedTokens"));
             var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
-            AmberElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens");
+            AccentElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens");
             Press(main, Named<Button>(main, "NewToken"));
             Fill(main, "Token name", _token);
             Fill(main, "Token scope", "read:billing/dev/*");
-            AmberElements.AssertOne(main, Named<Button>(main, "CreateToken"), "a new token's form");
+            AccentElements.AssertOne(main, Named<Button>(main, "CreateToken"), "a new token's form");
             Press(main, Named<Button>(main, "CreateToken"));
             Assert.True(tokens.HasMinted, tokens.FormError);
-            AmberElements.AssertOne(main, Named<Button>(main, "CopyToken"), "a minted token");
+            AccentElements.AssertOne(main, Named<Button>(main, "CopyToken"), "a minted token");
             Press(main, Named<Button>(main, "CopyToken"));
             await Until(() => shell.Clipboard.IsCounting, () => shell.Clipboard.Failure ?? "not counting");
             Assert.Equal(_token, shell.Clipboard.Label);
@@ -107,17 +107,18 @@ public sealed class OneHomeJourneyTests
             Press(main, VisibleButton(main, "Revoke"));
             Press(main, VisibleButton(main, "Revoke"));
             Assert.DoesNotContain(new TokenStore(app.Authority.Session.Unlocked!).List(), token => token.Name == _token);
-            AmberElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens, the token revoked");
+            AccentElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens, the token revoked");
 
             // The facts a support question needs, from Settings › Advanced.
             Press(main, Named<Button>(main, "Back"));
+            DismissToasts(shell);
             Press(main, Named<Button>(main, "OpenDiagnostics"));
             Assert.IsType<DiagnosticsViewModel>(shell.Content);
             var facts = AutomationNames(main);
             Assert.Contains(vault, facts);
             Assert.Contains(KeypasteHome.Resolve(home), facts);
             Assert.Contains(DiagnosticsViewModel.Version, facts);
-            AmberElements.AssertOne(main, null, "Diagnostics");
+            AccentElements.AssertOne(main, null, "Diagnostics");
 
             // An agent's settings, opened by choosing its row on Agents, which carries no dropdown until they are.
             await using var bridge = await ConnectAsync(app.Authority, vault);
@@ -125,38 +126,43 @@ public sealed class OneHomeJourneyTests
             await Until(() => AgentRowOf(main) is not null, () => "no row for the bridge");
             AssertNamesNone(main, "Agents");
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
-            AmberElements.AssertOne(main, null, "Agents");
+            AccentElements.AssertOne(main, null, "Agents");
 
-            // The clock here never ends a toast or the clipboard's countdown, which would lie over the row's middle where this presses.
-            shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
-            if (shell.Clipboard.ClearNowCommand.CanExecute(null))
-            {
-                shell.Clipboard.ClearNowCommand.Execute(null);
-            }
-
-            WindowInput.Drain();
+            DismissToasts(shell);
             Press(main, AgentRowOf(main)!);
             await Until(
                 () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),
                 () => "the settings did not open");
-            AmberElements.AssertOne(main, null, "Agents, an agent's settings open");
-            AmberElements.AssertOne(main, null, "Agents, the mode changed");
+            AccentElements.AssertOne(main, null, "Agents, an agent's settings open");
+            AccentElements.AssertOne(main, null, "Agents, the mode changed");
 
             // Activity holds the records and the chain's hash check.
             Press(main, Named<Button>(main, "OpenActivity"));
             var log = Assert.IsType<LogViewModel>(shell.Content);
             Assert.Contains(log.Rows, row => row.Actor == _label);
-            AmberElements.AssertOne(main, null, "Activity");
+            AccentElements.AssertOne(main, null, "Activity");
             Press(main, Named<Button>(main, "VerifyChain"));
             Assert.True(log.VerdictShown);
             Press(main, Named<Button>(main, "CopyHash"));
             await Until(() => shell.Clipboard.Label == "Latest hash");
-            AmberElements.AssertOne(main, null, "Activity, its verdict shown");
+            AccentElements.AssertOne(main, null, "Activity, its verdict shown");
 
             Chord(main, PhysicalKey.L);
             await Until(() => root.Content is UnlockView);
             main.Close();
         });
+
+    /// <summary>Closes the toasts and the clipboard's countdown, which the clock here never ends, so they lie over the middle of the window where the journey presses.</summary>
+    private static void DismissToasts(ShellViewModel shell)
+    {
+        shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
+        if (shell.Clipboard.ClearNowCommand.CanExecute(null))
+        {
+            shell.Clipboard.ClearNowCommand.Execute(null);
+        }
+
+        WindowInput.Drain();
+    }
 
     /// <summary>Fails when the automation tree names a control or fact that has moved to Settings › Advanced.</summary>
     private static void AssertNamesNone(Window window, string where)

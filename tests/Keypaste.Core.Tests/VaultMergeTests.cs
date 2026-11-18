@@ -7,7 +7,6 @@ using KeePassLib.Cryptography.KeyDerivation;
 using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
-using Keypaste.Core.Browser;
 using Keypaste.Core.Internal;
 using Xunit;
 
@@ -907,8 +906,9 @@ public sealed class VaultMergeTests : IDisposable
     }
 
     /// <summary>
-    /// A tombstone wins over a pairing's record whatever the times or changes, as over a token's: one copy removed the pairing and the
-    /// other changed its record afterwards, which would keep an ordinary item in the bin, or in place in a vault that does not recycle (D-0540, D-0633).
+    /// A tombstone wins over a pairing record an earlier version kept in the vault whatever the times or changes, as over a token's: one
+    /// copy retired the record and the other changed it afterwards, which would keep an ordinary item in the bin, or in place in a vault
+    /// that does not recycle.
     /// </summary>
     [Theory]
     [InlineData(true, true)]
@@ -918,13 +918,12 @@ public sealed class VaultMergeTests : IDisposable
     public void ATombstone_WinsOverAPairingsRecord_ThatTheOtherCopyChanged(bool removedHere, bool recycles)
     {
         const string pairing = "Chrome on desk";
-        var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var record = new EntryName(ReservedGroups.Browsers, pairing);
         Seed("stripe");
         using (var vault = Vault.Open(VaultPath, _password))
         {
             vault.SetRecyclesDeletedEntries(recycles);
-            Assert.True(new BrowserPairings(vault).TryAdd(pairing, BrowserIdentity.ChromeWebStore, key, DateTimeOffset.UtcNow, out _));
+            vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Browsers, Title = pairing, Password = new string('a', 64) });
             vault.Save();
         }
 
@@ -933,7 +932,11 @@ public sealed class VaultMergeTests : IDisposable
 
         if (removedHere)
         {
-            Assert.True(new BrowserPairings(open).Remove(pairing, out _));
+            if (open.RemoveEntry(record, out var recycled) == DeletionOutcome.Recycled)
+            {
+                open.PurgeRecycled(recycled);
+            }
+
             InFile(FilePath, database => Edit(database, pairing, _later, entry => entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://example.com"))));
         }
         else
@@ -949,7 +952,6 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Empty(merged.ReadRecycled());
         Assert.Empty(report.Kept);
         Assert.Equal(1, merged.TombstoneCount);
-        Assert.Equal(PairingCheck.Unknown, new BrowserPairings(merged).Verify(pairing, BrowserIdentity.ChromeWebStore, key));
     }
 
     [Fact]

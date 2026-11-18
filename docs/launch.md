@@ -12,7 +12,7 @@ It is not an instruction to publish or contact anyone, and there is no campaign,
 
 keypaste is a local password manager that keeps your logins, keys and project values in a KeePass-format file on your computer, with no account. AI coding agents use what they need one field at a time, each use approved by you and logged.
 
-It comes as a desktop app for Windows, macOS and Linux, the `keypaste` command-line tool, and an MCP bridge your AI tools start as `keypaste mcp`. An agent asks for one field and says why; you answer in the app or in `keypaste approve` with Deny, Allow once, or for a labelled agent Always allow or Always block. Agent settings say, for each kind of value, whether to ask, allow or block. `keypaste run dev -- npm start` hands a project's variables to a command without a `.env` file. Every request goes into a local, hash-chained log.
+It comes as a desktop app for Windows, macOS and Linux, the `keypaste` command-line tool, and an MCP bridge your AI tools start as `keypaste mcp`. An agent asks for one field and says why; you answer in the app or in `keypaste approve` with Deny, Allow once, or for a labelled agent Always allow. Agent settings say, for each kind of value, whether to ask, allow or block. `keypaste run dev -- npm start` hands a project's variables to a command without a `.env` file. Every request goes into a local, hash-chained log.
 
 KeePassXC opens the same file, and the source is AGPL-3.0. Locking the vault cannot take back a value a program already received.
 
@@ -27,7 +27,8 @@ The recorded example uses a fake credential. `scripts/verify-demo.sh` compares t
 keypaste: an agent is asking for a credential.
 
   agent    claude-code (claude-code)
-  item     env/demo/.env
+  item     .env
+  group    env/demo
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -35,7 +36,7 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  [a] always  [b] block  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
 ```

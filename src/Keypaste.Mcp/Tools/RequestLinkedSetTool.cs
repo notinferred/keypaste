@@ -18,9 +18,9 @@ namespace Keypaste.Mcp.Tools;
 /// set, or one naming a path this bridge does not expose, never reaches the owner.
 /// </remarks>
 /// <param name="options">What this bridge was started with.</param>
-/// <param name="approver">The connection to the vault's owner.</param>
+/// <param name="vaults">The vaults this bridge serves, each through its own owner; a set comes from one vault.</param>
 /// <param name="audit">The bridge's audit log.</param>
-internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnection approver, AuditLog audit) : McpServerTool
+internal sealed class RequestLinkedSetTool(ServerOptions options, BridgeVaults vaults, AuditLog audit) : McpServerTool
 {
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
@@ -54,6 +54,9 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
         var reason = arguments is not null && arguments.TryGetValue("reason", out var said) && said.ValueKind == JsonValueKind.String
             ? said.GetString() ?? string.Empty
             : string.Empty;
+        var vault = arguments is not null && arguments.TryGetValue("vault", out var named) && named.ValueKind == JsonValueKind.String
+            ? named.GetString() ?? string.Empty
+            : string.Empty;
 
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
 
@@ -70,7 +73,7 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
         {
             try
             {
-                verdict = await DecideAsync(client, items ?? [], items is null, reason, cancellationToken).ConfigureAwait(false);
+                verdict = await DecideAsync(client, items ?? [], items is null, reason, vault, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -85,7 +88,7 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
 
         if (!verdict.Recorded
             && !audit.TryAppend(
-                RequestRecords.SetRefused(client, null, items ?? [], reason, verdict.Method, verdict.Reason, [], options.Exposure.Globs, verdict.Session, options.VaultKey),
+                RequestRecords.SetRefused(client, null, items ?? [], reason, verdict.Method, verdict.Reason, [], options.Exposure.Globs, verdict.Session, verdict.Route is { } route ? route.Key : vaults.SoleKey),
                 out _))
         {
             return ToolResults.Refuse(ToolText.AuditUnavailable);
@@ -93,11 +96,11 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
 
         return verdict.Released is { } released && items is not null
             ? ToolResults.ReleaseSet([.. released.Select((field, index) => (items[index].Entry, items[index].Field, field.Value, field.CodeSeconds))])
-            : ToolResults.Refuse(verdict.Refusal ?? (verdict.Method == AuditMethod.OutOfScope ? ToolText.SetOutOfScope : ToolText.Refusal(verdict.Method)));
+            : ToolResults.Refuse(InVault(verdict.Route, verdict.Refusal ?? (verdict.Method == AuditMethod.OutOfScope ? ToolText.SetOutOfScope : ToolText.Refusal(verdict.Method))));
     }
 
     /// <summary>Works out the answer: the arguments, then what this bridge exposes, then the vault's owner.</summary>
-    private async ValueTask<Verdict> DecideAsync(AuditClient client, List<SetItem> items, bool malformed, string reason, CancellationToken cancellationToken)
+    private async ValueTask<Verdict> DecideAsync(AuditClient client, List<SetItem> items, bool malformed, string reason, string vault, CancellationToken cancellationToken)
     {
         if (malformed)
         {
@@ -115,6 +118,17 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
             return new Verdict(AuditMethod.OutOfScope, "an item in the set is outside what this agent can see through this bridge");
         }
 
+        var routing = await vaults.RouteAsync(vault, [.. items.Select(item => item.Entry).Distinct(StringComparer.Ordinal)], [], cancellationToken).ConfigureAwait(false);
+
+        return routing.Route is { } route
+            ? await AskAsync(client, route, items, reason, cancellationToken).ConfigureAwait(false) with { Route = route }
+            : new Verdict(routing.Method, routing.Reason, Refusal: routing.Refusal);
+    }
+
+    /// <summary>Asks the owner of the vault the set went to.</summary>
+    private async ValueTask<Verdict> AskAsync(AuditClient client, VaultRoute route, List<SetItem> items, string reason, CancellationToken cancellationToken)
+    {
+        var approver = route.Connection;
         var (reply, outcome, refusal) = await approver.RequestSetAsync(
             new SetRequest
             {
@@ -155,7 +169,7 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
                 _ => new Verdict(
                     AuditMethod.NoApprover,
                     "no keypaste process holds the vault unlocked",
-                    Refusal: outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                    Refusal: outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(route.Vault, cancellationToken).ConfigureAwait(false)
                         ? ToolText.AppLocked
                         : null),
             };
@@ -200,6 +214,10 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
         return items;
     }
 
+    /// <summary>A refusal from one of several vaults, named with its vault; the one vault's, as it is.</summary>
+    private string InVault(VaultRoute? route, string refusal) =>
+        vaults.Several && route?.Vault is { } named ? ToolText.InVault(named.Name, refusal) : refusal;
+
     private static Verdict Invalid(string argument, string rule) =>
         new(AuditMethod.InvalidRequest, "the request did not satisfy the tool's schema", Refusal: ToolText.Invalid(argument, rule));
 
@@ -218,5 +236,8 @@ internal sealed class RequestLinkedSetTool(ServerOptions options, ApproverConnec
     {
         /// <summary>Whether the owner recorded this call, so the bridge writes no line of its own.</summary>
         public bool Recorded { get; init; }
+
+        /// <summary>The vault the set went to, or null when it went to none.</summary>
+        public VaultRoute? Route { get; init; }
     }
 }

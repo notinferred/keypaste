@@ -24,7 +24,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// What the app shows and a screen reader says holds item, environment, allowance, what an agent
+/// What the app shows and a screen reader says holds item, stage, allowance, what an agent
 /// can see, KeePass database and AI tool, never the words those replaced.
 /// </summary>
 /// <remarks>
@@ -34,7 +34,7 @@ namespace Keypaste.App.Tests.Session;
 /// </remarks>
 public sealed partial class PlainWordsTests
 {
-    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?|(?-i:recycle bins?)|keyfiles?|the root|ceilings?|selectors?|unlock id|relay)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?|(?-i:recycle bins?)|keyfiles?|the root|ceilings?|selectors?|unlock id|relay|(?-i:(?<!(?:command's|its|their) )environments?\b(?! variables?))|(?-i:\bEnvironment\b))", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
     [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
@@ -113,6 +113,13 @@ public sealed partial class PlainWordsTests
         project.Environments[0].AddEntry.Press();
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "a project's add-item form"));
+
+        project.CancelAddEntryCommand.Press();
+        project.ShowKeysCommand.Press();
+        project.Launch.SetUpCommand.Press();
+        project.BeginAddProfileCommand.Press();
+        RenderedShell.Drain();
+        said.AddRange(Shown(shell.Window, "a project's stage and run forms"));
 
         foreach (var (name, window) in Prompts())
         {
@@ -404,10 +411,10 @@ public sealed partial class PlainWordsTests
         yield return ("a browser's pairing", new PairingWindow(new PairingViewModel(new PairingPrompt
         {
             Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+            Code = "472 913",
             SuggestedName = "Chrome on work laptop",
             TakenNames = ["Chrome on work laptop"],
         })));
-        yield return ("the not-paired notice", new PairingNoticeWindow(new PairingNotice(Core.Browser.BrowserIdentity.FirefoxAddOns), () => { }));
     }
 
     [Fact]

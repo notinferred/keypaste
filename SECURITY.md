@@ -87,12 +87,14 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 - An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
 - An agent may ask the person to move an item it sees whole to Trash or mark it expired, and to delete for good only an item it created through an approved save; each of these is asked every time and made only once the person allows it. It may add or remove the item's `needs-update` tag without asking. Every change's line is written before the vault is saved, and a change whose line cannot be written is not made (unreleased) [T-57].
 - Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
-- One prompt at a time; 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
+- One prompt at a time, across every vault open in the app (unreleased); 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].
 - The local pipe admits only the current user (v0.3.0) [T-10].
 - One owner per vault; CLI edits go to it and wait for the person (unreleased) [T-29] [T-43].
-- Agent rules hold only while sealed; anything else asks about every value (unreleased) [T-15].
-- Limit: client labels are unauthenticated, so whoever starts a bridge gets what an Allow gives, also under another agent's label [T-3] [T-14] [T-36].
+- Agent rules hold only while sealed, each vault's apart and under its own key; anything else asks about every value (unreleased) [T-15].
+- A tool Connect sets up reaches only the vaults it was connected to, through one bridge that asks each vault's own owner (unreleased) [T-4].
+- The app's prompt says Verified only when the system shows keypaste's own program on the pipe, started by the AI tool its label names; otherwise Not verified. It decides nothing (unreleased) [T-3].
+- Limit: client labels are unauthenticated, so whoever starts a bridge gets what an Allow gives, also under another agent's label; Verified does not stop a process of the same user [T-3] [T-14] [T-36].
 - Limit: a rule covers the vault's current contents, so a new field or tag changes what an Allow releases [T-13].
 - Limit: nobody reads the reason behind an unasked release, and timing reveals which categories are Allow [T-12] [T-17].
 - Limit: a run's command is the runner's claim, and a run can leak values its scrubber misses [T-30] [T-35].
@@ -103,15 +105,18 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 ### Browser fill (unreleased)
 
 - keypaste answers only its own extension's three builds, under its own host name, and never writes KeePassXC's [T-48] [T-49] [T-60].
-- A browser pairs only while you armed pairing in Settings or with `keypaste approve --pair-browser`, and only once you confirm it [T-48] [T-50].
-- A login fills only on your answer to a prompt that names the site, or on the exact site where you chose to always fill it; a page's own load asks nobody [T-59] [T-61].
-- An item matches a page only on its own host or a subdomain, on the same scheme and port, within one registrable domain by the Public Suffix List; a lookalike or another tenant of a shared host gets nothing, and an `http` page or a form posting to another site is asked every time with no Always [T-58].
+- A browser pairs only once you confirm it in keypaste, which shows the code the extension shows beside Connect; one request is asked about at a time, and a refusal holds the next back from a minute up to an hour [T-48].
+- One pairing per browser serves every vault unlocked on this computer. It is kept on this computer with only a hash of the extension's key, and counts only while an unlocked vault's seal holds it, so a program writing that file adds no pairing [T-50].
+- Nothing is asked of keypaste as a page loads: a click on keypaste's key icon in a login field lists the page's logins from every open vault by name, with no password, and names the vaults that are locked [T-59].
+- A login fills only when you pick it in that list: at once where that browser filled it on that exact site before, otherwise once you allow it in keypaste, which asks "Fill this login on this site?" naming the site; every login filled is recorded with the page's origin before it leaves keypaste [T-59] [T-61].
+- The list is drawn in a closed shadow root in the browser's top layer; a pick counts only from a trusted click or key, on a list that has been on screen half a second, that the page has not faded, filtered or covered. The extension takes the site from the browser's tab, never from the page [T-59].
+- An item matches a page only on its own host or a subdomain, on the same scheme and port, within one registrable domain by the Public Suffix List, and the first fill on each subdomain is asked; a lookalike or another tenant of a shared host gets nothing. An `http` page, a single-label host and a form posting to another site are listed with a warning and asked in keypaste at every pick [T-58].
 - The extension refuses a login form in a frame from another origin before keypaste is asked [T-58].
-- A release carries the item's username and password, title and UUID, nothing else [T-60].
+- A release carries one item's username and password, title and UUID, nothing else [T-60].
 - Checked in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux with keypaste's test build (8.3a3).
-- Limit: whoever holds a pairing's key gets the always-filled logins on those sites unasked, and anything able to start keypaste as the browser can ask to pair [T-48] [T-50] [T-61].
+- Limit: whoever holds a pairing's key can list the names of the logins of any site it names and gets the logins that browser filled on a site before, unasked, by naming that site; anything able to start keypaste as the browser can put a pairing confirmation in front of you at any time, whose code differs from your browser's [T-48] [T-50] [T-59] [T-61].
 - Limit: a filled password belongs to the page and the extension, whose scripts or updates can send it anywhere [T-60].
-- Limit: whoever controls a subdomain of an item's site is offered its login there [T-58].
+- Limit: a page that fools a person into picking from a list it did not tamper with, or a page of the site itself that is compromised, gets the login it is picked on; whoever controls a subdomain of an item's site has its login listed there [T-58] [T-59].
 
 ### What unlocks a vault
 
@@ -127,6 +132,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 - Secret fields show automation only their length [T-22]; a revealed value shows at most 30 seconds [T-25].
 - Copies clear after 20 seconds if unchanged, as `keypaste get` does in v0.3.0 [T-19].
+- Several vaults can be open at once, each with its own claim and pipe; the idle lock, `Ctrl/Cmd+L` and quitting lock them all [T-23] [T-29].
 - Idle lock after 30 minutes by default, at most 8 hours [T-23].
 - Notifications carry fixed words only [T-51].
 - Crash reports are sent only after consent, hold no value, name or path, and never come from the CLI or bridge [T-9].
@@ -157,7 +163,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 ### Audit
 
 - The log is hash-chained and appended to; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
-- Only the vault's owner rewrites it: lookups older than 30 days become one summary line per agent per day, days older than the period you keep it for (a year by default) are removed whole, every other line keeps its bytes, and a first line signed with the vault's key seals the result (unreleased) [T-5].
+- Only the vault's owner rewrites it: lookups older than 30 days become one summary line per agent per day, days older than the period you keep it for (a year by default) are removed whole, every other line keeps its bytes, and a first line signed with the vault's key seals the result, which another open vault's owner checks under that key before it seals over it (unreleased) [T-5].
 - The vault's owner signs the chain with a key the vault holds every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so a rewrite before the last one needs the unlocked vault (unreleased) [T-5].
 - Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
 - Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.

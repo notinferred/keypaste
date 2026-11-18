@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// An item's title is words, drawn in Instrument Sans; a key is machine text, drawn in Fragment Mono (N.7).
+/// An item's title is words, drawn in the system's interface face; a key is machine text, drawn in its monospace (N.7).
 /// </summary>
 /// <remarks>
 /// Read from the frame: each claim that a text is drawn in one face sits beside the claim that the
@@ -35,29 +35,30 @@ public sealed class TitleTypographyTests
     });
 
     [Fact]
-    public Task The_sidebars_foot_sets_only_the_file_name_in_mono_and_says_Lock() => HeadlessSession.On(() =>
+    public Task The_sidebar_heads_the_vault_by_its_title_in_sans_and_the_title_bar_locks_by_its_icon() => HeadlessSession.On(() =>
     {
-        using var shell = Open("github");
+        using var shell = Open("github", secondVault: "acme");
         var frame = shell.Frame();
-        var foot = frame.Of(shell.Named<Border>("VaultFoot"), shell.Window);
+        var vault = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Classes.Contains("vault") && block.Text != "acme");
+        var heading = frame.Of(vault, shell.Window);
 
-        Assert.True(frame.Shows("vault.kdbx", new TextStyle(new Typeface(Mono), 12), foot), "the vault's file name is not drawn in mono");
-        Assert.True(frame.Shows("saved", new TextStyle(new Typeface(Sans), 13), foot), "the save state is not drawn in sans");
-        Assert.False(frame.Shows("saved", new TextStyle(new Typeface(Mono), 12), foot), "the save state is drawn in mono");
-        Assert.True(frame.Shows("Lock", new TextStyle(new Typeface(Sans, weight: FontWeight.Medium), 12), foot), "Lock is not drawn in sans");
+        Assert.Equal("vault", vault.Text);
+        Assert.True(frame.Shows("vault", new TextStyle(new Typeface(Sans, weight: FontWeight.SemiBold), 13), heading), "the vault's title is not drawn in sans");
+        Assert.False(frame.Shows("vault", new TextStyle(new Typeface(Mono), 12), heading), "the vault's title is drawn in mono");
+        Assert.Equal(Keypaste.App.Resources.Strings.LockNow, Avalonia.Automation.AutomationProperties.GetName(shell.Named<Button>("LockButton")));
     });
 
     private static FontFamily Sans => (FontFamily)Avalonia.Application.Current!.FindResource("KpSans")!;
 
     private static FontFamily Mono => (FontFamily)Avalonia.Application.Current!.FindResource("KpMono")!;
 
-    private static TextStyle Heading(FontFamily family) => new(new Typeface(family, weight: FontWeight.SemiBold), 24, -0.72);
+    private static TextStyle Heading(FontFamily family) => new(new Typeface(family, weight: FontWeight.Bold), 20, -0.2);
 
-    private static TextStyle Row(FontFamily family) => new(new Typeface(family, weight: FontWeight.Medium), 13.5);
+    private static TextStyle Row(FontFamily family) => new(new Typeface(family, weight: FontWeight.SemiBold), 13);
 
-    private static RenderedShell Open(string title)
+    private static RenderedShell Open(string title, string? secondVault = null)
     {
-        var shell = new RenderedShell("keypaste-typography-");
+        var shell = new RenderedShell("keypaste-typography-", secondVault: secondVault);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         entries.Selected = entries.Rows.Single(row => row.Title == title);
         RenderedShell.Drain();

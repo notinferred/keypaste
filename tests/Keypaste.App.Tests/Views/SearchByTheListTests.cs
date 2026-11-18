@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>Items' list header: its one search, what it names, and a pane that shows only what the list does (Q.18).</summary>
+/// <summary>Items' one search, in the title bar, what the list's header names, and a pane that shows only what the list does (Q.18).</summary>
 public sealed class SearchByTheListTests
 {
     private const string _longGroup = "a group with a very long name indeed that keeps on going/and a subgroup under it";
@@ -44,17 +44,16 @@ public sealed class SearchByTheListTests
         new Rect(control.Bounds.Size).TransformToAABB(control.TransformToVisual(shell.Window)!.Value);
 
     [Fact]
-    public Task Typing_in_the_header_filters_the_list_and_the_titlebar_holds_no_search() => HeadlessSession.On(() =>
+    public Task Typing_in_the_title_bars_search_filters_the_list() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-header-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         var search = shell.Named<TextBox>("ShellSearch");
 
-        Assert.Equal("Search", search.PlaceholderText);
+        Assert.Equal("Search vault", search.PlaceholderText);
         Assert.Equal("Search", AutomationProperties.GetName(search));
-        Assert.DoesNotContain(shell.Named<Border>("TitleBar").GetVisualDescendants(), visual => visual is TextBox);
-        Assert.True(Bounds(shell, shell.Named<TextBlock>("ListTitle")).Bottom <= Bounds(shell, search).Top);
-        Assert.True(Bounds(shell, shell.Named<ToggleButton>("AddEntry")).Bottom <= Bounds(shell, search).Top);
+        Assert.Contains(search, shell.Named<Border>("TitleBar").GetVisualDescendants());
+        Assert.True(Bounds(shell, search).Bottom <= Bounds(shell, shell.Named<TextBlock>("ListTitle")).Top);
 
         Find(shell);
         WindowInput.Type(shell.Window, "box");
@@ -77,10 +76,10 @@ public sealed class SearchByTheListTests
         RenderedShell.Drain();
 
         Assert.Equal("All items", title.Text);
-        Assert.Equal("vault.kdbx", shell.Named<TextBlock>("VaultFileName").Text);
-        Assert.Equal("saved", shell.Named<TextBlock>("VaultSaveState").Text);
+        Assert.Equal("vault", shell.Named<TextBlock>("ListSubtitle").Text);
+        Assert.False(shell.Named<TextBlock>("VaultSaveState").IsEffectivelyVisible, "a saved vault says nothing of it");
         Assert.Contains(shell.Session.VaultPath!, shell.Shell.VaultStatusDetail, StringComparison.Ordinal);
-        Assert.Single(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text?.Contains("vault.kdbx", StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text?.Contains("vault.kdbx", StringComparison.Ordinal) == true);
 
         entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
         RenderedShell.Drain();
@@ -106,6 +105,25 @@ public sealed class SearchByTheListTests
     });
 
     [Fact]
+    public Task The_keyboard_on_the_search_leaves_a_place_where_it_is_and_typing_searches_items() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-search-elsewhere-", Seed);
+        shell.Shell.GoTo(2);
+        RenderedShell.Drain();
+        var search = shell.Named<TextBox>("ShellSearch");
+
+        search.Focus();
+        RenderedShell.Drain();
+        Assert.Equal(DestinationKind.AgentActivity, shell.Shell.Current.Kind);
+
+        WindowInput.Type(shell.Window, "box");
+        RenderedShell.Drain();
+
+        Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
+        Assert.Equal(["box"], Assert.IsType<EntriesViewModel>(shell.Shell.Content).Rows.Select(row => row.Title));
+    });
+
+    [Fact]
     public Task Find_closes_a_sidebar_lying_over_the_field() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-overlay-", Seed);
@@ -122,12 +140,11 @@ public sealed class SearchByTheListTests
     });
 
     [Fact]
-    public Task The_keycap_shows_a_chord_Find_answers() => HeadlessSession.On(() =>
+    public Task The_searchs_tooltip_names_a_chord_Find_answers() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-keycap-", Seed);
-        var keycap = shell.Named<TextBox>("ShellSearch").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Text?.EndsWith('F') == true);
 
-        Assert.Equal(OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F", keycap.Text);
+        Assert.Equal($"Search, {(OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F")}", ToolTip.GetTip(shell.Named<TextBox>("ShellSearch")));
     });
 
     [Fact]
@@ -240,7 +257,7 @@ public sealed class SearchByTheListTests
         Assert.Equal(string.Empty, search.Text);
         Assert.Same(entries, shell.Shell.Content);
 
-        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "other");
+        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.GroupRowAt("other");
         RenderedShell.Drain();
         Assert.True(shell.Shell.HasDiscardPrompt);
         shell.Shell.KeepDraftCommand.Press();
@@ -365,72 +382,65 @@ public sealed class SearchByTheListTests
 
         Assert.True(title.Right <= rename.X, $"the title {title} runs into Rename {rename}");
         Assert.True(rename.Right <= add.X, $"Rename {rename} runs into New {add}");
-        Assert.True(rename.Bottom <= search.Top, $"Rename {rename} runs into the search {search}");
+        Assert.True(search.Bottom <= rename.Top, $"the search {search} runs into Rename {rename}");
         Assert.True(search.Width >= 160, $"the search is {search.Width:0} wide");
         Assert.True(add.Right <= width, $"New {add} is past the window's {width}");
     });
 
     [Fact]
-    public Task A_long_file_name_gives_way_before_Lock_and_the_save_state() => HeadlessSession.On(() =>
+    public Task A_long_file_name_gives_way_in_the_sidebar_and_its_path_is_the_tooltip() => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell("keypaste-search-long-file-", Seed, new string('n', 150) + ".kdbx");
-        shell.Window.Width = 720;
-        RenderedShell.Drain();
-        shell.Shell.ToggleSidebar();
+        using var shell = new RenderedShell("keypaste-search-long-file-", Seed, new string('n', 150) + ".kdbx", secondVault: "acme");
+        shell.Window.Width = 1000;
         shell.Frame();
 
-        var line = shell.Named<TextBlock>("VaultFileName");
-        var lockNow = shell.Named<Button>("LockButton");
+        var vault = shell.Named<ListBox>("Nav").GetVisualDescendants().OfType<TextBlock>().Single(block => block.Classes.Contains("vault") && block.Text != "acme");
 
-        Assert.Equal("saved", shell.Named<TextBlock>("VaultSaveState").Text);
-        Assert.True(line.TextLayout.TextLines[0].HasCollapsed);
-        Assert.True(Bounds(shell, lockNow).Right <= 720);
-        Assert.True(Bounds(shell, line).X >= Bounds(shell, shell.Named<Button>("ShowSidebar")).Right);
+        Assert.True(vault.TextLayout.TextLines[0].HasCollapsed);
+        Assert.True(Bounds(shell, vault).Right <= WindowChrome.RailWidth + WindowChrome.SidebarWidth);
+        Assert.Equal(shell.Session.VaultPath, ToolTip.GetTip(vault.GetVisualAncestors().OfType<Grid>().First()));
+        Assert.True(Bounds(shell, shell.Named<Button>("LockButton")).Right <= 1000);
     });
 
     [Fact]
-    public Task The_sidebars_button_shows_only_while_the_sidebar_is_away_and_opens_it() => HeadlessSession.On(() =>
+    public Task The_sidebars_button_hides_and_shows_it_and_over_a_narrow_window_opens_it_over_the_content() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-sidebar-", Seed);
         var button = shell.Named<Button>("ShowSidebar");
-        var lockButton = shell.Named<Button>("LockButton");
         shell.Frame();
 
-        Assert.False(button.IsEffectivelyVisible);
-        var lockedAt = Bounds(shell, lockButton);
-
-        shell.Shell.ToggleSidebar();
-        shell.Frame();
         Assert.True(button.IsEffectivelyVisible);
         Assert.Equal("Show sidebar", AutomationProperties.GetName(button));
-        Assert.Equal("Show sidebar", ToolTip.GetTip(button));
-        Assert.True(Bounds(shell, lockButton).Bottom <= WindowChrome.TitleBarHeight, "with the sidebar away, Lock is in the titlebar");
-        Assert.True(Bounds(shell, button).X >= WindowChrome.LeadingInset(InterfaceZoom.Factor), "the button lies under the traffic lights or the menu button");
+        Assert.True(Bounds(shell, button).Bottom <= WindowChrome.TitleBarHeight, "the button is in the title bar");
+        Assert.True(Bounds(shell, button).X >= WindowChrome.LeadingInset(InterfaceZoom.Factor), "the button lies after the traffic lights or the menu button");
 
         shell.Press(button);
         shell.Release(button);
         RenderedShell.Drain();
-        Assert.False(button.IsEffectivelyVisible);
+        Assert.True(shell.Shell.SidebarHidden);
+        Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
+
+        shell.Press(button);
+        shell.Release(button);
+        RenderedShell.Drain();
         Assert.True(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
 
         shell.Window.Width = 720;
         shell.Frame();
-        Assert.False(button.IsEffectivelyVisible, "the rail takes over the button's job");
+        Assert.True(button.IsEffectivelyVisible);
         Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
 
-        var railButton = shell.Named<Button>("RailGroups");
-        shell.Press(railButton);
-        shell.Release(railButton);
+        shell.Press(button);
+        shell.Release(button);
         RenderedShell.Drain();
         Assert.True(shell.Shell.SidebarOverlays);
-        Assert.False(button.IsEffectivelyVisible);
+        Assert.False(shell.Shell.SidebarHidden, "opening it over a narrow window is not the kept choice");
 
-        AmberElements.AssertAtMostOne(shell.Window, "the sidebar over the content");
+        AccentElements.AssertAtMostOne(shell.Window, "the sidebar over the content");
 
         shell.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         RenderedShell.Drain();
         Assert.False(shell.Shell.SidebarOverlays);
-        Assert.True(railButton.IsFocused);
     });
 
     [Fact]
@@ -441,12 +451,12 @@ public sealed class SearchByTheListTests
         var add = shell.Named<ToggleButton>("AddEntry");
         shell.Frame();
         Assert.DoesNotContain("primary", add.Classes);
-        AmberElements.AssertOne(shell.Window, null, "Items at rest");
+        AccentElements.AssertOne(shell.Window, null, "Items at rest");
         var fieldAtRest = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
 
         Find(shell);
         shell.Frame();
-        AmberElements.AssertOne(shell.Window, null, "the search focused");
+        AccentElements.AssertOne(shell.Window, null, "the search focused");
         Assert.Equal(fieldAtRest, Bounds(shell, shell.Named<TextBox>("ShellSearch")));
 
         entries.Selected = entries.Rows.Single(row => row.Title == "box");
@@ -454,7 +464,7 @@ public sealed class SearchByTheListTests
         shell.Frame();
         var copy = shell.Named<Button>("CopyPassword");
         Assert.Contains("primary", copy.Classes);
-        AmberElements.AssertOne(shell.Window, copy, "an open item");
+        AccentElements.AssertOne(shell.Window, copy, "an open item");
         Assert.DoesNotContain("primary", add.Classes);
     });
 }

@@ -18,8 +18,8 @@ public sealed class ItemChangeViewModelTests
 
         Assert.False(prompt.AllowOnceCommand.CanExecute(null));
         Assert.False(prompt.OffersAlways);
-        Assert.False(prompt.OffersAlwaysBlock);
         Assert.Equal(("Move work/github to Trash", "Allow"), (prompt.Change, prompt.AllowLabel));
+        Assert.Equal(("Let Claude Code move github to Trash?", "github"), (prompt.Question, prompt.Item));
 
         prompt.Arm();
         prompt.AllowOnceCommand.Execute(null);
@@ -35,7 +35,9 @@ public sealed class ItemChangeViewModelTests
         Assert.True(prompt.DeletesForGood);
         Assert.Equal("Delete for good", prompt.AllowLabel);
         Assert.Equal("Delete work/github for good. An agent created it on 2026-11-15", prompt.Change);
-        Assert.StartsWith("Allowing deletes it for good", prompt.Explainer, StringComparison.Ordinal);
+        Assert.Equal("Let Claude Code delete github for good?", prompt.Question);
+        Assert.Equal("An agent created it on 2026-11-15. Trash will not hold it, and nothing can bring it back.", prompt.Explainer);
+        Assert.False(prompt.AnswersReturn);
 
         prompt.DenyCommand.Execute(null);
 

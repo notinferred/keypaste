@@ -3,7 +3,7 @@ using Keypaste.App.Navigation;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>A sidebar row: a place, the count beside it and, for Agents, a status dot.</summary>
+/// <summary>A place on the rail: its icon, the count on its badge and, for Agents, a status dot.</summary>
 internal sealed partial class NavItem : ObservableObject
 {
     internal NavItem(Destination destination)
@@ -19,6 +19,7 @@ internal sealed partial class NavItem : ObservableObject
 
     /// <summary>The number at the right of the row, or empty. Always muted: a live signal is the dot's.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBadge), nameof(RailName))]
     internal partial string Count { get; set; } = string.Empty;
 
     /// <summary>Whether the row draws a status dot: Agents does, for whether agents can reach this vault.</summary>
@@ -37,19 +38,11 @@ internal sealed partial class NavItem : ObservableObject
     /// <summary>Whether the mark is a ring: this app is not answering agents for the vault.</summary>
     internal bool DotStopped => !DotLive && !DotDanger;
 
-    /// <summary>Whether the row folds the rows under it: Items does, over the group tree.</summary>
-    internal bool IsExpandable { get; init; }
+    /// <summary>Whether the slot is kept for later: dimmed, never chosen, and named so in its tooltip.</summary>
+    internal bool IsLater => Destination.Kind == DestinationKind.Access;
 
-    /// <summary>Whether the rows under it are showing.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Chevron), nameof(FoldLabel))]
-    internal partial bool IsExpanded { get; set; } = true;
-
-    /// <summary>The fold's chevron: down while open, right while closed.</summary>
-    internal string Chevron => IsExpanded ? "chevron-down" : "chevron-right";
-
-    /// <summary>What the fold button will do.</summary>
-    internal string FoldLabel => IsExpanded ? "Hide the groups" : "Show the groups";
+    /// <summary>Whether the badge shows: Security's count of what needs review.</summary>
+    internal bool HasBadge => Count.Length > 0;
 
     /// <summary>The dot's state in words, beside its colour.</summary>
     internal string DotWords => DotDanger ? "refusing" : DotLive ? "live" : string.Empty;
@@ -65,16 +58,16 @@ internal sealed partial class NavItem : ObservableObject
     internal partial int Waiting { get; set; }
 
     /// <summary>The rail's row for a screen reader: the rail draws no word, so its name says what the dot's colour and the row's count do.</summary>
-    internal string RailName => string.Join(", ", new[] { Title, DotWords, Waiting > 0 ? string.Create(CultureInfo.InvariantCulture, $"{Waiting} waiting") : string.Empty }.Where(part => part.Length > 0));
+    internal string RailName => string.Join(", ", new[] { Title, DotWords, Waiting > 0 ? string.Create(CultureInfo.InvariantCulture, $"{Waiting} waiting") : string.Empty, HasDot ? string.Empty : Count }.Where(part => part.Length > 0));
 
     /// <summary>The rail's tooltip: the place, and what the row would say beside it if there were room.</summary>
     internal string RailTip => string.IsNullOrEmpty(Detail) ? Title : $"{Title} · {Detail}";
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
-    public override string ToString() => string.Join(", ", new[] { Title, IsExpandable ? "level 1" : string.Empty, Count, DotWords }.Where(part => part.Length > 0));
+    public override string ToString() => string.Join(", ", new[] { Title, Count, DotWords }.Where(part => part.Length > 0));
 }
 
-/// <summary>A project in the sidebar, beneath Items, with how many entries are tagged into it.</summary>
+/// <summary>A project in the sidebar, beneath its vault's Environments while that is in view, with how many entries are tagged into it.</summary>
 internal sealed record ProjectRow(string Name, int Count)
 {
     /// <summary>The row's name for a screen reader.</summary>

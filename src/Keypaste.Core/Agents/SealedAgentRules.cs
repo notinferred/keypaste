@@ -4,7 +4,7 @@ using System.Globalization;
 namespace Keypaste.Core.Agents;
 
 /// <summary>
-/// The rules a vault's owner decides by: <c>agents.toml</c> only while its seal holds, an HMAC-SHA256 under a key the
+/// The rules a vault's owner decides by: the vault's file in this home only while its seal holds, an HMAC-SHA256 under a key the
 /// vault keeps in <see cref="ReservedGroups.Keys"/>, over this home's identity, the vault's count of this home's sealed writes and the rules;
 /// otherwise the defaults.
 /// </summary>
@@ -20,11 +20,17 @@ namespace Keypaste.Core.Agents;
 /// after, so a file sealed before the home's latest write, put back, is ignored too, a write whose file never lands leaves
 /// the defaults, and another home sharing the vault changes nothing here.
 /// </para>
+/// <para>
+/// Each vault keeps its own file, so two vaults open at once never seal over each other's rules. The one
+/// <c>agents.toml</c> a home kept before moves, whole and as it is, to the first vault whose key sealed it, read while that
+/// vault has no file of its own; one no open vault's key sealed stays where it is, and every vault asks about everything.
+/// </para>
 /// </remarks>
-/// <param name="file">This home's <c>agents.toml</c>.</param>
+/// <param name="file">This vault's rules in this home.</param>
 /// <param name="vault">The owner's unlocked vault, or null while it is locked.</param>
 /// <param name="save">Saves an edit to that vault under the owner's claim, which the key is created by when there is none.</param>
-public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Func<Func<Vault, bool>, AgentSave> save) : IAgentRules
+/// <param name="shared">The home's earlier <c>agents.toml</c>, from <see cref="AgentRulesFile.Shared"/>, or null to move nothing.</param>
+public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Func<Func<Vault, bool>, AgentSave> save, AgentRulesFile? shared = null) : IAgentRules
 {
     /// <summary>What the app says while the file's rules are ignored.</summary>
     public const string IgnoredText = "agent rules and browser fill allowances were changed outside keypaste and are ignored until you set them again";
@@ -49,20 +55,43 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
     /// <inheritdoc/>
     public bool TryRead([NotNullWhen(true)] out AgentRules? rules, out string problem)
     {
+        var open = _vault();
+        TakeShared(open);
+
         if (!_file.TryReadFile(out var read, out problem))
         {
             rules = null;
             return false;
         }
 
-        var open = _vault();
-        var holds = !read.Present
-            || (read.Seal is { } seal && Key(open) is { } key && _file.HomeId() is { } home && Count(open, home) is { } count
-                && Matches(Seal(key, home, count, read.Rules), seal));
+        var holds = !read.Present || Sealed(read, open);
         _ignored = holds ? null : IgnoredText;
         rules = holds ? read.Rules : AgentRules.Defaults;
         return true;
     }
+
+    /// <summary>Moves the home's earlier rules here when this vault's key sealed them and this vault has none of its own yet.</summary>
+    private void TakeShared(Vault? open)
+    {
+        if (shared is null || open is null || File.Exists(_file.Path) || !shared.TryReadFile(out var read, out _) || !read.Present || !Sealed(read, open))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_file.Path)!);
+            File.Move(shared.Path, _file.Path, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Another vault took it, or it cannot move: this vault reads what its own file says, the defaults while there is none.
+        }
+    }
+
+    private bool Sealed(RulesFileRead read, Vault? open) =>
+        read.Seal is { } seal && Key(open) is { } key && _file.HomeId() is { } home && Count(open, home) is { } count
+        && Matches(Seal(key, home, count, read.Rules), seal);
 
     /// <inheritdoc/>
     /// <remarks>Applied to the rules that hold now, the defaults while the file's are ignored, so a change made outside keypaste is replaced, never carried on.</remarks>

@@ -78,6 +78,19 @@ const messageBuffer = {
             this.buffer.splice(index, 1);
         }
     },
+
+    // Answers each request sent on a port that was closed, which nothing can answer any more, as not connected.
+    dropPort(port) {
+        for (const message of this.buffer.filter(pending => pending.port === port)) {
+            message.cancelTimeout();
+            message.resolve({
+                action: message.request.action,
+                error: kpErrors.getError(kpErrors.TIMEOUT_OR_NOT_CONNECTED),
+                errorCode: kpErrors.TIMEOUT_OR_NOT_CONNECTED
+            });
+            this.removeMessage(message);
+        }
+    },
 };
 
 // Basic class for a message to be sent. The Promise inside the class will be resolved when
@@ -347,8 +360,10 @@ keepassClient.decrypt = function(input, nonce) {
 //--------------------------------------------------------------------------
 
 keepassClient.connectToNative = function() {
-    if (keepassClient.nativePort) {
-        keepassClient.nativePort.disconnect();
+    const previous = keepassClient.nativePort;
+    if (previous) {
+        previous.disconnect();
+        navigator.locks.request('messageBuffer', () => messageBuffer.dropPort(previous));
     }
     keepassClient.nativeConnect();
 };

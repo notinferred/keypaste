@@ -47,7 +47,7 @@ public sealed class BrandMarksTests
 
         using var bitmap = window.CaptureRenderedFrame();
         Assert.NotNull(bitmap);
-        var (pixels, width, _) = AmberElements.Read(bitmap);
+        var (pixels, width, _) = AccentElements.Read(bitmap);
         var ink = Assert.IsAssignableFrom<ISolidColorBrush>(mark.InkBrush).Color;
 
         var origin = mark.TranslatePoint(default, window) ?? throw new InvalidOperationException("the mark is not in the window");
@@ -65,7 +65,7 @@ public sealed class BrandMarksTests
                 {
                     inked++;
                 }
-                else if (AmberElements.IsAmber(r, g, b))
+                else if (IsAmber(r, g, b))
                 {
                     Assert.True(x >= dotFrom, $"{mark.GetType().Name} has amber at ({x},{y}), before its dot");
                     dotted++;
@@ -75,5 +75,12 @@ public sealed class BrandMarksTests
 
         Assert.True(inked > 40, $"{mark.GetType().Name} drew {inked} pixels of its ink");
         Assert.True(dotted > 8, $"{mark.GetType().Name} drew {dotted} pixels of its dot");
+    }
+
+    /// <summary>The brand's amber and its anti-aliased edge: a hue of 30° to 48° well away from grey.</summary>
+    private static bool IsAmber(byte r, byte g, byte b)
+    {
+        var (hue, chroma) = AccentElements.HueAndChroma(r, g, b);
+        return chroma >= 48 && hue is >= 30 and <= 48;
     }
 }

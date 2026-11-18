@@ -111,6 +111,11 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
 
+    <!-- A favorite's star takes the accent, as Mail's flag marks a message. -->
+    <Style Selector="Button.favorite ctl|KpIcon">
+      <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+    </Style>
+
     <!-- A note is one ink step up; amber stays for the action inside it. -->
     <Style Selector="Border.note">
       <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
@@ -244,21 +249,31 @@
 
     </StackPanel>
 
-    <ctl:ListDetail x:Name="Split" ShowsList="{Binding ShowsList}" ShowsDetail="{Binding HasOpenPane}">
+    <ctl:ListDetail x:Name="Split" ListWidth="280" DetailLeast="380" ShowsList="{Binding ShowsList}" ShowsDetail="{Binding HasOpenPane}">
 
       <!-- The list: its header with the title, sort and New, then the search, then the two-line rows. Drawn above the detail so its menus can lie over it. -->
       <Border x:Name="ListColumn" ZIndex="1" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="12,16,12,8" Spacing="8">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
-              <TextBlock x:Name="ListTitle"
-                         Classes="list-title"
-                         Text="{Binding ListTitle}"
-                         ToolTip.Tip="{Binding ListTitle}"
-                         TextTrimming="CharacterEllipsis"
-                         VerticalAlignment="Center" />
+          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="16,0,12,0">
+            <Grid Height="46" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4">
+              <!-- The place's title, with the vault it is in muted after it, as Outlook names a folder and its account. -->
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock x:Name="ListTitle"
+                           Classes="list-title"
+                           Text="{Binding ListTitle}"
+                           ToolTip.Tip="{Binding ListTitle}"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="180"
+                           VerticalAlignment="Center" />
+                <TextBlock x:Name="ListSubtitle"
+                           Classes="size-11 muted"
+                           Text="{Binding ListSubtitle}"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="90"
+                           VerticalAlignment="Center" />
+              </StackPanel>
               <!-- A group is renamed where its name is; the tree it is chosen from is the sidebar's. -->
-              <Button Grid.Column="1"
+              <Button Grid.Column="2"
                       x:Name="RenameGroup"
                       Classes="icon ghost sm"
                       ToolTip.Tip="{x:Static res:Strings.RenameGroup}"
@@ -267,44 +282,38 @@
                       Command="{Binding BeginRenameGroupCommand}">
                 <ctl:KpIcon Icon="folder-pen" Size="14" />
               </Button>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                 <ToggleButton x:Name="SortMenu"
                               Classes="more"
                               ToolTip.Tip="{x:Static res:Strings.SortThisList}"
                               AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
-                  <ctl:KpIcon Icon="chevrons-up-down" Size="14" />
+                  <ctl:KpIcon Icon="list-filter" Size="16" />
                 </ToggleButton>
+                <!-- In a place of one kind, "+" opens that kind's form in this vault; where the place holds every kind, it asks which. -->
+                <Button x:Name="AddInPlace"
+                        Classes="icon ghost"
+                        IsVisible="{Binding AddsInPlace}"
+                        Command="{Binding BeginAddCommand}"
+                        ToolTip.Tip="{Binding AddInPlaceTip}"
+                        AutomationProperties.Name="{Binding AddInPlaceTip}">
+                  <ctl:KpIcon Icon="plus" Size="16" />
+                </Button>
                 <ToggleButton x:Name="AddEntry"
                               Classes="more"
-                              ToolTip.Tip="{x:Static res:Strings.NewItemOrPassword}"
-                              AutomationProperties.Name="{x:Static res:Strings.New}">
-                  <ctl:KpIcon Icon="plus" Size="14" />
+                              IsVisible="{Binding !AddsInPlace}"
+                              ToolTip.Tip="{Binding AddMenuHeading}"
+                              AutomationProperties.Name="{Binding AddMenuHeading}">
+                  <ctl:KpIcon Icon="plus" Size="16" />
                 </ToggleButton>
               </StackPanel>
             </Grid>
-
-            <!-- The app's only search. It searches what the header names. -->
-            <TextBox x:Name="ShellSearch"
-                     Classes="search"
-                     Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).Search, FallbackValue={x:Null}}"
-                     PlaceholderText="{x:Static res:Strings.Search}"
-                     AutomationProperties.Name="{x:Static res:Strings.Search}">
-              <TextBox.InnerLeftContent>
-                <ctl:KpIcon Icon="search" Size="14" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
-              </TextBox.InnerLeftContent>
-              <TextBox.InnerRightContent>
-                <Border Classes="keycap" Margin="0,0,4,0">
-                  <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
-                </Border>
-              </TextBox.InnerRightContent>
-            </TextBox>
 
             <!-- The menus take no room, so an open one lies over the rows rather than pushing them down. -->
             <Canvas Height="0">
               <Border x:Name="SortMenuPanel"
                       Classes="menu"
                       Canvas.Right="0"
-                      Canvas.Top="-36"
+                      Canvas.Top="-6"
                       MinWidth="180"
                       IsVisible="{Binding #SortMenu.IsChecked}">
                 <ItemsControl ItemsSource="{Binding SortChoices}">
@@ -326,10 +335,11 @@
           <Border x:Name="AddMenuPanel"
                   Classes="menu"
                   Canvas.Right="0"
-                  Canvas.Top="-36"
+                  Canvas.Top="-6"
                   MinWidth="200"
                   IsVisible="{Binding #AddEntry.IsChecked}">
             <StackPanel Spacing="2">
+              <TextBlock Classes="caption" Margin="12,4,12,2" Text="{Binding AddMenuHeading}" TextTrimming="CharacterEllipsis" />
               <ItemsControl x:Name="NewItemKinds" ItemsSource="{Binding Kinds}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -351,13 +361,13 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <Border Classes="divider" Margin="6,2" />
-              <Button x:Name="NewGeneratedPassword"
+              <Button x:Name="MoreTemplates"
                       Classes="ghost menu-item"
-                      Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="{x:Static res:Strings.GeneratePassword}">
+                      Command="{Binding ChooseTemplateCommand}"
+                      AutomationProperties.Name="{x:Static res:Strings.MoreTemplatesLabel}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="wand-2" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.GeneratePasswordXf22f07}" VerticalAlignment="Center" />
+                  <ctl:KpIcon Icon="ellipsis" Size="14" />
+                  <TextBlock Text="{x:Static res:Strings.MoreTemplatesLabel}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -405,19 +415,22 @@
 
             <ListBox Name="Rows"
                      AutomationProperties.Name="{x:Static res:Strings.Items}"
-                     Classes="rows two-line"
-                     Padding="4,0,4,4"
+                     Classes="rows two-line monograms"
+                     Padding="6,0,6,6"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     ItemsSource="{Binding Rows}"
+                     ItemsSource="{Binding ListedRows}"
                      SelectedItem="{Binding Selected}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:EntryRow">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <!-- The tile answers the pointer only on its strokes, so a background carries its tip. -->
-                    <Panel Name="KindMark" Background="Transparent" ToolTip.Tip="{Binding KindLabel}" AutomationProperties.Name="{Binding KindLabel}">
-                      <Border Classes="row-tile">
-                        <ctl:KpIcon Classes="kind" Icon="{Binding Icon}" Size="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                      </Border>
+              <ListBox.DataTemplates>
+                <DataTemplate DataType="vm:RowSection">
+                  <TextBlock Classes="row-section" Text="{Binding Title}" />
+                </DataTemplate>
+                <DataTemplate DataType="vm:EntryRow">
+                  <!-- When it last changed is the row's tooltip, and the pane's Modified line; the row draws no time. -->
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Background="Transparent"
+                        ToolTip.Tip="{Binding ChangedTip}">
+                    <!-- The tile is the service's mark, the item's kind or its first letter; its kind is its tooltip. -->
+                    <Panel Name="KindMark" Background="Transparent" VerticalAlignment="Center" ToolTip.Tip="{Binding KindLabel}" AutomationProperties.Name="{Binding KindLabel}">
+                      <ctl:Monogram Title="{Binding DisplayTitle}" Id="{Binding Hue}" Mark="{Binding Mark}" Size="30" />
                     </Panel>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -433,26 +446,28 @@
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding SharesItsName}" />
                       </Grid>
-                      <!-- Why it is in a result, its username, or where it lives; never a password or a field's value. -->
+                      <!-- Why it is in a result, its username, or its kind; never a password or a field's value. -->
                       <TextBlock Name="RowSecondLine"
-                                 Classes="mono muted size-12"
+                                 Classes="caption" TextWrapping="NoWrap"
                                  Text="{Binding SecondLine}"
                                  ToolTip.Tip="{Binding SecondLine}"
                                  TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <!-- When an agent last received it, with a dot only while it is in use. A time, never a value. Not amber:
-                         several rows can be in use at once, and a view has one amber element. -->
-                    <StackPanel Grid.Column="2"
-                                Orientation="Horizontal"
-                                Spacing="6"
-                                VerticalAlignment="Center"
-                                IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                      <TextBlock Classes="size-13 muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
-                      <Border Classes="dot info" IsVisible="{Binding IsInUse}" />
+                    <!-- A dot while an agent uses it. Not the accent: several rows can be in use at once. -->
+                    <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Top" Margin="0,2,0,0">
+                      <Border Classes="dot info" HorizontalAlignment="Right" IsVisible="{Binding IsInUse}" ToolTip.Tip="{Binding LastUsedText}" />
+                      <!-- The item's vault, where the list holds several vaults' items. -->
+                      <TextBlock Name="RowVault"
+                                 Classes="size-11 muted"
+                                 HorizontalAlignment="Right"
+                                 MaxWidth="90"
+                                 TextTrimming="CharacterEllipsis"
+                                 Text="{Binding VaultName}"
+                                 IsVisible="{Binding ShowsVaultName}" />
                     </StackPanel>
                   </Grid>
                 </DataTemplate>
-              </ListBox.ItemTemplate>
+              </ListBox.DataTemplates>
             </ListBox>
           </Panel>
         </DockPanel>
@@ -487,7 +502,7 @@
         <ContentControl.DataTemplates>
           <DataTemplate DataType="vm:EntryDetailViewModel">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-              <Grid Margin="32,24">
+              <Grid Margin="24,20">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" MaxWidth="640" />
                   <ColumnDefinition Width="Auto" />
@@ -496,58 +511,72 @@
 
                   <!-- The header, drawn above everything after it so its menu can lie over them. -->
                   <StackPanel ZIndex="1">
-                    <ctl:HeaderRow Spacing="16">
-                      <StackPanel Spacing="2">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <TextBlock x:Name="ItemKind" Classes="muted size-13" Text="{Binding KindLabel}" IsVisible="{Binding !IsEditing}" />
-                          <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.EditingItem}" IsVisible="{Binding IsEditing}" />
-                          <Border Width="2" Height="2" CornerRadius="4" VerticalAlignment="Center" Background="{DynamicResource KpTextMuted}" IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
-                          <TextBlock x:Name="PaneLocation"
-                                     Text="{Binding Location}"
-                                     Classes="muted size-13"
-                                     TextWrapping="Wrap"
-                                     IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
+                    <StackPanel Spacing="16">
+                      <!-- The item's tile, title and what it is, as Mail heads a message. -->
+                      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <ctl:Monogram Title="{Binding DisplayTitle}" Id="{Binding Hue}" Mark="{Binding Mark}" Size="52" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                          <TextBlock x:Name="EntryTitle"
+                                     Classes="title"
+                                     Text="{Binding DisplayTitle}"
+                                     TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock x:Name="ItemKind" Classes="caption" TextWrapping="NoWrap" Text="{Binding KindLabel}" IsVisible="{Binding !IsEditing}" />
+                            <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.EditingItem}" IsVisible="{Binding IsEditing}" />
+                            <TextBlock Classes="caption" TextWrapping="NoWrap" Text="·" />
+                            <TextBlock x:Name="ItemVault" Classes="caption" TextWrapping="NoWrap" Text="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).ItemVaultTitle, FallbackValue={x:Null}}" />
+                            <TextBlock Classes="caption" TextWrapping="NoWrap" Text="›" IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
+                            <TextBlock x:Name="PaneLocation"
+                                       Text="{Binding Location}"
+                                       Classes="caption" TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
+                          </StackPanel>
                         </StackPanel>
-                        <TextBlock x:Name="EntryTitle"
-                                   Classes="title"
-                                   Text="{Binding DisplayTitle}"
-                                   TextWrapping="Wrap" />
-                      </StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                        <Button x:Name="EditItem" Classes="action" IsVisible="{Binding !IsEditing}" Content="{x:Static res:Strings.Edit}" Command="{Binding EditCommand}" AutomationProperties.Name="{x:Static res:Strings.EditFields}" />
-                        <Button x:Name="ShareItem"
-                                Classes="icon"
+                      </Grid>
+                      <!-- The item's actions under its title: Copy password, the view's one filled accent, Edit, and the rest behind ⋯. -->
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button x:Name="CopyPassword"
+                                  Classes="action"
+                                  Classes.primary="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).CopyPasswordIsPrimary, FallbackValue={x:False}}"
+                                  Command="{Binding CopyPasswordCommand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
+                            <Button.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsEditing" />
+                                <Binding Path="HasPassword" />
+                              </MultiBinding>
+                            </Button.IsVisible>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="copy" Size="14" />
+                              <TextBlock Text="{x:Static res:Strings.CopyPassword}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                          <Button x:Name="EditItem" Classes="action" IsVisible="{Binding !IsEditing}" Content="{x:Static res:Strings.Edit}" Command="{Binding EditCommand}" AutomationProperties.Name="{x:Static res:Strings.EditFields}" />
+                          <Button x:Name="CancelEdit" Classes="ghost action" IsVisible="{Binding IsEditing}" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+                          <Button x:Name="SaveEdit" Classes="primary action" IsVisible="{Binding IsEditing}" Content="{x:Static res:Strings.Save}" Command="{Binding SaveCommand}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                        <Button x:Name="FavoriteItem"
+                                Classes="icon ghost"
+                                Classes.favorite="{Binding IsFavorite}"
                                 IsVisible="{Binding !IsEditing}"
-                                Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
-                                CommandParameter="{Binding Name}"
-                                ToolTip.Tip="{x:Static res:Strings.Share}"
-                                AutomationProperties.Name="{x:Static res:Strings.Share}">
-                          <ctl:KpIcon Icon="share-2" Size="16" />
+                                Command="{Binding ToggleFavoriteCommand}"
+                                ToolTip.Tip="{Binding FavoriteLabel}"
+                                AutomationProperties.Name="{Binding FavoriteLabel}">
+                          <ctl:KpIcon Icon="star" Size="16" />
                         </Button>
                         <ToggleButton x:Name="EntryMenu"
                                       Classes="more"
                                       IsVisible="{Binding !IsEditing}"
                                       ToolTip.Tip="{x:Static res:Strings.MoreActions}"
                                       AutomationProperties.Name="{x:Static res:Strings.MoreActions}">
-                          <ctl:KpIcon Icon="ellipsis" Size="14" />
+                          <ctl:KpIcon Icon="ellipsis" Size="16" />
                         </ToggleButton>
-                        <Button x:Name="CopyPassword"
-                                Classes="action"
-                                Classes.primary="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).CopyPasswordIsPrimary, FallbackValue={x:False}}"
-                                Command="{Binding CopyPasswordCommand}"
-                                AutomationProperties.Name="{x:Static res:Strings.CopyPassword}">
-                          <Button.IsVisible>
-                            <MultiBinding Converter="{x:Static BoolConverters.And}">
-                              <Binding Path="!IsEditing" />
-                              <Binding Path="HasPassword" />
-                            </MultiBinding>
-                          </Button.IsVisible>
-                          <TextBlock Text="{x:Static res:Strings.CopyPassword}" VerticalAlignment="Center" />
-                        </Button>
-                        <Button x:Name="CancelEdit" Classes="ghost action" IsVisible="{Binding IsEditing}" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
-                        <Button x:Name="SaveEdit" Classes="primary action" IsVisible="{Binding IsEditing}" Content="{x:Static res:Strings.Save}" Command="{Binding SaveCommand}" />
-                      </StackPanel>
-                    </ctl:HeaderRow>
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
                     <StackPanel x:Name="NothingTellsItApart" Spacing="6" Margin="0,8,0,0" IsVisible="{Binding NothingTellsItApart}">
                       <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.SharedNameNothingTells}" TextWrapping="Wrap" />
                       <Button Classes="ghost sm"
@@ -609,10 +638,33 @@
                               <TextBlock Text="{x:Static res:Strings.Share}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
-                          <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}" AutomationProperties.Name="{Binding History.ToggleLabel}">
+                          <Border Classes="divider" Margin="6,2" />
+                          <Button x:Name="AddTotp"
+                                  Classes="ghost menu-item"
+                                  IsVisible="{Binding CanAddTotp}"
+                                  Command="{Binding BeginSetTotpCommand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.AddOneTimeCode}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <ctl:KpIcon Icon="history" Size="14" />
-                              <TextBlock Text="{Binding History.ToggleLabel}" VerticalAlignment="Center" />
+                              <ctl:KpIcon Icon="plus" Size="14" />
+                              <TextBlock Text="{x:Static res:Strings.AddOneTimeCode}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                          <Button x:Name="AddField"
+                                  Classes="ghost menu-item"
+                                  Command="{Binding BeginAddFieldCommand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.AddField}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <ctl:KpIcon Icon="plus" Size="14" />
+                              <TextBlock Text="{x:Static res:Strings.AddFieldLabel}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                          <Button x:Name="AddAttachment"
+                                  Classes="ghost menu-item"
+                                  Command="{Binding Attachments.AddCommand}"
+                                  AutomationProperties.Name="{x:Static res:Strings.AddAttachment}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <ctl:KpIcon Icon="plus" Size="14" />
+                              <TextBlock Text="{x:Static res:Strings.AddAttachmentLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <!-- What names the entry rather than what it holds, kept here out of the preview (N.5). -->
@@ -920,7 +972,7 @@
                     <ctl:GroupedRows>
                     <ctl:FieldRow Label="{x:Static res:Strings.Username}" IsVisible="{Binding HasUsername}">
                       <ctl:PressToCopy x:Name="CopyUsername" Command="{Binding CopyUsernameCommand}" ToolTip.Tip="{x:Static res:Strings.CopyUsername}" AutomationProperties.Name="{x:Static res:Strings.CopyUsername}">
-                        <TextBlock Classes="mono size-13" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Classes="size-13" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                       </ctl:PressToCopy>
                     </ctl:FieldRow>
 
@@ -1010,7 +1062,7 @@
                     <ctl:FieldRow Label="{x:Static res:Strings.URL}" IsVisible="{Binding HasUrl}">
                       <StackPanel Spacing="4">
                         <ctl:PressToCopy x:Name="CopyUrl" Command="{Binding CopyUrlCommand}" ToolTip.Tip="{x:Static res:Strings.CopyUrl}" AutomationProperties.Name="{x:Static res:Strings.CopyUrl}">
-                          <TextBlock Classes="mono size-13" Text="{Binding DisplayUrl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <TextBlock Classes="size-13" Classes.accent="{Binding OpensUrl}" Text="{Binding DisplayUrl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         </ctl:PressToCopy>
                         <TextBlock x:Name="UrlNote"
                                    Classes="caption"
@@ -1047,6 +1099,14 @@
                   </Border>
 
                   <!-- Custom fields: a name and a fixed mask each. A value, plain or protected, is read only while it is revealed or copied, as the password is. -->
+                  <StackPanel Spacing="6">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="HasListedFields" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Classes="group-caption" Text="{x:Static res:Strings.CustomFields}" />
                   <Border Classes="group">
                     <Border.IsVisible>
                       <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -1060,7 +1120,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:EntryFieldRow">
-                        <ctl:FieldRow Classes="mono-label" Label="{Binding DisplayName}" ToolTip.Tip="{Binding Kind}">
+                        <ctl:FieldRow Classes.mono-label="{Binding IsVariableName}" Label="{Binding DisplayName}" ToolTip.Tip="{Binding Kind}">
                           <ctl:PressToCopy x:Name="CopyFieldValue"
                                            Command="{Binding CopyValueCommand}"
                                            ToolTip.Tip="{x:Static res:Strings.CopyTheValueTheClipboardClearsItself}"
@@ -1097,6 +1157,7 @@
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   </Border>
+                  </StackPanel>
 
                   <!-- Attachments, tags and agent access: one group at the end. Attachments by name and size, never their content; nothing here opens or runs one. -->
                   <Border Classes="group" x:Name="ItemExtras" IsVisible="{Binding !IsEditing}">
@@ -1132,9 +1193,9 @@
                     </ItemsControl>
 
                     <!-- The entry's own tags. A project tag reads as its project and environment, with a shield when every agent request for the entry is asked about. -->
-                    <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Tags}">
+                    <ctl:FieldRow Classes="top-label" Label="{x:Static res:Strings.Tags}">
                       <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding #AddTagToggle.IsChecked}">
                           <!-- Suggests the vault's project tags the item lacks as one is typed; choosing one fills the box, and Add tag still asks first for a project tag. -->
                           <AutoCompleteBox x:Name="NewTag"
                                            AutomationProperties.Name="{x:Static res:Strings.Tags}"
@@ -1146,6 +1207,7 @@
                                            Width="220" />
                           <Button Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
                         </StackPanel>
+                        <WrapPanel Orientation="Horizontal">
                         <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -1170,6 +1232,14 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <ToggleButton x:Name="AddTagToggle"
+                                      Classes="chip-add"
+                                      Margin="0,0,0,6"
+                                      ToolTip.Tip="{x:Static res:Strings.AddTag}"
+                                      AutomationProperties.Name="{x:Static res:Strings.AddTag}">
+                          <ctl:KpIcon Icon="plus" Size="14" />
+                        </ToggleButton>
+                        </WrapPanel>
                       </StackPanel>
                     </ctl:FieldRow>
 
@@ -1206,7 +1276,7 @@
                           <DataTemplate x:DataType="vm:EnvironmentRow">
                             <Grid ColumnDefinitions="*,Auto" Margin="0,2">
                               <TextBlock Grid.Column="0"
-                                         Classes="mono"
+                                         Classes="size-13"
                                          Text="{Binding Label}"
                                          TextTrimming="CharacterEllipsis"
                                          VerticalAlignment="Center" />
@@ -1257,37 +1327,6 @@
                         </StackPanel>
                       </StackPanel>
                     </Border>
-                    <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
-                      <Button x:Name="AddTotp"
-                              Classes="ghost sm"
-                              IsVisible="{Binding CanAddTotp}"
-                              Command="{Binding BeginSetTotpCommand}"
-                              AutomationProperties.Name="{x:Static res:Strings.AddOneTimeCode}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="plus" Size="14" />
-                          <TextBlock Text="{x:Static res:Strings.AddOneTimeCode}" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Button>
-                      <Button x:Name="AddField"
-                              Classes="ghost sm"
-                              Command="{Binding BeginAddFieldCommand}"
-                              AutomationProperties.Name="{x:Static res:Strings.AddField}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="plus" Size="14" />
-                          <TextBlock Text="{x:Static res:Strings.AddFieldLabel}" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Button>
-                      <Button x:Name="AddAttachment"
-                              Classes="ghost sm"
-                              Command="{Binding Attachments.AddCommand}"
-                              AutomationProperties.Name="{x:Static res:Strings.AddAttachment}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <ctl:KpIcon Icon="plus" Size="14" />
-                          <TextBlock Text="{x:Static res:Strings.AddAttachmentLabel}" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Button>
-                    </WrapPanel>
-
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="8">
                         <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.AddAField}" />
@@ -1452,25 +1491,43 @@
                       </StackPanel>
                     </Border>
 
-                    <!-- When it was made, rotated and expires; an expiry KeePassXC set reads Expired in danger text once the session's clock passes it. -->
-                    <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
+                    <!-- Where paired browsers fill it, and its earlier versions. -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="2,0,0,0">
+                      <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding FillsOn, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <ctl:KpIcon Icon="app-window" Size="14" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="FillsOn" Classes="caption" TextWrapping="NoWrap" Text="{Binding FillsOn}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <Button Grid.Column="1" x:Name="HistoryToggle" Classes="link accent" Command="{Binding History.ToggleCommand}" AutomationProperties.Name="{Binding History.ToggleLabel}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <ctl:KpIcon Icon="history" Size="14" />
+                          <TextBlock Text="{x:Static res:Strings.HistoryLink}" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+
+                    <!-- When it was made, last changed, rotated and expires; an expiry KeePassXC set reads Expired in danger text once the session's clock passes it. -->
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2" Margin="2,0,0,0">
                       <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.Created}" />
-                        <TextBlock x:Name="CreatedText" Classes="secondary size-13" Text="{Binding Created}" />
+                        <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.Created}" />
+                        <TextBlock x:Name="CreatedText" Classes="caption" TextWrapping="NoWrap" Text="{Binding Created}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.Rotated}" />
-                        <TextBlock x:Name="RotatedText" Classes="secondary size-13" Text="{Binding Rotated}" />
+                        <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.Modified}" />
+                        <TextBlock x:Name="ModifiedText" Classes="caption" TextWrapping="NoWrap" Text="{Binding Modified}" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.Rotated}" />
+                        <TextBlock x:Name="RotatedText" Classes="caption" TextWrapping="NoWrap" Text="{Binding Rotated}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasExpiry}">
-                        <TextBlock Classes="muted size-13" Text="{Binding ExpiryLabel}" />
+                        <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{Binding ExpiryLabel}" />
                         <TextBlock x:Name="ExpiryText"
-                                   Classes="size-13"
-                                   Classes.secondary="{Binding !IsExpired}"
+                                   Classes="caption"
+                                   TextWrapping="NoWrap"
                                    Classes.danger="{Binding IsExpired}"
                                    Text="{Binding Expiry}" />
                       </StackPanel>
-                      <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.PressAValueToCopyIt}" />
+                      <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.PressAValueToCopyIt}" />
                     </WrapPanel>
                   </StackPanel>
 

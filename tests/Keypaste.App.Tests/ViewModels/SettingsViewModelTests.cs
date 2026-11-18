@@ -203,6 +203,25 @@ public sealed class SettingsViewModelTests
         Assert.True(model.HasMessage);
     }
 
+    [Fact]
+    public void Reduce_transparency_is_kept_in_app_toml_and_the_window_follows_at_once()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
+        var preferences = new DesktopPreferences(fixture.Home);
+        using var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
+        var told = 0;
+        preferences.Changed += (_, _) => told++;
+
+        model.ReduceTransparency = true;
+
+        Assert.True(preferences.ReduceTransparency);
+        Assert.Equal(1, told);
+        Assert.True(AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home)).ReduceTransparency);
+        Assert.True(new DesktopPreferences(fixture.Home).ReduceTransparency);
+        Assert.Equal(OperatingSystem.IsMacOS(), SettingsViewModel.OffersReduceTransparency);
+    }
+
     private static SettingsViewModel Screen(AppVaultSession session, TempVault fixture) =>
         new(session, fixture.Home, new DesktopPreferences(fixture.Home), _ => { });
 

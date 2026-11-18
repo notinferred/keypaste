@@ -95,6 +95,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <returns>Whether they are equal.</returns>
     public bool Equals(EntryRow? other) =>
         other is not null
+        && ReferenceEquals(Vault, other.Vault)
         && string.Equals(Uuid, other.Uuid, StringComparison.Ordinal)
         && string.Equals(Title, other.Title, StringComparison.Ordinal)
         && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
@@ -110,6 +111,14 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
 
     /// <summary>The item's KDBX UUID, which tells this row from another of the same name.</summary>
     internal required string Uuid { get; init; }
+
+    /// <summary>The vault the item is in, whose session reads and writes it, or null for the list's own vault.</summary>
+    internal Session.AppVaultSession? Vault { get; init; }
+
+    /// <summary>The vault's title, muted on the row where the list holds several vaults' items; otherwise empty.</summary>
+    internal string VaultName { get; init; } = string.Empty;
+
+    internal bool ShowsVaultName => VaultName.Length > 0;
 
     /// <summary>What core reads and writes this item through.</summary>
     /// <remarks>
@@ -153,7 +162,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     /// <returns>The row's columns, as it draws them, which hold no secret.</returns>
     public override string ToString() =>
-        string.Join(", ", new[] { DisplayTitle, Why, DisplayUsername, DisplayUrl, KindLabel, Where, LastUsedText }.Where(column => !string.IsNullOrEmpty(column)));
+        string.Join(", ", new[] { DisplayTitle, Why, DisplayUsername, DisplayUrl, KindLabel, Where, VaultName, ChangedText, LastUsedText }.Where(column => !string.IsNullOrEmpty(column)));
 
     /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
     internal string Where { get; } =
@@ -171,8 +180,34 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The URL column, scrubbed as the item's preview scrubs it.</summary>
     internal string DisplayUrl => DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
 
-    /// <summary>The row's second line: why it is in a result, its username, or where it lives; never a password or a field's value.</summary>
-    internal string SecondLine => Why.Length > 0 ? Why : DisplayUsername.Length > 0 ? DisplayUsername : Where;
+    /// <summary>The row's second line: why it is in a result, its username, or its kind; never a password or a field's value.</summary>
+    internal string SecondLine => Why.Length > 0 ? Why : DisplayUsername.Length > 0 ? DisplayUsername : KindLabel;
+
+    /// <summary>Whether the item carries the favorite tag, which lists it in Favorites.</summary>
+    internal bool IsFavorite { get; init; }
+
+    /// <summary>Whether a project tag makes the item one of a project's variables.</summary>
+    internal bool InProject { get; init; }
+
+    /// <summary>What the row's tile draws in place of the letter, from the item's website and kind.</summary>
+    internal Controls.ItemMark Mark => _mark ??= Controls.ItemMarks.Of(Url, Kind, InProject);
+
+    private Controls.ItemMark? _mark;
+
+    /// <summary>When the item last changed, as its file records it, or null when it was not read.</summary>
+    internal DateTimeOffset? Modified { get; init; }
+
+    /// <summary>When the item last changed, for sorting.</summary>
+    internal long? ModifiedTicks => Modified?.UtcTicks;
+
+    /// <summary>When the item last changed, "Changed" and the moment; empty when it was not read.</summary>
+    internal string ChangedText { get; init; } = string.Empty;
+
+    /// <summary>The row's tooltip, which carries the time the row does not draw.</summary>
+    internal string? ChangedTip => ChangedText.Length > 0 ? ChangedText : null;
+
+    /// <summary>The item's UUID as a <see cref="Guid"/>, which picks its monogram's hue.</summary>
+    internal Guid Hue => Guid.TryParseExact(Uuid, "N", out var id) ? id : Guid.Empty;
 
     /// <summary>The entry's own tags the current query was in, or none when there is no query or it matched no tag.</summary>
     internal IReadOnlyList<string> Tags { get; init; } = [];

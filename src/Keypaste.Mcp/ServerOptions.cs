@@ -6,6 +6,7 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Settings;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Mcp;
@@ -26,13 +27,15 @@ namespace Keypaste.Mcp;
 /// </remarks>
 internal sealed record ServerOptions
 {
-    private static readonly Option<string> _vault = Syntax.Value(
-        "--vault", "path", "which vault to ask, or set KEYPASTE_VAULT; without either, the vault chosen in the keypaste app or with `keypaste use`");
+    private static readonly Option<string[]> _vault = Syntax.Values(
+        "--vault",
+        "path",
+        "a vault to ask, once for each vault this agent may reach, or set KEYPASTE_VAULT; without either, the vault chosen in the keypaste app or with `keypaste use`");
 
     private static readonly Option<string[]> _expose = Syntax.Values(
         "--expose",
         "glob",
-        "what this agent can see at most: a group/title glob reaches whole items, tag:env:<project>[:<environment>] the "
+        "what this agent can see at most: a group/title glob reaches whole items, tag:env:<project>[:<stage>] the "
             + "variables of items tagged into it; tag:env:* by default");
 
     private static readonly Option<string> _clientLabel =
@@ -72,22 +75,19 @@ internal sealed record ServerOptions
     /// <summary>What <c>keypaste mcp --help</c> prints.</summary>
     internal static string Usage { get; } = Render();
 
-    internal required string VaultPath { get; init; }
+    /// <summary>The vaults this bridge serves, in the order named; none when no vault was named or chosen.</summary>
+    /// <remarks>
+    /// Each one's pipe is resolved at startup so a malformed name is a startup failure, but nothing connects until a call
+    /// needs an answer: the bridge is spawned by a client long before anybody unlocks a vault, and refusing to start without
+    /// an owner would make keypaste look broken in the client's log rather than saying so in an answer an agent can act on.
+    /// </remarks>
+    internal required IReadOnlyList<BridgeVault> Vaults { get; init; }
 
     /// <summary>What this server may name at all.</summary>
     internal required EntryExposure Exposure { get; init; }
 
     /// <summary>Where the audit trail is appended.</summary>
     internal required string AuditPath { get; init; }
-
-    /// <summary>Which pipe the vault's owner is expected on, or null when no vault was named.</summary>
-    /// <remarks>
-    /// Resolved at startup so a malformed name is a startup failure, but nothing connects until a
-    /// call needs an answer: the bridge is spawned by a client long before anybody unlocks the
-    /// vault, and refusing to start without an owner would make keypaste look broken in the client's
-    /// log rather than saying so in an answer an agent can act on.
-    /// </remarks>
-    internal required string? ApproverName { get; init; }
 
     /// <summary>What to call this client in the audit log, or null.</summary>
     internal string? ClientLabel { get; init; }
@@ -97,15 +97,6 @@ internal sealed record ServerOptions
 
     /// <summary>Whether <c>--allow-run</c> was given: the run tool is offered only then.</summary>
     internal bool AllowRun { get; init; }
-
-    /// <summary>The configured vault's identity key, for audit lines, or null without a vault.</summary>
-    internal string? VaultKey { get; init; }
-
-    /// <summary>
-    /// Where the desktop app listens while it is open and locked on this vault, or null without a vault.
-    /// </summary>
-    /// <remarks>Named from the vault alone, so <c>--approver</c> and <c>KEYPASTE_APPROVER</c> never move it.</remarks>
-    internal string? LockedAppName { get; init; }
 
     /// <summary>Parses the command line.</summary>
     /// <param name="argv">The arguments, excluding the program name.</param>
@@ -152,7 +143,7 @@ internal sealed record ServerOptions
             return false;
         }
 
-        var vault = line.GetValue(_vault);
+        var named = line.GetValue(_vault) ?? [];
         var label = line.GetValue(_clientLabel);
         var auditPath = line.GetValue(_auditLog);
         var approver = line.GetValue(_approver);
@@ -179,14 +170,57 @@ internal sealed record ServerOptions
         // A missing vault is deliberately not fatal. Malformed configuration should stop the
         // server; absent state should not, because a server that starts and says "no vault is
         // configured" is diagnosable, and one that exits leaves the client's log as the only clue.
-        VaultLocation.TryResolve(vault, vaultFromEnvironment, chosenVault, out var vaultPath, out _);
+        List<string> paths = [];
 
-        string? pipeName;
-        var identity = vaultPath.Length > 0 ? VaultIdentity.Of(KeypasteHome.Resolve(homeFromEnvironment), vaultPath) : null;
+        if (named.Length == 0)
+        {
+            if (VaultLocation.TryResolve(null, vaultFromEnvironment, chosenVault, out var resolved, out _))
+            {
+                paths.Add(resolved);
+            }
+        }
+        else
+        {
+            foreach (var path in named.Select(Path.GetFullPath))
+            {
+                if (!paths.Any(held => PathIdentity.SameFile(held, path)))
+                {
+                    paths.Add(path);
+                }
+            }
+        }
+
+        if (paths.Count > LocalAccount.MaximumVaults)
+        {
+            error = $"--vault: at most {LocalAccount.MaximumVaults} vaults";
+            return false;
+        }
+
+        // A pinned pipe is one owner's, so it cannot stand for several vaults.
+        if (paths.Count > 1 && (approver is { Length: > 0 } || approverFromEnvironment is { Length: > 0 }))
+        {
+            error = "--approver: it names one vault's owner, so it goes with one --vault";
+            return false;
+        }
+
+        var home = KeypasteHome.Resolve(homeFromEnvironment);
+        List<BridgeVault> vaults = [];
 
         try
         {
-            pipeName = ApproverEndpoint.Resolve(approver, approverFromEnvironment, identity);
+            // Checked even with no vault to ask through it, so a malformed name never waits for one.
+            _ = ApproverEndpoint.Resolve(approver, approverFromEnvironment, null);
+
+            foreach (var path in paths)
+            {
+                var identity = VaultIdentity.Of(home, path);
+                vaults.Add(new BridgeVault(
+                    BridgeVault.NameFor(path, vaults),
+                    path,
+                    identity.Key,
+                    ApproverEndpoint.Resolve(approver, approverFromEnvironment, identity)!,
+                    LockedAppEndpoint.NameFor(identity)));
+            }
         }
         catch (ArgumentException ex)
         {
@@ -199,13 +233,10 @@ internal sealed record ServerOptions
 
         options = new ServerOptions
         {
-            VaultPath = vaultPath,
+            Vaults = vaults,
             Exposure = exposure,
             ClientLabel = label,
-            ApproverName = pipeName,
             AllowRun = allowRun,
-            VaultKey = identity?.Key,
-            LockedAppName = identity is null ? null : LockedAppEndpoint.NameFor(identity),
             AuditPath = log,
         };
 
@@ -221,10 +252,9 @@ internal sealed record ServerOptions
 
     private static ServerOptions Help() => new()
     {
-        VaultPath = string.Empty,
+        Vaults = [],
         Exposure = EntryExposure.Default,
         AuditPath = string.Empty,
-        ApproverName = string.Empty,
         WantsHelp = true,
     };
 }

@@ -100,6 +100,16 @@ KeePassLib sorts an entry's tags with `string.Compare` under the current culture
 | `Serialization/KdbxFile.Write.cs`, `Cryptography/QualityEstimation.cs`, `Cryptography/PopularPasswords.cs` | Lower-case invariant, so a password rates the same under every culture |
 | `KeePassLib.csproj` | Defines the guard |
 
+### `KEYPASTE_PURE_TAG_READS`
+
+`PwEntry.Tags` and `PwGroup.Tags` normalize and sort their list on every read, so two threads reading one entry's tags, such as Security's scan and the desktop window, write to a list the other is walking. keypaste reads and writes tags under one lock in `KeePassInterop`, and this guard keeps KeePassLib's own reads, such as a save's, from writing to a list already in normal form.
+
+| File | Change |
+|---|---|
+| `Utility/StrUtil.cs` | Adds `AreTagsNormalized`, true when `NormalizeTags` would leave the list as it is |
+| `PwEntry.cs`, `PwGroup.cs` | The `Tags` getter normalizes only a list that is not in normal form |
+| `KeePassLib.csproj` | Defines the guard |
+
 ### Files excluded from compilation
 
 | Path | Reason |

@@ -42,8 +42,11 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(EditReplyFrame))]
 [JsonSerializable(typeof(BrowserPairRequestFrame))]
 [JsonSerializable(typeof(BrowserCheckRequestFrame))]
-[JsonSerializable(typeof(BrowserFillRequestFrame))]
+[JsonSerializable(typeof(BrowserListRequestFrame))]
+[JsonSerializable(typeof(BrowserReleaseRequestFrame))]
+[JsonSerializable(typeof(BrowserShowRequestFrame))]
 [JsonSerializable(typeof(BrowserReplyFrame))]
+[JsonSerializable(typeof(BrowserListReplyFrame))]
 [JsonSerializable(typeof(BrowserFillReplyFrame))]
 internal sealed partial class ApproverJsonContext : JsonSerializerContext
 {
@@ -550,17 +553,40 @@ internal sealed class BrowserCheckRequestFrame(BrowserCheckRequest request)
     public string IdentificationKey => request.IdentificationKey;
 }
 
-internal sealed class BrowserFillRequestFrame(BrowserFillRequest request)
+internal sealed class BrowserListRequestFrame(BrowserListRequest request)
 {
     public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.BrowserFillKind;
+    public string Kind { get; } = ApproverProtocol.BrowserListKind;
     public string Vault => request.Vault;
     public string Session => request.Session;
     public string Pairing => request.Pairing;
     public string IdentificationKey => request.IdentificationKey;
     public string Url => request.Url;
     public string? SubmitUrl => request.SubmitUrl;
-    public bool PersonAsked => request.PersonAsked;
+}
+
+internal sealed class BrowserReleaseRequestFrame(BrowserReleaseRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.BrowserReleaseKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Pairing => request.Pairing;
+    public string IdentificationKey => request.IdentificationKey;
+    public string Url => request.Url;
+    public string? SubmitUrl => request.SubmitUrl;
+    public string Uuid => request.Uuid;
+}
+
+internal sealed class BrowserShowRequestFrame(BrowserShowRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.BrowserShowKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public int What => (int)request.What;
+    public string VaultName => request.VaultName;
+    public string Url => request.Url;
 }
 
 internal sealed class BrowserReplyFrame(BrowserReply reply)
@@ -572,10 +598,30 @@ internal sealed class BrowserReplyFrame(BrowserReply reply)
     public string? Pairing => reply.Pairing;
 }
 
+internal sealed class BrowserListReplyFrame(BrowserListReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.BrowserListKind;
+    public int Outcome => (int)reply.Outcome;
+    public string Reason => reply.Reason;
+    public string Site => reply.Site;
+    public string Warning => reply.Warning;
+    public IReadOnlyList<string> LockedVaults => reply.LockedVaults;
+    public IEnumerable<BrowserLoginNameRow> Names => reply.Names.Select(name => new BrowserLoginNameRow(name));
+}
+
+internal sealed class BrowserLoginNameRow(BrowserLoginName name)
+{
+    public string Uuid => name.Uuid;
+    public string Title => name.Title;
+    public string Username => name.Username;
+    public string Vault => name.Vault;
+}
+
 internal sealed class BrowserFillReplyFrame(BrowserFillReply reply)
 {
     public int V { get; } = ApproverProtocol.Version;
-    public string Kind { get; } = ApproverProtocol.BrowserFillKind;
+    public string Kind { get; } = ApproverProtocol.BrowserReleaseKind;
     public int Outcome => (int)reply.Outcome;
     public string Reason => reply.Reason;
     public IEnumerable<BrowserLoginRow> Logins => reply.Logins.Select(login => new BrowserLoginRow(login));

@@ -176,7 +176,7 @@ public sealed class SessionOwnershipTests
         Unlock(authority.Session, fixture.Path_, TempVault.Password);
         using var agents = new AgentActivityViewModel(authority, fixture.Home, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
-        var dot = shell.MainNav.Single(item => item.HasDot);
+        var dot = shell.RailPlaces.Single(item => item.HasDot);
 
         Assert.False(File.Exists(log));
         Assert.Null(authority.LastAuditFailure);
@@ -328,7 +328,7 @@ public sealed class SessionOwnershipTests
         Unlock(authority.Session, fixture.Path_, TempVault.Password);
         using var agents = new AgentActivityViewModel(authority, fixture.Home, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
-        var dot = shell.MainNav.Single(item => item.HasDot);
+        var dot = shell.RailPlaces.Single(item => item.HasDot);
 
         await ListedRequestAsync(authority, fixture.Path_);
         agents.Refresh();

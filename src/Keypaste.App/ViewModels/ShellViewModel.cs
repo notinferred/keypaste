@@ -46,7 +46,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan _statusTick = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _countdownTick = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan _fileSettle = TimeSpan.FromMilliseconds(250);
 
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
@@ -54,37 +53,35 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private readonly TimeProvider _clock;
     private readonly Action<Action>? _post;
     private readonly ITimer? _statusTimer;
-    private readonly ITimer? _fileTimer;
-    private readonly FileSystemWatcher? _fileWatch;
+    private VaultFileWatch? _ownWatch;
+    private readonly Dictionary<AppVaultSession, VaultFileWatch?> _followed = [];
+    private AppVaultSession? _statusSession;
     private ITimer? _countdownTimer;
     private TimeSpan _lockWindow;
     private DateTimeOffset _warnedWall;
     private long _warnedStamp;
     private Destination _current;
     private string _search = string.Empty;
-    private static readonly SidebarHeading _groupsHeading = new("Groups", SidebarAddition.Group);
-    private static readonly SidebarHeading _projectsHeading = new("Projects", SidebarAddition.Project);
-
-    private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
     private IReadOnlyList<ProjectRow> _projects = [];
-    private IReadOnlyList<GroupNode> _groups = [];
     private string? _openProject;
-    private bool _rebuildingSidebar;
     private int _conflictedCopiesSaid;
     private bool _agentsServing;
     private bool _agentsRefusing;
     private string _agentsDetail = string.Empty;
     private string? _reloadFailure;
-    private Task _merging = Task.CompletedTask;
-    private bool _isMerging;
-    private DateTimeOffset? _updatedAt;
+    private readonly Dictionary<AppVaultSession, DateTimeOffset> _updatedAt = [];
     private bool _noticeNamesAConflict;
-    private int _ticks;
     private readonly Action<string, string?, int?>? _openInPlace;
     private Action? _discard;
     private Action? _keep;
     private bool _disposed;
     private SecretField? _newItemPassword;
+    private readonly Dictionary<AppVaultSession, RecommendationsViewModel> _scans = [];
+    private IReadOnlyList<AppVaultSession> _contentVaults = [];
+    private bool _contentSpansVaults;
+    private VaultSection? _settingsVault;
+    private VaultSection? _agentsVault;
+    private VaultSection? _securityVault;
 
     internal ShellViewModel(
         AppVaultSession session,
@@ -124,7 +121,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _clock,
             post);
 
-        LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
+        LockCommand = new AsyncRelayCommand(LockAllAsync);
         Toasts = new ToastStack(_clock, Post);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         ShareCommand = new RelayCommand<EntryName>(OpenShare, item => item is not null && Share is null);
@@ -132,17 +129,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
 
         FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
-        MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
-        FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
-        RailPlaces = [.. MainNav, .. FooterNav];
+        RailPlaces = [.. Destinations.Places.Take(3).Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity }), new NavItem(Destinations.Access), new NavItem(Destinations.Places[3])];
+        _current = Destinations.Places[0];
+        _itemsVault = new VaultSection(session);
+        Account = new AccountSection(AccountSection.LocalTitle, [_itemsVault]);
         SidebarRows = SidebarOf();
 
-        _current = Destinations.Places[0];
         _session.LockingSoon += OnLockingSoon;
-        _session.Edited += OnEdited;
         _session.WaitingForTouch += OnWaitingForTouch;
-        _session.Saved += OnSaved;
-        _session.Merged += OnMerged;
+        _ownWatch = new VaultFileWatch(session);
 
         if (authority is not null)
         {
@@ -160,7 +155,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             if (e.PropertyName is nameof(RecommendationsViewModel.NeedsReview) or nameof(RecommendationsViewModel.IsEmpty))
             {
-                ShowRecommendationsRow();
+                ShowSecurityCount();
             }
 
             if (e.PropertyName == nameof(RecommendationsViewModel.ConflictedCopies))
@@ -172,13 +167,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         // Built here rather than left to the first navigation. Assigning Current to the destination
         // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
         Show(_current);
-        ShowRecommendationsRow();
+        ShowSecurityCount();
         ReadAuthority();
         ReadVaultStatus();
 
         _statusTimer = _clock.CreateTimer(_ => Post(OnStatusTick), null, _statusTick, _statusTick);
-        _fileTimer = _clock.CreateTimer(_ => Post(ReadVaultStatus), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        _fileWatch = WatchVaultFile();
     }
 
     /// <summary>
@@ -195,50 +188,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasNotice => Notice is not null;
 
-    /// <summary>Whether the person hid the sidebar with View › Hide sidebar; it stays hidden at every width and across locks.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
-    internal partial bool SidebarHidden { get; private set; }
-
-    /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar collapses to the rail and Items drops two columns.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
-    [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
-    [NotifyPropertyChangedFor(nameof(SidebarWayBack))]
-    internal partial bool IsNarrow { get; set; }
-
-    /// <summary>Whether the rail opened the whole sidebar over the content, which keeps its width, so a group or a project can still be chosen.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
-    [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
-    [NotifyPropertyChangedFor(nameof(ShowsRail), nameof(ContentIsTight))]
-    private partial bool SidebarOpenedOver { get; set; }
-
-    /// <summary>Whether the whole sidebar is on the screen.</summary>
-    internal bool ShowsSidebar => IsNarrow ? SidebarOpenedOver : !SidebarHidden;
-
-    /// <summary>Whether the rail of icons stands in for the sidebar: a narrow window, unless the person hid it or it is open over the content.</summary>
-    internal bool ShowsRail => IsNarrow && !SidebarHidden && !SidebarOpenedOver;
-
-    /// <summary>The window's width, in the design's pixels, which <see cref="ContentIsTight"/> is judged from.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ContentIsTight))]
-    internal partial double WindowWidth { get; set; }
-
-    /// <summary>Whether the content is under <see cref="Views.WindowChrome.ContentTightBelow"/> wide, where the log drops a column, whatever takes the rest of the window.</summary>
-    internal bool ContentIsTight =>
-        WindowWidth - (ShowsRail ? Views.WindowChrome.RailWidth : !IsNarrow && !SidebarHidden ? Views.WindowChrome.SidebarWidth : 0) < Views.WindowChrome.ContentTightBelow;
-
-    /// <summary>What a narrow window's titlebar button adds to its name: every way back, the button being all that is left of the places there.</summary>
-    internal string? SidebarWayBack => IsNarrow
-        ? $"The sidebar is hidden. Show it here, from the View menu or with {(OperatingSystem.IsMacOS() ? "⌃⌘S" : "Ctrl+B")}."
-        : null;
-
-    /// <summary>Whether the sidebar lies over the content rather than beside it.</summary>
-    internal bool SidebarOverlays => IsNarrow && SidebarOpenedOver;
-
     /// <summary>How each table was sorted and sized, which outlives the screens drawing them and is kept with the window.</summary>
     internal TableStates Tables { get; }
 
@@ -251,21 +200,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         _ => null,
     };
 
-    /// <summary>View › Hide sidebar and Show sidebar, and the titlebar's button: the person's kept choice at every width, which hides the rail too.</summary>
-    [RelayCommand]
-    internal void ToggleSidebar() => SidebarHidden = !SidebarHidden;
-
-    /// <summary>The rail's button and View › Show groups and projects: the whole sidebar over the content, for what does not fit in icons.</summary>
-    [RelayCommand]
-    internal void OpenSidebarOverlay() => SidebarOpenedOver = ShowsRail;
-
-    /// <summary>Closes a sidebar lying over the content: a press outside it, or Escape.</summary>
-    internal void CloseSidebarOverlay() => SidebarOpenedOver = false;
-
-    partial void OnIsNarrowChanged(bool value) => SidebarOpenedOver = false;
-
-    partial void OnSidebarHiddenChanged(bool value) => SidebarOpenedOver = false;
-
     /// <summary>What the notice says while the file holds another program's save that keypaste did not merge, or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasVaultChanged))]
@@ -276,8 +210,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>What the vault holds has just changed under the screen, whichever screen is open and whether or not it reads again.</summary>
     internal event Action? VaultMoved;
 
-    /// <summary>The merge of another program's save the poll or the folder watch started, or a completed task when none runs.</summary>
-    internal Task Merging => _merging;
+    /// <summary>The merge of another program's save the vault in view's watch started, or a completed task when none runs.</summary>
+    internal Task Merging => WatchOf(ShownSession)?.Merging ?? Task.CompletedTask;
+
+    /// <summary>The vault whose save state the title bar shows and whose banner offers Reload: the vault in view.</summary>
+    private AppVaultSession ShownSession => VaultForScreens.Session;
+
+    /// <summary>The watch merging another program's save of a vault's file.</summary>
+    private VaultFileWatch? WatchOf(AppVaultSession session) =>
+        OpenOf(session)?.Watch ?? (ReferenceEquals(session, _session) ? _ownWatch : null);
+
+    /// <summary>A vault's file name, as a notice names it.</summary>
+    private string FileNameOf(AppVaultSession session) =>
+        (Vaults?.PathOf(session) ?? session.VaultPath) is { } path ? Shown(Path.GetFileName(path)) : string.Empty;
 
     /// <summary>Whether a save is waiting for the vault's YubiKey to be touched.</summary>
     [ObservableProperty]
@@ -330,180 +275,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<Destination> Destinations_ => Navigation.Destinations.All;
 #pragma warning restore CA1822
 
-    /// <summary>The sidebar's main rows.</summary>
-    /// <summary>The sidebar's row for Recommendations, under Items while there is anything to list.</summary>
-    internal NavItem RecommendationsRow { get; } = new(Destinations.Of(DestinationKind.Recommendations));
-
-    internal IReadOnlyList<NavItem> MainNav { get; }
-
-    /// <summary>The sidebar's quieter rows at the bottom: Settings and Trash.</summary>
-    internal IReadOnlyList<NavItem> FooterNav { get; }
-
-    /// <summary>The four places, in the order the rail draws them.</summary>
-    internal IReadOnlyList<NavItem> RailPlaces { get; }
-
-    /// <summary>
-    /// The sidebar's main list, in reading order: Items with the vault's group tree folded under it,
-    /// the projects under their heading, then Agents.
-    /// </summary>
-    /// <remarks>
-    /// One list rather than several, so the arrow keys walk the sidebar as a person reads it; Left and
-    /// Right fold and unfold a row, as they do in KeePassXC's tree.
-    /// </remarks>
-    [ObservableProperty]
-    internal partial IReadOnlyList<object> SidebarRows { get; private set; } = [];
-
-    /// <summary>
-    /// The sidebar row for where the shell is: the open project's row on its Env profiles, the group
-    /// Items shows, otherwise the place the screen is, or is under. Choosing a row goes there.
-    /// </summary>
-    internal object? SelectedSidebarRow
-    {
-        get
-        {
-            if (_current.Kind == DestinationKind.EnvSets && _openProject is { } open
-                && _projects.FirstOrDefault(row => row.Name == open) is { } project)
-            {
-                return project;
-            }
-
-            if (_current.Kind == DestinationKind.Entries && (Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group
-                && SidebarRows.OfType<GroupRow>().FirstOrDefault(row => row.Path == group.Path) is { } shown)
-            {
-                return shown;
-            }
-
-            return SelectedMain;
-        }
-        set
-        {
-            // Replacing the rows makes the list re-select, and write back, whichever row it had.
-            if (_rebuildingSidebar || Equals(value, SelectedSidebarRow))
-            {
-                return;
-            }
-
-            switch (value)
-            {
-                case NavItem { Destination.Kind: DestinationKind.Entries }:
-                    ShowGroup(string.Empty);
-                    break;
-                case NavItem item:
-                    Current = item.Destination;
-                    break;
-                case GroupRow group:
-                    ShowGroup(group.Path);
-                    break;
-                case ProjectRow project:
-                    OpenProject(project.Name);
-                    break;
-            }
-        }
-    }
-
-    /// <summary>The main row for the place <see cref="Current"/> is, or is under; null while it is a footer place.</summary>
-    internal NavItem? SelectedMain
-    {
-        get => MainNav.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
-        set
-        {
-            if (value is not null)
-            {
-                Current = value.Destination;
-            }
-        }
-    }
-
-    /// <summary>The footer row for the place <see cref="Current"/> is, or is under; null while it is a main place.</summary>
-    internal NavItem? SelectedFooter
-    {
-        get => FooterNav.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
-        set
-        {
-            if (value is not null)
-            {
-                Current = value.Destination;
-            }
-        }
-    }
-
-    /// <summary>The rail's row for the place <see cref="Current"/> is, or is under; a group or a project in view counts as Items.</summary>
-    internal NavItem? SelectedRailPlace
-    {
-        get => RailPlaces.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
-        set
-        {
-            if (value is not null && !Equals(value, SelectedRailPlace))
-            {
-                SelectedSidebarRow = value;
-            }
-        }
-    }
-
-    /// <summary>The vault's projects, by name, with how many entries each holds.</summary>
-    internal IReadOnlyList<ProjectRow> Projects
-    {
-        get => _projects;
-        private set
-        {
-            if (_projects.SequenceEqual(value))
-            {
-                return;
-            }
-
-            _projects = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(HasProjects));
-            RebuildSidebar();
-        }
-    }
-
-    /// <summary>Folds or unfolds a row of the tree: Items, or a group with groups inside it.</summary>
-    internal RelayCommand<object> FoldCommand { get; }
-
-    /// <summary>
-    /// Opens or closes a row of the tree, or flips it when <paramref name="open"/> is null. Folding away
-    /// the group Items shows shows the folded row instead, as KeePassXC selects the parent it folds.
-    /// </summary>
-    internal void Fold(object? row, bool? open)
-    {
-        switch (row)
-        {
-            case NavItem { IsExpandable: true } items:
-                items.IsExpanded = open ?? !items.IsExpanded;
-
-                if (!items.IsExpanded)
-                {
-                    ShowGroupIfInside(string.Empty);
-                }
-
-                break;
-            case GroupRow { HasChildren: true } group:
-                if (open ?? !_expanded.Contains(group.Path))
-                {
-                    _expanded.Add(group.Path);
-                }
-                else
-                {
-                    _expanded.Remove(group.Path);
-                    ShowGroupIfInside(group.Path);
-                }
-
-                break;
-            default:
-                return;
-        }
-
-        RebuildSidebar();
-    }
-
-    internal bool HasProjects => _projects.Count > 0;
-
     /// <summary>Goes up from a screen to the screen or place it sits under.</summary>
     internal RelayCommand BackCommand { get; }
 
     /// <summary>Whether the shell shows a screen under a place, which offers Back.</summary>
-    internal bool HasBack => !_current.IsPlace;
+    internal bool HasBack => _current.HasBack;
 
     /// <summary>What Back says: the screen or place it returns to.</summary>
     internal string BackTitle => Destinations.UpOf(_current).Title;
@@ -624,11 +400,10 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The open vault's file name. The full path is a tooltip, never a heading.</summary>
-    internal string VaultName =>
-        _session.VaultPath is { } path ? Shown(Path.GetFileName(path)) : string.Empty;
+    internal string VaultName => FileNameOf(ShownSession);
 
     /// <summary>The open vault's full path, for the tooltip.</summary>
-    internal string VaultPath => _session.VaultPath ?? string.Empty;
+    internal string VaultPath => ShownSession.VaultPath ?? string.Empty;
 
     /// <summary>The titlebar's status line: whether the file holds what is open.</summary>
     [ObservableProperty]
@@ -689,7 +464,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _agentsDetail, value))
             {
-                MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).Detail = value;
+                AgentsRow.Detail = value;
             }
         }
     }
@@ -702,9 +477,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             var before = _search;
 
-            if (SetProperty(ref _search, value ?? string.Empty) && Content is EntriesViewModel)
+            if (!SetProperty(ref _search, value ?? string.Empty))
+            {
+                return;
+            }
+
+            if (Content is EntriesViewModel)
             {
                 Leave(() => (Content as EntriesViewModel)!.Search = _search, () => TakeBackSearch(before));
+            }
+            else if (_search.Length > 0)
+            {
+                // Typing in the title bar's search from another place searches Items, which takes the query as it is built.
+                Leave(() => MoveTo(Destinations.Of(DestinationKind.Entries)), () => TakeBackSearch(before));
             }
         }
     }
@@ -778,9 +563,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(ShowsHeader));
             OnPropertyChanged(nameof(HasBack));
             OnPropertyChanged(nameof(BackTitle));
-            OnPropertyChanged(nameof(SelectedMain));
-            OnPropertyChanged(nameof(SelectedFooter));
             OnPropertyChanged(nameof(SelectedRailPlace));
+            OnPropertyChanged(nameof(ShowsItemsPlace));
+            OnPropertyChanged(nameof(ShowsSidebar));
+            OnPropertyChanged(nameof(SidebarOverlays));
+            OnPropertyChanged(nameof(ContentIsTight));
             BackCommand.NotifyCanExecuteChanged();
 
             if (destination.Kind is DestinationKind.AgentActivity or DestinationKind.Settings)
@@ -950,8 +737,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             previous.PropertyChanged -= OnEntriesChanged;
         }
 
-        // Recommendations lives as long as the unlock, and is disposed with the shell.
-        if (!ReferenceEquals(Content, Recommendations))
+        if (Content is EnvSetsViewModel previousProjects)
+        {
+            previousProjects.PropertyChanged -= OnProjectsChanged;
+        }
+
+        // Each vault's check lives as long as its unlock, and is disposed with the shell or the vault's lock.
+        if (Content is not RecommendationsViewModel)
         {
             (Content as IDisposable)?.Dispose();
         }
@@ -961,34 +753,194 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _crashes.Screen = CrashReporting.ScreenOf(destination.Kind);
         }
 
+        _contentSpansVaults = false;
+
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log, CheckpointKey),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { OffersTheme = OffersTheme, Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post), BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable) },
+            DestinationKind.Settings => Settings(),
             DestinationKind.AgentActivity => Activity(),
-            DestinationKind.Entries => Entries(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast) { AskDiscard = AskDiscard },
-            DestinationKind.Trash => new TrashViewModel(_session, Tables.Trash),
+            DestinationKind.Entries => ItemsScreen(),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast),
+            DestinationKind.Trash => new TrashViewModel(_itemsVault.Session, Tables.Trash),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
             DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes, Authority),
             DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
-            DestinationKind.Recommendations => Recommendations,
+            DestinationKind.Recommendations => SecurityInView,
             _ => null,
         };
+
+        _contentVaults = ContentVaults();
 
         if (Content is EntriesViewModel entries)
         {
             entries.PropertyChanged += OnEntriesChanged;
         }
 
+        if (Content is EnvSetsViewModel projects)
+        {
+            projects.PropertyChanged += OnProjectsChanged;
+            FollowOpenProject(projects);
+        }
+
         Count();
+
+        if (!ReferenceEquals(ShownSession, _statusSession))
+        {
+            ReadVaultStatus();
+        }
     }
+
+    /// <summary>The vaults the screen in view reads, whose lock makes it read again; none for a screen of the shell's own vault, whose lock builds the window again.</summary>
+    private IReadOnlyList<AppVaultSession> ContentVaults()
+    {
+        switch (Content)
+        {
+            case EntriesViewModel shown:
+                return shown.Vaults;
+            case EnvSetsViewModel or TrashViewModel:
+                return [_itemsVault.Session];
+            case SettingsViewModel:
+                return [_settingsVault?.Session ?? _session];
+            case AgentActivityViewModel:
+                return [_agentsVault?.Session ?? _session];
+            case RecommendationsViewModel check:
+                return [check.Session, .. check.AlsoShown.Select(other => other.Session)];
+            default:
+                return [];
+        }
+    }
+
+    /// <summary>Settings, its This vault on the vault in view or the one its picker chose.</summary>
+    private SettingsViewModel Settings()
+    {
+        var vault = Chosen(_settingsVault, VaultForScreens);
+        _settingsVault = vault;
+
+        return new SettingsViewModel(vault.Session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync)
+        {
+            OffersTheme = OffersTheme,
+            Login = LoginItem,
+            CliLink = CliLink,
+            Crashes = _crashes,
+            BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _post),
+            BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable),
+            VaultChoices = VaultChoices(withAll: false),
+            ShowVault = choice => ShowAnother(choice, chosen => _settingsVault = chosen, () =>
+            {
+                if (Content is SettingsViewModel settings)
+                {
+                    settings.Section = SettingsSectionChoice.ThisVault;
+                }
+            }),
+        };
+    }
+
+    /// <summary>Security: one vault's check, or every unlocked vault's under each one's title.</summary>
+    /// <remarks>A property, so CA2000 reads it as a check the shell keeps rather than one it makes per visit.</remarks>
+    private RecommendationsViewModel SecurityInView => Security();
+
+    private RecommendationsViewModel Security()
+    {
+        var unlocked = UnlockedSections;
+        var all = _securityVault is null || !unlocked.Contains(_securityVault);
+        var shown = all ? unlocked : [_securityVault!];
+        List<RecommendationsViewModel> checks = [.. shown.Select(vault => ScanOf(vault.Session))];
+        var first = checks.Count > 0 ? checks[0] : Recommendations;
+        var choices = VaultChoices(withAll: true);
+        var headed = all && checks.Count > 1;
+
+        foreach (var check in _scans.Values.Append(Recommendations).Distinct())
+        {
+            check.IsListedUnderAnother = !ReferenceEquals(check, first);
+            check.VaultHeading = headed && checks.Contains(check) ? SectionOf(check.Session).Title : string.Empty;
+            check.AlsoShown = [];
+            check.VaultChoices = [];
+        }
+
+        first.AlsoShown = all ? [.. checks.Skip(1)] : [];
+        first.VaultChoices = choices;
+        first.ShowVault = choice => ShowAnother(choice, chosen => _securityVault = chosen, null, allowsAll: true);
+        _contentSpansVaults = all;
+        return first;
+    }
+
+    /// <summary>The check of an unlocked vault's items, made the first time Security or its count asks for it.</summary>
+    private RecommendationsViewModel ScanOf(AppVaultSession session)
+    {
+        if (ReferenceEquals(session, _session))
+        {
+            return Recommendations;
+        }
+
+        if (!_scans.TryGetValue(session, out var scan))
+        {
+            scan = new RecommendationsViewModel(session, Home, name => OpenEntry(name, session), _post, Preferences, _web);
+            scan.PropertyChanged += OnScanChanged;
+            _scans[session] = scan;
+        }
+
+        return scan;
+    }
+
+    private void OnScanChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(RecommendationsViewModel.NeedsReview) or nameof(RecommendationsViewModel.IsEmpty))
+        {
+            ShowSecurityCount();
+        }
+    }
+
+    /// <summary>Starts a check for each unlocked vault that has none and drops the check of each vault that locked.</summary>
+    private void KeepScans()
+    {
+        foreach (var locked in _scans.Keys.Where(session => !session.IsUnlocked || !Account.Vaults.Any(vault => vault.Session == session)).ToList())
+        {
+            var scan = _scans[locked];
+            _scans.Remove(locked);
+            scan.PropertyChanged -= OnScanChanged;
+            scan.Dispose();
+        }
+
+        foreach (var vault in UnlockedSections)
+        {
+            _ = ScanOf(vault.Session);
+        }
+
+        ShowSecurityCount();
+    }
+
+    /// <summary>Shows the screen in view again for a vault its picker chose, asking first about a draft it would leave.</summary>
+    private void ShowAnother(VaultChoice choice, Action<VaultSection?> choose, Action? then, bool allowsAll = false)
+    {
+        if (choice.Vault is null && !allowsAll)
+        {
+            return;
+        }
+
+        Leave(
+            () =>
+            {
+                choose(choice.Vault is { } session ? SectionOf(session) : null);
+                Show(_current);
+                then?.Invoke();
+            },
+            () => OnPropertyChanged(nameof(Content)));
+    }
+
+    /// <summary>Items' list: the place in view, or a locked vault's form.</summary>
+    private IDisposable ItemsScreen() => _itemsVault.IsLocked && !_allAccounts ? LockedVault() : Entries();
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker, Tables.Items) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith };
+        var unlocked = UnlockedSections;
+        var home = _itemsVault.IsLocked && unlocked.Count > 0 ? unlocked[0] : _itemsVault;
+        IReadOnlyList<AppVaultSession> others = _allAccounts ? [.. unlocked.Where(vault => vault != home).Select(vault => vault.Session)] : [];
+        var inView = ReferenceEquals(home.Session, _session);
+        _contentSpansVaults = _allAccounts;
+        var entries = new EntriesViewModel(home.Session, Clipboard, inView ? EntryActivity : null, _web, _post, _picker, Tables.Items, others, session => SectionOf(session).Title) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith, Place = _place, VaultTitle = home.Title, ListSubtitle = ListSubtitle(), SaveInPlaces = () => [.. Account.Vaults.Select(vault => new SaveInChoice(vault.Session, Account.Title, vault.Title))] };
 
         entries.ClearSearchBox = () => Search = string.Empty;
         entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
@@ -1009,8 +961,35 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         (Content as AgentActivityViewModel)?.OpenSettings(agent);
     });
 
-    private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.Log), Clipboard, _web) { RulesForEveryAgent = Authority is null ? null : new AgentRulesViewModel(Authority) };
+    /// <summary>Agents, on the vault in view or the one its picker chose, since each vault keeps its own agents' rules.</summary>
+    private AgentActivityViewModel Activity()
+    {
+        var vault = Chosen(_agentsVault, VaultForScreens);
+        _agentsVault = vault;
+        var authority = AuthorityOf(vault.Session);
+
+        return new(authority, Home, _clock, _post, authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.Log), Clipboard, _web)
+        {
+            RulesForEveryAgent = authority is null ? null : new AgentRulesViewModel(authority),
+            VaultChoices = authority is null ? [] : VaultChoices(withAll: false),
+            ShowVault = choice => ShowAnother(choice, chosen => _agentsVault = chosen, null),
+        };
+    }
+
+    private void OnProjectsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EnvSetsViewModel.OpenProject) && sender is EnvSetsViewModel projects)
+        {
+            FollowOpenProject(projects);
+        }
+    }
+
+    /// <summary>The sidebar highlights the project Environments has open, however it was opened, under its vault's Environments.</summary>
+    private void FollowOpenProject(EnvSetsViewModel projects)
+    {
+        _openProject = projects.OpenProject?.Name;
+        OnPropertyChanged(nameof(SelectedSidebarRow));
+    }
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -1018,7 +997,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         // whose change names no entry for Count to hear of.
         if (e.PropertyName == nameof(EntriesViewModel.Groups) && sender is EntriesViewModel { Groups.Count: > 0 } entries)
         {
-            _groups = entries.Groups;
+            _itemsVault.TakeGroups(entries.Groups);
             RebuildSidebar();
         }
 
@@ -1137,7 +1116,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
                 if (Content is EntriesViewModel items)
                 {
-                    items.BeginAddCommand.Press();
+                    items.BeginAddOfKindCommand.Press(ItemTemplate.Login);
                     items.NewItem?.Password.TakeFrom(password);
                 }
 
@@ -1239,87 +1218,23 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Items showing <paramref name="name"/>'s group with it selected, the search cleared so the list holds it.</summary>
-    internal void OpenEntry(EntryName name)
+    internal void OpenEntry(EntryName name) => OpenEntry(name, _session);
+
+    /// <summary>Items showing <paramref name="name"/> of <paramref name="vault"/>'s vault in its group, selected.</summary>
+    private void OpenEntry(EntryName name, AppVaultSession vault)
     {
         ArgumentNullException.ThrowIfNull(name);
 
         Leave(() =>
         {
             Search = string.Empty;
-            ShowGroupNow(name.GroupPath);
+            ShowGroupNow(SectionOf(vault), name.GroupPath);
 
             if (Content is EntriesViewModel entries)
             {
                 entries.Selected = entries.Rows.FirstOrDefault(row => row.Is(name));
             }
         });
-    }
-
-    /// <summary>Items showing <paramref name="path"/>, or every item when it is empty.</summary>
-    private void ShowGroup(string path) => Leave(() => ShowGroupNow(path));
-
-    private void ShowGroupNow(string path)
-    {
-        MoveTo(Destinations.Of(DestinationKind.Entries));
-
-        if (Content is EntriesViewModel entries && entries.Groups.FirstOrDefault(node => node.Path == path) is { } node)
-        {
-            entries.SelectedGroup = node;
-        }
-
-        OnPropertyChanged(nameof(SelectedSidebarRow));
-    }
-
-    /// <summary>Shows <paramref name="path"/> when the group Items shows is folded away inside it.</summary>
-    private void ShowGroupIfInside(string path)
-    {
-        if (Content is EntriesViewModel { SelectedGroup: { IsEverything: false } shown }
-            && (path.Length == 0 || shown.Path.StartsWith(path + "/", StringComparison.Ordinal)))
-        {
-            ShowGroup(path);
-        }
-    }
-
-    /// <summary>
-    /// The sidebar's main list: Items, the groups whose parents are all open when Items is under their
-    /// heading, the projects under theirs, then Agents; each heading stays, for its +, while nothing is under it.
-    /// </summary>
-    private List<object> SidebarOf()
-    {
-        var items = MainNav[0];
-        List<object> rows = [items, _groupsHeading];
-
-        if (items.IsExpanded)
-        {
-            foreach (var node in _groups.Where(node => !node.IsEverything && ParentsOpen(node.Path)))
-            {
-                rows.Add(new GroupRow(node.Path, node.Label, node.Depth, node.Children.Count > 0, _expanded.Contains(node.Path)));
-            }
-        }
-
-        rows.Add(_projectsHeading);
-        rows.AddRange(_projects);
-
-        if (Recommendations is { IsEmpty: false })
-        {
-            rows.Add(RecommendationsRow);
-        }
-
-        rows.AddRange(MainNav.Skip(1));
-        return rows;
-    }
-
-    private bool ParentsOpen(string path)
-    {
-        for (var slash = path.IndexOf('/', StringComparison.Ordinal); slash > 0; slash = path.IndexOf('/', slash + 1))
-        {
-            if (!_expanded.Contains(path[..slash]))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private void SayWhenACopyArrives()
@@ -1330,84 +1245,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         _conflictedCopiesSaid = Recommendations.ConflictedCopies.Count;
-    }
-
-    private void ShowRecommendationsRow()
-    {
-        RecommendationsRow.Count = Recommendations.NeedsReview > 0 ? Recommendations.NeedsReview.ToString(CultureInfo.InvariantCulture) : string.Empty;
-        RebuildSidebar();
-    }
-
-    /// <summary>Replaces the sidebar's rows when they differ, keeping the list from writing back the row it had.</summary>
-    private void RebuildSidebar()
-    {
-        var rows = SidebarOf();
-
-        if (rows.SequenceEqual(SidebarRows))
-        {
-            return;
-        }
-
-        _rebuildingSidebar = true;
-
-        try
-        {
-            SidebarRows = rows;
-        }
-        finally
-        {
-            _rebuildingSidebar = false;
-        }
-
-        OnPropertyChanged(nameof(SelectedSidebarRow));
-    }
-
-    /// <summary>Counts entries and projects for the sidebar.</summary>
-    private void Count()
-    {
-        if (_disposed || _session.Unlocked is not { } vault)
-        {
-            _groups = [];
-            Projects = [];
-            RebuildSidebar();
-            return;
-        }
-
-        IReadOnlyList<ProjectListing> projects;
-        IReadOnlyList<GroupNode> groups;
-        int total;
-
-        try
-        {
-            total = vault.ReadEntries().Count;
-            projects = ProjectCatalog.Read(vault).Projects;
-            groups = GroupNode.Flatten(vault.ReadGroupPaths());
-        }
-        catch (ObjectDisposedException)
-        {
-            return;
-        }
-
-        _groups = groups;
-        Projects =
-        [
-            .. projects.Select(project => new ProjectRow(
-                project.Name,
-                project.Environments.SelectMany(environment => environment.Members).Distinct().Count())),
-        ];
-        RebuildSidebar();
-        SetCount(DestinationKind.Entries, total);
-    }
-
-    private void SetCount(DestinationKind kind, int count)
-    {
-        foreach (var item in MainNav.Concat(FooterNav))
-        {
-            if (item.Destination.Kind == kind)
-            {
-                item.Count = count > 0 ? count.ToString(CultureInfo.InvariantCulture) : string.Empty;
-            }
-        }
     }
 
     private void ReadAuthority()
@@ -1457,7 +1294,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         AgentsRow.Waiting = 0;
     }
 
-    private NavItem AgentsRow => MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
+    private NavItem AgentsRow => RailPlaces.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
 
     private void ShowAgentsDot()
     {
@@ -1474,70 +1311,97 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private void OnStatusTick()
     {
         ReadAuthority();
+        CountWhenAVaultChanged();
 
-        // The five-second poll covers a folder that cannot be watched; an edit, a save or a watched change says so at once.
-        if (++_ticks % 5 == 0)
-        {
-            ReadVaultStatus();
-        }
+        // A vault's mark for unsaved changes follows a save that failed, which no event names.
+        RebuildSidebar();
     }
 
     /// <summary>
-    /// Watches the vault's folder, not the file alone, because another program often saves by renaming a
-    /// new file over it, and compares the file a moment after the last change it sees; null where the
-    /// folder cannot be watched, which leaves the five-second poll.
+    /// Follows each listed vault's saves, merges and file watch, so another program's save of any open vault is merged and
+    /// said, and the title bar and the sidebar say each vault's state; drops a vault no longer listed.
     /// </summary>
-    private FileSystemWatcher? WatchVaultFile()
+    private void FollowVaults()
     {
-        if (_session.VaultPath is not { } path || Path.GetDirectoryName(Path.GetFullPath(path)) is not { Length: > 0 } folder)
+        List<AppVaultSession> listed = [.. Account.Vaults.Select(vault => vault.Session)];
+
+        foreach (var gone in _followed.Keys.Where(session => !listed.Contains(session)).ToList())
         {
-            return null;
+            Unfollow(gone);
         }
 
-        FileSystemWatcher? watch = null;
+        foreach (var session in listed)
+        {
+            var watch = WatchOf(session);
 
-        try
-        {
-            watch = new FileSystemWatcher(folder, Path.GetFileName(path));
-            watch.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime;
-            watch.Changed += OnVaultFileChanged;
-            watch.Created += OnVaultFileChanged;
-            watch.Deleted += OnVaultFileChanged;
-            watch.Renamed += OnVaultFileChanged;
-            watch.Error += OnVaultWatchError;
-            watch.EnableRaisingEvents = true;
+            if (_followed.TryGetValue(session, out var followed))
+            {
+                if (ReferenceEquals(followed, watch))
+                {
+                    continue;
+                }
 
-            var watching = watch;
-            watch = null;
-            return watching;
-        }
-        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
-        {
-            return null;
-        }
-        finally
-        {
-            watch?.Dispose();
+                if (followed is not null)
+                {
+                    followed.Changed -= OnWatchChanged;
+                }
+            }
+            else
+            {
+                session.Saved += OnSaved;
+                session.Merged += OnMerged;
+                session.Edited += OnEdited;
+            }
+
+            if (watch is not null)
+            {
+                watch.Changed += OnWatchChanged;
+            }
+
+            _followed[session] = watch;
         }
     }
 
-    private void OnVaultFileChanged(object? sender, FileSystemEventArgs e) => Settle();
-
-    // A watch that lost track compares rather than waiting for the poll.
-    private void OnVaultWatchError(object? sender, ErrorEventArgs e) => Settle();
-
-    /// <summary>Compares the file a moment after the last change, so a save still being written is compared once it has finished.</summary>
-    private void Settle()
+    private void Unfollow(AppVaultSession session)
     {
-        try
+        session.Saved -= OnSaved;
+        session.Merged -= OnMerged;
+        session.Edited -= OnEdited;
+
+        if (_followed.TryGetValue(session, out var watch) && watch is not null)
         {
-            _fileTimer?.Change(_fileSettle, Timeout.InfiniteTimeSpan);
+            watch.Changed -= OnWatchChanged;
         }
-        catch (ObjectDisposedException)
-        {
-            // The shell was disposed while the watch was still reporting, on a thread of its own.
-        }
+
+        _followed.Remove(session);
     }
+
+    /// <summary>A vault's watch saw its file change or a merge start or finish: the title bar reads the vault in view again, and the sidebar its marks.</summary>
+    private void OnWatchChanged(object? sender, EventArgs e) => Post(() =>
+    {
+        if (_disposed || sender is not VaultFileWatch watch)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(watch.Session, ShownSession))
+        {
+            ReadVaultStatus();
+        }
+
+        RebuildSidebar();
+    });
+
+    /// <summary>Whether the screen in view reads <paramref name="session"/>'s vault, which a merge or a reload of it shows again.</summary>
+    private bool ReadsVault(AppVaultSession session) =>
+        _contentVaults.Contains(session) || (_contentVaults.Count == 0 && ReferenceEquals(session, _session));
+
+    /// <summary>What a vault's heading says beside its title: a merge of another program's save under way, or changes not yet in its file.</summary>
+    private string SaveMarkOf(VaultSection vault) =>
+        vault.IsLocked ? string.Empty
+        : WatchOf(vault.Session)?.IsMerging == true ? "merging"
+        : vault.Session.Unsaved.Count > 0 ? "unsaved"
+        : string.Empty;
 
     private void ReadVaultStatus()
     {
@@ -1546,7 +1410,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault || VaultName.Length == 0)
+        var session = ShownSession;
+
+        if (!ReferenceEquals(session, _statusSession))
+        {
+            _statusSession = session;
+            _reloadFailure = null;
+        }
+
+        if (session.Unlocked is not { } vault || VaultName.Length == 0)
         {
             VaultSaveWords = string.Empty;
             VaultStatusDetail = string.Empty;
@@ -1555,7 +1427,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_isMerging)
+        if (WatchOf(session)?.IsMerging == true)
         {
             ShowMerging();
             return;
@@ -1574,7 +1446,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         (VaultSaveWords, VaultStatusTone) = state.Status switch
         {
-            VaultSaveStatus.Saved when _updatedAt is { } updated =>
+            VaultSaveStatus.Saved when _updatedAt.TryGetValue(session, out var updated) =>
                 ($"updated {PersonTime.Clock(updated.ToLocalTime())}", StatusTone.Ok),
             VaultSaveStatus.Saved => ("saved", StatusTone.Ok),
             VaultSaveStatus.Unsaved => ("unsaved changes", StatusTone.Pending),
@@ -1582,7 +1454,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _ => ("file unreadable", StatusTone.Danger),
         };
 
-        VaultStatusDetail = (state.Status, _updatedAt, state.SavedAt) switch
+        VaultStatusDetail = (state.Status, _updatedAt.TryGetValue(session, out var at) ? at : (DateTimeOffset?)null, state.SavedAt) switch
         {
             (VaultSaveStatus.Saved, { } updated, _) =>
                 $"Updated from another program's save at {PersonTime.ClockWithSeconds(updated.ToLocalTime())} · {VaultPath}",
@@ -1591,7 +1463,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         };
 
         OffersSaveOverFile = false;
-        Recommendations.LookForConflictedCopies();
+        ScanOf(session).LookForConflictedCopies();
 
         if (!File.Exists(vault.Path))
         {
@@ -1607,8 +1479,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        // The poll and the folder watch merge another program's save; Reload is offered for one keypaste did not merge.
-        if (_session.MergeRefusal() is { } refused)
+        // The vault's watch merges another program's save; Reload is offered for one keypaste did not merge.
+        if (session.MergeRefusal() is { } refused)
         {
             OffersSaveOverFile = refused.Outcome == VaultMergeSaveOutcome.Unreadable;
             VaultChanged = string.Concat(
@@ -1618,9 +1490,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Merges)
+        if (session.Merges)
         {
-            StartMerge();
+            ShowMerging();
             return;
         }
 
@@ -1628,27 +1500,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             $"Another program saved {VaultName}. Agents are refused until you reload it.",
             state.Unwritten ? Discarded() : string.Empty,
             _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
-    }
-
-    /// <summary>Merges another program's save on a thread of its own, the title bar saying so meanwhile.</summary>
-    private void StartMerge()
-    {
-        if (_isMerging)
-        {
-            return;
-        }
-
-        _isMerging = true;
-        ShowMerging();
-        _merging = AppVaultSession.OnItsOwnThread(() =>
-        {
-            _session.Merge();
-            Post(() =>
-            {
-                _isMerging = false;
-                ReadVaultStatus();
-            });
-        });
     }
 
     private void OpenAgents() => Current = Destinations.Of(DestinationKind.AgentActivity);
@@ -1661,13 +1512,20 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         VaultChanged = null;
     }
 
-    private void OnMerged(object? sender, MergeResult merged) => Post(() => ShowMerged(merged));
+    private void OnMerged(object? sender, MergeResult merged)
+    {
+        if (sender is AppVaultSession session)
+        {
+            Post(() => ShowMerged(session, merged));
+        }
+    }
 
     /// <summary>
-    /// Says what a merge did and shows the merged copy on the screen open now, leaving an item being edited as typed, so
-    /// its next save writes by name to the merged copy; a refusal is said by the banner the status reads.
+    /// Says what a merge of any open vault did, naming that vault, and shows the merged copy on the screen open now where it
+    /// reads that vault, leaving an item being edited as typed, so its next save writes by name to the merged copy; a refusal
+    /// is said by the banner the status reads.
     /// </summary>
-    private void ShowMerged(MergeResult merged)
+    private void ShowMerged(AppVaultSession session, MergeResult merged)
     {
         if (_disposed)
         {
@@ -1676,21 +1534,41 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         if (merged.Merged)
         {
-            VaultMoved?.Invoke();
-            _reloadFailure = null;
-            _updatedAt = merged.Outcome == VaultMergeSaveOutcome.Updated ? merged.At : null;
+            var shown = ReadsVault(session);
+
+            if (shown)
+            {
+                VaultMoved?.Invoke();
+            }
+
+            if (ReferenceEquals(session, ShownSession))
+            {
+                _reloadFailure = null;
+            }
+
+            if (merged.Outcome == VaultMergeSaveOutcome.Updated)
+            {
+                _updatedAt[session] = merged.At;
+            }
+            else
+            {
+                _updatedAt.Remove(session);
+            }
 
             if (merged.Outcome == VaultMergeSaveOutcome.Saved)
             {
-                var said = MergeNotice.Saved(VaultName, merged);
+                var said = MergeNotice.Saved(FileNameOf(session), merged);
                 Notice = _noticeNamesAConflict && Notice is { } standing ? $"{standing} {said}" : said;
                 _noticeNamesAConflict |= MergeNotice.NamesAConflict(merged);
             }
 
             Count();
 
-            switch (Content)
+            switch (shown ? Content : null)
             {
+                case null:
+                    break;
+
                 case EntriesViewModel entries:
                     entries.ShowChangeFromElsewhere();
                     break;
@@ -1711,10 +1589,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     break;
             }
 
-            Recommendations.Check();
+            if (session.IsUnlocked)
+            {
+                ScanOf(session).Check();
+            }
         }
 
         ReadVaultStatus();
+        RebuildSidebar();
     }
 
     [RelayCommand]
@@ -1727,7 +1609,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>What reloading would discard, naming the items changed here since the last save and never a value.</summary>
     private string Discarded()
     {
-        var unsaved = _session.Unsaved;
+        var unsaved = ShownSession.Unsaved;
         var items = unsaved.Where(name => !ReservedGroups.IsReserved(name.GroupPath)).ToList();
         List<string> named = [.. items.Take(3).Select(Core.Approval.ApprovalPrompt.Shown)];
 
@@ -1760,7 +1642,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void SaveOverFile()
     {
-        if (_session.SaveOpenCopyOverFile() is { } failed)
+        if (ShownSession.SaveOpenCopyOverFile() is { } failed)
         {
             _reloadFailure = failed;
         }
@@ -1770,7 +1652,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private void ReloadNow()
     {
-        var result = _session.Reload();
+        var session = ShownSession;
+        var result = session.Reload();
 
         if (_disposed || result.Outcome == ReloadOutcome.Locked)
         {
@@ -1788,17 +1671,23 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         _reloadFailure = null;
         Show(_current);
-        Recommendations.Check();
+        ScanOf(session).Check();
         ReadVaultStatus();
     }
 
     private void OnSaved(object? sender, EventArgs e) => Post(() =>
     {
-        if (!_disposed)
+        if (!_disposed && sender is AppVaultSession session)
         {
-            _updatedAt = null;
+            _updatedAt.Remove(session);
             ReadVaultStatus();
-            Recommendations.Check();
+
+            if (session.IsUnlocked)
+            {
+                ScanOf(session).Check();
+            }
+
+            RebuildSidebar();
         }
     });
 
@@ -1832,7 +1721,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private void OnEdited(object? sender, VaultEdit edit) => Post(() =>
     {
-        _updatedAt = null;
+        if (_disposed || sender is not AppVaultSession session)
+        {
+            return;
+        }
+
+        _updatedAt.Remove(session);
         Count();
         ReadVaultStatus();
     });
@@ -1916,10 +1810,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
-        _session.Edited -= OnEdited;
         _session.WaitingForTouch -= OnWaitingForTouch;
-        _session.Saved -= OnSaved;
-        _session.Merged -= OnMerged;
+
+        foreach (var session in _followed.Keys.ToList())
+        {
+            Unfollow(session);
+        }
+
+        _ownWatch?.Dispose();
+        _ownWatch = null;
 
         if (Authority is not null)
         {
@@ -1927,14 +1826,20 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         Recommendations.Dispose();
+
+        foreach (var scan in _scans.Values)
+        {
+            scan.PropertyChanged -= OnScanChanged;
+            scan.Dispose();
+        }
+
+        _scans.Clear();
         CloseDiscardPrompt();
         DropNewItemPassword();
         CloseShare();
         CloseGenerator();
 
         _statusTimer?.Dispose();
-        _fileWatch?.Dispose();
-        _fileTimer?.Dispose();
         Toasts.Dispose();
         _countdownTimer?.Dispose();
         EntryActivity?.Dispose();

@@ -118,7 +118,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
+        var running = launch.RunOrSetUpCommand.ExecuteAsync(null);
 
         Assert.True(launch.IsConfirming);
         Assert.Contains(pipeName, launch.ConfirmStarts, StringComparison.Ordinal);
@@ -503,9 +503,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Contains($"DB_URL={_dbUrl}", report);
     }
 
-    /// <summary>The card asked about one environment, so choosing another on the project while it is up does not change what Start starts.</summary>
+    /// <summary>The card asked about one stage, so choosing another on the project while it is up does not change what Start starts.</summary>
     [Fact]
-    public async Task Choosing_another_environment_while_the_card_is_up_starts_the_one_the_card_named()
+    public async Task Choosing_another_stage_while_the_card_is_up_starts_the_one_the_card_named()
     {
         Reopened(vault =>
         {

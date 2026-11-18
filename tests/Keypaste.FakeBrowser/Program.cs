@@ -17,9 +17,9 @@ namespace Keypaste.FakeBrowser;
 /// <para>
 /// <c>associate</c> sends the session key and the identification key, as the extension pairs; <c>test-associate=&lt;id&gt;</c>
 /// presents the pairing <c>id</c> with the identification key, as it checks one, and a bare <c>test-associate</c> the id the last
-/// <c>associate</c> was answered with; <c>get-logins=&lt;url&gt;</c> asks for a page's logins under the pairing last presented, as
-/// a page's load does, and <c>click=&lt;url&gt;</c> as the person's click on the field's key icon does, marked <c>triggerUnlock</c>;
-/// any other action is sent with nothing else in it. The identification key is
+/// <c>associate</c> was answered with; <c>get-logins=&lt;url&gt;</c> asks for the names of a page's logins under the pairing last
+/// presented, as the person's click on the field's key icon does, and <c>pick=&lt;url&gt;</c> asks for the first login the last
+/// list named, as the person's pick in it does, both marked <c>triggerUnlock</c>; any other action is sent with nothing else in it. The identification key is
 /// <c>--id-key</c>'s, so two runs can pair and then check, or a fresh one. A host may be any program that speaks the protocol,
 /// <c>keepassxc-proxy</c> included, which drops what it cannot hand KeePassXC, hence <c>--within</c>.
 /// </para>
@@ -33,7 +33,7 @@ namespace Keypaste.FakeBrowser;
 internal static class Program
 {
     private const string _usage =
-        "usage: Keypaste.FakeBrowser <host> chrome|edge|firefox [--id-key <base64>] [--within <seconds>] [action | test-associate=<id> | get-logins=<url> | click=<url>]...\n" +
+        "usage: Keypaste.FakeBrowser <host> chrome|edge|firefox [--id-key <base64>] [--within <seconds>] [action | test-associate=<id> | get-logins=<url> | pick=<url>]...\n" +
         "       Keypaste.FakeBrowser find chrome|chromium|edge|brave|firefox --home <dir> --config-home <dir> --app-data <dir>\n" +
         "                            --local-app-data <dir> --registry-root <key> [--id-key <base64>] [--within <seconds>] [action]...";
 
@@ -148,6 +148,7 @@ internal static class Program
         await Console.Out.WriteLineAsync((await client.ChangePublicKeysAsync(cancellationToken).ConfigureAwait(false)).ToJsonString()).ConfigureAwait(false);
 
         string? paired = null;
+        string? listed = null;
 
         foreach (var request in requests)
         {
@@ -156,23 +157,36 @@ internal static class Program
                 paired = request["test-associate=".Length..];
             }
 
-            var clicked = request.StartsWith("click=", StringComparison.Ordinal);
+            var picked = request.StartsWith("pick=", StringComparison.Ordinal);
+            var listing = request.StartsWith("get-logins=", StringComparison.Ordinal);
             var (action, fields) = request switch
             {
                 "associate" => ("associate", new JsonObject { ["key"] = client.PublicKey, ["idKey"] = identificationKey }),
                 "test-associate" => ("test-associate", new JsonObject { ["id"] = paired ?? string.Empty, ["key"] = identificationKey }),
                 _ when request.StartsWith("test-associate=", StringComparison.Ordinal) =>
                     ("test-associate", new JsonObject { ["id"] = paired, ["key"] = identificationKey }),
-                _ when clicked || request.StartsWith("get-logins=", StringComparison.Ordinal) =>
+                _ when listing =>
                     ("get-logins", new JsonObject
                     {
-                        ["url"] = request[(request.IndexOf('=', StringComparison.Ordinal) + 1)..],
+                        ["url"] = request["get-logins=".Length..],
+                        ["keys"] = new JsonArray(new JsonObject { ["id"] = paired ?? string.Empty, ["key"] = identificationKey }),
+                    }),
+                _ when picked =>
+                    ("get-login", new JsonObject
+                    {
+                        ["url"] = request["pick=".Length..],
+                        ["uuid"] = listed ?? string.Empty,
                         ["keys"] = new JsonArray(new JsonObject { ["id"] = paired ?? string.Empty, ["key"] = identificationKey }),
                     }),
                 _ => (request, (JsonObject?)null),
             };
 
-            var answer = await client.RequestAsync(action, fields, ExtensionClient.NewNonce(), triggerUnlock: clicked, cancellationToken).ConfigureAwait(false);
+            var answer = await client.RequestAsync(action, fields, ExtensionClient.NewNonce(), triggerUnlock: listing || picked, cancellationToken).ConfigureAwait(false);
+
+            if (listing && answer.Message?["entries"] is JsonArray { Count: > 0 } entries)
+            {
+                listed = (string?)entries[0]?["uuid"];
+            }
 
             // The extension checks a pairing it has just made under the id the host answered, as this does for a bare test-associate.
             if (action == "associate" && (string?)answer.Message?["id"] is { } id)

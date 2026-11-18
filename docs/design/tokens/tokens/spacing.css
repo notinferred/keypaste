@@ -11,15 +11,21 @@
   --space-10: 40px;
   --space-11: 56px;
 
-  --radius-chip: 4px;
-  --radius-field: 6px;
+  --radius-keycap: 4px;
+  --radius-segment: 6px;
+  --radius-chip: 999px;
+  --radius-field: 7px;
   --radius-button: 7px;
+  --radius-row: 8px;
+  --radius-tile: 8px;
   --radius-card: 10px;
+  --radius-tile-large: 12px;
   --radius-dialog: 14px;
   --radius-icon: 23.4%;
 
-  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+  --shadow-dialog: 0 22px 60px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+  --shadow-segment: 0 1px 1.5px rgba(0, 0, 0, 0.06);
 
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms;

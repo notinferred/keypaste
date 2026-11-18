@@ -108,6 +108,28 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
     internal RelayCommand OpenAdvancedCommand { get; }
 
+    /// <summary>The unlocked vaults This vault's picker offers, or none where one vault is open.</summary>
+    internal IReadOnlyList<VaultChoice> VaultChoices { get; init; } = [];
+
+    /// <summary>Whether This vault starts with a picker of the vault it shows.</summary>
+    internal bool OffersVaultChoice => VaultChoices.Count > 1;
+
+    /// <summary>The vault This vault shows; choosing another shows that vault's settings through <see cref="ShowVault"/>.</summary>
+    internal VaultChoice? ShownVault
+    {
+        get => VaultChoices.FirstOrDefault(choice => ReferenceEquals(choice.Vault, _session));
+        set
+        {
+            if (value?.Vault is { } vault && !ReferenceEquals(vault, _session))
+            {
+                ShowVault?.Invoke(value);
+            }
+        }
+    }
+
+    /// <summary>Shows another vault's settings, set by the shell.</summary>
+    internal Action<VaultChoice>? ShowVault { get; init; }
+
     /// <summary>Changing the vault's master password and keyfile.</summary>
     internal VaultAccessViewModel Access { get; }
 
@@ -294,6 +316,23 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             if (SetProperty(ref _lockWhenMinimized, value))
             {
                 Persist(_settings with { LockWhenMinimized = value });
+            }
+        }
+    }
+
+    /// <summary>Whether macOS draws the rail and the sidebar over its vibrancy; only macOS has it to reduce.</summary>
+    public static bool OffersReduceTransparency => OperatingSystem.IsMacOS();
+
+    /// <summary>Settings › General's Reduce transparency: the rail and the sidebar drawn solid, as they always are on Windows, Linux and under high contrast.</summary>
+    internal bool ReduceTransparency
+    {
+        get => _settings.ReduceTransparency;
+        set
+        {
+            if (_settings.ReduceTransparency != value)
+            {
+                Persist(_settings with { ReduceTransparency = value });
+                OnPropertyChanged();
             }
         }
     }

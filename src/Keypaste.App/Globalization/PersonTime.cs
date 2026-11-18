@@ -25,6 +25,13 @@ internal static class PersonTime
     /// <summary>The time to the second.</summary>
     internal static string ClockWithSeconds(DateTimeOffset at) => Read(at.DateTime, "T", "HH:mm:ss");
 
+    /// <summary>The day of the week, abbreviated as the culture writes it.</summary>
+    internal static string Weekday(DateTimeOffset at) => Read(at.DateTime, "ddd", "ddd");
+
+    /// <summary>The month and the day, the month abbreviated, in the culture's order.</summary>
+    internal static string MonthDay(DateTimeOffset at) =>
+        Read(at.DateTime, Culture.DateTimeFormat.MonthDayPattern.Replace("MMMM", "MMM", StringComparison.Ordinal), "MM-dd");
+
     /// <summary>A day in words, with the year only where it is not this one or the culture always writes it.</summary>
     internal static string Day(DateTime day, DateTime today)
     {

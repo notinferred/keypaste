@@ -16,9 +16,22 @@ public sealed class TokenContrastTests
     private const double _edge = 3;
     private const double _visibleChange = 1.3;
 
-    private static readonly string[] _everyGround = ["KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover", "KpBgActive", "KpBgActiveHover"];
-    private static readonly string[] _raisedAtMost = ["KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover"];
-    private static readonly string[] _unraised = ["KpBgApp", "KpBgPanel", "KpBgCard"];
+    private static readonly string[] _everyGround = ["KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover", "KpBgActive", "KpBgActiveHover", "KpBgSidebar", "KpBgRail"];
+    private static readonly string[] _raisedAtMost = ["KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover", "KpBgSidebar"];
+    private static readonly string[] _unraised = ["KpBgApp", "KpBgPanel", "KpBgCard", "KpBgSidebar"];
+
+    /// <summary>The accents macOS offers, as its light appearance reports them; Windows and Linux report colours in the same range.</summary>
+    private static readonly Dictionary<string, Color> _systemAccents = new()
+    {
+        ["blue"] = Color.FromRgb(0x00, 0x7A, 0xFF),
+        ["purple"] = Color.FromRgb(0x95, 0x3D, 0x96),
+        ["pink"] = Color.FromRgb(0xF7, 0x4F, 0x9E),
+        ["red"] = Color.FromRgb(0xE0, 0x38, 0x3E),
+        ["orange"] = Color.FromRgb(0xF7, 0x82, 0x1B),
+        ["yellow"] = Color.FromRgb(0xFF, 0xC6, 0x00),
+        ["green"] = Color.FromRgb(0x62, 0xBA, 0x46),
+        ["graphite"] = Color.FromRgb(0x8C, 0x8C, 0x8C),
+    };
     private static readonly string[] _terminal = ["KpTerminal"];
 
     /// <summary>The Fluent theme's copies of the control edge, at rest and under the pointer, which stock fields and choices draw.</summary>
@@ -42,8 +55,8 @@ public sealed class TokenContrastTests
         ("KpOk", _raisedAtMost, _text),
         ("KpDanger", _raisedAtMost, _text),
         ("KpInfo", _raisedAtMost, _text),
+        ("KpTextPrimary", ["KpBgRaised"], _text),
         ("KpOnAccent", ["KpAccent", "KpAccentHover", "KpAccentPress"], _text),
-        ("KpAccentContrast", ["KpAccent"], _text),
         ("KpGrey3", _terminal, _text),
         ("KpGrey5", _terminal, _text),
         ("KpPaper", _terminal, _text),
@@ -82,13 +95,17 @@ public sealed class TokenContrastTests
         ("ButtonForegroundDisabled", _unraised),
     ];
 
-    /// <summary>Surfaces, tints and marks, which nothing is measured against this table for: a ground is measured from the other side.</summary>
+    /// <summary>
+    /// Surfaces, tints and marks, which nothing is measured against this table for: a ground is measured from the other side. A translucent
+    /// sidebar or rail is measured as the solid one it stands for, and a monogram's letter repeats the title beside it, so it is decoration.
+    /// </summary>
     private static readonly HashSet<string> _notTextOrEdge =
     [
-        "KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover", "KpBgActive", "KpBgActiveHover", "KpSurface0", "KpSurface1", "KpSurface2", "KpSurface3",
+        "KpBgApp", "KpBgPanel", "KpBgCard", "KpBgHover", "KpBgActive", "KpBgActiveHover", "KpBgRaised",
+        "KpBgSidebar", "KpBgRail", "KpBgSidebarVibrant", "KpBgRailVibrant",
         "KpInk0", "KpInk1", "KpInk2", "KpInk3", "KpInk4", "KpInk5", "KpTerminal", "KpBackdrop", "KpFocusGap",
-        "KpAccent", "KpAccentHover", "KpAccentPress", "KpAccentTint", "KpAccentTintStrong", "KpAccentHalo", "KpAccentQuiet",
         "KpDangerTint", "KpDangerTintHover", "KpMarkInk", "KpMarkDot",
+        "KpMonogram1", "KpMonogram2", "KpMonogram3", "KpMonogram4", "KpMonogram5", "KpMonogram6", "KpMonogram7", "KpOnMonogram",
     ];
 
     public static TheoryData<string, string, string, double> Pairs()
@@ -208,6 +225,67 @@ public sealed class TokenContrastTests
         var unmeasured = keys.Distinct().Where(key => !measured.Contains(key) && !_notTextOrEdge.Contains(key)).ToList();
         Assert.True(unmeasured.Count == 0, string.Join(", ", unmeasured));
     });
+
+    public static TheoryData<string> SystemAccents() => [.. _systemAccents.Keys];
+
+    /// <summary>Whatever accent the system gives, each palette's accent reads: text on the fill, the accent as text, the ring, and a selected row's text on its tint.</summary>
+    [Theory]
+    [MemberData(nameof(SystemAccents))]
+    public Task Every_system_accent_is_derived_to_read_in_every_palette(string name) => HeadlessSession.On(() =>
+    {
+        var derived = AccentPalette.Resources(_systemAccents[name], Application.Current!);
+
+        foreach (var (palette, variant) in Palettes)
+        {
+            var high = variant == HighContrast.Dark || variant == HighContrast.Light;
+            var (text, edge) = high ? (7d, 4.5d) : (_text, _edge);
+            Color Accent(string key) => Assert.IsType<SolidColorBrush>(derived[variant][key]).Color;
+
+            foreach (var fill in new[] { "KpAccent", "KpAccentHover", "KpAccentPress" })
+            {
+                AssertReads(Accent("KpOnAccent"), Accent(fill), text, $"{name}: KpOnAccent on {fill} in {palette}");
+            }
+
+            foreach (var ground in _raisedAtMost)
+            {
+                AssertReads(Accent("KpAccentText"), Colour(ground, variant), text, $"{name}: KpAccentText on {ground} in {palette}");
+                AssertReads(Accent("KpFocusRing"), Colour(ground, variant), edge, $"{name}: KpFocusRing on {ground} in {palette}");
+            }
+
+            foreach (var row in new[] { "KpTextPrimary", "KpTextSecondary" })
+            {
+                AssertReads(Colour(row, variant), Accent("KpAccentTint"), _text, $"{name}: {row} on KpAccentTint in {palette}");
+            }
+        }
+    });
+
+    [Fact]
+    public Task With_no_accent_reported_the_accent_is_system_blue_and_it_follows_the_system_as_it_changes() => HeadlessSession.On(() =>
+    {
+        Assert.Null(AccentPalette.Reported(Application.Current!.PlatformSettings!.GetColorValues().AccentColor1));
+        Assert.Equal(AccentPalette.SystemBlueDark.ToHsl().H, Colour("KpAccent", ThemeVariant.Dark).ToHsl().H, tolerance: 2d);
+
+        var purple = _systemAccents["purple"];
+
+        try
+        {
+            PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark, accent: purple);
+            Assert.Equal(purple.ToHsl().H, Colour("KpAccent", ThemeVariant.Dark).ToHsl().H, tolerance: 3d);
+            Assert.Equal(purple.ToHsl().H, Colour("KpAccentText", ThemeVariant.Light).ToHsl().H, tolerance: 3d);
+        }
+        finally
+        {
+            PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
+        }
+
+        Assert.Equal(AccentPalette.SystemBlueDark.ToHsl().H, Colour("KpAccent", ThemeVariant.Dark).ToHsl().H, tolerance: 2d);
+    });
+
+    private static void AssertReads(Color token, Color ground, double minimum, string what)
+    {
+        var ratio = Contrast(token, ground);
+        Assert.True(ratio >= minimum, $"{what} is {ratio:F2}:1, under {minimum}:1");
+    }
 
     private static Color Colour(string key, ThemeVariant variant)
     {

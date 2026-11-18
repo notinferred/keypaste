@@ -345,24 +345,19 @@ internal sealed class FakeChannel : IApprovalChannel
     /// <summary>Every pairing's confirmation shown, in order.</summary>
     internal List<PairingPrompt> PairingPrompts { get; } = [];
 
-    /// <summary>Every notice that a browser asked to pair while pairing was not armed, in order.</summary>
-    internal List<PairingNotice> PairingNotices { get; } = [];
-
     public ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
     {
         PairingPrompts.Add(prompt);
         return ValueTask.FromResult(AnswerPairing(prompt));
     }
 
-    public void Tell(PairingNotice notice) => PairingNotices.Add(notice);
-
     /// <summary>How a fill prompt is answered; a no unless a test says otherwise.</summary>
-    internal Func<FillPrompt, CancellationToken, ValueTask<FillAnswer>> AnswerFill { get; set; } = (_, _) => ValueTask.FromResult(new FillAnswer(ApprovalAnswer.Denied, null, false));
+    internal Func<FillPrompt, CancellationToken, ValueTask<ApprovalAnswer>> AnswerFill { get; set; } = (_, _) => ValueTask.FromResult(ApprovalAnswer.Denied);
 
     /// <summary>Every fill prompt shown, in order.</summary>
     internal List<FillPrompt> FillPrompts { get; } = [];
 
-    public ValueTask<FillAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
+    public ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
     {
         FillPrompts.Add(prompt);
         return AnswerFill(prompt, cancellationToken);

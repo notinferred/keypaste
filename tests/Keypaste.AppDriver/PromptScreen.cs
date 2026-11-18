@@ -69,7 +69,7 @@ internal sealed class PromptScreen : IDisposable
 
     /// <summary>
     /// Answers the prompt on screen: <c>once</c>, <c>always</c> (Always allow),
-    /// <c>allow</c> (a change's confirmation), <c>deny</c> or <c>close</c>.
+    /// <c>allow</c> (a change's confirmation, or a fill's Fill), <c>deny</c> or <c>close</c>.
     /// </summary>
     internal Task AnswerAsync(string answer) =>
         Dispatcher.UIThread.InvokeAsync(
@@ -112,36 +112,6 @@ internal sealed class PromptScreen : IDisposable
                 }
             });
 
-    /// <summary>Picks the fill prompt's login at <paramref name="number"/>, from 1, ticks Always fill when asked, and presses Fill once it is armed.</summary>
-    internal Task FillAsync(int number, bool always) =>
-        Dispatcher.UIThread.InvokeAsync(
-            async () =>
-            {
-                var window = _open as FillWindow ?? throw new DriverException("no fill prompt is on screen");
-                var fill = (FillViewModel)window.DataContext!;
-                fill.Picked = fill.Rows[number - 1];
-
-                if (always)
-                {
-                    window.FindControl<CheckBox>("AlwaysBox")!.IsChecked = true;
-                }
-
-                var allow = Button(window, "Allow");
-                var armedBy = DateTime.UtcNow + _armingWait;
-
-                while (!allow.IsEffectivelyEnabled)
-                {
-                    if (DateTime.UtcNow > armedBy)
-                    {
-                        throw new DriverException("Fill never became pressable");
-                    }
-
-                    await Task.Delay(50).ConfigureAwait(true);
-                }
-
-                Click(window, allow);
-            });
-
     /// <summary>
     /// Waits until the prompt on screen is armed, then presses Show the prompt on Agents through
     /// <paramref name="press"/> on this display's thread, and says whether the prompt is then armed and which
@@ -175,21 +145,14 @@ internal sealed class PromptScreen : IDisposable
     private void OnShown(object? sender, Window window)
     {
         window.CaptureRenderedFrame();
-
-        if (window is PairingNoticeWindow)
-        {
-            Console.Out.WriteLine($"pair-notice identity={Text(window, "IdentityText")} text={Text(window, "NoticeText")}");
-            return;
-        }
-
         _open = window;
 
         Console.Out.WriteLine(window switch
         {
-            EnvApprovalWindow =>
+            EnvApprovalWindow { DataContext: EnvApprovalViewModel env } =>
                 $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
                 $"directory={Text(window, "DirectoryText")} keys={string.Join(',', Classed(window, "key"))} " +
-                $"entries={string.Join(',', Classed(window, "entry"))}",
+                $"entries={string.Join(',', env.Keys.Select(key => key.Entry))}",
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")} " +
@@ -198,11 +161,10 @@ internal sealed class PromptScreen : IDisposable
                 $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
                 $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
             PairingWindow =>
-                $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
+                $"pair-prompt identity={Text(window, "IdentityText")} code={Text(window, "CodeText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             FillWindow when window.DataContext is FillViewModel fill =>
-                $"fill-prompt origin={fill.Origin} pairing={fill.Pairing} logins={string.Join('|', fill.Rows.Select(row => row.Spoken))} " +
-                $"always={(window.FindControl<CheckBox>("AlwaysBox")?.IsVisible == true ? "offered" : "none")}" +
-                (fill.HasFormNote ? $" note={fill.FormNote}" : string.Empty),
+                $"fill-prompt question={fill.Question} origin={fill.Origin} pairing={fill.Pairing} login={fill.Login}" +
+                (fill.HasNote ? $" note={fill.Note}" : string.Empty),
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",

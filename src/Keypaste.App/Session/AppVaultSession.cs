@@ -48,7 +48,7 @@ namespace Keypaste.App.Session;
 /// would have made the whole idle policy untestable.
 /// </para>
 /// </remarks>
-internal sealed class AppVaultSession : IDisposable
+internal sealed class AppVaultSession : IDisposable, IIdleWatched
 {
     /// <summary>The shipped default, and what any unreadable setting falls back to.</summary>
     internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(30);
@@ -325,10 +325,13 @@ internal sealed class AppVaultSession : IDisposable
         EntryEnvironment.Read(
             vault,
             entry,
-            new Core.Agents.SealedAgentRules(
-                new Core.Agents.AgentRulesFile(KeypasteHome.AgentsPath(_home)),
-                () => vault,
-                _ => new Core.Agents.AgentSave(Core.Agents.AgentSaveOutcome.Refused, "reading only")));
+            Identity is { } identity
+                ? new Core.Agents.SealedAgentRules(
+                    Core.Agents.AgentRulesFile.For(_home, identity),
+                    () => vault,
+                    _ => new Core.Agents.AgentSave(Core.Agents.AgentSaveOutcome.Refused, "reading only"),
+                    Core.Agents.AgentRulesFile.Shared(_home))
+                : Core.Agents.IAgentRules.Defaults);
 
     /// <summary>
     /// The items the open vault changed since it was opened or last saved, which a reload discards: names
@@ -1661,7 +1664,7 @@ internal sealed class AppVaultSession : IDisposable
     /// the lock <see cref="Reevaluate"/> exists to deliver (F.13).
     /// </para>
     /// </remarks>
-    internal void Touch()
+    public void Touch()
     {
         lock (_gate)
         {
@@ -1698,7 +1701,7 @@ internal sealed class AppVaultSession : IDisposable
     /// rather than locking a few seconds after somebody is already looking at it.
     /// </para>
     /// </remarks>
-    internal void Reevaluate() => Tick();
+    public void Reevaluate() => Tick();
 
     /// <summary>Closes the vault. Doing it twice is not an error.</summary>
     internal void Lock(VaultLockReason reason)

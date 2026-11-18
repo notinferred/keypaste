@@ -143,7 +143,7 @@ internal sealed record LogRow
 
     private static string ActorOf(AuditEntry entry)
     {
-        // A browser's line names the build as its client and the pairing as its label (D-0637).
+        // A browser's line names the build as its client and the pairing as its label.
         if (Is(entry.Tool, "browser"))
         {
             return entry.Label.Length > 0 ? entry.Label : "keypaste's extension";
@@ -187,7 +187,8 @@ internal sealed record LogRow
                 "check" => "Checked its pairing",
                 "remove" => "Removed a pairing",
                 "fill" => entry.Granted ? "Filled a login" : "Asked to fill a login",
-                "unallow" => "Stopped always filling",
+                "unallow" => "Asks again before filling",
+                "list" => "Listed logins by name",
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
             },
             "vault_merge" => "Merged another program's save",

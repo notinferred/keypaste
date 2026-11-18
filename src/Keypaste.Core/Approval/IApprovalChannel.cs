@@ -91,7 +91,7 @@ public interface IApprovalChannel
     ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ApprovalAnswer.NoChannel);
 
-    /// <summary>Asks a human, who armed pairing, to pair a browser under a name they may change, and waits for their answer.</summary>
+    /// <summary>Asks a human to pair a browser whose code they compare, under a name they may change, and waits for their answer.</summary>
     /// <param name="prompt">What to show. Render it as inert text.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>What the human said, with the name they gave it, or why they were not asked.</returns>
@@ -99,19 +99,11 @@ public interface IApprovalChannel
     ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(PairingAnswer.NoChannel);
 
-    /// <summary>Asks a human whether to fill one of a page's matching logins in a browser, and waits for their answer.</summary>
+    /// <summary>Asks a human whether to fill the login they picked in a page's list, and waits for their answer.</summary>
     /// <param name="prompt">What to show. Render it as inert text.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What the human said, the item they chose and whether they ticked Always, or why they were not asked.</returns>
+    /// <returns>What the human said, <see cref="ApprovalAnswer.ApprovedOnce"/> for Fill, or why they were not asked.</returns>
     /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is filled.</remarks>
-    ValueTask<FillAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(FillAnswer.NoChannel);
-
-
-    /// <summary>Tells a human that a browser asked to pair while pairing was not armed, and how to pair one.</summary>
-    /// <param name="notice">What asked.</param>
-    /// <remarks>It asks nothing and must not wait for anything. A channel that cannot show it says nothing.</remarks>
-    void Tell(PairingNotice notice)
-    {
-    }
+    ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
 }

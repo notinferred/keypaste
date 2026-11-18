@@ -40,7 +40,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// </code>
 /// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
 /// four times, into <c>dark</c>, <c>light</c>, <c>high-contrast-dark</c> and <c>high-contrast-light</c>
-/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element. Dark and light
+/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one accent element. Dark and light
 /// are also drawn at 150% and 200%, into <c>zoom-150</c> and <c>zoom-200</c>, where the 200% folders add <c>s-</c> frames on small screens. Add a
 /// screen by adding a <see cref="Save"/> call: <see cref="Every_screen_keeps_every_control_within_reach"/>, which needs no folder, walks each frame at each zoom.
 /// </summary>
@@ -219,6 +219,74 @@ public sealed class ScreenRenderer
         DrawDrops(demo, output);
         DrawPolish(demo, output);
         DrawEmptyVault(demo, output);
+        DrawSeveralVaults(demo, output);
+    }
+
+    /// <summary>
+    /// Two vaults in the local account, as the target's window draws them: Personal and Acme open side by side, All Accounts
+    /// listing both, and Acme locked on its own with its unlock form while Personal stays open.
+    /// </summary>
+    private static void DrawSeveralVaults(DemoVault demo, string output)
+    {
+        var clock = new ManualClock(AppClock.Start);
+        var personalPath = Path.Combine(demo.Home, "Personal.kdbx");
+
+        using (var personal = Vault.Create(personalPath, _master))
+        {
+            personal.AddEntry(new VaultEntry { Title = "gmail", Username = "maya.ortiz@gmail.com", Password = "demo-gm-3a11", Url = "https://mail.google.com" });
+            personal.AddEntry(new VaultEntry { Title = "netflix", Username = "maya.o", Password = "demo-nf-82Lq", Url = "https://netflix.com" });
+            personal.AddEntry(new VaultEntry { Title = "home wifi", Password = "demo-wifi-f3a9", Notes = "Router in the hall cupboard." });
+            personal.Save();
+        }
+
+        // The open vaults own every session and authority made here.
+#pragma warning disable CA2000
+        using var vaults = new OpenVaults(
+            new AppVaultSession(clock, home: demo.Home),
+            () => new AppVaultSession(clock, home: demo.Home),
+            (open, session) => new AppAuthority(session, approverOverride: null, () => new NobodyToAsk(), turns: open.Turns, otherKeys: () => open.KeysBesides(session), pairings: open.Pairings));
+#pragma warning restore CA2000
+        var acme = vaults.Add(demo.Path);
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, vaults.InView.Session.TryUnlock(personalPath, master.Value));
+            Assert.Equal(UnlockOutcome.Opened, acme.Session.TryUnlock(demo.Path, master.Value));
+        }
+
+        using var shell = new ShellViewModel(vaults.InView.Session, demo.Home, vaults.InView.Authority, clipboard: new FakeClipboard(), clock: clock, picker: new FakeVaultFilePicker()) { Vaults = vaults };
+        var window = new MainWindow { Width = _width * InterfaceZoom.Factor, Height = _height * InterfaceZoom.Factor };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<PlaceRow>().Single(row => row is { Vault.Title: "acme", Place: ItemPlace.Logins });
+        var logins = Assert.IsType<EntriesViewModel>(shell.Content);
+        logins.Selected = logins.Rows.First(row => row.Title == "linear");
+        Save(window, output, "95-vaults-two-open");
+
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<PlaceRow>().Single(row => row is { IsTop: true, Place: ItemPlace.All });
+        var everything = Assert.IsType<EntriesViewModel>(shell.Content);
+        everything.Selected = everything.Rows.First(row => row.Title == "netflix");
+        Save(window, output, "95-vaults-all-accounts");
+
+        shell.Current = Destinations.Of(DestinationKind.Recommendations);
+        Save(window, output, "95-vaults-security");
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        Assert.IsType<SettingsViewModel>(shell.Content).Section = SettingsSectionChoice.ThisVault;
+        Save(window, output, "95-vaults-settings");
+
+        shell.Current = Destinations.Of(DestinationKind.AgentActivity);
+        Save(window, output, "95-vaults-agents");
+
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        vaults.LockAlone(acme);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<VaultRow>().Single(row => row.Title == "acme");
+        Assert.IsType<LockedVaultViewModel>(shell.Content);
+        Save(window, output, "95-vaults-one-locked");
+
+        window.Close();
     }
 
     /// <summary>A vault with nothing in it, as a new person's first look at each place finds it.</summary>
@@ -555,6 +623,8 @@ public sealed class ScreenRenderer
         }
 
         var nav = shellView.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav");
+        shell.ShowGroups();
+        WindowInput.Drain();
         using var item = FileDragData.ItemPayload();
         shellView.HoldItem(entries.Selected!);
         var personal = (Control)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == "Personal"))!;
@@ -570,9 +640,9 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
         Save(main, output, "d9-narrow-before");
         shellView.HoldItem(entries.Selected!);
-        var railGroups = shellView.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "RailGroups");
-        WindowDrag.Over(main, WindowDrag.Centre(main, railGroups), item);
-        Save(main, output, "d10-narrow-rail-hold");
+        var sidebarButton = shellView.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ShowSidebar");
+        WindowDrag.Over(main, WindowDrag.Centre(main, sidebarButton), item);
+        Save(main, output, "d10-narrow-sidebar-hold");
         shellView.OpenGroupsForHeldItem();
         WindowInput.Drain();
         Save(main, output, "d11-narrow-groups-open");
@@ -796,7 +866,7 @@ public sealed class ScreenRenderer
         Save(window, output, "20a-agents-looking");
         SetDrawnState(agents, nameof(agents.IsLooking), false);
 
-        SetDrawnState(agents, nameof(agents.ClientsProblem), $"{Core.Audit.KeypasteHome.AgentsPath(demo.Home)}: line 3: [[client]] is not a section keypaste reads here. Every agent request is refused until it is fixed; deleting it asks about every value again.");
+        SetDrawnState(agents, nameof(agents.ClientsProblem), $"{System.IO.Path.Combine(Core.Audit.KeypasteHome.AgentsDirectory(demo.Home), "4f1c2a9e7b3d5a60.toml")}: line 3: [[client]] is not a section keypaste reads here. Every agent request is refused until it is fixed; deleting it asks about every value again.");
         Save(window, output, "20b-agents-clients-unreadable");
         SetDrawnState(agents, nameof(agents.ClientsProblem), string.Empty);
 
@@ -862,7 +932,6 @@ public sealed class ScreenRenderer
         var settingsScreen = Assert.IsType<SettingsViewModel>(shell.Content);
         settingsScreen.Section = SettingsSectionChoice.Browser;
         var browserFill = settingsScreen.BrowserFill!;
-        browserFill.PairCommand.Press();
         var pairing = new PairingItem("work laptop", "chrome-extension://fipabobollckgdobkjfkkchimlphcicg", "Last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
         WindowInput.Drain();
@@ -871,14 +940,34 @@ public sealed class ScreenRenderer
             toast.CloseCommand.Press();
         }
 
-        var stopPairing = window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "StopPairing");
-        var scroller = stopPairing.GetVisualAncestors().OfType<ScrollViewer>().First();
-        scroller.Offset = new Vector(0, scroller.Offset.Y + stopPairing.TranslatePoint(default, scroller)!.Value.Y - 160);
+        var howToPair = window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Name == "PairInTheExtension");
+        var scroller = howToPair.GetVisualAncestors().OfType<ScrollViewer>().First();
+        scroller.Offset = new Vector(0, scroller.Offset.Y + howToPair.TranslatePoint(default, scroller)!.Value.Y - 160);
         WindowInput.Drain();
-        Save(window, output, "04-settings-browser-fill-armed");
         pairing.IsConfirmingRemove = true;
         Save(window, output, "04-settings-browser-fill-remove");
-        browserFill.StopCommand.Press();
+        pairing.IsConfirmingRemove = false;
+        SetDrawnState(browserFill, nameof(browserFill.Allowances), new[]
+        {
+            new AllowanceItem(new Core.Agents.BrowserAllowance("work laptop", AppClock.Start, "https://github.com", "a1"), "work/GitHub"),
+            new AllowanceItem(new Core.Agents.BrowserAllowance("work laptop", AppClock.Start, "https://accounts.login.payroll-provider-for-enterprises.example.co.uk", "a5"), "work/finance/payroll/Payroll provider administrator account"),
+        });
+        WindowInput.Drain();
+        scroller.Offset = default;
+        WindowInput.Drain();
+        Save(window, output, "04-settings-browser");
+        var browserHosts = settingsScreen.BrowserHosts!;
+        if (browserHosts.Rows.FirstOrDefault(row => row.Name.Contains("Firefox", StringComparison.Ordinal)) is { } other)
+        {
+            browserHosts.ChangeCommand.Execute(other);
+            WindowInput.Drain();
+            Save(window, output, "04-settings-browser-replace");
+            other.IsConfirmingReplace = false;
+        }
+
+        scroller.Offset = new Vector(0, scroller.Extent.Height);
+        WindowInput.Drain();
+        Save(window, output, "04-settings-browser-allowances");
 
         settingsScreen.Section = SettingsSectionChoice.General;
         WindowInput.Drain();
@@ -1034,18 +1123,28 @@ public sealed class ScreenRenderer
         Save(window, output, "13i-items-add-menu");
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
 
-        // The sidebar's adds: a + on the Groups and Projects headings, and Import above Trash and Settings.
-        Save(window, output, "16f-sidebar-headings-and-import");
-        var sidebarImport = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarImport");
-        sidebarImport.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Save(window, output, "16g-sidebar-import-menu");
-        var sidebarMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarImport)!;
-        Save(TopLevel.GetTopLevel(sidebarMenu.Items.OfType<MenuItem>().First())!, output, "16g-sidebar-import-menu-popup");
-        sidebarMenu.Hide();
+        // On Logins the "+" opens a login's form at once; its tooltip, "New login in acme", is ItemAddMenuTests', since a headless tooltip draws at the window's corner.
+        var shownGroup = entries.SelectedGroup;
+        entries.ShowEveryItem();
+        entries.Place = ItemPlace.Logins;
+        Save(window, output, "13j-items-add-in-place");
+        entries.Place = ItemPlace.All;
+        entries.SelectedGroup = shownGroup;
+
+        // The vault's Groups row unfolded over the KeePass group tree, its + making a group.
+        shell.ShowGroups();
+        Save(window, output, "16f-sidebar-groups-open");
+        shell.Fold(shell.SidebarRows.OfType<GroupsRow>().Single(), open: false);
         WindowInput.Drain();
 
         entries.SelectedGroup = entries.Groups[0];
-        entries.BeginAddCommand.Press();
+        entries.ChooseTemplateCommand.Press();
+        Save(window, output, "13k-items-new-templates");
+        var templatesWidth = window.Width;
+        window.Width = 720 * InterfaceZoom.Factor;
+        Save(window, output, "13k-items-new-templates-720");
+        window.Width = templatesWidth;
+        entries.NewItem!.ChooseTemplateCommand.Press(ItemTemplate.Login);
         Save(window, output, "13-secrets-new");
         var newItemWidth = window.Width;
         window.Width = 720 * InterfaceZoom.Factor;
@@ -1078,6 +1177,20 @@ public sealed class ScreenRenderer
         Save(window, output, "13g-secrets-new-generator-720");
         window.Width = newItemWidth;
         entries.NewItem.CloseGeneratorCommand.Execute(null);
+
+        // A login with one custom field added, as the target draws it.
+        entries.NewItem.AddFieldCommand.Execute(NewItemField.CustomField);
+        entries.NewItem.CustomFields[^1].Name = "Region";
+        entries.NewItem.CustomFields[^1].Value = "us-east-1";
+        Save(window, output, "13l-items-new-login-custom-field");
+        entries.CancelAddCommand.Press();
+
+        entries.BeginAddOfKindCommand.Press(ItemTemplate.ApiKey);
+        Save(window, output, "13m-items-new-api-key");
+        entries.CancelAddCommand.Press();
+
+        entries.BeginAddOfKindCommand.Press(ItemTemplate.Card);
+        Save(window, output, "13n-items-new-card");
         entries.CancelAddCommand.Press();
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
@@ -1101,13 +1214,9 @@ public sealed class ScreenRenderer
         window.Width = 720;
         Save(window, output, "16b-secrets-720");
 
-        shell.OpenSidebarOverlay();
+        shell.ToggleSidebar();
         Save(window, output, "16c-secrets-720-sidebar-open");
         shell.CloseSidebarOverlay();
-
-        shell.ToggleSidebar();
-        Save(window, output, "16e-secrets-720-sidebar-hidden");
-        shell.ToggleSidebar();
 
         window.Width = _width;
         window.Height = _height;
@@ -1134,7 +1243,7 @@ public sealed class ScreenRenderer
         shell.FocusSearch();
         WindowInput.Drain();
         DrawnFrame.Capture(window);
-        AmberElements.AssertOne(window, null, "a focused search beside New");
+        AccentElements.AssertOne(window, null, "a focused search beside New");
         Save(window, output, "17e-items-search-focused");
         entries.Selected = entries.Rows.First(row => row.Title == "github");
         window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Rows").ContainerFromIndex(0)!.Focus();
@@ -1589,18 +1698,25 @@ public sealed class ScreenRenderer
         asked.Close();
     }
 
+    /// <summary>claude-code, which keypaste checked is asking from Terminal, as the prompts' frames name it.</summary>
+    private static readonly RequesterIdentity _verified = new("claude-code", "Terminal", true);
+
+    /// <summary>The vault the prompts' frames name beside their item.</summary>
+    private const string _promptVault = "Acme";
+
     private static void DrawPrompts(string output)
     {
-        var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "/home/maya/acme/api";
+        var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "~/acme/api";
         var preview = new EnvPreview("acme-api", ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION"]);
-        var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory);
+        var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory) with { Identity = new RequesterIdentity(EnvReleasePrompt.RunnerName, "Terminal", true) };
         DrawWindow(new EnvApprovalWindow(new EnvApprovalViewModel(env)), output, "91b-env-approval");
 
         var run = new RunPrompt
         {
             Client = "claude-code",
-            Label = "work laptop",
-            Reason = "Run the pending database migration for the api service before the deploy.",
+            Label = "claude-code",
+            Identity = _verified,
+            Reason = "Apply the new billing tables to the dev database.",
             ReasonWasTruncated = false,
             ReasonWasAltered = false,
             Program = OperatingSystem.IsWindows() ? @"C:\Program Files\nodejs\npm.cmd" : "/usr/local/bin/npm",
@@ -1611,23 +1727,46 @@ public sealed class ScreenRenderer
             Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
         };
         DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
-        var protectedPrompt = ApprovalPrompt.For(
-            "claude-code",
-            new EntryName("env/acme-api", ".env.prod"),
-            "DATABASE_URL",
-            "I need the \u202eproduction database URL to check the schema.",
-            null);
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt)), output, "91d-approval-protected");
-        var ordinary = ApprovalPrompt.For("claude-code", new EntryName("api", "Stripe"), "password", "Run the webhook tests against the dev Stripe account.", "work laptop");
-        DrawWindow(new ApprovalWindow(new ApprovalViewModel(ordinary with { Label = null })), output, "91e3-approval-unnamed");
+
+        var stripe = new EntryName("Acme/Stripe", "Stripe live key");
+        var protectedPrompt = ApprovalPrompt.For("claude-code", stripe, "STRIPE_SECRET_KEY", "Check the live webhook signing secret.", "claude-code") with
+        {
+            Identity = _verified,
+            Protected = true,
+        };
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt) { Vault = _promptVault }), output, "91d-approval-protected");
+        var ordinary = ApprovalPrompt.For("claude-code", new EntryName("api", "Stripe"), "password", "Run the webhook tests against the dev Stripe account.", null);
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(ordinary)), output, "91e3-approval-unnamed");
 
         var asked = ApprovalPrompt.For(
             "claude-code",
-            new EntryName("env/acme-api", ".env"),
+            _apiHome,
             "STRIPE_SECRET_KEY",
-            "Run the webhook tests against the dev Stripe account.",
+            "I need the \u202eproduction key to check the webhook.",
             "work laptop");
         DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked)), output, "91e-approval");
+
+        var confirming = new ApprovalViewModel(StripeTestKey()) { Vault = _promptVault };
+        var confirm = new ApprovalWindow(confirming);
+        confirming.Tick(TimeSpan.FromSeconds(28));
+        confirming.Arm();
+        confirming.AlwaysAllowCommand.Execute(null);
+        confirming.Arm();
+        confirm.Show();
+        Save(confirm, output, "91a-approval-confirm-always");
+        confirm.Close();
+
+        var save = SavePrompt.For("claude-code", "claude-code", "Acme/OpenAI", "OPENAI_API_KEY", "I rotated the eval key. Please store the new one for the eval runs.") with { Identity = _verified };
+        using (var saving = new SaveValueViewModel(save, Keypaste.App.Clipboard.NoClipboard.Instance, new ManualClock(AppClock.Start)) { Vault = _promptVault })
+        {
+            DrawWindow(new SaveValueWindow(saving), output, "91f-save-value");
+        }
+
+        var change = ItemChangePrompt.For("claude-code", "claude-code", new EntryName("Acme", "Old staging key"), new ItemChange(ItemChangeKind.MoveToTrash, null), "The staging key was rotated last week.") with { Identity = _verified };
+        DrawWindow(new ItemChangeWindow(new ItemChangeViewModel(change) { Vault = _promptVault }), output, "91g-item-change");
+
+        var set = SetPrompt.For("claude-code", "claude-code", [(new EntryName("Acme", "staging db"), "host"), (new EntryName("Acme", "staging db"), "password"), (new EntryName("Acme/ssh", "deploy"), "password")], "Run the migration against the staging database.") with { Identity = _verified };
+        DrawWindow(new SetApprovalWindow(new SetApprovalViewModel(set)), output, "91l-linked-set");
 
         DrawWindow(
             new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
@@ -1640,8 +1779,9 @@ public sealed class ScreenRenderer
             "91h-terminal-edit");
 
         DrawPickers(output);
+        DrawBrowserPrompts(output);
 
-        var arming = new ApprovalWindow(new ApprovalViewModel(asked));
+        var arming = new ApprovalWindow(new ApprovalViewModel(StripeTestKey()) { Vault = _promptVault });
         arming.Show();
         Save(arming, output, "91j-approval-arming");
         arming.Close();
@@ -1652,6 +1792,14 @@ public sealed class ScreenRenderer
         Save(locked, output, "91i-locked-notice");
         locked.Close();
     }
+
+    /// <summary>The target's value request: claude-code, verified, asking for the Stripe test key's secret.</summary>
+    private static ApprovalPrompt StripeTestKey() =>
+        ApprovalPrompt.For("claude-code", new EntryName("Acme/Stripe", "Stripe test key"), "STRIPE_SECRET_KEY", "Run the webhook tests against the dev Stripe account.", "claude-code") with
+        {
+            Identity = _verified,
+            OffersAlways = true,
+        };
 
     /// <summary>The picker armed with nothing picked, with an item picked, with a protected one picked, and with as many items as it offers.</summary>
     private static void DrawPickers(string output)
@@ -1666,8 +1814,10 @@ public sealed class ScreenRenderer
             Url = url,
         };
 
-        var pair = ApprovalPrompt.For("claude-code", new EntryName("work", "GitHub"), "password", "Push the release branch to the company repository.", "work laptop") with
+        var pair = ApprovalPrompt.For("claude-code", new EntryName("work", "GitHub"), "password", "Push the release branch to the company repository.", "claude-code") with
         {
+            Identity = _verified,
+            OffersAlways = true,
             Candidates =
             [
                 Candidate(0, "dana@acme.example", "https://github.com", protectedItem: false),
@@ -1687,7 +1837,7 @@ public sealed class ScreenRenderer
             (many, 3, "91k4-picker-most-items"),
         })
         {
-            var picker = new ItemPickViewModel(prompt);
+            var picker = new ItemPickViewModel(prompt) { Vault = _promptVault };
             var window = new ItemPickWindow(picker);
             picker.Tick(TimeSpan.FromSeconds(28));
             picker.Arm();
@@ -1696,6 +1846,46 @@ public sealed class ScreenRenderer
             Save(window, output, name);
             window.Close();
         }
+    }
+
+    /// <summary>A browser asking to pair with its code, under a free name and a taken one; and fill prompts for one login, several, an http page, a form posting elsewhere and long names.</summary>
+    private static void DrawBrowserPrompts(string output)
+    {
+        var pairing = new PairingPrompt
+        {
+            Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+            Code = "472 913",
+            SuggestedName = "Chrome on work laptop",
+            TakenNames = ["Firefox on work laptop"],
+        };
+        DrawWindow(new PairingWindow(new PairingViewModel(pairing)), output, "91m-pairing");
+        DrawWindow(new PairingWindow(new PairingViewModel(pairing with { TakenNames = ["Chrome on work laptop"] })), output, "91m2-pairing-name-taken");
+
+        var fill = new FillPrompt
+        {
+            Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+            Pairing = "Chrome on work laptop",
+            Origin = "https://github.com:443",
+            Site = "github.com",
+            Title = "GitHub",
+            Username = "dana@acme.example",
+        };
+        DrawWindow(new FillWindow(new FillViewModel(fill)), output, "91n-fill");
+        DrawWindow(new FillWindow(new FillViewModel(fill with { Vault = "Acme" })), output, "91n2-fill-vault");
+        DrawWindow(new FillWindow(new FillViewModel(fill with { Origin = "http://intranet.acme.example:8080", Site = "intranet.acme.example", Warning = "This page's connection is not secure. keypaste asks before each fill." })), output, "91n3-fill-http");
+        DrawWindow(new FillWindow(new FillViewModel(fill with { FormOrigin = "https://collect.example.net:443", Warning = "This form sends what you fill to collect.example.net, another site. keypaste asks before each fill." })), output, "91n4-fill-form-elsewhere");
+        DrawWindow(
+            new FillWindow(new FillViewModel(fill with
+            {
+                Pairing = "Microsoft Edge on the shared design studio workstation",
+                Identity = Core.Browser.BrowserIdentity.EdgeAddOns,
+                Origin = "https://accounts.login.payroll-provider-for-enterprises.example.co.uk:443",
+                Site = "accounts.login.payroll-provider-for-enterprises.example.co.uk",
+                Title = "Payroll provider administrator account for the finance department",
+                Username = "finance-administrator@acme-holdings-international.example",
+            })),
+            output,
+            "91n5-fill-long");
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)
@@ -2031,8 +2221,13 @@ public sealed class ScreenRenderer
 
         shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var project = Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject!;
+        Save(window, output, "40b-env-dev");
         project.SelectedProfile = "staging";
         Save(window, output, "40-env-staging");
+
+        project.Launch.SetUpCommand.Press();
+        Save(window, output, "43-env-where-it-runs");
+        project.Launch.CancelSetUpCommand.Press();
 
         Revealing(window, "REDIS_URL", () => Save(window, output, "42-env-revealed"));
 
@@ -2196,13 +2391,7 @@ public sealed class ScreenRenderer
 
     private static void DrawApproval(string output, string name = "91-approval")
     {
-        var prompt = ApprovalPrompt.For(
-            "claude-code",
-            _apiHome,
-            "DATABASE_URL",
-            "Run the database migration for the api service.",
-            "work laptop");
-        var model = new ApprovalViewModel(prompt);
+        var model = new ApprovalViewModel(StripeTestKey()) { Vault = _promptVault };
         model.Tick(TimeSpan.FromSeconds(28));
         model.Arm();
         var window = new ApprovalWindow(model);
@@ -2301,8 +2490,8 @@ public sealed class ScreenRenderer
             Row(Button("Connect", ""), Button("Allow once", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
             Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
-            Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
-            Row(Box("dot ok"), Text("Allowed", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono size-12 amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
+            Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
+            Row(Box("dot ok"), Text("Allowed", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono size-12 accent"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
             Row(
                 new Border { Classes = { "card" }, Width = 260, Child = Text("card: hairline, no fill", "") },
                 new Border { Classes = { "card", "filled" }, Width = 260, Child = Text("card filled", "") },
@@ -2377,7 +2566,7 @@ public sealed class ScreenRenderer
     /// <param name="window">The window to draw.</param>
     /// <param name="output">The folder.</param>
     /// <param name="name">The file's name.</param>
-    /// <param name="sheet">Whether the frame is a sheet of components side by side rather than one view, which the amber rule does not apply to.</param>
+    /// <param name="sheet">Whether the frame is a sheet of components side by side rather than one view, which the accent rule does not apply to.</param>
     private static void Save(TopLevel window, string output, string name, bool sheet = false)
     {
         WindowInput.Drain();
@@ -2393,7 +2582,7 @@ public sealed class ScreenRenderer
 
         if (!sheet)
         {
-            AmberElements.AssertAtMostOne(window, $"{Path.GetFileName(output)}/{name}");
+            AccentElements.AssertAtMostOne(window, $"{Path.GetFileName(output)}/{name}");
             _cutOff?.AddRange(ReachableControls.Problems(window).Concat(LabelledFields.Problems(window)).Select(problem => $"{name}: {problem}"));
         }
     }

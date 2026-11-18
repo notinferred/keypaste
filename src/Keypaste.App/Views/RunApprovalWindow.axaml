@@ -6,7 +6,7 @@
                     x:Class="Keypaste.App.Views.RunApprovalWindow"
                     x:DataType="vm:RunApprovalViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
-                    Title="keypaste: an agent wants to run a command with your secrets"
+                    Title="keypaste: an agent wants to run a command"
                     Width="508"
                     SizeToContent="Height"
                     CanResize="False"
@@ -20,100 +20,114 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- Fixed heights, as in the other prompt windows: the client, program, command, directory and
-       reason are the agent's, so none of them can move the question or the buttons (THREATS.md T-2,
-       T-35). The header is one fixed row whose lines are trimmed; the environment, which the person
-       decides on, has a fixed row of its own beneath it, drawn whole; the call box below holds the
-       command and directory whole, wrapping and scrolling, so no part of either is hidden past an
-       edge. No button is the default: Enter approves nothing, and Escape denies. -->
+  <!-- A claim card for a command, asked every time with Allow once only: no Always allow. The command, folder and names sit
+       in a block of fixed height that wraps and scrolls, and the agent's words in a box of fixed height, so nothing an agent
+       sends moves the question or the buttons (THREATS.md T-2, T-35). Return presses the primary only once it is armed; Escape denies. -->
 
-  <Border Classes="prompt">
-    <StackPanel Spacing="16">
+  <Border Classes="claim">
+    <StackPanel>
+      <StackPanel Classes="claim-body">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <views:PromptHead />
 
-      <StackPanel Spacing="8">
-        <Grid Classes="prompt-head" Height="57" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-          <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
-          <Border Grid.Column="0" Classes="prompt-tile">
-            <ctl:KpIcon Icon="bot" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
-          </Border>
-          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-            <TextBlock Name="TitleText" Classes="prompt-title size-16" Text="{Binding Title}" />
-            <TextBlock Name="SubtitleText" Classes="prompt-sub size-13" Text="{Binding Subtitle}" />
-            <TextBlock Name="ClientText" Classes="prompt-sub size-13" Text="{Binding Client}" />
-          </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Border Classes="dot waiting" />
-            <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
-          </StackPanel>
-        </Grid>
+        <TextBlock Name="TitleText" Classes="claim-title size-16" Text="{Binding Title}" />
 
-        <Grid Classes="prompt-environment" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="prompt-sub size-13" Text="environment" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment size-12-5" Text="{Binding Profile}" />
-        </Grid>
-      </StackPanel>
-
-      <Border Classes="prompt-call size-12" Height="94">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="12,8">
-            <TextBlock Name="ToolText" Text="{Binding Tool}" />
-            <TextBlock Name="CommandText" Classes="value" Text="{Binding Command}" TextWrapping="Wrap" />
-            <TextBlock Name="ProgramText" Text="{Binding Program}" TextWrapping="Wrap" />
-            <Grid ColumnDefinitions="Auto,*">
-              <TextBlock Grid.Column="0" Text="in " />
-              <TextBlock Grid.Column="1" Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap" />
-            </Grid>
-          </StackPanel>
-        </ScrollViewer>
-      </Border>
-
-      <Border Classes="prompt-list size-12-5" Height="131">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:RunVariableRow">
-                <Border Classes="prompt-row" Padding="12,6">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="2">
-                      <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                      <TextBlock Classes="source size-12" Text="{Binding Source}" TextWrapping="Wrap" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Classes="tag size-13" Text="{Binding Tag}" TextWrapping="Wrap" MaxWidth="170"
-                               TextAlignment="Right" VerticalAlignment="Center" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-      </Border>
-
-      <StackPanel Spacing="6">
-        <TextBlock Classes="caption" Text="The agent says it needs this because" />
-        <Border Classes="prompt-reason" Height="77">
+        <Border Classes="claim-block" Height="148">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12,8" Spacing="6">
-              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed size-13" Text="{Binding Scrubbed}"
-                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Classes="prompt-scrubbed size-13" Text="{Binding Truncation}"
-                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
-                         Foreground="{DynamicResource KpTextSecondary}" />
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                <TextBlock Classes="mono" Text="$" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Grid.Column="1" Name="CommandText" Classes="mono" Text="{Binding Command}" TextWrapping="Wrap" />
+              </Grid>
+              <StackPanel Spacing="6">
+                <TextBlock Classes="claim-line size-12-5" Text="It can read:" />
+                <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RunVariableRow">
+                      <Border Classes="claim-chip" ToolTip.Tip="{Binding Source}">
+                        <TextBlock Classes="mono size-12" Text="{Binding Name}" TextWrapping="Wrap" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="6"
+                            IsVisible="{Binding StartWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Center" />
+                  <TextBlock Name="StartWarningText" Classes="claim-line size-12-5" Text="{Binding StartWarning}" />
+                </StackPanel>
+              </StackPanel>
+              <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="6">
+                <ctl:KpIcon Classes="claim-muted" Icon="folder" Size="14" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" Name="DirectoryText" Classes="mono" Text="{Binding Directory}" MaxWidth="240" TextWrapping="Wrap" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Grid.Column="2" Classes="claim-muted size-12-5" Text="&#x00B7;" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="3" Name="ProfileText" Classes="claim-agent size-12-5" Text="{Binding Profile}" VerticalAlignment="Top" />
+              </Grid>
             </StackPanel>
           </ScrollViewer>
         </Border>
-        <TextBlock Name="AttributionText" Classes="caption" Text="{Binding Attribution}" />
+
+          <StackPanel Spacing="4">
+            <TextBlock Classes="claim-label size-11" Text="{Binding SaysLabel}" />
+            <Border Classes="claim-quote">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <DockPanel Classes="claim-quote-text">
+                  <Border Classes="claim-quote-bar" />
+                  <StackPanel Spacing="4">
+                    <TextBlock Name="ScrubbedText" Classes="claim-muted size-12-5" Text="{Binding Scrubbed}"
+                               IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="claim-muted size-12-5" Text="{Binding Truncation}"
+                               IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
+                  </StackPanel>
+                </DockPanel>
+              </ScrollViewer>
+            </Border>
+          </StackPanel>
+
+        <TextBlock Name="ConsequenceText" Classes="claim-line size-12-5" Text="{Binding Consequence}" />
+
+          <StackPanel Spacing="8">
+            <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+              </StackPanel>
+            </ToggleButton>
+            <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                  ColumnSpacing="12" RowSpacing="4" Margin="20,0,0,0" IsVisible="{Binding #DetailsToggle.IsChecked}">
+              <TextBlock Grid.Row="0" Classes="fact" Text="Tool" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Name="ToolText" Classes="mono" Text="{Binding Tool}" />
+              <TextBlock Grid.Row="1" Classes="fact" Text="Runs" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Name="ProgramText" Classes="mono" Text="{Binding Program}" />
+              <TextBlock Grid.Row="2" Classes="fact" Text="From" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Name="SourcesText" Classes="mono" Text="{Binding Sources}" />
+              <TextBlock Grid.Row="3" Classes="fact" Text="Label" />
+              <TextBlock Grid.Row="3" Grid.Column="1" Name="LabelText" Text="{Binding Label}" />
+              <TextBlock Grid.Row="4" Classes="fact" Text="Calls itself" />
+              <TextBlock Grid.Row="4" Grid.Column="1" Name="ClientText" Text="{Binding Client}" />
+              <TextBlock Grid.Row="5" Classes="fact" Text="Process" />
+              <TextBlock Grid.Row="5" Grid.Column="1" Name="ProcessText" Classes="mono" Text="{Binding Process}" />
+            </Grid>
+          </StackPanel>
       </StackPanel>
 
-      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" />
+      <Border Classes="claim-rule" />
 
-      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
-                IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt primary" Content="Allow once"
-                Command="{Binding AllowOnceCommand}" />
-      </Grid>
-
+      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
+        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center"
+                          TextWrapping="NoWrap" IsVisible="{Binding IsChoosing}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                  IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+          <Button Name="AllowOnce" Classes="claim keyed primary" Content="Run once" Tag="&#x21A9;"
+                  IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+        </StackPanel>
+      </ctl:HeaderRow>
     </StackPanel>
   </Border>
 

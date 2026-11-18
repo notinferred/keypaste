@@ -306,16 +306,6 @@ kpxcObserverHelper.handleObserverAdd = async function(target) {
 
     await kpxc.initCombinations(inputs);
     await kpxcIcons.initIcons(kpxc.combinations);
-
-    if (kpxc.databaseState === DatabaseState.UNLOCKED) {
-        if (_called.retrieveCredentials === false) {
-            await kpxc.retrieveCredentials();
-            return;
-        }
-
-        kpxc.prepareCredentials();
-    }
-
     kpxcIcons.deleteAllHiddenIcons();
 };
 

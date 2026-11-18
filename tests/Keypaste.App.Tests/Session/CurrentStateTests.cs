@@ -53,6 +53,8 @@ public sealed class CurrentStateTests : IDisposable
 
     public void Dispose()
     {
+        // A test that failed while a request was held lets it go, so the host stops rather than waiting on it.
+        _prompt.Allow();
         _host.Dispose();
         _session.Dispose();
         _fixture.Dispose();
@@ -394,7 +396,7 @@ public sealed class CurrentStateTests : IDisposable
             var client = await ApproverClient.TryConnectAsync(test._host.Endpoint, _connect, Cancel);
             Assert.NotNull(client);
 
-            var attached = await client.AttachAsync(new AttachRequest(test._fixture.Path_), Cancel);
+            var attached = await Within(client.AttachAsync(new AttachRequest(test._fixture.Path_), Cancel).AsTask(), "attaching");
             Assert.True(attached!.Attached);
 
             return new Agent(client, test._fixture.Path_, attached.Session!);
@@ -402,18 +404,20 @@ public sealed class CurrentStateTests : IDisposable
 
         internal async Task<(AuditMethod Method, string? Value)> RequestAsync(string entry)
         {
-            var reply = await _client.RequestAsync(
-                new CredentialRequest
-                {
-                    Entry = entry,
-                    Field = "password",
-                    Reason = "deploy",
-                    Exposure = ["env/**"],
-                    ClientLabel = TempVault.Agent,
-                    Vault = _vault,
-                    Session = _session,
-                },
-                Cancel);
+            var reply = await Within(
+                _client.RequestAsync(
+                    new CredentialRequest
+                    {
+                        Entry = entry,
+                        Field = "password",
+                        Reason = "deploy",
+                        Exposure = ["env/**"],
+                        ClientLabel = TempVault.Agent,
+                        Vault = _vault,
+                        Session = _session,
+                    },
+                    Cancel).AsTask(),
+                $"the request for {entry}");
 
             Assert.NotNull(reply);
             Assert.Equal(_session, reply.Session);
@@ -422,13 +426,25 @@ public sealed class CurrentStateTests : IDisposable
 
         internal async Task<EditReply> EditAsync(TerminalEdit edit)
         {
-            var reply = await _client.EditAsync(new EditRequest(edit) { Vault = _vault, Session = _session }, Cancel);
+            var reply = await Within(_client.EditAsync(new EditRequest(edit) { Vault = _vault, Session = _session }, Cancel).AsTask(), "the edit");
 
             Assert.NotNull(reply);
             return reply;
         }
 
         public ValueTask DisposeAsync() => _client.DisposeAsync();
+
+        private static async Task<T> Within<T>(Task<T> answer, string what)
+        {
+            try
+            {
+                return await answer.WaitAsync(_connect, Cancel);
+            }
+            catch (TimeoutException e)
+            {
+                throw new TimeoutException($"{what} had no answer within {_connect.TotalSeconds:0} seconds", e);
+            }
+        }
     }
 
     /// <summary>A person who approves every request put to them, at once unless told to hold the next one.</summary>

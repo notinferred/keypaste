@@ -49,7 +49,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Theory]
     [InlineData("Work", "github", "Login", "Work")]
     [InlineData("Home", "wifi", "Password", "Home")]
-    [InlineData("Home", "recovery", "Secure note", "Home")]
+    [InlineData("Home", "recovery", "Note", "Home")]
     [InlineData("env/acme-api", "DATABASE_URL", "Password", "env/acme-api")]
     [InlineData("env/acme-api/prod", "DATABASE_URL", "Password", "env/acme-api/prod")]
     public void A_row_says_its_kind_and_where_it_lives(string group, string title, string kind, string place)

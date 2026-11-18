@@ -49,10 +49,11 @@ internal sealed class RenderedShell : IDisposable
     private readonly string _directory;
     private readonly Shortcuts _shortcuts;
     private readonly CrashReporting _crashes;
+    private OpenVaults? _vaults;
     private ShellViewModel? _shell;
     private UnlockViewModel? _unlock;
 
-    internal RenderedShell(string directoryPrefix = "keypaste-drawn-", Action<Vault>? seed = null, string fileName = "vault.kdbx", bool offersTheme = false)
+    internal RenderedShell(string directoryPrefix = "keypaste-drawn-", Action<Vault>? seed = null, string fileName = "vault.kdbx", bool offersTheme = false, string? secondVault = null)
     {
         _directory = Directory.CreateTempSubdirectory(directoryPrefix).FullName;
         var path = Path.Combine(_directory, fileName);
@@ -70,17 +71,23 @@ internal sealed class RenderedShell : IDisposable
         // The unlock screen this vault was opened from remembers it, so the lock screen offers it again.
         Core.Recent.RecentVaults.Save(Core.Audit.KeypasteHome.RecentPath(_directory), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow)]);
 
-        Session = new AppVaultSession(new ManualClock(AppClock.Start));
+        Session = secondVault is null ? new AppVaultSession(new ManualClock(AppClock.Start)) : new AppVaultSession(new ManualClock(AppClock.Start), home: _directory);
+        var second = secondVault is null ? null : OpenSecond(secondVault);
 
         using (var master = TempVault.Secret(Master))
         {
             Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(path, master.Value));
+
+            if (second is not null)
+            {
+                Assert.Equal(UnlockOutcome.Opened, second.Value.Session.TryUnlock(second.Value.Path, master.Value));
+            }
         }
 
         Window = new MainWindow { Height = 1000 };
         // Crash reports composed as launch composes them, so Settings shows their switch and Diagnostics their list.
         _crashes = new CrashReporting(_directory, new DesktopPreferences(_directory), endpoint: null);
-        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes, OffersTheme = offersTheme };
+        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes, OffersTheme = offersTheme, Vaults = _vaults };
         _shortcuts = App.Bind(Window, Session, () => _unlock, () => _shell);
         Root.Content = new ShellView { DataContext = _shell, Commands = _shortcuts.Commands };
         Session.Locked += OnLocked;
@@ -90,6 +97,27 @@ internal sealed class RenderedShell : IDisposable
         // The unlock's check lands on the UI thread whenever its scan ends, and changes Settings when it does: a test starts once it has.
         Assert.True(RunUntil(_shell.Recommendations.Checking, TimeSpan.FromSeconds(30)), "the unlock's recommendations check did not finish");
         Drain();
+    }
+
+    /// <summary>Opens a second vault, with one login, into the local account beside <see cref="Session"/>, which the open vaults then own.</summary>
+    private (AppVaultSession Session, string Path)? OpenSecond(string title)
+    {
+        var path = Path.Combine(_directory, title + ".kdbx");
+
+        using (var vault = Vault.Create(path, Master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "example", Username = "ops", Password = "example-password" });
+            vault.Save();
+        }
+
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000 // The open vaults own every session and authority made here.
+        _vaults = new OpenVaults(
+            Session,
+            () => new AppVaultSession(clock, home: _directory),
+            (open, session) => new AppAuthority(session, approverOverride: null, () => new Tests.Session.NobodyToAsk(), turns: open.Turns, otherKeys: () => open.KeysBesides(session), pairings: open.Pairings));
+#pragma warning restore CA2000
+        return (_vaults.Add(path).Session, path);
     }
 
     /// <summary>Runs the window's work, idle between jobs rather than spinning, until <paramref name="task"/> completes or <paramref name="limit"/> passes.</summary>
@@ -160,7 +188,7 @@ internal sealed class RenderedShell : IDisposable
                 break;
 
             case "NewItemKeyValue":
-                NewItemForm.Open(Show<EntriesViewModel>(DestinationKind.Entries)).Template = ItemTemplate.ApiKey;
+                NewItemForm.Open(Show<EntriesViewModel>(DestinationKind.Entries), template: ItemTemplate.ApiKey);
                 break;
 
             case "ReplacementPassword":
@@ -258,7 +286,16 @@ internal sealed class RenderedShell : IDisposable
         _shell?.Dispose();
         _unlock?.Dispose();
         _crashes.Dispose();
-        Session.Dispose();
+
+        if (_vaults is null)
+        {
+            Session.Dispose();
+        }
+        else
+        {
+            _vaults.Dispose();
+        }
+
         Window.Close();
 
         try

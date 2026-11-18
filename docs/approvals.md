@@ -47,16 +47,16 @@ The pipe name is derived per user and per vault, so the vault the bridge names m
 
 ## The prompt
 
-At the terminal, `keypaste approve` draws the request between two rules: who is asking, the item and field, the agent's reason under a line saying the agent wrote it, and the choice line `[d] deny  [o] once  [a] always  [b] block` with a countdown. [The demo](demo.md#review-the-request) shows it exactly as the shipped binaries print it, which CI checks.
+At the terminal, `keypaste approve` draws the request between two rules: who is asking, the item and field, the agent's reason under a line saying the agent wrote it, and the choice line `[d] deny  [o] once  [a] always` with a countdown. [The demo](demo.md#review-the-request) shows it exactly as the shipped binaries print it, which CI checks.
 
 - `agent` is the name the connecting program gave itself, which nothing checks, then in brackets the label its bridge was started with (`--client-label`). Agent settings follow the label, never the name.
-- `item` and `field` name the value in your vault. A `/` inside an item's title is shown as a space, so a title such as `../../prod/ROOT_TOKEN` cannot pass for another group path.
+- `item` names the item by its title, `group` the group it is in, and `field` the value. A `/` inside an item's title is shown as a space, so a title such as `../../prod/ROOT_TOKEN` cannot pass for another group path. A run's and a project's prompts name the stage, such as `dev` or `prod`.
 - The reason is the agent's text. keypaste removes control characters, line breaks, invisible characters and right-to-left controls and cuts it to 400 characters. It cannot change the prompt, its default or its deadline.
 
 The answers:
 
 - `o` allows this request once and keeps nothing.
-- `a` (Always allow) and `b` (Always block) appear only for an agent whose bridge has a label. Each asks you to confirm with `y`, then keeps that answer for that agent and that item's field until you remove it on the agent's page in Agents or with `keypaste clients <agent> --forget <key>` ([agent settings](policy.md#one-agents-own-rules)). They are not offered once an agent has 128 kept answers and picks, nor for an item in a protected environment, which is asked about every time.
+- `a` (Always allow) appears only for an agent whose bridge has a label. It asks you to confirm with `y`, then keeps that answer for that agent and that item's field until you remove it on the agent's page in Agents or with `keypaste clients <agent> --forget <key>` ([agent settings](policy.md#one-agents-own-rules)). It is not offered once an agent has 128 kept answers and picks, nor for an item in a protected stage, which is asked about every time.
 - Anything else, Enter included, is a no, and so is no answer within 45 seconds. The countdown shows the seconds left.
 
 An allow counts only once the choices have been on screen for a second, and keys typed before they appeared are discarded, so a key meant for the last prompt cannot answer this one.
@@ -73,16 +73,17 @@ An agent's `request_linked_set` asks for two to four fields together, of one ite
 
 ### Item changes
 
-An agent's `request_item_change` asks you to allow one change to an item its bridge shows whole, never one it reaches only through a project tag: moving it to Trash or marking it expired with KeePass's own expiry date, now or on a day it names. The prompt says the change in keypaste's words, such as "Move work/github to Trash" or "Mark cloud/aws-prod as expired on 2026-12-01", under the agent's reason, and offers only Deny and Allow; at the terminal, `y` allows it and anything else denies it. A change is asked about every time and no setting allows one. An agent may also ask to delete an item for good, which only an item that same agent created through a `request_save` you approved can be; the prompt says "Delete work/scratch-token for good. An agent created it on 2026-11-15", and its Allow reads Delete for good. A change is refused without asking when the item already carries it, when Trash is off for a move, and for a delete of any other item. Deny changes nothing and holds the item back for a minute, whatever change the agent asks for next. The same agent may add or remove the tag `needs-update` on an item it sees whole without asking you, whether or not the item is held back; the tag shows on the item and in a search for it, and each change is a line in the agent log, as every change is. An expired item and a weak or reused password appear in Items › Recommendations. keypaste writes a change's line before it saves the vault, so a change it cannot record is not made.
+An agent's `request_item_change` asks you to allow one change to an item its bridge shows whole, never one it reaches only through a project tag: moving it to Trash or marking it expired with KeePass's own expiry date, now or on a day it names. The prompt says the change in keypaste's words, such as "Move work/github to Trash" or "Mark cloud/aws-prod as expired on 2026-12-01", under the agent's reason, and offers only Deny and Allow; at the terminal, `y` allows it and anything else denies it. A change is asked about every time and no setting allows one. An agent may also ask to delete an item for good, which only an item that same agent created through a `request_save` you approved can be; the prompt says "Delete work/scratch-token for good. An agent created it on 2026-11-15", and its Allow reads Delete for good. A change is refused without asking when the item already carries it, when Trash is off for a move, and for a delete of any other item. Deny changes nothing and holds the item back for a minute, whatever change the agent asks for next. The same agent may add or remove the tag `needs-update` on an item it sees whole without asking you, whether or not the item is held back; the tag shows on the item and in a search for it, and each change is a line in the agent log, as every change is. An expired item and a weak or reused password appear in Security. keypaste writes a change's line before it saves the vault, so a change it cannot record is not made.
 
 <a id="approving-in-the-desktop-app"></a>
 
 ### In the desktop app
 
-When the app has the vault unlocked, a request opens a keypaste prompt window over whatever you are doing, showing the same facts and a countdown, with the agent's reason under a line saying the agent wrote it. It offers Deny and Allow once, and for an agent whose bridge has a label, Always allow and Always block, each confirmed in the same window.
+When the app has the vault unlocked, a request opens a keypaste card over whatever you are doing. It says who is asking, then the question, such as "Give claude-code STRIPE_SECRET_KEY?", the item by its title and vault, the agent's own words under "claude-code says", and what allowing does; Details holds the tool, the label, the item's group and the process. It offers Deny and Allow once, and for an agent whose bridge has a label, Always allow, which asks once to confirm. An item in a protected stage says "Protected · asked every time" and offers no Always allow, and neither does a command or a linked set. No prompt offers Always block; block a kind of value on the agent's page in Agents ([agent settings](policy.md#one-agents-own-rules)).
 
+- The requester line says **Verified** only when keypaste checked with the system that the program asking is keypaste's own `keypaste`, started by the AI tool the label names, such as Claude Code, or by Node running that tool's installed npm package; it then names the app it runs in, such as Terminal. Otherwise it says **Not verified**: the name is the agent's own claim. Verified changes no rule ([THREATS](../THREATS.md) T-3).
 - Allow once works from a second after the prompt has focus. While another window has focus the prompt is drawn inactive and its allows stay disarmed; click into it, or press Show the prompt on Agents, and they work a second later.
-- Focus starts on Deny, so Enter refuses. Deny, Escape, closing the window, 45 seconds without an answer, a lock, quitting and the client giving up each refuse.
+- Focus starts on Deny. Return presses Allow once, or confirms Always allow, once it works; before that it does nothing, and it never deletes an item for good. Deny, Escape, closing the window, 45 seconds without an answer ("Denies in" counts it down), a lock, quitting and the client giving up each refuse; on the Always allow confirmation, Escape goes back.
 - Agents lists the request under Waiting for you, with the agent, the item, the field and the seconds left, never the reason. You answer only in the prompt window.
 - While keypaste is in the background, a request may also post a system notification that names no item, vault or agent; it never answers a request.
 
@@ -112,7 +113,7 @@ There is no pause button for an agent that keeps asking; your settings are the p
 
 The prompt names the project, the variable names, the item each value comes from, the command and the directory, and for an agent's run the exact program and command line and the agent's reason; a loader such as `NODE_OPTIONS` is marked as changing how programs start. It never shows a value. A run offers Deny and Allow once only, every time, and no setting releases a set without asking. Allow once, or `o`, starts the command once. Refusing a run refuses the same project, command and directory for a minute. An agent runs nothing until you turn run on for it, and a run whose set holds a blocked value is refused without asking.
 
-An item tagged into a protected environment, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, is asked about at every run that names it and refused to a scoped token's run. A single request for one of its values is asked about every time too, whatever Agents allows, with Deny and Allow once only.
+An item tagged into a protected stage, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, is asked about at every run that names it and refused to a scoped token's run. A single request for one of its values is asked about every time too, whatever Agents allows, with Deny and Allow once only.
 
 The command shown is what the run says it will start; approve only a run you started or a command whose behaviour you know ([THREATS](../THREATS.md) T-30, T-34, T-35).
 
@@ -175,7 +176,7 @@ A call is refused when its line cannot be written. The log is never rotated or t
 | `unfillable` | A placeholder in the value could not be filled from its field. |
 | `unchanged` | A terminal edit the holder needed to write nothing for. |
 | `token`, `share-created`, `share-revoked` | A scoped token's release, a share link made, a share link revoked. |
-| `not-armed`, `not-paired`, `removed` | A browser asked to pair while pairing was off, presented an unknown pairing, or had its pairing removed. |
+| `not-armed`, `not-paired`, `removed` | A browser asked to pair while an earlier version's pairing was off, presented a pairing no unlocked vault vouches for, or had its pairing removed. |
 | `invalid-request` / `failed` / `not-initialized` | Wrong arguments / something went wrong / a tool called before the MCP handshake finished. |
 
 **Older logs.** The log is append-only, so old lines keep the words they were written with. v0.3.0 wrote `grant-cache` (a live approval on the same connection served the request), `policy` and `policy-limit` (a `policy.toml` rule released it, or had spent its hourly allowance). Earlier source builds wrote `automatic`, `automatic-commands`, `always-allowed`, `inject-only` and `granted_seconds`, and the earliest build wrote `not-implemented`. Nothing in the 1.0.0 build writes them.

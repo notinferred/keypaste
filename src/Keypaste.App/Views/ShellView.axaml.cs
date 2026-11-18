@@ -36,8 +36,9 @@ internal sealed partial class ShellView : UserControl
         var nav = this.FindControl<ListBox>("Nav")!;
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
-        this.FindControl<ListBox>("RailNav")!.AddHandler(TappedEvent, OnRailPlaceTapped);
-        this.FindControl<Button>("SidebarImport")!.Click += OnSidebarImport;
+        var rail = this.FindControl<ListBox>("RailNav")!;
+        rail.ContainerPrepared += OnRailPlacePrepared;
+        rail.AddHandler(TappedEvent, OnRailPlaceTapped);
         nav.AddHandler(Button.ClickEvent, OnHeadingAdd);
         nav.AddHandler(PointerPressedEvent, OnHeadingPressed, RoutingStrategies.Tunnel);
 
@@ -91,35 +92,22 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as the rail does, and with neither the foot moves up to the titlebar.</summary>
+    /// <summary>The sidebar sits beside the content on Items, or over it in a narrow window, and its column closes while it is away; the title bar keeps room for the traffic lights or the menu button.</summary>
     private void PlaceSidebar()
     {
         var beside = _shell is { ShowsSidebar: true, SidebarOverlays: false };
         var title = this.FindControl<Grid>("TitleColumns")!;
-        this.FindControl<Border>("TitleBar")!.Classes.Set("beside-sidebar", beside);
-        this.FindControl<Border>("TitleOverSidebar")!.IsVisible = beside;
-        var foot = this.FindControl<Border>("VaultFoot")!;
-        var sidebarSlot = this.FindControl<Decorator>("SidebarFootSlot")!;
-        var titleSlot = this.FindControl<Decorator>("TitleFootSlot")!;
-        var noRoomBelow = _shell is { ShowsSidebar: false, ShowsRail: false };
-        foot.Classes.Set("in-titlebar", noRoomBelow);
-
-        if (noRoomBelow && titleSlot.Child != foot)
-        {
-            sidebarSlot.Child = null;
-            titleSlot.Child = foot;
-        }
-        else if (!noRoomBelow && sidebarSlot.Child != foot)
-        {
-            titleSlot.Child = null;
-            sidebarSlot.Child = foot;
-        }
-
         title.Margin = WindowChrome.CaptionInset(InterfaceZoom.Factor);
-        title.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset(InterfaceZoom.Factor));
-        var collapsed = _shell is { ShowsRail: true } or { SidebarOverlays: true } ? WindowChrome.RailWidth : 0;
-        this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : collapsed);
+        title.ColumnDefinitions[0].Width = new GridLength(WindowChrome.LeadingInset(InterfaceZoom.Factor));
+        this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[1].Width = new GridLength(beside ? WindowChrome.SidebarWidth : 0);
         Grid.SetColumnSpan(this.FindControl<Border>("Sidebar")!, _shell is { SidebarOverlays: true } ? 2 : 1);
+    }
+
+    /// <summary>Draws the rail and the sidebar translucent while the window shows the system's vibrancy through them.</summary>
+    internal void ShowVibrancy(bool vibrant)
+    {
+        this.FindControl<Border>("Rail")!.Classes.Set("vibrant", vibrant);
+        this.FindControl<Border>("Sidebar")!.Classes.Set("vibrant", vibrant);
     }
 
     /// <summary>A sidebar opened over the content takes the keyboard. What goes with the keyboard on it hands it on rather than to nothing, unless a press has already moved it.</summary>
@@ -146,34 +134,18 @@ internal sealed partial class ShellView : UserControl
             return;
         }
 
-        var showSidebar = this.FindControl<Button>("ShowSidebar")!;
-
-        // At 840 and wider the button's hand-off stays as Q.18 left it.
-        var fromButton = _lastFocused == showSidebar && _shell is { IsNarrow: true };
-
-        if (!fromButton && _lastFocused?.GetSelfAndVisualAncestors().Any(visual => visual == this.FindControl<Border>("Sidebar") || visual == this.FindControl<Border>("Rail")) != true)
+        if (_lastFocused?.GetSelfAndVisualAncestors().Any(visual => visual == this.FindControl<Border>("Sidebar")) != true)
         {
             return;
         }
 
-        if (_shell is { ShowsRail: true } shell)
-        {
-            if (fromButton && shell.SelectedRailPlace is { } place)
-            {
-                GiveFocus(this.FindControl<ListBox>("RailNav")!.ContainerFromItem(place), NavigationMethod.Directional);
-            }
-            else
-            {
-                GiveFocus(this.FindControl<Button>("RailGroups"), NavigationMethod.Tab);
-            }
-        }
-        else if (_shell is { ShowsSidebar: true })
+        if (_shell is { ShowsSidebar: true })
         {
             FocusChosenRow();
         }
         else
         {
-            GiveFocus(showSidebar, NavigationMethod.Tab);
+            GiveFocus(this.FindControl<Button>("ShowSidebar"), NavigationMethod.Tab);
         }
     }
 
@@ -183,17 +155,6 @@ internal sealed partial class ShellView : UserControl
         if (control is { IsFocused: false })
         {
             control.Focus(method);
-        }
-    }
-
-    /// <summary>The list does not hear a press on its selected row, but the rail's Items still shows every item from a group or a project, as the sidebar's row does.</summary>
-    private void OnRailPlaceTapped(object? sender, TappedEventArgs e)
-    {
-        if (e.Source is Visual source && _shell is { } shell
-            && source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext is NavItem { IsExpandable: true } items
-            && Equals(items, shell.SelectedRailPlace))
-        {
-            shell.SelectedSidebarRow = items;
         }
     }
 
@@ -225,13 +186,32 @@ internal sealed partial class ShellView : UserControl
     /// <summary>The commands a row's context menu offers; the running app's, or a test's.</summary>
     internal AppCommands? Commands { get; init; }
 
-    /// <summary>A heading names the rows under it and cannot be chosen, though its + can be pressed; a group's row is a denser tree row.</summary>
+    /// <summary>The account's heading names the vaults under it and cannot be chosen; a group's row is a denser tree row.</summary>
     private static void OnSidebarRowPrepared(object? sender, ContainerPreparedEventArgs e)
     {
-        var heading = e.Container.DataContext is SidebarHeading;
+        var heading = e.Container.DataContext is AccountRow;
         e.Container.Focusable = !heading;
         e.Container.Classes.Set("heading", heading);
-        e.Container.Classes.Set("group", e.Container.DataContext is GroupRow);
+        e.Container.Classes.Set("vault", e.Container.DataContext is VaultRow);
+        e.Container.Classes.Set("group", e.Container.DataContext is GroupRow or ProjectRow);
+    }
+
+    /// <summary>Access waits for later on the rail: dimmed, never chosen, its tooltip saying so.</summary>
+    private static void OnRailPlacePrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        var later = e.Container.DataContext is NavItem { IsLater: true };
+        e.Container.IsEnabled = !later;
+        e.Container.Classes.Set("later", later);
+    }
+
+    /// <summary>The list does not hear a press on its selected row, but the rail's Items still lists every item of the vault in view from a group, a place or a project.</summary>
+    private void OnRailPlaceTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Visual source && _shell is { ShowsItemsPlace: true } shell
+            && source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext is NavItem { Destination.Kind: Navigation.DestinationKind.Entries })
+        {
+            shell.ShowEveryItem();
+        }
     }
 
     /// <summary>
@@ -252,7 +232,7 @@ internal sealed partial class ShellView : UserControl
 
         var selected = _shell.SelectedSidebarRow;
 
-        if (selected is NavItem { IsExpandable: true } or GroupRow { HasChildren: true })
+        if (selected is VaultRow { IsExpandable: true } or GroupsRow or GroupRow { HasChildren: true })
         {
             _shell.Fold(selected, open: e.Key == (FlowDirection == FlowDirection.RightToLeft ? Key.Left : Key.Right));
             e.Handled = true;
@@ -260,28 +240,15 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>The sidebar's Import menu, at its row.</summary>
-    private void OnSidebarImport(object? sender, RoutedEventArgs e)
-    {
-        if (Commands is null || sender is not Button button)
-        {
-            return;
-        }
-
-        var menu = AppMenu.Context(Commands.SidebarImport);
-        FlyoutBase.SetAttachedFlyout(button, menu);
-        menu.ShowAt(button);
-    }
-
-    /// <summary>A heading's +: New group… in the group chosen, or New project….</summary>
+    /// <summary>The Groups row's +: New group… in the group chosen.</summary>
     private void OnHeadingAdd(object? sender, RoutedEventArgs e)
     {
-        if (Commands is null || e.Source is not Button { Name: "HeadingAdd", DataContext: SidebarHeading heading })
+        if (Commands is null || e.Source is not Button { Name: "HeadingAdd", DataContext: GroupsRow })
         {
             return;
         }
 
-        var command = heading.Adds == SidebarAddition.Group ? Commands.NewGroup : Commands.NewProject;
+        var command = Commands.NewGroup;
 
         if (command.CanRun())
         {
@@ -291,12 +258,10 @@ internal sealed partial class ShellView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>A heading cannot be chosen, so a press on it, but not on its +, selects nothing.</summary>
+    /// <summary>The account's heading cannot be chosen, so a press on it selects nothing.</summary>
     private static void OnHeadingPressed(object? sender, PointerPressedEventArgs e)
     {
-        var ancestors = (e.Source as Visual)?.GetSelfAndVisualAncestors().ToList() ?? [];
-
-        if (ancestors.OfType<ListBoxItem>().FirstOrDefault() is { DataContext: SidebarHeading } && !ancestors.OfType<Button>().Any())
+        if ((e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault() is { DataContext: AccountRow })
         {
             e.Handled = true;
         }
@@ -367,12 +332,10 @@ internal sealed partial class ShellView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>Gives the keyboard to the sidebar's chosen row, which is in the footer's list on Trash and Settings.</summary>
+    /// <summary>Gives the keyboard to the sidebar's chosen row.</summary>
     private void FocusChosenRow()
     {
-        var chosen = _shell?.SelectedFooter is { } footer
-            ? this.FindControl<ListBox>("FooterNav")!.ContainerFromItem(footer)
-            : _shell?.SelectedSidebarRow is { } row ? this.FindControl<ListBox>("Nav")!.ContainerFromItem(row) : null;
+        var chosen = _shell?.SelectedSidebarRow is { } row ? this.FindControl<ListBox>("Nav")!.ContainerFromItem(row) : null;
         GiveFocus(chosen, NavigationMethod.Directional);
     }
 
@@ -439,7 +402,6 @@ internal sealed partial class ShellView : UserControl
                 {
                     // The lists keep the row they wrote, and a binding does not republish a value its source never took.
                     this.FindControl<ListBox>("Nav")!.SelectedItem = _shell?.SelectedSidebarRow;
-                    this.FindControl<ListBox>("FooterNav")!.SelectedItem = _shell?.SelectedFooter;
                     this.FindControl<ListBox>("RailNav")!.SelectedItem = _shell?.SelectedRailPlace;
 
                     if (_focusBeforeDiscardPrompt is { IsEffectivelyVisible: true } before)
@@ -472,11 +434,19 @@ internal sealed partial class ShellView : UserControl
             NameTheWindow();
         }
 
-        if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays) or nameof(ShellViewModel.ShowsRail))
+        if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays))
         {
             PlaceSidebar();
             Commands?.SidebarChanged();
             OnSidebarShownChanged();
+        }
+
+        if (e.PropertyName == nameof(ShellViewModel.SidebarRows))
+        {
+            // The list puts back the row it had once its rows are replaced, after the shell has named another, such as the project Environments opened.
+            Dispatcher.UIThread.Post(
+                () => this.FindControl<ListBox>("Nav")!.SelectedItem = _shell?.SelectedSidebarRow,
+                DispatcherPriority.Loaded);
         }
 
         if (e.PropertyName == nameof(ShellViewModel.HasDiscardPrompt) && _shell is not null)
@@ -506,7 +476,7 @@ internal sealed partial class ShellView : UserControl
             {
                 var back = _focusBeforeImport is { IsEffectivelyVisible: true } before && TopLevel.GetTopLevel(before) is not null
                     ? before
-                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "RailGroups" or "ShowSidebar" && control.IsEffectivelyVisible);
+                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "ShowSidebar" && control.IsEffectivelyVisible);
                 _focusBeforeImport = null;
                 back?.Focus();
             },

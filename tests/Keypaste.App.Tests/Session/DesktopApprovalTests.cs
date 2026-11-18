@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -727,17 +728,36 @@ public sealed class DesktopApprovalTests
         });
 
     [Fact]
-    public Task EnterOnOpen_Denies() =>
+    public Task Return_does_nothing_before_the_prompt_is_armed_and_then_allows_once() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
-            await app.ArmAsync();
 
-            // Focus starts on Deny, so a keystroke meant for another window can only refuse.
+            // Focus starts on Deny, and Return still means Allow once, which a keystroke landing as the prompt appears cannot press.
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Key(window, PhysicalKey.Enter);
+            await Task.Delay(100, Token);
+            Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
+
+            await app.ArmAsync();
+            Key(window, PhysicalKey.Enter);
+
+            var answered = await reply.WaitAsync(_wait, Token);
+
+            Assert.NotNull(answered);
+            Assert.Equal(AuditDecision.Granted, answered.Decision);
+        });
+
+    [Fact]
+    public Task Escape_denies_whether_or_not_the_prompt_is_armed() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            Key(window, PhysicalKey.Escape);
 
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -792,7 +812,7 @@ public sealed class DesktopApprovalTests
             Assert.DoesNotContain(Buttons(imitating), button => button.IsDefault);
 
             var reason = imitating.FindControl<TextBlock>("ReasonText")!;
-            Assert.Equal(ApprovalPrompt.For("c", new EntryName("env/ci", "DEPLOY_KEY"), "password", hostile).Reason, reason.Text);
+            Assert.Equal(ApprovalViewModel.Quote(ApprovalPrompt.For("c", new EntryName("env/ci", "DEPLOY_KEY"), "password", hostile).Reason), reason.Text);
             Assert.Empty(reason.Inlines ?? []);
 
             ordinary.Close();
@@ -889,13 +909,13 @@ public sealed class DesktopApprovalTests
             var reply = app.Ask();
             var window = await app.PromptAsync();
 
-            Assert.Equal("0:45", Text(window, "CountdownText"));
+            Assert.Equal("Denies in 0:45", Text(window, "CountdownText"));
 
             app.Clock.Advance(TimeSpan.FromSeconds(1));
-            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "0:44");
+            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "Denies in 0:44");
 
             app.Clock.Advance(TimeSpan.FromSeconds(10));
-            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "0:34");
+            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "Denies in 0:34");
 
             Click(window, "Deny");
             await reply.WaitAsync(_wait, Token);
@@ -925,9 +945,9 @@ public sealed class DesktopApprovalTests
         return (window, layout);
     }
 
-    /// <summary>The window's own buttons on view; a scrolling reason box adds its scroll bar's, which move nothing that matters.</summary>
+    /// <summary>The window's own answers on view; a scrolling reason box adds its scroll bar's, and Details its disclosure, which answer nothing.</summary>
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton && button.IsEffectivelyVisible)];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton and not ToggleButton && button.IsEffectivelyVisible)];
 
     internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
 

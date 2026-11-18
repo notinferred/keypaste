@@ -90,6 +90,52 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         Check();
     }
 
+    /// <summary>The session whose vault is checked.</summary>
+    internal AppVaultSession Session => _session;
+
+    /// <summary>The filter Security offers with several vaults open: every vault, then each; none where one is open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersVaultChoice), nameof(ShownVault))]
+    internal partial IReadOnlyList<VaultChoice> VaultChoices { get; set; } = [];
+
+    /// <summary>Whether Security starts with its vault filter.</summary>
+    internal bool OffersVaultChoice => VaultChoices.Count > 2;
+
+    /// <summary>Whether this check is drawn under another vault's, which heads the page, as every vault's are.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPageHeader))]
+    internal partial bool IsListedUnderAnother { get; set; }
+
+    internal bool ShowsPageHeader => !IsListedUnderAnother;
+
+    /// <summary>The filter's choice: every vault, while others are drawn under this one, or this vault alone.</summary>
+    internal VaultChoice? ShownVault
+    {
+        get => VaultChoices.FirstOrDefault(choice => AlsoShown.Count > 0 ? choice.Vault is null : ReferenceEquals(choice.Vault, _session));
+        set
+        {
+            if (value is not null && !Equals(value, ShownVault))
+            {
+                ShowVault?.Invoke(value);
+            }
+        }
+    }
+
+    /// <summary>Shows Security for another choice of the filter, set by the shell.</summary>
+    internal Action<VaultChoice>? ShowVault { get; set; }
+
+    /// <summary>The vault's title over its findings while every vault's are listed, or empty.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsVaultHeading))]
+    internal partial string VaultHeading { get; set; } = string.Empty;
+
+    internal bool ShowsVaultHeading => VaultHeading.Length > 0;
+
+    /// <summary>The other vaults' checks drawn under this one while the filter shows every vault.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShownVault))]
+    internal partial IReadOnlyList<RecommendationsViewModel> AlsoShown { get; set; } = [];
+
     /// <summary>Every finding: those needing review first, then those dismissed.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys), nameof(Line))]

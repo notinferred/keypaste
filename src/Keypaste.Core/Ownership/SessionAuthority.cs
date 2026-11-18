@@ -47,8 +47,8 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// A browser's attachment, which names the KeePassXC-Browser build its relay was started for, makes only a pairing, a pairing
-/// check, a fill and a lock, and no other attachment makes those (D-0627). Its lock is answered as <c>keypaste lock</c>'s; the
-/// other three are decided by the <see cref="IBrowserRequests"/> this owner was given, and refused without one.
+/// check, a list, a release, a show and a lock, and no other attachment makes those. Its lock is answered as
+/// <c>keypaste lock</c>'s; the others are decided by the <see cref="IBrowserRequests"/> this owner was given, and refused without one.
 /// </para>
 /// <para>
 /// Every listing, credential, run and token request it reads is recorded in this
@@ -296,7 +296,7 @@ public sealed class SessionAuthority : IApproverHandler
         };
 
         // The relay attaches again before each of the extension's requests, so the same build on the same connection and unlock
-        // keeps the pairing its check proved; anything else starts unbound (D-0635).
+        // keeps the pairing its check proved; anything else starts unbound.
         if (earlier is { Browser: { } was } && ReferenceEquals(was, browser) && earlier.Session == lifetime.Id && earlier.Vault == request.Vault)
         {
             attachment.Pairing = earlier.Pairing;
@@ -304,7 +304,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         _attached[connectionId] = attachment;
 
-        // A browser's attachment is told the hash its extension files this vault's pairing under (D-0636).
+        // A browser's attachment is told the hash its extension files this computer's pairing under.
         return Answer(AttachReply.To(lifetime.Id) with { DatabaseHash = browser is null ? null : _browsers?.DatabaseHash() });
     }
 
@@ -1603,7 +1603,7 @@ public sealed class SessionAuthority : IApproverHandler
                 request.Project,
                 request.Profile,
                 EnvOutcome.Unauthorized,
-                $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an item of a protected environment");
+                $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an item of a protected stage");
         }
 
         if (unrecordable is not null)
@@ -1630,7 +1630,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>Answered as <c>keypaste lock</c> is, asking nobody, since it only takes access away, and recorded nowhere (D-0439, D-0627).</remarks>
+    /// <remarks>Answered as <c>keypaste lock</c> is, asking nobody, since it only takes access away, and recorded nowhere.</remarks>
     public async ValueTask<BrowserReply> LockBrowserAsync(BrowserLockRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -1646,7 +1646,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>A pairing granted binds this connection to it, as a check that proves it does (D-0635).</remarks>
+    /// <remarks>A pairing granted binds this connection to it, as a check that proves it does.</remarks>
     public async ValueTask<BrowserReply> PairBrowserAsync(BrowserPairRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -1667,7 +1667,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <inheritdoc/>
     /// <remarks>
     /// Whatever the check finds, the connection is bound to no pairing but the one it proves, so a fill names only a pairing
-    /// this connection proved in this unlock (D-0635).
+    /// this connection proved in this unlock.
     /// </remarks>
     public async ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -1720,32 +1720,48 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// The logins leave only while the lifetime the request was admitted to is live and nothing withdrew it (D-0313), and all of
-    /// them or none: a reply too large for one frame is refused whole.
-    /// </remarks>
-    public async ValueTask<BrowserFillReply> FillBrowserAsync(BrowserFillRequest request, string connectionId, CancellationToken cancellationToken)
+    public async ValueTask<BrowserListReply> ListBrowserAsync(BrowserListRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        SessionLifetime? admitted = null;
-        var waiting = CancellationToken.None;
-
-        // A fill on a connection no check or pairing bound to its pairing reaches nobody (D-0635).
-        if (_attached.TryGetValue(connectionId, out var attachment)
-            && attachment.Browser is not null
-            && !string.Equals(attachment.Pairing, request.Pairing, StringComparison.Ordinal))
+        if (!IsBoundTo(connectionId, request.Pairing))
         {
-            return new BrowserFillReply(BrowserOutcome.NotPaired, "this connection has proved no pairing of that name; check it first");
+            return new BrowserListReply(BrowserOutcome.NotPaired, _unbound);
         }
 
         var reply = await DecideBrowserAsync(
             request.Vault,
             request.Session,
             connectionId,
-            (browsers, browser, token) => browsers.FillAsync(request, browser, connectionId, token),
+            (browsers, browser, token) => browsers.ListAsync(request, browser, connectionId, token),
+            static (outcome, reason) => new BrowserListReply(outcome, reason),
+            admitted: null,
+            cancellationToken).ConfigureAwait(false);
+
+        return reply.Outcome == BrowserOutcome.Done ? reply : reply with { Names = [] };
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The login leaves only while the lifetime the request was admitted to is live and nothing withdrew it.</remarks>
+    public async ValueTask<BrowserFillReply> ReleaseBrowserAsync(BrowserReleaseRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        SessionLifetime? admitted = null;
+        var waiting = CancellationToken.None;
+
+        if (!IsBoundTo(connectionId, request.Pairing))
+        {
+            return new BrowserFillReply(BrowserOutcome.NotPaired, _unbound);
+        }
+
+        var reply = await DecideBrowserAsync(
+            request.Vault,
+            request.Session,
+            connectionId,
+            (browsers, browser, token) => browsers.ReleaseAsync(request, browser, connectionId, token),
             static (outcome, reason) => new BrowserFillReply(outcome, reason),
             (lifetime, wait) => (admitted, waiting) = (lifetime, wait),
             cancellationToken).ConfigureAwait(false);
@@ -1757,15 +1773,44 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (admitted is null || !admitted.TryCommitAfter(waiting))
         {
-            var (method, reason) = admitted is null ? (AuditMethod.VaultLocked, _lockedReason) : WithdrawnBy(admitted, "the logins were sent");
+            var (method, reason) = admitted is null ? (AuditMethod.VaultLocked, _lockedReason) : WithdrawnBy(admitted, "the login was sent");
             return new BrowserFillReply(BrowserRefusal(method), reason);
         }
 
-        return ApproverProtocol.Fits(reply) ? reply : new BrowserFillReply(BrowserOutcome.Refused, "the logins would not fit one reply");
+        return ApproverProtocol.Fits(reply) ? reply : new BrowserFillReply(BrowserOutcome.Refused, "the login would not fit one reply");
     }
 
+    /// <inheritdoc/>
+    public async ValueTask<BrowserReply> ShowBrowserAsync(BrowserShowRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        if (!_attached.TryGetValue(connectionId, out var attachment) || attachment.Pairing is null)
+        {
+            return new BrowserReply(BrowserOutcome.NotPaired, _unbound);
+        }
+
+        return await DecideBrowserAsync(
+            request.Vault,
+            request.Session,
+            connectionId,
+            (browsers, browser, token) => browsers.ShowAsync(request, browser, connectionId, token),
+            static (outcome, reason) => new BrowserReply(outcome, reason),
+            admitted: null,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private const string _unbound = "this connection has proved no pairing of that name; check it first";
+
+    /// <summary>Whether a browser's connection is bound to the pairing a list or release names, as only a check or a pairing on it binds one.</summary>
+    private bool IsBoundTo(string connectionId, string pairing) =>
+        !_attached.TryGetValue(connectionId, out var attachment)
+        || attachment.Browser is null
+        || string.Equals(attachment.Pairing, pairing, StringComparison.Ordinal);
+
     /// <summary>
-    /// Admits a browser's pairing, pairing check or fill on a browser's attachment to the live session and has
+    /// Admits a browser's pairing, pairing check, list, release or show on a browser's attachment to the live session and has
     /// <see cref="_browsers"/> decide it, withdrawn by a lock or a reload as a person's question is; <paramref name="admitted"/>
     /// is told the lifetime it was admitted to and the wait a release must commit after.
     /// </summary>
@@ -1890,7 +1935,7 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <summary>
     /// Admits a request to the live session from the kind of attachment that may make it: a browser's makes only the four
-    /// <paramref name="browser"/> marks, and no other attachment makes those (D-0627).
+    /// <paramref name="browser"/> marks, and no other attachment makes those.
     /// </summary>
     private bool TryAdmit(
         string vault,
@@ -1957,7 +2002,7 @@ public sealed class SessionAuthority : IApproverHandler
         /// <summary>The KeePassXC-Browser build a browser's attachment named, or null for any other attachment.</summary>
         internal BrowserIdentity? Browser { get; init; }
 
-        /// <summary>The pairing the last check or pairing on a browser's connection proved, or null (D-0635).</summary>
+        /// <summary>The pairing the last check or pairing on a browser's connection proved, or null.</summary>
         internal string? Pairing
         {
             get => Volatile.Read(ref _pairing);

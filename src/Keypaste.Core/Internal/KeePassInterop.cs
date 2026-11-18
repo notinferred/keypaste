@@ -665,7 +665,7 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (string tag in tags)
         {
-            pwEntry.AddTag(tag);
+            AddTagTo(pwEntry, tag);
         }
 
         (destination ?? EnsureGroup(entry.GroupPath)).AddEntry(pwEntry, true);
@@ -1892,7 +1892,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Locate(name) is { } found ? [.. found.Entry.Tags] : null;
+        return Locate(name) is { } found ? TagsOf(found.Entry) : null;
     }
 
     /// <summary>Every live entry's lost project memberships, by the traversal <see cref="Collect"/> uses (V.11).</summary>
@@ -1957,6 +1957,16 @@ internal sealed class KeePassInterop : IDisposable
         SortedSet<string> usernames = new(StringComparer.Ordinal);
         CollectUsernames(_database.RootGroup, string.Empty, usernames, Bin());
         return [.. usernames];
+    }
+
+    /// <summary>When each live entry outside keypaste's own groups last changed, by its UUID as hex, by the traversal <see cref="Collect"/> uses; no field is read.</summary>
+    internal IReadOnlyDictionary<string, DateTimeOffset> ReadModifiedTimes()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Dictionary<string, DateTimeOffset> times = new(StringComparer.Ordinal);
+        CollectModifiedTimes(_database.RootGroup, string.Empty, times, Bin());
+        return times;
     }
 
     /// <summary>Every live entry as a listing names it, by the traversal <see cref="Collect"/> uses; no value is read.</summary>
@@ -2042,13 +2052,13 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Locate(name) is not { } found || found.Entry.HasTag(tag))
+        if (Locate(name) is not { } found || HasTag(found.Entry, tag))
         {
             return 0;
         }
 
         found.Entry.CreateBackup(_database);
-        found.Entry.AddTag(tag);
+        AddTagTo(found.Entry, tag);
         MarkEdited(found.Entry);
         return 1;
     }
@@ -2069,7 +2079,7 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (string tag in tags)
         {
-            found.Entry.RemoveTag(tag);
+            RemoveTagFrom(found.Entry, tag);
         }
 
         MarkEdited(found.Entry);
@@ -2351,11 +2361,11 @@ internal sealed class KeePassInterop : IDisposable
         clone.LastModificationTime = now;
         clone.LastAccessTime = now;
 
-        List<string> projectTags = [.. clone.Tags.Where(tag => ProjectTag.Read(tag).Kind != ProjectTagKind.None)];
+        List<string> projectTags = [.. TagsOf(clone).Where(tag => ProjectTag.Read(tag).Kind != ProjectTagKind.None)];
 
         foreach (string tag in projectTags)
         {
-            clone.RemoveTag(tag);
+            RemoveTagFrom(clone, tag);
         }
 
         SetField(clone, PwDefs.TitleField, title);
@@ -2865,7 +2875,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             PwEntry revision = found.Entry.History.GetAt(order[index]);
             revisions[index] = new EntryRevision(
-                index, revision.LastModificationTime, Read(revision, PathOf(found.Group)!), [.. revision.Tags], FieldsOf(revision));
+                index, revision.LastModificationTime, Read(revision, PathOf(found.Group)!), TagsOf(revision), FieldsOf(revision));
         }
 
         return revisions;
@@ -3314,6 +3324,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Serialises transacted saves in this process. See <see cref="EnterGateIfTransacting"/>.</summary>
     private static readonly SemaphoreSlim _saveGate = new(1, 1);
 
+    /// <summary>Held for every read and write of a KeePassLib tag list, since Security's scan reads tags on a worker thread while the window reads and writes them.</summary>
+    private static readonly Lock _tagsGate = new();
+
     /// <summary>The <see cref="SaveClock.Operation"/> holding <see cref="_saveGate"/>; 0 when free.</summary>
     private static long _gateHolder;
 
@@ -3686,7 +3699,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         foreach (PwEntry entry in group.Entries)
         {
-            var needsUpdate = entry.HasTag(ItemChangeRules.NeedsUpdateTag);
+            var needsUpdate = HasTag(entry, ItemChangeRules.NeedsUpdateTag);
 
             found.Add(new EntryReminderFacts(
                 new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)) { Uuid = entry.Uuid.ToHexString() },
@@ -3719,7 +3732,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             var version = entry.History.GetAt(position);
 
-            if (!version.HasTag(tag))
+            if (!HasTag(version, tag))
             {
                 return new DateTimeOffset(TimeUtil.ToUtc(since, true));
             }
@@ -3787,12 +3800,12 @@ internal sealed class KeePassInterop : IDisposable
     private static void LostProjectTags(PwEntry entry, EntryName name, List<LostProjectTag> lost)
     {
         PwEntry[] versions = [.. Enumerable.Reverse(HistoryNewestFirst(entry)).Select(position => entry.History.GetAt(position)), entry];
-        var current = Memberships(entry.Tags);
+        var current = Memberships(TagsOf(entry));
         Dictionary<(string Project, string Environment), (int Held, string Tag, bool Protects)> dropped = [];
 
         for (var version = 0; version < versions.Length - 1; version++)
         {
-            foreach (var tag in versions[version].Tags)
+            foreach (var tag in TagsOf(versions[version]))
             {
                 if (ProjectTag.Read(tag) is { Kind: ProjectTagKind.Member, Project: { } project, Environment: { } environment } read
                     && !current.Contains((project, environment)))
@@ -3813,6 +3826,60 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
+    /// <summary>A copy of the entry's tags, so no other thread's write reaches the list a caller walks.</summary>
+    private static List<string> TagsOf(PwEntry entry)
+    {
+        lock (_tagsGate)
+        {
+            return [.. entry.Tags];
+        }
+    }
+
+    private static List<string> TagsOf(PwGroup group)
+    {
+        lock (_tagsGate)
+        {
+            return [.. group.Tags];
+        }
+    }
+
+    private static bool HasTag(PwEntry entry, string tag)
+    {
+        lock (_tagsGate)
+        {
+            return entry.HasTag(tag);
+        }
+    }
+
+    private static bool AddTagTo(PwEntry entry, string tag)
+    {
+        lock (_tagsGate)
+        {
+            var added = entry.AddTag(tag);
+
+            // Reading normalizes the list while the lock is held, so a later read outside it writes nothing.
+            _ = entry.Tags;
+            return added;
+        }
+    }
+
+    private static bool RemoveTagFrom(PwEntry entry, string tag)
+    {
+        lock (_tagsGate)
+        {
+            return entry.RemoveTag(tag);
+        }
+    }
+
+    private static void Retag(PwEntry entry, List<string> tags)
+    {
+        lock (_tagsGate)
+        {
+            entry.Tags = tags;
+            _ = entry.Tags;
+        }
+    }
+
     private static HashSet<(string Project, string Environment)> Memberships(IEnumerable<string> tags) =>
         [.. tags.Select(ProjectTag.Read)
             .Where(read => read.Kind == ProjectTagKind.Member)
@@ -3822,7 +3889,7 @@ internal sealed class KeePassInterop : IDisposable
     private static bool ChangedMoreThanTags(PwEntry before, PwEntry after)
     {
         var retagged = before.CloneDeep();
-        retagged.Tags = [.. after.Tags];
+        Retag(retagged, TagsOf(after));
 
         // A merge's mark on a version it kept is no change to the version.
         retagged.CustomData.Remove(PwEntry.KeptVersionKey);
@@ -3841,9 +3908,9 @@ internal sealed class KeePassInterop : IDisposable
     {
         foreach (PwEntry entry in group.Entries)
         {
-            if (entry.Tags.Count > 0)
+            if (TagsOf(entry) is { Count: > 0 } tags)
             {
-                tagged.Add(new EntryTags(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), [.. entry.Tags]));
+                tagged.Add(new EntryTags(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), tags));
             }
         }
 
@@ -3876,6 +3943,27 @@ internal sealed class KeePassInterop : IDisposable
             if (!ReferenceEquals(child, bin))
             {
                 CollectUsernames(child, ChildPath(groupPath, child.Name), usernames, bin);
+            }
+        }
+    }
+
+    private static void CollectModifiedTimes(PwGroup group, string groupPath, Dictionary<string, DateTimeOffset> times, PwGroup? bin)
+    {
+        if (ReservedGroups.IsReserved(groupPath))
+        {
+            return;
+        }
+
+        foreach (PwEntry entry in group.Entries)
+        {
+            times[entry.Uuid.ToHexString()] = new DateTimeOffset(DateTime.SpecifyKind(entry.LastModificationTime, DateTimeKind.Utc));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectModifiedTimes(child, ChildPath(groupPath, child.Name), times, bin);
             }
         }
     }
@@ -4054,14 +4142,14 @@ internal sealed class KeePassInterop : IDisposable
                 .Order(StringComparer.Ordinal),
         ];
 
-        return new ListedEntry(name, fields, [.. entry.Tags.Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)]);
+        return new ListedEntry(name, fields, [.. TagsOf(entry).Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)]);
     }
 
     private static void CollectEnvEntries(PwGroup group, string groupPath, List<EnvEntry> found, PwGroup? bin)
     {
         foreach (PwEntry entry in group.Entries)
         {
-            List<string> tags = [.. entry.Tags];
+            List<string> tags = TagsOf(entry);
             List<KeyValuePair<string, string>> fields = [];
             List<string> names = [];
 
@@ -4101,7 +4189,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             string title = ReadField(entry, PwDefs.TitleField);
             MatchedFields fields = Matched(title, groupPath, entry, query);
-            List<string> tags = query.Length == 0 ? [] : [.. entry.Tags.Where(tag => Contains(tag, query))];
+            List<string> tags = query.Length == 0 ? [] : [.. TagsOf(entry).Where(tag => Contains(tag, query))];
 
             if (tags.Count > 0)
             {
@@ -4207,6 +4295,11 @@ internal sealed class KeePassInterop : IDisposable
         (ItemKind.Database, PwIcon.Disk),
         (ItemKind.Server, PwIcon.NetworkServer),
         (ItemKind.SecureNote, PwIcon.Notepad),
+        (ItemKind.Card, PwIcon.Money),
+        (ItemKind.Identity, PwIcon.Identity),
+        (ItemKind.SshKey, PwIcon.TerminalEncrypted),
+        (ItemKind.Wifi, PwIcon.IRCommunication),
+        (ItemKind.Environment, PwIcon.Console),
     ];
 
     private static ItemKind KindOf(PwEntry entry) =>
@@ -4968,7 +5061,7 @@ internal sealed class KeePassInterop : IDisposable
                 .. older.Binaries.Select(field => field.Key).Union(shared.Binaries.Select(field => field.Key), StringComparer.Ordinal)
                     .Where(name => !SameAttachment(older, shared, name) && SameAttachment(newer, shared, name)),
             ];
-            bool tags = !older.Tags.SequenceEqual(shared.Tags, StringComparer.Ordinal) && newer.Tags.SequenceEqual(shared.Tags, StringComparer.Ordinal);
+            bool tags = !TagsOf(older).SequenceEqual(TagsOf(shared), StringComparer.Ordinal) && TagsOf(newer).SequenceEqual(TagsOf(shared), StringComparer.Ordinal);
 
             return strings.Count == 0 && attachments.Count == 0 && !tags ? null : new FieldsToKeep(older, strings, attachments, tags);
         }
@@ -5031,7 +5124,7 @@ internal sealed class KeePassInterop : IDisposable
 
                 if (Tags)
                 {
-                    entry.Tags = [.. Older.Tags];
+                    Retag(entry, TagsOf(Older));
                 }
             }
         }
@@ -5491,7 +5584,7 @@ internal sealed class KeePassInterop : IDisposable
             Add(entry.Expires);
             Add(entry.OverrideUrl);
             Add(entry.QualityCheck);
-            Add(entry.Tags);
+            Add(TagsOf(entry));
             if (customData)
             {
                 Add(entry.CustomData);
@@ -5516,7 +5609,7 @@ internal sealed class KeePassInterop : IDisposable
             Add(group.EnableAutoType);
             Add(group.EnableSearching);
             Add(group.LastTopVisibleEntry);
-            Add(group.Tags);
+            Add(TagsOf(group));
             Add(group.CustomData);
             return _hmac.GetHashAndReset();
         }
@@ -5878,7 +5971,7 @@ internal sealed class KeePassInterop : IDisposable
 
             foreach (string tag in imported.Tags)
             {
-                entry.AddTag(tag);
+                AddTagTo(entry, tag);
             }
 
             foreach (ExportAttachment attachment in imported.Attachments)
@@ -6157,7 +6250,7 @@ internal sealed class KeePassInterop : IDisposable
             found.Group.Uuid.ToHexString(),
             entry.Strings.ToDictionary(pair => pair.Key, pair => pair.Value.ReadString(), StringComparer.Ordinal),
             entry.Binaries.ToDictionary(pair => pair.Key, pair => pair.Value.ReadData(), StringComparer.Ordinal),
-            [.. entry.Tags],
+            TagsOf(entry),
             entry.CustomIconUuid.IsZero ? null : entry.CustomIconUuid.ToHexString(),
             _database.GetCustomIconIndex(entry.CustomIconUuid) >= 0,
             entry.CreationTime,

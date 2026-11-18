@@ -3,6 +3,8 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
+using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -44,6 +46,65 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.False(detail.Fields[1].RemoveCommand.CanExecute(null));
         Assert.False(detail.Fields[1].ToggleProtectionCommand.CanExecute(null));
         Assert.Equal("4321", detail.Fields[0].Reveal());
+    }
+
+    /// <summary>A card made from its template is a card on the pane, in the Cards place and to agents, whose protected fields are card values.</summary>
+    [Fact]
+    public void A_card_from_its_template_reads_as_a_card_and_its_number_as_a_card_value()
+    {
+        using var context = new Context(_vaultPath);
+        var form = NewItemForm.Open(context.Entries, "Banking/Visa", ItemTemplate.Card);
+        foreach (var c in _secret)
+        {
+            form.CustomFields.Single(custom => custom.Name == "Number").Secret.Type(c);
+        }
+
+        context.Entries.ConfirmAddCommand.Press();
+        var detail = context.Open(new EntryName("Banking", "Visa"));
+
+        Assert.Equal("Card", detail.KindLabel);
+        Assert.Equal(["Number"], detail.Fields.Select(field => field.Name));
+        Assert.Equal(["Credit Card"], detail.Tags.Select(chip => chip.Tag));
+        Assert.Equal(_secret, detail.Fields[0].Reveal());
+        context.Entries.Place = ItemPlace.Cards;
+        Assert.Equal(["Banking/Visa"], context.Entries.Rows.Select(row => $"{row.GroupPath}/{row.Title}"));
+        Assert.Equal(FieldCategory.Card, FieldCategories.Of("Number", [.. detail.Tags.Select(chip => chip.Tag)], isProtected: true));
+    }
+
+    /// <summary>A Bitwarden card or identity keeps KeePass's default icon and carries only its tag, which makes it a card or an identity on the list, in the sidebar's count and on the pane.</summary>
+    [Fact]
+    public void A_card_and_an_identity_imported_from_bitwarden_are_a_card_and_an_identity_by_their_tags()
+    {
+        var export = Path.Combine(_directory, "bitwarden_export.json");
+        File.WriteAllText(export, """
+            {
+              "encrypted": false,
+              "folders": [],
+              "items": [
+                { "id": "item-card", "type": 3, "name": "Visa", "card": { "cardholderName": "bw-holder", "number": "bw-number", "code": "bw-code" } },
+                { "id": "item-identity", "type": 4, "name": "Me", "identity": { "firstName": "bw-first", "passportNumber": "bw-passport" } }
+              ]
+            }
+            """);
+
+        using var context = new Context(_vaultPath);
+        using (var source = ExportImport.Open(export, ExportImport.Readers)!)
+        {
+            source.Commit(context.Session.Unlocked!, source.Plan(context.Session.Unlocked!, "imported"), vault => vault.Save());
+        }
+
+        context.Entries.Reload();
+        Assert.Equal(ItemKind.None, context.Session.Unlocked!.Find(new EntryName("imported", "Visa"))!.Kind);
+        Assert.Equal(EntryKind.Card, context.Entries.Rows.Single(row => row is { GroupPath: "imported", Title: "Visa" }).Kind);
+        Assert.Equal(EntryKind.Identity, context.Entries.Rows.Single(row => row is { GroupPath: "imported", Title: "Me" }).Kind);
+        Assert.Equal("Identity", context.Open(new EntryName("imported", "Me")).KindLabel);
+
+        context.Entries.Place = ItemPlace.Cards;
+        Assert.Equal(["imported/Visa"], context.Entries.Rows.Select(row => $"{row.GroupPath}/{row.Title}"));
+
+        var section = new VaultSection(context.Session);
+        section.Count();
+        Assert.Equal(1, section.CountOf(ItemPlace.Cards));
     }
 
     [Fact]
@@ -174,7 +235,7 @@ public sealed class EntryFieldsTests : IDisposable
 
         Assert.True(detail.IsConfirmingFieldRename);
         Assert.Equal(
-            "PIN is a variable of billing/staging. Renamed, those environments give PIN_CODE instead, and nothing there gives PIN.",
+            "PIN is a variable of billing/staging. Renamed, those stages give PIN_CODE instead, and nothing there gives PIN.",
             detail.FieldRenameLines[0]);
         Assert.Contains(detail.FieldRenameLines, line => line.StartsWith("These references name PIN and will find nothing: kp://", StringComparison.Ordinal));
         Assert.All(detail.FieldRenameLines, line => Assert.DoesNotContain("4321", line, StringComparison.Ordinal));

@@ -2,15 +2,14 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>A terminal's edit to the vault, in front of the person at this desktop, allowed once (D-0464).</summary>
-/// <remarks>
-/// Allow is armed after the prompt has been up a moment, as every allow is, and is the only answer that
-/// writes anything. The command and where it came from are a claim: any program can type one. What
-/// changes is keypaste's own words, naming items, fields and variables and never a value.
-/// </remarks>
+/// <summary>A terminal's edit to the held vault, in front of the person at this desktop, answered once.</summary>
 internal sealed class TerminalEditViewModel : PromptViewModel
 {
+    /// <summary>Who the card says is asking: a terminal, which keypaste cannot check.</summary>
+    internal static readonly RequesterIdentity Terminal = new("A terminal", null, false);
+
     internal TerminalEditViewModel(TerminalEditPrompt prompt)
+        : base(Terminal)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
@@ -21,26 +20,29 @@ internal sealed class TerminalEditViewModel : PromptViewModel
         DeletesForGood = prompt.DeletesForGood;
     }
 
-    /// <summary>The command that asked, as a person types it.</summary>
     internal string Command { get; }
 
-    /// <summary>The item, or the environment, sanitized.</summary>
     internal string Item { get; }
 
-    /// <inheritdoc/>
-    protected override string Asks => $"{Item}, {Command}";
+    /// <summary>The question.</summary>
+    internal string Question { get; } = "Allow this change from a terminal?";
 
-    /// <summary>Where the request says it came from, said as a claim.</summary>
+    /// <inheritdoc/>
+    protected override string Asks => $"{Question} {Item}, {Command}";
+
     internal string Origin { get; }
 
-    /// <summary>What changes, in keypaste's own words.</summary>
     internal IReadOnlyList<string> Changes { get; }
 
-    /// <summary>Whether allowing erases the item for good, which draws Allow as danger.</summary>
     internal bool DeletesForGood { get; }
 
     internal string AllowLabel => DeletesForGood ? "Delete for good" : "Allow";
 
-    /// <summary>What allowing does.</summary>
+    /// <summary>The key that presses the allow button, which a delete for good has none of.</summary>
+    internal string AllowKey => DeletesForGood ? string.Empty : "↩";
+
+    /// <inheritdoc/>
+    internal override bool AnswersReturn => !DeletesForGood;
+
     internal string Explainer { get; } = "Allowing saves this in the vault now. Allow only a change you made yourself.";
 }

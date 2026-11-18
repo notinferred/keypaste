@@ -22,4 +22,19 @@ public enum ItemKind
 
     /// <summary>A note with no password of its own, kept as KeePass's notepad icon.</summary>
     SecureNote,
+
+    /// <summary>A payment card, kept as KeePass's money icon.</summary>
+    Card,
+
+    /// <summary>A person's identity details, kept as KeePass's identity icon.</summary>
+    Identity,
+
+    /// <summary>An SSH key pair, kept as KeePass's encrypted terminal icon.</summary>
+    SshKey,
+
+    /// <summary>A Wi-Fi network's name and password, kept as KeePass's wireless icon.</summary>
+    Wifi,
+
+    /// <summary>A project's .env variables, kept as KeePass's console icon.</summary>
+    Environment,
 }

@@ -8,10 +8,14 @@ namespace Keypaste.App.Controls;
 /// </summary>
 /// <remarks>
 /// <c>Classes="stacked"</c> puts the label above the value, as a field a person types in keeps it (DESIGN Interaction rule 5).
-/// A custom field's name takes <c>Classes="mono-label"</c>. The value is the row's content.
+/// A custom field's name takes <c>Classes="mono-label"</c>. The value is the row's content; a row without one gives its label the value's room.
+/// <c>Classes="adaptive"</c> keeps the label at the left and puts it above while the row is under <see cref="NarrowBelow"/> wide.
 /// </remarks>
 internal sealed class FieldRow : ContentControl
 {
+    /// <summary>The width under which an adaptive row's label goes above its field: the label's column, a field's least width and its actions.</summary>
+    internal const double NarrowBelow = 380;
+
     /// <summary>What the row holds, in words: a label, never a value.</summary>
     internal static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<FieldRow, string?>(nameof(Label));
@@ -19,6 +23,8 @@ internal sealed class FieldRow : ContentControl
     /// <summary>The row's quiet actions, such as Reveal.</summary>
     internal static readonly StyledProperty<object?> ActionsProperty =
         AvaloniaProperty.Register<FieldRow, object?>(nameof(Actions));
+
+    public FieldRow() => PseudoClasses.Set(":no-value", true);
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -30,6 +36,18 @@ internal sealed class FieldRow : ContentControl
         {
             PseudoClasses.Set(":follows", change.GetNewValue<bool>());
         }
+        else if (change.Property == ContentProperty)
+        {
+            PseudoClasses.Set(":no-value", change.NewValue is null);
+        }
+    }
+
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        base.OnSizeChanged(e);
+        PseudoClasses.Set(":narrow", e.NewSize.Width < NarrowBelow);
     }
 
     internal string? Label

@@ -58,9 +58,6 @@ internal static class ApproveCommand
         "seconds",
         $"how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, {ApprovalLimits.DefaultWindowSeconds} by default");
 
-    private static readonly Option<string> _pairBrowser =
-        Syntax.Value("--pair-browser", "name", "pair keypaste's extension under this name in the first 2 minutes");
-
     internal static CliVerb Command { get; } = new(
         "approve",
         "approve agents' requests in this terminal\n\n"
@@ -70,7 +67,7 @@ internal static class ApproveCommand
             + "shows and changes them. your master password is typed here, never in a window an agent caused to appear.",
         Execute)
     {
-        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _pairBrowser,
+        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout,
     };
 
     private static int Execute(ParseResult line, CliContext context)
@@ -80,14 +77,6 @@ internal static class ApproveCommand
 
         if (!TryLimits(line, context, out var limits))
         {
-            return CliApp.ExitUsageError;
-        }
-
-        var pairing = line.GetValue(_pairBrowser);
-
-        if (pairing is not null && PairingNames.Problem(pairing, []) is { } badName)
-        {
-            context.Stderr.WriteLine($"keypaste: {_pairBrowser.Name}: {badName}");
             return CliApp.ExitUsageError;
         }
 
@@ -131,14 +120,14 @@ internal static class ApproveCommand
             }
 
             var retired = KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-            var rules = new AgentRulesFile(KeypasteHome.AgentsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+            var rules = AgentRulesFile.For(home, VaultIdentity.Of(home, vaultPath));
 
             return VaultSession.OpenHeld(
                 vaultPath,
                 line,
                 context,
                 OwnerKind.TerminalAgent,
-                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, rules, File.Exists(retired) ? retired : null, pairing, context));
+                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, rules, File.Exists(retired) ? retired : null, context));
         }
     }
 
@@ -150,7 +139,6 @@ internal static class ApproveCommand
         ApprovalLimits limits,
         AgentRulesFile rulesFile,
         string? retiredPolicy,
-        string? pairing,
         CliContext context)
     {
         var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
@@ -194,7 +182,7 @@ internal static class ApproveCommand
             }
         }
 
-        var rules = new SealedAgentRules(rulesFile, () => lifetime.IsLive ? vault : null, Save);
+        var rules = new SealedAgentRules(rulesFile, () => lifetime.IsLive ? vault : null, Save, AgentRulesFile.Shared(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
         SessionServer server;
 
         try
@@ -221,8 +209,8 @@ internal static class ApproveCommand
                 // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
                 WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
 
-                // A browser pairs only while this terminal's person armed it with --pair-browser (D-0634).
-                BrowserUses = new PairingUses(),
+                // A browser pairs once the person here confirms the code it shows, for this computer.
+                BrowserPairings = new OwnerPairings(BrowserPairings.In(KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable)))),
             });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -246,12 +234,6 @@ internal static class ApproveCommand
                     : [];
 
                 Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, allowed, console);
-
-                if (pairing is not null)
-                {
-                    server.Browsers?.Arm(pairing);
-                    console.WriteLine($"keypaste: pairing a browser as {pairing} for the next 2 minutes: in keypaste's extension, press Connect, then answer here.");
-                }
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.

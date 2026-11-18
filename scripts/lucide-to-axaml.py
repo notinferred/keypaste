@@ -18,14 +18,14 @@ SOURCE = ROOT / "third_party" / "lucide" / "icons"
 TARGET = ROOT / "src" / "Keypaste.App" / "Theme" / "Icons.axaml"
 
 ICONS = """
-activity alert-triangle arrow-down arrow-right arrow-up bot bug check chevron-down chevron-right
+activity alert-triangle app-window arrow-down arrow-right arrow-up bot braces bug check chevron-down chevron-left chevron-right
 chevrons-up-down
-circle-check circle-dot clipboard-check clock copy credit-card database download ellipsis
-external-link eye eye-off file-code file-down file-input file-key file-lock-2 file-up filter
-fingerprint folder folder-git-2 folder-input folder-open folder-pen folder-plus globe history
-hourglass import info key key-round key-square layers link lock lock-open log-out menu moon
+circle-check circle-dot clipboard-check clock copy credit-card database download ellipsis ethernet-port
+external-link eye eye-off file-code file-down file-input file-key file-lock-2 file-text file-up filter
+fingerprint folder folder-git-2 folder-input folder-open folder-pen folder-plus globe history house id-card inbox
+hourglass import info key key-round key-square laptop layers link list-filter lock lock-open log-out menu moon network play
 more-horizontal panel-left pencil plug plus refresh-cw rotate-cw search server settings share-2
-shield shield-check sticky-note sun terminal ticket trash-2 unlock upload usb user vault wand-2 x
+shield shield-check square-pen star sticky-note sun tag terminal ticket trash trash-2 unlock upload usb user users vault wand-2 wifi x
 """.split()
 
 # Names the design uses that this Lucide release publishes under another name.

@@ -104,6 +104,34 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.Equal(fixture.Unlocked.Find("api")?.Password, value);
     }
 
+    /// <summary>A card, a kind the app added with its template, is an item the CLI shows: its tag, its protected number and its value.</summary>
+    [Fact]
+    public void A_card_made_from_its_template_in_the_gui_is_what_the_cli_shows()
+    {
+        using var fixture = new VaultFixture(("seed", "seed-password"));
+        using var screen = Entries(fixture);
+
+        var form = NewItemForm.Open(screen.Model, "visa", ItemTemplate.Card);
+        foreach (var c in "4111 1111 1111 1111")
+        {
+            form.CustomFields.Single(field => field.Name == "Number").Secret.Type(c);
+        }
+
+        screen.Model.ConfirmAddCommand.Execute(null);
+        Assert.Null(screen.Model.Error);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("show", "visa", "--json", "--reveal"));
+        Assert.NotEmpty(fixture.Cli.Out);
+
+        using var json = System.Text.Json.JsonDocument.Parse(fixture.Cli.Out);
+        var shown = json.RootElement.EnumerateArray().Single();
+        Assert.Equal(["Credit Card"], shown.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()));
+        var number = shown.GetProperty("fields").EnumerateArray().Single(field => field.GetProperty("name").GetString() == "Number");
+        Assert.True(number.GetProperty("protected").GetBoolean());
+        Assert.Equal("4111 1111 1111 1111", number.GetProperty("value").GetString());
+        Assert.Equal(ItemKind.Card, fixture.Unlocked.Find("visa")?.Kind);
+    }
+
     [Fact]
     public void An_entry_edited_in_the_gui_is_what_the_cli_reads_back()
     {

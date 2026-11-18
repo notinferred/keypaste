@@ -36,7 +36,10 @@ namespace Keypaste.Mcp.Tools;
 /// result and T-35 say.
 /// </para>
 /// </remarks>
-internal sealed class RunTool(ServerOptions options, ApproverConnection approver, AuditLog audit) : McpServerTool
+/// <param name="options">What this bridge was started with.</param>
+/// <param name="vaults">The vaults this bridge serves, each through its own owner; a run's set comes from one vault.</param>
+/// <param name="audit">The bridge's audit log.</param>
+internal sealed class RunTool(ServerOptions options, BridgeVaults vaults, AuditLog audit) : McpServerTool
 {
     private static readonly TimeSpan _heartbeat = TimeSpan.FromSeconds(10);
 
@@ -70,7 +73,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         ArgumentNullException.ThrowIfNull(request);
 
         var call = Read(request.Params?.Arguments);
-        var line = new Line(call);
+        var line = new Line(call) { VaultKey = vaults.SoleKey };
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
 
         if (!initialized)
@@ -157,6 +160,21 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             }
         }
 
+        var routing = await vaults.RouteAsync(
+            call.Vault,
+            [.. (call.References ?? []).Select(reference => reference.Parsed).OfType<EntryReference>().Select(named => BridgeVaults.PathOf(named.Entry))],
+            [.. new[] { call.Project }.Concat((call.References ?? []).Select(reference => reference.Parsed).OfType<EnvReference>().Select(env => env.Project)).OfType<string>().Distinct(StringComparer.Ordinal)],
+            cancellationToken).ConfigureAwait(false);
+
+        if (routing.Route is not { } route)
+        {
+            return Finish(client, line, Verdict.Denied(routing.Method, routing.Reason, routing.Refusal), null);
+        }
+
+        line.Route = route;
+        line.VaultKey = route.Key;
+        var approver = route.Connection;
+
         using var heartbeat = Heartbeat.Start(request, cancellationToken);
 
         var (reply, outcome, refusal) = await approver.RunAsync(
@@ -211,7 +229,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
                 _ => Verdict.Denied(
                     AuditMethod.NoApprover,
                     "no keypaste process holds the vault unlocked",
-                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(route.Vault, cancellationToken).ConfigureAwait(false)
                         ? ToolText.AppLocked
                         : null),
             }, null);
@@ -267,7 +285,9 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             return ToolResults.Refuse(ToolText.AuditUnavailable);
         }
 
-        return answer ?? ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method));
+        var refusal = verdict.Refusal ?? ToolText.Refusal(verdict.Method);
+
+        return answer ?? ToolResults.Refuse(vaults.Several && line.Route?.Vault is { } named ? ToolText.InVault(named.Name, refusal) : refusal);
     }
 
     private static Verdict Invalid(string argument, string rule) =>
@@ -342,7 +362,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             Text("reason") ?? string.Empty,
             timeout);
 
-        return call with { Malformed = malformed };
+        return call with { Vault = Text("vault"), Malformed = malformed };
     }
 
     /// <summary>The arguments as the agent sent them.</summary>
@@ -356,6 +376,9 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         string Reason,
         int TimeoutSeconds)
     {
+        /// <summary>The vault the agent named, or null.</summary>
+        public string? Vault { get; init; }
+
         public string? Malformed { get; init; }
 
         public RunArguments Arguments => new(Command, Directory, Project, Profile, Keys, References, Reason, TimeoutSeconds);
@@ -379,6 +402,12 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         /// <summary>Whether the owner recorded the call, so this bridge writes no line for it.</summary>
         internal bool Recorded { get; set; }
 
+        /// <summary>The vault the run went to, or null before it went to one.</summary>
+        internal VaultRoute? Route { get; set; }
+
+        /// <summary>The vault key the line names.</summary>
+        internal string? VaultKey { get; set; }
+
         internal AuditRecord Record(AuditClient client, Verdict verdict, ServerOptions options) =>
             RequestRecords.Run(
                 client,
@@ -390,7 +419,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
                 Entries,
                 options.Exposure.Globs,
                 Session,
-                options.VaultKey);
+                VaultKey);
     }
 
     /// <summary>Tells a client that asked for progress that the run is alive, so its request timeout resets.</summary>

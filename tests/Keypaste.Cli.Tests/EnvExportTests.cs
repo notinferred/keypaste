@@ -563,6 +563,6 @@ public sealed class EnvExportTests
 
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(CliApp.ExitNotFound, harness.Run("env", "export", "billing", "-p", "qa", "--vault", harness.VaultPath));
-        Assert.Contains("'billing' has no 'qa' environment", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("'billing' has no 'qa' stage", harness.Err, StringComparison.Ordinal);
     }
 }

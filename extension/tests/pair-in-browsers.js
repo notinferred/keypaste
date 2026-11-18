@@ -2,7 +2,7 @@
 'use strict';
 
 // scripts/verify-extension-load.sh's browser half: tests/Keypaste.AppDriver holds the vault, turns the host on for Chromium and
-// Firefox, and arms pairing; each browser loads its unpacked build, its options page presses Connect once the extension has
+// Firefox; each browser loads its unpacked build, its options page presses Connect once the extension has
 // connected, the driver allows the pairing, and the page and Settings' list must both show it under that build. On a failure
 // it prints what each browser and keypaste left: the extension's status, page and console, the host manifest and the logs.
 //

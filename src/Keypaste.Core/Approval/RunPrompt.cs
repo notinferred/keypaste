@@ -38,6 +38,15 @@ public sealed record RunPrompt
     /// <summary>The bridge's <c>--client-label</c>, sanitized, or null.</summary>
     public string? Label { get; init; }
 
+    /// <summary>Who is asking, as the requester line says it: verified only from what the system said of the connection, never from the label.</summary>
+    public RequesterIdentity Identity
+    {
+        get => _identity ?? new RequesterIdentity(Client, null, false);
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
+
     /// <summary>The agent's reason, sanitized and capped as a credential prompt's is.</summary>
     public required string Reason { get; init; }
 
@@ -88,6 +97,7 @@ public sealed record RunPrompt
         {
             Client = named.Client,
             Label = named.Label,
+            Identity = named.Identity,
             Reason = named.Reason,
             ReasonWasTruncated = named.ReasonWasTruncated,
             ReasonWasAltered = named.ReasonWasAltered,

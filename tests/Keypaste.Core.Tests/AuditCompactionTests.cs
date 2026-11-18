@@ -307,6 +307,57 @@ public sealed class AuditCompactionTests : IDisposable
         Assert.False(File.Exists(LogPath));
     }
 
+    /// <summary>Two vaults' owners in one process write and sign one log, and it verifies under both keys, each checkpoint under its own vault's.</summary>
+    [Fact]
+    public void Two_owners_in_one_process_sign_one_log_that_verifies_under_both_keys()
+    {
+        var acme = new AuditCheckpointKey(RandomNumberGenerator.GetBytes(32), "fedcba9876543210");
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(_today), out var personal, out var error), error);
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(_today), out var work, out error), error);
+
+        using (personal)
+        using (work)
+        {
+            Assert.True(personal.TryAppend(Release("claude-code"), out error), error);
+            Assert.True(work.TryAppend(Release("claude-code") with { Vault = acme.Vault }, out error), error);
+            Assert.True(personal.TryCheckpoint(_key, "personal-session", out error), error);
+            Assert.True(work.TryAppend(Release("cursor") with { Vault = acme.Vault }, out error), error);
+            Assert.True(work.TryCheckpoint(acme, "acme-session", out error), error);
+        }
+
+        var both = AuditChainVerifier.Verify(LogPath, null, [_key, acme]);
+        var one = AuditChainVerifier.Verify(LogPath, checkpoints: _key);
+
+        Assert.Equal((AuditChainVerdict.Intact, 2, 2, 0), (both.Verdict, both.Checkpoints, both.SignedCheckpoints, both.UnsignedRecords));
+        Assert.Equal((AuditChainVerdict.Intact, 1, 2), (one.Verdict, one.SignedCheckpoints, one.UnsignedRecords));
+        Assert.Empty(both.Findings);
+    }
+
+    /// <summary>
+    /// A log another open vault's owner sealed is compacted over once that vault's key checks its seal, and refused
+    /// while the key is not given or did not sign the seal that names it.
+    /// </summary>
+    [Fact]
+    public void A_seal_another_open_vaults_owner_wrote_is_checked_under_its_key_before_it_is_sealed_over()
+    {
+        var acme = new AuditCheckpointKey(RandomNumberGenerator.GetBytes(32), "fedcba9876543210");
+        CompactedLog();
+        Write(_today.AddDays(1), Lookup("cursor", AuditTools.List, granted: true) with { Vault = acme.Vault });
+        Write(_today.AddDays(40), Release("claude-code"));
+
+        Assert.Equal(AuditCompactionOutcome.Refused, AuditCompaction.Compact(LogPath, acme, 365, _today.AddDays(40), "acme-session").Outcome);
+
+        var forged = new AuditCheckpointKey(RandomNumberGenerator.GetBytes(32), _vault);
+        Assert.Equal(AuditCompactionOutcome.Refused, AuditCompaction.Compact(LogPath, acme, 365, _today.AddDays(40), "acme-session", [forged]).Outcome);
+
+        var result = AuditCompaction.Compact(LogPath, acme, 365, _today.AddDays(40), "acme-session", [_key]);
+
+        Assert.Equal(AuditCompactionOutcome.Compacted, result.Outcome);
+        var report = AuditChainVerifier.Verify(LogPath, null, [_key, acme]);
+        Assert.Equal((AuditChainVerdict.Intact, AuditCompactionCheck.Verified), (report.Verdict, report.Compaction));
+        Assert.Equal(AuditCompactionCheck.OtherVault, AuditChainVerifier.Verify(LogPath, checkpoints: _key).Compaction);
+    }
+
     private void OldLog()
     {
         Write(_today.AddDays(-40), Lookup("claude-code", AuditTools.List, granted: true), Release("claude-code"), Lookup("claude-code", AuditTools.Find, granted: true));

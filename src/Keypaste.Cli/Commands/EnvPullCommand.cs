@@ -32,7 +32,7 @@ internal static class EnvPullCommand
         "pull",
         "import a .env file, then offer to delete it\n\n"
             + "a key the project has is updated where it lives; a new one becomes a protected field of --entry, or of the "
-            + "environment's home item env/<project>/.env, created tagged. if any line is malformed, every problem is "
+            + "stage's home item env/<project>/.env, created tagged. if any line is malformed, every problem is "
             + "reported and nothing is imported. values are stored exactly as written: ${VAR} is not expanded.",
         Execute)
     {

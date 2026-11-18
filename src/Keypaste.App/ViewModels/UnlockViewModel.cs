@@ -1118,7 +1118,18 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (await _picker.PickNewAsync().ConfigureAwait(true) is not { } path)
+        if (await _picker.PickNewAsync().ConfigureAwait(true) is { } path)
+        {
+            BeginCreate(path);
+        }
+    }
+
+    /// <summary>Opens the create fields for a new vault at <paramref name="path"/>, unless a file is there already.</summary>
+    internal void BeginCreate(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_disposed)
         {
             return;
         }

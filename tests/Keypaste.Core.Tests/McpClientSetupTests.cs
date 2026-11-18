@@ -404,7 +404,7 @@ public sealed class McpClientSetupTests : IDisposable
     public void An_approver_the_bridge_would_refuse_is_refused_before_anything_is_written(string approver)
     {
         Assert.False(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins(null, null, approver), "codex", [], out _, out var error));
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins([], null, approver), "codex", [], out _, out var error));
         Assert.StartsWith("approver: ", error, StringComparison.Ordinal);
     }
 
@@ -412,8 +412,8 @@ public sealed class McpClientSetupTests : IDisposable
     public void The_vault_and_the_audit_log_are_made_absolute()
     {
         Assert.True(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins("vault.kdbx", "audit.jsonl", null), "codex", [], out var registration, out _));
-        Assert.Equal(Path.GetFullPath("vault.kdbx"), registration.VaultPath);
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins(["vault.kdbx"], "audit.jsonl", null), "codex", [], out var registration, out _));
+        Assert.Equal([Path.GetFullPath("vault.kdbx")], registration.VaultPaths);
         Assert.Equal(Path.GetFullPath("audit.jsonl"), registration.AuditLogPath);
     }
 
@@ -427,7 +427,7 @@ public sealed class McpClientSetupTests : IDisposable
         var server = new McpServerCommand(Path.Combine(_directory, "keypaste"), [McpServerLocator.BridgeArgument]);
         Assert.True(McpServerRegistration.TryCreate(
             server,
-            new McpServerPins(Path.Combine(_directory, "v.kdbx"), Path.Combine(_directory, "a.jsonl"), "keypaste-vault-0123"),
+            new McpServerPins([Path.Combine(_directory, "v.kdbx")], Path.Combine(_directory, "a.jsonl"), "keypaste-vault-0123"),
             "claude-code",
             ["env/**"],
             out var registration,
@@ -453,12 +453,38 @@ public sealed class McpClientSetupTests : IDisposable
         Assert.True(wide.Covers(EntryExposure.Default));
     }
 
+    /// <summary>A tool allowed several vaults starts one bridge naming each, in the order chosen.</summary>
+    [Fact]
+    public void A_registration_for_several_vaults_names_each_with_a_vault_flag_of_its_own()
+    {
+        var personal = Path.Combine(_directory, "Personal.kdbx");
+        var acme = Path.Combine(_directory, "Acme.kdbx");
+        var server = new McpServerCommand(Path.Combine(_directory, "keypaste"), [McpServerLocator.BridgeArgument]);
+
+        Assert.True(McpServerRegistration.TryCreate(server, new McpServerPins([personal, acme, personal], null, null), "claude-code", [], out var registration, out var error), error);
+
+        Assert.Equal([personal, acme], registration.VaultPaths);
+        Assert.Equal(
+            [server.Path, "mcp", "--vault", personal, "--vault", acme, "--client-label", "claude-code", "--allow-run", "--expose", "**"],
+            registration.CommandLine());
+        Assert.Equal(["--vault", personal, "--vault", acme], registration.FileEntry(typed: false)["args"]!.AsArray().Select(node => (string?)node).Skip(1).Take(4));
+    }
+
+    /// <summary>The bridge refuses one pipe for several vaults, so no registration is written that it would refuse at each start.</summary>
+    [Fact]
+    public void An_approver_with_several_vaults_is_refused_before_anything_is_written()
+    {
+        Assert.False(McpServerRegistration.TryCreate(
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), new McpServerPins(["a.kdbx", "b.kdbx"], null, "keypaste-vault-0123"), "codex", [], out _, out var error));
+        Assert.StartsWith("approver: ", error, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_registration_for_the_chosen_vault_names_no_vault()
     {
         var registration = Registration(vault: null);
 
-        Assert.Null(registration.VaultPath);
+        Assert.Empty(registration.VaultPaths);
         Assert.Equal([registration.Server.Path, "mcp", "--client-label", "claude-code", "--allow-run", "--expose", "**"], registration.CommandLine());
         Assert.DoesNotContain("--vault", McpConfigFile.OneLine(registration.FileEntry(typed: false)), StringComparison.Ordinal);
     }
@@ -472,7 +498,7 @@ public sealed class McpClientSetupTests : IDisposable
         Assert.Equal(["/usr/bin/node", "/opt/claude/cli.js", "mcp", "add", "C:\\Program Files\\keypaste\\keypaste.exe"], command.Started);
     }
 
-    private static McpServerPins Pins(string? vault) => new(vault, AuditLogPath: null, ApproverName: null);
+    private static McpServerPins Pins(string? vault) => new(vault is null ? [] : [vault], AuditLogPath: null, ApproverName: null);
 
     private static string Quoted(string value) =>
         value.Length > 0 && !value.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'') ? value : "\"" + value.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";

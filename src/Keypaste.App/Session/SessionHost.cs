@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
@@ -55,8 +56,10 @@ internal sealed class SessionHost : IDisposable
     private readonly Func<IApprovalChannel> _approvals;
     private readonly Action? _requestLock;
     private readonly string? _launchName;
-    private readonly PairingUses _pairingUses = new();
+    private readonly OwnerPairings _pairings;
     private readonly Action<Exception>? _unexpected;
+    private readonly PromptTurns? _turns;
+    private readonly Func<IReadOnlyList<AuditCheckpointKey>>? _otherKeys;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private int _auditFailureTold;
@@ -68,13 +71,19 @@ internal sealed class SessionHost : IDisposable
     /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
     /// <param name="servesLaunches">Whether each unlock is also served on a launch endpoint for the run Terminal starts.</param>
     /// <param name="unexpected">Told of an exception the owner refused a request for as one it could not complete, or null.</param>
+    /// <param name="turns">The prompt queue every vault open in this app shares, or null for one of this vault's own.</param>
+    /// <param name="otherKeys">The checkpoint keys of the other vaults open in this app, which write to the same log, or null for none.</param>
+    /// <param name="pairings">This computer's browser pairings as every vault open in this app serves them, or null for this vault's alone.</param>
     internal SessionHost(
         AppVaultSession session,
         string? approverOverride,
         Func<IApprovalChannel> approvals,
         Action? requestLock = null,
         bool servesLaunches = false,
-        Action<Exception>? unexpected = null)
+        Action<Exception>? unexpected = null,
+        PromptTurns? turns = null,
+        Func<IReadOnlyList<AuditCheckpointKey>>? otherKeys = null,
+        OwnerPairings? pairings = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(approvals);
@@ -84,6 +93,10 @@ internal sealed class SessionHost : IDisposable
         _approvals = approvals;
         _requestLock = requestLock;
         _unexpected = unexpected;
+        _turns = turns;
+        _otherKeys = otherKeys;
+        _pairings = pairings ?? new OwnerPairings(BrowserPairings.In(session.Home));
+        _pairings.Changed += OnPairingsChanged;
         _launchName = servesLaunches ? LaunchEndpoint.NewName() : null;
 
         _session.Opened += OnOpened;
@@ -98,6 +111,9 @@ internal sealed class SessionHost : IDisposable
     /// <summary>The endpoint being served, or null.</summary>
     /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>
     internal event EventHandler<EditDone>? TerminalEdited;
+
+    /// <summary>Raised, on whichever thread made it, once a browser's pairing is made or removed for this computer.</summary>
+    internal event EventHandler? PairingsChanged;
 
     internal string? Endpoint { get; private set; }
 
@@ -305,44 +321,7 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
-    internal DateTimeOffset? PairingArmedUntil
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _hosted?.Browsers?.ArmedUntil;
-            }
-        }
-    }
-
-    /// <summary>Arms pairing a browser for two minutes and one pairing, for the person's press of Pair a browser and nothing else.</summary>
-    /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
-    internal bool ArmPairing()
-    {
-        lock (_gate)
-        {
-            if (_hosted?.Browsers is not { } browsers)
-            {
-                return false;
-            }
-
-            browsers.Arm();
-            return true;
-        }
-    }
-
-    /// <summary>Ends an arming before its two minutes are up.</summary>
-    internal void DisarmPairing()
-    {
-        lock (_gate)
-        {
-            _hosted?.Browsers?.Disarm();
-        }
-    }
-
-    /// <summary>The pairings the unlocked vault holds, with when each was last proven here; none while nothing here answers browsers.</summary>
+    /// <summary>The pairings this computer holds for the unlocked vaults, with when each was last proven; none while nothing here answers browsers.</summary>
     internal IReadOnlyList<PairingRow> Pairings()
     {
         SessionBrowsers? browsers;
@@ -371,7 +350,7 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
     }
 
-    /// <summary>The "Always fill" allowances of the pairings the unlocked vault holds; none while nothing here answers browsers.</summary>
+    /// <summary>The logins the pairings the unlocked vault holds filled on a site before; none while nothing here answers browsers.</summary>
     internal IReadOnlyList<AllowanceRow> Allowances()
     {
         SessionBrowsers? browsers;
@@ -384,7 +363,7 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Allowances() ?? [];
     }
 
-    /// <summary>Removes an "Always fill" allowance for the person.</summary>
+    /// <summary>Forgets, for the person, that a login was filled on a site before, so its next fill there is asked.</summary>
     /// <param name="allowance">The allowance.</param>
     /// <param name="problem">Why it was not removed, or empty.</param>
     /// <returns>Whether it was removed.</returns>
@@ -455,7 +434,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), () => Volatile.Write(ref _auditFailureTold, 0), _unexpected);
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _pairings, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), () => Volatile.Write(ref _auditFailureTold, 0), _unexpected, _turns, _otherKeys);
             _hosted = hosted;
 
             // The authority answering agents merges another program's save, so its withdrawal and its line are the merge's.
@@ -502,9 +481,24 @@ internal sealed class SessionHost : IDisposable
             _disposed = true;
             _session.Opened -= OnOpened;
             _session.Locked -= OnLocked;
+            _pairings.Changed -= OnPairingsChanged;
             StopLocked();
         }
     }
+
+    /// <summary>What saving an edit through a session's own save came to, as an owner's write reports it.</summary>
+    /// <param name="written">The session's write.</param>
+    /// <returns>The save.</returns>
+    internal static AgentSave Saved(WriteResult<bool> written) => written.Outcome switch
+    {
+        WriteOutcome.Saved => AgentSave.Saved,
+        WriteOutcome.NothingToSave => AgentSave.Unchanged,
+        WriteOutcome.Locked => new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
+        WriteOutcome.ChangedOnDisk => new AgentSave(AgentSaveOutcome.ChangedOnDisk, "another program changed the vault since the app opened it; reload it in the app first"),
+        _ => new AgentSave(AgentSaveOutcome.Failed, written.Reason ?? "the vault could not be saved"),
+    };
+
+    private void OnPairingsChanged(object? sender, EventArgs e) => PairingsChanged?.Invoke(this, e);
 
     /// <summary>What answers for one unlock, and the endpoints it is served on.</summary>
     private sealed class Hosted : IDisposable
@@ -598,12 +592,14 @@ internal sealed class SessionHost : IDisposable
             SessionLifetime lifetime,
             IApprovalChannel channel,
             Action? requestLock,
-            PairingUses pairingUses,
+            OwnerPairings pairings,
             string? approverOverride,
             string? launchName,
             Action<EditDone> edited,
             Action auditWritten,
-            Action<Exception>? unexpected)
+            Action<Exception>? unexpected,
+            PromptTurns? turns,
+            Func<IReadOnlyList<AuditCheckpointKey>>? otherKeys)
         {
             var auditPath = KeypasteHome.AuditPath(session.Home);
             AuditOpener? audit = new(auditPath, auditWritten);
@@ -619,10 +615,13 @@ internal sealed class SessionHost : IDisposable
                     CurrentLifetime = () => session.Lifetime,
                     UnlockedFor = session.UnlockedFor,
                     Channel = channel,
+                    Turns = turns,
+                    OtherCheckpointKeys = otherKeys ?? (() => []),
                     Rules = new SealedAgentRules(
-                        new AgentRulesFile(KeypasteHome.AgentsPath(session.Home)),
+                        AgentRulesFile.For(session.Home, vault),
                         () => session.UnlockedFor(lifetime),
-                        edit => Saved(session.WriteFor(lifetime, edit, changed => changed))),
+                        edit => Saved(session.WriteFor(lifetime, edit, changed => changed)),
+                        AgentRulesFile.Shared(session.Home)),
                     Audit = audit.Open,
                     AuditPath = auditPath,
                     KeepLogDays = () => Core.Settings.AppSettings.Load(KeypasteHome.SettingsPath(session.Home)).KeepLogDays,
@@ -635,8 +634,8 @@ internal sealed class SessionHost : IDisposable
                     Edited = edited,
                     Unexpected = unexpected,
 
-                    // A browser pairs only while the person armed it in Settings, saved through this session.
-                    BrowserUses = pairingUses,
+                    // A browser pairs once the person confirms the code it shows, for every vault open in this app.
+                    BrowserPairings = pairings,
                 });
 
                 string? launchFailure = null;
@@ -692,16 +691,6 @@ internal sealed class SessionHost : IDisposable
                 return (null, $"keypaste could not listen for agents: {ex.Message}");
             }
         }
-
-        /// <summary>What saving an agent's settings through the session's own save came to.</summary>
-        private static AgentSave Saved(WriteResult<bool> written) => written.Outcome switch
-        {
-            WriteOutcome.Saved => AgentSave.Saved,
-            WriteOutcome.NothingToSave => AgentSave.Unchanged,
-            WriteOutcome.Locked => new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
-            WriteOutcome.ChangedOnDisk => new AgentSave(AgentSaveOutcome.ChangedOnDisk, "another program changed the vault since the app opened it; reload it in the app first"),
-            _ => new AgentSave(AgentSaveOutcome.Failed, written.Reason ?? "the vault could not be saved"),
-        };
 
         public void Dispose()
         {

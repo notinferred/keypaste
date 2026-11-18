@@ -173,7 +173,7 @@ public sealed class EachFactOnceTests
         var labels = Shown<TextBlock>(shell).Where(block => block.Classes.Contains("label")).Select(block => block.Text).ToList();
         Assert.DoesNotContain("Username", labels);
         Assert.DoesNotContain("Password", labels);
-        Assert.DoesNotContain("URL", labels);
+        Assert.DoesNotContain("Website", labels);
         Assert.DoesNotContain(Shown<RevealedValue>(shell), value => value.Name == "CurrentPassword");
         Assert.False(shell.Named<Button>("CopyPassword").IsEffectivelyVisible);
         Assert.DoesNotContain(Shown<Control>(shell), control => AutomationProperties.GetName(control) == "Reveal the password");
@@ -238,7 +238,8 @@ public sealed class EachFactOnceTests
         RenderedShell.Drain();
 
         Assert.DoesNotContain(TableStates.ItemColumns, column => column.Key == "kind");
-        var row = shell.Named<ListBox>("Rows").ContainerFromIndex(0)!;
+        var rows = shell.Named<ListBox>("Rows");
+        var row = rows.ContainerFromItem(entries.Rows[0])!;
         var mark = row.GetVisualDescendants().OfType<Panel>().First(panel => panel.Name == "KindMark");
         Assert.Equal(entries.Rows[0].KindLabel, AutomationProperties.GetName(mark));
         Assert.Equal(entries.Rows[0].KindLabel, ToolTip.GetTip(mark));
@@ -248,9 +249,9 @@ public sealed class EachFactOnceTests
         Assert.Contains(mark, shell.Window.GetInputElementsAt(corner));
     });
 
-    /// <summary>Settings opens on settings: one line, gone when nothing was found, and the sidebar's count stays what it says.</summary>
+    /// <summary>Security is a place on the rail whose badge counts what needs review, and only its screen draws a finding.</summary>
     [Fact]
-    public Task Settings_says_recommendations_in_one_line_opening_their_screen_with_a_Back() => HeadlessSession.On(async () =>
+    public Task Security_counts_its_findings_on_the_rail_and_only_its_screen_draws_them() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             "keypaste-recommendations-line-",
@@ -262,19 +263,19 @@ public sealed class EachFactOnceTests
         Assert.True(count > 0);
 
         Assert.DoesNotContain(Shown<TextBlock>(shell), block => block.Text == "STRIPE_SECRET_KEY");
-        Assert.Equal(count.ToString(System.Globalization.CultureInfo.InvariantCulture), shell.Shell.RecommendationsRow.Count);
-        Assert.Contains(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
+        Assert.Equal(count.ToString(System.Globalization.CultureInfo.InvariantCulture), shell.Shell.SecurityPlace.Count);
+        Assert.True(shell.Shell.SecurityPlace.HasBadge);
 
-        shell.Shell.SelectedSidebarRow = shell.Shell.RecommendationsRow;
+        shell.Shell.SelectedRailPlace = shell.Shell.SecurityPlace;
         RenderedShell.Drain();
 
         Assert.Same(recommendations, shell.Shell.Content);
-        Assert.True(shell.Shell.HasBack);
+        Assert.False(shell.Shell.HasBack);
         Assert.Contains(Shown<TextBlock>(shell), block => block.Text == "STRIPE_SECRET_KEY");
         Assert.DoesNotContain(Shown<TextBlock>(shell), block => block.Text == "Needs review");
 
         // Leaving and coming back keeps the list, which the shell owns for the whole unlock.
-        shell.Shell.BackCommand.Press();
+        shell.Shell.GoTo(1);
         RenderedShell.Drain();
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
         Assert.Equal(count, recommendations.NeedsReview);
@@ -287,34 +288,21 @@ public sealed class EachFactOnceTests
         }
 
         RenderedShell.Drain();
-        Assert.Equal(string.Empty, shell.Shell.RecommendationsRow.Count);
-        Assert.Contains(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
+        Assert.Equal(string.Empty, shell.Shell.SecurityPlace.Count);
+        Assert.False(shell.Shell.SecurityPlace.HasBadge);
     });
 
     [Fact]
-    public Task The_sidebar_lists_no_recommendations_when_nothing_was_found() => HeadlessSession.On(async () =>
+    public Task Security_draws_no_badge_when_nothing_was_found() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell("keypaste-recommendations-none-");
         await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
         RenderedShell.Drain();
         Assert.True(shell.Shell.Recommendations.IsEmpty);
 
-        Assert.DoesNotContain(shell.Shell.RecommendationsRow, shell.Shell.SidebarRows);
+        Assert.False(shell.Shell.SecurityPlace.HasBadge);
+        Assert.DoesNotContain(shell.Named<ListBox>("RailNav").GetVisualDescendants().OfType<Border>(), border => border.Name == "RailBadge" && border.IsEffectivelyVisible);
     });
-
-    /// <summary>A column's usual item is the one holding most of its keys, a tie going to the first path in ordinal order.</summary>
-    [Fact]
-    public void A_columns_usual_item_is_decided_the_same_way_every_time()
-    {
-        Assert.Equal("b", EnvProfileCell.UsualOf([["a"], ["b"], ["b"]]));
-        Assert.Equal("a", EnvProfileCell.UsualOf([["b"], ["b"], ["a"], ["a"]]));
-        Assert.Null(EnvProfileCell.UsualOf([["b"], ["a"]]));
-        Assert.Null(EnvProfileCell.UsualOf([["a"], ["b", "c"], ["b", "c"]]));
-        Assert.Null(EnvProfileCell.UsualOf([[], ["a", "b"]]));
-
-        var usual = new EnvProfileCell("prod", EnvCellState.Set, null, [], null, new CommunityToolkit.Mvvm.Input.RelayCommand(() => { })) { Sources = ["a"], UsualSource = "a", Also = ["dev"] };
-        Assert.Equal("item also in dev", usual.SourceNote);
-    }
 
     /// <summary>Then and Now show what changed, with the rest in one line; a custom field's value is never read to say so.</summary>
     [Fact]

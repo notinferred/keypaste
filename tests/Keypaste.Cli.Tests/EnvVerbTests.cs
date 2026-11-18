@@ -152,7 +152,7 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "billing", "OTHER_KEY=v", "--entry", "services/Other", "--vault", harness.VaultPath));
-        Assert.Contains("services/Other is not in 'billing/dev'; tag it into the environment first", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("services/Other is not in 'billing/dev'; tag it into the stage first", harness.Err, StringComparison.Ordinal);
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "set", "billing", "OTHER_KEY=v", "--entry", "services/Absent", "--vault", harness.VaultPath));
@@ -345,10 +345,10 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "rm", "acme-api", "PULLED", "-p", "qa", "--yes", "--vault", harness.VaultPath));
-        Assert.Contains("'acme-api' has no 'qa' environment", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("'acme-api' has no 'qa' stage", harness.Err, StringComparison.Ordinal);
 
         Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "acme-api", "X=y", "-p", "Staging", "--vault", harness.VaultPath));
-        Assert.Contains("is not an environment name", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("is not a stage name", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -387,7 +387,7 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "ls", "acme-api", "-p", "qa", "--vault", harness.VaultPath));
-        Assert.Equal("keypaste env ls: 'acme-api' has no 'qa' environment", harness.Err.Trim());
+        Assert.Equal("keypaste env ls: 'acme-api' has no 'qa' stage", harness.Err.Trim());
     }
 
     [Fact]

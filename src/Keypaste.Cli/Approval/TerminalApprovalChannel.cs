@@ -30,9 +30,9 @@ namespace Keypaste.Cli.Approval;
 /// newlines, no bidirectional overrides — so it cannot draw a second dialog inside this one or move
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
 /// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once, and
-/// every other answer, Enter and silence included, is a denial (D-0326). Where the prompt offers them,
-/// <c>a</c> and <c>b</c> ask to confirm an Always allow or an Always block with <c>y</c>, and any other
-/// answer to that is a denial too.
+/// every other answer, Enter and silence included, is a denial (D-0326). Where the prompt offers it,
+/// <c>a</c> asks to confirm an Always allow with <c>y</c>, and any other answer to that is a denial too. Blocking is
+/// set on the agent's page in the app, never at a prompt.
 /// </para>
 /// </remarks>
 internal sealed class TerminalApprovalChannel : IApprovalChannel
@@ -70,7 +70,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
-        return AnswerAsync(started, Always.Of(request, request.Field, blocks: true), cancellationToken);
+        return AnswerAsync(started, Always.Of(request, $"this item's {request.Field}"), cancellationToken);
     }
 
     /// <summary>Lists the items a request names by number, reads the number of the one the person picks, then asks about that one as any request is asked.</summary>
@@ -101,7 +101,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         _console.WriteLine(string.Join(Environment.NewLine, string.Empty, $"  picked   [{picked + 1}] {Described(request.Candidates[picked])}"));
 
-        var always = Always.Of(request, $"the {request.Field} of {Described(request.Candidates[picked])} when it asks for {request.Entry},", blocks: false);
+        var always = Always.Of(request, $"the {request.Field} of {Described(request.Candidates[picked])} when it asks for {request.Entry},");
 
         return new ItemPick(await AnswerAsync(started, always, cancellationToken).ConfigureAwait(false), picked);
     }
@@ -248,7 +248,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             "keypaste: an agent asks you to change an item. Nothing changes unless you allow it.",
             string.Empty,
             $"  agent    {Named(request.Client, request.Label)}",
-            $"  item     {request.Item}",
+            $"  item     {request.ItemTitle}",
+            .. Group(request.Item, request.ItemTitle),
             $"  change   {request.Says}",
         ];
 
@@ -320,7 +321,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         try
         {
-            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started)), cancellationToken).ConfigureAwait(false);
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "pair"), cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -333,66 +334,71 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         _console.WriteLine(string.Join(
             Environment.NewLine,
             allowed
-                ? _console.Paint(Tone.Ok, $"keypaste: allowed. Saving the pairing {request.SuggestedName} in the vault.")
+                ? _console.Paint(Tone.Ok, $"keypaste: paired as {request.SuggestedName}.")
                 : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was paired."),
             RuleLine));
 
         return allowed ? new PairingAnswer(ApprovalAnswer.ApprovedOnce, request.SuggestedName) : new PairingAnswer(ApprovalAnswer.Denied, null);
     }
 
-    /// <summary>Lists the logins a browser may fill by number and reads the number of the one to fill; anything else denies. No Always here: that is the app's.</summary>
-    public async ValueTask<FillAnswer> AskAsync(FillPrompt request, CancellationToken cancellationToken)
+    /// <summary>Asks whether to fill the login the person picked in a page on a site it was not filled on before, reading <c>y</c> to fill; anything else denies.</summary>
+    public async ValueTask<ApprovalAnswer> AskAsync(FillPrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var started = _clock.GetTimestamp();
-        var numbers = string.Concat(Enumerable.Range(1, request.Candidates.Count).Select(number => number.ToString(CultureInfo.InvariantCulture)));
         _console.WriteLine(Render(request, RuleLine));
 
         char? choice;
 
         try
         {
-            choice = await ChooseAsync(numbers, () => Filling(request.Candidates.Count, Remaining(started)), cancellationToken).ConfigureAwait(false);
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "fill"), cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             _ = Withdrawn("Nothing was filled.");
-            return new FillAnswer(ApprovalAnswer.Denied, null, false);
+            return ApprovalAnswer.Denied;
         }
 
-        if (choice is not { } digit || numbers.IndexOf(digit, StringComparison.Ordinal) is var picked && picked < 0)
-        {
-            _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Danger, "keypaste: denied. Nothing was filled."), RuleLine));
-            return new FillAnswer(ApprovalAnswer.Denied, null, false);
-        }
+        var filled = choice == 'y';
 
-        var candidate = request.Candidates[picked];
-        _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Ok, $"keypaste: filling {Described(candidate)}."), RuleLine));
-        return new FillAnswer(ApprovalAnswer.ApprovedOnce, candidate.Uuid, false);
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            filled
+                ? _console.Paint(Tone.Ok, $"keypaste: filling {request.Title} on {request.Site}.")
+                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was filled."),
+            RuleLine));
+
+        return filled ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
     }
 
-    /// <summary>A browser's request to fill: the build, the pairing, the page's origin and each login by title and username, never a password.</summary>
+    /// <summary>A pick to fill on a new site: the question, the login by title and username, the build, the pairing and the page's origin, never a password.</summary>
     internal static string Render(FillPrompt request, string rule)
     {
         List<string> lines =
         [
             string.Empty,
             rule,
-            "keypaste: a browser asks to fill a login.",
+            $"keypaste: {request.Question}",
             string.Empty,
-            $"  browser  {request.IdentityText}",
-            $"  pairing  {request.Pairing}",
-            $"  page     {request.Origin}",
+            $"  login    {(request.Username.Length == 0 ? request.Title : $"{request.Title} ({request.Username})")}",
         ];
 
-        if (request.FormOrigin is { } form)
+        if (request.Vault.Length > 0)
         {
-            lines.Add($"  sends to {form}, another site");
+            lines.Add($"  vault    {request.Vault}");
         }
 
-        lines.Add(string.Empty);
-        lines.AddRange(request.Candidates.Select((candidate, index) => string.Create(CultureInfo.InvariantCulture, $"  [{index + 1}] {Described(candidate)}")));
+        lines.Add($"  page     {request.Origin}");
+        lines.Add($"  browser  {request.IdentityText}");
+        lines.Add($"  pairing  {request.Pairing}");
+
+        if (request.Warning.Length > 0)
+        {
+            lines.Add($"  {request.Warning}");
+        }
+
         lines.Add(string.Empty);
         lines.Add("  The browser says which page asks, and any program you run can say it too,");
         lines.Add("  so fill only on a page you are signing in to now.");
@@ -400,16 +406,6 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         return string.Join(Environment.NewLine, lines);
     }
-
-    private static string Described(FillCandidate candidate) =>
-        candidate.Username.Length == 0 ? candidate.Title : $"{candidate.Title} ({candidate.Username})";
-
-    /// <summary>The fill's choice line: deny first, then the numbers that fill a login.</summary>
-    private string Filling(int count, int secondsLeft) =>
-        _console.Paint(Tone.Accent, "[d] deny  ")
-        + _console.Paint(Tone.Ok, count == 1 ? "[1] fill  " : string.Create(CultureInfo.InvariantCulture, $"[1-{count}] fill  "))
-        + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
-        + " ";
 
     /// <summary>Shows an agent's linked set, every item and field, and reads <c>y</c> to allow it once; anything else denies the whole set.</summary>
     public async ValueTask<ApprovalAnswer> AskAsync(SetPrompt request, CancellationToken cancellationToken)
@@ -448,37 +444,25 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return AnswerAsync(started, always: null, cancellationToken);
     }
 
-    public void Tell(PairingNotice notice)
-    {
-        ArgumentNullException.ThrowIfNull(notice);
-
-        _console.WriteLine(_console.Paint(
-            Tone.Danger,
-            $"keypaste: {notice.Identity.Described} asked to pair, and was refused: pairing is not on. "
-            + "To pair it, start keypaste approve with --pair-browser <name>, then connect again."));
-    }
-
     private async ValueTask<ApprovalAnswer> AnswerAsync(long started, Always? always, CancellationToken cancellationToken)
     {
-        var choices = _choices + (always is null ? string.Empty : always.Blocks ? "ab" : "a");
+        var choices = _choices + (always is null ? string.Empty : "a");
         char? choice;
 
         try
         {
             choice = await ChooseAsync(choices, () => Choice(always, Remaining(started)), cancellationToken).ConfigureAwait(false);
 
-            if (always is not null && choice is 'a' or 'b')
+            if (always is not null && choice == 'a')
             {
-                var allows = choice == 'a';
                 _console.WriteLine(string.Join(
                     Environment.NewLine,
                     string.Empty,
-                    $"  {(allows ? "Always give" : "Always refuse")} {always.Agent} {always.What} without asking you?",
+                    $"  Always give {always.Agent} {always.What} without asking you?",
                     "  Remove it on the agent's page in the keypaste app to be asked again."));
-                var confirmed = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), allows ? "always allow" : "always block"), cancellationToken).ConfigureAwait(false) == 'y';
+                var confirmed = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "always allow"), cancellationToken).ConfigureAwait(false) == 'y';
 
-                return Said(
-                    confirmed ? allows ? ApprovalAnswer.AlwaysAllowed : ApprovalAnswer.AlwaysBlocked : ApprovalAnswer.Denied);
+                return Said(confirmed ? ApprovalAnswer.AlwaysAllowed : ApprovalAnswer.Denied);
             }
         }
         catch (OperationCanceledException)
@@ -497,7 +481,6 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             {
                 ApprovalAnswer.ApprovedOnce => _console.Paint(Tone.Ok, "keypaste: allowed once."),
                 ApprovalAnswer.AlwaysAllowed => _console.Paint(Tone.Ok, "keypaste: allowed, and always from now on."),
-                ApprovalAnswer.AlwaysBlocked => _console.Paint(Tone.Danger, "keypaste: denied, and always from now on. Nothing was released."),
                 _ => _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."),
             },
             RuleLine));
@@ -505,14 +488,13 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return answer;
     }
 
-    /// <summary>What a prompt's always answers keep, for the agent its bridge names, or null when it offers none.</summary>
+    /// <summary>What a prompt's Always allow keeps, for the agent its bridge names, or null when it offers none.</summary>
     /// <param name="Agent">The agent's name.</param>
     /// <param name="What">What the agent would always get, as the confirmation names it.</param>
-    /// <param name="Blocks">Whether Always block is offered too.</param>
-    private sealed record Always(string Agent, string What, bool Blocks)
+    private sealed record Always(string Agent, string What)
     {
-        internal static Always? Of(ApprovalPrompt prompt, string what, bool blocks) =>
-            prompt.OffersAlways && prompt.Label is { } agent ? new Always(agent, blocks ? $"this item's {what}" : what, blocks) : null;
+        internal static Always? Of(ApprovalPrompt prompt, string what) =>
+            prompt.OffersAlways && prompt.Label is { } agent ? new Always(agent, what) : null;
     }
 
     /// <summary>Reads one choice under a countdown, the choice line drawn and cleared around it.</summary>
@@ -562,7 +544,6 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         _console.Paint(Tone.Accent, always switch
         {
             null => "[d] deny  [o] once  ",
-            { Blocks: true } => "[d] deny  [o] once  [a] always  [b] block  ",
             _ => "[d] deny  [o] once  [a] always  ",
         })
         + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
@@ -600,7 +581,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             "keypaste: `keypaste run --session` is asking for a project's variables.",
             string.Empty,
             $"  project      {request.Project}",
-            $"  environment  {request.Profile}",
+            $"  stage        {request.Profile}",
         ];
 
         if (request.Requester is { } requester)
@@ -649,7 +630,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             "keypaste: an agent is asking for a credential.",
             string.Empty,
             $"  agent    {Named(request.Client, request.Label)}",
-            $"  item     {request.Entry}",
+            $"  item     {request.ItemTitle}",
+            .. Group(request.Entry, request.ItemTitle),
             $"  field    {request.Field}",
             string.Empty,
             "  the agent says it needs this because:",
@@ -762,25 +744,29 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             "  ",
             new[] { candidate.Title, candidate.Group.Length > 0 ? candidate.Group : "top level", candidate.Username, candidate.Url }.Where(part => part.Length > 0));
 
+    /// <summary>The group an item is in, on a line of its own under its title, or nothing for an item at the top level.</summary>
+    private static string[] Group(string entry, string title) =>
+        entry.Length > title.Length + 1 ? [$"  group    {entry[..(entry.Length - title.Length - 1)]}"] : [];
+
     /// <summary>The agent as both prompts name it: the client it says it is, then the label its bridge was started with.</summary>
     private static string Named(string client, string? label) => label is { } shown ? $"{client} ({shown})" : client;
 
-    /// <summary>A browser's request to pair: the build it named and the pairing's name, never a key.</summary>
+    /// <summary>A browser's request to pair: the code it shows, the build it named and the pairing's name, never a key.</summary>
     internal static string Render(PairingPrompt request, string rule) =>
         string.Join(
             Environment.NewLine,
             string.Empty,
             rule,
-            "keypaste: a browser asks to pair with this vault.",
+            $"keypaste: pair {request.Identity.Browser} with keypaste?",
             string.Empty,
+            $"  code     {request.Code}",
             $"  browser  {request.IdentityText}",
             $"  name     {request.SuggestedName}",
             string.Empty,
-            "  The browser names this build when it starts keypaste, and any program you run can name it too,",
-            "  so allow only a pairing you started in your browser just now.",
+            $"  Pair only if {request.Identity.Browser} shows the same code.",
             string.Empty,
             "  [d] deny: nothing is paired.",
-            "  [y] allow: keypaste saves the pairing in the vault, and that browser can ask you for logins.");
+            "  [y] pair: that browser can ask you for logins from the vaults open here.");
 
     /// <summary>A terminal's edit: the command, the item, where it says it came from and what changes, never a value.</summary>
     internal static string Render(TerminalEditPrompt request, string rule)
@@ -823,7 +809,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             $"  command      {request.Command}",
             $"  in           {request.Directory}",
             $"  project      {request.Project}",
-            $"  environment  {request.Profile}",
+            $"  stage        {request.Profile}",
         ];
 
         lines.AddRange(request.Variables.Select(variable =>

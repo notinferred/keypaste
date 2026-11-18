@@ -19,8 +19,8 @@ namespace Keypaste.App.Tests;
 /// <remarks>Read from the pixels of the app's own window, composed by the method launch runs.</remarks>
 public sealed class ThemeFollowsSystemTests
 {
-    private static readonly (byte R, byte G, byte B) _dark = (0x11, 0x12, 0x14);
-    private static readonly (byte R, byte G, byte B) _light = (0xF7, 0xF7, 0xF5);
+    private static readonly (byte R, byte G, byte B) _dark = (0x1E, 0x1E, 0x1F);
+    private static readonly (byte R, byte G, byte B) _light = (0xFF, 0xFF, 0xFF);
 
     [Fact]
     public Task With_no_settings_file_the_app_follows_the_system_until_Settings_chooses() => HeadlessSession.On(() =>
@@ -109,7 +109,7 @@ public sealed class ThemeFollowsSystemTests
 
         using var frame = window.CaptureRenderedFrame();
         Assert.NotNull(frame);
-        var (pixels, width, height) = AmberElements.Read(frame);
+        var (pixels, width, height) = AccentElements.Read(frame);
         var centre = (((height / 2) * width) + (width / 2)) * 4;
         return (pixels[centre + 2], pixels[centre + 1], pixels[centre]);
     }

@@ -167,7 +167,8 @@ public sealed class TerminalApprovalChannelTests
             "keypaste: an agent is asking for a credential.",
             string.Empty,
             "  agent    claude-code (ci-probe)",
-            "  item     env/demo/STRIPE_KEY",
+            "  item     STRIPE_KEY",
+            "  group    env/demo",
             "  field    password",
             string.Empty,
             "  the agent says it needs this because:",
@@ -202,7 +203,7 @@ public sealed class TerminalApprovalChannelTests
         await rig.Channel.AskAsync(Prompt(), Token);
 
         Assert.DoesNotContain("not what the vault holds", rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("protected environment", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("protected stage", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -215,7 +216,8 @@ public sealed class TerminalApprovalChannelTests
         var shown = rig.Stderr.ToString();
 
         Assert.Contains("claude-code", shown, StringComparison.Ordinal);
-        Assert.Contains("env/dev/STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("  item     STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("  group    env/dev", shown, StringComparison.Ordinal);
         Assert.Contains("password", shown, StringComparison.Ordinal);
         Assert.Contains("deploy billing to staging", shown, StringComparison.Ordinal);
 
@@ -296,7 +298,7 @@ public sealed class TerminalApprovalChannelTests
 
         var shown = rig.Stderr.ToString();
         Assert.Contains(
-            "  project      billing" + Environment.NewLine + "  environment  staging" + Environment.NewLine + "  asked by     token ci-deploy" + Environment.NewLine,
+            "  project      billing" + Environment.NewLine + "  stage        staging" + Environment.NewLine + "  asked by     token ci-deploy" + Environment.NewLine,
             shown,
             StringComparison.Ordinal);
     }
@@ -341,18 +343,18 @@ public sealed class TerminalApprovalChannelTests
     private static PairingPrompt PairingPromptFor(string name = "laptop") => new()
     {
         Identity = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore,
+        Code = "472 913",
         SuggestedName = name,
         TakenNames = [],
-        NameChosen = true,
     };
 
-    /// <summary>A browser's request to pair names the build it claims and the pairing's name, and only y pairs it (D-0634).</summary>
+    /// <summary>A browser's request to pair shows the code, the build it claims and the pairing's name, and only y pairs it.</summary>
     [Theory]
     [InlineData("y", ApprovalAnswer.ApprovedOnce)]
     [InlineData("", ApprovalAnswer.Denied)]
     [InlineData("o", ApprovalAnswer.Denied)]
     [InlineData("d", ApprovalAnswer.Denied)]
-    public async Task APairing_NamesTheBuildAndTheName_AndOnlyYPairs(string answer, ApprovalAnswer expected)
+    public async Task APairing_ShowsTheCodeTheBuildAndTheName_AndOnlyYPairs(string answer, ApprovalAnswer expected)
     {
         var rig = Build(answer);
 
@@ -361,10 +363,12 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(expected, said.Answer);
         Assert.Equal(expected == ApprovalAnswer.ApprovedOnce ? "laptop" : null, said.Name);
         var shown = rig.Stderr.ToString();
-        Assert.Contains("keypaste: a browser asks to pair with this vault.", shown, StringComparison.Ordinal);
+        Assert.Contains("keypaste: pair Chrome with keypaste?", shown, StringComparison.Ordinal);
+        Assert.Contains("  code     472 913", shown, StringComparison.Ordinal);
         Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", shown, StringComparison.Ordinal);
         Assert.Contains("  name     laptop", shown, StringComparison.Ordinal);
-        Assert.Contains("any program you run can name it too", shown, StringComparison.Ordinal);
+        Assert.Contains("Pair only if Chrome shows the same code.", shown, StringComparison.Ordinal);
+        Assert.StartsWith("[d] deny  [y] pair", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
     }
 
     private static FillPrompt FillPromptFor() => new()
@@ -374,44 +378,33 @@ public sealed class TerminalApprovalChannelTests
         Origin = "https://github.com:443",
         Site = "github.com",
         FormOrigin = "https://collector.example:443",
-        Candidates = [new FillCandidate("AAAA", "GitHub", "dana", "web"), new FillCandidate("BBBB", "GitHub", string.Empty, "work")],
-        OffersAlways = true,
+        Warning = "This form sends what you fill to collector.example, another site. keypaste asks before each fill.",
+        Title = "GitHub",
+        Username = "dana",
+        Vault = "Acme",
     };
 
-    /// <summary>A browser's fill lists each login by number, never a password, and a number fills that one; there is no always here.</summary>
+    /// <summary>A first fill on a site asks y/N about the one login picked in the page, naming it and the site and never a password.</summary>
     [Theory]
-    [InlineData("1", ApprovalAnswer.ApprovedOnce, "AAAA")]
-    [InlineData("2", ApprovalAnswer.ApprovedOnce, "BBBB")]
-    [InlineData("3", ApprovalAnswer.Denied, null)]
-    [InlineData("d", ApprovalAnswer.Denied, null)]
-    [InlineData("", ApprovalAnswer.Denied, null)]
-    public async Task A_fill_lists_the_logins_by_number_and_a_number_fills_that_one(string answer, ApprovalAnswer expected, string? uuid)
+    [InlineData("y", ApprovalAnswer.ApprovedOnce)]
+    [InlineData("d", ApprovalAnswer.Denied)]
+    [InlineData("1", ApprovalAnswer.Denied)]
+    [InlineData("", ApprovalAnswer.Denied)]
+    public async Task A_first_fill_on_a_site_asks_y_or_no_about_the_login_picked(string answer, ApprovalAnswer expected)
     {
         var rig = Build(answer);
 
         var said = await rig.Channel.AskAsync(FillPromptFor(), Token);
 
-        Assert.Equal(new FillAnswer(expected, uuid, false), said);
+        Assert.Equal(expected, said);
         var shown = rig.Stderr.ToString();
-        Assert.Contains("keypaste: a browser asks to fill a login.", shown, StringComparison.Ordinal);
+        Assert.Contains("keypaste: Fill GitHub on github.com?", shown, StringComparison.Ordinal);
+        Assert.Contains("  login    GitHub (dana)", shown, StringComparison.Ordinal);
+        Assert.Contains("  vault    Acme", shown, StringComparison.Ordinal);
         Assert.Contains("  page     https://github.com:443", shown, StringComparison.Ordinal);
-        Assert.Contains("  sends to https://collector.example:443, another site", shown, StringComparison.Ordinal);
-        Assert.Contains("  [1] GitHub (dana)", shown, StringComparison.Ordinal);
-        Assert.Contains("  [2] GitHub", shown, StringComparison.Ordinal);
-        Assert.Equal("[d] deny  [1-2] fill  45s › ", rig.Prompt.PromptsSeen[0]);
+        Assert.Contains("  This form sends what you fill to collector.example, another site.", shown, StringComparison.Ordinal);
+        Assert.StartsWith("[d] deny  [y] fill", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
         Assert.DoesNotContain("always", shown, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void ARequestToPairWhileNotArmed_SaysHowToPair()
-    {
-        var rig = Build();
-
-        rig.Channel.Tell(new PairingNotice(Keypaste.Core.Browser.BrowserIdentity.FirefoxAddOns));
-
-        var said = rig.Stderr.ToString();
-        Assert.Contains("keypaste's extension from Firefox Add-ons (browser@keypaste.invalid) asked to pair, and was refused", said, StringComparison.Ordinal);
-        Assert.Contains("--pair-browser <name>", said, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -433,18 +426,28 @@ public sealed class TerminalApprovalChannelTests
     /// <summary>An always holds only once the person confirms it with <c>y</c>; anything else is a refusal that keeps nothing (F.78b).</summary>
     [Theory]
     [InlineData("a", "y", ApprovalAnswer.AlwaysAllowed, "keypaste: allowed, and always from now on.")]
-    [InlineData("b", "y", ApprovalAnswer.AlwaysBlocked, "keypaste: denied, and always from now on.")]
     [InlineData("a", "", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
     [InlineData("a", "o", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
-    [InlineData("b", "n", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
+    [InlineData("a", "n", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
     public async Task An_offered_always_is_confirmed_with_y_or_refused(string choice, string confirmation, ApprovalAnswer expected, string said)
     {
         var rig = Build(choice, confirmation);
 
         Assert.Equal(expected, await rig.Channel.AskAsync(Offering(), Token));
-        Assert.Contains("[a] always  [b] block", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+        Assert.Contains("[d] deny  [o] once  [a] always  ", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("block", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
         Assert.Contains(said, rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.Contains(choice == "a" ? "Always give claude-code this item's password without asking you?" : "Always refuse claude-code this item's password without asking you?", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Always give claude-code this item's password without asking you?", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>Blocking is set on the agent's page in the app: <c>b</c> at a prompt is a refusal like any other key.</summary>
+    [Fact]
+    public async Task B_at_a_prompt_is_a_plain_refusal()
+    {
+        var rig = Build("b", "y");
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Offering(), Token));
+        Assert.Contains("keypaste: denied. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -545,7 +548,8 @@ public sealed class TerminalApprovalChannelTests
             "keypaste: an agent is asking for a credential.",
             string.Empty,
             "  agent    claude-code",
-            "  item     env/demo/STRIPE_KEY",
+            "  item     STRIPE_KEY",
+            "  group    env/demo",
             "  field    password",
             string.Empty,
             "  the agent says it needs this because:",
@@ -586,7 +590,7 @@ public sealed class TerminalApprovalChannelTests
 
         var shown = once.Stderr.ToString();
         Assert.Contains("project      billing", shown, StringComparison.Ordinal);
-        Assert.Contains("environment  dev", shown, StringComparison.Ordinal);
+        Assert.Contains("stage        dev", shown, StringComparison.Ordinal);
         Assert.Contains("variables    DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
         Assert.Contains("from         env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
         Assert.Contains("command      npm run deploy", shown, StringComparison.Ordinal);
@@ -614,7 +618,7 @@ public sealed class TerminalApprovalChannelTests
             "  command      npm run migrate",
             "  in           /home/me/acme/api",
             "  project      acme-api",
-            "  environment  dev",
+            "  stage        dev",
             "  injects      DATABASE_URL        env/acme-api/DATABASE_URL        inject only",
             "  injects      STRIPE_SECRET_KEY   env/acme-api/STRIPE_SECRET_KEY   inject only",
             string.Empty,

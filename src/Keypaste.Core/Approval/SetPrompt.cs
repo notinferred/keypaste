@@ -4,7 +4,17 @@ namespace Keypaste.Core.Approval;
 /// <param name="Entry">The item, sanitized as <see cref="ApprovalPrompt.Shown"/> writes it.</param>
 /// <param name="Field">The field, scrubbed for display.</param>
 /// <param name="EntryWasAltered">Whether <paramref name="Entry"/> differs from the name the vault holds.</param>
-public sealed record SetPromptField(string Entry, string Field, bool EntryWasAltered);
+public sealed record SetPromptField(string Entry, string Field, bool EntryWasAltered)
+{
+    /// <summary>The item's own title, sanitized, which a prompt names it by; <see cref="Entry"/> is shown under Details.</summary>
+    public string ItemTitle
+    {
+        get => _itemTitle ?? Entry[(Entry.LastIndexOf('/') + 1)..];
+        init => _itemTitle = value;
+    }
+
+    private readonly string? _itemTitle;
+}
 
 /// <summary>
 /// A linked set in front of a person: the agent, each item and field, and the agent's reason, already sanitized and capped,
@@ -18,6 +28,15 @@ public sealed record SetPrompt
 
     /// <summary>The bridge's <c>--client-label</c>, sanitized, or null when it was started without one.</summary>
     public string? Label { get; init; }
+
+    /// <summary>Who is asking, as the requester line says it: verified only from what the system said of the connection, never from the label.</summary>
+    public RequesterIdentity Identity
+    {
+        get => _identity ?? new RequesterIdentity(Client, null, false);
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
 
     /// <summary>Each field asked for, the anchor's first.</summary>
     public required IReadOnlyList<SetPromptField> Fields { get; init; }
@@ -47,10 +66,14 @@ public sealed record SetPrompt
 
         var shownReason = EntryNameSanitizer.SanitizeProse(reason, ApprovalPrompt.MaximumReasonLength);
 
+        var shownClient = client is { Length: > 0 } ? EntryNameSanitizer.Sanitize(client, ApprovalPrompt.MaximumClientLength).Text : "an unnamed agent";
+        var shownLabel = clientLabel is { Length: > 0 } ? EntryNameSanitizer.Sanitize(clientLabel, ApprovalPrompt.MaximumClientLength).Text : null;
+
         return new SetPrompt
         {
-            Client = client is { Length: > 0 } ? EntryNameSanitizer.Sanitize(client, ApprovalPrompt.MaximumClientLength).Text : "an unnamed agent",
-            Label = clientLabel is { Length: > 0 } ? EntryNameSanitizer.Sanitize(clientLabel, ApprovalPrompt.MaximumClientLength).Text : null,
+            Client = shownClient,
+            Label = shownLabel,
+            Identity = RequesterIdentity.Current(shownClient, shownLabel),
             Fields =
             [
                 .. fields.Select(field => Shown(field.Entry, field.Field)),
@@ -64,6 +87,6 @@ public sealed record SetPrompt
     private static SetPromptField Shown(EntryName entry, string field)
     {
         var shown = ApprovalPrompt.Display(entry);
-        return new SetPromptField(shown.Text, EntryNameSanitizer.Sanitize(field).Text, shown.WasAltered);
+        return new SetPromptField(shown.Text, EntryNameSanitizer.Sanitize(field).Text, shown.WasAltered) { ItemTitle = EntryNameSanitizer.Sanitize(entry.Title).Text };
     }
 }

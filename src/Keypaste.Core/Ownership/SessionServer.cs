@@ -27,7 +27,16 @@ public sealed record SessionServerOptions
     /// <summary>How many requests wait for a person, and for how long.</summary>
     public ApprovalLimits Limits { get; init; } = ApprovalLimits.Default;
 
-    /// <summary>The rules every agent's request is decided by, this computer's <c>agents.toml</c>.</summary>
+    /// <summary>The prompt queue this owner shares with the other vaults' owners asking the same person, or null for one of its own (THREATS.md T-11).</summary>
+    public PromptTurns? Turns { get; init; }
+
+    /// <summary>
+    /// The checkpoint keys of the other vaults this process holds unlocked, which write to the same audit log, so a
+    /// compaction can check what their owners signed and sealed: fresh copies, which it zeroes once done; none by default.
+    /// </summary>
+    public Func<IReadOnlyList<AuditCheckpointKey>> OtherCheckpointKeys { get; init; } = () => [];
+
+    /// <summary>The rules every agent's request is decided by, this vault's file under the keypaste home.</summary>
     public required IAgentRules Rules { get; init; }
 
     /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
@@ -55,10 +64,10 @@ public sealed record SessionServerOptions
     public Func<SessionLifetime, Func<Vault, bool>, AgentSave>? WriteEdit { get; init; }
 
     /// <summary>
-    /// When each browser's pairing was last proven, kept for the owner's life, or null for an owner that pairs no browsers;
-    /// pairing also needs <see cref="WriteEdit"/> (D-0634).
+    /// This computer's browser pairings as this owner process serves them, or null for an owner that pairs no browsers;
+    /// pairing also needs <see cref="WriteEdit"/>.
     /// </summary>
-    public PairingUses? BrowserUses { get; init; }
+    public OwnerPairings? BrowserPairings { get; init; }
 
     /// <summary>Told of each terminal's edit once it is saved, or null.</summary>
     public Action<EditDone>? Edited { get; init; }
@@ -98,7 +107,7 @@ public sealed class SessionServer : IDisposable
     /// <summary>What answers each request.</summary>
     public SessionAuthority Authority { get; }
 
-    /// <summary>What pairs a browser for this unlock, arming included, or null for an owner that pairs none.</summary>
+    /// <summary>What pairs a browser for this unlock, or null for an owner that pairs none.</summary>
     public SessionBrowsers? Browsers { get; private init; }
 
     /// <summary>Builds what answers agents for one unlock, binding no endpoint.</summary>
@@ -115,7 +124,7 @@ public sealed class SessionServer : IDisposable
         var launches = lifetime.Own(new LaunchPasses(options.Clock));
 #pragma warning restore CA2000
 
-        var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits);
+        var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits, options.Turns);
 
         var checkpoints = new AuditCheckpoints(options.Audit, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id);
 
@@ -140,8 +149,8 @@ public sealed class SessionServer : IDisposable
                 ? new SessionItemChanger(gate, options.UnlockedFor, change, options.Clock, options.Narrate)
                 : null;
 
-            var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
-                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Rules, checkpoints.Watched, uses, options.Clock, options.Narrate)
+            var browsers = options.BrowserPairings is { } pairings && options.WriteEdit is { } pair
+                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Rules, checkpoints.Watched, pairings, options.Clock, options.Narrate)
                 : null;
 
             var authority = new SessionAuthority(
@@ -165,7 +174,7 @@ public sealed class SessionServer : IDisposable
                 browsers.Removed += (_, pairing) => authority.Unbind(pairing);
             }
 
-            var compactions = new AuditCompactions(options.AuditPath, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id, options.KeepLogDays, options.Clock);
+            var compactions = new AuditCompactions(options.AuditPath, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id, options.KeepLogDays, options.Clock, options.OtherCheckpointKeys);
             compactions.Start();
             return new SessionServer(authority, gate, checkpoints, compactions) { Browsers = browsers };
         }

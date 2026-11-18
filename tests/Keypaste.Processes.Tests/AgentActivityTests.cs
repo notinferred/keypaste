@@ -89,7 +89,7 @@ public sealed class AgentActivityTests
         Allowed();
         Assert.Contains($"agent={_label} run=off", Settings(), StringComparison.Ordinal);
         Change("run on");
-        Assert.Contains("[[seal]]", File.ReadAllText(Path.Combine(workspace.Home, "agents.toml")), StringComparison.Ordinal);
+        Assert.Contains("[[seal]]", File.ReadAllText(Directory.GetFiles(Path.Combine(workspace.Home, "agents"), "*.toml").Single()), StringComparison.Ordinal);
         Assert.Contains("run=on", Settings(), StringComparison.Ordinal);
 
         Allowed();

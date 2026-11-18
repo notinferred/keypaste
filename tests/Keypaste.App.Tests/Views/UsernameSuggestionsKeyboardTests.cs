@@ -56,7 +56,7 @@ public sealed class UsernameSuggestionsKeyboardTests
 
         Press(shell, PhysicalKey.ArrowDown);
         Assert.True(box.IsDropDownOpen);
-        Assert.Contains("mono", box.Classes);
+        Assert.DoesNotContain("mono", box.Classes);
         Press(shell, PhysicalKey.ArrowDown);
         Press(shell, PhysicalKey.Enter);
 

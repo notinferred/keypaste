@@ -97,17 +97,20 @@ public sealed class AssistiveTechnologyTests
     [Fact]
     public Task The_sidebars_rows_say_their_level_and_its_fold_says_what_it_will_do() => HeadlessSession.On(() =>
     {
+        using var shell = new RenderedShell("keypaste-sidebar-levels-", secondVault: "acme");
         var folded = new GroupRow("work", "work", 1, HasChildren: true, IsExpanded: false);
-        var open = new NavItem(Destinations.All.Single(destination => destination.Kind == DestinationKind.Entries)) { IsExpandable = true };
+        var groups = shell.Shell.SidebarRows.OfType<GroupsRow>().First();
+        var vault = shell.Shell.SidebarRows.OfType<VaultRow>().First();
 
         Assert.Equal("work, level 2", folded.ToString());
         Assert.Equal("Show the groups in work", folded.FoldLabel);
-        Assert.StartsWith("Items, level 1", open.ToString());
-        Assert.Equal("Hide the groups", open.FoldLabel);
+        Assert.Equal("Groups, level 1", groups.ToString());
+        Assert.Equal("Show the groups", groups.FoldLabel);
+        Assert.Equal($"Hide {vault.Title}'s places", vault.FoldLabel);
 
-        open.IsExpanded = false;
+        shell.Shell.ShowGroups();
 
-        Assert.Equal("Show the groups", open.FoldLabel);
+        Assert.Equal("Hide the groups", shell.Shell.SidebarRows.OfType<GroupsRow>().First().FoldLabel);
         return Task.CompletedTask;
     });
 
@@ -187,7 +190,7 @@ public sealed class AssistiveTechnologyTests
         WindowInput.Drain();
 
         var line = Assert.Single(said);
-        Assert.Contains("claude-code wants 1 secret", line);
+        Assert.StartsWith("Give claude-code password from DEPLOY_KEY? ", line, StringComparison.Ordinal);
         Assert.EndsWith("2 minutes to answer.", line);
         window.Close();
     });

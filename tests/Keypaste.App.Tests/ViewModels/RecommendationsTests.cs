@@ -271,7 +271,7 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     private static NavItem Settings(ShellViewModel shell) =>
-        shell.RecommendationsRow;
+        shell.SecurityPlace;
 
     private ShellViewModel Shell(Action<Action>? post = null) =>
         new(_session, _fixture.Home, authority: null, clock: _clock, post: post);

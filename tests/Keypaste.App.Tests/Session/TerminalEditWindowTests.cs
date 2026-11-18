@@ -33,6 +33,7 @@ public sealed class TerminalEditWindowTests
             var asking = screen.Ask(Prompt("work/github", ["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."]));
             var window = Assert.IsType<TerminalEditWindow>(await screen.ShownAsync());
 
+            Assert.Equal("Allow this change from a terminal?", Text(window, "TitleText"));
             Assert.Equal("work/github", Text(window, "ItemText"));
             Assert.Equal("keypaste set", Text(window, "CommandText"));
             Assert.Equal("asked from a terminal; any program you run could have typed it", Text(window, "OriginText"));
@@ -117,7 +118,7 @@ public sealed class TerminalEditWindowTests
     [Theory]
     [InlineData("deny")]
     [InlineData("escape")]
-    [InlineData("enter")]
+    [InlineData("enter on a delete for good")]
     [InlineData("close")]
     [InlineData("withdrawn")]
     public Task Every_way_but_Allow_refuses_and_takes_the_window_down(string how) =>
@@ -125,7 +126,10 @@ public sealed class TerminalEditWindowTests
         {
             var screen = new Screen();
             using var withdrawing = CancellationTokenSource.CreateLinkedTokenSource(Token);
-            var asking = screen.Ask(Prompt("work/github", ["Moves work/github to the recycle bin, where it can be restored."]), withdrawing.Token);
+            var asked = Prompt("work/github", ["Moves work/github to the recycle bin, where it can be restored."]);
+
+            // Return presses no destructive action: on a delete for good it reaches Deny, which holds focus.
+            var asking = screen.Ask(how.StartsWith("enter", StringComparison.Ordinal) ? asked with { DeletesForGood = true } : asked, withdrawing.Token);
             var window = await screen.ShownAsync();
             await screen.ArmAsync(window);
 
@@ -137,7 +141,7 @@ public sealed class TerminalEditWindowTests
                 case "escape":
                     Key(window, PhysicalKey.Escape);
                     break;
-                case "enter":
+                case "enter on a delete for good":
                     Key(window, PhysicalKey.Enter);
                     break;
                 case "close":

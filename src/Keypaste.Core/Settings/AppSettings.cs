@@ -102,6 +102,10 @@ public sealed record AppSettings
     internal const string LogKeepDaysKey = "keep_days";
     internal const string RecommendationsSectionName = "recommendations";
     internal const string ExpiryReminderDaysKey = "expiry_reminder_days";
+    internal const string AppearanceSectionName = "appearance";
+    internal const string ReduceTransparencyKey = "reduce_transparency";
+    internal const string AccountVaultSectionName = "account_vault";
+    internal const string AccountVaultPathKey = "path";
 
     /// <summary>How many days before an item expires Recommendations lists it, until chosen.</summary>
     public const int DefaultExpiryReminderDays = 14;
@@ -110,6 +114,7 @@ public sealed record AppSettings
     public const int MaximumExpiryReminderDays = 365;
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
+    private const string _accountVaultComment = "a vault the local account holds";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
@@ -189,6 +194,10 @@ public sealed record AppSettings
         init => _keepLogDays = AuditRetention.Clamp(value);
     }
 
+    /// <summary>The vaults the local account holds, in the order the person first opened them, each a full path; none until one is opened.</summary>
+    /// <remarks>One <c>[[account_vault]]</c> section each, since a section's line cannot hold several paths. Nothing in it is an authorization.</remarks>
+    public IReadOnlyList<string> AccountVaults { get; init; } = [];
+
     /// <summary>How many days before an item expires Recommendations lists it, 0 for never.</summary>
     /// <value>Never above <see cref="MaximumExpiryReminderDays"/>; a longer period is shortened on the way in.</value>
     /// <remarks>In its own section, <c>[[recommendations]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
@@ -197,6 +206,10 @@ public sealed record AppSettings
         get => _expiryReminderDays;
         init => _expiryReminderDays = Math.Clamp(value, 0, MaximumExpiryReminderDays);
     }
+
+    /// <summary>Whether the desktop draws its sidebar and rail solid on macOS rather than over the system's vibrancy; off until chosen.</summary>
+    /// <remarks>In its own section, <c>[[appearance]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
+    public bool ReduceTransparency { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -281,6 +294,27 @@ public sealed record AppSettings
             && recommendations.TryGet(ExpiryReminderDaysKey, out var remind) && remind.Value.Kind == TomlValueKind.Number)
         {
             settings = settings with { ExpiryReminderDays = remind.Value.Number };
+        }
+
+        if (document.Tables.FirstOrDefault(IsAppearanceSection) is { } appearance
+            && appearance.TryGet(ReduceTransparencyKey, out var reduce) && reduce.Value.Kind == TomlValueKind.Number)
+        {
+            settings = settings with { ReduceTransparency = reduce.Value.Number != 0 };
+        }
+
+        List<string> held = [];
+
+        foreach (var table in document.Tables.Where(IsAccountVaultSection))
+        {
+            if (TextOf(table, AccountVaultPathKey) is { } written && ChosenVault.FullPath(written) is { } vault && !held.Exists(known => ChosenVault.Same(known, vault)))
+            {
+                held.Add(vault);
+            }
+        }
+
+        if (held.Count > 0)
+        {
+            settings = settings with { AccountVaults = held };
         }
 
         if (document.Tables.FirstOrDefault(IsShareSection) is { } share)
@@ -408,6 +442,7 @@ public sealed record AppSettings
         var share = settings.ShareTermsLineShown ? existing.Tables.FirstOrDefault(IsShareSection) : null;
         var log = existing.Tables.FirstOrDefault(IsLogSection);
         var recommendations = existing.Tables.FirstOrDefault(IsRecommendationsSection);
+        var appearance = existing.Tables.FirstOrDefault(IsAppearanceSection);
 
         try
         {
@@ -456,7 +491,22 @@ public sealed record AppSettings
                 }
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log) && !ReferenceEquals(other, recommendations)))
+            if (appearance is not null || settings.ReduceTransparency)
+            {
+                writer.BlankLine().Table(AppearanceSectionName).Number(ReduceTransparencyKey, settings.ReduceTransparency ? 1 : 0, "1 draws the desktop's sidebar solid on macOS");
+
+                if (appearance is not null && !TryWrite(writer, appearance.Pairs.Where(pair => !string.Equals(pair.Key, ReduceTransparencyKey, StringComparison.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var vault in settings.AccountVaults.Where(CanRecord))
+            {
+                writer.BlankLine().Table(AccountVaultSectionName).Text(AccountVaultPathKey, RecentVaults.Portable(vault), _accountVaultComment);
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log) && !ReferenceEquals(other, recommendations) && !ReferenceEquals(other, appearance) && !IsAccountVaultSection(other)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -535,6 +585,10 @@ public sealed record AppSettings
     private static bool IsLogSection(TomlTable table) => string.Equals(table.Name, LogSectionName, StringComparison.Ordinal);
 
     private static bool IsRecommendationsSection(TomlTable table) => string.Equals(table.Name, RecommendationsSectionName, StringComparison.Ordinal);
+
+    private static bool IsAppearanceSection(TomlTable table) => string.Equals(table.Name, AppearanceSectionName, StringComparison.Ordinal);
+
+    private static bool IsAccountVaultSection(TomlTable table) => string.Equals(table.Name, AccountVaultSectionName, StringComparison.Ordinal);
 
     private static string? TextOf(TomlTable table, string key) =>
         table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;

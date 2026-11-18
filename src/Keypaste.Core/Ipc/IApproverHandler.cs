@@ -137,7 +137,7 @@ public interface IApproverHandler
     ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new ItemChangeReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not change items agents ask about"));
 
-    /// <summary>Pairs the browser attached on this connection (D-0627).</summary>
+    /// <summary>Pairs the browser attached on this connection.</summary>
     /// <param name="request">The extension's identification key, and the attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
@@ -153,13 +153,29 @@ public interface IApproverHandler
     ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new BrowserReply(BrowserOutcome.Refused, _noBrowsers));
 
-    /// <summary>Decides which logins of a page the browser attached on this connection gets.</summary>
+    /// <summary>Lists the names of a page's logins for the browser attached on this connection.</summary>
     /// <param name="request">The pairing, its key and the page, and the attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
-    /// <returns>The logins released, or why none were. A handler that answers no browser refuses.</returns>
-    ValueTask<BrowserFillReply> FillBrowserAsync(BrowserFillRequest request, string connectionId, CancellationToken cancellationToken) =>
+    /// <returns>The names, or why none. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserListReply> ListBrowserAsync(BrowserListRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserListReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>Decides whether the login the person picked in a page's list is filled for the browser attached on this connection.</summary>
+    /// <param name="request">The pairing, its key, the page and the item, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The login released, or why none was. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserFillReply> ReleaseBrowserAsync(BrowserReleaseRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new BrowserFillReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>Brings keypaste forward for what the person pressed in a page's list.</summary>
+    /// <param name="request">What to show, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether keypaste was brought forward. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserReply> ShowBrowserAsync(BrowserShowRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserReply(BrowserOutcome.Refused, _noBrowsers));
 
     /// <summary>Locks now for the browser attached on this connection, asking nobody.</summary>
     /// <param name="request">The attachment it is made under.</param>

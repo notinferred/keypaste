@@ -51,7 +51,7 @@ public sealed record McpBridgeTarget(McpServerCommand Server, McpBridgeLink? Lin
 /// </para>
 /// <para>
 /// The bridge reads its vault, its audit log and its approver from <c>KEYPASTE_HOME</c> and <c>KEYPASTE_APPROVER</c>,
-/// which a client need not pass on and Gemini CLI strips. <see cref="TryPin"/> writes them as flags when they differ
+/// which a client need not pass on and Gemini CLI strips. <see cref="TryPin(McpClientMachine, string?, string?, IReadOnlyList{string}, string?, out McpServerPins?)"/> writes them as flags when they differ
 /// from what a bridge started without them would find (D-0389).
 /// </para>
 /// </remarks>
@@ -158,28 +158,63 @@ public static class McpServerLocator
         string? approverOverride,
         string? namedVault,
         string? chosenVault,
+        [NotNullWhen(true)] out McpServerPins? pins) =>
+        TryPin(machine, home, approverOverride, namedVault is null ? [] : [namedVault], chosenVault, out pins);
+
+    /// <summary>What a registration reaching each of <paramref name="namedVaults"/> through one bridge pins with its flags.</summary>
+    /// <param name="machine">The machine, whose home names the default <c>.keypaste</c>.</param>
+    /// <param name="home"><c>KEYPASTE_HOME</c>, or the app's home; null or empty when unset.</param>
+    /// <param name="approverOverride"><c>KEYPASTE_APPROVER</c>; null or empty when unset.</param>
+    /// <param name="namedVaults">The vaults the tool may reach, in order, or none.</param>
+    /// <param name="chosenVault">The vault chosen with <c>keypaste use</c>, or null.</param>
+    /// <param name="pins">The flags, when they can be decided.</param>
+    /// <returns>
+    /// False for a home other than the default with no vault named or chosen, and for several vaults with a pipe set or under
+    /// another home, whose pipes only that home names and a tool may start the bridge without it.
+    /// </returns>
+    /// <remarks>One vault is pinned as <see cref="TryPin(McpClientMachine, string?, string?, string?, string?, out McpServerPins?)"/> pins it; several are each pinned.</remarks>
+    public static bool TryPin(
+        McpClientMachine machine,
+        string? home,
+        string? approverOverride,
+        IReadOnlyList<string> namedVaults,
+        string? chosenVault,
         [NotNullWhen(true)] out McpServerPins? pins)
     {
         ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(namedVaults);
 
         var approver = approverOverride is { Length: > 0 } ? approverOverride : null;
+        var defaultHome = home is not { Length: > 0 } || IsDefaultHome(machine, home);
+        pins = null;
 
-        if (home is not { Length: > 0 } || IsDefaultHome(machine, home))
+        if (namedVaults.Count > 1)
         {
-            var vault = namedVault is not null && !ChosenVault.Same(chosenVault, namedVault) ? namedVault : null;
-            pins = new McpServerPins(vault, AuditLogPath: null, approver);
+            if (approver is not null || !defaultHome)
+            {
+                return false;
+            }
+
+            pins = new McpServerPins(namedVaults, AuditLogPath: null, ApproverName: null);
+            return true;
+        }
+
+        var namedVault = namedVaults.Count == 1 ? namedVaults[0] : null;
+
+        if (defaultHome)
+        {
+            pins = new McpServerPins(namedVault is not null && !ChosenVault.Same(chosenVault, namedVault) ? [namedVault] : [], AuditLogPath: null, approver);
             return true;
         }
 
         if ((namedVault ?? chosenVault) is not { } pinned)
         {
-            pins = null;
             return false;
         }
 
         pins = new McpServerPins(
-            pinned,
-            KeypasteHome.AuditPath(home),
+            [pinned],
+            KeypasteHome.AuditPath(home!),
             approver ?? ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), pinned)));
         return true;
     }

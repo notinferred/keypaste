@@ -6,183 +6,63 @@
  */
 const kpxcFill = {};
 
-// Fill requested from the context menu. Active element is used for combination detection
-kpxcFill.fillInFromActiveElement = async function() {
-    const elem = document.activeElement;
-
-    await kpxc.receiveCredentialsIfNecessary();
-    if (kpxc.credentials.length === 0) {
-        logDebug(`Error: Credential list is empty for: ${document.location.origin}`);
-        showErrorNotification(`${tr('credentialsNoLoginsFound')} ${document.location.origin}`);
+// The one login the person picked, asked of keypaste for the tab's address and filled into the field's form; nothing is kept.
+kpxcFill.fillPicked = async function(combination, uuid) {
+    if (!combination || !uuid) {
         return;
     }
 
-    if (kpxc.combinations.length > 0) {
-        if (await kpxcFill.fillFromCombination(elem)) {
-            // Combination found and filled
-            return;
-        }
-    }
-
-    // No previous combinations detected. Create a new one from active element
-    const combination = await kpxc.createCombination(elem);
-
-    await sendMessage('page_set_login_id', kpxc.credentials[0].uuid);
-    kpxcFill.fillInCredentials(combination, kpxc.credentials[0].login, kpxc.credentials[0].uuid);
-};
-
-// Fill from combination, if found
-kpxcFill.fillFromCombination = async function(elem) {
-    const combination = kpxc.combinations.find(c => c.username === elem) ?? kpxc.combinations.find(c => c.username);
-    if (!combination) {
-        logDebug('Error: No username/password field combination found.');
-        return false;
-    }
-
-    const field = combination.username;
-    if (!field) {
-        logDebug('Error: No input field found.');
-        return false;
-    }
-
-    // Set focus to the input field
-    field.focus();
-
-    if (kpxc.credentials.length > 1 && kpxc.settings.autoCompleteUsernames) {
-        // More than one credential -> show autocomplete list
-        kpxcUserAutocomplete.showList(field);
-    } else {
-        // Just one credential -> fill the first combination found
-        await sendMessage('page_set_login_id', kpxc.credentials[0].uuid);
-        kpxcFill.fillInCredentials(combination, kpxc.credentials[0].login, kpxc.credentials[0].uuid);
-    }
-
-    return true;
-};
-
-// Fill requested by Auto-Fill
-kpxcFill.fillFromAutofill = async function() {
-    if (kpxc.credentials.length !== 1 || kpxc.combinations.length === 0) {
-        logDebug('Error: Credential list is empty or contains more than one entry.');
-        return;
-    }
-
-    const index = kpxc.combinations.length - 1;
-    await sendMessage('page_set_login_id', kpxc.credentials[0].uuid);
-    kpxcFill.fillInCredentials(kpxc.combinations[index], kpxc.credentials[0].login, kpxc.credentials[0].uuid);
-
-    // Generate popup-list of usernames + descriptions
-    sendMessage('popup_login', [
-        {
-            text: `${kpxc.credentials[0].login} (${kpxc.credentials[0].name})`,
-            title: kpxc.credentials[0].name,
-            username: kpxc.credentials[0].login || tr('credentialsNoUsername'),
-            uuid: kpxc.credentials[0].uuid
-        },
-    ]);
-};
-
-// Fill requested by selecting credentials from the popup
-kpxcFill.fillFromPopup = async function(id, uuid) {
-    if (kpxc.credentials.length === 0 || !kpxc.credentials[id] || kpxc.combinations.length === 0) {
-        logDebug('Error: Credential list is empty.');
+    const login = await sendMessage('fill_login', [ uuid, kpxc.submitUrl ]);
+    if (login?.uuid !== uuid) {
+        kpxcUI.createNotification('warning', tr(login?.locked ? 'loginListKeypasteLocked' : 'loginListNotFilled'));
         return;
     }
 
     await sendMessage('page_set_login_id', uuid);
-    const selectedCredentials = kpxc.credentials.find(c => c.uuid === uuid);
-    if (!selectedCredentials) {
-        logError('Uuid not found: ', uuid);
-        return;
-    }
-
-    const foundCombination = kpxcFields.getCombinationFromAllInputs();
-    kpxcFill.fillInCredentials(foundCombination, selectedCredentials.login, uuid);
-    kpxcUserAutocomplete.closeList();
+    await kpxcFill.fillLogin(combination, login);
 };
 
-// Fill requested from username icon
-kpxcFill.fillFromUsernameIcon = async function(combination) {
-    await kpxc.receiveCredentialsIfNecessary();
-    if (kpxc.credentials.length === 0) {
-        logDebug(`Error: Credential list is empty for: ${document.location.origin}`);
-        showErrorNotification(`${tr('credentialsNoLoginsFound')} ${document.location.origin}`);
-        return;
-    } else if (kpxc.credentials.length > 1 && kpxc.settings.autoCompleteUsernames) {
-        kpxcUserAutocomplete.showList(combination.username || combination.password);
+// Picked in the toolbar's login popup, the extension's own page
+kpxcFill.fillFromPopup = async function(uuid) {
+    if (kpxc.combinations.length === 0) {
+        logDebug('Error: No login fields on this page.');
         return;
     }
 
-    await sendMessage('page_set_login_id', kpxc.credentials[0].uuid);
-    kpxcFill.fillInCredentials(combination, kpxc.credentials[0].login, kpxc.credentials[0].uuid);
+    await kpxcFill.fillPicked(kpxcFields.getCombinationFromAllInputs(), uuid);
 };
 
 /**
- * The main function for filling any credentials
- * @param {Array} combination Combination to be used
- * @param {String} predefinedUsername Predefined username. If set, there's no need to find it from combinations
- * @param {String} uuid Identifier for the entry. There can be identical usernames with different password
+ * Fills one released login into a form
+ * @param {Object} combination  The form's username and password fields
+ * @param {Object} login        The login keypaste released: login, password, name and uuid
  */
-kpxcFill.fillInCredentials = async function(combination, predefinedUsername, uuid) {
-    if (kpxc.credentials.length === 0) {
-        showErrorNotification(`${tr('credentialsNoLoginsFound')} ${document.location.origin}`);
-        return;
-    }
-
-    if (!combination) {
-        logDebug('Error: Empty login combination.');
-        return;
-    }
-
-    // Use predefined username as default
-    let usernameValue = predefinedUsername;
-
-    // With single password field the combination.password is used instead
-    usernameValue ??= combination.username ? combination.username.value : combination.password.value;
-
-    // Find the correct credentials
-    const selectedCredentials = kpxc.credentials.find(c => c.uuid === uuid);
-    if (!selectedCredentials) {
-        logError('Uuid not found: ' + uuid);
-        return;
-    }
-
-    // Handle auto-submit
-    let skipAutoSubmit = false;
-    if (selectedCredentials.skipAutoSubmit !== undefined) {
-        skipAutoSubmit = selectedCredentials.skipAutoSubmit === 'true';
-    }
+kpxcFill.fillLogin = async function(combination, login) {
+    const usernameValue = login.login;
 
     // Additional checks
     checkIdenticalPasswordFields(combination);
     checkReadOnlyUsernameField(combination);
 
-    // Fill password
     if (combination.password && matchesWithNodeName(combination.password, 'INPUT')) {
         // Show a notification if password length exceeds the length defined in input
         if (combination.password.maxLength
             && combination.password.maxLength > 0
-            && selectedCredentials.password.length > combination.password.maxLength) {
+            && login.password.length > combination.password.maxLength) {
             kpxcUI.createNotification('warning', tr('errorMessagePaswordLengthExceeded'));
         }
 
-        await kpxcFill.setValueWithChange(combination.password, selectedCredentials.password);
+        await kpxcFill.setValueWithChange(combination.password, login.password);
         await kpxc.setPasswordFilled(true);
     }
 
-    // Fill username
     if (combination.username && usernameValue && combination.username !== combination.password &&
         (!combination.username.value || combination.username.value !== usernameValue)) {
         await kpxcFill.setValueWithChange(combination.username, usernameValue);
     }
 
-    // Close autocomplete menu after fill
     kpxcUserAutocomplete.closeList();
-
-    // Reset ManualFill
-    await sendMessage('page_set_manual_fill', ManualFill.NONE);
-
-    await kpxcFill.performAutoSubmit(combination, skipAutoSubmit);
+    await kpxcFill.performAutoSubmit(combination, false);
 };
 
 // Performs Auto-Submit. If filling single credentials is enabled, a 5 second timeout will be needed for fill
@@ -253,19 +133,6 @@ kpxcFill.setValueWithChange = async function(field, value) {
     dispatchLegacyEvent(field, 'change');
 };
 
-
-// Show a specific error notification if current database is not connected
-const showErrorNotification = async function(errorMessage, notificationType = 'error') {
-    const connectedDatabase = await sendMessage('get_connected_database');
-    if (!connectedDatabase?.identifier && kpxc.databaseState === DatabaseState.UNLOCKED) {
-        kpxcUI.createNotification('error', tr('errorCurrentDatabaseNotConnected'));
-    } else if (!await isIframeAllowed()) {
-        // Special error if we are blocking due to iframe
-        kpxcUI.createNotification('error', tr('credentialsBlockedInIframe'));
-    } else {
-        kpxcUI.createNotification(notificationType, errorMessage);
-    }
-};
 
 // Update the password field if form has been updated with a new identical element (Moodle).
 // If found, replace the new input field to the combination.

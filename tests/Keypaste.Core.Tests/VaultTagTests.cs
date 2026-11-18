@@ -154,6 +154,49 @@ public sealed class VaultTagTests : IDisposable
         return (header[10] | (header[11] << 8), header[8] | (header[9] << 8));
     }
 
+    [Fact]
+    public async Task Tags_read_on_another_thread_while_this_one_reads_and_writes_them_never_fault()
+    {
+        using var vault = Seeded(NewVaultPath());
+        foreach (var tag in new[] { "env:billing:prod", "env:billing:dev", "favorite", "ops" })
+        {
+            vault.AddTag(_stripe, tag);
+            vault.AddTag(_database, tag);
+        }
+
+        using var done = new CancellationTokenSource();
+        var scanning = Task.Run(() =>
+        {
+            while (!done.IsCancellationRequested)
+            {
+                _ = Recommendations.LostProjectTagCheck.Scan(vault);
+                _ = vault.ReadTags();
+            }
+        }, TestContext.Current.CancellationToken);
+
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (var round = 0; clock.Elapsed < TimeSpan.FromSeconds(2) && !scanning.IsCompleted; round++)
+            {
+                _ = vault.Tags(_stripe);
+                _ = vault.ReadTags();
+
+                if (round % 200 == 0)
+                {
+                    vault.AddTag(_database, "z" + round);
+                    vault.RemoveTags(_database, ["z" + (round - 200)]);
+                }
+            }
+        }
+        finally
+        {
+            await done.CancelAsync();
+        }
+
+        await scanning;
+    }
+
     private static Vault Seeded(string path)
     {
         var vault = Vault.Create(path, _master);

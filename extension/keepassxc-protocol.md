@@ -515,3 +515,64 @@ Response (error, decrypted):
     }
 }
 ```
+
+### keypaste's changes
+
+keypaste's relay answers `get-logins` with names only, and two actions of its own fill the one login the person picked and bring keypaste forward. The relay sends the vault's owner each as a typed request, never this JSON, and only under the pairing the last `test-associate` proved.
+
+`get-logins` is sent only when the person clicks keypaste's key icon, with the tab's address as the browser reports it. Its answer carries each matching login of every open vault with an empty `password`, the vault's name in `vault` while several vaults are open, the open vaults that are locked, the page's `site` and, where every fill is asked in keypaste, a `warning` saying why. A list matching nothing is this answer with no entries, not error 15. Error 1 means no vault is unlocked.
+
+Response message data (success, decrypted):
+```json
+{
+    "count": 1,
+    "entries": [
+        { "login": "maya@acme.dev", "name": "GitHub", "password": "", "uuid": "0123456789abcdef0123456789abcdef", "vault": "Personal" }
+    ],
+    "lockedVaults": [ "Acme" ],
+    "site": "github.com",
+    "warning": "",
+    "id": "<pairing>",
+    "nonce": "<incremented nonce>",
+    "success": "true",
+    "version": "2.6.0"
+}
+```
+
+### get-login (keypaste)
+Asks for the one login the person picked. keypaste fills it at once where that pairing filled it on that exact origin before, and otherwise asks the person in keypaste first; error 6 is a refusal, by the person or by keypaste's rules, and error 15 a login that does not match the page.
+
+Unencrypted message:
+```json
+{
+    "action": "get-login",
+    "url": "<the tab's address>",
+    "submitUrl": "<optional>",
+    "uuid": "<the picked entry's uuid>",
+    "keys": [ { "id": "<pairing>", "key": "<identification public key>" } ]
+}
+```
+
+Response message data (success, decrypted):
+```json
+{
+    "count": 1,
+    "entries": [ { "login": "maya@acme.dev", "name": "GitHub", "password": "<password>", "uuid": "0123456789abcdef0123456789abcdef" } ],
+    "id": "<pairing>",
+    "nonce": "<incremented nonce>",
+    "success": "true",
+    "version": "2.6.0"
+}
+```
+
+### open-keypaste (keypaste)
+Brings keypaste's window forward for what the person pressed in the list: `open`, `new-login`, or `unlock` with the locked vault's name in `vault`. It releases nothing; the answer carries only `success`.
+
+Unencrypted message:
+```json
+{
+    "action": "open-keypaste",
+    "what": "unlock",
+    "vault": "Acme"
+}
+```

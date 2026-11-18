@@ -272,7 +272,7 @@ public static class RunRequestRules
 
         if (run.Profile is { } profile && !EnvProfileNames.IsValid(profile, out _))
         {
-            return new("profile", "must be an environment name: lowercase letters, digits and '-'");
+            return new("profile", "must be a stage name: lowercase letters, digits and '-'");
         }
 
         if (run.Keys is { } keys)

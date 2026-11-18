@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons, and links Polly and System.CommandLine. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database. Its browser extension is a separate GPL-3.0 program forked from KeePassXC-Browser, with its own components under [keypaste's browser extension](#keypastes-browser-extension). Every NuGet package a release carries, direct or indirect, is listed with its licence and copyright under [NuGet packages a release carries](#nuget-packages-a-release-carries).
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces, Lucide icons and Simple Icons' brand icons, and links Polly and System.CommandLine. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database. Its browser extension is a separate GPL-3.0 program forked from KeePassXC-Browser, with its own components under [keypaste's browser extension](#keypastes-browser-extension). Every NuGet package a release carries, direct or indirect, is listed with its licence and copyright under [NuGet packages a release carries](#nuget-packages-a-release-carries).
 
 ## KeePassLib
 
@@ -62,21 +62,27 @@ The [upstream list](https://publicsuffix.org/list/) is vendored at `third_party/
 
 ## Instrument Sans
 
-Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans). Licensed under the SIL Open Font License, Version 1.1; the full text is in `src/Keypaste.App/Assets/Fonts/OFL-InstrumentSans.txt`.
+Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans). Licensed under the SIL Open Font License, Version 1.1; the full text is in `extension/src/fonts/OFL-InstrumentSans.txt`.
 
-The Regular, Medium and SemiBold faces are embedded unmodified in the desktop app as its interface typeface, and in the browser extension's `fonts/` for its pages. The fonts remain under the OFL.
+The Regular, Medium and SemiBold faces are embedded unmodified in the browser extension's `fonts/` for its pages. The desktop app draws its text in the system's own faces and carries none. The fonts remain under the OFL.
 
 ## Fragment Mono
 
-Copyright 2022 The Fragment-Mono Project Authors (https://github.com/weiweihuanghuang/fragment-mono). Licensed under the SIL Open Font License, Version 1.1; the full text is in `src/Keypaste.App/Assets/Fonts/OFL-FragmentMono.txt`.
+Copyright 2022 The Fragment-Mono Project Authors (https://github.com/weiweihuanghuang/fragment-mono). Licensed under the SIL Open Font License, Version 1.1; the full text is in `scripts/demo/fonts/OFL-FragmentMono.txt`.
 
-The Regular face is embedded unmodified in the desktop app for keys, values, paths and commands. The font remains under the OFL.
+The Regular face is kept unmodified beside `scripts/demo/render-gif.py`, which draws the demo's terminal in it; no shipped binary carries it. The font remains under the OFL.
 
 ## Lucide
 
 Copyright (c) Lucide Contributors 2022; portions copyright (c) Cole Bemis 2013-2022 as part of Feather (MIT). Licensed under the ISC License; the full text is in `third_party/lucide/LICENSE`, and [UPSTREAM.md](third_party/lucide/UPSTREAM.md) records the release.
 
 The icons are vendored as SVG at `third_party/lucide/icons/`. [lucide-to-axaml.py](scripts/lucide-to-axaml.py) converts the ones the desktop app uses into path geometry in `src/Keypaste.App/Theme/Icons.axaml`, which the app strokes at its own width; the browser extension inlines the ones it uses as SVG. The shapes are not otherwise modified.
+
+## Simple Icons
+
+Simple Icons' brand icons, by Simple Icons' contributors, are dedicated to the public domain under CC0 1.0 Universal; the full text is in `third_party/simple-icons/LICENSE.md`, and [UPSTREAM.md](third_party/simple-icons/UPSTREAM.md) records the release. As Simple Icons' disclaimer, `third_party/simple-icons/DISCLAIMER.md`, says, CC0 covers the drawings and not the marks: each brand icon is a trademark of its owner, and keypaste draws one only to show which service an item belongs to, implying no endorsement.
+
+The icons keypaste draws are vendored as SVG at `third_party/simple-icons/icons/`, with their entries from Simple Icons' data file. [simple-icons-to-axaml.py](scripts/simple-icons-to-axaml.py) converts them into path geometry and colours in `src/Keypaste.App/Theme/ServiceIcons.axaml`. The shapes are not otherwise modified.
 
 ## Polly
 

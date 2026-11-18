@@ -1,6 +1,7 @@
 using System.Text;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -40,6 +41,8 @@ internal sealed class McpHarness : IAsyncDisposable
 
     private readonly ApproverConnection _approver;
     private readonly CancellationTokenSource _inputEnded = new();
+    private readonly List<(string Name, FakeApprover Owner, ApproverConnection Connection)> _others = [];
+    private BridgeVaults? _vaults;
     private TeeStream? _transcript;
 
     private AuditLog? _audit;
@@ -66,7 +69,7 @@ internal sealed class McpHarness : IAsyncDisposable
     internal string AuditPath => KeypasteHome.AuditPath(_directory);
 
     /// <summary>Where the started bridge looks for the app open and locked on its vault, or null before it starts.</summary>
-    internal string? LockedAppName => _options?.LockedAppName;
+    internal string? LockedAppName => _options is { Vaults.Count: > 0 } options ? options.Vaults[0].LockedAppName : null;
 
     /// <summary>Every byte the server has sent the client, as text.</summary>
     /// <remarks>
@@ -114,6 +117,27 @@ internal sealed class McpHarness : IAsyncDisposable
         _approver = new ApproverConnection(approverPipeName, VaultPath) { InputEnded = _inputEnded.Token };
         _approverPipeName = approverPipeName;
     }
+
+    /// <summary>A bridge serving several vaults, the first <paramref name="names"/> on <see cref="Approver"/> and each other on a fake owner of its own.</summary>
+    private McpHarness(IReadOnlyList<string> names)
+    {
+        _vaultPath = Path.Combine(_directory, names[0] + ".kdbx");
+        Approver = new FakeApprover();
+        _approver = new ApproverConnection(Approver.PipeName, VaultPath) { InputEnded = _inputEnded.Token };
+
+        foreach (var name in names.Skip(1))
+        {
+            var owner = new FakeApprover();
+            _others.Add((name, owner, new ApproverConnection(owner.PipeName, Path.Combine(_directory, name + ".kdbx")) { InputEnded = _inputEnded.Token }));
+        }
+    }
+
+    /// <summary>A bridge serving a vault for each of <paramref name="names"/>, in that order, each with its own fake owner.</summary>
+    internal static McpHarness OfVaults(params string[] names) => new(names);
+
+    /// <summary>The fake owner of the vault named <paramref name="name"/>.</summary>
+    internal FakeApprover OwnerOf(string name) =>
+        name == Path.GetFileNameWithoutExtension(VaultPath) ? Approver : _others.Single(other => other.Name == name).Owner;
 
     private readonly string? _approverPipeName;
     private readonly string? _vaultPath;
@@ -173,23 +197,42 @@ internal sealed class McpHarness : IAsyncDisposable
             ToolCollection = [],
         };
 
-        // Pointed at a real approver, the listing goes through the real source too: the point of
-        // that constructor is to leave nothing faked but the human.
-        var names = new ApproverEntryNameSource(_approver, options);
-        serverOptions.ToolCollection.Add(
-            _approverPipeName is null
-                ? new ListEntryNamesTool(Source, options, _audit)
-                : new ListEntryNamesTool(names, options, _audit));
-        serverOptions.ToolCollection.Add(new FindAccessTool(names, options, _audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit, attachments: true));
-        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, _approver, _audit));
-        serverOptions.ToolCollection.Add(new SaveValueTool(options, _approver, _audit));
-        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, _approver, _audit));
+        var first = options.Vaults.Count > 0 ? options.Vaults[0] : null;
+        List<VaultRoute> routes = [new VaultRoute(first, _approver, new ApproverEntryNameSource(_approver, options, first))];
+
+        foreach (var (name, owner, connection) in _others)
+        {
+            var path = Path.Combine(_directory, name + ".kdbx");
+            var identity = VaultIdentity.Of(KeypasteHome.Resolve(InItsOwnHome ? _directory : null), path);
+            var vault = new BridgeVault(name, path, identity.Key, owner.PipeName, LockedAppEndpoint.NameFor(identity));
+            routes.Add(new VaultRoute(vault, connection, new ApproverEntryNameSource(connection, options, vault)));
+        }
+
+        _vaults = new BridgeVaults(routes, _inputEnded.Token);
+
+        // Pointed at a real approver, or serving several vaults, the listing goes through the real source too: the point
+        // of that constructor is to leave nothing faked but the human.
+#pragma warning disable CA2000 // Its one connection is the harness's own, which DisposeAsync disposes.
+        var listing = _approverPipeName is null && _others.Count == 0
+            ? new BridgeVaults([routes[0] with { Names = Source }], _inputEnded.Token)
+            : _vaults;
+#pragma warning restore CA2000
+        serverOptions.ToolCollection.Add(new ListEntryNamesTool(listing, options, _audit));
+        serverOptions.ToolCollection.Add(new FindAccessTool(_vaults, options, _audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _vaults, _audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _vaults, _audit, attachments: true));
+        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, _vaults, _audit));
+        serverOptions.ToolCollection.Add(new SaveValueTool(options, _vaults, _audit));
+        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, _vaults, _audit));
+
+        if (_vaults.Several)
+        {
+            serverOptions.ServerInstructions += ToolText.VaultsInstructions;
+        }
 
         if (options.AllowRun)
         {
-            serverOptions.ToolCollection.Add(new RunTool(options, _approver, _audit));
+            serverOptions.ToolCollection.Add(new RunTool(options, _vaults, _audit));
             serverOptions.ServerInstructions += ToolText.RunInstructions;
         }
 
@@ -200,16 +243,18 @@ internal sealed class McpHarness : IAsyncDisposable
         _transport = new StreamServerTransport(channels.ServerReads, _transcript, "keypaste");
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
         var server = _server;
-        _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
-        _approver.Exposure = options.Exposure.Globs;
+        _vaults.Describe(() => McpAudit.AttachIdentity(server.ClientInfo, options), options.Exposure.Globs);
         _serving = _server.RunAsync();
 
         return channels;
     }
 
     /// <summary>Has the bridge attach to its owner as the client <paramref name="server"/> names, for a test that calls a tool on a server of its own.</summary>
-    internal void AttachAs(McpServer server) =>
-        _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, _options ?? throw new InvalidOperationException("the harness is not serving"));
+    internal void AttachAs(McpServer server)
+    {
+        var options = _options ?? throw new InvalidOperationException("the harness is not serving");
+        _vaults!.Describe(() => McpAudit.AttachIdentity(server.ClientInfo, options), options.Exposure.Globs);
+    }
 
     /// <summary>Ends the bridge's input as a client closing its standard input does, as <c>BridgeEntry</c> tells the connection.</summary>
     internal Task EndInputAsync() => _inputEnded.CancelAsync();
@@ -276,6 +321,13 @@ internal sealed class McpHarness : IAsyncDisposable
         }
 
         await _approver.DisposeAsync();
+
+        foreach (var (_, owner, connection) in _others)
+        {
+            await connection.DisposeAsync();
+            await owner.DisposeAsync();
+        }
+
         _inputEnded.Dispose();
         await Approver.DisposeAsync();
 

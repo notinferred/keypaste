@@ -17,9 +17,9 @@ namespace Keypaste.Mcp.Tools;
 /// it was made. Every call is recorded, by the owner when it answered and here otherwise, as the save tool's are (T-6).
 /// </remarks>
 /// <param name="options">What this bridge was started with.</param>
-/// <param name="approver">The connection to the vault's owner.</param>
+/// <param name="vaults">The vaults this bridge serves, each through its own owner.</param>
 /// <param name="audit">The bridge's audit log.</param>
-internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConnection approver, AuditLog audit) : McpServerTool
+internal sealed class RequestItemChangeTool(ServerOptions options, BridgeVaults vaults, AuditLog audit) : McpServerTool
 {
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
@@ -50,6 +50,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
         ArgumentNullException.ThrowIfNull(request);
 
         var arguments = request.Params?.Arguments;
+        var vault = ReadString(arguments, "vault");
         var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
         var asked = new ItemChangeRequest
         {
@@ -73,7 +74,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
         {
             try
             {
-                verdict = await DecideAsync(asked, cancellationToken).ConfigureAwait(false);
+                verdict = await DecideAsync(asked, vault, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -85,7 +86,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
             }
         }
 
-        var record = RequestRecords.ItemChange(client, asked, verdict.Decision, verdict.Method, verdict.Reason, resolved: null, item: null, verdict.Session, options.VaultKey);
+        var record = RequestRecords.ItemChange(client, asked, verdict.Decision, verdict.Method, verdict.Reason, resolved: null, item: null, verdict.Session, verdict.Route is { } route ? route.Key : vaults.SoleKey);
 
         if (!verdict.Recorded && !audit.TryAppend(record, out _))
         {
@@ -93,17 +94,17 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
         }
 
         return verdict.Item is { } item
-            ? ToolResults.ItemChanged(item, asked.Change)
-            : ToolResults.Refuse(verdict.Refusal ?? verdict.Method switch
+            ? ToolResults.ItemChanged(vaults.Several && verdict.Route?.Vault is { } changed ? ToolText.InVaultPlace(item, changed.Name) : item, asked.Change)
+            : ToolResults.Refuse(InVault(verdict.Route, verdict.Refusal ?? verdict.Method switch
             {
                 AuditMethod.Prompt => ToolText.ItemNotChanged,
                 AuditMethod.InvalidRequest => ToolText.ItemChangeRefused,
                 _ => ToolText.Refusal(verdict.Method),
-            });
+            }));
     }
 
     /// <summary>Checks the arguments' shape and what this bridge may see, then asks the owner, which checks both again.</summary>
-    private async ValueTask<Verdict> DecideAsync(ItemChangeRequest asked, CancellationToken cancellationToken)
+    private async ValueTask<Verdict> DecideAsync(ItemChangeRequest asked, string vault, CancellationToken cancellationToken)
     {
         if (ItemChangeRules.Check(asked, out _) is { } problem)
         {
@@ -117,7 +118,17 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
             return new Verdict(AuditDecision.Denied, AuditMethod.OutOfScope, "the item is outside what this agent can see whole through this bridge");
         }
 
-        var (reply, outcome, refusal) = await approver.ChangeItemAsync(asked, cancellationToken).ConfigureAwait(false);
+        var routing = await vaults.RouteAsync(vault, [asked.Entry], [], cancellationToken).ConfigureAwait(false);
+
+        return routing.Route is { } route
+            ? await AskAsync(route, asked, cancellationToken).ConfigureAwait(false) with { Route = route }
+            : new Verdict(AuditDecision.Denied, routing.Method, routing.Reason, routing.Refusal);
+    }
+
+    /// <summary>Asks the owner of the vault the request went to.</summary>
+    private static async ValueTask<Verdict> AskAsync(VaultRoute route, ItemChangeRequest asked, CancellationToken cancellationToken)
+    {
+        var (reply, outcome, refusal) = await route.Connection.ChangeItemAsync(asked, cancellationToken).ConfigureAwait(false);
 
         if (reply is { Recorded: false })
         {
@@ -136,7 +147,7 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
                     AuditDecision.Denied,
                     AuditMethod.NoApprover,
                     "no keypaste process holds the vault unlocked",
-                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false) ? ToolText.AppLocked : null),
+                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(route.Vault, cancellationToken).ConfigureAwait(false) ? ToolText.AppLocked : null),
             };
         }
 
@@ -146,6 +157,10 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
             Item = reply.Decision == AuditDecision.Granted ? reply.Item : null,
         };
     }
+
+    /// <summary>A refusal from one of several vaults, named with its vault; the one vault's, as it is.</summary>
+    private string InVault(VaultRoute? route, string refusal) =>
+        vaults.Several && route?.Vault is { } named ? ToolText.InVault(named.Name, refusal) : refusal;
 
     private static string ReadString(IDictionary<string, JsonElement>? arguments, string name) =>
         arguments is not null && arguments.TryGetValue(name, out var element) && element.ValueKind == JsonValueKind.String
@@ -157,6 +172,9 @@ internal sealed class RequestItemChangeTool(ServerOptions options, ApproverConne
     {
         /// <summary>Whether the owner recorded this call, so the bridge writes no line of its own.</summary>
         public bool Recorded { get; init; }
+
+        /// <summary>The vault the request went to, or null when it went to none.</summary>
+        public VaultRoute? Route { get; init; }
 
         /// <summary>The item changed, on the one path that changed it.</summary>
         public string? Item { get; init; }

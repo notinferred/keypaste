@@ -48,6 +48,27 @@ public sealed record ApprovalPrompt
     /// </remarks>
     public string? Label { get; init; }
 
+    /// <summary>Who is asking, as the requester line says it: verified only from what the system said of the connection, never from the label.</summary>
+    public RequesterIdentity Identity
+    {
+        get => _identity ?? new RequesterIdentity(Client, null, false);
+        init => _identity = value;
+    }
+
+    private readonly RequesterIdentity? _identity;
+
+    /// <summary>The item's own title, sanitized, which a prompt names it by; <see cref="Entry"/> is shown under Details.</summary>
+    public string ItemTitle
+    {
+        get => _itemTitle ?? Entry[(Entry.LastIndexOf('/') + 1)..];
+        init => _itemTitle = value;
+    }
+
+    private readonly string? _itemTitle;
+
+    /// <summary>Whether the item belongs to a protected environment, so it is asked about every time and offers no always answer.</summary>
+    public bool Protected { get; init; }
+
     /// <summary>The entry, sanitized for display. Not an address: sanitizing is lossy.</summary>
     public required string Entry { get; init; }
 
@@ -81,7 +102,7 @@ public sealed record ApprovalPrompt
     /// <remarks><see cref="Entry"/> is the name they share.</remarks>
     public IReadOnlyList<ItemCandidate> Candidates { get; init; } = [];
 
-    /// <summary>Whether the person is offered Always allow and, on one item, Always block: only for a named agent while keypaste has room to remember.</summary>
+    /// <summary>Whether the person is offered Always allow: only for a named agent while keypaste has room to remember.</summary>
     public bool OffersAlways { get; init; }
 
     /// <summary>The UUID of the one item asked about, as hex, or null when the prompt is a picker or the UUID could not be read.</summary>
@@ -121,15 +142,16 @@ public sealed record ApprovalPrompt
         // the altered-warning on every ordinary request. See SanitizeProse.
         var shownReason = EntryNameSanitizer.SanitizeProse(reason, MaximumReasonLength);
 
+        var shownClient = client is { Length: > 0 } ? EntryNameSanitizer.Sanitize(client, MaximumClientLength).Text : "an unnamed agent";
+        var shownLabel = clientLabel is { Length: > 0 } ? EntryNameSanitizer.Sanitize(clientLabel, MaximumClientLength).Text : null;
+
         return new ApprovalPrompt
         {
-            Client = client is { Length: > 0 }
-                ? EntryNameSanitizer.Sanitize(client, MaximumClientLength).Text
-                : "an unnamed agent",
-            Label = clientLabel is { Length: > 0 }
-                ? EntryNameSanitizer.Sanitize(clientLabel, MaximumClientLength).Text
-                : null,
+            Client = shownClient,
+            Label = shownLabel,
+            Identity = RequesterIdentity.Current(shownClient, shownLabel),
             Entry = shownEntry.Text,
+            ItemTitle = EntryNameSanitizer.Sanitize(entry.Title).Text,
             EntryWasAltered = shownEntry.WasAltered,
             Field = field,
             Reason = shownReason.Text,

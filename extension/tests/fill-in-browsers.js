@@ -3,10 +3,11 @@
 
 // scripts/verify-browser-fill.sh's browser half. tests/Keypaste.AppDriver holds a vault of logins and answers keypaste's
 // prompts; each browser loads keypaste's extension, pairs, and visits pages a local HTTPS server serves under test names, where
-// a trusted click on the field's key icon asks for logins as a person's does. Each page's fields and the owner's log must show
-// what 8.3a1's rules allow: the item's site filled, a lookalike and another tenant of a shared host offered nothing, an http
-// page and a form posting elsewhere asked with no Always, an Always filling on reload, a second login still reachable on an
-// always-filled page, and a cross-origin frame refused by the extension itself.
+// a trusted click on the field's key icon opens keypaste's list of names and trusted keys pick one, as a person's do. Each
+// page's fields and the owner's log must show what keypaste's rules allow: the list written as one line and no password before
+// a pick, the first pick on a site asked in keypaste and a later one filled at once, a subdomain listing the site's logins and
+// asked at its own first pick, a lookalike and another tenant of a shared host listing nothing, an http page and a form posting
+// elsewhere asked at every pick, and a cross-origin frame refused by the extension itself.
 //
 // Usage: fill-in-browsers.js <settings.json>, written by verify-browser-fill.sh:
 //   { root, driver, keypaste, vault, real, geckodriver, cert, key, chromiumBuild, edgeBuild, firefoxBuild, chromeId, edgeId,
@@ -206,6 +207,7 @@ const PAGE_STATE = `
         password: value('password'),
         icons: ours.filter((element) => element.style.cssText === 'all: unset;').length,
         notices: ours.filter((element) => element.style.display === 'block').length,
+        divs: ours.length,
         styles: ours.map((element) => element.style.cssText.slice(0, 60)),
         field: rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null,
     };`;
@@ -326,6 +328,10 @@ class ChromiumTab {
         await this.page.mouse.click(x, y);
     }
 
+    async press(key) {
+        await this.page.keyboard.press(key);
+    }
+
     // What the page's own document has at a point: a shadow root the extension draws in shows as its host.
     at({ x, y }) {
         return this.page.evaluate(`document.elementFromPoint(${x}, ${y})?.tagName ?? ''`);
@@ -370,6 +376,10 @@ class FirefoxTab {
         await this.gecko.clickAt(x, y);
     }
 
+    async press(key) {
+        await this.gecko.press(key);
+    }
+
     at({ x, y }) {
         return this.gecko.evaluate(`return document.elementFromPoint(${x}, ${y})?.tagName ?? '';`);
     }
@@ -395,34 +405,49 @@ const fillActs = async function(app, tab, ports, items, name, pairing) {
         return framed || (await tab.at(iconPoint(state.field))).startsWith('DIV') ? state : undefined;
     }, `${name} to draw keypaste's icon`);
 
-    // A click on the icon, once it is drawn, with the driver watched for a prompt from the moment of the click.
-    const clickWatching = async (framed, ms) => {
+    // A click on the icon opens keypaste's list beside the field, a div more in the page, and writes one line when it names a
+    // login. Brave has let a first click on a page just opened do nothing (BACKLOG), so one more click is allowed and printed.
+    const opened = async (framed = false) => {
+        const before = (await ready(framed)).divs;
         const point = iconPoint((await ready(framed)).field);
-        const prompt = app.next(/^fill-prompt /, ms);
         await tab.clickAt(point);
-        return prompt;
-    };
-
-    // A click that must bring keypaste's prompt for origin, which the driver then answers. Brave has let a first click on a
-    // page just opened do nothing (BACKLOG), so one more click is allowed and printed.
-    const prompted = async (expectedOrigin, framed = false) => {
-        const shown = await clickWatching(framed, QUIET_MS * 2).catch(() => {
-            console.log(`${name}: a click on ${expectedOrigin} brought no prompt; clicking again`);
-            return clickWatching(framed);
+        await until(async () => (await tab.state(framed)).divs > before || undefined, `${name} to open keypaste's list`, QUIET_MS * 2).catch(async () => {
+            console.log(`${name}: a click brought no list; clicking again`);
+            await tab.clickAt(point);
+            await until(async () => (await tab.state(framed)).divs > before || undefined, `${name} to open keypaste's list`);
         });
-        const match = /^fill-prompt origin=(\S+) pairing=(.*) logins=(.*) always=(offered|none)( note=.*)?$/.exec(shown);
-        if (!match || match[1] !== expectedOrigin || match[2] !== pairing) {
-            throw new Error(`${name}: expected a prompt for ${expectedOrigin} under ${pairing}, saw ${shown}`);
-        }
-        return { logins: match[3].split('|'), always: match[4] === 'offered', note: (match[5] ?? '').trim() };
     };
 
-    const rowOf = (shown, item) => {
-        const index = shown.logins.findIndex((row) => row.startsWith(`${item.title}, ${item.username} `));
-        if (index < 0) {
-            throw new Error(`${name}: the prompt lists ${shown.logins.join(' | ')}, not ${item.title}`);
+    // The list's line for an origin, naming how many logins it showed and no password.
+    const listed = (expectedOrigin, count, since) => until(async () => {
+        const lines = auditText().slice(since).split('\n').filter((line) => line.includes('"field":"list"') && line.includes(expectedOrigin));
+        return lines.find((line) => line.includes(`listed ${count} login(s) by name, no password`));
+    }, `${name}'s list of ${count} login(s) on ${expectedOrigin} to be recorded`);
+
+    // Opens the list on the page, waits for its line, and picks the login at row (from 1) with the keys, focus being in the field.
+    const pickRow = async (expectedOrigin, count, row) => {
+        const since = auditText().length;
+        await opened();
+        await listed(expectedOrigin, count, since);
+        // A pick counts only once the list has been on screen a moment (autocomplete.js).
+        await pause(800);
+        for (let i = 1; i < row; i++) {
+            await tab.press('ArrowDown');
         }
-        return index + 1;
+        await tab.press('Enter');
+    };
+
+    // A pick keypaste must ask about, for the login and origin given, which the driver then answers.
+    const asked = async (expectedOrigin, count, row, item) => {
+        const prompt = app.next(/^fill-prompt /, QUIET_MS * 3);
+        await pickRow(expectedOrigin, count, row);
+        const shown = await prompt;
+        const host = new URL(expectedOrigin).hostname;
+        const match = /^fill-prompt question=(.*) origin=(\S+) pairing=(.*) login=(.*?)( note=.*)?$/.exec(shown);
+        if (!match || match[1] !== `Fill ${item.title} on ${host}?` || match[2] !== expectedOrigin || match[3] !== pairing) {
+            throw new Error(`${name}: expected keypaste to ask to fill ${item.title} on ${expectedOrigin} under ${pairing}, saw ${shown}`);
+        }
+        return { note: (match[5] ?? '').trim() };
     };
 
     const filledWith = (item, framed = false) => {
@@ -436,23 +461,31 @@ const fillActs = async function(app, tab, ports, items, name, pairing) {
         });
     };
 
-    // A click that must bring no prompt: the extension shows its notice instead, and the fields stay empty.
-    const unprompted = async (what, framed = false) => {
+    // A pick keypaste fills at once, as a login filled on that exact site before is.
+    const atOnce = async (expectedOrigin, count, row, item) => {
         const prompts = app.watch(/^fill-prompt /);
-        let seen;
-        await tab.clickAt(iconPoint((await ready(framed)).field));
-        await until(async () => {
-            const now = await tab.state(framed);
-            const top = framed ? await tab.state() : now;
-            seen = framed ? { frame: now, top } : now;
-            return now.notices + top.notices > 0 || undefined;
-        }, `${name} to say ${what} has no logins`).catch((error) => {
-            throw new Error(`${error.message}; the page showed ${JSON.stringify(seen)}`);
-        });
+        await pickRow(expectedOrigin, count, row);
+        await filledWith(item);
+        prompts.stop();
+        if (prompts.lines.length > 0) {
+            throw new Error(`${name}: a login filled on ${expectedOrigin} before was asked again: ${prompts.lines[0]}`);
+        }
+    };
+
+    // A click that lists nothing: the list opens, keypaste records no list line for the host and asks nobody, and the fields stay empty.
+    const nothingListed = async (what, host, framed = false) => {
+        const prompts = app.watch(/^fill-prompt /);
+        const since = auditText().length;
+        await opened(framed);
+        await pause(1000);
+        await tab.press('Enter');
         await pause(1000);
         prompts.stop();
         if (prompts.lines.length > 0) {
             throw new Error(`${name}: ${what} brought a prompt: ${prompts.lines[0]}`);
+        }
+        if (auditText().slice(since).split('\n').some((line) => line.includes('"field":"list"') && line.includes(host))) {
+            throw new Error(`${name}: ${what} listed a login`);
         }
         const state = await tab.state(framed);
         if (state.username || state.password) {
@@ -461,80 +494,75 @@ const fillActs = async function(app, tab, ports, items, name, pairing) {
     };
 
     const answer = (command) => app.act(command, /^fill-prompt withdrawn/);
+    const emptied = async () => {
+        await pause(1000);
+        const state = await tab.state();
+        if (state.username || state.password) {
+            throw new Error(`${name}: a refused pick filled ${state.username}`);
+        }
+    };
 
-    // The item's own site: both of its logins are offered, Always among the choices, and the one picked fills.
+    // The item's own site lists both of its logins by name; the first pick there is asked in keypaste, and fills once allowed.
     await tab.goto(at(NAMES.shop, '/login?next=/account'));
-    let shown = await prompted(origin(NAMES.shop));
-    if (shown.logins.length !== 2 || !shown.always) {
-        throw new Error(`${name}: the item's site offered ${shown.logins.join(' | ')}, always ${shown.always}`);
-    }
-    await answer(`fill ${rowOf(shown, shopDana)} always`);
+    await asked(origin(NAMES.shop), 2, 1, shopDana);
+    await answer('allow');
     await filledWith(shopDana);
 
-    // On reload the page's own load gets the always-filled login unasked; a click still offers the other login, which then fills.
+    // A later pick of that login on that exact site fills at once; the other login's first pick there is still asked.
     await tab.reload();
-    shown = await prompted(origin(NAMES.shop));
-    if (shown.logins.length !== 1) {
-        throw new Error(`${name}: after Always, the click offered ${shown.logins.join(' | ')}, not Shop work alone`);
-    }
-    const released = auditText().length;
-    await answer(`fill ${rowOf(shown, shopSam)}`);
-    // keypaste releases the second login, recorded as the person's choice, and the extension opens its list of both beside
-    // the icon; picking from that list is the extension's own drop-down, which Edge's autofill can close on Windows.
-    await until(async () => /"entry":"Shop work".*"method":"prompt"/.test(auditText().slice(released)) || undefined, `${name}'s release of Shop work to be recorded`);
-    await until(async () => (await tab.state()).icons > 1 || undefined, `${name} to list both logins`);
+    await atOnce(origin(NAMES.shop), 2, 1, shopDana);
+    await tab.reload();
+    await asked(origin(NAMES.shop), 2, 2, shopSam);
+    await answer('allow');
+    await filledWith(shopSam);
 
-    // A subdomain of the item's site is asked about, and a refusal fills nothing.
+    // A subdomain of the item's site lists its logins, and the first pick there is asked though the site was filled before.
     await tab.goto(at(NAMES.www, '/login'));
-    shown = await prompted(origin(NAMES.www));
+    await asked(origin(NAMES.www), 2, 1, shopDana);
     await answer('deny');
-    await pause(1000);
-    const refused = await tab.state();
-    if (refused.username || refused.password) {
-        throw new Error(`${name}: a refused prompt filled the subdomain's page with ${refused.username}`);
-    }
+    await emptied();
 
-    // A lookalike name and another tenant of a shared host get nothing, and nobody is asked.
+    // A lookalike name and another tenant of a shared host list nothing, and nobody is asked.
     await tab.goto(at(NAMES.lookalike, '/login'));
-    await unprompted('a lookalike of the item\'s site');
+    await nothingListed('a lookalike of the item\'s site', NAMES.lookalike);
     await tab.goto(at(NAMES.bob, '/login'));
-    await unprompted('another tenant of github.io');
+    await nothingListed('another tenant of github.io', NAMES.bob);
 
-    // An http page is asked about every time, with no Always.
+    // An http page is asked at every pick, saying so; a refusal fills nothing.
     await tab.goto(at(NAMES.router, '/login', ports.httpPort, 'http'));
-    shown = await prompted(origin(NAMES.router, ports.httpPort, 'http'));
-    if (shown.always) {
-        throw new Error(`${name}: an http page offered Always`);
+    let shown = await asked(origin(NAMES.router, ports.httpPort, 'http'), 1, 1, router);
+    if (!shown.note.includes('not secure')) {
+        throw new Error(`${name}: an http page's prompt said ${shown.note}`);
     }
-    await answer(`fill ${rowOf(shown, router)}`);
+    await answer('allow');
     await filledWith(router);
+    await tab.reload();
+    await asked(origin(NAMES.router, ports.httpPort, 'http'), 1, 1, router);
+    await answer('deny');
+    await emptied();
 
-    // A form that posts to another site is named in the prompt, with no Always.
+    // A form that posts to another site is asked at every pick, even of a login filled on the page's site before, naming that site.
     await tab.goto(at(NAMES.shop, '/cross'));
-    shown = await prompted(origin(NAMES.shop));
-    if (shown.always || !shown.note.includes(origin(NAMES.other))) {
-        throw new Error(`${name}: a form posting to ${NAMES.other} was shown as always=${shown.always} ${shown.note}`);
+    shown = await asked(origin(NAMES.shop), 2, 1, shopDana);
+    if (!shown.note.includes(NAMES.other)) {
+        throw new Error(`${name}: a form posting to ${NAMES.other} was asked with ${shown.note}`);
     }
     await answer('deny');
+    await emptied();
 
-    // Always on a site with one login: after a reload the click fills it with nobody asked.
+    // A site with one login: the first pick asked, the next filled at once, and Settings lists it as filled there before.
     await tab.goto(at(NAMES.mail, '/login'));
-    shown = await prompted(origin(NAMES.mail));
-    await answer(`fill ${rowOf(shown, mail)} always`);
+    await asked(origin(NAMES.mail), 1, 1, mail);
+    await answer('allow');
     await filledWith(mail);
     await tab.reload();
-    const quiet = clickWatching(false, QUIET_MS).catch(() => null);
-    await filledWith(mail);
-    const unasked = await quiet;
-    if (unasked) {
-        throw new Error(`${name}: an always-filled login asked again: ${unasked}`);
-    }
+    await atOnce(origin(NAMES.mail), 1, 1, mail);
     await app.act('allowances', new RegExp(`^allowance item=Mail on ${escape(origin(NAMES.mail))} in ${escape(pairing)}$`));
 
     // A login form in a frame from another origin, even of the item's own site, is refused by the extension before keypaste.
     const before = auditText();
     await tab.goto(at(NAMES.shop, '/framed'));
-    await unprompted('a cross-origin frame', true);
+    await nothingListed('a cross-origin frame', NAMES.frame, true);
     if (auditText().slice(before.length).includes(NAMES.frame)) {
         throw new Error(`${name}: the cross-origin frame reached keypaste`);
     }

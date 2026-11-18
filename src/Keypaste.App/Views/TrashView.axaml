@@ -81,20 +81,27 @@
       <!-- The list: its header with the title and the sort, then the two-line rows. A row carries no field value, because RecycledEntry has none. -->
       <Border x:Name="ListColumn" ZIndex="1" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="12,16,12,8" Spacing="8">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-              <TextBlock x:Name="ListTitle"
-                         Classes="list-title"
-                         Text="{Binding ListTitle}"
-                         ToolTip.Tip="{Binding Note}"
-                         VerticalAlignment="Center" />
+          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="16,0,12,0">
+            <Grid Height="46" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock x:Name="ListTitle"
+                           Classes="list-title"
+                           Text="{Binding ListTitle}"
+                           ToolTip.Tip="{Binding Note}"
+                           VerticalAlignment="Center" />
+                <TextBlock Classes="size-11 muted"
+                           Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).VaultInView.Title, FallbackValue={x:Null}}"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="120"
+                           VerticalAlignment="Center" />
+              </StackPanel>
               <ToggleButton x:Name="SortMenu"
-                            Grid.Column="1"
+                            Grid.Column="2"
                             Classes="more"
                             IsVisible="{Binding !IsEmpty}"
                             ToolTip.Tip="{x:Static res:Strings.SortThisList}"
                             AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
-                <ctl:KpIcon Icon="chevrons-up-down" Size="14" />
+                <ctl:KpIcon Icon="list-filter" Size="16" />
               </ToggleButton>
             </Grid>
 
@@ -103,7 +110,7 @@
               <Border x:Name="SortMenuPanel"
                       Classes="menu"
                       Canvas.Right="0"
-                      Canvas.Top="-36"
+                      Canvas.Top="-6"
                       MinWidth="180"
                       IsVisible="{Binding #SortMenu.IsChecked}">
                 <ItemsControl ItemsSource="{Binding SortChoices}">
@@ -126,7 +133,7 @@
           </StackPanel>
 
           <!-- Every row at once, so it is offered only while there is something to empty. -->
-          <Border DockPanel.Dock="Bottom" Classes="vault-foot" Margin="12,0,12,12" IsVisible="{Binding !IsEmpty}">
+          <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource KpBorderSubtle}" Padding="0,8,0,0" Margin="12,0,12,12" IsVisible="{Binding !IsEmpty}">
             <Button Name="EmptyButton" Classes="ghost" HorizontalAlignment="Left" Command="{Binding EmptyCommand}" AutomationProperties.Name="{x:Static res:Strings.EmptyTrash}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="trash-2" Size="14" />
@@ -144,8 +151,8 @@
             </StackPanel>
 
             <ListBox Name="TrashRows" AutomationProperties.Name="{x:Static res:Strings.DeletedItems}"
-                     Classes="rows two-line"
-                     Padding="4,0,4,4"
+                     Classes="rows two-line monograms"
+                     Padding="6,0,6,6"
                      IsVisible="{Binding !IsEmpty}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ItemsSource="{Binding Rows}"
@@ -155,15 +162,13 @@
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TrashRow">
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Border Classes="row-tile">
-                      <ctl:KpIcon Icon="key-round" Size="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
-                    </Border>
+                    <ctl:Monogram Title="{Binding DisplayTitle}" Id="{Binding Hue}" Size="30" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                       <TextBlock Classes="row-title" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="mono muted size-12" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Summary}" />
+                      <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Summary}" />
                     </StackPanel>
                     <!-- A long date, as a Hijri one is, wraps rather than pushing the row past the list. -->
-                    <TextBlock Grid.Column="2" Classes="caption" Text="{Binding When}" TextWrapping="Wrap" TextAlignment="End" MaxWidth="120" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="size-11 muted" Text="{Binding When}" TextWrapping="Wrap" TextAlignment="End" MaxWidth="110" VerticalAlignment="Top" Margin="0,2,0,0" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>

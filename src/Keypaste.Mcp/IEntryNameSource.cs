@@ -121,7 +121,10 @@ internal interface IEntryNameSource
 /// path does not fuse them; sharing an interface would have.
 /// </para>
 /// </remarks>
-internal sealed class ApproverEntryNameSource(ApproverConnection approver, ServerOptions options)
+/// <param name="approver">The link to the vault's owner.</param>
+/// <param name="options">What the bridge was started with.</param>
+/// <param name="vault">The vault, whose locked app is told when nothing holds it, or null without one.</param>
+internal sealed class ApproverEntryNameSource(ApproverConnection approver, ServerOptions options, BridgeVault? vault)
     : IEntryNameSource
 {
     /// <inheritdoc/>
@@ -209,7 +212,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 return new EntryNameListing(VaultAvailability.Failed, [], ToolText.ApproverFailed, true);
             }
 
-            return await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+            return await LockedApp.TellAsync(vault, cancellationToken).ConfigureAwait(false)
                 ? new EntryNameListing(VaultAvailability.Failed, [], ToolText.AppLockedForListing, true) { AuditReason = ToolText.NoApproverForListing }
                 : new EntryNameListing(VaultAvailability.Failed, [], ToolText.NoApproverForListing, true);
         }

@@ -67,8 +67,10 @@ public sealed record AuditCompactionResult(AuditCompactionOutcome Outcome, int F
 /// </para>
 /// <para>
 /// <b>Only a log that verifies is compacted.</b> Resealing a broken chain would launder the break, so a log that does
-/// not verify under the key, ends mid-line, holds lines of a newer schema or was sealed under another vault's key is
-/// left as it is. The day of the last line is never compacted, which keeps the line the next append links to.
+/// not verify under the key, ends mid-line, holds lines of a newer schema or was sealed under the key of a vault this
+/// process does not hold is left as it is. Several vaults' owners in one process write to one log, so each compacts
+/// under its own key with the others' given, which check what those owners signed and sealed before it seals over them.
+/// The day of the last line is never compacted, which keeps the line the next append links to.
 /// </para>
 /// <para>
 /// <b>One rename, under the writers' lock.</b> The log is read under the sidecar lock every appender takes, then
@@ -94,9 +96,10 @@ public static class AuditCompaction
     /// <param name="keepDays">How long the log is kept, as <see cref="AuditRetention.Clamp"/> allows.</param>
     /// <param name="now">The time the periods are measured from.</param>
     /// <param name="session">The owner's session writing the seal.</param>
+    /// <param name="others">The checkpoint keys of the other vaults whose owners write to this log in this process, or none.</param>
     /// <returns>What was done.</returns>
-    public static AuditCompactionResult Compact(string path, AuditCheckpointKey key, int keepDays, DateTimeOffset now, string session) =>
-        Compact(path, key, keepDays, now, session, beforeCommit: null);
+    public static AuditCompactionResult Compact(string path, AuditCheckpointKey key, int keepDays, DateTimeOffset now, string session, IReadOnlyCollection<AuditCheckpointKey>? others = null) =>
+        Compact(path, key, keepDays, now, session, beforeCommit: null, others);
 
     /// <summary>Compacts the log, running <paramref name="beforeCommit"/> before the old file is replaced.</summary>
     /// <param name="path">The log.</param>
@@ -105,11 +108,14 @@ public static class AuditCompaction
     /// <param name="now">The time the periods are measured from.</param>
     /// <param name="session">The owner's session writing the seal.</param>
     /// <param name="beforeCommit">Run between composing the new file and taking the lock to replace the old one, for tests.</param>
-    internal static AuditCompactionResult Compact(string path, AuditCheckpointKey key, int keepDays, DateTimeOffset now, string session, Action? beforeCommit)
+    /// <param name="others">The checkpoint keys of the other vaults whose owners write to this log in this process, or none.</param>
+    internal static AuditCompactionResult Compact(string path, AuditCheckpointKey key, int keepDays, DateTimeOffset now, string session, Action? beforeCommit, IReadOnlyCollection<AuditCheckpointKey>? others = null)
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(session);
+
+        IReadOnlyCollection<AuditCheckpointKey> keys = [key, .. (others ?? []).Where(other => !string.Equals(other.Vault, key.Vault, StringComparison.Ordinal))];
 
         var full = Path.GetFullPath(path);
 
@@ -125,7 +131,7 @@ public static class AuditCompaction
                 return AuditCompactionResult.Refused(refusal);
             }
 
-            var plan = Plan(full, snapshot, key, AuditRetention.Clamp(keepDays), now, session);
+            var plan = Plan(full, snapshot, key, keys, AuditRetention.Clamp(keepDays), now, session);
 
             if (plan.Contents is not { } compacted)
             {
@@ -314,7 +320,7 @@ public static class AuditCompaction
         internal DateOnly? RemovedFrom { get; init; }
     }
 
-    private static Planned Plan(string path, byte[] snapshot, AuditCheckpointKey key, int keepDays, DateTimeOffset now, string session)
+    private static Planned Plan(string path, byte[] snapshot, AuditCheckpointKey key, IReadOnlyCollection<AuditCheckpointKey> keys, int keepDays, DateTimeOffset now, string session)
     {
         if (snapshot.Length == 0)
         {
@@ -328,7 +334,7 @@ public static class AuditCompaction
 
         using (var stream = new MemoryStream(snapshot, writable: false))
         {
-            var report = AuditChainVerifier.Verify(stream, path, checkpoints: key);
+            var report = AuditChainVerifier.Verify(stream, path, null, keys);
 
             if (report.Verdict != AuditChainVerdict.Intact || report.Newer > 0 || report.Rewritten)
             {
@@ -337,7 +343,7 @@ public static class AuditCompaction
 
             if (report.Compaction is not (AuditCompactionCheck.None or AuditCompactionCheck.Verified))
             {
-                return new Planned(AuditCompactionResult.Refused("the audit log was sealed under another vault's key"), null);
+                return new Planned(AuditCompactionResult.Refused("the audit log was sealed under the key of a vault this process does not hold"), null);
             }
         }
 
@@ -441,7 +447,7 @@ public static class AuditCompaction
         // The new file is checked as the verifier will check it before it replaces anything.
         using (var check = new MemoryStream(contents, writable: false))
         {
-            var report = AuditChainVerifier.Verify(check, path, checkpoints: key);
+            var report = AuditChainVerifier.Verify(check, path, null, keys);
 
             if (report.Verdict != AuditChainVerdict.Intact || report.Compaction != AuditCompactionCheck.Verified)
             {

@@ -45,9 +45,9 @@ public sealed class FinishThePolishTests
         shell.Show<LogViewModel>(DestinationKind.Log);
         Assert.Equal("Activity - keypaste", shell.Window.Title);
 
-        shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<ProjectRow>().First(row => row.Name == "secret-project");
+        shell.Shell.SelectedSidebarRow = shell.Shell.ProjectRowNamed("secret-project");
         shell.Frame();
-        Assert.Equal("Projects - keypaste", shell.Window.Title);
+        Assert.Equal("Environments - keypaste", shell.Window.Title);
     });
 
     [Fact]
@@ -276,20 +276,20 @@ public sealed class FinishThePolishTests
             ProjectVariables.Set(vault, "billing", "prod", "SHARED", "other");
         });
         shell.Window.Width = width * percent / 100d;
-        shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "billing");
+        shell.Shell.SelectedSidebarRow = shell.Shell.ProjectRowNamed("billing");
         shell.Frame();
 
-        var note = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.IsEffectivelyVisible && block.Text == "same as staging");
+        var note = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.IsEffectivelyVisible && block.Text == "Same as staging");
         Assert.All(note.TextLayout.TextLines, line => Assert.False(line.HasCollapsed, $"the note is cut at {width}"));
         var overprints = ReachableControls.Problems(shell.Window).Where(problem => problem.Contains("overprints", StringComparison.Ordinal)).ToList();
         Assert.True(overprints.Count == 0, string.Join(Environment.NewLine, overprints));
 
         var root = (Visual)ShellViewOf(shell);
-        var newProject = BoundsIn(root, Named("New project"));
-        foreach (var action in new[] { Named("More actions"), Named("Run in a terminal") })
+        var stages = BoundsIn(root, shell.Named<ItemsControl>("StageSegments")).Union(BoundsIn(root, Named("Add stage")));
+        foreach (var action in new[] { Named("Edit"), Named("Run in a terminal") })
         {
             var actionBounds = BoundsIn(root, action);
-            Assert.False(newProject.Intersects(actionBounds), $"New project at {newProject} overlaps {AutomationProperties.GetName(action)} at {actionBounds} at {width}");
+            Assert.False(stages.Intersects(actionBounds), $"The stages at {stages} overlap {AutomationProperties.GetName(action)} at {actionBounds} at {width}");
         }
 
         Button Named(string name) => shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);
@@ -299,11 +299,11 @@ public sealed class FinishThePolishTests
     public Task A_wide_window_keeps_the_logs_Where_and_a_hidden_sidebar_gives_it_back() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-tight-wide-");
-        shell.Window.Width = 1000;
+        shell.Window.Width = 1060;
         shell.Frame();
         Assert.False(shell.Shell.ContentIsTight);
 
-        shell.Window.Width = 999;
+        shell.Window.Width = 1059;
         shell.Frame();
         Assert.True(shell.Shell.ContentIsTight);
 

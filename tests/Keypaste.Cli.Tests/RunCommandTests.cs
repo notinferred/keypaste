@@ -295,7 +295,7 @@ public sealed class RunCommandTests
 
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(CliApp.ExitNotFound, harness.Run("run", "--profile", "qa", "acme-api", "--vault", harness.VaultPath, "--", "node"));
-        Assert.Contains("'acme-api' has no 'qa' environment", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("'acme-api' has no 'qa' stage", harness.Err, StringComparison.Ordinal);
 
         harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "-p", "QA", "acme-api", "--vault", harness.VaultPath, "--", "node"));
         Assert.Single(harness.ProcessLauncher.Started);
@@ -378,7 +378,7 @@ public sealed class RunCommandTests
 
         Assert.Equal("dev-db", harness.ProcessLauncher.Environment["DB"]);
         Assert.Equal("octocat", harness.ProcessLauncher.Environment["GH"]);
-        Assert.Contains("environment dev", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("stage dev", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -427,7 +427,7 @@ public sealed class RunCommandTests
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
 
         var said = harness.Err.ReplaceLineEndings("\n");
-        Assert.StartsWith("keypaste run: resolving .env.keypaste → project acme-api environment staging\n", said, StringComparison.Ordinal);
+        Assert.StartsWith("keypaste run: resolving .env.keypaste → project acme-api stage staging\n", said, StringComparison.Ordinal);
         Assert.Contains("keypaste run: literal NODE_OPTIONS=--max-old-space-size=4096\n", said, StringComparison.Ordinal);
         Assert.Equal("staging-db", harness.ProcessLauncher.Environment["DB"]);
         Assert.Equal("--max-old-space-size=4096", harness.ProcessLauncher.Environment["NODE_OPTIONS"]);
@@ -449,10 +449,10 @@ public sealed class RunCommandTests
 
         Assert.Equal(
             [
-                $"keypaste run: resolving {file} → project acme-api, vault items environment mixed",
+                $"keypaste run: resolving {file} → project acme-api, vault items stage mixed",
                 "keypaste run: literal HTTPS_PROXY=http://proxy.internal:3128",
                 "keypaste run: literal NO_PROXY=localhost",
-                $"  resolving {file}  environment mixed",
+                $"  resolving {file}  stage mixed",
                 "  ✓ A                   kp://acme-api/dev",
                 "  ✓ B                   kp://acme-api/dev",
                 "  = HTTPS_PROXY=http://proxy.internal:3128",
@@ -570,7 +570,7 @@ public sealed class RunCommandTests
 
         Assert.Equal(
             [
-                "  resolving acme-api  environment dev",
+                "  resolving acme-api  stage dev",
                 "  ✓ DATABASE_URL        kp://acme-api/dev",
                 "  ✓ STRIPE_KEY          kp://acme-api/dev",
                 "  2 injected · nothing written to disk",

@@ -9,13 +9,13 @@ using Xunit;
 namespace Keypaste.Consistency.Tests;
 
 /// <summary>
-/// An entry the app's Projects screen adds to an environment is in the next <c>keypaste run</c>, and
+/// An entry the app's Environments adds to a stage is in the next <c>keypaste run</c>, and
 /// one it takes out is not (C.4).
 /// </summary>
 /// <remarks>
 /// The CLI is asked rather than the tags, because the claim is that the screen's tag change is what
 /// both front ends read as membership. The mutations this must catch: a tag written for another
-/// environment, a removal that leaves one of the entry's tags behind, and a removal that deletes the
+/// stage, a removal that leaves one of the entry's tags behind, and a removal that deletes the
 /// entry instead.
 /// </remarks>
 public sealed class EntriesTaggedOnTheProjectsScreenAreWhatTheCliRunsTests

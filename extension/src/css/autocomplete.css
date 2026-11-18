@@ -1,4 +1,7 @@
 .kpxcAutocomplete-container {
+    /* The browser exposes no reliable system accent to a page, so a fixed accent keeps white text at 5.5:1 in light and dark. */
+    --kp-list-accent: #0A64D6;
+    --kp-list-on-accent: #FFFFFF;
     background-color: var(--kp-card);
     border: 1px solid var(--kp-line);
     border-radius: 10px;
@@ -6,10 +9,12 @@
     box-sizing: border-box;
     color: var(--kp-text);
     display: none;
-    font: 400 13px/1.5 var(--kp-sans);
+    font: 400 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-style: normal;
+    inset: auto;
     letter-spacing: normal;
     min-width: 16em;
+    opacity: 1;
     overflow: hidden;
     padding: 4px;
     position: absolute !important;
@@ -19,8 +24,33 @@
     z-index: 2147483646;
 }
 
+.kpxcAutocomplete-container:popover-open {
+    position: fixed !important;
+}
+
 .kpxcAutocomplete-container--visible {
     display: block;
+}
+
+.kpxcAutocomplete-site__name {
+    align-items: center;
+    color: var(--kp-text-muted);
+    display: flex;
+    font-size: 11px;
+    gap: 6px;
+    padding: 4px 8px 6px;
+}
+
+.kpxcAutocomplete-site__name .kpxc-icon,
+.kpxcAutocomplete-action .kpxc-icon {
+    fill: none;
+    flex: none;
+    height: 14px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 14px;
 }
 
 .kpxcAutocomplete-items {
@@ -29,22 +59,38 @@
 }
 
 .kpxcAutocomplete-item {
-    border-radius: 7px;
-    padding: 6px 8px 6px 10px;
+    align-items: center;
+    border-radius: 6px;
+    cursor: default;
+    display: flex;
+    gap: 10px;
+    padding: 5px 8px;
 }
 
-.kpxcAutocomplete-item__header {
-    align-items: baseline;
+.kpxcAutocomplete-item__monogram {
+    align-items: center;
+    background-color: var(--kp-text-muted);
+    border-radius: 6px;
+    color: var(--kp-card);
     display: flex;
-    flex-direction: row-reverse;
-    gap: 8px;
-    justify-content: space-between;
+    flex: none;
+    font-size: 12px;
+    font-weight: 600;
+    height: 24px;
+    justify-content: center;
+    pointer-events: none;
+    width: 24px;
+}
+
+.kpxcAutocomplete-item__names {
+    flex: 1;
+    min-width: 0;
+    pointer-events: none;
 }
 
 .kpxcAutocomplete-item__label,
-.kpxcAutocomplete-item__group,
 .kpxcAutocomplete-item__value,
-.kpxcAutocomplete-item__value--last {
+.kpxcAutocomplete-item__vault {
     overflow: hidden;
     pointer-events: none;
     text-overflow: ellipsis;
@@ -52,43 +98,98 @@
 }
 
 .kpxcAutocomplete-item__label {
-    font-size: 13.5px;
-    font-weight: 500;
-}
-
-.kpxcAutocomplete-item__group {
-    color: var(--kp-text-muted);
-    flex: none;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    max-width: 40%;
-    text-transform: uppercase;
+    font-weight: 600;
 }
 
 .kpxcAutocomplete-item__value,
-.kpxcAutocomplete-item__value--last {
+.kpxcAutocomplete-item__vault {
     color: var(--kp-text-muted);
     font-size: 12px;
+}
+
+.kpxcAutocomplete-item__vault {
+    flex: none;
+    max-width: 35%;
 }
 
 .kpxcAutocomplete-item--active {
-    background-color: var(--kp-amber-tint);
-    box-shadow: inset 2px 0 0 var(--kp-amber-mark);
+    background-color: var(--kp-list-accent);
+    color: var(--kp-list-on-accent);
 }
 
-.kpxcAutocomplete-item--active .kpxcAutocomplete-item__group,
 .kpxcAutocomplete-item--active .kpxcAutocomplete-item__value,
-.kpxcAutocomplete-item--active .kpxcAutocomplete-item__value--last {
+.kpxcAutocomplete-item--active .kpxcAutocomplete-item__vault {
+    color: var(--kp-list-on-accent);
+}
+
+.kpxcAutocomplete-action {
+    align-items: center;
+    border-radius: 6px;
+    color: var(--kp-text);
+    cursor: default;
+    display: flex;
+    gap: 10px;
+    padding: 6px 8px;
+}
+
+.kpxcAutocomplete-action[role="button"]:hover {
+    background-color: var(--kp-hover);
+}
+
+.kpxcAutocomplete-action--locked {
     color: var(--kp-text-secondary);
 }
 
-.kpxcAutocomplete-container footer {
-    border-top: 1px solid var(--kp-line-subtle);
-    color: var(--kp-text-muted);
+.kpxcAutocomplete-action__label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kpxcAutocomplete-button {
+    background-color: var(--kp-card);
+    border: 1px solid var(--kp-line-strong);
+    border-radius: 6px;
+    color: var(--kp-text);
+    flex: none;
+    font: inherit;
     font-size: 12px;
+    padding: 2px 10px;
+}
+
+.kpxcAutocomplete-button--primary {
+    background-color: var(--kp-list-accent);
+    border-color: var(--kp-list-accent);
+    color: var(--kp-list-on-accent);
+}
+
+.kpxcAutocomplete-button:focus-visible {
+    outline: 2px solid var(--kp-list-accent);
+    outline-offset: 2px;
+}
+
+.kpxcAutocomplete-footer:not(:empty) {
+    border-top: 1px solid var(--kp-line-subtle);
     margin-top: 4px;
-    padding: 4px 8px 0;
+    padding-top: 4px;
+}
+
+.kpxcAutocomplete-items:empty + .kpxcAutocomplete-footer:not(:empty) {
+    border-top: none;
+    margin-top: 0;
+}
+
+.kpxcAutocomplete-note {
+    color: var(--kp-text-muted);
+    padding: 8px;
+    text-align: center;
+}
+
+.kpxcAutocomplete-note--warning {
+    color: var(--kp-danger);
+    text-align: start;
 }
 
 .kpxcAutocomplete-announcer {

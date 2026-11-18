@@ -12,511 +12,439 @@
   <ResourceDictionary.ThemeDictionaries>
 
     <ResourceDictionary x:Key="Dark">
-      <SolidColorBrush x:Key="SliderThumbBackground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="SliderTrackFill" Color="#2A2C30" />
-      <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#2A2C30" />
-      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#C9CACD" />
-      <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#F2B544" />
-      <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#F2B544" />
-      <SolidColorBrush x:Key="SystemRegionBrush" Color="#111214" />
-      <Color x:Key="SystemRegionColor">#111214</Color>
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#444448" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#444448" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#444448" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#444448" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#444448" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#444448" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#444448" />
+      <SolidColorBrush x:Key="SliderThumbBackground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="SliderTrackFill" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="SystemRegionBrush" Color="#1E1E1F" />
+      <Color x:Key="SystemRegionColor">#1E1E1F</Color>
 
-      <SolidColorBrush x:Key="ButtonBackground" Color="#2A2C30" />
-      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#33363B" />
-      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#24262A" />
-      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ButtonForeground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#2A2C30" />
-      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#55575C" />
+      <SolidColorBrush x:Key="ButtonBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#323234" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#252527" />
+      <SolidColorBrush x:Key="ButtonForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#5A5A5F" />
 
-      <SolidColorBrush x:Key="ToggleButtonBackground" Color="#2A2C30" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#33363B" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#24262A" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleButtonForeground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#55575C" />
+      <SolidColorBrush x:Key="ToggleButtonBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#323234" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#252527" />
+      <SolidColorBrush x:Key="ToggleButtonForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#5A5A5F" />
 
-      <SolidColorBrush x:Key="TextControlBackground" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#18191C" />
-      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#74767C" />
-      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#26282C" />
-      <SolidColorBrush x:Key="TextControlForeground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#8E9096" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#8E9096" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#8E9096" />
-      <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#24262A" />
+      <SolidColorBrush x:Key="TextControlBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#252527" />
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#7C7C82" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#98989D" />
+      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#333336" />
+      <SolidColorBrush x:Key="TextControlForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#949499" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#949499" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#949499" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#949499" />
+      <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#2E2E30" />
 
       <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="Transparent" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#24262A" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#2A2C30" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#74767C" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#8E9096" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#55575C" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#2E2E30" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#7C7C82" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#98989D" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#98989D" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#5A5A5F" />
 
-      <SolidColorBrush x:Key="RadioButtonForeground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonForegroundPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#74767C" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#8E9096" />
+      <SolidColorBrush x:Key="RadioButtonForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="RadioButtonForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="RadioButtonForegroundPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#7C7C82" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#98989D" />
       <SolidColorBrush x:Key="RadioButtonOuterEllipseFill" Color="Transparent" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseFillPointerOver" Color="#24262A" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseFillPointerOver" Color="#2E2E30" />
 
-      <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="#2A2C30" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#33363B" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#24262A" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#74767C" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#F2F2F0" />
-      <!-- A checked box, a chosen radio and a switch that is on are drawn in the text colour, not amber: a view keeps amber for its primary action or a live signal (D-0375). -->
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#444446" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#2E2E30" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#7C7C82" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#98989D" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1E1E1F" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1E1E1F" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1E1E1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#1E1E1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#1E1E1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#1E1E1F" />
 
-      <SolidColorBrush x:Key="ComboBoxBackground" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#18191C" />
-      <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#18191C" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#74767C" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#F2B544" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#26282C" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#74767C" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#8E9096" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#8E9096" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#26282C" />
-      <SolidColorBrush x:Key="ComboBoxForeground" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#8E9096" />
-      <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3A3D43" />
-      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#24262A" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed" Color="#2A2C30" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#2A2C30" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#33363B" />
+      <SolidColorBrush x:Key="ComboBoxBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#252527" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#252527" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#7C7C82" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#98989D" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#333336" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#7C7C82" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#98989D" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#98989D" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#333336" />
+      <SolidColorBrush x:Key="ComboBoxForeground" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#949499" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#545458" />
+      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#B4B4BA" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#2E2E30" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#444446" />
 
-      <Color x:Key="ScrollBarThumbBackgroundColor">#3A3D43</Color>
-      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#2A2C30</Color>
-      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#55575C" />
-      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#55575C" />
-      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#8E9096" />
+      <Color x:Key="ScrollBarThumbBackgroundColor">#545458</Color>
+      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#3A3A3C</Color>
+      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#5A5A5F" />
+      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#949499" />
 
-      <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#111214" />
+      <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#1E1E1F" />
 
-      <SolidColorBrush x:Key="ToolTipBackground" Color="#24262A" />
-      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#3A3D43" />
-      <SolidColorBrush x:Key="ToolTipForeground" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="ToolTipBackground" Color="#2E2E30" />
+      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#545458" />
+      <SolidColorBrush x:Key="ToolTipForeground" Color="#F5F5F7" />
 
-      <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#1D1E22" />
-      <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#1D1E22" />
-      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#3A3D43" />
-      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#24262A" />
-      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#2A2C30" />
+      <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#2A2A2C" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#545458" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#2E2E30" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#3A3A3C" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="Light">
-      <SolidColorBrush x:Key="SliderThumbBackground" Color="#111214" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="SliderTrackFill" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#3A3C40" />
-      <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#8A5A00" />
-      <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#8A5A00" />
-      <SolidColorBrush x:Key="SystemRegionBrush" Color="#F7F7F5" />
-      <Color x:Key="SystemRegionColor">#F7F7F5</Color>
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="SliderThumbBackground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#515154" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#515154" />
+      <SolidColorBrush x:Key="SliderTrackFill" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#515154" />
+      <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="SystemRegionBrush" Color="#FFFFFF" />
+      <Color x:Key="SystemRegionColor">#FFFFFF</Color>
 
-      <SolidColorBrush x:Key="ButtonBackground" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#DDDDD8" />
-      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ButtonForeground" Color="#111214" />
-      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#111214" />
-      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#A3A5A9" />
+      <SolidColorBrush x:Key="ButtonBackground" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ButtonForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#A6A6AB" />
 
-      <SolidColorBrush x:Key="ToggleButtonBackground" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#DDDDD8" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ToggleButtonForeground" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#A3A5A9" />
+      <SolidColorBrush x:Key="ToggleButtonBackground" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleButtonForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#A6A6AB" />
 
       <SolidColorBrush x:Key="TextControlBackground" Color="#FFFFFF" />
       <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFFFFF" />
       <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#84847F" />
-      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#E8E8E4" />
-      <SolidColorBrush x:Key="TextControlForeground" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#6B6D72" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#6B6D72" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#6B6D72" />
-      <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#EFEFEC" />
+      <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#86868B" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#E4E4E7" />
+      <SolidColorBrush x:Key="TextControlForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#6B6B70" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#6B6B70" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#6B6B70" />
+      <SolidColorBrush x:Key="TextControlButtonForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="TextControlButtonBackgroundPointerOver" Color="#EDEDEF" />
 
       <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="Transparent" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#84847F" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#6B6D72" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPressed" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPressed" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#A3A5A9" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#86868B" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#6B6B70" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#A6A6AB" />
 
-      <SolidColorBrush x:Key="RadioButtonForeground" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonForegroundPressed" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#84847F" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#6B6D72" />
+      <SolidColorBrush x:Key="RadioButtonForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="RadioButtonForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="RadioButtonForegroundPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#86868B" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#6B6B70" />
       <SolidColorBrush x:Key="RadioButtonOuterEllipseFill" Color="Transparent" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseFillPointerOver" Color="#EFEFEC" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseFillPointerOver" Color="#EDEDEF" />
 
-      <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#DDDDD8" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#84847F" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#6B6D72" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#111214" />
-      <!-- A checked box, a chosen radio and a switch that is on are drawn in the text colour, not amber: a view keeps amber for its primary action or a live signal (D-0375). -->
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#111214" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#111214" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#DCDCE0" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#86868B" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#6B6B70" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#515154" />
+      <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#515154" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#515154" />
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#111214" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#515154" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#515154" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#FFFFFF" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#FFFFFF" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#FFFFFF" />
 
       <SolidColorBrush x:Key="ComboBoxBackground" Color="#FFFFFF" />
       <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#84847F" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#8A5A00" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#E8E8E4" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#84847F" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#6B6D72" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#6B6D72" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#E8E8E4" />
-      <SolidColorBrush x:Key="ComboBoxForeground" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#6B6D72" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#86868B" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#E4E4E7" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#86868B" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#6B6B70" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#6B6B70" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#E4E4E7" />
+      <SolidColorBrush x:Key="ComboBoxForeground" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#6B6B70" />
       <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#C4C4BE" />
-      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="#111214" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#E6E6E2" />
-      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#DDDDD8" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#515154" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#E5E5EA" />
+      <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="#DCDCE0" />
 
-      <Color x:Key="ScrollBarThumbBackgroundColor">#C4C4BE</Color>
-      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#DCDCD7</Color>
-      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#A3A5A9" />
-      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#6B6D72" />
+      <Color x:Key="ScrollBarThumbBackgroundColor">#C7C7CC</Color>
+      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#D1D1D6</Color>
+      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#A6A6AB" />
+      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#6B6B70" />
 
       <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#FFFFFF" />
 
       <SolidColorBrush x:Key="ToolTipBackground" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#C4C4BE" />
-      <SolidColorBrush x:Key="ToolTipForeground" Color="#111214" />
+      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="ToolTipForeground" Color="#1D1D1F" />
 
       <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#FFFFFF" />
       <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#C4C4BE" />
-      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#EFEFEC" />
-      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#E6E6E2" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#EDEDEF" />
+      <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#E5E5EA" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="{x:Static app:HighContrast.Dark}">
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#A1A1A6" />
       <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#F5F5F7" />
       <SolidColorBrush x:Key="SliderTrackFill" Color="#4A4C52" />
       <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#4A4C52" />
-      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#F5F5F7" />
       <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#FFFFFF" />
       <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#C9CACD" />
-      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#D9DADD" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#D9DADD" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#D9DADD" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#D9DADD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#C9CACD" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#C9CACD" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#F2F2F0" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#D9DADD" />
-      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#C9CACD" />
-      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#F2F2F0" />
-      <Color x:Key="ScrollBarThumbBackgroundColor">#C9CACD</Color>
-      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#A9ABB0" />
-      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#D9DADD" />
-      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#C9CACD" />
-      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#C9CACD" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#F5F5F7" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#F5F5F7" />
+      <Color x:Key="ScrollBarThumbBackgroundColor">#C7C7CC</Color>
+      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#A1A1A6" />
+      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#D1D1D6" />
+      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#C7C7CC" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#C7C7CC" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="{x:Static app:HighContrast.Light}">
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#545458" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#545458" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#545458" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#545458" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#545458" />
+      <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#545458" />
       <SolidColorBrush x:Key="SliderThumbBackground" Color="#000000" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#1D1E22" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#1D1D1F" />
       <SolidColorBrush x:Key="SliderTrackFill" Color="#B8BABF" />
       <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#B8BABF" />
-      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#1D1E22" />
+      <SolidColorBrush x:Key="SliderTrackValueFill" Color="#1D1D1F" />
       <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#000000" />
       <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#000000" />
-      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#3A3C40" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#3A3C40" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#3A3C40" />
-      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#3A3C40" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#1D1E22" />
-      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#55575C" />
-      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#1D1E22" />
-      <Color x:Key="ScrollBarThumbBackgroundColor">#3A3C40</Color>
-      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#4A4C50</Color>
-      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#55575C" />
-      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#55575C" />
-      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#3A3C40" />
-      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#3A3C40" />
-      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#6B4500" />
-      <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#6B4500" />
-      <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#6B4500" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="TextControlBorderBrush" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="TextControlButtonForeground" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxForegroundUncheckedDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="CheckBoxForegroundCheckedDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="RadioButtonForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStroke" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseStrokePointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrush" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPointerOver" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushPressed" Color="#1D1D1F" />
+      <SolidColorBrush x:Key="CalendarDatePickerBorderBrushDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#545458" />
+      <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#1D1D1F" />
+      <Color x:Key="ScrollBarThumbBackgroundColor">#3A3A3C</Color>
+      <Color x:Key="ScrollBarPanningThumbBackgroundColor">#545458</Color>
+      <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#545458" />
+      <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#545458" />
+      <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#3A3A3C" />
+      <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#3A3A3C" />
     </ResourceDictionary>
 
   </ResourceDictionary.ThemeDictionaries>
 
-  <!-- Amber in both themes; text on amber is ink. -->
-  <Color x:Key="SystemAccentColor">#F2B544</Color>
-  <Color x:Key="SystemAccentColorDark1">#D99D2E</Color>
-  <Color x:Key="SystemAccentColorDark2">#C08A24</Color>
-  <Color x:Key="SystemAccentColorDark3">#A6771C</Color>
-  <Color x:Key="SystemAccentColorLight1">#F7C566</Color>
-  <Color x:Key="SystemAccentColorLight2">#F9D185</Color>
-  <Color x:Key="SystemAccentColorLight3">#FBDDA3</Color>
+  <!-- The accent's keys, SystemAccentColor and AccentButton* among them, are set by App from the system's accent (AccentPalette). -->
 
-  <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
-  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
-  <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="Transparent" />
-  <SolidColorBrush x:Key="AccentButtonBackground" Color="#F2B544" />
-  <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="AccentButtonForeground" Color="#111214" />
-  <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#111214" />
   <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="Transparent" />
   <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="Transparent" />
   <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="Transparent" />
   <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="Transparent" />
-  <Thickness x:Key="ButtonPadding">12,6</Thickness>
+  <Thickness x:Key="ButtonPadding">12,4</Thickness>
 
-  <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#F2B544" />
-  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#111214" />
-  <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#111214" />
-  <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="Transparent" />
-  <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="Transparent" />
   <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="Transparent" />
   <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="Transparent" />
   <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="Transparent" />
 
-  <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#66F2B544" />
   <Thickness x:Key="TextControlBorderThemeThickness">1</Thickness>
   <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
   <Thickness x:Key="TextControlThemePadding">12,6</Thickness>
@@ -527,14 +455,14 @@
   <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
   <x:Double x:Key="ScrollBarSize">10</x:Double>
 
-  <!-- Focus: a 2px ink gap, then a 2px amber ring. -->
+  <!-- Focus: a 2px gap in the window's colour, then a 2px accent ring. -->
   <Thickness x:Key="SystemControlFocusVisualPrimaryThickness">2</Thickness>
   <Thickness x:Key="SystemControlFocusVisualSecondaryThickness">2</Thickness>
   <Thickness x:Key="SystemControlFocusVisualMargin">-4</Thickness>
 
-  <FontFamily x:Key="ContentControlThemeFontFamily">avares://keypaste-app/Assets/Fonts#Instrument Sans</FontFamily>
+  <FontFamily x:Key="ContentControlThemeFontFamily">Helvetica Neue, Segoe UI</FontFamily>
   <x:Double x:Key="ControlContentThemeFontSize">13</x:Double>
-  <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+  <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
   <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
 
 </ResourceDictionary>

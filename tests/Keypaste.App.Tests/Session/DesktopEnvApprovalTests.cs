@@ -85,7 +85,7 @@ public sealed class DesktopEnvApprovalTests
         { "deny", EnvOutcome.Declined },
         { "escape", EnvOutcome.Declined },
         { "close", EnvOutcome.Declined },
-        { "enter", EnvOutcome.Declined },
+        { "enter before arming, then deny", EnvOutcome.Declined },
         { "timeout", EnvOutcome.Declined },
         { "lock", EnvOutcome.Locked },
     };
@@ -98,6 +98,14 @@ public sealed class DesktopEnvApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
+
+            if (how.StartsWith("enter", StringComparison.Ordinal))
+            {
+                Key(window, PhysicalKey.Enter);
+                await Task.Delay(100, Token);
+                Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
+            }
+
             await app.ArmAsync();
 
             switch (how)
@@ -111,9 +119,8 @@ public sealed class DesktopEnvApprovalTests
                 case "close":
                     window.Close();
                     break;
-                case "enter":
-                    // Focus starts on Deny, so Enter refuses.
-                    Key(window, PhysicalKey.Enter);
+                case "enter before arming, then deny":
+                    Click(window, "Deny");
                     break;
                 case "timeout":
                     app.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
@@ -202,11 +209,10 @@ public sealed class DesktopEnvApprovalTests
         });
 
     /// <summary>
-    /// The environment has a fixed row of its own, so the longest name one can have is drawn whole on one
-    /// line and moves nothing, while a long project is trimmed in the header before the countdown.
+    /// The stage is drawn whole on one line beside the folder and moves nothing, and a long project keeps to its own line.
     /// </summary>
     [Fact]
-    public Task The_longest_environment_is_drawn_whole_on_its_own_row_and_a_long_project_ends_before_the_countdown() =>
+    public Task The_longest_stage_is_drawn_whole_and_a_long_project_keeps_to_one_line() =>
         HeadlessSession.On(() =>
         {
             var longest = new string('w', EnvProfileNames.MaximumLength - 3) + "-eu";
@@ -215,14 +221,9 @@ public sealed class DesktopEnvApprovalTests
                 new EnvPreview("acme-payments-platform-api-for-the-eu-west-region-billing", ["DEPLOY_KEY"]) { Profile = longest },
                 ["deploy"],
                 "/work");
-            var project = window.FindControl<TextBlock>("ProjectText")!;
-            var ends = project.TranslatePoint(new Point(project.Bounds.Width, 0), window)!.Value.X;
-            var countdown = window.FindControl<TextBlock>("CountdownText")!.GetVisualParent()!.TranslatePoint(default, window)!.Value.X;
-
             Assert.Equal(longest, Drawn(window, "ProfileText"));
             Assert.Single(window.FindControl<TextBlock>("ProfileText")!.TextLayout.TextLines);
-            Assert.EndsWith("…", Drawn(window, "ProjectText"), StringComparison.Ordinal);
-            Assert.True(ends < countdown, $"the project ends at {ends}, past the countdown at {countdown}");
+            Assert.Single(window.FindControl<TextBlock>("ProjectText")!.TextLayout.TextLines);
             Assert.Equal(ordinaryLayout, layout);
 
             ordinary.Close();

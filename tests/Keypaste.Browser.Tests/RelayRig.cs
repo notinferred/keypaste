@@ -23,20 +23,27 @@ internal sealed class RelayRig : IAsyncDisposable
     private readonly AnonymousPipeClientStream _relayOutput;
     private readonly CancellationTokenSource _stop = new();
 
-    internal RelayRig(bool owner = true)
+    /// <param name="owner">Whether the first vault's owner starts answering.</param>
+    /// <param name="others">The names of the vaults after the first, each with a fake owner of its own that starts answering.</param>
+    internal RelayRig(bool owner = true, params string[] others)
     {
         _relayInput = new AnonymousPipeClientStream(PipeDirection.In, _toRelay.ClientSafePipeHandle);
         _relayOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromRelay.ClientSafePipeHandle);
 
-        var vaultPath = Path.Combine(_home, "vault.kdbx");
-        var pipeName = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-
-        Options = new RelayOptions(BrowserIdentity.ChromeWebStore, vaultPath, pipeName, LockedAppEndpoint.NameFor(VaultIdentity.Of(_home, vaultPath)));
-        Owner = new FakeOwner(pipeName);
+        List<RelayVault> vaults = [.. new[] { "vault" }.Concat(others).Select(Vault)];
+        Options = new RelayOptions(BrowserIdentity.ChromeWebStore, vaults);
+        Owner = new FakeOwner(vaults[0].PipeName);
 
         if (owner)
         {
             Owner.Listen();
+        }
+
+        foreach (var (name, vault) in others.Zip(vaults.Skip(1)))
+        {
+            var other = new FakeOwner(vault.PipeName);
+            other.Listen();
+            Others[name] = other;
         }
 
         Browser = new ExtensionClient(_toRelay, _fromRelay);
@@ -45,7 +52,17 @@ internal sealed class RelayRig : IAsyncDisposable
 
     internal RelayOptions Options { get; }
 
+    /// <summary>The first vault, which the relay asks first.</summary>
+    internal string VaultPath => Options.Vaults[0].Path;
+
+    /// <summary>Where the app open and locked on the first vault listens.</summary>
+    internal string LockedAppName => Options.Vaults[0].LockedAppName;
+
+    /// <summary>The first vault's owner.</summary>
     internal FakeOwner Owner { get; }
+
+    /// <summary>The owners of the vaults after the first, by name.</summary>
+    internal Dictionary<string, FakeOwner> Others { get; } = new(StringComparer.Ordinal);
 
     internal ExtensionClient Browser { get; }
 
@@ -62,9 +79,9 @@ internal sealed class RelayRig : IAsyncDisposable
     internal Stream FromRelay => _fromRelay;
 
     /// <summary>A relay that has exchanged keys, the browser holding the host's key.</summary>
-    internal static async Task<RelayRig> KeyedAsync(bool owner = true)
+    internal static async Task<RelayRig> KeyedAsync(bool owner = true, params string[] others)
     {
-        var rig = new RelayRig(owner);
+        var rig = new RelayRig(owner, others);
         var reply = await rig.Browser.ChangePublicKeysAsync(TestContext.Current.CancellationToken);
         Assert.Equal("true", (string?)reply["success"]);
         return rig;
@@ -75,6 +92,13 @@ internal sealed class RelayRig : IAsyncDisposable
 
     /// <summary>Closes the relay's end of its standard output, once it has stopped, so the browser reads to the end of what it wrote.</summary>
     internal void CloseOutput() => _relayOutput.Dispose();
+
+    /// <summary>A vault in the rig's home, by name, with a pipe of its own.</summary>
+    private RelayVault Vault(string name)
+    {
+        var path = Path.Combine(_home, name + ".kdbx");
+        return new RelayVault(path, "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), LockedAppEndpoint.NameFor(VaultIdentity.Of(_home, path)));
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -95,6 +119,12 @@ internal sealed class RelayRig : IAsyncDisposable
 
         Browser.Dispose();
         await Owner.DisposeAsync();
+
+        foreach (var other in Others.Values)
+        {
+            await other.DisposeAsync();
+        }
+
         _stop.Dispose();
         Error.Dispose();
         Directory.Delete(_home, recursive: true);
@@ -127,7 +157,11 @@ internal sealed class FakeOwner(string pipeName) : IApproverHandler, IAsyncDispo
 
     internal BrowserReply CheckReply { get; set; } = new(BrowserOutcome.Done, string.Empty);
 
+    internal BrowserListReply ListReply { get; set; } = new(BrowserOutcome.Done, string.Empty);
+
     internal BrowserFillReply FillReply { get; set; } = new(BrowserOutcome.Done, string.Empty);
+
+    internal BrowserReply ShowReply { get; set; } = new(BrowserOutcome.Done, string.Empty);
 
     internal BrowserReply LockReply { get; set; } = new(BrowserOutcome.Done, string.Empty);
 
@@ -190,8 +224,14 @@ internal sealed class FakeOwner(string pipeName) : IApproverHandler, IAsyncDispo
     public ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken) =>
         Answer(request, CheckReply);
 
-    public ValueTask<BrowserFillReply> FillBrowserAsync(BrowserFillRequest request, string connectionId, CancellationToken cancellationToken) =>
+    public ValueTask<BrowserListReply> ListBrowserAsync(BrowserListRequest request, string connectionId, CancellationToken cancellationToken) =>
+        Answer(request, ListReply);
+
+    public ValueTask<BrowserFillReply> ReleaseBrowserAsync(BrowserReleaseRequest request, string connectionId, CancellationToken cancellationToken) =>
         Answer(request, FillReply);
+
+    public ValueTask<BrowserReply> ShowBrowserAsync(BrowserShowRequest request, string connectionId, CancellationToken cancellationToken) =>
+        Answer(request, ShowReply);
 
     public ValueTask<BrowserReply> LockBrowserAsync(BrowserLockRequest request, string connectionId, CancellationToken cancellationToken) =>
         Answer(request, LockReply);

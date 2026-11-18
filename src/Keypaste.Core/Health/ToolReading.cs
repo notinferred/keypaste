@@ -104,7 +104,7 @@ public sealed record ToolReading(McpClient Tool, McpEntryReading Reading, string
             }
         }
 
-        if (PinnedVault(arguments) is { } vault && !File.Exists(vault))
+        if (PinnedVaults(arguments).FirstOrDefault(vault => !File.Exists(vault)) is { } vault)
         {
             return Said(HealthStatus.Fix, "names a vault that is not there", vault, setup) with { Version = version };
         }
@@ -164,7 +164,8 @@ public sealed record ToolReading(McpClient Tool, McpEntryReading Reading, string
     private static bool Named(string name, string program, StringComparison comparison) =>
         string.Equals(name, program, comparison) || string.Equals(name, program + ".exe", comparison);
 
-    private static string? PinnedVault(IReadOnlyList<string> arguments)
+    /// <summary>Each vault a registration pins, one <c>--vault</c> each.</summary>
+    private static IEnumerable<string> PinnedVaults(IReadOnlyList<string> arguments)
     {
         const string Option = "--vault";
 
@@ -172,15 +173,12 @@ public sealed record ToolReading(McpClient Tool, McpEntryReading Reading, string
         {
             if (arguments[i].StartsWith(Option + "=", StringComparison.Ordinal))
             {
-                return arguments[i][(Option.Length + 1)..];
+                yield return arguments[i][(Option.Length + 1)..];
             }
-
-            if (string.Equals(arguments[i], Option, StringComparison.Ordinal))
+            else if (string.Equals(arguments[i], Option, StringComparison.Ordinal) && i + 1 < arguments.Count)
             {
-                return i + 1 < arguments.Count ? arguments[i + 1] : null;
+                yield return arguments[++i];
             }
         }
-
-        return null;
     }
 }

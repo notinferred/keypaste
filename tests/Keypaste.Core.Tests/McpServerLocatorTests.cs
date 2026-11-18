@@ -272,7 +272,7 @@ public sealed class McpServerLocatorTests : IDisposable
         var chosen = Path.Combine(_directory, "chosen.kdbx");
 
         Assert.True(McpServerLocator.TryPin(Machine(), keypasteHome, null, named, chosen, out var pins));
-        Assert.Equal(new McpServerPins(named, AuditLogPath: null, ApproverName: null), pins);
+        Assert.Equal(new McpServerPins([named], AuditLogPath: null, ApproverName: null), pins);
 
         Assert.True(McpServerLocator.TryPin(Machine(), keypasteHome, null, chosen, chosen, out pins));
         Assert.Equal(McpServerPins.None, pins);
@@ -287,7 +287,7 @@ public sealed class McpServerLocatorTests : IDisposable
         var chosen = Path.Combine(_directory, "chosen.kdbx");
 
         Assert.True(McpServerLocator.TryPin(Machine(), Path.Combine(Home, ".keypaste"), "keypaste-test-pipe", namedVault: null, chosen, out var pins));
-        Assert.Equal(new McpServerPins(VaultPath: null, AuditLogPath: null, "keypaste-test-pipe"), pins);
+        Assert.Equal(new McpServerPins([], AuditLogPath: null, "keypaste-test-pipe"), pins);
     }
 
     [Fact]
@@ -298,13 +298,36 @@ public sealed class McpServerLocatorTests : IDisposable
         var chosen = Path.Combine(_directory, "chosen.kdbx");
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, null, namedVault: null, chosen, out var pins));
-        Assert.Equal(new McpServerPins(chosen, Path.Combine(home, "audit.jsonl"), Owner(home, chosen)), pins);
+        Assert.Equal(new McpServerPins([chosen], Path.Combine(home, "audit.jsonl"), Owner(home, chosen)), pins);
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, null, named, chosen, out pins));
-        Assert.Equal(new McpServerPins(named, Path.Combine(home, "audit.jsonl"), Owner(home, named)), pins);
+        Assert.Equal(new McpServerPins([named], Path.Combine(home, "audit.jsonl"), Owner(home, named)), pins);
 
         Assert.True(McpServerLocator.TryPin(Machine(), home, "keypaste-test-pipe", named, chosen, out pins));
         Assert.Equal("keypaste-test-pipe", pins.ApproverName);
+    }
+
+    /// <summary>Several vaults are each pinned under the default home, the chosen one too, so the tool keeps reaching exactly those.</summary>
+    [Fact]
+    public void Under_the_default_home_several_vaults_are_each_pinned()
+    {
+        var personal = Path.Combine(_directory, "Personal.kdbx");
+        var acme = Path.Combine(_directory, "Acme.kdbx");
+
+        Assert.True(McpServerLocator.TryPin(Machine(), null, null, [personal, acme], personal, out var pins));
+        Assert.Equal(new McpServerPins([personal, acme], AuditLogPath: null, ApproverName: null), pins);
+    }
+
+    /// <summary>Several vaults' pipes are named by keypaste's home, which a tool may start the bridge without, and one set pipe is one owner's.</summary>
+    [Fact]
+    public void Several_vaults_under_another_home_or_with_a_set_approver_cannot_be_pinned()
+    {
+        string[] vaults = [Path.Combine(_directory, "Personal.kdbx"), Path.Combine(_directory, "Acme.kdbx")];
+
+        Assert.False(McpServerLocator.TryPin(Machine(), Path.Combine(_directory, "custom"), null, vaults, chosenVault: null, out var pins));
+        Assert.Null(pins);
+        Assert.False(McpServerLocator.TryPin(Machine(), null, "keypaste-test-pipe", vaults, chosenVault: null, out pins));
+        Assert.Null(pins);
     }
 
     [Fact]

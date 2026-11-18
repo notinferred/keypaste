@@ -48,7 +48,7 @@ public static class KeypasteHome
         Path.Combine(Resolve(fromEnvironment), AuditFileName);
 
     /// <summary>Resolves where the retired policy file was kept, so <c>keypaste approve</c> can say it no longer reads one there.</summary>
-    /// <remarks>Agents' rules are kept in <see cref="AgentsPath"/> now.</remarks>
+    /// <remarks>Agents' rules are kept in <see cref="AgentsDirectory"/> now.</remarks>
     public static string PolicyPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), PolicyFileName);
 
@@ -92,11 +92,30 @@ public static class KeypasteHome
     public static string CrashReportsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), CrashReportsDirectoryName);
 
-    /// <summary>The rules every agent's request is decided by on this computer, and each known agent's run switch.</summary>
+    /// <summary>The one file every vault's agent rules were kept in before each vault kept its own.</summary>
     public const string AgentsFileName = "agents.toml";
 
-    /// <summary>Resolves the agents' rules. The file is not created.</summary>
+    /// <summary>The folder of each vault's agent rules, one file per vault.</summary>
+    public const string AgentsDirectoryName = "agents";
+
+    /// <summary>Resolves a vault's agent rules: what every agent's request to that vault is decided by, and each known agent's run switch. The file is not created.</summary>
     /// <remarks>Not <c>app.toml</c>, which holds the desktop's preferences: <c>keypaste approve</c> decides by the same file.</remarks>
-    public static string AgentsPath(string? fromEnvironment) =>
+    public static string AgentsPath(string? fromEnvironment, Ownership.VaultIdentity vault)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+
+        return Path.Combine(Resolve(fromEnvironment), AgentsDirectoryName, vault.Key + ".toml");
+    }
+
+    /// <summary>Resolves the folder of each vault's agent rules. The folder is not created.</summary>
+    public static string AgentsDirectory(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), AgentsDirectoryName);
+
+    /// <summary>Resolves the one <c>agents.toml</c> every vault shared before, whose rules move to the vault whose key sealed them. The file is not created.</summary>
+    public static string SharedAgentsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), AgentsFileName);
+
+    /// <summary>Resolves this home's random identity, which every vault's sealed rules cover. The file is not created.</summary>
+    public static string HomeIdPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), "agents.id");
 }

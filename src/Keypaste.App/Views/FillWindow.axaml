@@ -6,7 +6,7 @@
                     x:Class="Keypaste.App.Views.FillWindow"
                     x:DataType="vm:FillViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
-                    Title="keypaste: a browser asks to fill a login"
+                    Title="keypaste: fill a login on this site?"
                     Width="508"
                     SizeToContent="Height"
                     CanResize="False"
@@ -20,67 +20,63 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- Fixed heights, as in the other prompt windows, the list three rows that scroll past them, so neither the page nor how many
-       logins match move the buttons. The page and the build are what the extension claims (THREATS.md T-48, T-58), and no password
-       is drawn. No button is the default: Enter fills nothing, and Escape denies. -->
+  <!-- A claim card with no requester line, as the pairing card has: the page and the build are what the extension claims
+       (THREATS.md T-48, T-58, T-59), so they wait under Details, and no password is drawn. No button is the default: Enter
+       fills nothing, and Escape denies. -->
 
-  <Border Classes="prompt">
-    <StackPanel Spacing="16">
-
-      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+  <Border Classes="claim">
+    <StackPanel>
+      <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
-        <Border Grid.Column="0" Classes="prompt-tile">
-          <ctl:KpIcon Icon="globe" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
+          <ctl:BrandMark Height="16" VerticalAlignment="Center" />
+          <TextBlock Classes="claim-label size-11" Text="keypaste" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock Name="TitleText" Classes="claim-title size-16" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                   AutomationProperties.Name="{Binding Question}">
+          <Run Text="{Binding QuestionBefore}" /><Run Text="{Binding Site}" FontWeight="Bold" /><Run Text="?" />
+        </TextBlock>
+
+        <Border Classes="claim-block" Padding="12,8" IsVisible="{Binding HasLogin}">
+          <TextBlock Name="LoginText" Classes="claim-line size-12-5" Text="{Binding Login}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
         </Border>
-        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Name="TitleText" Classes="prompt-title size-16" Text="A browser asks to fill a login" />
-          <TextBlock Name="PairingText" Classes="prompt-sub size-13" Text="{Binding Pairing}" MaxWidth="300" TextTrimming="CharacterEllipsis" />
+
+        <TextBlock Name="FormText" Classes="size-12-5" Text="{Binding Note}" Foreground="{DynamicResource KpDanger}"
+                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasNote}" />
+
+        <TextBlock Name="ExplainerText" Classes="claim-muted size-12-5" Text="{Binding Explainer}" TextWrapping="Wrap" />
+
+        <StackPanel Spacing="8">
+          <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+              <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
+          <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" Margin="20,0,0,0"
+                IsVisible="{Binding #DetailsToggle.IsChecked}">
+            <TextBlock Classes="fact" Text="Page" />
+            <TextBlock Grid.Column="1" Name="OriginText" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="1" Classes="fact" Text="Extension" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Name="IdentityText" Text="{Binding Identity}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="2" Classes="fact" Text="Pairing" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Name="PairingText" Text="{Binding Pairing}" TextTrimming="CharacterEllipsis" />
+          </Grid>
         </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Border Classes="dot waiting" />
-          <TextBlock Name="CountdownText" Classes="prompt-countdown size-12" Text="{Binding Countdown}" />
+      </StackPanel>
+
+      <Border Classes="claim-rule" />
+
+      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
+        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center" TextWrapping="NoWrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                  IsCancel="True" Command="{Binding DenyCommand}" />
+          <Button Name="Allow" Classes="claim primary" Content="Fill"
+                  Command="{Binding AllowOnceCommand}" />
         </StackPanel>
-      </Grid>
-
-      <Border Classes="prompt-call size-12" Padding="12,8">
-        <StackPanel Spacing="2">
-          <TextBlock Name="IdentityText" Text="{Binding Identity}" TextTrimming="CharacterEllipsis" />
-          <TextBlock Name="OriginText" Classes="value" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Origin}">
-            <Run Text="{Binding OriginBefore}" /><Run Text="{Binding OriginSite}" FontWeight="SemiBold" Foreground="{DynamicResource KpTextPrimary}" /><Run Text="{Binding OriginAfter}" />
-          </TextBlock>
-        </StackPanel>
-      </Border>
-
-      <TextBlock Name="FormText" Classes="size-13" Height="20" Text="{Binding FormNote}" Foreground="{DynamicResource KpDanger}"
-                 TextTrimming="CharacterEllipsis" IsVisible="{Binding HasFormNote}" />
-
-      <Border Classes="prompt-reason" Height="164" Padding="4">
-        <ListBox Name="Candidates" ItemsSource="{Binding Rows}" SelectedItem="{Binding Picked}" SelectionMode="Single"
-                 AutomationProperties.Name="Logins that match this page">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:FillRow">
-              <StackPanel Spacing="2" Height="44" VerticalAlignment="Center" AutomationProperties.Name="{Binding Spoken}">
-                <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Classes="caption" Text="{Binding Details}" TextTrimming="CharacterEllipsis" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </Border>
-
-      <TextBlock Name="ExplainerText" Classes="prompt-note size-13" Text="{Binding Explainer}" TextWrapping="Wrap" />
-
-      <CheckBox Name="AlwaysBox" Height="32" IsChecked="{Binding Always}" IsVisible="{Binding ShowsAlways}">
-        <TextBlock Classes="size-13" Text="{Binding AlwaysText}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-      </CheckBox>
-
-      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
-                IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Fill"
-                HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
-      </Grid>
-
+      </ctl:HeaderRow>
     </StackPanel>
   </Border>
 

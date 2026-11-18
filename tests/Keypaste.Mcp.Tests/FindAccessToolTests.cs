@@ -64,7 +64,7 @@ public sealed class FindAccessToolTests
         Assert.False(tool.Annotations.DestructiveHint);
         Assert.False(tool.Annotations.OpenWorldHint);
         var properties = tool.InputSchema.GetProperty("properties");
-        Assert.Equal(["text", "host", "kind", "related_to", "project"], properties.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["text", "host", "kind", "related_to", "project", "vault"], properties.EnumerateObject().Select(property => property.Name));
         Assert.Equal(
             Enum.GetValues<ItemKind>().Select(kind => JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString())),
             properties.GetProperty("kind").GetProperty("enum").EnumerateArray().Select(kind => kind.GetString()));
@@ -155,7 +155,7 @@ public sealed class FindAccessToolTests
         var result = await FindAsync(client, new() { ["project"] = "billing" });
 
         var lines = Between(TextOf(result));
-        Assert.Equal("project billing: environments dev, prod; 3 items", lines[0]);
+        Assert.Equal("project billing: stages dev, prod; 3 items", lines[0]);
         Assert.Equal(2, lines.Length);
         Assert.DoesNotContain("infra", TextOf(result), StringComparison.Ordinal);
         var project = Assert.Single(result.StructuredContent!.Value.GetProperty("projects").EnumerateArray());

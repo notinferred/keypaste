@@ -122,7 +122,7 @@ public sealed class ShortcutsTests : IDisposable
         Assert.Equal(2, searched);
 
         window.KeyPressQwerty(PhysicalKey.Digit3, key);
-        Assert.Equal(DestinationKind.Trash, shell.Current.Kind);
+        Assert.Equal(DestinationKind.Recommendations, shell.Current.Kind);
 
         window.KeyPressQwerty(PhysicalKey.Comma, key);
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);

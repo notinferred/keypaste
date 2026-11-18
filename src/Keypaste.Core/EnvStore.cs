@@ -325,7 +325,7 @@ public sealed class EnvStore(Vault vault)
         }
 
         return explicitly
-            ? $"{shown} is not in '{project}/{environment}'; tag it into the environment first"
+            ? $"{shown} is not in '{project}/{environment}'; tag it into the stage first"
             : $"{shown} is not tagged {tag}; tag it into '{project}/{environment}' or rename it";
     }
 

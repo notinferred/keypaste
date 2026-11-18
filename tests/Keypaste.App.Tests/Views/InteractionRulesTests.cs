@@ -105,7 +105,7 @@ public sealed partial class InteractionRulesTests
         using var shell = new RenderedShell("keypaste-hidden-pane-");
         var entries = OpenGithub(shell);
         AppCommand Command(string header) => Flat(shell.Commands.Menus.SelectMany(menu => menu.Entries)).First(command => command.Header == header);
-        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy URL", "Copy the reference", "Rename or move…", "Duplicate", "Share…"];
+        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy website", "Copy the reference", "Rename or move…", "Duplicate", "Share…"];
 
         Assert.All(pane, header => Assert.True(Command(header).CanRun(), $"{header} is off on an open item"));
 
@@ -154,19 +154,14 @@ public sealed partial class InteractionRulesTests
     });
 
     [Fact]
-    public Task A_new_items_kind_is_a_segmented_control_with_a_label_and_its_refusals_sit_under_their_fields() => HeadlessSession.On(() =>
+    public Task A_new_items_refusals_sit_under_their_fields() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-new-item-");
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.BeginAddCommand.Press();
+        entries.BeginAddOfKindCommand.Press(ItemTemplate.ApiKey);
         RenderedShell.Drain();
         var form = entries.NewItem!;
 
-        var kind = shell.Named<ListBox>("NewItemTemplate");
-        Assert.Contains("segmented", kind.Classes);
-        Assert.DoesNotContain(kind.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("selected-bar"));
-
-        form.SelectedTemplate = form.Templates.Single(choice => choice.Template == ItemTemplate.ApiKey);
         form.Title = "stripe";
         RenderedShell.Drain();
 

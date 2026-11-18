@@ -34,12 +34,12 @@ public enum ApproverMessageKind
     Withdraw = 11,
     /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves (D-0464).</summary>
     Edit = 14,
-    /// <summary>A browser's request to pair, made only on a browser's attachment (D-0627).</summary>
+    /// <summary>A browser's request to pair, made only on a browser's attachment.</summary>
     BrowserPair = 15,
     /// <summary>A browser's check of a pairing the extension holds, made only on a browser's attachment.</summary>
     BrowserCheck = 16,
-    /// <summary>A browser's request for a page's logins, made only on a browser's attachment.</summary>
-    BrowserFill = 17,
+    /// <summary>A browser's request for the names of a page's logins, made only on a browser's attachment.</summary>
+    BrowserList = 17,
     /// <summary>A browser's request to lock now, made only on a browser's attachment.</summary>
     BrowserLock = 18,
 
@@ -57,6 +57,12 @@ public enum ApproverMessageKind
 
     /// <summary>An agent's request that the person allow a change to an item it may see, such as moving it to Trash.</summary>
     ItemChange = 23,
+
+    /// <summary>A browser's request to fill the one login the person picked in a page's list, made only on a browser's attachment.</summary>
+    BrowserRelease = 24,
+
+    /// <summary>A browser's request to bring keypaste forward, made only on a browser's attachment.</summary>
+    BrowserShow = 25,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -88,7 +94,7 @@ public sealed record AttachRequest(string Vault)
 
     /// <summary>
     /// The KeePassXC-Browser build a browser relay attaches for, as its browser named the caller, which makes this a browser's
-    /// attachment; null from a bridge, a runner or a terminal (D-0627).
+    /// attachment; null from a bridge, a runner or a terminal.
     /// </summary>
     /// <remarks>Whoever can reach the pipe can name it, as anything can start the relay with it (THREATS.md T-48).</remarks>
     public string? Browser { get; init; }
@@ -108,7 +114,7 @@ public sealed record AttachReply(string? Session, AuditMethod? Refusal, string R
 
     /// <summary>
     /// For a browser's attachment, the database hash the extension files this vault's pairing under, in lowercase hex; null for
-    /// any other attachment, a refusal, or an owner that pairs no browsers (D-0636).
+    /// any other attachment, a refusal, or an owner that pairs no browsers.
     /// </summary>
     public string? DatabaseHash { get; init; }
 

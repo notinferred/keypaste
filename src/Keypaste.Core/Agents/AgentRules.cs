@@ -25,7 +25,7 @@ public sealed record RememberedAnswer(string Agent, string Item, string Field, C
 /// <param name="Item">The picked item's UUID as hex.</param>
 public sealed record RememberedPick(string Agent, string Name, string Field, string Item);
 
-/// <summary>A person's "Always fill this item on" one origin, for one browser's pairing, kept once they ticked it at a fill.</summary>
+/// <summary>A login the person filled on one origin through one browser's pairing, kept so a pick of it in that page's list fills at once.</summary>
 /// <param name="Pairing">The pairing's name.</param>
 /// <param name="Paired">When that pairing was made, so a later pairing of the same name inherits nothing.</param>
 /// <param name="Origin">The page's origin, as <c>scheme://host:port</c>.</param>
@@ -68,7 +68,7 @@ public sealed record AgentRules
     /// <summary>The most remembered answers and picks the file keeps, together.</summary>
     public const int MaximumRemembered = 128;
 
-    /// <summary>The most browser allowances the file keeps.</summary>
+    /// <summary>The most browser allowances the file keeps; past it the oldest is forgotten, and its next fill is asked again.</summary>
     public const int MaximumBrowserAllowances = 128;
 
     private Dictionary<FieldCategory, CategoryRule> Rules { get; init; } = [];
@@ -119,10 +119,7 @@ public sealed record AgentRules
     /// <summary>The browser allowances kept, in the order they were given.</summary>
     public IReadOnlyList<BrowserAllowance> BrowserAllowances { get; private init; } = [];
 
-    /// <summary>Whether another browser allowance can be kept.</summary>
-    public bool HasBrowserRoom => BrowserAllowances.Count < MaximumBrowserAllowances;
-
-    /// <summary>Whether a pairing may fill an item on an origin without asking.</summary>
+    /// <summary>Whether the person filled an item on an origin through a pairing before, so a pick of it there fills without asking.</summary>
     /// <param name="pairing">The pairing's name.</param>
     /// <param name="paired">When it was made.</param>
     /// <param name="origin">The page's origin, as <c>scheme://host:port</c>.</param>
@@ -131,11 +128,10 @@ public sealed record AgentRules
     public bool AllowsFill(string pairing, DateTimeOffset paired, string origin, string item) =>
         BrowserAllowances.Any(allowance => Same(allowance.Pairing, pairing) && allowance.Paired == paired && Same(allowance.Origin, origin) && SameItem(allowance.Item, item));
 
-    /// <summary>These rules keeping a browser allowance the person ticked, in place of the same one kept before.</summary>
+    /// <summary>These rules keeping a fill the person allowed, in place of the same one kept before, forgetting the oldest when full.</summary>
     /// <param name="allowance">The allowance.</param>
     /// <returns>The new rules.</returns>
     /// <exception cref="ArgumentException">The allowance names no pairing, origin or item.</exception>
-    /// <exception cref="InvalidOperationException">No more can be kept (<see cref="HasBrowserRoom"/>).</exception>
     public AgentRules AllowingFill(BrowserAllowance allowance)
     {
         ArgumentNullException.ThrowIfNull(allowance);
@@ -149,7 +145,7 @@ public sealed record AgentRules
 
         if (kept.Count >= MaximumBrowserAllowances)
         {
-            throw new InvalidOperationException($"keypaste keeps at most {MaximumBrowserAllowances} browser allowances");
+            kept.RemoveRange(0, kept.Count - MaximumBrowserAllowances + 1);
         }
 
         return this with { BrowserAllowances = [.. kept, allowance with { Item = allowance.Item.ToLowerInvariant() }] };

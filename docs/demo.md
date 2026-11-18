@@ -31,7 +31,7 @@ Value for STRIPE_KEY:
 Set STRIPE_KEY on env/demo/.env, created and tagged env:demo
 ```
 
-The key is a variable of the project `demo`: a protected field named `STRIPE_KEY` on the item `env/demo/.env`, which the tag `env:demo` puts in the project's `dev` environment. That is the field the request below names, and one an agent with no settings of its own can see. Nothing is echoed at the prompts. When it asks for the value, paste this:
+The key is a variable of the project `demo`: a protected field named `STRIPE_KEY` on the item `env/demo/.env`, which the tag `env:demo` puts in the project's `dev` stage. That is the field the request below names, and one an agent with no settings of its own can see. Nothing is echoed at the prompts. When it asks for the value, paste this:
 
 ```
 sk_test_EXAMPLE_ONLY_not_a_real_key_0000
@@ -132,7 +132,8 @@ Claude calls `request_credential`, and your left terminal stops being idle:
 keypaste: an agent is asking for a credential.
 
   agent    claude-code (claude-code)
-  item     env/demo/.env
+  item     .env
+  group    env/demo
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -140,10 +141,10 @@ keypaste: an agent is asking for a credential.
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  [a] always  [b] block  45s ›
+[d] deny  [o] once  [a] always  45s ›
 ```
 
-Your run may use different arguments. Claude writes the reason. `agent` is the sanitized name the AI tool gave itself, which nothing checks; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `item` is the resolved vault item, and `field` is the requested allowed field.
+Your run may use different arguments. Claude writes the reason. `agent` is the sanitized name the AI tool gave itself, which nothing checks; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `item` is the resolved vault item by its title and `group` the group it is in, and `field` is the requested allowed field.
 
 `o` releases it for this request only. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 

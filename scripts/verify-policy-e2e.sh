@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Proves this computer's agent rules hold across processes only as the vault's owner sealed them.
 #
-# agents.toml says what every agent gets without asking, and any program the person runs can write it, so the
+# The vault's agent rules say what every agent gets without asking, and any program the person runs can write it, so the
 # owner follows it only while the seal it wrote with the vault's key for this home holds. This gate drives the
 # shipped processes: `keypaste approve` holding the vault, a bridge asking for a value, and `keypaste clients`
 # turning an agent's run on, which only the owner can seal. Every absence of a prompt is paired with a presence:
@@ -9,7 +9,7 @@
 # that did appear is a denial and a release nobody should have made fails the "nothing came back" checks too.
 #
 # NEGATIVE CONTROL: this script fails if an agent with no rules is released anything unasked, if a hand-edited
-# Allow in agents.toml, sealed before the edit or not, releases anything unasked, if `keypaste clients` cannot
+# Allow in the vault's rules, sealed before the edit or not, releases anything unasked, if `keypaste clients` cannot
 # turn run on through the owner or its change is left unsealed or unrecorded, if `keypaste clients` with nothing
 # holding the vault turns run on or leaves the file looking sealed, if the old policy.toml still grants, or if
 # the secret reaches the audit log. These checks must never be skipped or soft-passed.
@@ -34,7 +34,8 @@ export KEYPASTE_HOME
 readonly VAULT="$WORK/vault.kdbx"
 # The log in the owner's home, where the bridges here write too.
 readonly AUDIT="$WORK/home/audit.jsonl"
-readonly RULES="$WORK/home/agents.toml"
+# The vault's rules, agents/<vault>.toml in the home, which the owner writes first in B.
+vault_rules() { local found=("$WORK/home/agents/"*.toml); [ -f "${found[0]}" ] && printf '%s' "${found[0]}"; }
 readonly RETIRED="$WORK/home/policy.toml"
 readonly PIPE="keypaste-policy-$$-$(date +%s)"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
@@ -56,7 +57,7 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 project_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$SECRET" || die "could not store ci's DEPLOY_KEY"
 project_var "$CLI" "$VAULT" "$MASTER" ci OTHER_KEY "$OTHER" || die "could not store ci's OTHER_KEY"
 
-# The file keypaste read before agents' rules moved to agents.toml, as wide as a rule could be.
+# The file keypaste read before agents' rules moved to agents.toml and then to each vault's own file, as wide as a rule could be.
 cat >"$RETIRED" <<EOF
 [[allow]]
 client          = "$LABEL"
@@ -126,13 +127,14 @@ grep -q "$SECRET" "$OUT" && die "the answer d still released the credential, or 
 ERR="$WORK/run-on.txt"
 clients "$LABEL" --run on 2>"$ERR" || die "keypaste clients could not turn run on through the owner: $(cat "$ERR")"
 grep -q 'sealed by the process holding the vault' "$ERR" || die "turning run on did not say the owner sealed it"
-grep -q '^\[\[seal\]\]' "$RULES" || die "the owner wrote agents.toml without its seal"
+RULES="$(vault_rules)" || die "the owner wrote no rules for the vault"
+grep -q '^\[\[seal\]\]' "$RULES" || die "the owner wrote the vault's rules without their seal"
 jq -se --arg name "$LABEL" 'any(.[]; .tool == "access_change" and .method == "rules-changed" and .client.label == $name)' <"$AUDIT" >/dev/null \
   || die "the owner did not record the rules change"
 
 # ===================================== C: a hand-edited Allow is ignored, though the old seal stays
 sed 's/^variable = "ask"$/variable = "allow"/' "$RULES" >"$RULES.edited" && mv "$RULES.edited" "$RULES"
-grep -q '^variable = "allow"$' "$RULES" || die "the gate could not edit agents.toml"
+grep -q '^variable = "allow"$' "$RULES" || die "the gate could not edit the vault's rules"
 grep -q '^\[\[seal\]\]' "$RULES" || die "the edit dropped the seal, so this phase would prove less"
 
 before="$(prompts_drawn)"
@@ -155,7 +157,7 @@ grep -q 'only the process holding it can seal' "$ERR" || die "turning run on wit
 ERR="$WORK/no-owner-off.txt"
 clients "$LABEL" --run off 2>"$ERR" || die "keypaste clients could not turn run off with nothing holding the vault"
 grep -q 'written unsealed' "$ERR" || die "the change made with nothing holding the vault did not say it was written unsealed"
-grep -q '^\[\[seal\]\]' "$RULES" && die "a change made with nothing holding the vault left agents.toml looking sealed"
+grep -q '^\[\[seal\]\]' "$RULES" && die "a change made with nothing holding the vault left the vault's rules looking sealed"
 
 # ============================================================== E: no value reached the audit log
 for sentinel in "$SECRET" "$OTHER"; do

@@ -427,7 +427,7 @@ public sealed class SecretFieldAutomationTests
         /// <summary>Opens New item on the API key template, which shows the key's value field.</summary>
         internal void BeginAddKey()
         {
-            NewItemForm.Open(Model).Template = ItemTemplate.ApiKey;
+            NewItemForm.Open(Model, template: ItemTemplate.ApiKey);
             Drain();
         }
 

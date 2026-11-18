@@ -49,6 +49,8 @@ public sealed class FilesByDragTests
 
     private static ListBoxItem GroupRowOf(RenderedShell shell, string path)
     {
+        shell.Shell.ShowGroups();
+        RenderedShell.Drain();
         var nav = shell.Named<ListBox>("Nav");
         return (ListBoxItem)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == path))!;
     }
@@ -572,17 +574,17 @@ public sealed class FilesByDragTests
     });
 
     [Fact]
-    public Task On_the_rail_holding_the_groups_button_opens_the_groups_and_the_drop_closes_them() => HeadlessSession.On(async () =>
+    public Task In_a_narrow_window_holding_the_sidebar_button_opens_the_groups_and_the_drop_closes_them() => HeadlessSession.On(async () =>
     {
         using var shell = Shell("keypaste-drag-rail-", width: 720);
-        Assert.True(shell.Shell.ShowsRail);
+        Assert.False(shell.Shell.ShowsSidebar);
         var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
         var github = entries.Rows.Single(row => row.Title == "github");
         var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
         view.HoldItem(github);
         using var data = FileDragData.ItemPayload();
 
-        WindowDrag.Over(shell.Window, WindowDrag.Centre(shell.Window, shell.Named<Button>("RailGroups")), data);
+        WindowDrag.Over(shell.Window, WindowDrag.Centre(shell.Window, shell.Named<Button>("ShowSidebar")), data);
         Assert.True(Cue(shell.Window).IsVisible);
         Assert.False(shell.Shell.SidebarOverlays);
 

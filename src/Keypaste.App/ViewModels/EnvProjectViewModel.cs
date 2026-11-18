@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows.Input;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
@@ -129,6 +131,34 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// </remarks>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
 
+    /// <summary>The project's two letters for its tile: the first of its first two words, or its first two.</summary>
+    internal string Initials
+    {
+        get
+        {
+            var words = DisplayName.Split(['-', '_', '.', ' '], StringSplitOptions.RemoveEmptyEntries);
+            var letters = words.Length >= 2 ? $"{words[0][0]}{words[1][0]}" : DisplayName.Length >= 2 ? DisplayName[..2] : DisplayName;
+
+            return letters.ToUpperInvariant();
+        }
+    }
+
+    /// <summary>Picks the tile's hue from the name, so a project keeps its colour.</summary>
+    internal Guid Hue => new(SHA256.HashData(Encoding.UTF8.GetBytes(Name)).AsSpan(0, 16));
+
+    /// <summary>What the header says under the name: how many stages, and the vault.</summary>
+    internal string Subtitle
+    {
+        get
+        {
+            var stages = Columns.Count == 1 ? "1 stage" : Invariant($"{Columns.Count} stages");
+
+            return _session.VaultPath is { } vault
+                ? $"{stages} · {EntryNameSanitizer.Sanitize(Path.GetFileNameWithoutExtension(vault)).Text}"
+                : stages;
+        }
+    }
+
     /// <summary>Imports a <c>.env</c> into this project.</summary>
     internal EnvImportViewModel Import { get; }
 
@@ -178,13 +208,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     internal partial IReadOnlyList<EnvProfileInfo> Profiles { get; private set; } = [];
 
     /// <summary>
-    /// The matrix columns and the preview's toggle: <see cref="Profiles"/>, plus the selected
-    /// profile while it has no key yet, placed before any protected one.
+    /// The stage control's segments: <see cref="Profiles"/>, plus the selected stage while it has
+    /// no variable yet, placed before any protected one.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Subtitle))]
     internal partial IReadOnlyList<EnvProfileColumn> Columns { get; private set; } = [];
 
-    /// <summary>Every key against <see cref="Columns"/>. Holds no value.</summary>
+    /// <summary>Every variable of the project, as the selected stage holds it. Holds no value.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRows))]
     internal partial IReadOnlyList<EnvKeyRow> Rows { get; private set; } = [];
@@ -236,7 +267,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
                 OnPropertyChanged(nameof(RunCommand));
                 OnPropertyChanged(nameof(SelectedIsProtected));
                 OnPropertyChanged(nameof(ReferencePreview));
-                OnPropertyChanged(nameof(ReferenceLines));
                 Import.Profile = value;
                 Launch.Profile = value;
                 Revealed = null;
@@ -250,10 +280,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The <c>.env.keypaste</c> the selected profile exports: references only, safe to commit.</summary>
     internal string ReferencePreview => EnvReferenceFile.Format(Name, SelectedProfile, _referenceKeys);
-
-    /// <summary>The preview a line at a time, as the terminal panel draws it.</summary>
-    internal IReadOnlyList<EnvPreviewLine> ReferenceLines =>
-        [.. ReferencePreview.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => new EnvPreviewLine(line))];
 
     /// <summary>Writes <see cref="ReferencePreview"/> to a file, never a value.</summary>
     /// <param name="path">The file.</param>
@@ -560,7 +586,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <summary>What leaving would lose: the first form here holding what was typed, or null.</summary>
     internal string? UnsavedDraft => ProfileDraft() ?? KeyDraft() ?? ReplaceDraft() ?? Launch.UnsavedDraft;
 
-    internal Func<string?> ProfileDraft => () => IsAddingProfile && NewProfile.Trim().Length > 0 ? "this new environment" : null;
+    internal Func<string?> ProfileDraft => () => IsAddingProfile && NewProfile.Trim().Length > 0 ? "this new stage" : null;
 
     internal Func<string?> KeyDraft => () =>
         IsAdding && (NewKey.Trim().Length > 0 || (NewValue.HasValue && !NewValue.IsGenerated)) ? "this new key" : null;
@@ -695,7 +721,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             IsAdding = false;
             Replacing = null;
             OnPropertyChanged(nameof(ReferencePreview));
-            OnPropertyChanged(nameof(ReferenceLines));
             return;
         }
 
@@ -739,7 +764,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         Layout();
         ListEnvironments(vault);
         OnPropertyChanged(nameof(ReferencePreview));
-        OnPropertyChanged(nameof(ReferenceLines));
     }
 
     /// <summary>The entries tagged into one of this project's environments.</summary>
@@ -755,12 +779,15 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             .. Columns.Select(column => new EnvEnvironmentEntries(
                 column.Name,
                 column.IsProtected,
-                [.. MembersOf(column.Name).Select(entry => new EnvMemberRow(
+                [.. MembersOf(column.Name).Select((entry, index) => new EnvMemberRow(
                     entry,
                     column.Name,
                     KeysOn(vault, entry),
                     Elsewhere(entry, column.Name),
-                    new RelayCommand(() => BeginRemoveEntry(entry, column.Name))))],
+                    new RelayCommand(() => BeginRemoveEntry(entry, column.Name)))
+                {
+                    FollowsAnother = index > 0,
+                })],
                 new RelayCommand(() => BeginAddEntry(column.Name)))),
         ];
     }
@@ -789,29 +816,24 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             profiles.Insert(pending.IsProtected || firstProtected < 0 ? profiles.Count : firstProtected, pending);
         }
 
+        var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
+        var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
+
+        Rows =
+        [
+            .. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))], SelectedProfile)),
+        ];
+
         Columns =
         [
             .. profiles.Select(profile => new EnvProfileColumn(
                 profile.Name,
                 profile.IsProtected,
                 string.Equals(profile.Name, SelectedProfile, StringComparison.Ordinal),
-                new RelayCommand(() => SelectedProfile = profile.Name))),
-        ];
-
-        var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
-        var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
-
-        var usual = profiles.ToDictionary(
-            profile => profile.Name,
-            profile => EnvProfileCell.UsualOf(
-                (Matrix?.Rows ?? [])
-                    .SelectMany(row => row.Cells.Where(cell => string.Equals(cell.Profile, profile.Name, StringComparison.Ordinal)))
-                    .Select(cell => (IReadOnlyList<string>)[.. cell.Sources.Select(ApprovalPrompt.Shown)])),
-            StringComparer.Ordinal);
-
-        Rows =
-        [
-            .. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))])),
+                new RelayCommand(() => SelectedProfile = profile.Name))
+            {
+                HasMissing = Rows.Any(row => row.Cells.Any(cell => cell.IsMissing && string.Equals(cell.Profile, profile.Name, StringComparison.Ordinal))),
+            }),
         ];
 
         EnvProfileCell Cell(string key, string profile)
@@ -820,6 +842,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             var isSelected = string.Equals(profile, SelectedProfile, StringComparison.Ordinal);
             var variable = isSelected ? selected.GetValueOrDefault(key) : null;
             var state = known?.State ?? (variable is null ? EnvCellState.Missing : EnvCellState.Set);
+            var sources = known?.Sources ?? [];
 
             return new EnvProfileCell(
                 profile,
@@ -829,11 +852,21 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
                 variable,
                 new RelayCommand(() => Act(key, profile, state)))
             {
-                Sources = [.. (known?.Sources ?? []).Select(ApprovalPrompt.Shown)],
-                Also = known?.Sources is [var only] ? Elsewhere(only, profile) : [],
-                UsualSource = usual.GetValueOrDefault(profile),
+                Sources = [.. sources.Select(ApprovalPrompt.Shown)],
+                SourceTitles = [.. sources.Select(TitleOf)],
+                Also = sources is [var only] ? Elsewhere(only, profile) : [],
             };
         }
+    }
+
+    /// <summary>An item by title, as the table names it; a project's own item, titled like a file, after the project's name.</summary>
+    private string TitleOf(EntryName entry)
+    {
+        var title = EntryNameSanitizer.Sanitize(entry.Title).Text;
+
+        return string.Equals(entry.GroupPath, EnvStore.HomeEntry(Name, EnvProfileNames.Default).GroupPath, StringComparison.Ordinal)
+            ? $"{DisplayName} {title}"
+            : title;
     }
 
     private void Act(string key, string profile, EnvCellState state)

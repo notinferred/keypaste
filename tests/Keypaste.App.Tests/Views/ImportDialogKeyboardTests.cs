@@ -184,7 +184,7 @@ public sealed class ImportDialogKeyboardTests
 
         var confirm = Named(window, "ExportConfirm");
         Assert.True(confirm.IsFocused);
-        AmberElements.AssertOne(window, confirm, "the export dialog's preview");
+        AccentElements.AssertOne(window, confirm, "the export dialog's preview");
 
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
@@ -193,7 +193,7 @@ public sealed class ImportDialogKeyboardTests
         Assert.True(import.IsImported, import.Message);
         var done = Named(window, "ExportDone");
         Assert.True(done.IsFocused);
-        AmberElements.AssertOne(window, done, "the export dialog's report");
+        AccentElements.AssertOne(window, done, "the export dialog's report");
         Assert.Empty(announced);
 
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);

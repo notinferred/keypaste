@@ -237,7 +237,7 @@ done
 # ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
 # is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF "[d] deny  [o] once  [a] always  [b] block  " "$page" \
+  grep -qF "[d] deny  [o] once  [a] always  " "$page" \
     || die "$page does not show the choices a person actually answers a labelled agent with"
 done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
@@ -331,19 +331,19 @@ for opt in --vault --client-label --expose; do
   grep -q -- "$opt" "$WORK/mcp-help.txt" || die "keypaste mcp no longer offers $opt, which $DOC tells you to configure"
 done
 
-# The generator options README.md's "Generating one" section tells you to type, and the verb it
-# says prints a passphrase and stores nothing. The README is in TRANSCRIPT_PAGES for the dialog;
-# this is the same principle applied to the commands it spells out beside it.
+# The generator options docs/FEATURES.md names, `--generate` among them on README.md, and the verb
+# FEATURES says prints a passphrase and stores nothing. The README is in TRANSCRIPT_PAGES for the
+# dialog; this is the same principle applied to the options the public pages spell out.
 "$CLI" add --help      >"$WORK/add-help.txt"      2>&1 || true
 "$CLI" generate --help >"$WORK/generate-help.txt" 2>&1 || true
 
 for opt in --generate --length --no-symbols --no-lookalikes --words --separator; do
-  grep -q -- "$opt" "$WORK/add-help.txt" || die "keypaste add no longer offers $opt, which README.md tells you to type"
+  grep -q -- "$opt" "$WORK/add-help.txt" || die "keypaste add no longer offers $opt, which docs/FEATURES.md names"
 done
 for opt in --words --separator; do
-  grep -q -- "$opt" "$WORK/generate-help.txt" || die "keypaste generate no longer offers $opt, which README.md tells you to type"
+  grep -q -- "$opt" "$WORK/generate-help.txt" || die "keypaste generate no longer offers $opt, which docs/FEATURES.md names"
 done
-grep -q 'not stored' "$WORK/generate-help.txt"   || die "keypaste generate no longer says its passphrase is not stored, which README.md promises"
+grep -q 'not stored' "$WORK/generate-help.txt"   || die "keypaste generate no longer says its passphrase is not stored, which docs/FEATURES.md promises"
 
 kill "$AGENT_PID" 2>/dev/null || true
 wait "$AGENT_PID" 2>/dev/null || true

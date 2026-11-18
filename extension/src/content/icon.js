@@ -52,15 +52,11 @@ class Icon {
         document.body.removeChild(this.shadowRoot.host);
     }
 
-    switchIcon(state, uuid) {
+    switchIcon(state) {
         if (!this.icon) {
             return;
         }
 
-        if (state === DatabaseState.UNLOCKED) {
-            this.icon.style.filter = kpxc.credentials.length === 0 && !uuid ? 'saturate(0%)' : 'saturate(100%)';
-        } else {
-            this.icon.style.filter = 'saturate(0%)';
-        }
+        this.icon.style.filter = state === DatabaseState.UNLOCKED ? 'saturate(100%)' : 'saturate(0%)';
     }
 }

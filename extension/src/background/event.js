@@ -9,7 +9,7 @@ kpxcEvent.onMessage = async function(request, sender) {
             sender.tab.id = tabs.currentTabId;
         }
 
-        return await kpxcEvent.messageHandlers[request.action](sender.tab, request.args);
+        return await kpxcEvent.messageHandlers[request.action](sender.tab, request.args, sender);
     }
 };
 
@@ -144,6 +144,7 @@ kpxcEvent.sendBackToTabs = async function(tab, args = []) {
 // All methods named in this object have to be declared BEFORE this!
 kpxcEvent.messageHandlers = {
     'associate': keepass.associate,
+    'begin_pairing': keepass.beginPairing,
     'check_database_hash': keepass.checkDatabaseHash,
     'frame_message': kpxcEvent.sendBackToTabs,
     'get_connected_database': kpxcEvent.onGetConnectedDatabase,
@@ -155,7 +156,10 @@ kpxcEvent.messageHandlers = {
     'iframe_detected': kpxcEvent.onIframeDetected,
     'is_connected': kpxcEvent.getIsKeypasteAvailable,
     'is_iframe_allowed': page.isIframeAllowed,
+    'list_logins': page.listLogins,
+    'fill_login': page.fillLogin,
     'load_settings': page.getSettings,
+    'open_keypaste': page.openKeypaste,
     'lock_database': kpxcEvent.lockDatabase,
     'page_clear_logins': kpxcEvent.pageClearLogins,
     'page_get_autosubmit_performed': page.getAutoSubmitPerformed,
@@ -168,6 +172,5 @@ kpxcEvent.messageHandlers = {
     'password_set_filled': kpxcEvent.passwordSetFilled,
     'popup_login': kpxcEvent.onLoginPopup,
     'reconnect': kpxcEvent.onReconnect,
-    'retrieve_credentials': page.retrieveCredentials,
     'show_default_browseraction': browserAction.showDefault
 };

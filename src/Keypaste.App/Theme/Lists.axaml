@@ -3,15 +3,13 @@
         xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
-    Lists. Every ListBoxItem is a row: radius 7, hover raises one ink step, selected gets a 10%
-    amber tint and a 2px amber bar on the left, and a KpIcon in a selected row takes the text's
-    colour: an icon is amber only while its object is live (DESIGN), and a view has one amber element.
+    Lists. Every ListBoxItem is a row: radius 8, hover raises one step, selected takes the accent's
+    tint with no bar, and a KpIcon in a selected row takes the text's colour.
     Classes:
-      ListBox.nav   the sidebar: 34px rows, selected is #2A2C30 with no bar
-      Button.sidebar-row   a sidebar footer row that runs a command, such as Import
+      ListBox.nav   the sidebar: 28px rows, selected takes the same tint
       ListBox.rows  a tall list such as Secrets (52px rows); the default look, named for intent
-      ListBox.segmented  the items of the segmented list in Inputs.axaml: selected is #2A2C30
-                    with no bar in every state; here so it follows the rules above
+      ListBox.segmented  the items of the segmented list in Inputs.axaml: the chosen one raised on its track
+                    in every state; here so it follows the rules above
   -->
 
   <Style Selector="ListBox">
@@ -20,18 +18,18 @@
   </Style>
 
   <Style Selector="ListBoxItem">
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusRow}" />
     <Setter Property="Padding" Value="12,6" />
     <Setter Property="Margin" Value="0,0,0,2" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
   <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
   <Style Selector="ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
   <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
                    ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
@@ -39,16 +37,6 @@
                    ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    <Setter Property="BoxShadow" Value="{DynamicResource KpSelectedBar}" />
-  </Style>
-  <!-- An inset shadow does not mirror, so under right to left the bar is a border, held on every row so selecting one moves nothing. -->
-  <Style Selector="ListBoxItem[FlowDirection=RightToLeft] /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderThickness" Value="2,0,0,0" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-  </Style>
-  <Style Selector="ListBoxItem:selected[FlowDirection=RightToLeft] /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BoxShadow" Value="none" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpSelectedBarMirrored}" />
   </Style>
   <Style Selector="ListBoxItem:selected ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
@@ -71,17 +59,28 @@
     <Setter Property="MinHeight" Value="36" />
   </Style>
 
+  <!-- The sidebar, as Mail and Outlook draw theirs: 28px rows in the body's size, icons in the accent's text colour, counts muted. -->
   <Style Selector="ListBox.nav > ListBoxItem">
-    <Setter Property="MinHeight" Value="34" />
-    <Setter Property="Height" Value="34" />
-    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="CornerRadius" Value="7" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="FontSize" Value="13.5" />
-    <Setter Property="FontWeight" Value="Medium" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem Button.fold ctl|KpIcon, ListBox.nav > ListBoxItem:selected Button.fold ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem TextBlock.count">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Margin" Value="8,0,0,0" />
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
@@ -91,57 +90,45 @@
                    ListBox.nav > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
                    ListBox.nav > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
                    ListBox.nav > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    <Setter Property="BoxShadow" Value="none" />
-    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem:selected ctl|KpIcon">
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
   </Style>
-  <!-- The group tree under Items is denser than the places, and its heading is a label, not a row. -->
-  <Style Selector="ListBox.nav > ListBoxItem.group">
-    <Setter Property="Height" Value="28" />
-    <Setter Property="MinHeight" Value="28" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="FontWeight" Value="Normal" />
+  <Style Selector="ListBox.nav > ListBoxItem:selected TextBlock.count">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
+  <!-- A vault's heading: its title in the row title's weight, with room above it, as Outlook heads an account. -->
+  <Style Selector="ListBox.nav > ListBoxItem.vault">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Padding" Value="8,8,8,0" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem TextBlock.vault">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <!-- The account's heading names the vaults under it and cannot be chosen. -->
   <Style Selector="ListBox.nav > ListBoxItem.heading">
     <Setter Property="Height" Value="30" />
     <Setter Property="MinHeight" Value="30" />
     <Setter Property="VerticalContentAlignment" Value="Bottom" />
-    <Setter Property="Padding" Value="12,0,12,4" />
+    <Setter Property="Padding" Value="8,0,8,2" />
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem.heading /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
   </Style>
-  <!-- The footer rows (Settings, Trash) are quieter than the destinations above them. -->
-  <Style Selector="ListBox.nav.quiet > ListBoxItem">
-    <Setter Property="Height" Value="30" />
-    <Setter Property="MinHeight" Value="30" />
-    <Setter Property="FontSize" Value="13" />
+  <Style Selector="ListBox.nav > ListBoxItem TextBlock.account">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
-
-  <!-- A sidebar row that runs a command rather than going to a place, such as Import: a footer row's size and colours. -->
-  <Style Selector="Button.sidebar-row">
-    <Setter Property="Height" Value="30" />
-    <Setter Property="MinHeight" Value="30" />
-    <Setter Property="Padding" Value="12,0" />
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="HorizontalContentAlignment" Value="Left" />
-    <Setter Property="FontSize" Value="13" />
+  <!-- The Groups row's + shows while the row is pointed at or chosen. -->
+  <Style Selector="ListBox.nav > ListBoxItem Button.reveal">
+    <Setter Property="Opacity" Value="0" />
   </Style>
-  <Style Selector="Button.sidebar-row /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-  </Style>
-  <Style Selector="Button.sidebar-row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-  </Style>
-  <Style Selector="Button.sidebar-row ctl|KpIcon">
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  <Style Selector="ListBox.nav > ListBoxItem:pointerover Button.reveal, ListBox.nav > ListBoxItem:selected Button.reveal, ListBox.nav > ListBoxItem Button.reveal:focus">
+    <Setter Property="Opacity" Value="1" />
   </Style>
 
   <!-- Thin, dark scrollbars, which hide or stay as the system says (SystemScrollBars). -->
@@ -159,7 +146,7 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Margin" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
   <Style Selector="ListBox.segmented > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BoxShadow" Value="none" />
@@ -174,9 +161,8 @@
                    ListBox.segmented > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
                    ListBox.segmented > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
                    ListBox.segmented > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgRaised}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    <Setter Property="BoxShadow" Value="none" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowControl}" />
   </Style>
 </Styles>

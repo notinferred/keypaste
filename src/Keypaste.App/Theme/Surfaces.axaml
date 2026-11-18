@@ -5,18 +5,18 @@
   <!--
     Surfaces, as classes on Border. Depth is lightness; only overlays (dialog, toast) cast shadows.
       card              radius 10, hairline border, no fill, padding 16
-      card.filled       the same on the panel ink (#18191C): MCP client cards, forms
-      dialog            overlay surface: #1D1E22, strong border, radius 14, shadow, padding 20
-      toast             bottom-right notice: #24262A, strong border, radius 10, shadow
+      card.filled       the same on the panel: MCP client cards, forms
+      dialog            overlay surface: the card, a hairline, radius 14, shadow, padding 20
+      toast             a notice under the title bar: the card, a hairline, radius 10, shadow
       backdrop          the modal scrim behind a dialog
       field             a read-only value in a field-shaped box (a kp:// reference)
       terminal          a command or file preview; stays dark in the light theme
       table             a bordered, clipped table; rows inside use table-head / table-row
-      chip              4px badge on #24262A; chip.outline for a bordered one; put a
+      chip              a pill on the hover ground; chip.outline for a bordered one; put a
                         TextBlock inside, which is drawn as a label; chip.tag holds a tag, in mono
       keycap            a keyboard shortcut hint
       dot               6px status dot: add ok, warn, danger, info or idle; waiting adds the halo
-      tile              the 32px initials / icon square
+      tile              the 32px icon square; ctl:Monogram is an item's lettered tile
   -->
 
   <Style Selector="Border.card">
@@ -31,7 +31,7 @@
 
   <Style Selector="Border.dialog">
     <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusDialog}" />
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowDialog}" />
@@ -39,8 +39,8 @@
   </Style>
 
   <Style Selector="Border.toast">
-    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
@@ -111,7 +111,7 @@
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
     <Setter Property="Padding" Value="8,0" />
-    <Setter Property="MinHeight" Value="20" />
+    <Setter Property="MinHeight" Value="22" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
@@ -122,12 +122,8 @@
     <Setter Property="Padding" Value="8,0" />
     <Setter Property="MinHeight" Value="22" />
   </Style>
-  <Style Selector="Border.chip.amber">
-    <Setter Property="Background" Value="{DynamicResource KpAccentTintStrong}" />
-  </Style>
-  <!-- A tag: the chip's text sits beside its icons and its remove button. -->
+  <!-- A tag: a name in words beside its icons, and its remove button while the chip is pointed at or holds the keyboard. -->
   <Style Selector="Border.chip.tag TextBlock">
-    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
@@ -146,6 +142,32 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
+  <Style Selector="Border.chip.tag Button.chip-remove">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="Border.chip.tag:pointerover Button.chip-remove, Border.chip.tag Button.chip-remove:focus-visible">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <!-- The + after an item's tags that opens the box to add one. -->
+  <Style Selector="ToggleButton.chip-add">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="ToggleButton.chip-add /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ToggleButton.chip-add:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.chip-add:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
   <Style Selector="Border.toast :is(TextBlock).muted">
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
@@ -159,13 +181,10 @@
   <Style Selector="Border.chip.outline > TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
-  <Style Selector="Border.chip.amber > TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
-  </Style>
 
   <Style Selector="Border.keycap">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusKeycap}" />
     <Setter Property="Padding" Value="6,2" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -198,7 +217,7 @@
     <Setter Property="Background" Value="{DynamicResource KpIdle}" />
   </Style>
   <Style Selector="Border.dot.waiting">
-    <Setter Property="Background" Value="{DynamicResource KpWarn}" />
+    <Setter Property="Background" Value="{DynamicResource KpAccentText}" />
     <Setter Property="BoxShadow" Value="{DynamicResource KpWaitingHalo}" />
   </Style>
   <!-- Agents' mark: these two shapes, against a running agent's filled dot, tell its state without colour. -->
@@ -215,8 +234,24 @@
   <Style Selector="Border.tile">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusTile}" />
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+
+  <!-- A count that needs attention, on a rail place: the accent with white, as Mail's unread badge. -->
+  <Style Selector="Border.badge">
+    <Setter Property="MinWidth" Value="15" />
+    <Setter Property="Height" Value="15" />
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+  </Style>
+  <Style Selector="Border.badge > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource KpOnAccent}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
   <Style Selector="Border.divider">
@@ -231,7 +266,7 @@
 
   <Style Selector="Border.menu">
     <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />

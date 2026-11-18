@@ -41,7 +41,7 @@ internal static class EnvExportCommand
     internal static CliVerb Command { get; } = new(
         "export",
         "write kp:// references, safe to commit; --dotenv for plain text\n\n"
-            + $"writes a kp:// reference for every variable of an environment, as a {EnvReferenceFile.FileName} that holds "
+            + $"writes a kp:// reference for every variable of a stage, as a {EnvReferenceFile.FileName} that holds "
             + "no value and is safe to commit, which `keypaste run` resolves. --dotenv puts your secrets on disk in plain "
             + "text, and asks first; prefer `keypaste run <project> -- <command>`, which needs no file at all.",
         Execute)
@@ -201,7 +201,7 @@ internal static class EnvExportCommand
                 return CliApp.ExitNotFound;
 
             case EnvOutcome.NoProfile:
-                context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' environment");
+                context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' stage");
                 return CliApp.ExitNotFound;
 
             default:

@@ -27,7 +27,7 @@ public static class AuditTools
     /// <summary>Another program's save merged with the vault's holder's copy and saved by that holder (D-0545).</summary>
     public const string Merge = "vault_merge";
 
-    /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused (D-0637).</summary>
+    /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused.</summary>
     public const string Browser = "browser";
 
     /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
@@ -67,8 +67,11 @@ public enum BrowserAct
     /// <summary>A login filled in a page, or a matched item refused one.</summary>
     Fill = 3,
 
-    /// <summary>The person's removal of an "Always fill" allowance.</summary>
+    /// <summary>The person's removal of a login's "filled on this site before", so its next fill there is asked.</summary>
     Unallow = 4,
+
+    /// <summary>A page's list of its logins by name, which releases nothing that fills.</summary>
+    List = 5,
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -578,7 +581,7 @@ public static class RequestRecords
         };
     }
 
-    /// <summary>The line for a browser's pairing or its check, naming the build and the pairing and never a key (D-0637).</summary>
+    /// <summary>The line for a browser's pairing or its check, naming the build and the pairing and never a key.</summary>
     /// <param name="identity">The KeePassXC-Browser build the browser named, written as the client's name by its extension ID.</param>
     /// <param name="pairing">The pairing's name, written as the client's label, or null when there is none to name.</param>
     /// <param name="act">What the line is about, written as its field.</param>
@@ -613,6 +616,7 @@ public static class RequestRecords
                     BrowserAct.Remove => "remove",
                     BrowserAct.Fill => "fill",
                     BrowserAct.Unallow => "unallow",
+                    BrowserAct.List => "list",
                     _ => "pair",
                 },
             },

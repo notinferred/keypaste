@@ -8,7 +8,7 @@ keypaste's MCP bridge, `keypaste mcp`, lets an AI agent see the names of items i
 keypaste approve --vault ~/vaults/personal.kdbx
 ```
 
-The bridge reaches whichever keypaste process holds the vault named by its `--vault` or `KEYPASTE_VAULT`, or, with neither, the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes. A bridge with no vault named or chosen is refused. A running bridge keeps the chosen vault it started with until its client restarts it.
+The bridge reaches whichever keypaste process holds the vault named by its `--vault` or `KEYPASTE_VAULT`, or each vault when `--vault` is given once for each, or, with neither, the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes. A bridge with no vault named or chosen is refused. A running bridge keeps the chosen vault it started with until its client restarts it.
 
 ## The short way
 
@@ -42,7 +42,7 @@ No master password, key file or session identifier is written into a client's co
 
 ## From the desktop app
 
-Agents lists the AI tools found on this computer and every agent that asked this vault in the last 30 days. Add an agent offers a setup prompt to copy, a specific app to connect, or MCP to add by hand. A tool's Connect (named for it, as in Connect Claude Code) shows exactly what it will run or edit, the same registration `setup` writes, and writes nothing until you press Connect in that pane. Check the connection then starts the registered command as the client would and asks for one value with a reason saying it is a check, which opens the app's prompt like any other request. A connected tool has Connect again, for a moved vault or app, and Disconnect. [The desktop guide](desktop.md) covers the screen.
+Agents lists the AI tools found on this computer and every agent that asked this vault in the last 30 days. Add an agent offers a setup prompt to copy, a specific app to connect, or MCP to add by hand. A tool's Connect (named for it, as in Connect Claude Code) shows exactly what it will run or edit, the same registration `setup` writes but always naming its vaults with `--vault`, and writes nothing until you press Connect in that pane. When the account holds several vaults, the pane lists them with the vault in view chosen, and a tool reaches only the vaults chosen when it was connected; one connected earlier keeps reaching only its vault, and connecting it again changes them. Several vaults are connected only under `~/.keypaste` with no `KEYPASTE_APPROVER` set, since a tool may start the bridge without either. Check the connection then starts the registered command as the client would and asks for one value with a reason saying it is a check, which opens the app's prompt like any other request. A connected tool has Connect again, for a moved vault or app, and Disconnect. [The desktop guide](desktop.md) covers the screen.
 
 The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. From an AppImage, which mounts somewhere new each time it starts, it registers `~/.local/bin/keypaste`, creating it first, or replacing another program's file there and keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
 
@@ -125,7 +125,7 @@ A bridge you configure by hand with no `--expose` sees only `tag:env:*`: the var
 ]
 ```
 
-A pattern matches the group path and the title separately: `*` stays inside one path segment and `**` spans any number. A title containing a slash is matched as a title, so it cannot pass for a deeper group. `tag:env:<project>[:<environment>]` reaches only that project's variables, never an item's password, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in. Every pattern discloses the matching names, which can reveal your inventory and help target later requests.
+A pattern matches the group path and the title separately: `*` stays inside one path segment and `**` spans any number. A title containing a slash is matched as a title, so it cannot pass for a deeper group. `tag:env:<project>[:<stage>]` reaches only that project's variables, never an item's password, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in. Every pattern discloses the matching names, which can reveal your inventory and help target later requests.
 
 ## The tools
 
@@ -137,6 +137,8 @@ A pattern matches the group path and the title separately: `*` stays inside one 
 - `request_save` takes `item` and `field`, or `project`, `environment` and `key`, with `reason`, and asks you to save a value there that you type, paste or generate. The item is created when there is none, a replace needs your confirmation, and the agent learns only whether it was saved ([THREATS](../THREATS.md) T-54).
 - `request_item_change` takes `entry`, `change` and `reason`, and changes one item the agent sees whole: `move_to_recycle_bin` moves it to Trash, `mark_expired` sets its KeePass expiry, now or on the day given as `expires`, and `delete` removes for good an item that agent created through a `request_save` you approved, each asked every time; `mark_needs_update` adds the tag `needs-update` and `clear_needs_update` removes it, without asking. The agent learns only whether it was made ([Approvals](approvals.md#item-changes), [THREATS](../THREATS.md) T-57).
 - `run`, offered by a bridge started with `--allow-run`, is below.
+
+A bridge started with several `--vault`s is one `keypaste` connection to all of them. `list_entry_names` and `find_access` ask every vault at once, name each item's vault (`vault=Acme` in the text, `vault` in the structured result) and each vault's state, so a locked vault is named as locked while the others answer; `find_access` takes `vault` to search one. Every request takes `vault` too, and goes to that vault's owner alone, under that vault's rules and prompt. Without it, a request goes to the one vault whose search or listing showed the item; one whose name or handle is in more than one vault is refused until `vault` names one, and a vault the bridge was not started with is refused before any owner hears of it.
 
 The MCP surface cannot add, edit or delete items except through `request_save` and `request_item_change`. Anyone who can edit the vault can influence item names; keypaste strips control characters, invisible Unicode and structural punctuation and labels the listing as data, which cannot rule out prompt injection ([THREATS](../THREATS.md) T-1).
 

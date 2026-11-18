@@ -8,6 +8,13 @@ HTMLElement.prototype.hide = function() {
     this.style.display = 'none';
 };
 
+function showError(heading, problem) {
+    $('#error-heading').textContent = heading;
+    $('#error-message').textContent = problem;
+    $('#error-problem').style.display = problem ? '' : 'none';
+    $('#error-encountered').show();
+}
+
 function statusResponse(r) {
     $('#initial-state').hide();
     $('#error-encountered').hide();
@@ -15,12 +22,12 @@ function statusResponse(r) {
     $('#not-configured').hide();
     $('#configured-and-associated').hide();
     $('#configured-not-associated').hide();
+    $('#checking-keypaste').hide();
     $('#lock-database-button').hidden = true;
     $('#database-not-opened').hide();
 
     if (!r.keypasteAvailable) {
-        $('#error-message').textContent = r.error;
-        $('#error-encountered').show();
+        showError(tr('popupKeypasteUnreachable'), '');
     } else if (r.keypasteAvailable && r.databaseClosed) {
         $('#database-error-message').textContent = r.error;
         $('#database-not-opened').show();
@@ -33,8 +40,7 @@ function statusResponse(r) {
         $('#need-reconfigure').show();
         $('#need-reconfigure-message').textContent = r.error;
     } else if (r.error) {
-        $('#error-encountered').show();
-        $('#error-message').textContent = r.error;
+        showError(tr('popupErrorEncountered'), r.error);
     } else {
         $('#configured-and-associated').show();
         $('#associated-identifier').textContent = r.identifier;
@@ -59,23 +65,23 @@ const sendMessageToTab = async function(message) {
     return true;
 };
 
+// Shows the code keypaste shows too while it asks the person, then what pairing came to.
+const connect = async function() {
+    const { code } = await browser.runtime.sendMessage({ action: 'begin_pairing' });
+    for (const section of document.querySelectorAll('.content > section, #initial-state')) {
+        section.hide();
+    }
+    $('#pairing-code').textContent = code;
+    $('#checking-keypaste').show();
+
+    await browser.runtime.sendMessage({ action: 'associate' });
+    statusResponse(await browser.runtime.sendMessage({ action: 'get_status' }));
+};
+
 (async () => {
-    $('#connect-button').addEventListener('click', async () => {
-        await browser.runtime.sendMessage({
-            action: 'associate'
-        });
+    $('#connect-button').addEventListener('click', connect);
 
-        // This does not work with Firefox because of https://bugzilla.mozilla.org/show_bug.cgi?id=1665380
-        await sendMessageToTab('retrieve_credentials_forced');
-        close();
-    });
-
-    $('#reconnect-button').addEventListener('click', async () => {
-        await browser.runtime.sendMessage({
-            action: 'associate'
-        });
-        close();
-    });
+    $('#reconnect-button').addEventListener('click', connect);
 
     $('#reload-status-button').addEventListener('click', async () => {
         statusResponse(await browser.runtime.sendMessage({

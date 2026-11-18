@@ -277,7 +277,8 @@ public sealed class DrawnRevealWaysOutTests
     private static void OpenSidebarMenu(RenderedShell shell)
     {
         var nav = shell.Named<ListBox>("Nav");
-        var billing = shell.Shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "billing");
+        var billing = shell.Shell.ProjectRowNamed("billing");
+        RenderedShell.Drain();
         var container = Assert.IsAssignableFrom<Control>(nav.ContainerFromItem(billing));
         container.BringIntoView();
         RenderedShell.Drain();

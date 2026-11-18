@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 8.1f: both builds of keypaste's extension, loaded unpacked in a real Chromium and a real Firefox, pair with a vault
-# tests/Keypaste.AppDriver holds. The driver turns the host on for both under a temporary home and arms pairing; each
+# tests/Keypaste.AppDriver holds. The driver turns the host on for both under a temporary home; each
 # browser starts the built keypaste through that host, its options page presses Connect, the driver allows the prompt,
 # and the page and Settings' list must show the pairing under that build (extension/tests/pair-in-browsers.js).
 #

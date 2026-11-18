@@ -113,6 +113,29 @@ public sealed class FieldsTests
         }
     }
 
+    /// <summary>A card's or an identity's tag, which sets its protected fields' agent category, and its kind's icon are KeePassXC's own.</summary>
+    [Theory]
+    [InlineData(ItemKind.Card, Keypaste.Core.Agents.FieldCategories.CardTag, "Number", 66)]
+    [InlineData(ItemKind.Identity, Keypaste.Core.Agents.FieldCategories.IdentityTag, "Passport number", 9)]
+    public void KeePassXC_reads_a_cards_and_an_identitys_tag_icon_and_protected_field(ItemKind kind, string tag, string field, int icon)
+    {
+        using var file = new KeePassXcVault();
+        using (var vault = file.Create())
+        {
+            vault.CreateEntry(new VaultEntry { Title = "Mine", Kind = kind }, [new FieldWrite(field, "4111 1111")], [tag]);
+            vault.Save();
+        }
+
+        var entry = KeePassXcVault.Entry(file.Current(), "Mine");
+        Assert.Equal(tag, (string?)entry.Element("Tags"));
+        Assert.Equal(icon, (int?)entry.Element("IconID"));
+        Assert.True(KeePassXcVault.IsProtected(entry, field));
+        Assert.Equal(["4111 1111"], KeePassXcCli.Show(file.Path_, "Mine", field));
+
+        using var reopened = file.Open();
+        Assert.Equal(kind, reopened.Find(new EntryName(string.Empty, "Mine"))!.Kind);
+    }
+
     private static KeePassXcVault Seeded()
     {
         var file = new KeePassXcVault();

@@ -155,6 +155,44 @@ internal static class ToolText
         reason what it is for: a human reads that sentence before deciding.
         """;
 
+    /// <summary>What the instructions add when this bridge serves several vaults.</summary>
+    internal const string VaultsInstructions = """
+
+        This agent can reach several of the user's vaults through this one server. Searches and listings span them and
+        name each item's vault; each vault keeps its own rules, and a locked one answers as locked. When an item's name
+        or handle is in more than one vault, give that vault's name as `vault` in the request.
+        """;
+
+    /// <summary>Why a request naming a vault this bridge does not serve was refused.</summary>
+    /// <param name="served">The names of the vaults it serves.</param>
+    internal static string VaultNotServed(IEnumerable<string> served) => string.Join(
+        "\n",
+        "keypaste: DENIED. This agent cannot reach that vault, so nothing was asked. "
+            + (served.Any() ? $"It can reach {string.Join(", ", served)}." : "It can reach no vault."),
+        "This call was recorded in the audit log as denied.");
+
+    /// <summary>Why a request whose item more than one vault could hold was refused.</summary>
+    /// <param name="vaults">The vaults that could hold it.</param>
+    internal static string VaultAmbiguous(IEnumerable<string> vaults) => string.Join(
+        "\n",
+        $"keypaste: DENIED. More than one vault this agent can reach could hold that item: {string.Join(", ", vaults)}. Nothing was asked.",
+        "Give the one you mean as `vault`, as find_access names it. This call was recorded in the audit log as denied.");
+
+    /// <summary>Why a request whose item no vault holds was refused.</summary>
+    internal const string InNoVault = """
+        keypaste: DENIED. No vault this agent can reach holds that item within what it can see, so nothing was asked.
+        Search with find_access and pass the handle it gives, or give `vault` to say which vault a new item goes in.
+        This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>A refusal from one of several vaults, named so the agent knows which.</summary>
+    /// <param name="vault">The vault's name.</param>
+    /// <param name="refusal">What that vault's answer said.</param>
+    internal static string InVault(string vault, string refusal) => $"{vault}: {refusal}";
+
+    /// <summary>A place in one of several vaults, named with its vault.</summary>
+    internal static string InVaultPlace(string place, string vault) => $"{place} in vault {vault}";
+
     /// <summary>The description a client shows for <c>list_entry_names</c>.</summary>
     internal const string ListDescription = """
         Lists the items in the user's keypaste vault that the user lets this agent see. Returns each

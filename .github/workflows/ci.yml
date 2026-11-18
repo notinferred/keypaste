@@ -37,7 +37,6 @@ on:
       - 'site/public/_headers'
       - 'site/public/brand.css'
       - 'site/public/favicon.svg'
-      - 'site/public/fonts/**'
       - 'site/public/demo/**'
       - 'site/public/thanks/**'
       - 'site/public/acaf/**'

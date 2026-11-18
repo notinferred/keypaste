@@ -92,12 +92,14 @@ public static class BridgeEntry
         // because a client spawns this server long before anybody unlocks the vault, and a bridge that
         // refused to start would look broken in the client's log rather than saying so in an
         // answer an agent can act on.
-        await using var approver = new ApproverConnection(options.ApproverName, options.VaultPath) { InputEnded = inputEnded.Token };
+        await using var vaults = BridgeVaults.Connect(options, inputEnded.Token);
 
         var serverOptions = new McpServerOptions
         {
             ServerInfo = new Implementation { Name = "keypaste", Version = CoreInfo.Version },
-            ServerInstructions = options.AllowRun ? ToolText.ServerInstructions + ToolText.RunInstructions : ToolText.ServerInstructions,
+            ServerInstructions = ToolText.ServerInstructions
+                + (vaults.Several ? ToolText.VaultsInstructions : string.Empty)
+                + (options.AllowRun ? ToolText.RunInstructions : string.Empty),
             Capabilities = new ServerCapabilities { Tools = new ToolsCapability() },
             ToolCollection = [],
         };
@@ -105,30 +107,28 @@ public static class BridgeEntry
         // Registered explicitly rather than by scanning the assembly: these are the whole
         // surface, and run another only when the person started this bridge with --allow-run, so
         // no existing configuration gains command execution on upgrade.
-        var names = new ApproverEntryNameSource(approver, options);
-        serverOptions.ToolCollection.Add(new ListEntryNamesTool(names, options, audit));
-        serverOptions.ToolCollection.Add(new FindAccessTool(names, options, audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit, attachments: true));
-        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, approver, audit));
+        serverOptions.ToolCollection.Add(new ListEntryNamesTool(vaults, options, audit));
+        serverOptions.ToolCollection.Add(new FindAccessTool(vaults, options, audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, vaults, audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, vaults, audit, attachments: true));
+        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, vaults, audit));
 
         // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one (F.79).
-        serverOptions.ToolCollection.Add(new SaveValueTool(options, approver, audit));
+        serverOptions.ToolCollection.Add(new SaveValueTool(options, vaults, audit));
 
         // Offered to every agent: each change is asked about every time and made only once the person allows it (T-57).
-        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, approver, audit));
+        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, vaults, audit));
 
         if (options.AllowRun)
         {
             // Every child of this process is a run's, so orphans a run leaves behind can be found.
             CapturedLaunch.AdoptOrphans();
-            serverOptions.ToolCollection.Add(new RunTool(options, approver, audit));
+            serverOptions.ToolCollection.Add(new RunTool(options, vaults, audit));
         }
 
         await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
         await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);
-        approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
-        approver.Exposure = options.Exposure.Globs;
+        vaults.Describe(() => McpAudit.AttachIdentity(server.ClientInfo, options), options.Exposure.Globs);
 
         // The server waits for the calls in flight once the client closes standard input, so a call
         // still waiting for the owner is withdrawn then, as one the client gives up on is.

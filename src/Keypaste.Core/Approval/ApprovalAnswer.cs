@@ -46,7 +46,4 @@ public enum ApprovalAnswer
 
     /// <summary>A human allowed this request and confirmed that this agent always gets this item's field, or the item they picked, without asking.</summary>
     AlwaysAllowed = 9,
-
-    /// <summary>A human refused this request and confirmed that this agent is always refused this item's field without asking.</summary>
-    AlwaysBlocked = 10,
 }

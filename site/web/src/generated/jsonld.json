@@ -1014,10 +1014,10 @@
         "@type": "TechArticle",
         "@id": "https://keypaste.com/products/organizations/#article",
         "headline": "Organizations",
-        "description": "Single sign-on, SCIM, approval for production changes and audit export.",
+        "description": "Work vaults the company owns, hand-over when access is revoked, single sign-on, SCIM, production approvals and audit export.",
         "url": "https://keypaste.com/products/organizations/",
         "mainEntityOfPage": "https://keypaste.com/products/organizations/",
-        "dateModified": "2026-11-13T02:24:44.223Z",
+        "dateModified": "2026-11-17",
         "isPartOf": {
           "@type": "WebSite",
           "name": "keypaste",

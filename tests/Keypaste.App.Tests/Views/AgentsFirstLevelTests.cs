@@ -10,7 +10,6 @@ using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -190,7 +189,7 @@ public sealed class AgentsFirstLevelTests
         agents.Clock.Advance(TimeSpan.FromMinutes(1));
         await waiting.WaitAsync(_wait, Token);
 
-        File.WriteAllText(KeypasteHome.AgentsPath(agents.Fixture.Home), "[[rules]]\npassword = \"sometimes\"\n");
+        agents.Fixture.WriteRules("[[rules]]\npassword = \"sometimes\"\n");
         agents.Settle();
         Assert.True(agents.Model.HasClientsProblem, "agents.toml was read");
         look(agents.Window);

@@ -165,6 +165,27 @@ public sealed class ApprovalGateTests
     /// shows every prompt, which is the storm it was meant to prevent (THREATS.md T-11).
     /// </summary>
     [Fact]
+    public async Task TwoGatesSharingTurns_PutOnePromptInFrontOfThePersonAtATime()
+    {
+        var turns = new PromptTurns();
+        var personal = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
+        var acme = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
+        var clock = new ManualClock();
+        using var personalGate = new ApprovalGate(personal, clock, ApprovalLimits.Default, turns);
+        using var acmeGate = new ApprovalGate(acme, clock, ApprovalLimits.Default, turns);
+
+        var first = personalGate.AskAsync("a", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await personal.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(ApprovalAnswer.Busy, await acmeGate.AskAsync("b", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(0, acme.Asked);
+
+        personal.Release();
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await first);
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await acmeGate.AskAsync("b", Prompt(), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued()
     {
         var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };

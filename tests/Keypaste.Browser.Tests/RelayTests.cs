@@ -12,7 +12,7 @@ namespace Keypaste.Browser.Tests;
 
 /// <summary>
 /// The relay as KeePassXC-Browser meets it, with a fake owner on a real pipe behind it: framing and its bound, the key exchange
-/// and the nonces, the errors it answers itself, what reaches the owner, and the lock signals (D-0625 to D-0628).
+/// and the nonces, the errors it answers itself, what reaches the owner, and the lock signals.
 /// </summary>
 public sealed class RelayTests
 {
@@ -133,7 +133,7 @@ public sealed class RelayTests
 
     /// <summary>
     /// A request under a nonce the session used, its own or a reply's, or whose reply would come under one, is refused before it
-    /// is opened, since a box key is the same both ways and its answer would reuse a nonce under it (D-0625).
+    /// is opened, since a box key is the same both ways and its answer would reuse a nonce under it.
     /// </summary>
     [Fact]
     public async Task A_nonce_the_session_used_is_refused_with_error_4_and_reaches_no_owner()
@@ -272,7 +272,7 @@ public sealed class RelayTests
     {
         await using var rig = await RelayRig.KeyedAsync(owner: false);
         using var heard = new SemaphoreSlim(0);
-        using var app = LockedAppEndpoint.Listen(rig.Options.LockedAppName!, () => heard.Release(), _ => { });
+        using var app = LockedAppEndpoint.Listen(rig.LockedAppName, () => heard.Release(), _ => { });
 
         var quiet = await rig.Browser.RequestAsync("get-databasehash", null, Token);
         Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the relay knocked when the extension had not asked to unlock");
@@ -282,6 +282,68 @@ public sealed class RelayTests
         Assert.Equal("1", quiet.ErrorCode);
         Assert.Equal("1", asking.ErrorCode);
         Assert.Equal("Database not opened", (string?)asking.Reply["error"]);
+        Assert.True(await heard.WaitAsync(_wait, Token), "the locked app was not told");
+        Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the locked app was told twice");
+    }
+
+    /// <summary>
+    /// One owner answers for every vault unlocked in its process, so with the first vault locked the relay reaches another's
+    /// owner and the list it gets names the locked vault rather than saying keypaste is locked.
+    /// </summary>
+    [Fact]
+    public async Task With_the_first_vault_locked_the_list_comes_from_another_vaults_owner_and_names_the_locked_one()
+    {
+        await using var rig = await RelayRig.KeyedAsync(owner: true, "Acme");
+        rig.Owner.Session = null;
+        var acme = rig.Others["Acme"];
+        acme.Session = "session-acme";
+        acme.ListReply = new BrowserListReply(BrowserOutcome.Done, string.Empty)
+        {
+            Site = "github.com",
+            Names = [new BrowserLoginName("0123456789abcdef0123456789abcdef", "GitHub", "ada") { Vault = "Acme" }],
+            LockedVaults = ["vault"],
+        };
+        var key = Key();
+        await CheckAsync(rig, key);
+
+        var list = await rig.Browser.RequestAsync("get-logins", new JsonObject { ["url"] = "https://github.com/login" }, Token);
+
+        Assert.Null(list.ErrorCode);
+        Assert.Equal("Acme", (string?)Assert.Single(list.Message!["entries"]!.AsArray())!["vault"]);
+        Assert.Equal("vault", (string?)list.Message["lockedVaults"]![0]);
+        Assert.Equal(
+            new BrowserListRequest(_pairing, key, "https://github.com/login") { Vault = rig.Options.Vaults[1].Path, Session = "session-acme" },
+            Assert.IsType<BrowserListRequest>(acme.Asked[^1]));
+        Assert.Empty(rig.Owner.Asked);
+    }
+
+    [Fact]
+    public async Task With_the_first_vault_unlocked_no_other_vaults_owner_is_asked()
+    {
+        await using var rig = await RelayRig.KeyedAsync(owner: true, "Acme");
+        var key = Key();
+        await CheckAsync(rig, key);
+
+        await rig.Browser.RequestAsync("get-logins", new JsonObject { ["url"] = "https://github.com/login" }, Token);
+
+        Assert.IsType<BrowserListRequest>(rig.Owner.Asked[^1]);
+        Assert.Empty(rig.Others["Acme"].Heard);
+    }
+
+    [Fact]
+    public async Task With_every_vault_locked_a_request_is_answered_as_not_open_and_knocks_the_first_vaults_app_once()
+    {
+        await using var rig = await RelayRig.KeyedAsync(owner: true, "Acme");
+        rig.Owner.Session = null;
+        rig.Others["Acme"].Session = null;
+        using var heard = new SemaphoreSlim(0);
+        using var app = LockedAppEndpoint.Listen(rig.LockedAppName, () => heard.Release(), _ => { });
+
+        var asking = await rig.Browser.RequestAsync("get-databasehash", null, ExtensionClient.NewNonce(), triggerUnlock: true, Token);
+
+        Assert.Equal("1", asking.ErrorCode);
+        Assert.Single(rig.Owner.Heard);
+        Assert.Single(rig.Others["Acme"].Heard);
         Assert.True(await heard.WaitAsync(_wait, Token), "the locked app was not told");
         Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the locked app was told twice");
     }
@@ -307,12 +369,12 @@ public sealed class RelayTests
 
         Assert.Equal("2", hash.ErrorCode);
         var attached = Assert.IsType<AttachRequest>(Assert.Single(rig.Owner.Heard));
-        Assert.Equal(new AttachRequest(rig.Options.VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, attached);
+        Assert.Equal(new AttachRequest(rig.VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, attached);
     }
 
     /// <summary>
     /// The hash the owner tells the attachment answers <c>get-databasehash</c> sealed, and comes with each pairing and check, as
-    /// KeePassXC's answers carry it, so the extension keeps keypaste's pairing in a slot of its own (D-0636).
+    /// KeePassXC's answers carry it, so the extension keeps keypaste's pairing in a slot of its own.
     /// </summary>
     [Fact]
     public async Task The_hash_the_owner_tells_answers_get_databasehash_and_comes_with_each_pairing_and_check()
@@ -344,7 +406,7 @@ public sealed class RelayTests
 
         Assert.Equal("8", strangers.ErrorCode);
         Assert.Equal(_pairing, (string?)paired.Message!["id"]);
-        Assert.Equal(new BrowserPairRequest(identificationKey) { Vault = rig.Options.VaultPath, Session = "session-one" }, Assert.Single(rig.Owner.Asked));
+        Assert.Equal(new BrowserPairRequest(identificationKey) { Vault = rig.VaultPath, Session = "session-one" }, Assert.Single(rig.Owner.Asked));
     }
 
     [Fact]
@@ -360,20 +422,22 @@ public sealed class RelayTests
 
     /// <summary>
     /// The extension sends every pairing it holds with each request for logins, KeePassXC's among them; only the one the last
-    /// check proved reaches the owner, whatever the request names (D-0625).
+    /// check proved reaches the owner, whatever the request names. The list it gets back carries names and an empty password.
     /// </summary>
     [Fact]
-    public async Task After_a_check_a_fill_sends_the_owner_that_pairing_alone_and_seals_its_logins()
+    public async Task After_a_check_a_list_sends_the_owner_that_pairing_alone_and_seals_names_with_no_password()
     {
         await using var rig = await RelayRig.KeyedAsync();
-        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Done, string.Empty)
+        rig.Owner.ListReply = new BrowserListReply(BrowserOutcome.Done, string.Empty)
         {
-            Logins = [new BrowserLogin("ada", "correct horse battery staple", "GitHub", "0123456789abcdef0123456789abcdef")],
+            Site = "github.com",
+            Names = [new BrowserLoginName("0123456789abcdef0123456789abcdef", "GitHub", "ada") { Vault = "Personal" }],
+            LockedVaults = ["Acme"],
         };
         var key = Key();
         var check = await CheckAsync(rig, key);
 
-        var fill = await rig.Browser.RequestAsync(
+        var list = await rig.Browser.RequestAsync(
             "get-logins",
             new JsonObject
             {
@@ -388,44 +452,85 @@ public sealed class RelayTests
 
         Assert.Equal(_pairing, (string?)check.Message!["id"]);
         Assert.Equal(
-            new BrowserFillRequest(_pairing, key, "https://github.com/login")
-            {
-                SubmitUrl = "https://github.com/session",
-                Vault = rig.Options.VaultPath,
-                Session = "session-one",
-            },
-            Assert.IsType<BrowserFillRequest>(rig.Owner.Asked[^1]));
-        Assert.Equal(2, rig.Owner.Asked.Count);
+            new BrowserListRequest(_pairing, key, "https://github.com/login") { SubmitUrl = "https://github.com/session", Vault = rig.VaultPath, Session = "session-one" },
+            Assert.IsType<BrowserListRequest>(rig.Owner.Asked[^1]));
 
-        var message = fill.Message;
+        var message = list.Message;
         Assert.NotNull(message);
         Assert.Equal(1, (int)message["count"]!);
-        Assert.Equal(_pairing, (string?)message["id"]);
+        Assert.Equal("github.com", (string?)message["site"]);
+        Assert.Equal(["Acme"], message["lockedVaults"]!.AsArray().Select(vault => (string?)vault));
         var entry = Assert.Single(message["entries"]!.AsArray())!.AsObject();
-        Assert.Equal(new[] { "login", "name", "password", "uuid" }, entry.Select(member => member.Key).Order(StringComparer.Ordinal));
-        Assert.Equal("ada", (string?)entry["login"]);
-        Assert.Equal("correct horse battery staple", (string?)entry["password"]);
-        Assert.DoesNotContain("correct horse", fill.Reply.ToJsonString(), StringComparison.Ordinal);
+        Assert.Equal(new[] { "login", "name", "password", "uuid", "vault" }, entry.Select(member => member.Key).Order(StringComparer.Ordinal));
+        Assert.Equal(("ada", "GitHub", string.Empty, "Personal"), ((string?)entry["login"], (string?)entry["name"], (string?)entry["password"], (string?)entry["vault"]));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task A_fill_tells_the_owner_whether_the_extension_says_the_person_asked(bool triggerUnlock)
+    [Fact]
+    public async Task An_empty_list_is_an_answer_that_still_names_the_locked_vaults()
     {
         await using var rig = await RelayRig.KeyedAsync();
-        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Done, string.Empty);
+        rig.Owner.ListReply = new BrowserListReply(BrowserOutcome.Done, string.Empty) { Site = "github.com", LockedVaults = ["Acme"] };
         var key = Key();
         await CheckAsync(rig, key);
 
-        await rig.Browser.RequestAsync(
-            "get-logins",
-            new JsonObject { ["url"] = "https://github.com/login", ["keys"] = new JsonArray(new JsonObject { ["id"] = _pairing, ["key"] = key }) },
-            ExtensionClient.NewNonce(),
-            triggerUnlock,
-            Token);
+        var list = await rig.Browser.RequestAsync("get-logins", new JsonObject { ["url"] = "https://github.com/login" }, Token);
 
-        Assert.Equal(triggerUnlock, Assert.IsType<BrowserFillRequest>(rig.Owner.Asked[^1]).PersonAsked);
+        Assert.Null(list.ErrorCode);
+        Assert.Empty(list.Message!["entries"]!.AsArray());
+        Assert.Equal("Acme", (string?)list.Message["lockedVaults"]![0]);
+    }
+
+    [Fact]
+    public async Task A_pick_sends_the_owner_the_item_under_the_proven_pairing_and_seals_its_one_login()
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Done, string.Empty)
+        {
+            Logins = [new BrowserLogin("ada", "correct horse battery staple", "GitHub", "0123456789abcdef0123456789abcdef")],
+        };
+        var key = Key();
+        await CheckAsync(rig, key);
+
+        var pick = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login", ["uuid"] = "0123456789abcdef0123456789abcdef" }, Token);
+
+        Assert.Equal(
+            new BrowserReleaseRequest(_pairing, key, "https://github.com/login", "0123456789abcdef0123456789abcdef") { Vault = rig.VaultPath, Session = "session-one" },
+            Assert.IsType<BrowserReleaseRequest>(rig.Owner.Asked[^1]));
+        var entry = Assert.Single(pick.Message!["entries"]!.AsArray())!.AsObject();
+        Assert.Equal(new[] { "login", "name", "password", "uuid" }, entry.Select(member => member.Key).Order(StringComparer.Ordinal));
+        Assert.Equal("correct horse battery staple", (string?)entry["password"]);
+        Assert.DoesNotContain("correct horse", pick.Reply.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pick_the_person_refused_is_error_6_and_one_with_no_item_reaches_no_owner()
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Refused, "a person refused to fill this login here");
+        await CheckAsync(rig, Key());
+
+        var refused = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login", ["uuid"] = "0123456789abcdef0123456789abcdef" }, Token);
+        var asked = rig.Owner.Asked.Count;
+        var noItem = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login" }, Token);
+
+        Assert.Equal("6", refused.ErrorCode);
+        Assert.Equal("15", noItem.ErrorCode);
+        Assert.Equal(asked, rig.Owner.Asked.Count);
+    }
+
+    [Theory]
+    [InlineData("open", BrowserShow.Open, "", "")]
+    [InlineData("new-login", BrowserShow.NewLogin, "Acme", "https://github.com/login?next=/")]
+    [InlineData("unlock", BrowserShow.Unlock, "Acme", "")]
+    public async Task Open_keypaste_asks_the_owner_to_show_what_the_person_pressed(string what, BrowserShow shown, string vault, string url)
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        await CheckAsync(rig, Key());
+
+        var answer = await rig.Browser.RequestAsync("open-keypaste", new JsonObject { ["what"] = what, ["vault"] = vault, ["url"] = url }, Token);
+
+        Assert.NotNull(answer.Message);
+        Assert.Equal(new BrowserShowRequest(shown) { VaultName = vault, Url = url, Vault = rig.VaultPath, Session = "session-one" }, Assert.IsType<BrowserShowRequest>(rig.Owner.Asked[^1]));
     }
 
     [Fact]
@@ -475,7 +580,7 @@ public sealed class RelayTests
         var answer = await rig.Browser.RequestAsync("lock-database", null, Token);
 
         Assert.NotNull(answer.Message);
-        Assert.Equal(new BrowserLockRequest { Vault = rig.Options.VaultPath, Session = "session-one" }, Assert.Single(rig.Owner.Asked));
+        Assert.Equal(new BrowserLockRequest { Vault = rig.VaultPath, Session = "session-one" }, Assert.Single(rig.Owner.Asked));
     }
 
     [Fact]

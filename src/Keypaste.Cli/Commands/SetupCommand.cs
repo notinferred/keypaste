@@ -453,7 +453,7 @@ internal static class SetupCommand
     private static void WriteHeader(CliContext context, McpServerRegistration registration, string? note, string? chosen)
     {
         context.Stdout.WriteLine($"keypaste mcp   {registration.Server.Path}");
-        context.Stdout.WriteLine(registration.VaultPath is { } pinned
+        context.Stdout.WriteLine(registration.VaultPaths is [var pinned]
             ? $"vault          {pinned}"
             : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the tool's configuration names none)");
 
@@ -477,13 +477,13 @@ internal static class SetupCommand
             context.Stdout.WriteLine(note);
         }
 
-        if (registration.VaultPath is null && chosen is null)
+        if (registration.VaultPaths.Count == 0 && chosen is null)
         {
             context.Stderr.WriteLine(
                 "keypaste: no vault is chosen yet. Wiring it anyway; open your vault in the keypaste app "
                 + "or run `keypaste use <path>` before an agent asks.");
         }
-        else if ((registration.VaultPath ?? chosen) is { } vault && !File.Exists(vault))
+        else if ((registration.VaultPaths is [var only] ? only : chosen) is { } vault && !File.Exists(vault))
         {
             context.Stderr.WriteLine(
                 $"keypaste: there is no vault at {vault} yet. Wiring it anyway; "
@@ -499,7 +499,7 @@ internal static class SetupCommand
         context.Stdout.WriteLine("Nothing is allowed yet. keypaste mcp holds no vault and decides nothing.");
         context.Stdout.WriteLine("Unlock the vault in the keypaste app, or start the process that decides in a terminal:");
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste approve --vault {pinned}" : "  keypaste approve");
+        context.Stdout.WriteLine(registration.VaultPaths is [var pinned] ? $"  keypaste approve --vault {pinned}" : "  keypaste approve");
     }
 
     private static void Line(CliContext context, string id, string text) => context.Stdout.WriteLine(Formatted(id, text));

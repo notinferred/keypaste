@@ -14,6 +14,8 @@ keepass.serverPublicKey = '';
 
 const kpActions = {
     GET_LOGINS: 'get-logins',
+    GET_LOGIN: 'get-login',
+    OPEN_KEYPASTE: 'open-keypaste',
     ASSOCIATE: 'associate',
     TEST_ASSOCIATE: 'test-associate',
     GET_DATABASE_HASH: 'get-databasehash',
@@ -31,58 +33,92 @@ browser.storage.local.get({ 'keyRing': {} }).then((item) => {
 // Commands
 //--------------------------------------------------------------------------
 
-keepass.retrieveCredentials = async function(tab, args = []) {
+// Sends one request and keeps its error code, which tells keypaste being locked from a refusal.
+keepass.ask = async function(kpAction, tab, messageData, triggerUnlock = false) {
+    const nonce = keepassClient.getNonce();
+    const request = keepassClient.buildRequest(kpAction, keepassClient.encrypt(messageData, nonce), nonce, keepass.clientID, triggerUnlock);
+    const response = await keepassClient.sendNativeMessage(request, false);
+    const message = keepassClient.handleResponse(response, keepassClient.incrementedNonce(nonce), tab);
+    return { message, errorCode: response?.errorCode };
+};
+
+// The names of a page's logins: keypaste sends each with an empty password, which never reaches the page.
+keepass.listLogins = async function(tab, args = []) {
     try {
-        const [ url, submiturl, triggerUnlock = false ] = args;
-        const taResponse = await keepass.testAssociation(tab, [ false, triggerUnlock ]);
-        if (!taResponse) {
-            browserAction.showDefault(tab);
-            return [];
+        const [ url, submitUrl ] = args;
+        const associated = await keepass.testAssociation(tab, [ false, false ]);
+        if (!associated || !keepass.isConnected) {
+            return { state: !keepass.isKeypasteAvailable ? 'disconnected' : keepass.isDatabaseClosed ? 'locked' : 'unpaired' };
         }
 
         keepass.clearErrorMessage(tab);
-
-        if (!keepass.isConnected) {
-            return [];
-        }
-
-        let entries = [];
-        const kpAction = kpActions.GET_LOGINS;
-        const nonce = keepassClient.getNonce();
         const [ dbid ] = keepass.getCryptoKey();
+        const messageData = { action: kpActions.GET_LOGINS, id: dbid, url: url, keys: keepass.getCryptoKeys() };
+        if (submitUrl) {
+            messageData.submitUrl = submitUrl;
+        }
 
-        const messageData = {
-            action: kpAction,
-            id: dbid,
-            url: url,
-            keys: keepass.getCryptoKeys()
+        const { message, errorCode } = await keepass.ask(kpActions.GET_LOGINS, tab, messageData);
+        if (!message) {
+            return { state: errorCode === String(kpErrors.DATABASE_NOT_OPENED) ? 'locked' : 'refused' };
+        }
+
+        keepass.updateLastUsed(keepass.databaseHash);
+        return {
+            state: 'unlocked',
+            entries: removeDuplicateEntries(message.entries ?? []).map(entry => ({ login: entry.login, name: entry.name, uuid: entry.uuid, vault: entry.vault ?? '' })),
+            lockedVaults: message.lockedVaults ?? [],
+            site: message.site ?? '',
+            warning: message.warning ?? '',
         };
-
-        if (submiturl) {
-            messageData.submitUrl = submiturl;
-        }
-
-        // triggerUnlock marks a request the person made, which keypaste may ask them about; a page's own load asks nobody.
-        const response = await keepassClient.sendMessage(kpAction, tab, messageData, nonce, false, triggerUnlock);
-        if (response) {
-            entries = removeDuplicateEntries(response.entries);
-            keepass.updateLastUsed(keepass.databaseHash);
-
-            if (entries.length === 0) {
-                // Questionmark-icon is not triggered, so we have to trigger for the normal symbol
-                browserAction.showDefault(tab);
-            }
-
-            logDebug(`Found ${entries.length} entries for url ${url}`);
-            return entries;
-        }
-
-        browserAction.showDefault(tab);
-        return [];
     } catch (err) {
-        logError(`retrieveCredentials failed: ${err}`);
-        return [];
+        logError(`listLogins failed: ${err}`);
+        return { state: 'refused' };
     }
+};
+
+// The one login the person picked, which keypaste fills at once on a site it filled before and otherwise asks about first.
+keepass.getLogin = async function(tab, args = []) {
+    try {
+        const [ url, submitUrl, uuid ] = args;
+        const [ dbid ] = keepass.getCryptoKey();
+        const messageData = { action: kpActions.GET_LOGIN, id: dbid, url: url, uuid: uuid, keys: keepass.getCryptoKeys() };
+        if (submitUrl) {
+            messageData.submitUrl = submitUrl;
+        }
+
+        const { message, errorCode } = await keepass.ask(kpActions.GET_LOGIN, tab, messageData);
+        const entry = message?.entries?.[0];
+        if (entry?.uuid === uuid) {
+            return { login: entry.login, password: entry.password, name: entry.name, uuid: entry.uuid };
+        }
+
+        return { locked: errorCode === String(kpErrors.DATABASE_NOT_OPENED) };
+    } catch (err) {
+        logError(`getLogin failed: ${err}`);
+        return {};
+    }
+};
+
+// Brings keypaste forward for what the person pressed in the list: open, unlock with the locked vault's name, or new-login with the site's vault and the page it is for.
+keepass.openKeypaste = async function(tab, args = []) {
+    const [ what, vault = '' ] = args;
+    const url = what === 'new-login' ? tab?.url ?? '' : '';
+    const { message } = await keepass.ask(kpActions.OPEN_KEYPASTE, tab, { action: kpActions.OPEN_KEYPASTE, what: what, vault: vault, url: url });
+    return Boolean(message);
+};
+
+// keypaste's six digits for an identification key: the first four bytes of its SHA-256, big-endian, modulo a million.
+keepass.pairingCode = async function(publicKey) {
+    const hash = new DataView(await crypto.subtle.digest('SHA-256', publicKey));
+    const digits = String(hash.getUint32(0) % 1000000).padStart(6, '0');
+    return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+};
+
+// Makes the identification key the next associate sends, so the popup can show its code while keypaste asks.
+keepass.beginPairing = async function() {
+    keepass.pendingIdKeyPair = nacl.box.keyPair();
+    return { code: await keepass.pairingCode(keepass.pendingIdKeyPair.publicKey) };
 };
 
 keepass.associate = async function(tab) {
@@ -106,7 +142,8 @@ keepass.associate = async function(tab) {
         const kpAction = kpActions.ASSOCIATE;
         const key = nacl.util.encodeBase64(keepass.keyPair.publicKey);
         const nonce = keepassClient.getNonce();
-        const idKeyPair = nacl.box.keyPair();
+        const idKeyPair = keepass.pendingIdKeyPair ?? nacl.box.keyPair();
+        keepass.pendingIdKeyPair = null;
         const idKey = nacl.util.encodeBase64(idKeyPair.publicKey);
 
         const messageData = {

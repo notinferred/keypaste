@@ -79,6 +79,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Action? cancelled = null,
         ClipboardCountdown? clipboard = null,
         IWebLauncher? web = null,
+        IReadOnlyList<string>? accountVaults = null,
         params string[] listed) =>
         new(
             Unlocked(home ?? DefaultHome),
@@ -98,7 +99,8 @@ public sealed class ConnectClientViewModelTests : IDisposable
             ran,
             cancelled,
             clipboard,
-            web);
+            web,
+            accountVaults);
 
     private static Func<McpBridgeTargetResult> Serving(McpServerCommand server) =>
         () => new McpBridgeTargetResult(new McpBridgeTarget(server, Link: null, Note: null), Error: null);
@@ -117,7 +119,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     private McpServerRegistration Expected(string label) =>
-        Registration(_server, new McpServerPins(_fixture.Path_, null, null), label);
+        Registration(_server, new McpServerPins([_fixture.Path_], null, null), label);
 
     private static McpServerRegistration Registration(McpServerCommand server, McpServerPins pins, string label)
     {
@@ -155,18 +157,81 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Connecting_the_chosen_vault_names_no_vault_so_the_client_follows_the_choice()
+    public async Task Connecting_the_chosen_vault_names_it_so_the_tool_keeps_reaching_only_it()
     {
         Assert.Equal(Core.Settings.ChooseOutcome.Chosen, Core.Settings.ChosenVault.Choose(DefaultHome, _fixture.Path_, onlyIfNone: false));
         using var model = Model();
 
         await model.PreviewAsync();
 
-        Assert.Equal(Plan("claude-code", Registration(_server, McpServerPins.None, "claude-code")), model.Preview);
-        Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
+        Assert.Equal(Plan("claude-code", Expected("claude-code")), model.Preview);
 
         await model.ConfirmCommand.PressAsync();
-        Assert.DoesNotContain(_runner.Changes, change => change.Contains("--vault", StringComparison.Ordinal));
+        Assert.Contains(_runner.Changes, change => change.Contains("--vault", StringComparison.Ordinal));
+    }
+
+    /// <summary>The vault in view is chosen by default; each other vault the account holds can be chosen too, and each chosen is pinned.</summary>
+    [Fact]
+    public async Task Connect_offers_the_accounts_other_vaults_and_writes_each_one_chosen()
+    {
+        var acme = Path.Combine(_fixture.Home, "Acme.kdbx");
+        using var model = Model(accountVaults: [_fixture.Path_, acme]);
+
+        await model.PreviewAsync();
+
+        Assert.True(model.ChoosesVaults);
+        Assert.Equal([(_fixture.Path_, true), (acme, false)], model.Vaults.Select(vault => (vault.Path, vault.IsChosen)));
+        Assert.Equal(Plan("claude-code", Expected("claude-code")), model.Preview);
+
+        model.Vaults[1].IsChosen = true;
+        await model.Choosing;
+
+        Assert.Equal(Plan("claude-code", Registration(_server, new McpServerPins([_fixture.Path_, acme], null, null), "claude-code")), model.Preview);
+
+        await model.ConfirmCommand.PressAsync();
+
+        Assert.Equal([_fixture.Path_, acme], model.Registered!.VaultPaths);
+        Assert.Contains($"--vault {_fixture.Path_} --vault {acme} --client-label", _runner.Changes[^1], StringComparison.Ordinal);
+        Assert.StartsWith("Connected. Claude Code starts keypaste mcp for these vaults;", model.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_no_vault_chosen_nothing_is_offered_to_run()
+    {
+        using var model = Model(accountVaults: [_fixture.Path_, Path.Combine(_fixture.Home, "Acme.kdbx")]);
+        await model.PreviewAsync();
+
+        model.Vaults[0].IsChosen = false;
+        await model.Choosing;
+
+        Assert.False(model.HasPreview);
+        Assert.False(model.ConfirmCommand.CanExecute(null));
+        Assert.Equal("Choose a vault Claude Code may reach.", model.Message);
+    }
+
+    /// <summary>Several vaults' pipes are named by keypaste's home, which a tool may start the bridge without, so another home connects one.</summary>
+    [Fact]
+    public async Task Under_another_home_several_vaults_are_refused_and_one_is_offered()
+    {
+        using var model = Model(home: _fixture.Home, accountVaults: [_fixture.Path_, Path.Combine(_fixture.Home, "Acme.kdbx")]);
+        await model.PreviewAsync();
+
+        model.Vaults[1].IsChosen = true;
+        await model.Choosing;
+
+        Assert.False(model.HasPreview);
+        Assert.Equal("Claude Code can reach several vaults only while keypaste uses its usual home and pipes. Choose one vault.", model.Message);
+    }
+
+    [Fact]
+    public async Task With_one_vault_in_the_account_no_choice_is_offered()
+    {
+        using var model = Model(accountVaults: [_fixture.Path_]);
+
+        await model.PreviewAsync();
+
+        Assert.False(model.ChoosesVaults);
+        Assert.Single(model.Vaults);
     }
 
     [Fact]
@@ -210,7 +275,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.PreviewAsync();
 
         var pins = new McpServerPins(
-            _fixture.Path_,
+            [_fixture.Path_],
             Core.Audit.KeypasteHome.AuditPath(_fixture.Home),
             Core.Ipc.ApproverEndpoint.Resolve(null, null, session.Identity));
         Assert.Equal(Plan("claude-code", Registration(_server, pins, "claude-code")), model.Preview);
@@ -218,15 +283,14 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task A_set_approver_alone_pins_only_the_approver()
+    public async Task A_set_approver_is_pinned_beside_the_vault()
     {
         Assert.Equal(Core.Settings.ChooseOutcome.Chosen, Core.Settings.ChosenVault.Choose(DefaultHome, _fixture.Path_, onlyIfNone: false));
         using var model = Model(approver: "keypaste-connect-test");
 
         await model.PreviewAsync();
 
-        Assert.Equal(Plan("claude-code", Registration(_server, McpServerPins.None with { ApproverName = "keypaste-connect-test" }, "claude-code")), model.Preview);
-        Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
+        Assert.Equal(Plan("claude-code", Registration(_server, new McpServerPins([_fixture.Path_], AuditLogPath: null, "keypaste-connect-test"), "claude-code")), model.Preview);
         Assert.DoesNotContain("--audit-log", model.Preview, StringComparison.Ordinal);
     }
 
@@ -548,7 +612,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         var server = new McpServerCommand(link.LinkPath, [McpServerLocator.BridgeArgument]);
         Assert.Equal(
-            $"create {link.LinkPath}, a script that starts {_image} cli\n" + Plan("claude-code", Registration(server, new McpServerPins(_fixture.Path_, null, null), "claude-code")),
+            $"create {link.LinkPath}, a script that starts {_image} cli\n" + Plan("claude-code", Registration(server, new McpServerPins([_fixture.Path_], null, null), "claude-code")),
             model.Preview);
         Assert.Contains($"It first creates {link.LinkPath}, which starts this AppImage.", model.PreviewNote, StringComparison.Ordinal);
         Assert.Equal(0, link.Links);

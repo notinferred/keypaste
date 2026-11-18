@@ -60,7 +60,7 @@
             </Grid>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
               <TextBlock Classes="caption" TextWrapping="Wrap" ctl:MachineRuns.InText="True"
-                         Text="{x:Static res:Strings.ReadProjectEnvironmentKEYOrForTheX9b0d4d}" />
+                         Text="{x:Static res:Strings.ReadProjectStageKeyOrStarForTheWholeSet}" />
               <Button Grid.Column="1" Name="LearnMoreScopes" Classes="link" VerticalAlignment="Top" Content="{x:Static res:Strings.LearnMore}"
                       AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutTokenScopes}">
                 <Button.Flyout>
@@ -74,7 +74,7 @@
                         <TextBlock Classes="mono size-12" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKeyExample}" />
                         <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeOfOneKey}" />
                       </StackPanel>
-                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeNamesNoProtectedEnvironmentHere}" />
+                      <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ScopeNamesNoProtectedStageHere}" />
                     </StackPanel>
                   </Flyout>
                 </Button.Flyout>

@@ -462,7 +462,9 @@ public static partial class ApproverProtocol
                 EditKind => ApproverMessageKind.Edit,
                 BrowserPairKind => ApproverMessageKind.BrowserPair,
                 BrowserCheckKind => ApproverMessageKind.BrowserCheck,
-                BrowserFillKind => ApproverMessageKind.BrowserFill,
+                BrowserListKind => ApproverMessageKind.BrowserList,
+                BrowserReleaseKind => ApproverMessageKind.BrowserRelease,
+                BrowserShowKind => ApproverMessageKind.BrowserShow,
                 BrowserLockKind => ApproverMessageKind.BrowserLock,
                 SaveKind => ApproverMessageKind.Save,
                 ItemChangeKind => ApproverMessageKind.ItemChange,
@@ -758,7 +760,7 @@ public static partial class ApproverProtocol
             // Optional so an older owner still attaches; bounded so a version cannot outgrow a line.
             var ownerVersion = Optional(root, "owner_version");
 
-            // A hash is a SHA-256 in lowercase hex, and only an attachment carries one (D-0636).
+            // A hash is a SHA-256 in lowercase hex, and only an attachment carries one.
             var databaseHash = Optional(root, "database_hash");
 
             if (refused == session is { Length: > 0 }

@@ -50,6 +50,9 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     /// <summary>The name as the pane draws it.</summary>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
 
+    /// <summary>Whether the name reads as a variable, GITHUB_TOKEN, which the row sets in the monospace; Region stays words.</summary>
+    internal bool IsVariableName => Name.Length > 0 && char.IsAsciiLetterUpper(Name[0]) && Name.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_') && Name.Any(c => c == '_' || char.IsAsciiDigit(c));
+
     internal bool IsProtected { get; }
 
     /// <summary>Whether keypaste leaves the field to KeePassXC.</summary>

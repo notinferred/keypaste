@@ -8,7 +8,7 @@ public sealed class AgentRulesFileTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-agent-rules-").FullName;
 
-    private AgentRulesFile File => new(Path.Combine(_directory, "agents.toml"));
+    private AgentRulesFile File => new(Path.Combine(_directory, "agents.toml"), Path.Combine(_directory, "agents.id"));
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
@@ -82,6 +82,24 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.True(read.AllowsFill("work laptop", paired, "https://github.com:443", "0123456789abcdef0123456789abcdef"));
         Assert.False(read.AllowsFill("work laptop", paired.AddSeconds(1), "https://github.com:443", "0123456789abcdef0123456789abcdef"));
         Assert.False(read.AllowsFill("work laptop", paired, "https://gist.github.com:443", "0123456789abcdef0123456789abcdef"));
+    }
+
+    [Fact]
+    public void A_fill_kept_past_the_most_forgets_the_oldest_so_its_next_fill_is_asked()
+    {
+        var rules = AgentRules.Defaults;
+
+        for (var site = 0; site <= AgentRules.MaximumBrowserAllowances; site++)
+        {
+            rules = rules.AllowingFill(new BrowserAllowance("laptop", DateTimeOffset.UnixEpoch, $"https://site{site}.example:443", "0123456789abcdef0123456789abcdef"));
+        }
+
+        Assert.Equal(AgentRules.MaximumBrowserAllowances, rules.BrowserAllowances.Count);
+        Assert.False(rules.AllowsFill("laptop", DateTimeOffset.UnixEpoch, "https://site0.example:443", "0123456789abcdef0123456789abcdef"));
+        Assert.True(rules.AllowsFill("laptop", DateTimeOffset.UnixEpoch, $"https://site{AgentRules.MaximumBrowserAllowances}.example:443", "0123456789abcdef0123456789abcdef"));
+        Assert.True(File.TryWrite(rules, seal: null, out var problem), problem);
+        Assert.True(File.TryRead(out var read, out problem), problem);
+        Assert.Equal(AgentRules.MaximumBrowserAllowances, read.BrowserAllowances.Count);
     }
 
     [Fact]

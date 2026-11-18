@@ -43,7 +43,8 @@ internal sealed class TempVault : IDisposable
     /// <param name="agents">The agents' names.</param>
     internal static void Sees(Vault vault, params string[] agents)
     {
-        var file = new AgentRulesFile(Core.Audit.KeypasteHome.AgentsPath(System.IO.Path.GetDirectoryName(vault.Path)));
+        var home = System.IO.Path.GetDirectoryName(vault.Path)!;
+        var file = AgentRulesFile.For(home, Core.Ownership.VaultIdentity.Of(home, vault.Path));
         var sealer = new SealedAgentRules(file, () => vault, edit =>
         {
             edit(vault);
@@ -55,6 +56,15 @@ internal sealed class TempVault : IDisposable
         {
             throw new InvalidOperationException(problem);
         }
+    }
+
+    /// <summary>Writes this vault's agent rules file in the fixture's home as a program other than keypaste would.</summary>
+    /// <param name="text">What the file holds.</param>
+    internal void WriteRules(string text)
+    {
+        var path = AgentRulesFile.For(Home, Core.Ownership.VaultIdentity.Of(Home, Path_)).Path;
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
     }
 
     /// <summary>Turns run on for agents beside this fixture's vault, before anything unlocks it.</summary>

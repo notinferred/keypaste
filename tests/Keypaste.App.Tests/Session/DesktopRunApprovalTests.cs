@@ -34,16 +34,16 @@ public sealed class DesktopRunApprovalTests
             var reply = app.AskRun();
             var window = Assert.IsType<RunApprovalWindow>(await app.PromptAsync());
 
-            Assert.Equal($"{DesktopApprovalTests.Label} wants 1 secret", Text(window, "TitleText"));
-            Assert.StartsWith("via MCP · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.Equal("Let claude-code run this command?", Text(window, "TitleText"));
             Assert.Equal("dev", Text(window, "ProfileText"));
-            Assert.Equal("tool: keypaste.run", Text(window, "ToolText"));
+            Assert.Equal("keypaste.run", Text(window, "ToolText"));
             Assert.Equal("deploy --to staging", Text(window, "CommandText"));
-            Assert.StartsWith("runs ", Text(window, "ProgramText"), StringComparison.Ordinal);
-            Assert.Contains("the command itself can read the values", Text(window, "ExplainerText"), StringComparison.Ordinal);
+            Assert.False(string.IsNullOrEmpty(Text(window, "ProgramText")));
+            Assert.Contains("The command can read these values", Text(window, "ConsequenceText"), StringComparison.Ordinal);
             Assert.Equal(TextWrapping.Wrap, window.FindControl<TextBlock>("CommandText")!.TextWrapping);
             Assert.Equal(TextTrimming.None, window.FindControl<TextBlock>("CommandText")!.TextTrimming);
-            Assert.Equal("Allow once", window.FindControl<Button>("AllowOnce")!.Content);
+            Assert.Equal("Run once", window.FindControl<Button>("AllowOnce")!.Content);
+            Assert.Null(window.FindControl<Button>("AlwaysAllow"));
 
             Click(window, "Deny");
             Assert.Equal(EnvOutcome.Declined, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
@@ -104,13 +104,9 @@ public sealed class DesktopRunApprovalTests
             hostile.Close();
         });
 
-    /// <summary>
-    /// The environment has a fixed row of its own, so the longest name one can have is drawn whole on one
-    /// line and moves nothing, while a directory long enough to fill the header, shown whole in the call
-    /// box, is what gets trimmed there.
-    /// </summary>
+    /// <summary>The longest stage is drawn whole on one line beside a directory that wraps, and moves nothing.</summary>
     [Fact]
-    public Task The_longest_environment_is_drawn_whole_on_its_own_row_and_moves_nothing() =>
+    public Task The_longest_stage_is_drawn_whole_and_moves_nothing() =>
         HeadlessSession.On(() =>
         {
             var longest = new string('w', EnvProfileNames.MaximumLength - 3) + "-eu";
@@ -120,8 +116,7 @@ public sealed class DesktopRunApprovalTests
 
             Assert.Equal(longest, Drawn(window, "ProfileText"));
             Assert.Single(window.FindControl<TextBlock>("ProfileText")!.TextLayout.TextLines);
-            Assert.StartsWith("via MCP · /home/", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
-            Assert.EndsWith("…", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.Equal(TextTrimming.None, window.FindControl<TextBlock>("DirectoryText")!.TextTrimming);
             Assert.Equal(ordinaryLayout, layout);
 
             ordinary.Close();
@@ -161,15 +156,30 @@ public sealed class DesktopRunApprovalTests
         [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "AllowOnce")];
 
     [Fact]
-    public Task EnterOnOpen_Denies() =>
+    public Task Return_runs_once_only_after_arming() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskRun();
             var window = await app.PromptAsync();
-            await app.ArmAsync();
 
             Key(window, PhysicalKey.Enter);
+            await Task.Delay(100, Token);
+            Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
+
+            await app.ArmAsync();
+            Key(window, PhysicalKey.Enter);
+            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+        });
+
+    [Fact]
+    public Task Escape_denies_the_run() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskRun();
+            var window = await app.PromptAsync();
+            Key(window, PhysicalKey.Escape);
 
             var answered = await reply.WaitAsync(_wait, Token);
             Assert.Equal(EnvOutcome.Declined, answered?.Set.Outcome);

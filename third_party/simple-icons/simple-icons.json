@@ -1,0 +1,634 @@
+[
+  {
+    "title": "Airbnb",
+    "slug": "airbnb",
+    "hex": "FF5A5F",
+    "source": "https://www.airbnb.com"
+  },
+  {
+    "title": "Anthropic",
+    "slug": "anthropic",
+    "hex": "191919",
+    "source": "https://www.anthropic.com"
+  },
+  {
+    "title": "Apple",
+    "slug": "apple",
+    "hex": "000000",
+    "source": "https://www.apple.com"
+  },
+  {
+    "title": "Asana",
+    "slug": "asana",
+    "hex": "F06A6A",
+    "source": "https://asana.com/brand",
+    "guidelines": "https://asana.com/brand"
+  },
+  {
+    "title": "Atlassian",
+    "slug": "atlassian",
+    "hex": "0052CC",
+    "source": "https://atlassian.design/resources/logo-library",
+    "guidelines": "https://atlassian.design/foundations/logos"
+  },
+  {
+    "title": "Auth0",
+    "slug": "auth0",
+    "hex": "EB5424",
+    "source": "https://auth0.com"
+  },
+  {
+    "title": "Backblaze",
+    "slug": "backblaze",
+    "hex": "E21E29",
+    "source": "https://www.backblaze.com/company/news.html",
+    "guidelines": "https://www.backblaze.com/company/news.html"
+  },
+  {
+    "title": "Bitbucket",
+    "slug": "bitbucket",
+    "hex": "0052CC",
+    "source": "https://atlassian.design/resources/logo-library",
+    "guidelines": "https://atlassian.design/foundations/logos"
+  },
+  {
+    "title": "Bluesky",
+    "slug": "bluesky",
+    "hex": "1185FE",
+    "source": "https://bsky.social/about/blog/press-faq",
+    "guidelines": "https://bsky.social/about/blog/press-faq",
+    "aliases": {
+      "aka": [
+        "bsky"
+      ]
+    }
+  },
+  {
+    "title": "Cash App",
+    "slug": "cashapp",
+    "hex": "00C244",
+    "source": "https://cash.app/press"
+  },
+  {
+    "title": "CircleCI",
+    "slug": "circleci",
+    "hex": "343434",
+    "source": "https://circleci.com/press"
+  },
+  {
+    "title": "Claude",
+    "slug": "claude",
+    "hex": "D97757",
+    "source": "https://claude.ai"
+  },
+  {
+    "title": "Cloudflare",
+    "slug": "cloudflare",
+    "hex": "F38020",
+    "source": "https://www.cloudflare.com/logo/",
+    "guidelines": "https://www.cloudflare.com/trademark/"
+  },
+  {
+    "title": "Coinbase",
+    "slug": "coinbase",
+    "hex": "0052FF",
+    "source": "https://www.coinbase.com/press"
+  },
+  {
+    "title": "Datadog",
+    "slug": "datadog",
+    "hex": "632CA6",
+    "source": "https://www.datadoghq.com/about/resources",
+    "guidelines": "https://www.datadoghq.com/about/resources/"
+  },
+  {
+    "title": "DigitalOcean",
+    "slug": "digitalocean",
+    "hex": "0080FF",
+    "source": "https://www.digitalocean.com/press/",
+    "guidelines": "https://www.digitalocean.com/press/"
+  },
+  {
+    "title": "Discord",
+    "slug": "discord",
+    "hex": "5865F2",
+    "source": "https://discord.com/branding",
+    "guidelines": "https://discord.com/branding"
+  },
+  {
+    "title": "Docker",
+    "slug": "docker",
+    "hex": "2496ED",
+    "source": "https://www.docker.com/company/newsroom/media-resources"
+  },
+  {
+    "title": "Dropbox",
+    "slug": "dropbox",
+    "hex": "0061FF",
+    "source": "https://www.dropbox.com/branding"
+  },
+  {
+    "title": "DuckDuckGo",
+    "slug": "duckduckgo",
+    "hex": "DE5833",
+    "source": "https://github.com/duckduckgo/duckduckgo-privacy-extension/blob/5c6ac8d6a07421adbfb97ee2ff855dd7655f8d71/shared/img/logo-small-grayscale.svg",
+    "guidelines": "https://duckduckgo.com/press#press-materials"
+  },
+  {
+    "title": "eBay",
+    "slug": "ebay",
+    "hex": "E53238",
+    "source": "https://go.developer.ebay.com/logos"
+  },
+  {
+    "title": "Epic Games",
+    "slug": "epicgames",
+    "hex": "313131",
+    "source": "https://dev.epicgames.com/docs/services/en-US/EpicAccountServices/DesignGuidelines/index.html#epicgamesbrandguidelines",
+    "guidelines": "https://dev.epicgames.com/docs/services/en-US/EpicAccountServices/DesignGuidelines/index.html#epicgamesbrandguidelines"
+  },
+  {
+    "title": "Etsy",
+    "slug": "etsy",
+    "hex": "F16521",
+    "source": "https://www.etsy.com/uk/press"
+  },
+  {
+    "title": "Facebook",
+    "slug": "facebook",
+    "hex": "0866FF",
+    "source": "https://about.meta.com/brand/resources/facebook/logo",
+    "guidelines": "https://about.meta.com/brand/resources/facebook/logo"
+  },
+  {
+    "title": "Figma",
+    "slug": "figma",
+    "hex": "F24E1E",
+    "source": "https://www.figma.com/using-the-figma-brand/",
+    "guidelines": "https://www.figma.com/using-the-figma-brand/"
+  },
+  {
+    "title": "Firebase",
+    "slug": "firebase",
+    "hex": "DD2C00",
+    "source": "https://firebase.google.com/brand-guidelines",
+    "guidelines": "https://firebase.google.com/brand-guidelines"
+  },
+  {
+    "title": "Fly.io",
+    "slug": "flydotio",
+    "hex": "24175B",
+    "source": "https://fly.io/docs/about/brand",
+    "guidelines": "https://fly.io/docs/about/brand"
+  },
+  {
+    "title": "GitHub",
+    "slug": "github",
+    "hex": "181717",
+    "source": "https://github.com/logos",
+    "guidelines": "https://github.com/logos"
+  },
+  {
+    "title": "GitLab",
+    "slug": "gitlab",
+    "hex": "FC6D26",
+    "source": "https://about.gitlab.com/press/press-kit/",
+    "guidelines": "https://about.gitlab.com/handbook/marketing/corporate-marketing/brand-activation/trademark-guidelines/"
+  },
+  {
+    "title": "Gmail",
+    "slug": "gmail",
+    "hex": "EA4335",
+    "source": "https://fonts.gstatic.com/s/i/productlogos/gmail_2020q4/v8/192px.svg"
+  },
+  {
+    "title": "GoDaddy",
+    "slug": "godaddy",
+    "hex": "1BDBDB",
+    "source": "https://aboutus.godaddy.net/newsroom/media-resources/",
+    "guidelines": "https://aboutus.godaddy.net/newsroom/media-resources/"
+  },
+  {
+    "title": "Google",
+    "slug": "google",
+    "hex": "4285F4",
+    "source": "https://partnermarketinghub.withgoogle.com",
+    "guidelines": "https://about.google/brand-resource-center/brand-elements/",
+    "aliases": {
+      "loc": {
+        "ko-KR": "구글"
+      }
+    }
+  },
+  {
+    "title": "Grafana",
+    "slug": "grafana",
+    "hex": "F46800",
+    "source": "https://grafana.com"
+  },
+  {
+    "title": "HashiCorp",
+    "slug": "hashicorp",
+    "hex": "000000",
+    "source": "https://www.hashicorp.com",
+    "guidelines": "https://www.hashicorp.com/brand"
+  },
+  {
+    "title": "Hetzner",
+    "slug": "hetzner",
+    "hex": "D50C2D",
+    "source": "https://www.hetzner.com"
+  },
+  {
+    "title": "HubSpot",
+    "slug": "hubspot",
+    "hex": "FF7A59",
+    "source": "https://www.hubspot.com/style-guide",
+    "guidelines": "https://www.hubspot.com/style-guide"
+  },
+  {
+    "title": "iCloud",
+    "slug": "icloud",
+    "hex": "3693F3",
+    "source": "https://commons.wikimedia.org/wiki/File:ICloud_logo.svg"
+  },
+  {
+    "title": "Instagram",
+    "slug": "instagram",
+    "hex": "FF0069",
+    "source": "https://about.meta.com/brand/resources/instagram",
+    "guidelines": "https://about.meta.com/brand/resources/instagram"
+  },
+  {
+    "title": "Linear",
+    "slug": "linear",
+    "hex": "5E6AD2",
+    "source": "https://linear.app"
+  },
+  {
+    "title": "MailChimp",
+    "slug": "mailchimp",
+    "hex": "FFE01B",
+    "source": "https://mailchimp.com/about/brand-assets",
+    "guidelines": "https://mailchimp.com/about/brand-assets"
+  },
+  {
+    "title": "Mailgun",
+    "slug": "mailgun",
+    "hex": "F06B66",
+    "source": "https://mailgun.com"
+  },
+  {
+    "title": "Mastodon",
+    "slug": "mastodon",
+    "hex": "6364FF",
+    "source": "https://github.com/mastodon/mastodon/blob/7ccf7a73f1c47a8c03712c39f7c591e837cf6d08/app/javascript/images/logo-symbol-icon.svg",
+    "guidelines": "https://joinmastodon.org/branding"
+  },
+  {
+    "title": "Medium",
+    "slug": "medium",
+    "hex": "000000",
+    "source": "https://medium.design/logos-and-brand-guidelines-f1a01a733592",
+    "guidelines": "https://medium.design/logos-and-brand-guidelines-f1a01a733592"
+  },
+  {
+    "title": "Miro",
+    "slug": "miro",
+    "hex": "050038",
+    "source": "https://miro.com"
+  },
+  {
+    "title": "MongoDB",
+    "slug": "mongodb",
+    "hex": "47A248",
+    "source": "https://www.mongodb.com/pressroom"
+  },
+  {
+    "title": "Namecheap",
+    "slug": "namecheap",
+    "hex": "DE3723",
+    "source": "https://www.namecheap.com"
+  },
+  {
+    "title": "Neon",
+    "slug": "neon",
+    "hex": "34D59A",
+    "source": "https://neon.com/brand",
+    "guidelines": "https://neon.com/brand"
+  },
+  {
+    "title": "Netflix",
+    "slug": "netflix",
+    "hex": "E50914",
+    "source": "https://brand.netflix.com/en/assets/logos",
+    "guidelines": "https://brand.netflix.com/en/assets/logos"
+  },
+  {
+    "title": "Netlify",
+    "slug": "netlify",
+    "hex": "00C7B7",
+    "source": "https://www.netlify.com/press/",
+    "guidelines": "https://www.netlify.com/press/",
+    "aliases": {
+      "dup": [
+        {
+          "title": "Netlify CMS",
+          "hex": "C9FA4B",
+          "source": "https://www.netlifycms.org"
+        }
+      ]
+    }
+  },
+  {
+    "title": "Notion",
+    "slug": "notion",
+    "hex": "000000",
+    "source": "https://www.notion.so"
+  },
+  {
+    "title": "npm",
+    "slug": "npm",
+    "hex": "CB3837",
+    "source": "https://www.npmjs.com",
+    "guidelines": "https://docs.npmjs.com/policies/logos-and-usage"
+  },
+  {
+    "title": "Okta",
+    "slug": "okta",
+    "hex": "007DC1",
+    "source": "https://www.okta.com/press-room/media-assets/",
+    "guidelines": "https://www.okta.com/terms-of-use-for-okta-content/"
+  },
+  {
+    "title": "OVH",
+    "slug": "ovh",
+    "hex": "123F6D",
+    "source": "https://www.ovh.com/ca/en/newsroom/"
+  },
+  {
+    "title": "PagerDuty",
+    "slug": "pagerduty",
+    "hex": "06AC38",
+    "source": "https://www.pagerduty.com/brand/",
+    "guidelines": "https://www.pagerduty.com/brand/"
+  },
+  {
+    "title": "Patreon",
+    "slug": "patreon",
+    "hex": "000000",
+    "source": "https://www.patreon.com/brand",
+    "guidelines": "https://www.patreon.com/brand"
+  },
+  {
+    "title": "PayPal",
+    "slug": "paypal",
+    "hex": "002991",
+    "source": "https://www.paypal.com/us",
+    "guidelines": "https://newsroom.paypal-corp.com/media-resources"
+  },
+  {
+    "title": "Pinterest",
+    "slug": "pinterest",
+    "hex": "BD081C",
+    "source": "https://business.pinterest.com/en/brand-guidelines",
+    "guidelines": "https://business.pinterest.com/en/brand-guidelines"
+  },
+  {
+    "title": "PlanetScale",
+    "slug": "planetscale",
+    "hex": "000000",
+    "source": "https://planetscale.com"
+  },
+  {
+    "title": "PlayStation",
+    "slug": "playstation",
+    "hex": "0070D1",
+    "source": "https://www.playstation.com/en-us/"
+  },
+  {
+    "title": "PostgreSQL",
+    "slug": "postgresql",
+    "hex": "4169E1",
+    "source": "https://wiki.postgresql.org/wiki/Logo",
+    "guidelines": "https://www.postgresql.org/about/policies/trademarks/"
+  },
+  {
+    "title": "Proton",
+    "slug": "proton",
+    "hex": "6D4AFF",
+    "source": "https://proton.me/media/kit"
+  },
+  {
+    "title": "Railway",
+    "slug": "railway",
+    "hex": "0B0D0E",
+    "source": "https://railway.app"
+  },
+  {
+    "title": "Reddit",
+    "slug": "reddit",
+    "hex": "FF4500",
+    "source": "https://www.redditinc.com/brand",
+    "guidelines": "https://www.redditinc.com/brand"
+  },
+  {
+    "title": "Redis",
+    "slug": "redis",
+    "hex": "FF4438",
+    "source": "https://redis.io/brand-guidelines",
+    "guidelines": "https://redis.io/brand-guidelines"
+  },
+  {
+    "title": "Render",
+    "slug": "render",
+    "hex": "000000",
+    "source": "https://render.com"
+  },
+  {
+    "title": "Resend",
+    "slug": "resend",
+    "hex": "000000",
+    "source": "https://resend.com/brand",
+    "guidelines": "https://resend.com/brand"
+  },
+  {
+    "title": "Revolut",
+    "slug": "revolut",
+    "hex": "191C1F",
+    "source": "https://developer.revolut.com/docs/resources/marketing-assets-guidelines/marketing-guidelines"
+  },
+  {
+    "title": "Sentry",
+    "slug": "sentry",
+    "hex": "362D59",
+    "source": "https://sentry.io/branding/"
+  },
+  {
+    "title": "Shopify",
+    "slug": "shopify",
+    "hex": "7AB55C",
+    "source": "https://www.shopify.com/brand-assets",
+    "guidelines": "https://www.shopify.com/brand-assets"
+  },
+  {
+    "title": "Signal",
+    "slug": "signal",
+    "hex": "3B45FD",
+    "source": "https://signal.org/brand",
+    "guidelines": "https://signal.org/brand"
+  },
+  {
+    "title": "Spotify",
+    "slug": "spotify",
+    "hex": "1ED760",
+    "source": "https://developer.spotify.com/documentation/general/design-and-branding/#using-our-logo",
+    "guidelines": "https://developer.spotify.com/documentation/general/design-and-branding/#using-our-logo"
+  },
+  {
+    "title": "Steam",
+    "slug": "steam",
+    "hex": "000000",
+    "source": "https://partner.steamgames.com/doc/marketing/branding",
+    "guidelines": "https://partner.steamgames.com/doc/marketing/branding"
+  },
+  {
+    "title": "Stripe",
+    "slug": "stripe",
+    "hex": "635BFF",
+    "source": "https://stripe.com/newsroom/information"
+  },
+  {
+    "title": "Substack",
+    "slug": "substack",
+    "hex": "FF6719",
+    "source": "https://on.substack.com"
+  },
+  {
+    "title": "Supabase",
+    "slug": "supabase",
+    "hex": "3FCF8E",
+    "source": "https://github.com/supabase/supabase/blob/4031a7549f5d46da7bc79c01d56be4177dc7c114/packages/common/assets/images/supabase-logo-wordmark--light.svg"
+  },
+  {
+    "title": "Tailscale",
+    "slug": "tailscale",
+    "hex": "242424",
+    "source": "https://tailscale.com/press"
+  },
+  {
+    "title": "Telegram",
+    "slug": "telegram",
+    "hex": "26A5E4",
+    "source": "https://telegram.org/tour/screenshots"
+  },
+  {
+    "title": "Terraform",
+    "slug": "terraform",
+    "hex": "844FBA",
+    "source": "https://www.hashicorp.com/brand",
+    "guidelines": "https://www.hashicorp.com/brand"
+  },
+  {
+    "title": "TikTok",
+    "slug": "tiktok",
+    "hex": "000000",
+    "source": "https://tiktok.com"
+  },
+  {
+    "title": "Trello",
+    "slug": "trello",
+    "hex": "0052CC",
+    "source": "https://atlassian.design/resources/logo-library",
+    "guidelines": "https://atlassian.design/foundations/logos"
+  },
+  {
+    "title": "Twitch",
+    "slug": "twitch",
+    "hex": "9146FF",
+    "source": "https://brand.twitch.tv",
+    "guidelines": "https://brand.twitch.tv"
+  },
+  {
+    "title": "Uber",
+    "slug": "uber",
+    "hex": "000000",
+    "source": "https://assets.uber.com/d/k4nuxdZ8MC7E/logos/collection/151",
+    "guidelines": "https://assets.uber.com/d/k4nuxdZ8MC7E/user-guide#/user-guide/terms-of-use"
+  },
+  {
+    "title": "Venmo",
+    "slug": "venmo",
+    "hex": "008CFF",
+    "source": "https://venmo.com/about/brand",
+    "guidelines": "https://venmo.com/about/brand"
+  },
+  {
+    "title": "Vercel",
+    "slug": "vercel",
+    "hex": "000000",
+    "source": "https://vercel.com/geist/brands",
+    "guidelines": "https://vercel.com/geist/brands"
+  },
+  {
+    "title": "Vultr",
+    "slug": "vultr",
+    "hex": "007BFC",
+    "source": "https://www.vultr.com/company/brand-assets",
+    "guidelines": "https://www.vultr.com/company/brand-assets"
+  },
+  {
+    "title": "WhatsApp",
+    "slug": "whatsapp",
+    "hex": "25D366",
+    "source": "https://about.meta.com/brand/resources/whatsapp/whatsapp-brand",
+    "guidelines": "https://about.meta.com/brand/resources/whatsapp/whatsapp-brand"
+  },
+  {
+    "title": "Wise",
+    "slug": "wise",
+    "hex": "9FE870",
+    "source": "https://wise.design/foundations/logo",
+    "guidelines": "https://wise.design/foundations/logo"
+  },
+  {
+    "title": "WordPress",
+    "slug": "wordpress",
+    "hex": "21759B",
+    "source": "https://wordpress.org/about/logos",
+    "guidelines": "https://wordpressfoundation.org/trademark-policy"
+  },
+  {
+    "title": "X",
+    "slug": "x",
+    "hex": "000000",
+    "source": "https://x.com",
+    "guidelines": "https://about.x.com/en/who-we-are/brand-toolkit",
+    "aliases": {
+      "aka": [
+        "Twitter"
+      ]
+    }
+  },
+  {
+    "title": "YouTube",
+    "slug": "youtube",
+    "hex": "FF0000",
+    "source": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors",
+    "guidelines": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors"
+  },
+  {
+    "title": "Zapier",
+    "slug": "zapier",
+    "hex": "FF4F00",
+    "source": "https://www.figma.com/file/NQFxTCE5pGR3dHZt0DkOyy/Zapier-Brand-Guidelines-%5BExternal%5D?type=design&node-id=101-9701&mode=design",
+    "guidelines": "https://www.figma.com/file/NQFxTCE5pGR3dHZt0DkOyy/Zapier-Brand-Guidelines-%5BExternal%5D?type=design&node-id=101-9701&mode=design"
+  },
+  {
+    "title": "Zoom",
+    "slug": "zoom",
+    "hex": "0B5CFF",
+    "source": "https://brand.zoom.us/media-library/",
+    "guidelines": "https://brand.zoom.us/usage-legal/"
+  }
+]

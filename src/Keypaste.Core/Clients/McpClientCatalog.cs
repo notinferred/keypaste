@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Nodes;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.Core.Clients;
 
@@ -90,6 +91,19 @@ public sealed record McpClient(
     /// <summary>For a client configured by file, its app bundle, which the macOS app looks for in <c>/Applications</c> and <c>~/Applications</c>.</summary>
     public string? MacApp { get; init; }
 
+    /// <summary>
+    /// The file names, without <c>.exe</c> and ignoring case, of the client's programs that start the bridge themselves; a
+    /// trailing <c>*</c> matches any ending. Beside <see cref="MacApp"/> and <see cref="ProgramFolders"/>, what a prompt's
+    /// Verified checks the bridge's parent against (<see cref="Approval.RequesterIdentity"/>).
+    /// </summary>
+    public IReadOnlyList<string> Programs { get; init; } = [];
+
+    /// <summary>The npm packages the client is installed as, whose script Node or Bun runs as the client (npm, pnpm and Bun all keep it under <c>node_modules/&lt;package&gt;/</c>).</summary>
+    public IReadOnlyList<string> Packages { get; init; } = [];
+
+    /// <summary>Folders, written with <c>/</c>, that only the client's own program runs from, such as one named by its version.</summary>
+    public IReadOnlyList<string> ProgramFolders { get; init; } = [];
+
     /// <summary>What the client expands in a server's command and arguments on every platform, so a registration holding it would start something else.</summary>
     public IReadOnlyList<string> Expands { get; init; } = [];
 
@@ -156,15 +170,26 @@ public sealed record McpClient(
 public sealed record McpServerCommand(string Path, IReadOnlyList<string> Arguments);
 
 /// <summary>What a registration fixes with the bridge's own flags rather than leaving to the environment it starts in.</summary>
-/// <param name="VaultPath">
-/// The vault for <c>--vault</c>, or null so the bridge uses the vault the person chose (D-0389).
+/// <param name="VaultPaths">
+/// The vaults for <c>--vault</c>, one flag each, which the tool may reach through one bridge; none so the bridge uses the
+/// vault the person chose (D-0389).
 /// </param>
 /// <param name="AuditLogPath">The log for <c>--audit-log</c>, or null for the one under the bridge's own home.</param>
-/// <param name="ApproverName">The pipe for <c>--approver</c>, or null for the one the bridge derives.</param>
-public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, string? ApproverName)
+/// <param name="ApproverName">The pipe for <c>--approver</c>, or null for the one the bridge derives; only with one vault.</param>
+public sealed record McpServerPins(IReadOnlyList<string> VaultPaths, string? AuditLogPath, string? ApproverName)
 {
     /// <summary>Nothing pinned: the bridge follows the chosen vault, under the home it resolves.</summary>
-    public static McpServerPins None { get; } = new(VaultPath: null, AuditLogPath: null, ApproverName: null);
+    public static McpServerPins None { get; } = new(VaultPaths: [], AuditLogPath: null, ApproverName: null);
+
+    /// <summary>Whether the two pin the same vaults, in order, the same log and the same pipe.</summary>
+    public bool Equals(McpServerPins? other) =>
+        other is not null
+        && VaultPaths.SequenceEqual(other.VaultPaths, StringComparer.Ordinal)
+        && string.Equals(AuditLogPath, other.AuditLogPath, StringComparison.Ordinal)
+        && string.Equals(ApproverName, other.ApproverName, StringComparison.Ordinal);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(VaultPaths.Count, AuditLogPath, ApproverName);
 }
 
 /// <summary>
@@ -176,14 +201,14 @@ public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, stri
 /// request: by default each value is asked about and nothing runs.
 /// </remarks>
 /// <param name="Server">How to start <c>keypaste mcp</c>.</param>
-/// <param name="VaultPath">The absolute vault the bridge is pinned to with <c>--vault</c>, or null for none.</param>
+/// <param name="VaultPaths">The absolute vaults the bridge is pinned to, each with a <c>--vault</c> of its own; none for none.</param>
 /// <param name="AuditLogPath">The absolute log the bridge is pinned to with <c>--audit-log</c>, or null for none.</param>
 /// <param name="ApproverName">The pipe the bridge is pinned to with <c>--approver</c>, or null for none.</param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">The globs the bridge may name through: <see cref="WideExposure"/>, or the narrower ones the person gave.</param>
 public sealed record McpServerRegistration(
     McpServerCommand Server,
-    string? VaultPath,
+    IReadOnlyList<string> VaultPaths,
     string? AuditLogPath,
     string? ApproverName,
     string ClientLabel,
@@ -238,9 +263,22 @@ public sealed record McpServerRegistration(
             return false;
         }
 
+        // The bridge refuses one pipe for several vaults, since it is one owner's.
+        if (pins.ApproverName is not null && pins.VaultPaths.Count > 1)
+        {
+            error = "approver: it names one vault's owner, so it goes with one vault";
+            return false;
+        }
+
+        if (pins.VaultPaths.Count > LocalAccount.MaximumVaults)
+        {
+            error = $"at most {LocalAccount.MaximumVaults} vaults";
+            return false;
+        }
+
         registration = new McpServerRegistration(
             server,
-            Absolute(pins.VaultPath),
+            [.. pins.VaultPaths.Where(path => path.Length > 0).Select(System.IO.Path.GetFullPath).Distinct(StringComparer.Ordinal)],
             Absolute(pins.AuditLogPath),
             pins.ApproverName,
             clientLabel,
@@ -254,10 +292,10 @@ public sealed record McpServerRegistration(
     {
         List<string> line = [Server.Path, .. Server.Arguments];
 
-        if (VaultPath is not null)
+        foreach (var vault in VaultPaths)
         {
             line.Add("--vault");
-            line.Add(VaultPath);
+            line.Add(vault);
         }
 
         if (AuditLogPath is not null)
@@ -326,6 +364,10 @@ public static class McpClientCatalog
             // The native installer, then the Homebrew cask (code.claude.com/docs/en/setup).
             InstallFolders = ["~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"],
             Configuration = McpConfigLocation.ClaudeCode,
+            // The native installer names each version's program by its number.
+            Programs = ["claude"],
+            ProgramFolders = ["/.local/share/claude/versions/"],
+            Packages = ["@anthropic-ai/claude-code"],
             Scope = ["--scope", "user"],
             AddOptions = ["--transport", "stdio"],
             Expands = ["${"],
@@ -335,12 +377,16 @@ public static class McpClientCatalog
             // The standalone installer, then the Homebrew cask and npm under Homebrew's or nodejs.org's Node (github.com/openai/codex).
             InstallFolders = ["~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"],
             Configuration = McpConfigLocation.Codex,
+            // npm's package starts a program named for its target, such as codex-aarch64-apple-darwin.
+            Programs = ["codex", "codex-*"],
         },
         new("gemini-cli", "Gemini CLI", McpWiring.OwnCli, "gemini")
         {
             // npm under Homebrew's or nodejs.org's Node and Homebrew, then MacPorts (github.com/google-gemini/gemini-cli).
             InstallFolders = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"],
             Configuration = McpConfigLocation.GeminiCli,
+            Programs = ["gemini"],
+            Packages = ["@google/gemini-cli"],
             Scope = ["--scope", "user"],
             ProgramBeforeSeparator = true,
             Expands = ["$"],
@@ -352,6 +398,7 @@ public static class McpClientCatalog
             // Its install script, then the Homebrew cask devin-cli (docs.devin.ai).
             InstallFolders = ["~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"],
             Configuration = McpConfigLocation.Devin,
+            Programs = ["devin"],
             Scope = ["-s", "user"],
             Expands = ["${"],
         },
@@ -361,6 +408,7 @@ public static class McpClientCatalog
             TypedEntry = true,
             Launcher = "code",
             MacApp = "Visual Studio Code.app",
+            Programs = ["code"],
             Expands = ["${"],
             InstallLink = McpInstallLinkFormat.VsCode,
         },
@@ -369,6 +417,7 @@ public static class McpClientCatalog
             Configuration = McpConfigLocation.Cursor,
             Launcher = "cursor",
             MacApp = "Cursor.app",
+            Programs = ["cursor"],
             Expands = ["${"],
             ReadsAtLaunch = true,
             InstallLink = McpInstallLinkFormat.Cursor,
@@ -378,6 +427,7 @@ public static class McpClientCatalog
             Platforms = McpClientPlatforms.Windows | McpClientPlatforms.MacOS,
             Configuration = McpConfigLocation.ClaudeDesktop,
             MacApp = "Claude.app",
+            Programs = ["claude"],
             ReadsAtLaunch = true,
         },
     ];

@@ -152,7 +152,7 @@ public sealed class TokenStore(Vault vault)
 
         if (!allowProd && scopes.FirstOrDefault(scope => scope.IsProtected) is { } protectedScope)
         {
-            error = $"{protectedScope} names a protected environment; --allow-prod lets the token ask you live for it, every time";
+            error = $"{protectedScope} names a protected stage; --allow-prod lets the token ask you live for it, every time";
             return false;
         }
 

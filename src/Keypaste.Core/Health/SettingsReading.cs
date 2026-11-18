@@ -24,7 +24,8 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
         (string Name, string Path, Func<string, string, HealthFinding?> Check)[] files =
         [
             (KeypasteHome.SettingsFileName, KeypasteHome.SettingsPath(home), AppToml),
-            (KeypasteHome.AgentsFileName, KeypasteHome.AgentsPath(home), AgentsToml),
+            (KeypasteHome.AgentsFileName, KeypasteHome.SharedAgentsPath(home), SharedAgentsToml),
+            .. VaultRules(home),
             (KeypasteHome.RecentFileName, KeypasteHome.RecentPath(home), RecentToml),
             (KeypasteHome.ProjectsFileName, KeypasteHome.ProjectsPath(home), ProjectsJson),
             (KeypasteHome.RecommendationsFileName, KeypasteHome.RecommendationsPath(home), RecommendationsJson),
@@ -72,9 +73,44 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
         return Unparsed(name, problem, path, fix);
     }
 
-    private static HealthFinding? AgentsToml(string name, string path)
+    /// <summary>Each vault's rules in the home, by name.</summary>
+    private static IEnumerable<(string Name, string Path, Func<string, string, HealthFinding?> Check)> VaultRules(string? home)
     {
-        if (new AgentRulesFile(path).TryRead(out _, out var problem))
+        var directory = KeypasteHome.AgentsDirectory(home);
+        string[] files;
+
+        try
+        {
+            files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.toml") : [];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            files = [];
+        }
+
+        return files
+            .Order(StringComparer.Ordinal)
+            .Select(path => (
+                $"{KeypasteHome.AgentsDirectoryName}/{System.IO.Path.GetFileName(path)}",
+                path,
+                (Func<string, string, HealthFinding?>)((name, file) => AgentsToml(name, file, home))));
+    }
+
+    /// <summary>The home's earlier shared rules, which move to the vault whose key sealed them at its next unlock, so only one that does not parse is worth a line.</summary>
+    private static HealthFinding? SharedAgentsToml(string name, string path)
+    {
+        if (new AgentRulesFile(path, KeypasteHome.HomeIdPath(System.IO.Path.GetDirectoryName(path))).TryRead(out _, out var problem))
+        {
+            return null;
+        }
+
+        var said = problem.StartsWith(path + ": ", StringComparison.Ordinal) ? problem[(path.Length + 2)..] : problem;
+        return Unparsed(name, $"{said}; no vault takes its rules, so every vault asks about every value", path, "delete it; each vault keeps its own rules now");
+    }
+
+    private static HealthFinding? AgentsToml(string name, string path, string? home)
+    {
+        if (new AgentRulesFile(path, KeypasteHome.HomeIdPath(home)).TryRead(out _, out var problem))
         {
             return null;
         }
@@ -100,7 +136,7 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
             : Unparsed(name, "could not be read", path, "delete it; recommendations you dismissed show again");
 
     private static HealthFinding? RetiredPolicy(string name, string path) =>
-        new(HealthArea.Settings, name, HealthStatus.Note, "keypaste no longer reads it; agents' rules are kept in agents.toml") { Where = path };
+        new(HealthArea.Settings, name, HealthStatus.Note, "keypaste no longer reads it; each vault's agent rules are kept in agents/") { Where = path };
 
     private static HealthFinding Unparsed(string name, string says, string path, string fix) =>
         new(HealthArea.Settings, name, HealthStatus.Fix, says) { Where = path, Fix = fix };

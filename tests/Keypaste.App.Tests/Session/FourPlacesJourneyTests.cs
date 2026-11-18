@@ -1,11 +1,9 @@
 using System.Text;
-using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
@@ -93,10 +91,17 @@ public sealed class FourPlacesJourneyTests
             var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);
             DrawnFrame.Capture(main);
 
-            // The sidebar lists the four places, the vault's group tree under Items and the project
-            // under its heading, and there is one search.
-            Assert.Equal(["Items", "Groups", "Work", "env", "Projects", "billing", "Recommendations", "Agents"], Names(Named<ListBox>(main, "Nav")));
-            Assert.Equal(["Trash", "Settings"], Names(Named<ListBox>(main, "FooterNav")));
+            // The rail lists the four places and Access for later; the sidebar the one vault's places, with no account around them, and there is one search.
+            var rail = Names(Named<ListBox>(main, "RailNav"));
+            Assert.Equal("Items", rail[0]);
+            Assert.StartsWith("Agents", rail[1], StringComparison.Ordinal);
+            Assert.StartsWith("Security", rail[2], StringComparison.Ordinal);
+            Assert.Equal(["Access, later", "Settings"], rail[3..]);
+            var sidebar = Names(Named<ListBox>(main, "Nav"));
+            Assert.Equal(["Favorites", "All items"], sidebar[..2]);
+            Assert.DoesNotContain(AccountSection.LocalTitle, sidebar);
+            Assert.Contains("Environments", sidebar);
+            Assert.Equal(["Trash", "Groups"], sidebar[^2..]);
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
             Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
 
@@ -107,33 +112,31 @@ public sealed class FourPlacesJourneyTests
             var items = Assert.IsType<EntriesViewModel>(shell.Content);
             Press(main, Row(main, "Rows", row => row is EntryRow { Title: "github" }));
             Assert.Equal("github", items.Selected?.Title);
+            shell.ShowGroups();
+            WindowInput.Drain();
             Press(main, Row(main, "Nav", row => row is GroupRow { Path: "Work" }));
             Assert.Equal("Work", Named<TextBlock>(main, "ListTitle").Text);
-            AmberElements.AssertOne(main, Named<Button>(main, "CopyPassword"), "Items, an item open in a group");
+            AccentElements.AssertOne(main, Named<Button>(main, "CopyPassword"), "Items, an item open in a group");
 
-            // A project's variables, from its row beneath Items; Back returns to Items.
+            // A project's variables, from its row under the vault's Environments; the vault's All items returns to Items.
+            Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.Environments }));
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));
             var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
             Assert.Equal(["STRIPE_KEY"], env.OpenProject!.Variables.Select(row => row.Key));
-            AmberElements.AssertOne(main, Named<Button>(main, "RunProject"), "a project's variables");
-            var back = Named<Button>(main, "Back");
-            Assert.Equal("Back to Items", AutomationProperties.GetName(back));
-            Press(main, back);
+            AccentElements.AssertOne(main, Named<Button>(main, "RunProject"), "a project's variables");
+            Assert.False(shell.HasBack);
+            Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.All, IsTop: false }));
             Assert.IsType<EntriesViewModel>(shell.Content);
 
-            // A KDBX import, from the sidebar's Import.
-            var sidebarImport = Named<Button>(main, "SidebarImport");
-            Press(main, sidebarImport);
-            var addMenu = (MenuFlyout)FlyoutBase.GetAttachedFlyout(sidebarImport)!;
-            addMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, AppCommands.ImportHeader)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-            addMenu.Hide();
+            // A KDBX import, from the File menu's Import.
+            app.Menus!.All.Single(command => command.Header == AppCommands.ImportHeader).Run();
             WindowInput.Drain();
             await Until(() => shell.HasImport);
             WindowInput.Click(main, Named<MaskedInput>(main, "ImportPassword"));
             WindowInput.Type(main, _sourcePassword);
             Press(main, main.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, shell.Import!.UnlockCommand)));
             await Until(() => shell.Import is { CanConfirm: true });
-            AmberElements.AssertOne(main, Named<Button>(main, "ImportConfirm"), "the import dialog");
+            AccentElements.AssertOne(main, Named<Button>(main, "ImportConfirm"), "the import dialog");
             Press(main, Named<Button>(main, "ImportConfirm"));
             await Until(() => !shell.HasImport);
             Assert.Contains(app.Authority!.Session.Unlocked!.ReadEntries(), entry => entry.Title == "Checking");
@@ -145,7 +148,7 @@ public sealed class FourPlacesJourneyTests
             Press(main, Named<ToggleButton>(main, "EntryMenu"));
             Press(main, Named<Button>(main, "ShareEntry"));
             Assert.True(shell.HasShare);
-            AmberElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
+            AccentElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
             Press(main, Named<Button>(main, "CreateLink"));
             await Until(() => !shell.HasShare);
             Assert.Single(server.Shares);
@@ -165,30 +168,44 @@ public sealed class FourPlacesJourneyTests
             Chord(main, PhysicalKey.Digit2);
             Press(main, Named<Button>(main, "OpenActivity"));
             var log = Assert.IsType<LogViewModel>(shell.Content);
-            AmberElements.AssertOne(main, null, "Activity");
+            AccentElements.AssertOne(main, null, "Activity");
             Assert.Contains(log.Rows, row => row.Actor == _label);
             Press(main, Named<Button>(main, "VerifyChain"));
             Assert.True(log.VerdictShown);
-            AmberElements.AssertOne(main, null, "Activity, its verdict shown");
+            AccentElements.AssertOne(main, null, "Activity, its verdict shown");
 
             // Settings › Advanced: the share links, revoked.
             Chord(main, PhysicalKey.Digit4);
-            AmberElements.AssertOne(main, null, "Settings");
+            AccentElements.AssertOne(main, null, "Settings");
             Press(main, Named<Button>(main, "OpenAdvanced"));
+            // The toasts the share and the prompt left, the clipboard's countdown among them, lie over the content until closed.
+            foreach (var toast in shell.Toasts.Shown.ToList())
+            {
+                Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, toast.CloseCommand)));
+            }
+
+            if (shell.Clipboard.IsCounting)
+            {
+                Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, shell.Clipboard.ClearNowCommand)));
+            }
+
             Press(main, Named<Button>(main, "OpenShareLinks"));
             var links = Assert.IsType<SharingViewModel>(shell.Content);
             await Until(() => links.Rows.Count == 1);
-            AmberElements.AssertOne(main, null, "share links");
+            AccentElements.AssertOne(main, null, "share links");
             DrawnFrame.Capture(main);
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Classes.Contains("row-action")));
             Assert.Single(server.Shares);
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConfirmRevoke", IsEffectivelyVisible: true }));
             await Until(() => server.Shares.Count == 0);
 
-            // Trash, then the lock, before the window closes.
+            // Security, then Trash from the vault's places, then the lock, before the window closes.
             Chord(main, PhysicalKey.Digit3);
+            Assert.IsType<RecommendationsViewModel>(shell.Content);
+            Chord(main, PhysicalKey.Digit1);
+            Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.Trash }));
             Assert.IsType<TrashViewModel>(shell.Content);
-            AmberElements.AssertOne(main, null, "Trash");
+            AccentElements.AssertOne(main, null, "Trash");
             Chord(main, PhysicalKey.L);
             await Until(() => root.Content is UnlockView);
             main.Close();

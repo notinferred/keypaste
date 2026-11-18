@@ -3,7 +3,6 @@
 // Contains already called method names
 const _called = {};
 _called.automaticRedetectCompleted = false;
-_called.retrieveCredentials = false;
 
 // Wrapper
 const sendMessage = async function(action, args) {
@@ -16,9 +15,8 @@ const sendMessage = async function(action, args) {
  */
 const kpxc = {};
 kpxc.combinations = [];
+// The names of the logins the last list showed, never a password.
 kpxc.credentials = [];
-// Whether kpxc.credentials came from the person asking, rather than only what the page's load was always filled with.
-kpxc.credentialsAsked = false;
 kpxc.databaseState = DatabaseState.DISCONNECTED;
 kpxc.detectedFields = 0;
 kpxc.improvedFieldDetectionEnabledForPage = false;
@@ -31,14 +29,9 @@ kpxc.url = null;
 // Clears all from the content and background scripts, including autocomplete
 kpxc.clearAllFromPage = function() {
     kpxc.credentials = [];
-    kpxc.credentialsAsked = false;
     kpxc.inputs = [];
     kpxcUserAutocomplete.clear();
-    _called.retrieveCredentials = false;
-
-    if (kpxc.settings.autoCompleteUsernames) {
-        kpxcUserAutocomplete.closeList();
-    }
+    kpxcUserAutocomplete.closeList();
 
     // Clear logins from background and switch back to default popup
     sendMessage('page_clear_logins');
@@ -77,21 +70,12 @@ kpxc.detectDatabaseChange = async function(response) {
 
     if (document.visibilityState !== 'hidden') {
         if (response.hash.new !== '') {
-            _called.retrieveCredentials = false;
             const settings = await sendMessage('load_settings');
             kpxc.settings = settings;
             kpxc.databaseState = DatabaseState.UNLOCKED;
 
             await kpxc.initCredentialFields();
             kpxcIcons.switchIcons();
-
-            // If user has requested a manual fill through context menu the actual credential filling
-            // is handled here when the opened database has been regognized. It's not a pretty hack.
-            const manualFill = await sendMessage('page_get_manual_fill');
-            if (manualFill !== ManualFill.NONE && kpxc.combinations.length > 0) {
-                await kpxcFill.fillInFromActiveElement();
-                await sendMessage('page_set_manual_fill', ManualFill.NONE);
-            }
         } else if (!response.connected) {
             kpxc.databaseState = DatabaseState.DISCONNECTED;
             kpxcIcons.switchIcons();
@@ -172,39 +156,6 @@ kpxc.identifyFormInputs = async function() {
     return inputs;
 };
 
-// Initialize autocomplete for username fields
-kpxc.initAutocomplete = function() {
-    if (!kpxc.settings.autoCompleteUsernames) {
-        return;
-    }
-
-    const showGroupNameInAutocomplete = kpxc.showGroupNameInAutocomplete();
-
-    for (const c of kpxc.combinations) {
-        if (c.username) {
-            kpxcUserAutocomplete.create(
-                c.username,
-                false,
-                kpxc.settings.autoSubmit,
-                kpxc.settings.useCompactMode,
-                showGroupNameInAutocomplete,
-                kpxc.settings.afterFillSorting,
-            );
-        } else if (!c.username && c.password) {
-            // Single password field
-            kpxcUserAutocomplete.create(
-                c.password,
-                false,
-                kpxc.settings.autoSubmit,
-                kpxc.settings.useCompactMode,
-                showGroupNameInAutocomplete,
-                kpxc.settings.afterFillSorting,
-            );
-        }
-
-    }
-};
-
 // Looks for any username & password combinations from the detected input fields
 kpxc.initCombinations = async function(inputs = []) {
     if (inputs.length === 0) {
@@ -261,14 +212,11 @@ kpxc.initCredentialFields = async function() {
         return;
     }
 
+    // Only the key icon is drawn: the page's logins are asked for when the person clicks it, never as the page loads.
     await kpxcIcons.initIcons(kpxc.combinations);
-
-    if (kpxc.databaseState === DatabaseState.UNLOCKED) {
-        await kpxc.retrieveCredentials();
-    }
 };
 
-// Initializes the login lists for popup and Autocomplete Menu
+// Gives the toolbar's login popup the names the list showed
 kpxc.initLoginPopup = function() {
     if (kpxc.credentials.length === 0) {
         return;
@@ -333,20 +281,8 @@ kpxc.initLoginPopup = function() {
     }
 
     const popupLoginItems = [];
-    kpxcUserAutocomplete.clear();
-
-    // Initialize Popup Login and Autocomplete Menu items
     for (const l of loginItems) {
         popupLoginItems.push({ text: l.text, title: l.title, username: l.visibleLogin, expired: l.expired, uuid: l.uuid });
-
-        kpxcUserAutocomplete.elements.push({
-            group: showGroupNameInAutocomplete ? l.group : undefined,
-            title: l.title,
-            label: l.text,
-            value: l.login,
-            uuid: l.uuid,
-            loginId: l.loginId
-        });
     }
 
     // Activate Popup Login list of usernames + descriptions
@@ -368,91 +304,16 @@ kpxc.passwordFilledWithExceptions = async function(currentForm) {
     return await sendMessage('password_get_filled');
 };
 
-// Prepares autocomplete and login popup ready for user interaction
-kpxc.prepareCredentials = async function() {
-    if (kpxc.credentials.length === 0) {
-        logDebug('Error: No combination found.');
-        return;
-    }
-
-    if (kpxc.settings.autoFillSingleEntry && kpxc.credentials.length === 1) {
-        kpxcFill.fillFromAutofill();
-        return;
-    }
-
-    kpxc.initLoginPopup();
-    kpxc.initAutocomplete();
-
-    if (kpxc.settings.autoFillRelevantCredential) {
-        const pageUuid = await sendMessage('page_get_login_id', false);
-        if (pageUuid) {
-            const relevantCredential = kpxc.credentials.find(c => c.uuid === pageUuid);
-            const combination = kpxc.combinations?.at(-1);
-            if (relevantCredential && combination) {
-                kpxcFill.fillInCredentials(combination, relevantCredential.login, relevantCredential.uuid);
-            }
-        }
-    }
-};
-
-// The basic function for retrieving credentials from keypaste.
-kpxc.retrieveCredentials = async function(force = false) {
+// Asks keypaste for the names of this page's logins, which a click on the key icon shows; the frame of another site gets none.
+kpxc.listLogins = async function() {
     if (!await isIframeAllowed()) {
-        return;
+        return { state: 'frame', entries: [] };
     }
 
-    kpxc.url = document.location.href;
-
-    // Search for first combination that has username or password input set
-    const firstCombination = kpxc.combinations?.find((combination) => combination?.username || combination?.password);
-    kpxc.submitUrl = kpxc.getFormActionUrl(firstCombination);
-
-    if (kpxc.settings.autoRetrieveCredentials && kpxc.url && kpxc.submitUrl) {
-        await kpxc.retrieveCredentialsCallback(
-            await sendMessage('retrieve_credentials', [ kpxc.url, kpxc.submitUrl, force ]),
-            force,
-        );
-    }
-};
-
-// Handles credentials from 'retrieve_credentials' response
-kpxc.retrieveCredentialsCallback = async function(credentials, asked = false) {
-    _called.retrieveCredentials = true;
-    if (credentials?.length > 0) {
-        kpxc.credentials = credentials;
-        kpxc.credentialsAsked = asked;
-        await kpxc.prepareCredentials();
-    }
-};
-
-// Asks keypaste unless the person already has: logins the page's load was always filled with leave others to ask about.
-kpxc.receiveCredentialsIfNecessary = async function() {
-    if (kpxc.credentials.length === 0 || !kpxc.credentialsAsked) {
-        if (!await isIframeAllowed()) {
-            return [];
-        }
-
-        if (!kpxc.url) {
-            kpxc.url = document.location.href;
-        }
-
-        // Sets triggerUnlock to true
-        const credentials = await sendMessage('retrieve_credentials', [ kpxc.url, kpxc.submitUrl, true ]);
-        if (credentials.length === 0) {
-            logDebug('Error: No credentials found.');
-            return kpxc.credentials;
-        }
-
-        // If the database was locked, this is scope never met.
-        // In these cases the response is met at kpxc.detectDatabaseChange
-        await sendMessage('page_set_manual_fill', ManualFill.NONE);
-        await kpxc.retrieveCredentialsCallback(credentials, true);
-
-        kpxcIcons.switchIcons();
-        return credentials;
-    }
-
-    return kpxc.credentials;
+    const answer = await sendMessage('list_logins', [ kpxc.submitUrl ]) ?? { state: 'disconnected' };
+    kpxc.credentials = answer.entries ?? [];
+    kpxc.initLoginPopup();
+    return answer;
 };
 
 kpxc.setPasswordFilled = async function(state) {
@@ -467,13 +328,6 @@ kpxc.showGroupNameInAutocomplete = function() {
 // Updates database status and icons when tab is activated again
 kpxc.triggerActivatedTab = async function() {
     await kpxc.updateDatabaseState();
-
-    if (kpxc.databaseState === DatabaseState.UNLOCKED && kpxc.credentials.length === 0) {
-        await kpxc.retrieveCredentials();
-    } else if (kpxc.credentials.length > 0) {
-        kpxc.initLoginPopup();
-    }
-
     kpxcIcons.switchIcons();
 };
 
@@ -568,12 +422,13 @@ browser.runtime.onMessage.addListener(async function(req, sender) {
             kpxc.clearAllFromPage();
         } else if (req.action === 'fill_user_pass_with_specific_login') {
             await kpxc.reconnect();
-            kpxcFill.fillFromPopup(req.id, req.uuid);
+            kpxcFill.fillFromPopup(req.uuid);
         } else if (req.action === 'fill_username_password') {
+            // The browser's own shortcut, which the page cannot press, opens the list as the key icon does.
             await kpxc.reconnect();
-            sendMessage('page_set_manual_fill', ManualFill.BOTH);
-            await kpxc.receiveCredentialsIfNecessary();
-            kpxcFill.fillInFromActiveElement();
+            if (document.activeElement instanceof HTMLInputElement) {
+                await kpxcUserAutocomplete.open(document.activeElement);
+            }
         } else if (req.action === 'frame_message') {
             if (req.args?.[0] === 'notification_from_frame' && window.self === window.top) {
                 // Handle notification from iframe in top window
@@ -585,8 +440,6 @@ browser.runtime.onMessage.addListener(async function(req, sender) {
             kpxc.inputs = [];
             kpxc.combinations = [];
             kpxc.initCredentialFields();
-        } else if (req.action === 'retrieve_credentials_forced') {
-            await kpxc.retrieveCredentials(true);
         }
     }
 });

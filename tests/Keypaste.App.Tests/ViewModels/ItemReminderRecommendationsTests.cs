@@ -70,7 +70,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
         Assert.False(marked.HasPage);
         Assert.False(marked.OpenPageCommand.CanExecute(null));
 
-        Assert.Equal("2", shell.RecommendationsRow.Count);
+        Assert.Equal("2", shell.SecurityPlace.Count);
         Assert.Empty(shell.Recommendations.Passwords);
         Assert.Empty(_web.Opened);
     }
@@ -98,7 +98,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
         await shell.Recommendations.Checking;
 
         Assert.Equal([ReminderReason.NeedsUpdate], shell.Recommendations.Reminders.Select(row => row.Finding.Reason));
-        Assert.Equal("1", shell.RecommendationsRow.Count);
+        Assert.Equal("1", shell.SecurityPlace.Count);
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
             await shell.Recommendations.Checking;
             shell.Recommendations.Reminders.Single(row => row.Finding.Entry == _github).DismissCommand.Press();
 
-            Assert.Equal("1", shell.RecommendationsRow.Count);
+            Assert.Equal("1", shell.SecurityPlace.Count);
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
@@ -123,7 +123,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
         using var again = Shell();
         await again.Recommendations.Checking;
         Assert.True(again.Recommendations.Reminders.Single(row => row.Finding.Entry == _github).IsDismissed);
-        Assert.Equal("1", again.RecommendationsRow.Count);
+        Assert.Equal("1", again.SecurityPlace.Count);
 
         _session.Unlocked!.SetExpiryUnchecked(_github, AppClock.Start.AddDays(5));
         _session.Unlocked!.Save();
@@ -131,7 +131,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
         await again.Recommendations.Checking;
 
         Assert.True(again.Recommendations.Reminders.Single(row => row.Finding.Entry == _github).NeedsReview);
-        Assert.Equal("2", again.RecommendationsRow.Count);
+        Assert.Equal("2", again.SecurityPlace.Count);
     }
 
     [Fact]

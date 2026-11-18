@@ -1,22 +1,50 @@
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste clients</c> lists this computer's agent rules and the agents it knows, turns an agent's run on or off and
-/// removes one, in <c>agents.toml</c>, needing nothing to hold the vault; every run is still asked.
+/// removes one, in the vault's rules, needing nothing to hold the vault; every run is still asked.
 /// </summary>
 public sealed class ClientsVerbTests : IDisposable
 {
     private readonly CliHarness _harness = new();
 
+    public ClientsVerbTests() => _harness.Environment[VaultLocator.EnvironmentVariable] = _harness.VaultPath;
+
     public void Dispose() => _harness.Dispose();
 
     private string Home => _harness.Environment[KeypasteHome.EnvironmentVariable];
 
-    private AgentRulesFile Rules => new(KeypasteHome.AgentsPath(Home));
+    private AgentRulesFile Rules => RulesOf(_harness.VaultPath);
+
+    private AgentRulesFile RulesOf(string vault) => AgentRulesFile.For(Home, VaultIdentity.Of(KeypasteHome.Resolve(Home), vault));
+
+    /// <summary>Each vault keeps its own rules, so a change named for one vault leaves another's as they were.</summary>
+    [Fact]
+    public void A_change_for_one_vault_leaves_another_vaults_rules_alone()
+    {
+        var acme = Path.Combine(Path.GetDirectoryName(_harness.VaultPath)!, "acme.kdbx");
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "claude-code", "--set", "notes=block", "--vault", acme));
+
+        Assert.True(RulesOf(acme).TryRead(out var work, out var problem), problem);
+        Assert.Equal(CategoryRule.Block, work.RuleFor("claude-code", FieldCategory.Notes));
+        Assert.False(File.Exists(Rules.Path));
+    }
+
+    [Fact]
+    public void With_no_vault_named_or_chosen_it_says_to_name_one()
+    {
+        _harness.Environment.Remove(VaultLocator.EnvironmentVariable);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients"));
+
+        Assert.Contains("vault", _harness.Err, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void With_no_file_it_lists_every_category_asked_and_writes_nothing()
@@ -136,7 +164,7 @@ public sealed class ClientsVerbTests : IDisposable
     [Fact]
     public void A_file_keypaste_cannot_read_is_named_and_left_as_it_is()
     {
-        Directory.CreateDirectory(Home);
+        Directory.CreateDirectory(Path.GetDirectoryName(Rules.Path)!);
         File.WriteAllText(Rules.Path, "[[rules]]\npassword = \"sometimes\"\n");
 
         _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "claude-code", "--run", "on"));

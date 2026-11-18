@@ -3,45 +3,113 @@ using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Totp;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>What a new item starts from (N.4).</summary>
+/// <summary>What a new item starts from: a preset of fields, never a limit on them.</summary>
 internal enum ItemTemplate
 {
     Login,
     ApiKey,
-    Database,
+    Environment,
+    Card,
+    Note,
+    Identity,
+    SshKey,
     Server,
-    SecureNote,
+    Database,
+    Wifi,
+    Blank,
 }
 
-/// <summary>One template as the form's choice shows it.</summary>
-internal sealed record TemplateChoice(ItemTemplate Template, string Label, string Icon)
+/// <summary>A custom field a template starts with, named and empty.</summary>
+internal sealed record PresetField(string Name, bool IsProtected);
+
+/// <summary>One template as New item's grid, the list's "+" and the menus show it, with the fields it presets.</summary>
+internal sealed record TemplateChoice(ItemTemplate Template, string Label, string Icon, string NewTitle)
 {
-    /// <summary>The five things a new item can be.</summary>
+    /// <summary>Every template, in the grid's order.</summary>
     internal static IReadOnlyList<TemplateChoice> All { get; } =
     [
-        new(ItemTemplate.Login, "Login", "globe"),
-        new(ItemTemplate.ApiKey, "API key", "key-round"),
-        new(ItemTemplate.Database, "Database", "database"),
-        new(ItemTemplate.Server, "Server", "server"),
-        new(ItemTemplate.SecureNote, "Secure note", "sticky-note"),
+        new(ItemTemplate.Login, "Login", "globe", "New login"),
+        new(ItemTemplate.ApiKey, "API key", "key", "New API key"),
+        new(ItemTemplate.Environment, "Environment", "braces", "New environment"),
+        new(ItemTemplate.Card, "Card", "credit-card", "New card"),
+        new(ItemTemplate.Note, "Note", "file-text", "New note"),
+        new(ItemTemplate.Identity, "Identity", "id-card", "New identity"),
+        new(ItemTemplate.SshKey, "SSH key", "key-square", "New SSH key"),
+        new(ItemTemplate.Server, "Server", "server", "New server"),
+        new(ItemTemplate.Database, "Database", "database", "New database"),
+        new(ItemTemplate.Wifi, "Wi-Fi", "wifi", "New Wi-Fi network"),
+        new(ItemTemplate.Blank, "Blank item", "plus", "New item"),
     ];
 
-    /// <summary>The kind the item keeps once created, as its icon.</summary>
+    /// <summary>The templates the list's "+" offers where its place holds every kind, before More templates….</summary>
+    internal static IReadOnlyList<TemplateChoice> Common { get; } = [.. All.Take(5)];
+
+    /// <summary>The templates that keep a kind, which an item's Change kind offers.</summary>
+    internal static IReadOnlyList<TemplateChoice> Kept { get; } = [.. All.Where(choice => choice.Kind != ItemKind.None)];
+
+    internal static TemplateChoice Of(ItemTemplate template) => All.First(choice => choice.Template == template);
+
+    /// <summary>The kind the item keeps once created, as its icon; a blank item keeps none.</summary>
     internal ItemKind Kind => Template switch
     {
+        ItemTemplate.Login => ItemKind.Login,
         ItemTemplate.ApiKey => ItemKind.ApiKey,
-        ItemTemplate.Database => ItemKind.Database,
+        ItemTemplate.Environment => ItemKind.Environment,
+        ItemTemplate.Card => ItemKind.Card,
+        ItemTemplate.Note => ItemKind.SecureNote,
+        ItemTemplate.Identity => ItemKind.Identity,
+        ItemTemplate.SshKey => ItemKind.SshKey,
         ItemTemplate.Server => ItemKind.Server,
-        ItemTemplate.SecureNote => ItemKind.SecureNote,
-        _ => ItemKind.Login,
+        ItemTemplate.Database => ItemKind.Database,
+        ItemTemplate.Wifi => ItemKind.Wifi,
+        _ => ItemKind.None,
+    };
+
+    /// <summary>The standard fields the form starts with.</summary>
+    internal IReadOnlyList<NewItemField> Fields => Template switch
+    {
+        ItemTemplate.Login => [NewItemField.Username, NewItemField.Password, NewItemField.Url, NewItemField.OneTimeCode],
+        ItemTemplate.ApiKey => [NewItemField.Url],
+        ItemTemplate.Environment or ItemTemplate.Card or ItemTemplate.Identity => [NewItemField.Tags],
+        ItemTemplate.Note => [NewItemField.Notes],
+        ItemTemplate.Server or ItemTemplate.Database => [NewItemField.Username, NewItemField.Password, NewItemField.OneTimeCode],
+        ItemTemplate.Wifi => [NewItemField.Password],
+        _ => [],
+    };
+
+    /// <summary>The custom fields the form starts with, named and empty.</summary>
+    internal IReadOnlyList<PresetField> CustomFields => Template switch
+    {
+        ItemTemplate.Card => [new("Cardholder name", false), new("Number", true), new("Expiration date", false), new("Security code", true)],
+        ItemTemplate.Identity => [new("First name", false), new("Last name", false), new("Email", false), new("Phone", false), new("Passport number", true)],
+        ItemTemplate.SshKey => [new("Private key", true), new("Public key", false)],
+        ItemTemplate.Wifi => [new("Network name", false)],
+        _ => [],
+    };
+
+    /// <summary>The tag a card or an identity starts with, which makes an agent's request for one of its protected fields a card or identity value.</summary>
+    internal string? Tag => Template switch
+    {
+        ItemTemplate.Card => FieldCategories.CardTag,
+        ItemTemplate.Identity => FieldCategories.IdentityTag,
+        _ => null,
     };
 
     /// <summary>How the add menus name it: the form it opens, so with an ellipsis.</summary>
     internal string MenuLabel => $"{Label}…";
+
+    public override string ToString() => Label;
+}
+
+/// <summary>An open vault a new item can be saved in, as the Save in pop-up names it.</summary>
+internal sealed record SaveInChoice(AppVaultSession Session, string Account, string Vault)
+{
+    internal string Label => $"{Account} › {Vault}";
 
     public override string ToString() => Label;
 }
@@ -63,15 +131,19 @@ internal enum NewItemField
 /// <summary>One field option as the add button's list shows it, with its icon.</summary>
 internal sealed record NewItemFieldOption(NewItemField Field, string Label, string Icon);
 
-/// <summary>A field the person named, added from the list; protected, its value is masked and read once, at Create.</summary>
+/// <summary>A field the person named, added from the list; protected, its value is masked and read once, at Save.</summary>
 internal sealed partial class NewItemCustomField : ObservableObject, IDisposable
 {
     private readonly Action<NewItemCustomField> _remove;
 
-    internal NewItemCustomField(bool isProtected, Action<NewItemCustomField> remove, ClipboardCountdown clipboard)
+    private readonly string _presetName;
+
+    internal NewItemCustomField(bool isProtected, Action<NewItemCustomField> remove, ClipboardCountdown clipboard, string presetName = "")
     {
         IsProtected = isProtected;
         _remove = remove;
+        _presetName = presetName;
+        Name = presetName;
         Secret = new SecretField(clipboard);
         RemoveCommand = new RelayCommand(() => _remove(this));
     }
@@ -80,8 +152,19 @@ internal sealed partial class NewItemCustomField : ObservableObject, IDisposable
 
     internal string Kind => IsProtected ? "Protected field" : "Custom field";
 
+    /// <summary>What the name box and the remove button are called: the field's name, or its kind while it has none.</summary>
+    internal string Spoken => Name.Trim().Length > 0 ? Name.Trim() : Kind;
+
+    /// <summary>Whether a template named it, so its row shows the name as its label rather than a box to type one in.</summary>
+    internal bool IsPreset => _presetName.Length > 0;
+
+    /// <summary>Whether it is a template's field still as the template named it with nothing in it, which Save leaves out.</summary>
+    internal bool IsUntouchedPreset => _presetName.Length > 0 && Name == _presetName && !HasValue;
+
+    private bool HasValue => IsProtected ? Secret.HasValue : Value.Length > 0;
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNameProblem))]
+    [NotifyPropertyChangedFor(nameof(HasNameProblem), nameof(Spoken))]
     internal partial string Name { get; set; } = string.Empty;
 
     /// <summary>The value of a plain field.</summary>
@@ -98,7 +181,7 @@ internal sealed partial class NewItemCustomField : ObservableObject, IDisposable
 
     internal RelayCommand RemoveCommand { get; }
 
-    internal bool HoldsDraft => Name.Trim().Length > 0 || (IsProtected ? Secret.HasValue && !Secret.IsGenerated : Value.Length > 0);
+    internal bool HoldsDraft => Name.Trim() != _presetName || (IsProtected ? Secret.HasValue && !Secret.IsGenerated : Value.Length > 0);
 
     partial void OnNameChanged(string value) => NameProblem = null;
 
@@ -112,12 +195,12 @@ internal sealed record FolderChoice(string Path, string Label, int Depth)
 }
 
 /// <summary>
-/// The New item form: a template's own fields, a folder chosen from the vault's groups, tags and
-/// notes, created in one change with no history item (N.4, D-0379).
+/// New item: first the grid of templates, then the chosen template's form, its preset fields and any other, saved in any open
+/// vault and created in one change with no history item.
 /// </summary>
 /// <remarks>
 /// A secret it takes, a password, an API key's value or a one-time code's setup, lives in a <see cref="SecretField"/> and is
-/// read once, when Create is pressed. A database's or a server's host is a plain custom field named
+/// read once, when Save is pressed. A database's or a server's host is a plain custom field named
 /// <see cref="HostField"/>, since KeePass has no standard field for one.
 /// </remarks>
 internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
@@ -127,12 +210,15 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     private const string _keyNameRule = "Name the key as a project reads it: capitals, digits and _, such as OPENAI_API_KEY.";
 
-    private readonly AppVaultSession _session;
-    private IReadOnlyList<string> _projectTags;
-    private ItemTemplate _template = ItemTemplate.Login;
+    private readonly string? _currentGroup;
+    private IReadOnlyList<string> _projectTags = [];
+    private ItemTemplate? _template;
+    private string _presetTitle = string.Empty;
+    private IReadOnlyList<string> _presetTags = [];
     private bool _titleRefused;
     private bool _keyNameRefused;
-    private FolderChoice _folder;
+    private SaveInChoice _saveIn;
+    private FolderChoice _folder = new(string.Empty, "Top level", 0);
     private bool _generatePassword = true;
     private readonly ClipboardCountdown _clipboard;
     private readonly HashSet<NewItemField> _added = [];
@@ -143,29 +229,23 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _hasHost;
     private bool _hasKey;
     private GeneratePasswordViewModel? _generatorPanel;
-    private UsernameSuggestions _usernames;
+    private UsernameSuggestions _usernames = new(null);
 
-    /// <param name="session">The unlocked vault the item is made in.</param>
+    /// <param name="places">The open vaults it can be saved in, the one in view first, where it starts.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
-    /// <param name="groupPaths">Every group the vault has.</param>
-    /// <param name="currentGroup">The group in view, which the folder starts at.</param>
-    internal NewItemViewModel(AppVaultSession session, ClipboardCountdown clipboard, IEnumerable<string> groupPaths, string? currentGroup)
+    /// <param name="currentGroup">The group in view, which the folder starts at while the vault in view is chosen.</param>
+    /// <param name="template">The template whose form opens, or null to choose one from the grid first.</param>
+    internal NewItemViewModel(IReadOnlyList<SaveInChoice> places, ClipboardCountdown clipboard, string? currentGroup, ItemTemplate? template = null)
     {
-        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(places);
         ArgumentNullException.ThrowIfNull(clipboard);
-        ArgumentNullException.ThrowIfNull(groupPaths);
+        ArgumentOutOfRangeException.ThrowIfZero(places.Count);
 
-        _session = session;
+        Places = places;
         _clipboard = clipboard;
-        _projectTags = session.Unlocked is { } vault ? ProjectCatalog.MemberTags(vault) : [];
-        _usernames = new UsernameSuggestions(session.Unlocked);
-
-        Folders =
-        [
-            .. GroupNode.Flatten(groupPaths)
-                .Select(node => new FolderChoice(node.Path, node.IsEverything ? "Top level" : node.Label, node.Depth)),
-        ];
-        _folder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, currentGroup, StringComparison.Ordinal)) ?? Folders[0];
+        _currentGroup = currentGroup;
+        _saveIn = places[0];
+        ReadVault();
 
         Password = new SecretField(clipboard);
         KeyValue = new SecretField(clipboard);
@@ -176,9 +256,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         CloseGeneratorCommand = new RelayCommand(CloseGenerator);
         AddFieldCommand = new RelayCommand<NewItemField>(AddField);
         RemoveFieldCommand = new RelayCommand<NewItemField>(RemoveField);
-        ApplyTemplate();
+        ChooseTemplateCommand = new RelayCommand<ItemTemplate>(ChooseTemplate, _ => IsChoosingTemplate);
 
-        // A new item starts with a generated password in its field, where it can be copied before Create (V.12).
+        // A new item starts with a generated password in its field, where it can be copied before Save (V.12).
         Password.GeneratedValueReplaced += (_, _) => SetProperty(ref _generatePassword, false, nameof(GeneratePassword));
         Generator.PropertyChanged += (_, _) =>
         {
@@ -187,7 +267,85 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 FillPassword();
             }
         };
-        FillPassword();
+
+        if (template is { } chosen)
+        {
+            ChooseTemplate(chosen);
+        }
+    }
+
+    /// <summary>The open vaults the Save in pop-up lists, each under its account.</summary>
+    internal IReadOnlyList<SaveInChoice> Places { get; }
+
+    /// <summary>Where the item is saved; choosing another vault starts the folder at its top level.</summary>
+    internal SaveInChoice SaveIn
+    {
+        get => _saveIn;
+        set
+        {
+            if (value is not null && SetProperty(ref _saveIn, value))
+            {
+                ReadVault();
+                Error = null;
+            }
+        }
+    }
+
+    /// <summary>Reads the chosen vault's groups, project tags and usernames, which the form offers.</summary>
+    private void ReadVault()
+    {
+        var vault = _saveIn.Session.Unlocked;
+        _projectTags = vault is null ? [] : ProjectCatalog.MemberTags(vault);
+        _usernames = new UsernameSuggestions(vault);
+        Folders =
+        [
+            .. GroupNode.Flatten(vault?.ReadGroupPaths() ?? [])
+                .Select(node => new FolderChoice(node.Path, node.IsEverything ? "Top level" : node.Label, node.Depth)),
+        ];
+        var start = ReferenceEquals(_saveIn, Places[0]) ? _currentGroup : null;
+        Folder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, start, StringComparison.Ordinal)) ?? (Folders.Count > 0 ? Folders[0] : _folder);
+        OnPropertyChanged(nameof(Folders));
+        OnPropertyChanged(nameof(TagSuggestions));
+        OnPropertyChanged(nameof(UsedUsernames));
+        OnPropertyChanged(nameof(SuggestedUsernames));
+        OnPropertyChanged(nameof(UsernameFilter));
+    }
+
+    /// <summary>Whether the grid of templates shows, before a template's form.</summary>
+    internal bool IsChoosingTemplate => _template is null;
+
+    /// <summary>A tile of the grid: opens that template's form.</summary>
+    internal RelayCommand<ItemTemplate> ChooseTemplateCommand { get; }
+
+    private void ChooseTemplate(ItemTemplate template)
+    {
+        if (_template is not null)
+        {
+            return;
+        }
+
+        _template = template;
+        var choice = TemplateChoice.Of(template);
+        _presetTitle = choice.NewTitle;
+        Title = _presetTitle;
+        ApplyTemplate(choice);
+
+        if (choice.Tag is { } tag)
+        {
+            Tags = [new EntryTagChip(tag, RemoveTag)];
+        }
+
+        _presetTags = [.. Tags.Select(chip => chip.Tag)];
+
+        if (_hasPassword)
+        {
+            FillPassword();
+        }
+
+        OnPropertyChanged(nameof(Template));
+        OnPropertyChanged(nameof(SelectedTemplate));
+        OnPropertyChanged(nameof(IsChoosingTemplate));
+        ChooseTemplateCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The options the add button lists, those not yet in the form; a custom or protected field can be added again.</summary>
@@ -196,21 +354,28 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private static readonly string[] _fieldProperties =
     [
         nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsOneTimeCode), nameof(ShowsHost), nameof(ShowsKey),
-        nameof(ShowsNotes), nameof(ShowsGroup), nameof(ShowsTags), nameof(ShowsGoesIn), nameof(FieldOptions), nameof(HasFieldOptions),
+        nameof(ShowsNotes), nameof(ShowsGroup), nameof(ShowsTags), nameof(ShowsGoesIn), nameof(FillsInBrowser), nameof(HasPresetRows),
+        nameof(FieldOptions), nameof(HasFieldOptions),
     ];
 
     private static readonly NewItemFieldOption[] _allOptions =
     [
         new(NewItemField.Username, "Username", "user"),
         new(NewItemField.Password, "Password", "key-round"),
-        new(NewItemField.Url, "URL", "link"),
+        new(NewItemField.Url, "Website", "link"),
         new(NewItemField.OneTimeCode, "One-time code", "clock"),
-        new(NewItemField.Notes, "Notes", "sticky-note"),
+        new(NewItemField.Notes, "Notes", "file-text"),
         new(NewItemField.Group, "Group", "folder"),
-        new(NewItemField.Tags, "Tags and project", "layers"),
+        new(NewItemField.Tags, "Tags and project", "tag"),
         new(NewItemField.CustomField, "Custom field", "plus"),
         new(NewItemField.ProtectedField, "Protected field", "shield-check"),
     ];
+
+    /// <summary>Whether the item will fill in the browser, which any item with a username, a password and a website does, whatever its template.</summary>
+    internal bool FillsInBrowser => _hasUsername && _hasPassword && _hasUrl;
+
+    /// <summary>Whether any standard field is in the form, whose group shows above the custom fields.</summary>
+    internal bool HasPresetRows => _hasKey || _hasHost || _hasUsername || _hasPassword || _hasUrl || _hasOneTimeCode || _added.Count > 0;
 
     internal RelayCommand<NewItemField> AddFieldCommand { get; }
 
@@ -230,20 +395,26 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>Where the item goes while Group is not in the form.</summary>
     internal string GoesIn => $"In {Folder.Label}";
 
-    internal bool ShowsGoesIn => !ShowsGroup;
+    /// <summary>Whether the form says where the item goes: while it goes in a group and Group is not in the form.</summary>
+    internal bool ShowsGoesIn => !ShowsGroup && Folder.Path.Length > 0;
 
-    private void ApplyTemplate()
+    private void ApplyTemplate(TemplateChoice choice)
     {
-        _hasUsername = _template is ItemTemplate.Login or ItemTemplate.Database or ItemTemplate.Server;
-        _hasPassword = _hasUsername;
-        _hasUrl = _template == ItemTemplate.Login;
-        _hasOneTimeCode = _hasPassword;
-        _hasHost = _template is ItemTemplate.Database or ItemTemplate.Server;
-        _hasKey = _template == ItemTemplate.ApiKey;
+        _hasUsername = choice.Fields.Contains(NewItemField.Username);
+        _hasPassword = choice.Fields.Contains(NewItemField.Password);
+        _hasUrl = choice.Fields.Contains(NewItemField.Url);
+        _hasOneTimeCode = choice.Fields.Contains(NewItemField.OneTimeCode);
+        _hasHost = choice.Template is ItemTemplate.Database or ItemTemplate.Server;
+        _hasKey = choice.Template == ItemTemplate.ApiKey;
 
-        if (_template == ItemTemplate.SecureNote)
+        foreach (var field in choice.Fields.Where(field => field is NewItemField.Notes or NewItemField.Group or NewItemField.Tags))
         {
-            _added.Add(NewItemField.Notes);
+            _added.Add(field);
+        }
+
+        foreach (var preset in choice.CustomFields)
+        {
+            CustomFields.Add(new NewItemCustomField(preset.IsProtected, RemoveCustomField, _clipboard, preset.Name));
         }
 
         FieldsChanged();
@@ -436,49 +607,13 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         FieldsChanged();
     }
 
+    /// <summary>The grid's tiles.</summary>
     internal IReadOnlyList<TemplateChoice> Templates { get; } = TemplateChoice.All;
 
-    /// <summary>The template the form shows. Changing it keeps the title, folder, tags and notes.</summary>
-    internal ItemTemplate Template
-    {
-        get => _template;
-        set
-        {
-            if (SetProperty(ref _template, value))
-            {
-                OnPropertyChanged(nameof(SelectedTemplate));
-                CloseGenerator();
-                ApplyTemplate();
-                if (_hasPassword && _generatePassword)
-                {
-                    FillPassword();
-                }
+    /// <summary>The template the form started from, or null while the grid shows.</summary>
+    internal ItemTemplate? Template => _template;
 
-                KeyValueProblem = null;
-                OneTimeCodeProblem = null;
-                Error = null;
-
-                // Create ignores a one-time code the form has no field for, so it must not stay as a draft.
-                if (!ShowsOneTimeCode)
-                {
-                    OneTimeCode.Clear();
-                }
-            }
-        }
-    }
-
-    /// <summary>The template as the choice selects it.</summary>
-    internal TemplateChoice SelectedTemplate
-    {
-        get => Templates.First(choice => choice.Template == _template);
-        set
-        {
-            if (value is not null)
-            {
-                Template = value.Template;
-            }
-        }
-    }
+    internal TemplateChoice? SelectedTemplate => _template is { } template ? TemplateChoice.Of(template) : null;
 
     internal bool ShowsUsername => _hasUsername;
 
@@ -496,7 +631,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(TitleProblem), nameof(HasTitleProblem))]
     internal partial string Title { get; set; } = string.Empty;
 
-    /// <summary>Why the title typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
+    /// <summary>Why the title typed cannot be used, or null; an empty one only once Save is pressed on it.</summary>
     internal string? TitleProblem =>
         !HasTitle
             ? (_titleRefused ? "An item needs a title. Type one." : null)
@@ -508,13 +643,14 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal bool HasTitleProblem => TitleProblem is not null;
 
-    /// <summary>Whether Create can go on: it waits for a title.</summary>
+    /// <summary>Whether Save can go on: it waits for a title.</summary>
     internal bool HasTitle => Title.Trim().Length > 0;
 
-    /// <summary>What leaving would lose: anything typed, and never a password keypaste generated.</summary>
+    /// <summary>What leaving would lose: anything typed, and never what the template preset or a password keypaste generated.</summary>
     internal string? UnsavedDraft =>
-        new[] { Title, Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
-        || Tags.Count > 0
+        Title.Trim() != _presetTitle
+        || new[] { Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
+        || !Tags.Select(chip => chip.Tag).SequenceEqual(_presetTags, StringComparer.Ordinal)
         || CustomFields.Any(custom => custom.HoldsDraft)
         || KeyValue.HasValue
         || OneTimeCode.HasValue
@@ -522,8 +658,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             ? "this new item"
             : null;
 
-    /// <summary>The vault's groups a new item may go in, the top level first.</summary>
-    internal IReadOnlyList<FolderChoice> Folders { get; }
+    /// <summary>The chosen vault's groups a new item may go in, the top level first.</summary>
+    internal IReadOnlyList<FolderChoice> Folders { get; private set; } = [];
 
     internal FolderChoice Folder
     {
@@ -533,6 +669,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             if (value is not null && SetProperty(ref _folder, value))
             {
                 OnPropertyChanged(nameof(GoesIn));
+                OnPropertyChanged(nameof(ShowsGoesIn));
             }
         }
     }
@@ -563,7 +700,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(KeyNameProblem), nameof(HasKeyNameProblem))]
     internal partial string KeyName { get; set; } = string.Empty;
 
-    /// <summary>Why the key name typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
+    /// <summary>Why the key name typed cannot be used, or null; an empty one only once Save is pressed on it.</summary>
     internal string? KeyNameProblem =>
         (KeyName.Trim().Length > 0 || _keyNameRefused) && !EnvConvention.IsEnvNamedField(KeyName.Trim()) ? _keyNameRule : null;
 
@@ -607,7 +744,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>An API key's value.</summary>
     internal SecretField KeyValue { get; }
 
-    /// <summary>Why Create refused the key's value, or null; it names no value.</summary>
+    /// <summary>Why Save refused the key's value, or null; it names no value.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasKeyValueProblem))]
     internal partial string? KeyValueProblem { get; private set; }
@@ -617,7 +754,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>The item's one-time code: its setup key or <c>otpauth://totp/</c> link, kept as its TOTP; empty for none.</summary>
     internal SecretField OneTimeCode { get; }
 
-    /// <summary>Why Create refused the one-time code, or null; it names no value.</summary>
+    /// <summary>Why Save refused the one-time code, or null; it names no value.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasOneTimeCodeProblem))]
     internal partial string? OneTimeCodeProblem { get; private set; }
@@ -663,18 +800,23 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal RelayCommand AddTagCommand { get; }
 
-    /// <summary>Why the last Create wrote nothing, or null.</summary>
+    /// <summary>Why the last Save wrote nothing, or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     internal partial string? Error { get; set; }
 
     internal bool HasError => Error is not null;
 
-    /// <summary>Creates the item with one core call and one save.</summary>
+    /// <summary>Creates the item in the vault <see cref="SaveIn"/> names, with one core call and one save.</summary>
     /// <returns>The item's name, or null when it was refused and <see cref="Error"/> says why; nothing is written then.</returns>
     internal EntryName? Create()
     {
         var title = Title.Trim();
+
+        if (IsChoosingTemplate)
+        {
+            return null;
+        }
 
         if (title.Length == 0)
         {
@@ -748,7 +890,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         OneTimeCodeProblem = null;
 
-        var write = _session.Write(
+        var write = _saveIn.Session.Write(
             vault =>
             {
                 vault.CreateEntry(
@@ -760,7 +902,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                         Password = password,
                         Url = ShowsUrl ? Url.Trim() : string.Empty,
                         Notes = Notes,
-                        Kind = SelectedTemplate.Kind,
+                        Kind = SelectedTemplate?.Kind ?? ItemKind.None,
                     },
                     fields,
                     [.. Tags.Select(chip => chip.Tag)],
@@ -805,7 +947,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         var taken = fields.Select(field => field.Name).ToHashSet(StringComparer.Ordinal);
         var refused = false;
 
-        foreach (var field in CustomFields)
+        foreach (var field in CustomFields.Where(field => !field.IsUntouchedPreset))
         {
             var name = field.Name.Trim();
 

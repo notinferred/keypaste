@@ -138,7 +138,7 @@ public static class EnvReferenceResolution
 
         if (withheld && problems.Count == 0)
         {
-            problems.Add(new EnvProblem(string.Empty, "a referenced environment cannot be used"));
+            problems.Add(new EnvProblem(string.Empty, "a referenced stage cannot be used"));
         }
 
         if (problems.Count == 0 && !EnvNameRules.TryCheck(variables, out var names))
@@ -200,7 +200,7 @@ public static class EnvReferenceResolution
             : EnvResolved.Released(released.Project, variables, released.Profile, fills: fills);
     }
 
-    private const string _missing = "is not in this environment's set";
+    private const string _missing = "is not in this stage's set";
 
     private const string _stale = "cannot be read: the vault no longer matches its file";
 

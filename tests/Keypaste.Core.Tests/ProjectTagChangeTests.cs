@@ -41,7 +41,7 @@ public sealed class ProjectTagChangeTests : IDisposable
         Assert.Equal("billing/prod", change.Environment);
         Assert.Equal(
             [
-                "env:billing:prod puts services/Stripe in billing/prod, a protected environment whose every release is asked live.",
+                "env:billing:prod puts services/Stripe in billing/prod, a protected stage whose every release is asked live.",
                 "Joining billing/prod: STRIPE_KEY, WEBHOOK.",
             ],
             change.Describe());
@@ -54,12 +54,12 @@ public sealed class ProjectTagChangeTests : IDisposable
         Assert.True(_vault.AddTag(_stripe, "env:billing"));
 
         Assert.Equal(
-            ["services/Stripe is already in billing/dev through another tag, so adding env:billing:dev changes no environment."],
+            ["services/Stripe is already in billing/dev through another tag, so adding env:billing:dev changes no stage."],
             Preview(["env:billing:dev"], adding: true)!.Describe());
 
         Assert.True(_vault.AddTag(_stripe, "env:billing:dev"));
         Assert.Equal(
-            ["services/Stripe stays in billing/dev through another tag, so removing env:billing:dev changes no environment."],
+            ["services/Stripe stays in billing/dev through another tag, so removing env:billing:dev changes no stage."],
             Preview(["env:billing:dev"], adding: false)!.Describe());
 
         Assert.Equal(
@@ -76,7 +76,7 @@ public sealed class ProjectTagChangeTests : IDisposable
         Assert.Null(shouted.Environment);
         Assert.StartsWith("env:billing:Prod puts services/Stripe in no project: ", described[0], StringComparison.Ordinal);
         Assert.Equal("While the item carries it, every agent request for the item is asked live.", described[1]);
-        Assert.Equal("It changes no environment.", Preview(["Env:billing"], adding: true)!.Describe()[1]);
+        Assert.Equal("It changes no stage.", Preview(["Env:billing"], adding: true)!.Describe()[1]);
     }
 
     /// <summary>
@@ -152,8 +152,8 @@ public sealed class ProjectTagChangeTests : IDisposable
 
         Assert.Equal(
             [
-                "services/Stripe is already in billing/dev through another tag, so adding env:billing changes no environment.",
-                "services/Stripe stays in billing/dev through another tag, so removing env:billing:dev changes no environment.",
+                "services/Stripe is already in billing/dev through another tag, so adding env:billing changes no stage.",
+                "services/Stripe stays in billing/dev through another tag, so removing env:billing:dev changes no stage.",
             ],
             Restoring(bare).SelectMany(change => change.Describe()));
     }

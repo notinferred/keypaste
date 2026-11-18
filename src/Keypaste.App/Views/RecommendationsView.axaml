@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.RecommendationsView"
              x:DataType="vm:RecommendationsViewModel">
 
@@ -18,15 +19,21 @@
     <Style Selector=":is(Control).kind-head">
       <Setter Property="Margin" Value="4,0" />
     </Style>
+    <Style Selector="StackPanel.page">
+      <Setter Property="Margin" Value="32,12,32,24" />
+    </Style>
+    <Style Selector="StackPanel.page.under">
+      <Setter Property="Margin" Value="0,12,0,0" />
+    </Style>
   </UserControl.Styles>
 
   <!-- Keys left in notes, named by entry and key, never by value (C.2); project tags another app dropped (V.11); weak,
        reused or expired passwords, named by item and problem, never by value (V.9). One list of grouped rows by kind; each issue carries its action and Dismiss. No amber here. -->
   <ScrollViewer>
-    <StackPanel Margin="32,12,32,24" Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <TextBlock Classes="h1" Text="{x:Static res:Strings.Recommendations}" />
-        <Button Name="LearnMoreRecommendations" Classes="link" VerticalAlignment="Bottom" Content="{x:Static res:Strings.LearnMore}"
+    <StackPanel Classes="page" Classes.under="{Binding IsListedUnderAnother}" Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12" IsVisible="{Binding ShowsPageHeader}">
+        <TextBlock Classes="h1" Text="{x:Static res:Strings.Security}" />
+        <Button Grid.Column="1" Name="LearnMoreRecommendations" Classes="link" VerticalAlignment="Bottom" Content="{x:Static res:Strings.LearnMore}"
                 AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutRecommendations}">
           <Button.Flyout>
             <Flyout Placement="Bottom">
@@ -34,7 +41,18 @@
             </Flyout>
           </Button.Flyout>
         </Button>
-      </StackPanel>
+        <!-- With several vaults open, which vault's check the page shows, or every vault's. -->
+        <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsVisible="{Binding OffersVaultChoice}">
+          <TextBlock Classes="label" Text="{x:Static res:Strings.VaultLabel}" />
+          <ComboBox Name="SecurityVault"
+                    MinWidth="140"
+                    AutomationProperties.Name="{x:Static res:Strings.VaultLabel}"
+                    ItemsSource="{Binding VaultChoices}"
+                    SelectedItem="{Binding ShownVault}" />
+        </StackPanel>
+      </Grid>
+
+      <TextBlock Classes="dialog-title" AutomationProperties.HeadingLevel="2" Text="{Binding VaultHeading}" IsVisible="{Binding ShowsVaultHeading}" />
 
       <TextBlock Name="RecommendationsEmpty" Classes="caption" IsVisible="{Binding IsEmpty}" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
 
@@ -321,6 +339,15 @@
                 </ItemsControl>
               </Border>
             </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Every vault's check, each under its title, while the filter shows them all. -->
+      <ItemsControl Name="OtherVaultsChecks" ItemsSource="{Binding AlsoShown}" IsVisible="{Binding ShowsVaultHeading}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RecommendationsViewModel">
+            <views:RecommendationsView />
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

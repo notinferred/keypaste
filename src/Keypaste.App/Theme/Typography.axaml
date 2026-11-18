@@ -9,38 +9,36 @@
     <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     <Setter Property="FontFamily" Value="{DynamicResource KpSans}" />
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="13" />
   </Style>
 
   <Style Selector=":is(TextBlock).display">
     <Setter Property="FontSize" Value="54" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-2.43" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="-1.08" />
   </Style>
 
   <Style Selector=":is(TextBlock).h1">
     <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
-    <Setter Property="FontSize" Value="24" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.72" />
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="-0.2" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <!-- What a list shows, "All items" or a group, and New item's title: under an item's title at 24, which outranks it. -->
+  <!-- What a list shows, "All items" or a group, and New item's title: under an item's title at 20, which outranks it. -->
   <Style Selector=":is(TextBlock).list-title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
-    <Setter Property="FontSize" Value="20" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.2" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
   <!-- A dialog's, a card's or an inline form's heading: "Always allowed", "Rename or move". -->
   <Style Selector=":is(TextBlock).dialog-title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="15" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.16" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
@@ -57,21 +55,21 @@
 
   <Style Selector=":is(TextBlock).body">
     <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="LineHeight" Value="18" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
   <!-- The line under a screen's h1. -->
   <Style Selector=":is(TextBlock).subtitle">
     <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="LineHeight" Value="18" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
   <!-- Body text's line height wherever a sentence wraps at the size alone. -->
   <Style Selector=":is(TextBlock).size-13[TextWrapping=Wrap]">
-    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="LineHeight" Value="18" />
   </Style>
 
   <!-- A field's label. -->
@@ -84,15 +82,15 @@
   <!-- A helper line under a field: its label's size at a lighter weight, so it never reads above its label. -->
   <Style Selector=":is(TextBlock).caption">
     <Setter Property="FontSize" Value="12" />
-    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="LineHeight" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
-  <!-- Table header and sidebar section label: 11/500, +0.04em, muted, written in capitals. -->
+  <!-- Table header and sidebar section label: 11/600, +0.04em, muted, written in capitals. -->
   <Style Selector=":is(TextBlock).th">
     <Setter Property="FontSize" Value="11" />
-    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="0.44" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
@@ -108,13 +106,13 @@
        A variable's key is machine text and stays mono. -->
   <Style Selector=":is(TextBlock).title">
     <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
-    <Setter Property="FontSize" Value="24" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="LetterSpacing" Value="-0.72" />
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="-0.2" />
   </Style>
   <Style Selector=":is(TextBlock).row-title">
-    <Setter Property="FontSize" Value="13.5" />
-    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
   <Style Selector=":is(TextBlock).primary">
@@ -126,7 +124,7 @@
   <Style Selector=":is(TextBlock).muted">
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
-  <Style Selector=":is(TextBlock).amber">
+  <Style Selector=":is(TextBlock).accent">
     <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
   </Style>
   <Style Selector=":is(TextBlock).ok">

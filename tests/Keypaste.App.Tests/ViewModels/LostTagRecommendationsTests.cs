@@ -87,7 +87,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
 
         Assert.True(lost.IsConfirming);
         Assert.Equal(
-            ["env:billing:prod puts services/Billing in billing/prod, a protected environment whose every release is asked live.", "Joining billing/prod: STRIPE_SECRET_KEY."],
+            ["env:billing:prod puts services/Billing in billing/prod, a protected stage whose every release is asked live.", "Joining billing/prod: STRIPE_SECRET_KEY."],
             lost.Confirmation);
         Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
 
@@ -135,7 +135,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     private static NavItem Settings(ShellViewModel shell) =>
-        shell.RecommendationsRow;
+        shell.SecurityPlace;
 
     private ShellViewModel Shell() =>
         new(_session, _fixture.Home, authority: null, clock: _clock, post: null);

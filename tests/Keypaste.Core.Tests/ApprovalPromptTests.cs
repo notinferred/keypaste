@@ -44,11 +44,14 @@ public sealed class ApprovalPromptTests
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
     /// <c>OffersAlways</c> is set by the approver from the bridge's label and the room left in this computer's rules,
-    /// never from the request's text: it adds Always allow and Always block, each still confirmed in a step of its own,
+    /// never from the request's text: it adds Always allow, still confirmed in a step of its own,
     /// and leaves the default a denial and the deadline where it was.
     /// <c>Candidates</c> are the items the approver read from the vault for the name the request resolved to, each with its
     /// own names and its own offer, never the request's text: a list in the vault's order with none picked, so it adds no
     /// default, no duration and no position a reason could choose. <c>Item</c> is the one item's UUID, read from the vault.
+    /// <c>ItemTitle</c> is the item's own title, sanitized as <c>Entry</c> is; <c>Protected</c> is read from the item's tags and
+    /// only takes Always allow away; <c>Identity</c> is what the operating system said of the connection, never the request's
+    /// text. None holds a default, a duration or a position.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -65,9 +68,12 @@ public sealed class ApprovalPromptTests
                 "Entry",
                 "EntryWasAltered",
                 "Field",
+                "Identity",
                 "Item",
+                "ItemTitle",
                 "Label",
                 "OffersAlways",
+                "Protected",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
@@ -80,6 +86,17 @@ public sealed class ApprovalPromptTests
     /// block, then write a reassuring line that looks like it came from keypaste. Newlines are what
     /// make it work, and the sanitizer turning them into spaces is what stops it.
     /// </summary>
+    /// <summary>A prompt names the item by its own title, its group kept for Details, and outside a connection no requester is verified.</summary>
+    [Fact]
+    public void ItNamesTheItemByItsTitle_AndVerifiesNobodyOutsideAConnection()
+    {
+        var prompt = ApprovalPrompt.For("Claude Code", new EntryName("Acme/Stripe", "Stripe test key"), "STRIPE_SECRET_KEY", "tests", "claude-code");
+
+        Assert.Equal(("Stripe test key", "Acme/Stripe/Stripe test key"), (prompt.ItemTitle, prompt.Entry));
+        Assert.Equal(new RequesterIdentity("Claude Code", null, false), prompt.Identity);
+        Assert.Equal("Not verified", prompt.Identity.Verification);
+    }
+
     [Fact]
     public void AReasonCannotRedrawThePrompt()
     {

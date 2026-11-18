@@ -16,11 +16,13 @@ namespace Keypaste.App.Controls;
 /// </remarks>
 internal sealed class ListDetail : Panel
 {
-    /// <summary>The list's width beside the detail.</summary>
-    internal const double ListWidth = 262;
+    /// <summary>The list's width beside the detail; Items' list is wider, as Mail's is.</summary>
+    internal static readonly StyledProperty<double> ListWidthProperty =
+        AvaloniaProperty.Register<ListDetail, double>(nameof(ListWidth), 262);
 
     /// <summary>The least the detail keeps beside the list, its title and actions still readable.</summary>
-    internal const double DetailLeast = 420;
+    internal static readonly StyledProperty<double> DetailLeastProperty =
+        AvaloniaProperty.Register<ListDetail, double>(nameof(DetailLeast), 420);
 
     internal static readonly StyledProperty<bool> ShowsListProperty =
         AvaloniaProperty.Register<ListDetail, bool>(nameof(ShowsList), defaultValue: true);
@@ -43,7 +45,19 @@ internal sealed class ListDetail : Panel
     /// <summary>The keyboard was in a pane that has just hidden, so the screen decides where it goes.</summary>
     internal event Action<Pane>? HidKeyboardPane;
 
-    static ListDetail() => AffectsMeasure<ListDetail>(ShowsListProperty, ShowsDetailProperty);
+    static ListDetail() => AffectsMeasure<ListDetail>(ShowsListProperty, ShowsDetailProperty, ListWidthProperty, DetailLeastProperty);
+
+    internal double ListWidth
+    {
+        get => GetValue(ListWidthProperty);
+        set => SetValue(ListWidthProperty, value);
+    }
+
+    internal double DetailLeast
+    {
+        get => GetValue(DetailLeastProperty);
+        set => SetValue(DetailLeastProperty, value);
+    }
 
     /// <summary>Whether the list is in the layout at all; off, the detail takes the whole width.</summary>
     internal bool ShowsList
@@ -88,7 +102,7 @@ internal sealed class ListDetail : Panel
     /// <summary>Whether the list shows and the width cannot also hold the detail.</summary>
     internal bool ListStandsAlone => ShowsList && !Fits(Bounds.Width);
 
-    private static bool Fits(double width) => width >= ListWidth + DetailLeast || double.IsInfinity(width);
+    private bool Fits(double width) => width >= ListWidth + DetailLeast || double.IsInfinity(width);
 
     private void ShowWhatFits()
     {

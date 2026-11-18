@@ -139,6 +139,8 @@ Each row carries its purpose until it is selected and detailed.
 - [ ] **X.8 — Sign in with SSO and provision with SCIM.** Needs: X.4.
 - [ ] **X.9 — Approve production changes, export the audit and package the relay.** Needs: X.4.
   - A production change waits for a second member's approval, the relay's records export to an organization's log store, and the self-hosted relay ships as a package.
+- [ ] **X.18 — Give an organization its work vaults and hand them over on revocation.** Needs: X.8.
+  - The organization owns each member's work vault, created for the member and movable to another; keypaste recommends moving each login and credential carrying the company's email domain into it, each move confirmed by the member; revoking a member's access hands their work vaults and credentials to the person the organization names, and no server reads a personal vault (founder, 2026-11-17).
 
 ## Track 11 — Server access by choice
 

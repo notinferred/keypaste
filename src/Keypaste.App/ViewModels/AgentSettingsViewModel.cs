@@ -167,7 +167,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     {
         if (!_authority.TryRules(out var rules, out _))
         {
-            Problem = "These settings can't be read while the vault is locked or agents.toml can't be read. Correct that, then open them again.";
+            Problem = "These settings can't be read while the vault is locked or its agent rules can't be read. Correct that, then open them again.";
             RunChoices = [];
             Rows = [];
             Remembered = [];

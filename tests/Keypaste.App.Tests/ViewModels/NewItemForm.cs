@@ -2,15 +2,16 @@ using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>Opens New item and picks its title and folder from a path, as a person picks them (N.4).</summary>
+/// <summary>Opens a template's New item form and picks its title and folder from a path, as a person picks them.</summary>
 internal static class NewItemForm
 {
     /// <param name="entries">The Items screen.</param>
     /// <param name="path">The group, which must exist, and the title, joined by a slash; empty leaves both as they open.</param>
+    /// <param name="template">The template whose form opens, as its tile, the list's "+" or a menu opens it.</param>
     /// <returns>The open form.</returns>
-    internal static NewItemViewModel Open(EntriesViewModel entries, string path = "")
+    internal static NewItemViewModel Open(EntriesViewModel entries, string path = "", ItemTemplate template = ItemTemplate.Login)
     {
-        entries.BeginAddCommand.Press();
+        entries.BeginAddOfKindCommand.Press(template);
         var form = entries.NewItem ?? throw new Xunit.Sdk.XunitException($"New item did not open: {entries.Error}");
 
         if (path.Length > 0)

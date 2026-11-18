@@ -1,65 +1,46 @@
-/* keypaste's brand (docs/DESIGN.md) on Starlight's variables. The fonts are the files site/public/fonts serves. */
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-SemiBold.woff2") format("woff2");
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Fragment Mono";
-  src: url("/fonts/FragmentMono-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-
+/* keypaste's look (docs/DESIGN.md) on Starlight's variables: the desktop's Native palette, system blue and the system's faces. */
 :root {
-  --sl-font: "Instrument Sans", system-ui, sans-serif;
-  --sl-font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sl-color-accent-low: #3a2d12;
-  --sl-color-accent: #f2b544;
-  --sl-color-accent-high: #f7c566;
-  --sl-color-white: #f2f2f0;
-  --sl-color-gray-1: #e4e4e1;
-  --sl-color-gray-2: #c9cacd;
-  --sl-color-gray-3: #8e9096;
-  --sl-color-gray-4: #55575c;
-  --sl-color-gray-5: #2c2e33;
-  --sl-color-gray-6: #18191c;
-  --sl-color-black: #111214;
+  --sl-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --sl-font-mono: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+  --sl-color-accent-low: #193655;
+  --sl-color-accent: #0a84ff;
+  --sl-color-accent-high: #3398ff;
+  --sl-color-white: #f5f5f7;
+  --sl-color-gray-1: #e5e5ea;
+  --sl-color-gray-2: #b4b4ba;
+  --sl-color-gray-3: #949499;
+  --sl-color-gray-4: #545458;
+  --sl-color-gray-5: #333336;
+  --sl-color-gray-6: #252527;
+  --sl-color-black: #1e1e1f;
+  --kp-accent-fill: #0072e5;
+  --kp-accent-fill-hover: #0063c6;
+  --kp-ok: #3dd06b;
 }
 
 :root[data-theme="light"] {
-  --sl-color-accent-low: #f6e5c2;
-  --sl-color-accent: #d99d2e;
-  --sl-color-accent-high: #8a5a00;
-  --sl-color-white: #111214;
-  --sl-color-gray-1: #1d1e22;
-  --sl-color-gray-2: #3a3c40;
-  --sl-color-gray-3: #6b6d72;
-  --sl-color-gray-4: #a3a5a9;
-  --sl-color-gray-5: #dcdcd7;
-  --sl-color-gray-6: #efefec;
-  --sl-color-gray-7: #f7f7f5;
+  --sl-color-accent-low: #dbecff;
+  --sl-color-accent: #0064d1;
+  --sl-color-accent-high: #0053ae;
+  --sl-color-white: #1d1d1f;
+  --sl-color-gray-1: #2c2c2e;
+  --sl-color-gray-2: #515154;
+  --sl-color-gray-3: #6b6b70;
+  --sl-color-gray-4: #a6a6ab;
+  --sl-color-gray-5: #e4e4e7;
+  --sl-color-gray-6: #f5f5f7;
+  --sl-color-gray-7: #fafafa;
   --sl-color-black: #ffffff;
+  --kp-accent-fill: #0070eb;
+  --kp-accent-fill-hover: #0061cc;
+  --kp-ok: #1a7a35;
 }
 
 /* The landing page's heading tracking, so a content page reads as the same site. */
 h1,
 .sl-markdown-content :is(h2, h3) {
   font-weight: 600;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
 }
 
 .site-title img {
@@ -89,40 +70,37 @@ h1,
 .kp-nav a.kp-download:hover {
   margin-inline-start: 0.5rem;
   padding-inline: 0.9rem;
-  background: #f2b544;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  color: #111214;
+  background: var(--kp-accent-fill);
+  color: #ffffff;
   font-weight: 600;
 }
+.kp-nav a.kp-download:hover {
+  background: var(--kp-accent-fill-hover);
+}
 
-/* DESIGN's selected row: an amber tint and an inset bar, not a filled block. */
+/* The current page takes a neutral ground, leaving the accent to the one filled button. */
 .sidebar-content a[aria-current='page'],
 .sidebar-content a[aria-current='page']:hover,
 .sidebar-content a[aria-current='page']:focus {
-  background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
-  box-shadow: inset 2px 0 0 var(--sl-color-accent);
+  border-radius: 7px;
+  background: var(--sl-color-gray-5);
   color: var(--sl-color-white);
   font-weight: 500;
 }
 
-/* DESIGN's label: mono capitals in an outline, never a filled chip. */
+/* A state label: an outlined pill in sentence case, never a filled chip. */
 .sl-badge {
-  padding: 4px 7px;
-  border-radius: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
   background: transparent;
-  font-family: var(--sl-font-mono);
-  font-size: 11px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
   white-space: nowrap;
 }
 .sl-badge.success {
-  border-color: currentColor;
-  color: oklch(0.8 0.13 155);
-}
-:root[data-theme='light'] .sl-badge.success {
-  color: oklch(0.5 0.13 155);
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  color: var(--kp-ok);
 }
 .sl-badge.note {
   border-color: var(--sl-color-gray-3);
@@ -147,7 +125,6 @@ h1,
   flex-direction: column;
   gap: 0.4rem;
   padding: 1.1rem 1.25rem;
-  border: 1px solid var(--sl-color-gray-5);
   border-radius: 10px;
   background: var(--sl-color-gray-6);
   color: var(--sl-color-gray-2);
@@ -156,7 +133,7 @@ h1,
   text-decoration: none;
 }
 .kp-card:hover {
-  border-color: var(--sl-color-gray-4);
+  background: var(--sl-color-gray-5);
 }
 .kp-card strong {
   color: var(--sl-color-white);

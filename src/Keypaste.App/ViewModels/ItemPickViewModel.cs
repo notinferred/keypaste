@@ -24,9 +24,11 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     private readonly IReadOnlyList<ItemCandidate> _candidates;
     private readonly bool _offersAlways;
     private readonly string? _agent;
+    private readonly string _itemTitle;
     private int _picked = -1;
 
     internal ItemPickViewModel(ApprovalPrompt prompt)
+        : base(prompt?.Identity)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
@@ -38,6 +40,8 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
+        Field = prompt.Field;
+        _itemTitle = prompt.ItemTitle;
         Instruction = $"{_candidates.Count} items answer to this. Pick the one to send.";
         Reason = prompt.Reason;
         Scrubbed = ApprovalViewModel.ScrubbedText(prompt);
@@ -49,7 +53,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     /// <summary>The row the person picked, or null until they pick one.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AlwaysCaption))]
     internal partial PickRow? Picked { get; set; }
 
     partial void OnPickedChanged(PickRow? value)
@@ -67,11 +70,31 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     internal override bool OffersAlways => _offersAlways;
 
     /// <inheritdoc/>
-    protected override string Choices => Picked is null ? "Pick an item to allow it. Nothing is picked for you." : ApprovalViewModel.ChoicesText(_offersAlways, _agent);
+    internal override string AlwaysTip => $"Don't ask again for {Agent} and this key: it gets the item you pick whenever it asks for {_itemTitle}. Change in Settings \u203a Agents.";
 
     /// <inheritdoc/>
-    protected override string Confirmation(ApprovalAnswer always) =>
-        $"Always give {_agent} {Picked?.Title}'s {Picked?.Field} when it asks for {Entry}, without asking you? Remove it on its page in Agents to be asked again.";
+    internal override string NoAlways => ApprovalViewModel.NoAlwaysText(_offersAlways, _agent);
+
+    /// <summary>The question's first words: Give, or Always give while confirming.</summary>
+    internal string Verb => IsConfirming ? "Always give " : "Give ";
+
+    /// <summary>The field the agent asked for.</summary>
+    internal string Field { get; }
+
+    /// <summary>The name every candidate shares, with the vault, as the card names it.</summary>
+    internal string Item => InVault(_itemTitle);
+
+    /// <summary>Whose words the quote is.</summary>
+    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+
+    /// <summary>The agent's words, quoted.</summary>
+    internal string Quoted => ApprovalViewModel.Quote(Reason);
+
+    /// <summary>The tool the request came through.</summary>
+    internal string Tool { get; } = "keypaste.request_credential";
+
+    /// <inheritdoc/>
+    protected override void OnAllowsChanged() => OnPropertyChanged(nameof(Verb));
 
     /// <summary>Where the row picked as the person answered is among the candidates, or null; safe from any thread.</summary>
     internal int? PickedIndex => Volatile.Read(ref _picked) is >= 0 and var index ? index : null;
@@ -95,7 +118,7 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     internal string Client { get; }
 
     /// <inheritdoc/>
-    protected override string Asks => $"{Client} wants 1 secret, {Entry}, which {Rows.Count} items answer to";
+    protected override string Asks => $"Give {Agent} {Field}? {Rows.Count} items named {_itemTitle} answer to it";
 
     /// <summary>The label the client's configuration gave its bridge.</summary>
     internal string Label { get; }
@@ -111,9 +134,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     /// <summary>What was scrubbed from the names or the reason, or nothing.</summary>
     internal string Scrubbed { get; }
-
-    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
-    internal string Attribution { get; } = ApprovalViewModel.AttributionText;
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }

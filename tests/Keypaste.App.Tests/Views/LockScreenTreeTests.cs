@@ -117,7 +117,7 @@ public sealed class LockScreenTreeTests
         // Off the password field, whose focused caret is amber too.
         var quick = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "QuickUnlock");
         quick.Focus();
-        AmberElements.AssertOne(window, quick, "the lock screen offering Windows Hello");
+        AccentElements.AssertOne(window, quick, "the lock screen offering Windows Hello");
     });
 
     private static Window Show(UnlockViewModel model)

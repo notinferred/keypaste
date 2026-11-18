@@ -272,7 +272,14 @@ namespace KeePassLib
 
 		public List<string> Tags
 		{
-			get { StrUtil.NormalizeTags(m_lTags); return m_lTags; }
+			get
+			{
+#if KEYPASTE_PURE_TAG_READS
+				if(!StrUtil.AreTagsNormalized(m_lTags))
+#endif
+				StrUtil.NormalizeTags(m_lTags);
+				return m_lTags;
+			}
 			set
 			{
 				if(value == null) { Debug.Assert(false); throw new ArgumentNullException("value"); }

@@ -178,7 +178,8 @@ public sealed class SessionAttachmentTests
         approver.StartApproving();
         var chosen = Path.Combine(Path.GetTempPath(), "chosen.kdbx");
         Assert.True(ServerOptions.TryParse(["--expose", "env/**"], null, null, approver.PipeName, chosen, out var options, out var error), error);
-        await using var connection = new ApproverConnection(options.ApproverName, options.VaultPath);
+        var vault = Assert.Single(options.Vaults);
+        await using var connection = new ApproverConnection(vault.PipeName, vault.Path);
 
         await connection.RequestAsync(Request(), Token);
 
@@ -211,8 +212,9 @@ public sealed class SessionAttachmentTests
         var vault = Path.Combine(Path.GetTempPath(), "listing.kdbx");
         Assert.True(ServerOptions.TryParse(["--vault", vault, "--expose", "env/**"], null, null, approver.PipeName, null, out var options, out var error), error);
 
-        var connection = new ApproverConnection(options.ApproverName, options.VaultPath);
-        return (new ApproverEntryNameSource(connection, options), connection);
+        var named = Assert.Single(options.Vaults);
+        var connection = new ApproverConnection(named.PipeName, named.Path);
+        return (new ApproverEntryNameSource(connection, options, named), connection);
     }
 
     private static string TextOf(CallToolResult result) =>

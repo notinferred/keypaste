@@ -13,6 +13,7 @@
         <ResourceInclude Source="avares://keypaste-app/Theme/Tokens.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/Fluent.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/Icons.axaml" />
+        <ResourceInclude Source="avares://keypaste-app/Theme/ServiceIcons.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/BrandOutlines.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/Brand.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/Controls.axaml" />

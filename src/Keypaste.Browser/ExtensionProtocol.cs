@@ -7,7 +7,7 @@ internal static class ExtensionProtocol
 {
     /// <summary>
     /// The KeePassXC version the relay reports: the lowest KeePassXC-Browser accepts, so it offers neither its password
-    /// generator nor passkeys, which keypaste refuses (D-0625).
+    /// generator nor passkeys, which keypaste refuses.
     /// </summary>
     internal const string ReportedVersion = "2.6.0";
 
@@ -16,6 +16,12 @@ internal static class ExtensionProtocol
     internal const string Associate = "associate";
     internal const string TestAssociate = "test-associate";
     internal const string GetLogins = "get-logins";
+
+    /// <summary>keypaste's own action: the one login the person picked in a page's list, which <c>get-logins</c> names without a password.</summary>
+    internal const string GetLogin = "get-login";
+
+    /// <summary>keypaste's own action: bring keypaste forward for what the person pressed in a page's list.</summary>
+    internal const string OpenKeypaste = "open-keypaste";
     internal const string LockDatabase = "lock-database";
     internal const string DatabaseLocked = "database-locked";
     internal const string DatabaseUnlocked = "database-unlocked";
@@ -24,8 +30,8 @@ internal static class ExtensionProtocol
     internal const string True = "true";
 
     /// <summary>
-    /// Each action D-0548 refuses, answered by the relay itself and never sent to the vault's owner, with the code KeePassXC
-    /// answers its own refusal of that action with (D-0626).
+    /// Each action keypaste refuses, answered by the relay itself and never sent to the vault's owner, with the code KeePassXC
+    /// answers its own refusal of that action with.
     /// </summary>
     internal static FrozenDictionary<string, ExtensionError> Refused { get; } = new Dictionary<string, ExtensionError>(StringComparer.Ordinal)
     {

@@ -173,7 +173,7 @@ public sealed class EntryExposure
             {
                 if (!Selector.TryParse(glob, out var selector))
                 {
-                    error = Invariant($"pattern {i + 1} is a tag selector, which is {TagSelectorPrefix}{ProjectTag.Prefix}<project> or {TagSelectorPrefix}{ProjectTag.Prefix}<project>:<environment>");
+                    error = Invariant($"pattern {i + 1} is a tag selector, which is {TagSelectorPrefix}{ProjectTag.Prefix}<project> or {TagSelectorPrefix}{ProjectTag.Prefix}<project>:<stage>");
                     return false;
                 }
 

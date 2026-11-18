@@ -212,6 +212,21 @@ public sealed class HealthCheckTests : IDisposable
     }
 
     [Fact]
+    public void A_registration_pinned_to_several_vaults_is_a_fix_when_any_one_is_not_there()
+    {
+        var command = PlantAt(Path.Combine(_root, "bin", McpServerLocator.ExecutableName));
+        var there = Path.Combine(_root, "Personal.kdbx");
+        File.WriteAllText(there, string.Empty);
+        var moved = Path.Combine(_root, "Acme.kdbx");
+        var scope = Scope(McpClientMachine.CurrentPlatform);
+        Register(scope.Machine, command, "mcp", "--vault", there, "--vault", moved, "--client-label", "cursor");
+
+        var cursor = Assert.Single(ToolReading.ReadAll(scope, new Runner()));
+
+        Assert.Equal(new HealthFinding(HealthArea.Tool, "cursor", HealthStatus.Fix, "names a vault that is not there") { Where = moved, Fix = _setup }, cursor.Finding);
+    }
+
+    [Fact]
     public void A_tool_installed_but_not_connected_is_a_note_and_one_neither_installed_nor_registered_is_left_out()
     {
         var scope = Scope(McpClientMachine.CurrentPlatform);
@@ -308,15 +323,19 @@ public sealed class HealthCheckTests : IDisposable
         var home = KeypasteHomeDirectory;
         Directory.CreateDirectory(home);
         File.WriteAllText(KeypasteHome.SettingsPath(home), "idle_timeout_seconds = 900\n");
-        File.WriteAllText(KeypasteHome.AgentsPath(home), "this is not toml\n");
+        File.WriteAllText(KeypasteHome.SharedAgentsPath(home), "this is not toml\n");
+        var vaultRules = KeypasteHome.AgentsPath(home, VaultIdentity.Of(home, Path.Combine(_root, "personal.kdbx")));
+        Directory.CreateDirectory(Path.GetDirectoryName(vaultRules)!);
+        File.WriteAllText(vaultRules, "this is not toml\n");
         File.WriteAllText(KeypasteHome.RecentPath(home), "[[vault]]\nthis is not a pair at all\n");
         File.WriteAllText(KeypasteHome.ProjectsPath(home), "{");
         File.WriteAllText(KeypasteHome.RecommendationsPath(home), "[]");
         File.WriteAllText(KeypasteHome.PolicyPath(home), "[[agent]]\n");
 
         var findings = SettingsReading.Findings(SettingsReading.ReadAll(home));
+        var vaultRulesName = $"agents/{Path.GetFileName(vaultRules)}";
 
-        Assert.Equal(["app.toml", "agents.toml", "recent.toml", "projects.json", "recommendations.json", "policy.toml"], findings.Select(finding => finding.Subject));
+        Assert.Equal(["app.toml", "agents.toml", vaultRulesName, "recent.toml", "projects.json", "recommendations.json", "policy.toml"], findings.Select(finding => finding.Subject));
         Assert.All(findings, finding => Assert.Equal(HealthArea.Settings, finding.Area));
 
         var app = Of("app.toml");
@@ -325,11 +344,17 @@ public sealed class HealthCheckTests : IDisposable
         Assert.Equal(KeypasteHome.SettingsPath(home), app.Where);
         Assert.Equal("fix line 1, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences", app.Fix);
 
-        var agents = Of("agents.toml");
+        var shared = Of("agents.toml");
+        Assert.Equal(HealthStatus.Fix, shared.Status);
+        Assert.StartsWith("line 1: ", shared.Says, StringComparison.Ordinal);
+        Assert.EndsWith("; no vault takes its rules, so every vault asks about every value", shared.Says, StringComparison.Ordinal);
+        Assert.Equal("delete it; each vault keeps its own rules now", shared.Fix);
+
+        var agents = Of(vaultRulesName);
         Assert.Equal(HealthStatus.Fix, agents.Status);
         Assert.StartsWith("line 1: ", agents.Says, StringComparison.Ordinal);
         Assert.EndsWith("; agents are refused until it is fixed", agents.Says, StringComparison.Ordinal);
-        Assert.Equal($"fix line 1 of {KeypasteHome.AgentsPath(home)}, or delete it to ask about every value again", agents.Fix);
+        Assert.Equal($"fix line 1 of {vaultRules}, or delete it to ask about every value again", agents.Fix);
 
         var recent = Of("recent.toml");
         Assert.StartsWith("line 2: ", recent.Says, StringComparison.Ordinal);
@@ -350,7 +375,7 @@ public sealed class HealthCheckTests : IDisposable
             },
             Of("recommendations.json"));
         Assert.Equal(
-            new HealthFinding(HealthArea.Settings, "policy.toml", HealthStatus.Note, "keypaste no longer reads it; agents' rules are kept in agents.toml") { Where = KeypasteHome.PolicyPath(home) },
+            new HealthFinding(HealthArea.Settings, "policy.toml", HealthStatus.Note, "keypaste no longer reads it; each vault's agent rules are kept in agents/") { Where = KeypasteHome.PolicyPath(home) },
             Of("policy.toml"));
 
         HealthFinding Of(string subject) => findings.Single(finding => finding.Subject == subject);
@@ -366,7 +391,7 @@ public sealed class HealthCheckTests : IDisposable
             SettingsReading.Findings(SettingsReading.ReadAll(home)));
 
         Assert.True(AppSettings.Save(KeypasteHome.SettingsPath(home), AppSettings.Default));
-        File.WriteAllText(KeypasteHome.AgentsPath(home), string.Empty);
+        File.WriteAllText(KeypasteHome.SharedAgentsPath(home), string.Empty);
 
         Assert.Equal(
             [new HealthFinding(HealthArea.Settings, "settings", HealthStatus.Ok, "app.toml and agents.toml parse")],

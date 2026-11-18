@@ -73,3 +73,17 @@ test('A timed request still times out once the request ahead of it is answered',
 
     await expect.poll(() => page.evaluate(() => settled.hash?.errorCode)).toBe(TIMEOUT_OR_NOT_CONNECTED);
 });
+
+test('A request on the port a reconnect closes is answered at once as not connected, leaving keypaste reachable', async ({ page }) => {
+    await page.evaluate(() => {
+        const port = () => ({ postMessage: (request) => sent.push(request), disconnect: () => {}, onMessage: { addListener: () => {} }, onDisconnect: { addListener: () => {} } });
+        keepassClient.nativePort = port();
+        Object.assign(window, { browser: { runtime: { connectNative: port } } });
+        send('key', 'change-public-keys', false);
+    });
+
+    await page.evaluate(() => keepassClient.connectToNative());
+
+    await expect.poll(() => page.evaluate(() => settled.key?.errorCode), { timeout: 1000 }).toBe(TIMEOUT_OR_NOT_CONNECTED);
+    expect(await page.evaluate(() => keepass.isKeypasteAvailable)).toBe(true);
+});

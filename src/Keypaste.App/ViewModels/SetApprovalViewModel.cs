@@ -3,26 +3,24 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One field of a linked set as the prompt lists it: its item and its field.</summary>
-/// <param name="Entry">The item, as every prompt shows it.</param>
-/// <param name="Field">The field.</param>
-internal sealed record LinkedFieldRow(string Entry, string Field);
+/// <summary>One field of a linked set as the card lists it: the field, and the item it is in by its title.</summary>
+/// <param name="Field">The field's name.</param>
+/// <param name="Item">The item's title.</param>
+internal sealed record LinkedFieldRow(string Field, string Item);
 
-/// <summary>
-/// An agent's linked set in front of the person at this desktop, allowed once or denied as a whole. It holds names, never a value.
-/// </summary>
-/// <remarks>A set offers no always answer, so nothing is kept for it (PRODUCT §2).</remarks>
+/// <summary>An agent's request for a linked set, allowed once as a whole or denied.</summary>
 internal sealed class SetApprovalViewModel : PromptViewModel
 {
     internal SetApprovalViewModel(SetPrompt prompt)
+        : base(prompt?.Identity)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
         Client = prompt.Client;
-        Wants = string.Create(CultureInfo.InvariantCulture, $" wants {prompt.Fields.Count} secrets together");
-        Title = prompt.Client + Wants;
+        Count = string.Create(CultureInfo.InvariantCulture, $"{prompt.Fields.Count}");
         Label = prompt.Label ?? "none configured";
-        Fields = [.. prompt.Fields.Select(field => new LinkedFieldRow(field.Entry, field.Field))];
+        Fields = [.. prompt.Fields.Select(field => new LinkedFieldRow(field.Field, field.ItemTitle))];
+        Entries = string.Join(", ", prompt.Fields.Select(field => $"{field.Entry} · {field.Field}"));
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {
@@ -37,37 +35,35 @@ internal sealed class SetApprovalViewModel : PromptViewModel
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
 
-    /// <summary>Who asks and how many secrets, as the design's heading says it.</summary>
-    internal string Title { get; }
+    /// <summary>How many values the set holds, as the question says it.</summary>
+    internal string Count { get; }
 
     /// <inheritdoc/>
-    protected override string Asks => Title;
+    protected override string Asks => $"Give {Agent} these {Count} values?";
 
-    /// <summary>What the heading says after the client, drawn apart so a long client name is trimmed and this is not.</summary>
-    internal string Wants { get; }
-
-    /// <summary>The label the client's configuration gave its bridge.</summary>
     internal string Label { get; }
 
-    internal string Tool { get; } = "tool: keypaste.request_linked_set";
+    internal string Tool { get; } = "keypaste.request_linked_set";
 
-    /// <summary>Each item and field, in the order the agent asked.</summary>
+    /// <summary>The fields, in the order the agent named them.</summary>
     internal IReadOnlyList<LinkedFieldRow> Fields { get; }
+
+    /// <summary>Each field's item by its group and title, for Details.</summary>
+    internal string Entries { get; }
 
     /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
     internal string Reason { get; }
 
-    /// <summary>What was scrubbed from the items or the reason, or nothing.</summary>
+    /// <summary>Whose words the quote is.</summary>
+    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+
+    /// <summary>The agent's words, quoted.</summary>
+    internal string Quoted => ApprovalViewModel.Quote(Reason);
+
     internal string Scrubbed { get; }
 
-    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
-    internal string Attribution { get; } = ApprovalViewModel.AttributionText;
-
-    /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
 
-    /// <summary>What allowing does, and that it is the whole set or nothing.</summary>
-    internal string Explainer { get; } =
-        "Allowing returns every value above to the agent at once, which can read them and pass them on. "
-        + "Deny refuses them all. Allow only a request you expected.";
+    /// <summary>What allowing does, in one plain line.</summary>
+    internal string Consequence { get; } = "The agent receives every value at once and can pass them on.";
 }

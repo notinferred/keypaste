@@ -144,6 +144,14 @@
                                     IsChecked="{Binding LockWhenMinimized}" />
                     </ctl:FieldRow.Actions>
                   </ctl:FieldRow>
+                  <ctl:FieldRow Label="{x:Static res:Strings.ReduceTransparency}" IsVisible="{x:Static vm:SettingsViewModel.OffersReduceTransparency}">
+                    <ctl:FieldRow.Actions>
+                      <ToggleSwitch Name="ReduceTransparency"
+                                    AutomationProperties.Name="{x:Static res:Strings.ReduceTransparency}"
+                                    ToolTip.Tip="{x:Static res:Strings.ReduceTransparencyHelp}"
+                                    IsChecked="{Binding ReduceTransparency}" />
+                    </ctl:FieldRow.Actions>
+                  </ctl:FieldRow>
                   <ctl:FieldRow Label="{Binding StayInTrayLabel}">
                     <ctl:FieldRow.Actions>
                       <ToggleSwitch Name="StayInTray"
@@ -209,7 +217,7 @@
               <StackPanel Spacing="12">
                 <Border Classes="group">
                   <ctl:GroupedRows>
-                    <ctl:FieldRow Label="{x:Static res:Strings.RecentVaults}">
+                    <ctl:FieldRow Classes="adaptive" Label="{x:Static res:Strings.RecentVaults}">
                       <ctl:FieldRow.Actions>
                         <Button Name="AskForgetAll" Classes="ghost sm" Content="{x:Static res:Strings.ForgetRecentVaults}" Command="{Binding AskForgetAllCommand}"
                                 ToolTip.Tip="{x:Static res:Strings.KeypasteRemembersThePathsOfVaultsYouXb13291}"
@@ -245,6 +253,16 @@
             </StackPanel>
 
             <StackPanel Spacing="16" IsVisible="{Binding ShowsThisVault}">
+
+              <!-- With several vaults open, the vault this section shows. -->
+              <StackPanel Spacing="6" HorizontalAlignment="Left" IsVisible="{Binding OffersVaultChoice}">
+                <TextBlock Classes="label" Text="{x:Static res:Strings.VaultLabel}" />
+                <ComboBox Name="SettingsVault"
+                          MinWidth="200"
+                          AutomationProperties.Name="{x:Static res:Strings.VaultLabel}"
+                          ItemsSource="{Binding VaultChoices}"
+                          SelectedItem="{Binding ShownVault}" />
+              </StackPanel>
 
               <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
               <StackPanel Spacing="12" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
@@ -426,26 +444,17 @@
             </StackPanel>
 
             <StackPanel Spacing="16" IsVisible="{Binding ShowsBrowser}">
-              <!-- Browser fill: pairing keypaste's extension, armed by this press alone, and the pairings the vault holds. -->
+              <!-- Browser fill: how a browser pairs, from its extension, and this computer's pairings for the vaults open. -->
               <Border Name="BrowserFillCard" IsVisible="{Binding HasBrowserFill}">
                 <StackPanel Spacing="12" DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
                   <Border Classes="group">
                     <ctl:GroupedRows>
                       <ctl:FieldRow Label="{x:Static res:Strings.BrowserFill}">
                         <StackPanel Spacing="4">
-                          <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
-                                     Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
+                          <TextBlock Name="PairInTheExtension" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
+                                     Text="{x:Static res:Strings.PairInTheExtension}" />
                           <TextBlock ctl:MachineRuns.InText="True" Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
                         </StackPanel>
-                        <ctl:FieldRow.Actions>
-                          <Panel VerticalAlignment="Top">
-                            <Button Name="PairBrowser" Classes="ghost sm" Content="{x:Static res:Strings.PairABrowser}" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
-                                    ToolTip.Tip="{x:Static res:Strings.KeypasteExtensionPairsWithTheVaultXb9e44c}"
-                                    AutomationProperties.Name="{x:Static res:Strings.PairABrowser}" />
-                            <Button Name="StopPairing" Classes="ghost sm" Content="{x:Static res:Strings.StopPairing}" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
-                                    AutomationProperties.Name="{x:Static res:Strings.StopPairing}" />
-                          </Panel>
-                        </ctl:FieldRow.Actions>
                       </ctl:FieldRow>
                     </ctl:GroupedRows>
                   </Border>

@@ -19,7 +19,7 @@ public sealed class ServerOptionsTests
 
         Assert.False(plain!.AllowRun);
         Assert.True(allowed!.AllowRun);
-        Assert.NotNull(allowed.VaultKey);
+        Assert.NotNull(Assert.Single(allowed.Vaults).Key);
     }
 
     /// <summary>D-0422: a bridge nobody widened reaches the variables of tagged entries, and nothing by place.</summary>
@@ -64,13 +64,11 @@ public sealed class ServerOptionsTests
         Assert.True(ServerOptions.TryParse(["--vault", "flag.kdbx"], "env.kdbx", null, null, "chosen.kdbx", out var fromFlag, out _));
         Assert.True(ServerOptions.TryParse([], null, null, null, null, out var none, out _));
 
-        Assert.Equal(Path.GetFullPath("chosen.kdbx"), chosen!.VaultPath);
-        Assert.NotNull(chosen.VaultKey);
-        Assert.NotNull(chosen.ApproverName);
-        Assert.Equal(Path.GetFullPath("env.kdbx"), fromEnvironment!.VaultPath);
-        Assert.Equal(Path.GetFullPath("flag.kdbx"), fromFlag!.VaultPath);
-        Assert.Empty(none!.VaultPath);
-        Assert.Null(none.VaultKey);
+        Assert.Equal(Path.GetFullPath("chosen.kdbx"), Assert.Single(chosen!.Vaults).Path);
+        Assert.NotNull(chosen.Vaults[0].PipeName);
+        Assert.Equal(Path.GetFullPath("env.kdbx"), Assert.Single(fromEnvironment!.Vaults).Path);
+        Assert.Equal(Path.GetFullPath("flag.kdbx"), Assert.Single(fromFlag!.Vaults).Path);
+        Assert.Empty(none!.Vaults);
     }
 
     /// <summary>D-0466: a bridge looks for the locked app under its vault's own name, whatever <c>--approver</c> or <c>KEYPASTE_APPROVER</c> pins.</summary>
@@ -84,9 +82,9 @@ public sealed class ServerOptionsTests
         Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx", "--approver", "pinned-by-flag"], null, home, null, null, out var flagged, out _));
         Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx"], null, home, "pinned-by-environment", null, out var fromEnvironment, out _));
 
-        Assert.Equal(expected, plain!.LockedAppName);
-        Assert.Equal(("pinned-by-flag", expected), (flagged!.ApproverName, flagged.LockedAppName));
-        Assert.Equal(("pinned-by-environment", expected), (fromEnvironment!.ApproverName, fromEnvironment.LockedAppName));
+        Assert.Equal(expected, Assert.Single(plain!.Vaults).LockedAppName);
+        Assert.Equal(("pinned-by-flag", expected), (Assert.Single(flagged!.Vaults).PipeName, flagged.Vaults[0].LockedAppName));
+        Assert.Equal(("pinned-by-environment", expected), (Assert.Single(fromEnvironment!.Vaults).PipeName, fromEnvironment.Vaults[0].LockedAppName));
     }
 
     [Fact]
@@ -95,9 +93,39 @@ public sealed class ServerOptionsTests
         Assert.True(ServerOptions.TryParse(["--approver", "pinned-by-flag"], null, null, "pinned-by-environment", null, out var pinned, out _));
         Assert.True(Parse(out var help, out _, "--help"));
 
-        Assert.Equal("pinned-by-flag", pinned!.ApproverName);
-        Assert.Null(pinned.LockedAppName);
-        Assert.Null(help!.LockedAppName);
+        Assert.Empty(pinned!.Vaults);
+        Assert.Empty(help!.Vaults);
+    }
+
+    /// <summary>A tool allowed several vaults names each with --vault; each is asked through its own owner's pipe, named by its file.</summary>
+    [Fact]
+    public void EachVaultGiven_IsServedThroughItsOwnPipe_AndNamedByItsFile()
+    {
+        Assert.True(Parse(out var options, out var error, "--vault", "Personal.kdbx", "--vault", "work/Acme.kdbx", "--vault", "Personal.kdbx"), error);
+
+        Assert.Equal(["Personal", "Acme"], options!.Vaults.Select(vault => vault.Name));
+        Assert.Equal([Path.GetFullPath("Personal.kdbx"), Path.GetFullPath("work/Acme.kdbx")], options.Vaults.Select(vault => vault.Path));
+        Assert.Equal(2, options.Vaults.Select(vault => vault.PipeName).Distinct().Count());
+        Assert.Equal(2, options.Vaults.Select(vault => vault.LockedAppName).Distinct().Count());
+    }
+
+    [Fact]
+    public void TwoVaultsOfOneName_AreNumbered()
+    {
+        Assert.True(Parse(out var options, out var error, "--vault", "a/Personal.kdbx", "--vault", "b/Personal.kdbx"), error);
+
+        Assert.Equal(["Personal", "Personal 2"], options!.Vaults.Select(vault => vault.Name));
+    }
+
+    /// <summary>A pinned pipe is one owner's, so several vaults cannot share it.</summary>
+    [Fact]
+    public void AnApproverWithSeveralVaults_IsRefusedAtStartup()
+    {
+        Assert.False(Parse(out _, out var flagged, "--vault", "a.kdbx", "--vault", "b.kdbx", "--approver", "pinned"));
+        Assert.False(ServerOptions.TryParse(["--vault", "a.kdbx", "--vault", "b.kdbx"], null, null, "pinned", null, out _, out var fromEnvironment));
+
+        Assert.StartsWith("--approver:", flagged, StringComparison.Ordinal);
+        Assert.StartsWith("--approver:", fromEnvironment, StringComparison.Ordinal);
     }
 
     /// <summary>D-0466: a bridge never looks for its approver on a locked app's pipe, however the name is cased.</summary>

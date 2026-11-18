@@ -157,7 +157,7 @@ native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else pri
 
 # Turns run on, or off, for agents in this computer's rules the way a person does it with nothing else holding the
 # vault: a short-lived `keypaste approve` with a home of its own makes and seals each change, and the sealed
-# agents.toml and the home identity it is bound to are then put in $KEYPASTE_HOME, so the gate's own log holds
+# rules and the home identity they are bound to are then put in $KEYPASTE_HOME, so the gate's own log holds
 # only what the gate itself does. Every agent sees URLs, and usernames unless Settings hides them, so a change naming only what an
 # agent may see does nothing; one naming a removed setting fails.
 #   agent_settings <keypaste> <vault> <master> '<agent> [--run on|off] [--see <selector>]...'...
@@ -205,7 +205,8 @@ agent_settings() {
   wait "$pid" 2>/dev/null || true
   if [ "$status" -eq 0 ]; then
     word="$(cygpath -u "$KEYPASTE_HOME" 2>/dev/null || printf '%s' "$KEYPASTE_HOME")"
-    mkdir -p "$word" && cp "$home/agents.toml" "$home/agents.id" "$word/" || status=1
+    # Each vault's file is named for its home, so the rules go in as the home's shared file, which the vault's owner takes as its own.
+    mkdir -p "$word" && rm -rf "$word/agents" && cp "$home/agents/"*.toml "$word/agents.toml" && cp "$home/agents.id" "$word/" || status=1
   fi
   [ "$status" -eq 0 ] || cat "$err" >&2
   rm -rf "$home" 2>/dev/null || true

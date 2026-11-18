@@ -217,7 +217,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = password });
 
     private static NavItem Settings(ShellViewModel shell) =>
-        shell.RecommendationsRow;
+        shell.SecurityPlace;
 
     private ShellViewModel Shell() =>
         new(_session, _fixture.Home, authority: null, clock: _clock, post: null);

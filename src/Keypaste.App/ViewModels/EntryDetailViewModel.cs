@@ -142,7 +142,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Url = entry.Url;
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
-        Kind = EntryKinds.Of(entry);
+        _iconKind = EntryKinds.Of(entry);
+        Kind = _iconKind;
 
         // A reference names a path, and one two items answer to resolves to neither.
         Reference = session.Unlocked?.NameIsShared(Name) == true ? null : KpReferences.ForEntry(Name);
@@ -257,9 +258,19 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     internal RelayCommand CancelRemoveTotpCommand { get; }
 
+    /// <summary>Whether the item carries the favorite tag, which lists it in Favorites.</summary>
+    internal bool IsFavorite => Tags.Any(chip => string.Equals(chip.Tag, ItemPlaces.FavoriteTag, StringComparison.Ordinal));
+
+    /// <summary>What the star does: add the item to Favorites or take it out.</summary>
+    internal string FavoriteLabel => IsFavorite ? Resources.Strings.RemoveFromFavorites : Resources.Strings.AddToFavorites;
+
+    /// <summary>The star on the item's header and in its menu: the favorite tag added or removed, as a tag is.</summary>
+    [RelayCommand]
+    private void ToggleFavorite() => WriteTag(ItemPlaces.FavoriteTag, adding: !IsFavorite);
+
     /// <summary>The entry's own tags, never its group's.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasTags), nameof(TagsSummary))]
+    [NotifyPropertyChangedFor(nameof(HasTags), nameof(TagsSummary), nameof(IsFavorite), nameof(FavoriteLabel), nameof(Mark))]
     internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
     internal bool HasTags => Tags.Count > 0;
@@ -890,6 +901,10 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [ObservableProperty]
     internal partial string Created { get; private set; } = string.Empty;
 
+    /// <summary>When the entry last changed, as the metadata row shows it.</summary>
+    [ObservableProperty]
+    internal partial string Modified { get; private set; } = string.Empty;
+
     /// <summary>When its current password was set, as the metadata row shows it.</summary>
     [ObservableProperty]
     internal partial string Rotated { get; private set; } = string.Empty;
@@ -965,9 +980,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [NotifyPropertyChangedFor(nameof(ShowsAgentAccessSummary))]
     internal partial IReadOnlyList<string> AgentLines { get; private set; } = [];
 
-    /// <summary>What sort of entry this is.</summary>
+    // The kind its icon keeps, which a card's or an identity's tag overrides.
+    private EntryKind _iconKind;
+
+    /// <summary>What sort of entry this is: its tag's card or identity, or what its icon keeps.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(KindLabel))]
+    [NotifyPropertyChangedFor(nameof(KindLabel), nameof(Mark))]
     internal partial EntryKind Kind { get; private set; }
 
     internal string KindLabel => EntryKinds.Label(Kind);
@@ -997,6 +1015,15 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https.</summary>
     internal bool OpensUrl => WebAddress.TryOpenable(Url, out _);
+
+    /// <summary>The footer line that says where paired browsers fill the item, for one whose URL opens; empty otherwise.</summary>
+    internal string FillsOn => WebAddress.TryOpenable(Url, out var address) ? $"Fills on {address.Host} in paired browsers." : string.Empty;
+
+    /// <summary>The item's UUID as a <see cref="Guid"/>, which picks its monogram's hue.</summary>
+    internal Guid Hue => Guid.TryParseExact(_uuid, "N", out var id) ? id : Guid.Empty;
+
+    /// <summary>What the item's tile draws in place of the letter, from its website, kind and tags.</summary>
+    internal Controls.ItemMark Mark => Controls.ItemMarks.Of(Url, Kind, Tags.Any(chip => ProjectTag.Read(chip.Tag).Kind == ProjectTagKind.Member));
 
     /// <summary>Whether the URL is shown as text, with a line saying why it opens nothing.</summary>
     internal bool ShowsUrlNote => Url.Length > 0 && !OpensUrl;
@@ -1110,7 +1137,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal partial string Username { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl), nameof(HasUrl), nameof(HasStandardRows))]
+    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl), nameof(HasUrl), nameof(HasStandardRows), nameof(Mark))]
     [NotifyCanExecuteChangedFor(nameof(CopyUrlCommand), nameof(OpenUrlCommand))]
     internal partial string Url { get; private set; }
 
@@ -1228,7 +1255,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
         Changed?.Invoke(this, EventArgs.Empty);
-        Kind = EntryKinds.Of(entry);
+        _iconKind = EntryKinds.Of(entry);
+        Kind = _iconKind;
         ReadFieldsAndTags();
         Attachments.Read();
     }
@@ -1435,6 +1463,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             var now = _session.Clock.GetUtcNow();
             var times = vault.ReadTimes(Name);
             Created = UseText.Dated(times?.Created, now);
+            Modified = UseText.Dated(times?.Modified, now);
             Expiry = UseText.LocalMinute(times?.Expires);
             IsExpired = times?.Expires <= now;
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
@@ -1479,6 +1508,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
+            Kind = EntryKinds.Tagged(_iconKind, Tags.Select(chip => chip.Tag));
             TagSuggestions = [.. ProjectCatalog.MemberTags(vault).Except(Tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
             Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment))];
             ReadTotp(vault);
@@ -1645,8 +1675,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         {
             var where = string.Join(", ", environments);
             lines.Add(EnvConvention.IsEnvNamedField(newName)
-                ? $"{old} is a variable of {where}. Renamed, those environments give {renamed} instead, and nothing there gives {old}."
-                : $"{old} is a variable of {where}. {renamed} is not a variable name, so those environments stop giving {old}.");
+                ? $"{old} is a variable of {where}. Renamed, those stages give {renamed} instead, and nothing there gives {old}."
+                : $"{old} is a variable of {where}. {renamed} is not a variable name, so those stages stop giving {old}.");
         }
 
         if (change.References.Count > 0)

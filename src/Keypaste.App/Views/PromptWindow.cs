@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
@@ -10,7 +11,8 @@ namespace Keypaste.App.Views;
 /// <summary>
 /// A prompt window whose whole client area is the dialog card and its shadow: no system chrome,
 /// moved by dragging the card, focused on Deny when it opens, is brought forward or is activated, drawn
-/// inactive while another window has focus, and answered with a denial however it closes.
+/// inactive while another window has focus, and answered with a denial however it closes. A claim card
+/// answers Return and Escape itself, wherever focus is (<see cref="PromptViewModel.Return"/>).
 /// </summary>
 internal abstract class PromptWindow : Window
 {
@@ -42,6 +44,11 @@ internal abstract class PromptWindow : Window
 
             (Content as PromptFrame)?.Hold();
 
+            if (DataContext is PromptViewModel { Vault: { } vault })
+            {
+                Title = $"{Title}, in {vault}";
+            }
+
             // A window that opens without focus raises no Deactivated, and a press or a bring-forward then activates it.
             Classes.Set(_inactive, !IsActive);
 
@@ -56,6 +63,28 @@ internal abstract class PromptWindow : Window
             FocusDeny();
         };
         Deactivated += (_, _) => Classes.Set(_inactive, true);
+
+        // Before any focused control sees the key, so Return on a focused Deny or Details still means the primary.
+        AddHandler(KeyDownEvent, OnClaimKey, RoutingStrategies.Tunnel);
+    }
+
+    private void OnClaimKey(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None || DataContext is not PromptViewModel { Requester: not null } prompt)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter && prompt.AnswersReturn)
+        {
+            prompt.Return();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            prompt.Escape();
+            e.Handled = true;
+        }
     }
 
     /// <summary>The working area the prompt must fit: the screen it opens on, as the platform centers it.</summary>
@@ -92,7 +121,7 @@ internal abstract class PromptWindow : Window
         FocusDeny();
     }
 
-    private void FocusDeny() => this.FindControl<Button>("Deny")?.Focus();
+    private void FocusDeny() => (this.FindControl<Button>("Deny") is { IsVisible: true } deny ? deny : this.FindControl<Button>("Back"))?.Focus();
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {

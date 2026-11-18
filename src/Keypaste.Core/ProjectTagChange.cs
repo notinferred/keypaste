@@ -173,20 +173,20 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
                     ? Adding
                         ? "While the item carries it, every agent request for the item is asked live."
                         : "It stops making agent requests for the item ask live, unless another tag or the item's group still does."
-                    : Adding ? "It changes no environment." : "Removing it changes no environment.",
+                    : Adding ? "It changes no stage." : "Removing it changes no stage.",
             ];
         }
 
         var environment = EntryNameSanitizer.SanitizePath(Environment!).Text;
-        var protectedNote = Read.Protects ? ", a protected environment whose every release is asked live" : string.Empty;
+        var protectedNote = Read.Protects ? ", a protected stage whose every release is asked live" : string.Empty;
 
         if (!Moves)
         {
             return
             [
                 Adding
-                    ? $"{entry} is already in {environment} through another tag, so adding {tags} changes no environment."
-                    : $"{entry} stays in {environment} through another tag, so removing {tags} changes no environment.",
+                    ? $"{entry} is already in {environment} through another tag, so adding {tags} changes no stage."
+                    : $"{entry} stays in {environment} through another tag, so removing {tags} changes no stage.",
             ];
         }
 

@@ -166,7 +166,7 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
     {
         if (!_authority.TryRules(out var rules, out var ignored))
         {
-            Problem = "These rules can't be read or changed while the vault is locked or agents.toml can't be read. Correct that, then open Settings again.";
+            Problem = "These rules can't be read or changed while the vault is locked or its agent rules can't be read. Correct that, then open Settings again.";
             Ignored = string.Empty;
             Rows = [];
             ChooseCommand.NotifyCanExecuteChanged();

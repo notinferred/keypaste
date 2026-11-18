@@ -122,7 +122,7 @@ internal sealed partial class ShellView
         }
     }
 
-    /// <summary>A group takes the item unless the vault would refuse the move; the rail's groups button, held, opens the groups over the content.</summary>
+    /// <summary>A group takes the item unless the vault would refuse the move; a folded Groups row, held, unfolds, and in a narrow window the title bar's sidebar button, held, opens the sidebar with its groups over the content.</summary>
     private DragDropEffects OverItemTarget(EntryRow item, Point at)
     {
         var over = this.InputHitTest(at) as Visual;
@@ -134,10 +134,16 @@ internal sealed partial class ShellView
             return DragDropEffects.Move;
         }
 
-        if (over?.GetSelfAndVisualAncestors().Contains(this.FindControl<Button>("RailGroups")) == true && _shell is { ShowsRail: true })
+        if (over?.GetSelfAndVisualAncestors().Contains(this.FindControl<Button>("ShowSidebar")) == true && _shell is { IsNarrow: true, ShowsSidebar: false })
         {
-            Cue.Show(this.FindControl<Button>("RailGroups")!, "Hold here to see the groups");
-            StartRailTimer();
+            Cue.Show(this.FindControl<Button>("ShowSidebar")!, "Hold here to see the groups");
+            StartRailTimer(OpenGroupsForHeldItem);
+            return DragDropEffects.None;
+        }
+
+        if (over?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault() is { DataContext: GroupsRow { IsExpanded: false } groups } && _shell is { } shell)
+        {
+            StartRailTimer(() => shell.Fold(groups, open: true));
             return DragDropEffects.None;
         }
 
@@ -149,7 +155,7 @@ internal sealed partial class ShellView
     private GroupRow? GroupAt(Point at) =>
         (this.InputHitTest(at) as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as GroupRow;
 
-    private void StartRailTimer()
+    private void StartRailTimer(Action held)
     {
         if (_railTimer is not null)
         {
@@ -163,7 +169,7 @@ internal sealed partial class ShellView
 
             if (_heldItem is not null)
             {
-                OpenGroupsForHeldItem();
+                held();
             }
         };
         _railTimer.Start();
@@ -175,6 +181,11 @@ internal sealed partial class ShellView
         Cue.Hide();
         _openedForDrag = true;
         _shell?.OpenSidebarOverlay();
+
+        if (_shell?.SidebarRows.OfType<GroupsRow>().FirstOrDefault(row => row.Vault == _shell.VaultInView) is { IsExpanded: false } groups)
+        {
+            _shell.Fold(groups, open: true);
+        }
     }
 
     private void StopRailTimer()

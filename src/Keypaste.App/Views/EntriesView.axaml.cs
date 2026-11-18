@@ -42,6 +42,7 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;
+        _rows.ContainerPrepared += OnRowPrepared;
         _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
         _rows.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         _rows.AddHandler(PointerMovedEvent, OnRowDragged, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -90,6 +91,15 @@ internal sealed partial class EntriesView : UserControl
         (_rows.ContainerFromIndex(index) ?? _rows).Focus(NavigationMethod.Tab);
     }
 
+    /// <summary>A day's heading names the rows under it and cannot be chosen.</summary>
+    private static void OnRowPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        var heading = e.Container.DataContext is RowSection;
+        e.Container.Focusable = !heading;
+        e.Container.IsEnabled = !heading;
+        e.Container.Classes.Set("heading", heading);
+    }
+
     /// <summary>Where the detail would replace the list, a choice would hide it, so the arrows only move the keyboard and Enter or Space opens the row.</summary>
     private void OnRowsKeyDown(object? sender, KeyEventArgs e)
     {
@@ -99,13 +109,14 @@ internal sealed partial class EntriesView : UserControl
         }
 
         var focused = (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
-        var at = focused is null ? -1 : _rows.IndexFromContainer(focused);
-        var last = _rows.ItemCount - 1;
+        var rows = _entries.Rows;
+        var at = focused?.DataContext is EntryRow current ? rows.ToList().IndexOf(current) : -1;
+        var last = rows.Count - 1;
 
         switch (e.Key)
         {
             case Key.Down or Key.Up or Key.Home or Key.End when last >= 0:
-                FocusRow(_rows.Items[Math.Clamp(e.Key switch { Key.Down => at + 1, Key.Up => at < 0 ? 0 : at - 1, Key.Home => 0, _ => last }, 0, last)] as EntryRow);
+                FocusRow(rows[Math.Clamp(e.Key switch { Key.Down => at + 1, Key.Up => at < 0 ? 0 : at - 1, Key.Home => 0, _ => last }, 0, last)]);
                 e.Handled = true;
                 break;
             case Key.Enter or Key.Space when focused?.DataContext is EntryRow row:

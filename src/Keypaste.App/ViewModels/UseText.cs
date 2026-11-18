@@ -20,6 +20,9 @@ internal static class UseText
         return use.State == EntryUseState.InUse ? Strings.TimeInUse : use.LastUsed is { } at ? Ago(at, now) : Strings.TimeNever;
     }
 
+    /// <summary>"Changed" and the moment, as an item's row says it in its tooltip and to a screen reader.</summary>
+    internal static string Changed(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.ChangedValue, PersonTime.Moment(at.ToLocalTime()));
+
     /// <summary>What the reveal button's tooltip says.</summary>
     internal static string FragileKeyFile(string name) => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, name);
 

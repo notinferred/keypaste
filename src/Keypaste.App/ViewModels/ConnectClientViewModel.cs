@@ -6,8 +6,8 @@ using Keypaste.Core.Settings;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The pane under an AI tool's row on Agents: connects the tool to the vault this app has unlocked, checks
-/// the connection, or disconnects it.
+/// The pane under an AI tool's row on Agents: connects the tool to the vaults the person chooses, the one in view by
+/// default, checks the connection, or disconnects it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -58,6 +58,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     /// <param name="cancelled">Called once Cancel has dropped the plan.</param>
     /// <param name="clipboard">Where Copy link puts the tool's install link, or null to offer no copy.</param>
     /// <param name="web">What opens the tool's install link, or null to offer no opening.</param>
+    /// <param name="accountVaults">The vaults of the local account the tool may also be allowed, or null for the one in view alone.</param>
     internal ConnectClientViewModel(
         AppVaultSession session,
         ClientConnector connector,
@@ -66,7 +67,8 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         Action? ran = null,
         Action? cancelled = null,
         ClipboardCountdown? clipboard = null,
-        IWebLauncher? web = null)
+        IWebLauncher? web = null,
+        IReadOnlyList<string>? accountVaults = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(connector);
@@ -80,6 +82,12 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         _web = web;
         Client = client;
         Removes = removes;
+        Vaults = Choices(session.VaultPath, accountVaults ?? []);
+
+        foreach (var vault in Vaults)
+        {
+            vault.PropertyChanged += (_, _) => Choosing = PreviewAsync();
+        }
 
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => Pending is not null && !IsRunning);
         CancelCommand = new RelayCommand(Cancel, () => Pending is not null && !IsRunning);
@@ -97,6 +105,15 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
     /// <summary>What the pane is headed by.</summary>
     internal string Title => Removes ? $"Disconnect {Client.DisplayName}" : $"Connect {Client.DisplayName}";
+
+    /// <summary>The vaults the tool may be allowed, the one in view first and chosen; any others the local account holds follow, unchosen.</summary>
+    internal IReadOnlyList<ConnectVault> Vaults { get; }
+
+    /// <summary>Whether the pane offers a choice of vaults: connecting, with more than one to choose from.</summary>
+    internal bool ChoosesVaults => !Removes && Vaults.Count > 1;
+
+    /// <summary>The plan composed again after the person last changed which vaults are chosen.</summary>
+    internal Task Choosing { get; private set; } = Task.CompletedTask;
 
     /// <summary>Exactly what Connect or Remove will run, as core composed it.</summary>
     internal string Preview => _preview;
@@ -193,11 +210,28 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         Forget();
         InstallLink = null;
 
-        // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both.
-        if (_session.VaultPath is not { } vault
-            || !McpServerLocator.TryPin(_connector.Machine, _session.Home, _connector.ApproverOverride, vault, ChosenVault.Read(_session.Home), out var pins))
+        // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both. The vaults
+        // chosen are pinned even when one is the chosen vault, so the tool keeps reaching those alone whatever is opened or
+        // chosen later.
+        List<string> chosen = [.. Vaults.Where(vault => vault.IsChosen).Select(vault => vault.Path)];
+
+        if (_session.VaultPath is null)
         {
             Message = $"Unlock a vault before connecting {Client.DisplayName} to it.";
+            return;
+        }
+
+        if (chosen.Count == 0)
+        {
+            Message = $"Choose a vault {Client.DisplayName} may reach.";
+            return;
+        }
+
+        if (!McpServerLocator.TryPin(_connector.Machine, _session.Home, _connector.ApproverOverride, chosen, chosenVault: null, out var pins))
+        {
+            Message = chosen.Count > 1
+                ? $"{Client.DisplayName} can reach several vaults only while keypaste uses its usual home and pipes. Choose one vault."
+                : $"Unlock a vault before connecting {Client.DisplayName} to it.";
             return;
         }
 
@@ -240,6 +274,19 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         Pending = plan;
         _pendingRegistration = registration;
         Show(plan, ConnectNote(client, target, plan));
+    }
+
+    /// <summary>The vault in view, chosen, then each other vault the account holds, unchosen.</summary>
+    private static List<ConnectVault> Choices(string? inView, IReadOnlyList<string> accountVaults)
+    {
+        List<ConnectVault> choices = inView is null ? [] : [new ConnectVault(inView, chosen: true)];
+
+        foreach (var vault in accountVaults.Where(vault => !choices.Any(choice => ChosenVault.Same(choice.Path, vault))))
+        {
+            choices.Add(new ConnectVault(vault, chosen: false));
+        }
+
+        return choices;
     }
 
     private async Task PreviewRemoveAsync()
@@ -305,7 +352,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         Message = result.Status switch
         {
             McpSetupStatus.Done when removing => $"Disconnected. {name} can no longer start keypaste mcp for this vault." + Afterwards(client, result, removing),
-            McpSetupStatus.Done => $"Connected. {name} starts keypaste mcp for this vault; Check asks through it once." + Afterwards(client, result, removing),
+            McpSetupStatus.Done => $"Connected. {name} starts keypaste mcp for {(registration?.VaultPaths.Count > 1 ? "these vaults" : "this vault")}; Check asks through it once." + Afterwards(client, result, removing),
             McpSetupStatus.NotConnected => NotConnected(client),
             McpSetupStatus.NotInstalled => $"{name} could not be started, so nothing was changed. Check that it is installed, then run this again.",
             McpSetupStatus.LinkFailed when plan.Steps.OfType<McpBridgeLink>().FirstOrDefault() is { } link =>
@@ -602,4 +649,20 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
             _ = check.DisposeAsync().AsTask();
         }
     }
+}
+
+/// <summary>A vault Connect may allow the tool, and whether the person chose it.</summary>
+/// <param name="path">The vault's path.</param>
+/// <param name="chosen">Whether it starts chosen.</param>
+internal sealed partial class ConnectVault(string path, bool chosen) : ObservableObject
+{
+    /// <summary>The vault's path, which the registration pins.</summary>
+    internal string Path { get; } = path;
+
+    /// <summary>The vault's name, as prompts and the bridge's results give it.</summary>
+    internal string Name { get; } = System.IO.Path.GetFileNameWithoutExtension(path);
+
+    /// <summary>Whether the tool may reach it.</summary>
+    [ObservableProperty]
+    internal partial bool IsChosen { get; set; } = chosen;
 }
