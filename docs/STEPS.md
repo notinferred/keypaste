@@ -53,6 +53,9 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **J.2 — Ask a separate yes for crash reports at first launch.** Needs: none.
   - The first-launch screen asks for crash reports on their own, apart from accepting the terms of use, as [law 5](../SECURITY.md#security-laws) requires; nothing is sent without that yes, and Settings' switch still turns them off.
   - Accepted when tests show no report sent after the terms are accepted alone, reports sent once the person says yes, and none after the switch is off.
+- [ ] **Y.4 — Pin the KeePassXC version CI tests against on Linux.** Needs: none.
+  - Accepted when Linux CI installs one named KeePassXC version, and changing it takes a commit.
+  - Upstream's 2.8.0 AppImage needs glibc 2.38, which the `ubuntu-22.04` jobs that build and check the CLI release lack, and macOS's `keepassxc-cli --version` answers `KeePassXC 2.8.0`; the first attempt was reverted for both on 2026-11-18. Law 14 also names KeePassXC 2.7, which a single 2.8.0 pin stops testing.
 - [ ] **A.2 — Split the repository.** Needs: none. Input: the founder creates the repositories and re-points Cloudflare's deployment.
   - The extension, keypaste.com (private), KeePassLib with Twofish and `Keypaste.Infrastructure` each move to their own repository with their Git history; the product links KeePassLib, Infrastructure and the extension as submodules pinned to a commit, at their current paths.
   - A private workspace repository links every repository and holds the internal documents: ROADMAP, STEPS, BACKLOG, the step records, CLAUDE.md, PRODUCT, DESIGN, DESIGN-PRINCIPLES, launch and `site/TOPICS.md`.

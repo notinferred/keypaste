@@ -84,7 +84,7 @@ Each screen is checked in headless tests and frames rendered without a display; 
 
 ## KeePassXC compatibility
 
-`Keypaste.Core.Tests.KeePassXC.WorkflowsTests` runs the workflows below on vaults KeePassXC makes behind a password, a password and a key file, and a key file alone, and after every write KeePassXC reads the whole vault back. Every `ci` run checks it against the pinned KeePassXC 2.8.0 on Linux, a push to `main` also on Windows, and dispatch and release runs also on macOS. `FieldsTests`, `MergeTests` and `ProjectsTests` in the same namespace check field protection, `otp` and attachments, a KeePassXC save merged with the app's, and projects KeePassXC tagged. These tests run against source; `v0.3.0` passed the compatibility gate of its own release.
+`Keypaste.Core.Tests.KeePassXC.WorkflowsTests` runs the workflows below on vaults KeePassXC makes behind a password, a password and a key file, and a key file alone, and after every write KeePassXC reads the whole vault back. Every `ci` run checks it against Ubuntu 24.04's packaged KeePassXC 2.7.6, a push to `main` also against the pinned Windows KeePassXC, and dispatch and release runs against the pinned Windows and macOS KeePassXC 2.8.0. `FieldsTests`, `MergeTests` and `ProjectsTests` in the same namespace check field protection, `otp` and attachments, a KeePassXC save merged with the app's, and projects KeePassXC tagged. These tests run against source; `v0.3.0` passed the compatibility gate of its own release.
 
 | Workflow | CLI | Desktop |
 |---|---|---|

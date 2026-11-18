@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # The KeePassXC gates' setup and readers, sourced after common.sh. Sourcing it sets pw and cli and fails
-# the gate when either is missing, because a gate that passes without KeePassXC proves nothing.
+# the gate when either is missing, because a gate that passes without KeePassXC proves nothing (D-0008).
 #
 # Env: KP_COMPAT_PASSWORD  the master password of every vault a gate makes (required)
 #      KPXC_CLI            path to keepassxc-cli (default: PATH lookup)
@@ -13,12 +13,12 @@ if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
   die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
 fi
 
-# KeePassXC's app sits beside its CLI in the Windows archive, the macOS bundle and the extracted AppImage.
+# KeePassXC's app sits beside its CLI in the Windows archive and the macOS bundle; apt puts it on PATH.
 keepassxc_app() {
   local app=${KPXC_APP:-} cli_dir candidate
   if [ -z "$app" ]; then
     cli_dir=$(dirname "$(realpath "$(command -v "$cli" || printf '%s' "$cli")")")
-    for candidate in "$cli_dir/KeePassXC.exe" "$cli_dir/KeePassXC" "$cli_dir/keepassxc" "$(command -v keepassxc || true)"; do
+    for candidate in "$cli_dir/KeePassXC.exe" "$cli_dir/KeePassXC" "$(command -v keepassxc || true)"; do
       if [ -n "$candidate" ] && [ -x "$candidate" ]; then app=$candidate; break; fi
     done
   fi

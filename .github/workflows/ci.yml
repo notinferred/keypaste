@@ -151,7 +151,7 @@ jobs:
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         timeout-minutes: 10
-        run: cli="$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP/keepassxc")"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Build and test the backend solution
         shell: bash
@@ -215,11 +215,17 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
-      # PRODUCT law 4.6 requires this blocking gate on all three operating systems.
-      - name: Install keepassxc-cli
-        shell: bash
+      # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
+      # A stalled apt mirror otherwise holds the job for its whole limit.
+      - name: Install keepassxc-cli (Linux)
+        if: runner.os == 'Linux'
         timeout-minutes: 10
-        run: cli="$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP/keepassxc")"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
+
+      - name: Install keepassxc-cli (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
 
       - name: Verify what keypaste writes against real KeePassXC
         shell: bash
@@ -253,7 +259,7 @@ jobs:
         run: |
           set -euo pipefail
           command -v gtimeout >/dev/null || brew install coreutils
-          cli="$(bash scripts/install-keepassxc.sh)"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
 
       - name: Build and test the backend solution
         shell: bash
@@ -365,7 +371,7 @@ jobs:
         run: scripts/verify-demo.sh
 
       - name: Install KeePassXC
-        run: cli="$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP/keepassxc")"; echo "KPXC_CLI=$cli" >> "$GITHUB_ENV"
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Verify a vault written by the AOT binary opens in real KeePassXC
         shell: bash
