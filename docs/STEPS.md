@@ -84,9 +84,6 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **A.5 — Replace the retired D- and O- references.** Needs: none.
   - Each reference in code, configuration and messages becomes a one-line reason where one is needed, or is deleted; a package's reason in `Directory.Packages.props` is one line beside it ([law 9](../SECURITY.md#security-laws)).
   - Accepted when no source, configuration, script or message outside `docs/steps/` names a D- or O- number.
-- [ ] **A.6 — Update NuGet and npm packages automatically.** Needs: none.
-  - An update is proposed once its version is seven days old, a security fix at once, and each merges only after passing the vault-safety tests.
-  - Accepted when a version younger than seven days is not proposed, a security fix is, and an update that fails the vault-safety tests does not merge.
 - [ ] **A.7 — Run the product's CI by trigger.** Needs: A.2.
   - The founder's direction of 2026-11-18: a push runs only the checks its change can affect, cheapest first, and stops at the first failure; main runs the whole suite and smoke checks of the critical journeys; the schedule runs the full matrix of systems, browsers and real tools. Work is built once and reused, never repeated across jobs, and a flaky test is fixed rather than retried.
   - Accepted when each workflow's triggers and jobs are recorded against these rules with their timings, and no job repeats another's build or tests.

@@ -1,0 +1,93 @@
+name: dependency notices
+
+# A Dependabot NuGet branch gets CONTRIBUTING's lock files and a matching THIRD_PARTY_NOTICES.md before it can merge.
+on:
+  push:
+    branches: ['dependabot/nuget/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-notices-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Restore evaluates the new packages' MSBuild files, so this job holds a read-only token.
+  regenerate:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Regenerate the lock files and notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in keypaste.slnx keypaste.app.slnx tests/Keypaste.Consistency.Tests; do
+            dotnet restore "$target" --force-evaluate
+          done
+          bash scripts/third-party-notices.sh generate
+
+      - name: Write the change as a patch
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --binary > "$RUNNER_TEMP/regenerated.patch"
+          if [ -s "$RUNNER_TEMP/regenerated.patch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: regenerated-patch
+          path: ${{ runner.temp }}/regenerated.patch
+          retention-days: 1
+
+  # Runs no package code: it applies the patch only if it touches nothing but lock files and the notices.
+  commit:
+    needs: regenerate
+    if: needs.regenerate.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: regenerated-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Commit the patch and run the checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          PATCH: ${{ runner.temp }}/patch/regenerated.patch
+        run: |
+          set -euo pipefail
+          outside="$(git apply --numstat "$PATCH" | cut -f3- | grep -Ev '^((.+/)?packages\.lock\.json|THIRD_PARTY_NOTICES\.md)$' || true)"
+          if [ -n "$outside" ]; then
+            echo "::error::the patch changes files other than lock files and the notices: $outside"
+            exit 1
+          fi
+          git apply "$PATCH"
+          git -c user.name=keypaste -c user.email=contact@keypaste.com commit -a -s -m 'Regenerate lock files and third-party notices'
+          git push origin "HEAD:$BRANCH"
+          # A push with this job's token starts no workflow, so the checks the merge needs are started here.
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run app.yml --ref "$BRANCH"
