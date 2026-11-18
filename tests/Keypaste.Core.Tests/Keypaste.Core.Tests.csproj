@@ -16,6 +16,10 @@
     <ProjectReference Include="../../src/Keypaste.Core/Keypaste.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="ReleaseVaults/*/*.kdbx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- The programs these tests start, such as the child an agent's run starts in the capture tests: built beside them, never referenced. -->
   <ItemGroup>
     <ProjectReference Include="../Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" ReferenceOutputAssembly="false" />
