@@ -142,19 +142,19 @@ Licence texts and any third-party notices a package bundles follow the table, ea
 
 | Package | Version | Ships in | Native code | Licence | Copyright | Project |
 |---|---|---|---|---|---|---|
-| Avalonia | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | Avalonia.Angle.Windows.Natives | 2.1.27548.20260419 | Desktop (win-x64) | yes | See its text below | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/ |
-| Avalonia.Desktop | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Fonts.Inter | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.FreeDesktop | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.FreeDesktop.AtSpi | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.HarfBuzz | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Native | 12.1.0 | Desktop | yes | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Remote.Protocol | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Skia | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Themes.Fluent | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Win32 | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.X11 | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Desktop | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Fonts.Inter | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.FreeDesktop | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.FreeDesktop.AtSpi | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.HarfBuzz | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Native | 12.1.6 | Desktop | yes | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Remote.Protocol | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Skia | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Themes.Fluent | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Win32 | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.X11 | 12.1.6 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | CommunityToolkit.Diagnostics | 8.4.2 | Desktop | no | MIT | (c) .NET Foundation and Contributors. All rights reserved. | https://github.com/CommunityToolkit/dotnet |
 | CommunityToolkit.Mvvm | 8.4.2 | Desktop | no | MIT | (c) .NET Foundation and Contributors. All rights reserved. | https://github.com/CommunityToolkit/dotnet |
 | HarfBuzzSharp | 8.3.1.3 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
@@ -162,28 +162,26 @@ Licence texts and any third-party notices a package bundles follow the table, ea
 | HarfBuzzSharp.NativeAssets.macOS | 8.3.1.3 | Desktop (osx-arm64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | HarfBuzzSharp.NativeAssets.Win32 | 8.3.1.3 | Desktop (win-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | MicroCom.Runtime | 0.11.6 | Desktop | no | MIT | Copyright 2021 © Nikita Tsukanov | https://github.com/kekekeks/MicroCom |
-| Microsoft.Bcl.AsyncInterfaces | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Bcl.AsyncInterfaces | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Bcl.HashCode | 6.0.0 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://github.com/dotnet/maintenance-packages |
-| Microsoft.Extensions.AI.Abstractions | 10.5.2 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Configuration | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Configuration.Abstractions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Configuration.Binder | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Configuration.FileExtensions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Configuration.Json | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.AI.Abstractions | 10.11.0 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Configuration | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Configuration.Abstractions | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Configuration.Binder | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Configuration.FileExtensions | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Configuration.Json | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Extensions.DependencyInjection | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.7 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.FileProviders.Abstractions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.FileProviders.Physical | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.FileSystemGlobbing | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.14 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.FileProviders.Abstractions | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.FileProviders.Physical | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.FileSystemGlobbing | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Extensions.Logging | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.7 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.14 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Extensions.Logging.Configuration | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Extensions.Logging.Console | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Options | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Options.ConfigurationExtensions | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Microsoft.Extensions.Primitives | 10.0.12 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Options | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Options.ConfigurationExtensions | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
+| Microsoft.Extensions.Primitives | 10.0.14 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.NETCore.App.Runtime.linux-x64 | 10.0.14 | Desktop (linux-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.NETCore.App.Runtime.NativeAOT.linux-arm64 | 10.0.14 | CLI (linux-arm64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64 | 10.0.14 | CLI (linux-x64); Desktop (linux-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
@@ -192,18 +190,18 @@ Licence texts and any third-party notices a package bundles follow the table, ea
 | Microsoft.NETCore.App.Runtime.osx-arm64 | 10.0.14 | Desktop (osx-arm64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.NETCore.App.Runtime.win-x64 | 10.0.14 | Desktop (win-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
 | Microsoft.Windows.SDK.NET.Ref | 10.0.19041.57 | Desktop (win-x64) | no | Terms at <https://aka.ms/WinSDKLicenseURL> | © Microsoft Corporation. All rights reserved. | https://aka.ms/WinSDKProjectURL |
-| ModelContextProtocol.Core | 1.4.1 | CLI; Desktop | no | Apache-2.0 | © Model Context Protocol a Series of LF Projects, LLC. | https://csharp.sdk.modelcontextprotocol.io/ |
-| Polly.Core | 8.9.0 | CLI; Desktop | no | BSD-3-Clause | Copyright (c) 2015-2026, App vNext | https://github.com/App-vNext/Polly |
+| ModelContextProtocol.Core | 2.4.0 | CLI; Desktop | no | Apache-2.0 | © Model Context Protocol a Series of LF Projects, LLC. | https://csharp.sdk.modelcontextprotocol.io/ |
+| Polly.Core | 8.9.1 | CLI; Desktop | no | BSD-3-Clause | Copyright (c) 2015-2026, App vNext | https://github.com/App-vNext/Polly |
 | SkiaSharp | 3.119.4 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.Linux | 3.119.4 | Desktop (linux-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.macOS | 3.119.4 | Desktop (osx-arm64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.Win32 | 3.119.4 | Desktop (win-x64) | yes | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |
 | System.CommandLine | 2.0.14 | CLI; Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://github.com/dotnet/command-line-api |
 | System.Formats.Cbor | 10.0.15 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://dot.net/ |
-| Tmds.DBus.Protocol | 0.94.1 | Desktop | no | MIT | Tom Deseyn | https://github.com/tmds/Tmds.DBus.git |
-| Yubico.Core | 1.18.0 | Desktop | no | See its text below | Copyright (c) Yubico 2026 | https://github.com/Yubico/Yubico.NET.SDK |
-| Yubico.NativeShims | 1.18.0 | Desktop | yes | Not stated by the package | Not stated by the package | https://github.com/Yubico/Yubico.NET.SDK |
-| Yubico.YubiKey | 1.18.0 | Desktop | no | See its text below | Copyright (c) Yubico 2026 | https://github.com/Yubico/Yubico.NET.SDK |
+| Tmds.DBus.Protocol | 0.95.2 | Desktop | no | MIT | Tom Deseyn | https://tmds.github.io/Tmds.DBus |
+| Yubico.Core | 1.18.1 | Desktop | no | See its text below | Copyright (c) Yubico 2026 | https://github.com/Yubico/Yubico.NET.SDK |
+| Yubico.NativeShims | 1.18.1 | Desktop | yes | Not stated by the package | Not stated by the package | https://github.com/Yubico/Yubico.NET.SDK |
+| Yubico.YubiKey | 1.18.1 | Desktop | no | See its text below | Copyright (c) Yubico 2026 | https://github.com/Yubico/Yubico.NET.SDK |
 
 ### Licence and notice texts
 
