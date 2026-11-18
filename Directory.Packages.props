@@ -7,24 +7,24 @@
 
   <ItemGroup Label="Build-time analyzers">
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.321" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.325" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
     <!-- Names the test a hung desktop run is stuck in, at the testing platform's version. -->
-    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="1.9.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.5.3" />
   </ItemGroup>
 
   <!-- Keypaste.Core.Tests' properties over the parsers and the merge. -->
   <ItemGroup Label="Property tests">
     <PackageVersion Include="FsCheck" Version="3.6.0" />
-    <PackageVersion Include="FSharp.Core" Version="11.0.100" />
+    <PackageVersion Include="FSharp.Core" Version="11.0.101" />
   </ItemGroup>
 
   <!-- Keypaste.Core's retries, deadlines and polls. -->
   <ItemGroup Label="Resilience">
-    <PackageVersion Include="Polly.Core" Version="8.9.0" />
+    <PackageVersion Include="Polly.Core" Version="8.9.1" />
   </ItemGroup>
 
   <!-- The CLI's and the bridge's arguments and help. -->
@@ -36,7 +36,7 @@
        ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
        and brings no generic host. -->
   <ItemGroup Label="MCP bridge">
-    <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
+    <PackageVersion Include="ModelContextProtocol.Core" Version="2.4.0" />
   </ItemGroup>
 
   <!-- The desktop shell (Stage 4.1). This is the largest single change to this repository's
@@ -55,14 +55,14 @@
        CommunityToolkit.Mvvm, a .NET Foundation package with no dependencies of its own, generates
        the view models' properties and commands at build time. -->
   <ItemGroup Label="Desktop app">
-    <PackageVersion Include="Avalonia" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <PackageVersion Include="Avalonia" Version="12.1.6" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.6" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- org.freedesktop.Notifications on the session bus (Q.14): the D-Bus client Avalonia.FreeDesktop already brings at this version,
          named so the app's own use of it is pinned. It speaks only to the local bus and carries only fixed words. -->
-    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.95.2" />
   </ItemGroup>
 
   <!-- Hardware-key unlocking in the desktop app (P.1), under docs/PRODUCT.md law 3.9 because a YubiKey's response is key material.
@@ -81,7 +81,7 @@
        The CLI does not reference it: its NativeAOT publish would statically link the shim and
        OpenSSL and, on Linux, require libpcsclite at start-up for every user. -->
   <ItemGroup Label="Desktop hardware keys">
-    <PackageVersion Include="Yubico.YubiKey" Version="1.18.0" />
+    <PackageVersion Include="Yubico.YubiKey" Version="1.18.1" />
     <!-- Pinned past Yubico's 10.0.12 for CVE-2026-118747 (GHSA-vmv3-wvjp-wqpj), patched in 10.0.15. -->
     <PackageVersion Include="System.Formats.Cbor" Version="10.0.15" />
   </ItemGroup>
@@ -91,7 +91,7 @@
        integration package buys an attribute and costs a dependency. One session per process — a
        second throws on the 'avares' URI parser — so the test project shares one static session. -->
   <ItemGroup Label="Desktop app tests">
-    <PackageVersion Include="Avalonia.Headless" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.6" />
   </ItemGroup>
 
   <!-- Build-time only, in packaging/windows: harvests the staged payload into the MSI and ships
