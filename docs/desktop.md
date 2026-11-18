@@ -108,7 +108,7 @@ While the app holds the vault, `keypaste add`, `set`, `rm`, `rotate`, `field rm`
 
 If another program saves the vault while it is open, such as KeePassXC or a sync tool, the app merges that save with its own copy within five seconds, whichever open vault it is, matching items by identity and keeping both sides' changes to different fields of one item. Where both changed the same field the newer version is current and the other is in its history; an item one side deleted after the other changed it is kept, in Trash. A merge that carried your changes saves them, keeps the replaced file in `<vault>.backups` and says what it did; agents are refused as `vault-changed` until it is saved. A file the app will not merge, such as one now holding another vault, is named above the screen with Reload, which discards an edit the app could not save. If the other program changed the password or key file, the app locks and you unlock with the new ones.
 
-Saving keeps the file it replaces: the first save after each unlock, no more often than every fifteen minutes, copies the vault into `<vault>.backups` beside it, keeping the last five, and a save whose copy cannot be written does not happen. Every save opens what it wrote before replacing the vault and keeps the file's permissions.
+Saving keeps the file it replaces: the first save after each unlock, no more often than every fifteen minutes, copies the vault into `<vault>.backups` beside it, keeping the last five and the newest of each of the last seven days and four weeks, and a save whose copy cannot be written does not happen. Every save opens what it wrote before replacing the vault, refuses one that would lose an item nobody deleted, and keeps the file's permissions.
 
 ### Restoring a backup
 

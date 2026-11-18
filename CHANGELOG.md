@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A save that would lose an item nobody deleted is refused, and backups now keep one copy a day for a week and one a week for four weeks besides the last five. ([Y.1](docs/steps/Y.1.md))
+
 The window does less: with one vault the sidebar lists its places with no account around them, item rows drop their times (the time is the row's tooltip and the item's Modified line), prompts are headed by the keypaste wordmark with a tighter item picker and quote, and an item's tile shows the mark of a popular service its website belongs to, or an icon for its kind or a local host, from icons keypaste carries and never downloads ([desktop](docs/desktop.md#layout)).
 
 New item opens a grid of templates, Login, API key, Environment, Card, Note, Identity, SSH key, Server, Database, Wi-Fi and Blank item, whose tile opens a form that saves in any open vault and takes any field; the "+" beside the list's title makes the kind its place lists, or offers a short menu on All items, and a card or identity is tagged so agent settings treat its protected fields as card or identity values ([desktop](docs/desktop.md#new-item-and-the-generator)).

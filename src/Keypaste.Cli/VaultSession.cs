@@ -306,7 +306,7 @@ internal static class VaultSession
         }
 
         context.Stderr.WriteLine(
-            $"keypaste: keeping the last {report.Retained} copies of this vault in " +
+            $"keypaste: keeping the last {report.Retained} copies of this vault, one a day for a week and one a week for four weeks, in " +
             $"'{report.Directory}', in case the file is lost. They open with the master password " +
             "they were made under.");
     }

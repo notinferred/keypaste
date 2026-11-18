@@ -155,7 +155,8 @@ The [security laws](#security-laws) govern these guarantees, and [THREATS.md](TH
 - Idle lock after 30 minutes by default, at most 8 hours [T-23].
 - Notifications carry fixed words only [T-51].
 - Crash reports are sent only after consent, hold no value, name or path, and never come from the CLI or bridge [T-9].
-- A save keeps the last five copies in `<vault>.backups`, restorable from the unlock screen [T-26]; deletion goes to the recycle bin (v0.3.0 deletes permanently).
+- A save keeps the last five copies in `<vault>.backups`, and the newest of each of the last seven days and four weeks, restorable from the unlock screen [T-26]; deletion goes to the recycle bin (v0.3.0 deletes permanently).
+- A save whose new file drops an item of the file it replaces without recording a deletion, or differs from the open vault, is refused and replaces nothing.
 - Limit: screen capture and onlookers can read a revealed value [T-25].
 - Limit: clipboard managers can ignore keypaste's markers [T-19].
 - Limit: `recent.toml` shows where vaults and keyfiles are [T-24].

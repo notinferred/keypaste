@@ -247,7 +247,7 @@ public sealed class VaultBackupTests : IDisposable
         for (var edit = 1; edit <= VaultBackups.Retained + 1; edit++)
         {
             Edit(path, $"edit-{edit}");
-            Age(path, TimeSpan.FromHours(1));
+            Age(path, PastEveryDailyAndWeeklyCopy);
         }
 
         var backups = VaultBackups.List(path);
@@ -262,6 +262,30 @@ public sealed class VaultBackupTests : IDisposable
             using var kept = Vault.Open(backup.Path, MasterPassword);
             Assert.NotEqual("before", Read(kept));
         }
+    }
+
+    [Fact]
+    public void RetentionKeepsTheNewestFive_TheNewestOfEachOfSevenDays_AndOfEachOfFourWeeks()
+    {
+        var path = SeededVault("before");
+        var monday = new DateTimeOffset(2026, 1, 5, 0, 0, 0, TimeSpan.Zero);
+
+        for (var day = 0; day <= 40; day++)
+        {
+            foreach (var hour in new[] { 9, 18 })
+            {
+                VaultBackups.Preserve(path, monday.AddDays(day).AddHours(hour), applyFloor: true, out _, out _);
+            }
+        }
+
+        string[] expected =
+        [
+            "20260125T180000Z", "20260201T180000Z",
+            "20260208T180000Z", "20260209T180000Z", "20260210T180000Z", "20260211T180000Z", "20260212T180000Z",
+            "20260213T090000Z", "20260213T180000Z", "20260214T090000Z", "20260214T180000Z",
+        ];
+        string[] kept = [.. VaultBackups.List(path).Select(backup => backup.TakenAt.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture)).Order(StringComparer.Ordinal)];
+        Assert.Equal(expected, kept);
     }
 
     [Fact]
@@ -648,6 +672,9 @@ public sealed class VaultBackupTests : IDisposable
     /// The stamp lives in the name, so this is a rename and not a touch — which is the point of
     /// keeping it there: a modification time does not survive a copy, a restore or a folder sync.
     /// </remarks>
+    /// <summary>Further back than any daily or weekly copy is kept, so only the newest five survive a prune.</summary>
+    internal static readonly TimeSpan PastEveryDailyAndWeeklyCopy = TimeSpan.FromDays(30);
+
     internal static void Age(string vaultPath, TimeSpan by)
     {
         var stem = Path.GetFileNameWithoutExtension(vaultPath) + ".";

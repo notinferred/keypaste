@@ -75,6 +75,9 @@ internal sealed class KeePassInterop : IDisposable
     private bool _readOnly;
     private byte[]? _written;
 
+    /// <summary>The entries of the file this instance last read or wrote, which a save may drop only by recording their deletion.</summary>
+    private HashSet<PwUuid> _entriesOnDisk;
+
     /// <summary>The keyfile a vault opened from <see cref="VaultKeyParts"/> was first opened with, which its key no longer names.</summary>
     private string? _partsKeyfilePath;
 
@@ -89,6 +92,7 @@ internal sealed class KeePassInterop : IDisposable
     private KeePassInterop(PwDatabase database)
     {
         _database = database;
+        _entriesOnDisk = EntryIds(database);
     }
 
     /// <summary>Creates a new KDBX4 vault protected by the given UTF-8 master password.</summary>
@@ -450,6 +454,7 @@ internal sealed class KeePassInterop : IDisposable
     private void Write()
     {
         Replace(SerializeAndProve);
+        _entriesOnDisk = EntryIds(_database);
         _database.Modified = false;
     }
 
@@ -485,18 +490,67 @@ internal sealed class KeePassInterop : IDisposable
         {
             check.MasterKey = _database.MasterKey;
             new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
-            return bytes;
         }
         catch (Exception ex)
         {
             CryptographicOperations.ZeroMemory(bytes);
+            check.Close();
             throw new VaultException("keypaste could not read back what it was about to save. Nothing was replaced.", ex);
+        }
+
+        try
+        {
+            RefuseUnfaithful(check);
+            return bytes;
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            throw;
         }
         finally
         {
             check.Close();
         }
     }
+
+    private static HashSet<PwUuid> EntryIds(PwDatabase database) => [.. database.RootGroup.GetEntries(true).Select(entry => entry.Uuid)];
+
+    /// <summary>Refuses a read-back that drops an entry of the file it replaces without recording its deletion, or that is not the open vault.</summary>
+    /// <remarks>A delete for good and a merge record the deletion in the file's DeletedObjects; a move to the recycle bin keeps the entry.</remarks>
+    /// <exception cref="VaultException">The bytes must not replace the file.</exception>
+    private void RefuseUnfaithful(PwDatabase written)
+    {
+        HashSet<PwUuid> kept = EntryIds(written);
+        HashSet<PwUuid> deleted = [.. written.DeletedObjects.Select(tombstone => tombstone.Uuid)];
+        var lost = _entriesOnDisk.Count(id => !kept.Contains(id) && !deleted.Contains(id));
+
+        if (lost > 0)
+        {
+            throw new VaultException(Invariant(
+                $"keypaste did not save: the new file would lose {lost} item(s) nobody deleted. Nothing was replaced."));
+        }
+
+        var key = RandomNumberGenerator.GetBytes(32);
+
+        try
+        {
+            using ContentDigests digests = new(key);
+
+            if (!Fingerprint(_database, digests).SequenceEqual(Fingerprint(written, digests), StringComparer.Ordinal))
+            {
+                throw new VaultException("keypaste did not save: what it was about to write is not the open vault. Nothing was replaced.");
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
+    /// <summary>Each entry's UUID and keyed content digest, in order.</summary>
+    private static List<string> Fingerprint(PwDatabase database, ContentDigests digests) =>
+        [.. database.RootGroup.GetEntries(true).Select(entry => entry.Uuid.ToHexString() + Convert.ToHexString(digests.Of(entry))).Order(StringComparer.Ordinal)];
 
     /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
     /// <remarks>A re-keyed vault is closed rather than saved again.</remarks>
@@ -514,7 +568,13 @@ internal sealed class KeePassInterop : IDisposable
             }
             catch (Exception ex)
             {
+                check.Close();
                 throw new VaultException("The new credentials did not open what was about to be saved. Nothing was replaced.", ex);
+            }
+
+            try
+            {
+                RefuseUnfaithful(check);
             }
             finally
             {
@@ -522,6 +582,7 @@ internal sealed class KeePassInterop : IDisposable
             }
 
             Replace(() => bytes);
+            _entriesOnDisk = EntryIds(_database);
             change.Committed = true;
             _database.Modified = false;
         }

@@ -6,10 +6,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Track 1 — Everyday vault use and recovery
 
-- [ ] **Y.1 — Refuse a save that loses items, and keep backups longer.** Needs: none.
-  - A save compares the new file's contents with the vault's on read-back and refuses one that loses items without an explained cause, such as a deletion the person made.
-  - Backups keep the five most recent copies, plus one a day for a week and one a week for a month.
-  - Accepted when tests show a save that would lose an item without a cause refused with the file unchanged, a save that removes an item the person deleted made, and the backups kept on that schedule as days pass.
 - [ ] **Y.3 — Read back hardware-key vaults, and flush backups and renames to disk.** Needs: none.
   - A save of a vault that needs a hardware key reads the new file back as other saves do ([law 12](../SECURITY.md#security-laws)), and a backup and the rename that replaces the vault are flushed to disk before the save counts as made.
   - Accepted when a test shows a hardware-key vault's save refused when its read-back fails, with the file unchanged, and the backup and the rename flushed on Windows, macOS and Linux.

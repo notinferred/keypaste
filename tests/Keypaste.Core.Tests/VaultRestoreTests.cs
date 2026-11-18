@@ -331,11 +331,11 @@ public sealed class VaultRestoreTests : IDisposable
         for (var edit = 1; edit <= VaultBackups.Retained; edit++)
         {
             Edit(path, $"edit-{edit}");
-            Age(path, TimeSpan.FromHours(1));
+            Age(path, VaultBackupTests.PastEveryDailyAndWeeklyCopy);
         }
 
         VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
-        Age(path, TimeSpan.FromHours(1));
+        Age(path, VaultBackupTests.PastEveryDailyAndWeeklyCopy);
 
         Edit(path, "after the restore");
 

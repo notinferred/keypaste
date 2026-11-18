@@ -279,6 +279,64 @@ public sealed class VaultSaveTests : IDisposable
         Assert.Equal(before, File.ReadAllBytes(path));
     }
 
+    [Fact]
+    public void A_save_that_loses_an_item_nobody_deleted_is_refused_and_leaves_the_vault_as_it_was()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("loses");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var withoutTheSecond = File.ReadAllBytes(path);
+        vault.AddEntry(new VaultEntry { Title = "Second", Password = "p" });
+        vault.Save();
+        var before = File.ReadAllBytes(path);
+        vault.AddEntry(new VaultEntry { Title = "Third", Password = "p" });
+        vault.AfterSerializing = _ => [.. withoutTheSecond];
+
+        var failure = Record.Exception(vault.Save);
+
+        Assert.IsType<VaultException>(failure);
+        Assert.Contains("lose 1 item", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void A_save_whose_bytes_hold_other_values_than_the_open_vault_is_refused_and_leaves_the_vault_as_it_was()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("unfaithful");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var earlier = File.ReadAllBytes(path);
+        vault.UpdateEntry(new VaultEntry { Title = "T", Password = "changed", GroupPath = "env/dev" });
+        vault.Save();
+        var before = File.ReadAllBytes(path);
+        vault.UpdateEntry(new VaultEntry { Title = "T", Password = "changed again", GroupPath = "env/dev" });
+        vault.AfterSerializing = _ => [.. earlier];
+
+        var failure = Record.Exception(vault.Save);
+
+        Assert.IsType<VaultException>(failure);
+        Assert.Contains("not the open vault", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void Deleting_an_item_for_good_records_it_and_saves()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("purge");
+        var path = Path.Combine(home, "vault.kdbx");
+
+        using (vault)
+        {
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(EntryName.Parse("env/dev/T"), out var recycled));
+            vault.Save();
+            Assert.True(vault.PurgeRecycled(recycled));
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        Assert.Empty(reopened.ReadEntries());
+    }
+
     /// <remarks>
     /// A pipe at the temporary file's name stands in for a disk that fills during the save: each
     /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails.

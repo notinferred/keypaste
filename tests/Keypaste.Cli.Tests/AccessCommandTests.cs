@@ -180,7 +180,7 @@ public sealed class AccessCommandTests
         var kept = VaultBackups.List(harness.VaultPath)[0];
         Assert.Contains(kept.Path, harness.Err, StringComparison.Ordinal);
         Assert.Contains("copies made before this change may open with earlier credentials", harness.Err, StringComparison.Ordinal);
-        Assert.Contains($"keep only the last {VaultBackups.Retained} copies", harness.Err, StringComparison.Ordinal);
+        Assert.Contains($"keep the last {VaultBackups.Retained} copies", harness.Err, StringComparison.Ordinal);
         Assert.Contains("including the one this change just took", harness.Err, StringComparison.Ordinal);
         Assert.Contains("Losing that file locks the vault", harness.Err, StringComparison.Ordinal);
         Assert.Contains("somewhere other than beside the vault", harness.Err, StringComparison.Ordinal);

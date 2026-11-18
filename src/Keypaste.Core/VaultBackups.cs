@@ -58,8 +58,14 @@ public enum VaultBackupOutcome
 /// </remarks>
 public static class VaultBackups
 {
-    /// <summary>How many backups of one vault are kept.</summary>
+    /// <summary>How many of a vault's most recent backups are kept, besides the daily and weekly ones.</summary>
     public const int Retained = 5;
+
+    /// <summary>For how many days, today included, the newest backup of each day is kept.</summary>
+    internal const int DailyFor = 7;
+
+    /// <summary>For how many weeks, this one included, the newest backup of each week is kept.</summary>
+    internal const int WeeklyFor = 4;
 
     /// <summary>The suffix on a vault's backup directory.</summary>
     internal const string DirectorySuffix = ".backups";
@@ -145,7 +151,7 @@ public static class VaultBackups
     /// <remarks>
     /// Only files this type named are listed. Anything else in the directory — a copy somebody made
     /// themselves, a note, a half-written temporary — is left alone and never counted against
-    /// <see cref="Retained"/>, because pruning a file we did not write is not ours to do.
+    /// retention, because pruning a file we did not write is not ours to do.
     /// </remarks>
     public static IReadOnlyList<VaultBackup> List(string vaultPath)
     {
@@ -194,8 +200,8 @@ public static class VaultBackups
     }
 
     /// <summary>
-    /// Copies the vault at <paramref name="vaultPath"/> beside itself, then drops the oldest copies
-    /// beyond <see cref="Retained"/>.
+    /// Copies the vault at <paramref name="vaultPath"/> beside itself, then drops the copies
+    /// <see cref="Keeps"/> does not keep.
     /// </summary>
     /// <param name="vaultPath">An existing vault, about to be replaced.</param>
     /// <param name="now">The current time, in UTC.</param>
@@ -244,7 +250,7 @@ public static class VaultBackups
 
         kept = Keep(vaultPath, now, out createdDirectory);
 
-        Prune(vaultPath);
+        Prune(vaultPath, now);
 
         return VaultBackupOutcome.Written;
     }
@@ -700,28 +706,69 @@ public static class VaultBackups
         }
     }
 
-    /// <summary>Drops the oldest backups beyond <see cref="Retained"/>.</summary>
+    /// <summary>Drops every backup <see cref="Keeps"/> does not keep.</summary>
     /// <remarks>
     /// Runs only after a new backup is complete and named. Dropping one is deleting a directory
     /// entry and nothing more: the bytes stay on the storage until it reuses them, which SECURITY.md
     /// says of every deletion keypaste performs. A failure to prune is not a failure to back up, so
     /// it is swallowed — the copy the caller asked for is already there.
     /// </remarks>
-    private static void Prune(string vaultPath)
+    private static void Prune(string vaultPath, DateTimeOffset now)
     {
         var backups = List(vaultPath);
+        var kept = Keeps(backups, now);
 
-        for (var index = Retained; index < backups.Count; index++)
+        foreach (var backup in backups.Where(backup => !kept.Contains(backup)))
         {
             try
             {
-                File.Delete(backups[index].Path);
+                File.Delete(backup.Path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
             }
         }
     }
+
+    /// <summary>
+    /// The <see cref="Retained"/> newest backups, the newest of each of the last <see cref="DailyFor"/>
+    /// UTC days and the newest of each of the last <see cref="WeeklyFor"/> weeks, Monday to Sunday.
+    /// </summary>
+    /// <param name="newestFirst">The backups, as <see cref="List"/> orders them.</param>
+    /// <param name="now">The current time.</param>
+    /// <remarks>Calendar days and weeks, so a day's or a week's newest backup stays its newest once it ends and is never pruned before it ages out.</remarks>
+    internal static IReadOnlySet<VaultBackup> Keeps(IReadOnlyList<VaultBackup> newestFirst, DateTimeOffset now)
+    {
+        var today = DayOf(now);
+        HashSet<VaultBackup> kept = [.. newestFirst.Take(Retained)];
+        HashSet<int> days = [];
+        HashSet<int> weeks = [];
+
+        foreach (var backup in newestFirst)
+        {
+            var day = DayOf(backup.TakenAt);
+
+            if (day > today)
+            {
+                continue;
+            }
+
+            if (today - day < DailyFor && days.Add(day))
+            {
+                kept.Add(backup);
+            }
+
+            if ((today / 7) - (day / 7) < WeeklyFor && weeks.Add(day / 7))
+            {
+                kept.Add(backup);
+            }
+        }
+
+        return kept;
+    }
+
+    /// <summary>The UTC day, counted from 1 January of year 1, a Monday.</summary>
+    private static int DayOf(DateTimeOffset time) => DateOnly.FromDateTime(time.UtcDateTime).DayNumber;
 
     /// <summary>Removes temporaries a killed process left in the backup directory.</summary>
     /// <remarks>
@@ -807,7 +854,7 @@ public static class VaultBackups
 /// <param name="Directory">Where the backups of this vault are kept.</param>
 /// <param name="Outcome">Whether a copy was written or the floor suppressed it.</param>
 /// <param name="CreatedDirectory">Whether this save is what created <paramref name="Directory"/>.</param>
-/// <param name="Retained">How many backups are kept.</param>
+/// <param name="Retained">How many of the most recent backups are kept, besides one a day for a week and one a week for four weeks.</param>
 /// <remarks>
 /// Carries no entry name, count or content fingerprint, which is the standard THREATS.md T-24 already
 /// holds <c>recent.toml</c> to, and no part of an unlock secret.

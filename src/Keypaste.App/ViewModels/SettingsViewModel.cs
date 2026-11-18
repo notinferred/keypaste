@@ -587,7 +587,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     internal string BackupsRule =>
         $"A save keeps the file it replaces: the first save after each unlock, no more often than every " +
-        $"fifteen minutes, keeping the last {VaultBackups.Retained}. Each copy opens with the master " +
+        $"fifteen minutes, keeping the last {VaultBackups.Retained}, one a day for a week and one a week for four weeks. Each copy opens with the master " +
         "password it was made under, and none of them recovers a forgotten one.";
 
     internal string RestoreHint =>

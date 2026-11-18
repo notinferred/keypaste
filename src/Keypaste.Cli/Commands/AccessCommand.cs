@@ -138,8 +138,8 @@ internal static class AccessCommand
             $"keypaste: copies made before this change may open with earlier credentials ({copies} in " +
             $"'{VaultBackups.DirectoryFor(vaultPath)}'). If an old password or key file may have leaked, delete them.");
         err.WriteLine(
-            $"keypaste: routine saves keep only the last {VaultBackups.Retained} copies, so these leave over " +
-            "time, including the one this change just took.");
+            $"keypaste: routine saves keep the last {VaultBackups.Retained} copies, one a day for a week and one a week for four weeks, " +
+            "so these leave over time, including the one this change just took.");
 
         if (change.Keyfile == AccessKeyfileChange.Attach)
         {
