@@ -247,7 +247,6 @@ public sealed class SecretHygieneTests
         Assert.Contains(entries.Rows, row => row.Title == SentinelTitle);
         Assert.Contains(entries.Rows, row => row.GroupPath == "env/" + SentinelProject && row.Title == EnvStore.HomeTitle);
         Assert.Contains(entries.Rows, row => row.Title == SentinelUnselectedTitle);
-        Assert.Contains(entries.Groups, group => group.Name == SentinelGroup);
 
         // The username and the URL are columns now, on purpose.
         var chosen = entries.Rows.Single(listed => listed.Title == SentinelTitle);

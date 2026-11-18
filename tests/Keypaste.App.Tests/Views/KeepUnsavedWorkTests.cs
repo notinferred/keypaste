@@ -22,13 +22,13 @@ public sealed class KeepUnsavedWorkTests
 
     public static TheoryData<string> ConfirmingForms =>
     [
-        "new item", "new group", "rename group", "move group", "rotate", "rename or move", "add field", "replace field",
+        "new item", "rotate", "rename", "add field", "replace field",
         "rename field", "edit", "new project", "new environment", "add key", "replace key", "new token", "tag change",
         "restore revision", "import env",
     ];
 
     public static TheoryData<string> DangerForms =>
-        ["delete group", "delete item", "remove field", "remove key", "remove attachment", "revoke token", "change access", "delete .env file", "delete for good", "empty trash"];
+        ["delete item", "remove field", "remove key", "remove attachment", "revoke token", "change access", "delete .env file", "delete for good", "empty trash"];
 
     private static void Seed(Vault vault)
     {
@@ -46,9 +46,8 @@ public sealed class KeepUnsavedWorkTests
     {
         Seed(vault);
 
-        if (name is "delete group" or "delete item")
+        if (name is "delete item")
         {
-            vault.CreateGroup(string.Empty, "empty", out _);
             vault.SetRecyclesDeletedEntries(false);
         }
     };
@@ -162,27 +161,6 @@ public sealed class KeepUnsavedWorkTests
             case "new item":
                 entries.BeginAddCommand.Press();
                 return new Form(() => entries.IsAdding, () => entries.NewItem!.Title = "made");
-
-            case "new group":
-                entries.BeginCreateGroupCommand.Press();
-                return new Form(() => entries.IsCreatingGroup, () => entries.DraftGroupName = "made");
-
-            case "rename group":
-                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-                entries.BeginRenameGroupCommand.Press();
-                return new Form(() => entries.IsRenamingGroup, () => entries.DraftGroupName = "hosts");
-
-            case "move group":
-                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-                entries.BeginMoveGroupCommand.Press();
-                return new Form(
-                    () => entries.IsMovingGroup,
-                    () => entries.GroupMoveTarget = entries.MoveTargets.Single(group => group.Path == "other"));
-
-            case "delete group":
-                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "empty");
-                entries.BeginDeleteGroupCommand.Press();
-                return new Form(() => entries.IsConfirmingGroupDelete, () => { }, IsDanger: true);
         }
 
         var pane = shell.OpenPane();
@@ -199,7 +177,7 @@ public sealed class KeepUnsavedWorkTests
                 var deleting = entries;
                 return new Form(() => deleting.IsConfirmingDelete, () => { }, IsDanger: true);
 
-            case "rename or move":
+            case "rename":
                 entries.OrganizeCommand.Press();
                 var organizing = entries;
                 return new Form(() => organizing.IsOrganizing, () => organizing.DraftTitle = "renamed");
@@ -322,9 +300,7 @@ public sealed class KeepUnsavedWorkTests
 
     [Theory]
     [InlineData("new item")]
-    [InlineData("new group")]
-    [InlineData("rename group")]
-    [InlineData("rename or move")]
+    [InlineData("rename")]
     [InlineData("add field")]
     [InlineData("rename field")]
     [InlineData("edit")]
@@ -489,7 +465,6 @@ public sealed class KeepUnsavedWorkTests
 
     // Only a vault with no Trash asks, and what its question costs is named on the button.
     [Theory]
-    [InlineData("delete group")]
     [InlineData("delete item")]
     public Task A_delete_with_no_Trash_says_for_good_on_its_button(string name) => HeadlessSession.On(() =>
     {
@@ -500,21 +475,6 @@ public sealed class KeepUnsavedWorkTests
         var danger = shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && button.Classes.Contains("danger"));
 
         Assert.Equal("Delete for good", danger.Content);
-    });
-
-    [Fact]
-    public Task A_group_no_Trash_cannot_delete_offers_only_Cancel_under_what_to_do() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell(seed: SeedFor("delete group"));
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        entries.BeginDeleteGroupCommand.Press();
-        RenderedShell.Drain();
-
-        Assert.Contains("Move or delete what is in it first.", entries.GroupDeletePrompt, StringComparison.Ordinal);
-        Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<Button>(), button => button.IsEffectivelyVisible && button.Classes.Contains("danger"));
-        Assert.False(entries.ConfirmDeleteGroupCommand.CanExecute(null));
-        Assert.True(shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "KeepGroup").IsEffectivelyVisible);
     });
 
     [Fact]

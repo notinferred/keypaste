@@ -77,7 +77,6 @@ public sealed class AppCommandsTests : IDisposable
             ("File", "Restore a backup…"),
             ("File", "Reload"),
             ("Edit", "Clear search"),
-            ("Edit", "Search all items"),
             ("View", "Back"),
             ("Agents", "Copy latest hash"),
             ("Agents", "Refresh"),

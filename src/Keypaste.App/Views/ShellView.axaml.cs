@@ -39,7 +39,6 @@ internal sealed partial class ShellView : UserControl
         var rail = this.FindControl<ListBox>("RailNav")!;
         rail.ContainerPrepared += OnRailPlacePrepared;
         rail.AddHandler(TappedEvent, OnRailPlaceTapped);
-        nav.AddHandler(Button.ClickEvent, OnHeadingAdd);
         nav.AddHandler(PointerPressedEvent, OnHeadingPressed, RoutingStrategies.Tunnel);
 
         AddHandler(GotFocusEvent, (_, e) => _lastFocused = e.Source as Visual);
@@ -186,14 +185,14 @@ internal sealed partial class ShellView : UserControl
     /// <summary>The commands a row's context menu offers; the running app's, or a test's.</summary>
     internal AppCommands? Commands { get; init; }
 
-    /// <summary>The account's heading names the vaults under it and cannot be chosen; a group's row is a denser tree row.</summary>
+    /// <summary>The account's heading names the vaults under it and cannot be chosen; a project's row is a denser row.</summary>
     private static void OnSidebarRowPrepared(object? sender, ContainerPreparedEventArgs e)
     {
         var heading = e.Container.DataContext is AccountRow;
         e.Container.Focusable = !heading;
         e.Container.Classes.Set("heading", heading);
         e.Container.Classes.Set("vault", e.Container.DataContext is VaultRow);
-        e.Container.Classes.Set("group", e.Container.DataContext is GroupRow or ProjectRow);
+        e.Container.Classes.Set("group", e.Container.DataContext is ProjectRow);
     }
 
     /// <summary>Access waits for later on the rail: dimmed, never chosen, its tooltip saying so.</summary>
@@ -204,7 +203,7 @@ internal sealed partial class ShellView : UserControl
         e.Container.Classes.Set("later", later);
     }
 
-    /// <summary>The list does not hear a press on its selected row, but the rail's Items still lists every item of the vault in view from a group, a place or a project.</summary>
+    /// <summary>The list does not hear a press on its selected row, but the rail's Items still lists every item of the vault in view from a place or a project.</summary>
     private void OnRailPlaceTapped(object? sender, TappedEventArgs e)
     {
         if (e.Source is Visual source && _shell is { ShowsItemsPlace: true } shell
@@ -215,7 +214,7 @@ internal sealed partial class ShellView : UserControl
     }
 
     /// <summary>
-    /// Right unfolds the chosen row and Left folds it, as in KeePassXC's group tree. Folding replaces the
+    /// Right unfolds the chosen vault and Left folds it. Folding replaces the
     /// rows, so the keyboard is handed back to the chosen one, or the next key would go nowhere.
     /// </summary>
     private void OnSidebarKeyDown(object? sender, KeyEventArgs e)
@@ -232,30 +231,12 @@ internal sealed partial class ShellView : UserControl
 
         var selected = _shell.SelectedSidebarRow;
 
-        if (selected is VaultRow { IsExpandable: true } or GroupsRow or GroupRow { HasChildren: true })
+        if (selected is VaultRow { IsExpandable: true })
         {
             _shell.Fold(selected, open: e.Key == (FlowDirection == FlowDirection.RightToLeft ? Key.Left : Key.Right));
             e.Handled = true;
             Dispatcher.UIThread.Post(FocusChosenRow, DispatcherPriority.Loaded);
         }
-    }
-
-    /// <summary>The Groups row's +: New group… in the group chosen.</summary>
-    private void OnHeadingAdd(object? sender, RoutedEventArgs e)
-    {
-        if (Commands is null || e.Source is not Button { Name: "HeadingAdd", DataContext: GroupsRow })
-        {
-            return;
-        }
-
-        var command = Commands.NewGroup;
-
-        if (command.CanRun())
-        {
-            command.Run();
-        }
-
-        e.Handled = true;
     }
 
     /// <summary>The account's heading cannot be chosen, so a press on it selects nothing.</summary>

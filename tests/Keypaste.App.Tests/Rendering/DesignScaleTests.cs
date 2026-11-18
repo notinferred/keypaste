@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Keypaste.App.Views;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -164,8 +163,6 @@ public sealed partial class DesignScaleTests
     [Fact]
     public void A_literal_in_csharp_is_on_its_list()
     {
-        Assert.Contains(DepthToIndent.Step, _spacing);
-
         Assert.Empty(
             from file in Sources()
             from match in LiteralSpacing().Matches(File.ReadAllText(file))

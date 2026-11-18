@@ -52,8 +52,7 @@ public sealed class UndoTests : IDisposable
 
     public static TheoryData<string> Changes =>
     [
-        "delete item", "rename item", "move item", "rename and move item", "duplicate item",
-        "create group", "rename group", "move group", "delete group",
+        "delete item", "rename item", "duplicate item",
     ];
 
     [Theory]
@@ -88,10 +87,8 @@ public sealed class UndoTests : IDisposable
 
     [Theory]
     [InlineData("delete item", true)]
-    [InlineData("delete group", true)]
     [InlineData("rename item", false)]
     [InlineData("duplicate item", false)]
-    [InlineData("create group", false)]
     public void The_Restore_link_is_offered_for_a_delete_alone(string change, bool offered)
     {
         Make(change);
@@ -107,16 +104,10 @@ public sealed class UndoTests : IDisposable
 
         Assert.False(_entries.IsConfirmingDelete);
         Assert.DoesNotContain(_entries.Rows, row => row.Path == "servers/staging");
-
-        Group("other");
-        _entries.BeginDeleteGroupCommand.Press();
-
-        Assert.False(_entries.IsConfirmingGroupDelete);
-        Assert.DoesNotContain(_entries.Groups, group => group.Path == "other");
     }
 
     [Fact]
-    public void Undoing_a_duplicate_or_a_new_group_deletes_it_as_any_delete_does()
+    public void Undoing_a_duplicate_deletes_it_as_any_delete_does()
     {
         Make("duplicate item");
         _entries.UndoCommand.Press();
@@ -141,20 +132,6 @@ public sealed class UndoTests : IDisposable
     }
 
     [Fact]
-    public void A_group_comes_back_with_its_empty_groups_and_only_its_own_restore_is_undone()
-    {
-        Make("delete group");
-
-        Assert.Equal(GroupOutcome.NothingMatched, _session.Unlocked!.RestoreRecycledGroup("nowhere"));
-
-        _entries.UndoCommand.Press();
-
-        using var reopened = Vault.Open(_vaultPath, _master);
-        Assert.Contains("servers/empty", reopened.ReadGroupPaths());
-        Assert.Empty(reopened.ReadRecycled());
-    }
-
-    [Fact]
     public void A_group_is_not_restored_over_one_that_took_its_name()
     {
         var vault = _session.Unlocked!;
@@ -174,15 +151,7 @@ public sealed class UndoTests : IDisposable
                 break;
 
             case "rename item":
-                Organize("servers/staging", "renamed", "servers");
-                break;
-
-            case "move item":
-                Organize("servers/staging", "staging", "other");
-                break;
-
-            case "rename and move item":
-                Organize("servers/staging", "renamed", "other");
+                Rename("servers/staging", "renamed");
                 break;
 
             case "duplicate item":
@@ -190,49 +159,20 @@ public sealed class UndoTests : IDisposable
                 _entries.DuplicateCommand.Press();
                 break;
 
-            case "create group":
-                Group("servers");
-                _entries.BeginCreateGroupCommand.Press();
-                _entries.DraftGroupName = "made";
-                _entries.ConfirmCreateGroupCommand.Press();
-                break;
-
-            case "rename group":
-                Group("servers/live");
-                _entries.BeginRenameGroupCommand.Press();
-                _entries.DraftGroupName = "hosts";
-                _entries.ConfirmRenameGroupCommand.Press();
-                break;
-
-            case "move group":
-                Group("servers/live");
-                _entries.BeginMoveGroupCommand.Press();
-                _entries.GroupMoveTarget = _entries.MoveTargets.Single(group => group.Path == "other");
-                _entries.ConfirmMoveGroupCommand.Press();
-                break;
-
-            case "delete group":
-                Group("servers");
-                _entries.BeginDeleteGroupCommand.Press();
-                break;
-
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "no such change");
         }
     }
 
-    private void Organize(string path, string title, string group)
+    private void Rename(string path, string title)
     {
         Select(path);
         _entries.OrganizeCommand.Press();
         _entries.DraftTitle = title;
-        _entries.MoveTarget = _entries.MoveTargets.Single(node => node.Path == group);
         _entries.ConfirmOrganizeCommand.Press();
     }
 
     private void Select(string path) => _entries.Selected = _entries.Rows.Single(row => row.Path == path);
-
-    private void Group(string path) => _entries.SelectedGroup = _entries.Groups.Single(group => group.Path == path);
 
     /// <summary>Every live item's place and values and every group, read back from the file.</summary>
     private string VaultState()

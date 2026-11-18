@@ -332,7 +332,6 @@ public sealed class DrawnRevealTests
     /// <summary>A search that hides the selected item closes the pane, and a group that does not hold it, and neither leaves its value behind.</summary>
     [Theory]
     [InlineData("search")]
-    [InlineData("group")]
     [InlineData("another item")]
     public Task Leaving_the_item_takes_its_value_off_the_frame(string how) => HeadlessSession.On(() =>
     {
@@ -350,9 +349,6 @@ public sealed class DrawnRevealTests
         {
             case "search":
                 entries.Search = "no item is called this";
-                break;
-            case "group":
-                entries.SelectedGroup = entries.Groups.Single(group => group.Path == "work");
                 break;
             default:
                 entries.Selected = entries.Rows.Single(row => row.Title == "gitlab");

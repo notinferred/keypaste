@@ -9,7 +9,6 @@
              x:DataType="vm:EntriesViewModel">
 
   <UserControl.Resources>
-    <views:DepthToIndent x:Key="Indent" />
     <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="14" /></DataTemplate>
     <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="14" /></DataTemplate>
     <DataTemplate x:Key="AttachmentSaveGlyph"><ctl:KpIcon Icon="download" Size="14" /></DataTemplate>
@@ -23,26 +22,6 @@
     </Style>
     <Style Selector="ListBoxItem:selected ctl|KpIcon.kind">
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
-
-    <!-- The group tree: 30px rows, quieter than the sidebar's destinations. -->
-    <Style Selector="ListBox.groups > ListBoxItem">
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="Height" Value="30" />
-      <Setter Property="Padding" Value="8,0" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    </Style>
-    <Style Selector="ListBox.groups > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-    </Style>
-    <Style Selector="ListBox.groups > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
-                     ListBox.groups > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
-                     ListBox.groups > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-      <Setter Property="BoxShadow" Value="none" />
-      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
     <Style Selector="ToggleButton.tree">
@@ -160,93 +139,6 @@
         </Grid>
       </Border>
 
-      <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
-        <StackPanel Spacing="8">
-          <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
-          <StackPanel Spacing="6">
-            <TextBlock Classes="label" Text="{x:Static res:Strings.GroupName}" />
-            <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="{x:Static res:Strings.Servers}" AutomationProperties.Name="{x:Static res:Strings.GroupName}" />
-            <TextBlock x:Name="NewGroupProblem" ctl:ShowInView.Scrolls="True"
-                       Classes="caption danger"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding HasGroupProblem}"
-                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="CreateGroup" Classes="primary sm" Content="{x:Static res:Strings.Create}" Command="{Binding ConfirmCreateGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
-        <StackPanel Spacing="8">
-          <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
-          <StackPanel Spacing="6">
-            <TextBlock Classes="label" Text="{x:Static res:Strings.TheGroupsNewName}" />
-            <TextBox x:Name="RenameGroupName" AutomationProperties.Name="{x:Static res:Strings.TheGroupsNewName}" Text="{Binding DraftGroupName}" />
-            <TextBlock x:Name="RenameGroupProblem" ctl:ShowInView.Scrolls="True"
-                       Classes="caption danger"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding HasGroupProblem}"
-                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
-          </StackPanel>
-          <TextBlock Classes="caption" Text="{Binding AccessNote}" />
-          <!-- A group under env is where keypaste puts a project's new keys. -->
-          <TextBlock x:Name="ProjectRenameNote"
-                     Classes="caption"
-                     IsVisible="{Binding ShowsProjectRenameNote}"
-                     Text="{Binding ProjectRenameNote}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="RenameGroupSave" Classes="primary sm" Content="{x:Static res:Strings.Rename}" Command="{Binding ConfirmRenameGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <!-- A group moves with everything in it, to the places an item can move to. -->
-      <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
-        <StackPanel Spacing="8">
-          <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
-          <StackPanel Spacing="6">
-            <TextBlock Classes="label" Text="{x:Static res:Strings.MoveTo}" />
-            <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="{x:Static res:Strings.MoveTo}"
-                      HorizontalAlignment="Stretch"
-                      ItemsSource="{Binding MoveTargets}"
-                      SelectedItem="{Binding GroupMoveTarget}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:GroupNode">
-                  <TextBlock Text="{Binding Label}"
-                             Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                             TextTrimming="CharacterEllipsis" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock x:Name="MoveGroupProblem" ctl:ShowInView.Scrolls="True"
-                       Classes="caption danger"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding HasGroupProblem}"
-                       ctl:Announcer.Says="{Binding GroupProblem}" Text="{Binding GroupProblem}" />
-          </StackPanel>
-          <TextBlock Classes="caption" Text="{Binding AccessNote}" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="MoveGroupSave" Classes="primary sm" Content="{x:Static res:Strings.Move}" Command="{Binding ConfirmMoveGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <!-- Only where the vault has no recycle bin: a recycled group goes at once, and Undo brings it back. -->
-      <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
-        <StackPanel Spacing="8">
-          <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="KeepGroup" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelGroupCommand}" />
-            <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="{x:Static res:Strings.DeleteForGood}" IsVisible="{Binding GroupCanBeDeleted}" Command="{Binding ConfirmDeleteGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
     </StackPanel>
 
     <ctl:ListDetail x:Name="Split" ListWidth="280" DetailLeast="380" ShowsList="{Binding ShowsList}" ShowsDetail="{Binding HasOpenPane}">
@@ -272,16 +164,6 @@
                            MaxWidth="90"
                            VerticalAlignment="Center" />
               </StackPanel>
-              <!-- A group is renamed where its name is; the tree it is chosen from is the sidebar's. -->
-              <Button Grid.Column="2"
-                      x:Name="RenameGroup"
-                      Classes="icon ghost sm"
-                      ToolTip.Tip="{x:Static res:Strings.RenameGroup}"
-                      AutomationProperties.Name="{x:Static res:Strings.RenameGroup}"
-                      IsVisible="{Binding CanRenameGroup}"
-                      Command="{Binding BeginRenameGroupCommand}">
-                <ctl:KpIcon Icon="folder-pen" Size="14" />
-              </Button>
               <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                 <ToggleButton x:Name="SortMenu"
                               Classes="more"
@@ -387,12 +269,6 @@
                        TextAlignment="Center"
                        Text="{Binding ListEmptyNote}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-              <Button Classes="sm"
-                      Name="SearchAllItems"
-                      Content="{x:Static res:Strings.SearchAllItems}"
-                      IsVisible="{Binding ListEmptyOffersSearchAll}"
-                      Command="{Binding SearchAllItemsCommand}"
-                      AutomationProperties.Name="{x:Static res:Strings.SearchAllItems}" />
               <Button Classes="sm"
                       Name="ClearSearch"
                       Content="{x:Static res:Strings.ClearSearch}"
@@ -525,12 +401,6 @@
                             <TextBlock Classes="caption" TextWrapping="NoWrap" Text="{x:Static res:Strings.EditingItem}" IsVisible="{Binding IsEditing}" />
                             <TextBlock Classes="caption" TextWrapping="NoWrap" Text="·" />
                             <TextBlock x:Name="ItemVault" Classes="caption" TextWrapping="NoWrap" Text="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).ItemVaultTitle, FallbackValue={x:Null}}" />
-                            <TextBlock Classes="caption" TextWrapping="NoWrap" Text="›" IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
-                            <TextBlock x:Name="PaneLocation"
-                                       Text="{Binding Location}"
-                                       Classes="caption" TextWrapping="NoWrap"
-                                       TextTrimming="CharacterEllipsis"
-                                       IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
                           </StackPanel>
                         </StackPanel>
                       </Grid>
@@ -581,9 +451,9 @@
                       <TextBlock Classes="muted size-13" Text="{x:Static res:Strings.SharedNameNothingTells}" TextWrapping="Wrap" />
                       <Button Classes="ghost sm"
                               HorizontalAlignment="Left"
-                              Content="{x:Static res:Strings.RenameOrMoveLabel}"
+                              Content="{x:Static res:Strings.RenameLabel}"
                               Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
-                              AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}" />
+                              AutomationProperties.Name="{x:Static res:Strings.Rename}" />
                     </StackPanel>
 
                     <!-- The ⋯ menu. A canvas takes no room, so the open menu lies over the fields below
@@ -611,10 +481,10 @@
                           <Button x:Name="OrganizeFromPane"
                                   Classes="ghost menu-item"
                                   Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
-                                  AutomationProperties.Name="{x:Static res:Strings.RenameOrMove}">
+                                  AutomationProperties.Name="{x:Static res:Strings.Rename}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <ctl:KpIcon Icon="folder-input" Size="14" />
-                              <TextBlock Text="{x:Static res:Strings.RenameOrMoveLabel}" VerticalAlignment="Center" />
+                              <TextBlock Text="{x:Static res:Strings.RenameLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
                           <Button x:Name="DuplicateEntry"
@@ -742,15 +612,13 @@
                     </Border>
                   </StackPanel>
 
-                  <!-- Renaming and moving on one form, behind one Save. The two are a single core write
-                       (Vault.Relocate), and splitting them into two submits would let a rename commit in
-                       the open vault while the move beside it was refused, for the next save to write out. -->
+                  <!-- Renaming in the item's own group, behind one Save. -->
                   <Border Classes="form"
                           x:DataType="vm:EntriesViewModel"
                           DataContext="{Binding $parent[views:EntriesView].DataContext}"
                           IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
                     <StackPanel Spacing="8">
-                      <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.RenameOrMove}" />
+                      <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.Rename}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.Title}" />
                         <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="{x:Static res:Strings.Title}" Text="{Binding DraftTitle}" />
@@ -759,19 +627,6 @@
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding HasOrganizeTitleProblem}"
                                    ctl:Announcer.Says="{Binding OrganizeTitleProblem}" Text="{Binding OrganizeTitleProblem}" />
-                      </StackPanel>
-                      <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="{x:Static res:Strings.Group}" />
-                        <ComboBox x:Name="OrganizeGroup" AutomationProperties.Name="{x:Static res:Strings.Group}"
-                                  HorizontalAlignment="Stretch"
-                                  ItemsSource="{Binding MoveTargets}"
-                                  SelectedItem="{Binding MoveTarget}">
-                          <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:GroupNode">
-                              <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                            </DataTemplate>
-                          </ComboBox.ItemTemplate>
-                        </ComboBox>
                       </StackPanel>
                       <TextBlock Classes="caption" Text="{Binding AccessNote}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">

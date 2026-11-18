@@ -10,7 +10,6 @@
              Background="Transparent">
 
   <UserControl.Resources>
-    <views:DepthToIndent x:Key="Indent" />
   </UserControl.Resources>
 
   <!-- Implicit templates, matched by the type of whatever Content holds. Adding a destination
@@ -393,49 +392,6 @@
                       <TextBlock Name="VaultSaveMark" Classes="count" Text="{Binding SaveMark}" IsVisible="{Binding HasSaveMark}" VerticalAlignment="Center" />
                       <ctl:KpIcon Icon="lock" Size="14" IsVisible="{Binding IsLocked}" />
                     </StackPanel>
-                  </Grid>
-                </DataTemplate>
-                <DataTemplate DataType="vm:GroupsRow">
-                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" Classes="under-vault" AutomationProperties.Name="{x:Static res:Strings.Groups}">
-                    <ctl:KpIcon Icon="folder" Size="16" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="1" Text="{x:Static res:Strings.Groups}" VerticalAlignment="Center" />
-                    <Button Grid.Column="2"
-                            Name="HeadingAdd"
-                            Classes="icon ghost fold reveal"
-                            ToolTip.Tip="{x:Static res:Strings.NewGroupLabel}"
-                            AutomationProperties.Name="{x:Static res:Strings.NewGroupLabel}">
-                      <ctl:KpIcon Icon="plus" Size="14" />
-                    </Button>
-                    <Button Grid.Column="3"
-                            Classes="icon ghost fold"
-                            Margin="2,0,-6,0"
-                            Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
-                            CommandParameter="{Binding}"
-                            ToolTip.Tip="{Binding FoldLabel}"
-                            AutomationProperties.Name="{Binding FoldLabel}">
-                      <ctl:KpIcon Icon="{Binding Chevron}" Size="14" />
-                    </Button>
-                  </Grid>
-                </DataTemplate>
-                <DataTemplate DataType="vm:GroupRow">
-                  <Grid ColumnDefinitions="16,Auto,*"
-                        Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                        AutomationProperties.Name="{Binding Title}">
-                    <Button Grid.Column="0"
-                            Classes="icon ghost fold"
-                            Margin="-2"
-                            IsVisible="{Binding HasChildren}"
-                            Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
-                            CommandParameter="{Binding}"
-                            ToolTip.Tip="{Binding FoldLabel}"
-                            AutomationProperties.Name="{Binding FoldLabel}">
-                      <ctl:KpIcon Icon="{Binding Chevron}" Size="14" />
-                    </Button>
-                    <ctl:KpIcon Grid.Column="1" Icon="folder" Size="16" Margin="4,0,8,0" />
-                    <TextBlock Grid.Column="2"
-                               Text="{Binding Title}"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
                   </Grid>
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProjectRow">

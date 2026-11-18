@@ -6,7 +6,7 @@ using Keypaste.Core;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The Entries screen: a group tree, a searchable list of names, and one entry's detail.
+/// The Entries screen: each vault's items as one flat list, searchable, and one entry's detail.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,10 +16,9 @@ namespace Keypaste.App.ViewModels;
 /// was anything to break it.
 /// </para>
 /// <para>
-/// <b>Searching and the group tree are built here, not in the core.</b> Core has no search API and
-/// no tree API, and it should not grow either for one caller: <c>keypaste ls</c> assembles its own
-/// indentation from the same flat <see cref="Vault.ReadGroupPaths"/>. What must not be duplicated
-/// is a <em>rule</em> — where an entry lives, what a name may contain — and those stay in
+/// <b>The list is flat.</b> An item keeps the group the file holds it in, which the CLI, search and agents read, but
+/// this screen lists every item of the vault together and never moves one between groups. What must not be
+/// duplicated is a <em>rule</em> — where an entry lives, what a name may contain — and those stay in
 /// <see cref="EntryNameSanitizer"/> and the core's own addressing.
 /// </para>
 /// </remarks>
@@ -35,12 +34,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private readonly IWebLauncher? _web;
     private readonly Action<Action>? _post;
     private readonly IVaultFilePicker? _picker;
-    private GroupNode? _selectedGroup;
     private EntryName? _selection;
     private AppVaultSession? _selectionVault;
     private EntryName? _pinned;
     private AppVaultSession? _pinnedVault;
-    private string? _groupRefusal;
     private EntryDetailViewModel? _detail;
     private string _search = string.Empty;
     private string? _matchedQuery;
@@ -97,23 +94,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         ConfirmOrganizeCommand = new RelayCommand(ConfirmOrganize, () => IsOrganizing);
         CancelOrganizeCommand = new RelayCommand(() => CloseOrganize(), () => IsOrganizing);
 
-        BeginCreateGroupCommand = new RelayCommand(BeginCreateGroup, () => !IsCreatingGroup);
-        ConfirmCreateGroupCommand = new RelayCommand(ConfirmCreateGroup, () => IsCreatingGroup);
-        BeginRenameGroupCommand = new RelayCommand(
-            BeginRenameGroup,
-            () => !IsRenamingGroup && SelectedGroup is { IsEverything: false });
-        ConfirmRenameGroupCommand = new RelayCommand(ConfirmRenameGroup, () => IsRenamingGroup);
-        BeginMoveGroupCommand = new RelayCommand(
-            BeginMoveGroup,
-            () => !IsMovingGroup && SelectedGroup is { IsEverything: false });
-        ConfirmMoveGroupCommand = new RelayCommand(ConfirmMoveGroup, () => IsMovingGroup);
-        BeginDeleteGroupCommand = new RelayCommand(
-            BeginDeleteGroup,
-            () => !IsConfirmingGroupDelete && SelectedGroup is { IsEverything: false });
-        ConfirmDeleteGroupCommand = new RelayCommand(ConfirmDeleteGroup, () => IsConfirmingGroupDelete && GroupCanBeDeleted);
-        CancelGroupCommand = new RelayCommand(
-            CloseGroupForms,
-            () => IsCreatingGroup || IsRenamingGroup || IsMovingGroup || IsConfirmingGroupDelete);
         DuplicateCommand = new RelayCommand(Duplicate, () => Selected is not null);
 
         Reload();
@@ -122,48 +102,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         {
             _activity.Changed += OnActivity;
             ApplyActivity();
-        }
-    }
-
-    /// <summary>The group tree, flattened, with "All items" first.</summary>
-    [ObservableProperty]
-    internal partial IReadOnlyList<GroupNode> Groups { get; private set; } = [];
-
-    /// <summary>Which group is showing. Null means every entry.</summary>
-    internal GroupNode? SelectedGroup
-    {
-        get => _selectedGroup;
-        set
-        {
-            if (SetProperty(ref _selectedGroup, value))
-            {
-                OnPropertyChanged(nameof(CanRenameGroup));
-                OnPropertyChanged(nameof(ListTitle));
-                OnPropertyChanged(nameof(SortChoices));
-                OnPropertyChanged(nameof(PaneNamesGroup));
-                OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
-                OnPropertyChanged(nameof(ListEmptyNote));
-                OnPropertyChanged(nameof(ListEmptyOffersImport));
-                OnPropertyChanged(nameof(CreateGroupPrompt));
-                OnPropertyChanged(nameof(RenameGroupPrompt));
-                OnPropertyChanged(nameof(MoveGroupPrompt));
-                OnPropertyChanged(nameof(GroupDeletePrompt));
-                OnPropertyChanged(nameof(GroupCanBeDeleted));
-                OnPropertyChanged(nameof(ShowsProjectRenameNote));
-                OnPropertyChanged(nameof(ProjectRenameNote));
-                BeginRenameGroupCommand.NotifyCanExecuteChanged();
-                BeginMoveGroupCommand.NotifyCanExecuteChanged();
-                BeginDeleteGroupCommand.NotifyCanExecuteChanged();
-
-                if (_pinned is { } pin && !Shows(value, pin.GroupPath))
-                {
-                    _pinned = null;
-                }
-
-                Filter();
-                ClosePaneTheListHid();
-                CloseGroupForms();
-            }
         }
     }
 
@@ -211,7 +149,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The vault a row's item is in.</summary>
     private AppVaultSession SessionOf(EntryRow row) => row.Vault ?? _session;
 
-    /// <summary>Whether a row's item is in this screen's own vault, whose groups the list's forms move it among.</summary>
+    /// <summary>Whether a row's item is in this screen's own vault, which the list's forms change.</summary>
     private bool IsHome(EntryRow row) => ReferenceEquals(SessionOf(row), _session);
 
     private bool SameVault(EntryRow row, AppVaultSession? vault) => vault is null || ReferenceEquals(SessionOf(row), vault);
@@ -264,20 +202,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         return tags;
     }
 
-    /// <summary>Whether a group is showing, which Rename beside its name then renames.</summary>
-    internal bool CanRenameGroup => SelectedGroup is { IsEverything: false };
-
-    /// <summary>What the list header names, which is what the search covers: every item, or the group showing.</summary>
-    internal string ListTitle =>
-        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : ItemPlaces.Title(Place);
-
-    /// <summary>Shows every item again, which widens the search to all of them.</summary>
-    internal void ShowEveryItem() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything);
+    /// <summary>What the list header names, which is what the search covers: the place showing.</summary>
+    internal string ListTitle => ItemPlaces.Title(Place);
 
     /// <summary>How the list is sorted and sized.</summary>
     internal TableState Table { get; }
 
-    /// <summary>What matches the search and the selected group, in the table's order.</summary>
+    /// <summary>What matches the search and the place, in the table's order.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ListedRows), nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
@@ -290,17 +221,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal string ListEmptyNote =>
         Search.Trim() is { Length: > 0 } query
             ? $"No items match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
-            : Place == ItemPlace.Favorites && SelectedGroup is null or { IsEverything: true }
+            : Place == ItemPlace.Favorites
                 ? Strings.NoFavoritesYet
-            : SelectedGroup is { IsEverything: false } || Place != ItemPlace.All
+            : Place != ItemPlace.All
                 ? $"No items in {ListTitle}. {Strings.NewItemAddsOneHere}"
                 : "No items in this vault yet.";
 
     /// <summary>Whether a search found nothing, so clearing it is the next step.</summary>
     internal bool ListEmptyOffersClearSearch => Search.Trim().Length > 0;
-
-    /// <summary>Whether that search looked in one group, so looking everywhere is a next step too.</summary>
-    internal bool ListEmptyOffersSearchAll => ListEmptyOffersClearSearch && CanRenameGroup;
 
     /// <summary>Clears the search box, which the shell owns.</summary>
     internal Action? ClearSearchBox { get; set; }
@@ -308,20 +236,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Hides any value on screen before the open item is read again; the shell's.</summary>
     internal Action? EndReveals { get; init; }
 
-    /// <summary>Widens the search to every item through the shell, which keeps a draft from being lost.</summary>
-    internal Action? WidenSearch { get; set; }
-
     [RelayCommand]
     private void ClearSearch() => ClearSearchBox?.Invoke();
-
-    [RelayCommand]
-    private void SearchAllItems() => WidenSearch?.Invoke();
 
     /// <summary>
     /// Whether the empty list also offers Import .kdbx: the vault holds no item at all, as a new one
     /// does, so the first thing a KeePass user may want is to bring their database in.
     /// </summary>
-    internal bool ListEmptyOffersImport => TotalCount == 0 && !ListEmptyOffersClearSearch && Place == ItemPlace.All && SelectedGroup is null or { IsEverything: true };
+    internal bool ListEmptyOffersImport => TotalCount == 0 && !ListEmptyOffersClearSearch && Place == ItemPlace.All;
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -345,7 +267,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             {
                 OnPropertyChanged(nameof(ListEmptyNote));
                 OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
-                OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
                 // A new query is a new question, so an entry held in the list by the last one stops
                 // being held by this one.
@@ -367,7 +288,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>The pane shows only what the list does, so the group or query just chosen closes an item it hid.</summary>
+    /// <summary>The pane shows only what the list does, so the place or query just chosen closes an item it hid.</summary>
     private void ClosePaneTheListHid()
     {
         if (_selection is not null && !Rows.Any(IsSelected))
@@ -382,7 +303,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <b>Held as the name that reaches the item rather than as the row object, so what the list does to its rows
     /// does not decide the selection.</b> The list writes null back into this property whenever the
     /// row it had selected leaves <see cref="Rows"/>. A null from the list is therefore ignored;
-    /// <see cref="Select"/> is how the selection is deliberately dropped: by a query or group that
+    /// <see cref="Select"/> is how the selection is deliberately dropped: by a query or place that
     /// hides it, <see cref="Dispose"/>, the locked branch of <see cref="Reload"/> and a completed delete.
     /// </para>
     /// <para>
@@ -417,7 +338,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    private string? _renamedGroupName;
     private bool _changeHeldOff;
 
     private void MoveSelection(EntryName name, AppVaultSession vault)
@@ -435,21 +355,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal Action<string, Action, Action?>? AskDiscard { get; init; }
 
     /// <inheritdoc/>
-    public string? UnsavedDraft => PaneDraft ?? GroupDraft();
+    public string? UnsavedDraft => PaneDraft;
 
-    // What choosing another row would lose; a group's form stays open across that.
+    // What choosing another row would lose.
     private string? PaneDraft => _newItem?.UnsavedDraft ?? OrganizeDraft() ?? Detail?.UnsavedDraft;
 
     internal Func<string?> NewItemDraft => () => _newItem?.UnsavedDraft;
 
     internal Func<string?> OrganizeDraft => () =>
         IsOrganizing && Selected is { } row && DraftTitle.Trim() != row.Title ? "this new name" : null;
-
-    internal Func<string?> GroupDraft => () =>
-        (IsCreatingGroup && DraftGroupName.Trim().Length > 0)
-        || (IsRenamingGroup && DraftGroupName.Trim() != _renamedGroupName)
-            ? "this group's name"
-            : null;
 
     /// <summary>
     /// Whether the delete confirmation is showing.
@@ -487,19 +401,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>Whether the open item's Copy password holds the view's amber: not while a form here shows a primary of its own, since a view has one amber element.</summary>
     internal bool CopyPasswordIsPrimary =>
-        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
-
-    /// <summary>Whether the pane says the item's group: the list's two-line rows do not, so unless the header already names it.</summary>
-    internal bool PaneNamesGroup => _detail is { GroupPath.Length: > 0 } detail && detail.GroupPath != SelectedGroup?.Path;
+        !IsAdding && !IsOrganizing && _detail is not { HasOwnPrimary: true };
 
     /// <summary>Whether the list shows beside the chosen item; a comparison of two revisions takes the whole view instead.</summary>
     internal bool ShowsList => _detail is not { TakesWholeView: true };
 
-    /// <summary>The list's sorts: each of its columns, and which way the one in force runs. Group goes while the header names one.</summary>
+    /// <summary>The list's sorts: each of its columns, and which way the one in force runs.</summary>
     internal IReadOnlyList<SortChoice> SortChoices =>
     [
         .. Table.Columns
-            .Where(column => column.Key != TableStates.Group || SelectedGroup is null or { IsEverything: true })
             .Select(column => new SortChoice(
                 column.Key,
                 column.Name,
@@ -570,7 +480,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(CopyPasswordIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
                 OnPropertyChanged(nameof(HasOpenPane));
-                OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
@@ -638,7 +547,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(CopyPasswordIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
                 OnPropertyChanged(nameof(HasOpenPane));
-                OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
                 BeginAddCommand.NotifyCanExecuteChanged();
@@ -672,7 +580,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
         {
             OnPropertyChanged(nameof(ShowsList));
-            OnPropertyChanged(nameof(PaneNamesGroup));
         }
     }
 
@@ -683,83 +590,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     [NotifyCanExecuteChangedFor(nameof(OrganizeCommand), nameof(ConfirmOrganizeCommand), nameof(CancelOrganizeCommand))]
     internal partial bool IsOrganizing { get; private set; }
 
-    /// <summary>Whether the new-group form is showing.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(BeginCreateGroupCommand), nameof(ConfirmCreateGroupCommand), nameof(CancelGroupCommand))]
-    internal partial bool IsCreatingGroup { get; private set; }
-
-    /// <summary>Whether the rename-group form is showing.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary), nameof(ShowsProjectRenameNote), nameof(ProjectRenameNote))]
-    [NotifyCanExecuteChangedFor(nameof(BeginRenameGroupCommand), nameof(ConfirmRenameGroupCommand), nameof(CancelGroupCommand))]
-    internal partial bool IsRenamingGroup { get; private set; }
-
-    /// <summary>Whether the move-group form is showing.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(BeginMoveGroupCommand), nameof(ConfirmMoveGroupCommand), nameof(CancelGroupCommand))]
-    internal partial bool IsMovingGroup { get; private set; }
-
-    /// <summary>Whether the group delete confirmation is showing.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(GroupDeletePrompt), nameof(GroupCanBeDeleted))]
-    [NotifyCanExecuteChangedFor(nameof(BeginDeleteGroupCommand), nameof(ConfirmDeleteGroupCommand), nameof(CancelGroupCommand))]
-    internal partial bool IsConfirmingGroupDelete { get; private set; }
-
-    /// <summary>The group the selected group would move into, from <see cref="MoveTargets"/>.</summary>
-    [ObservableProperty]
-    internal partial GroupNode? GroupMoveTarget { get; set; }
-
-    /// <summary>Which group is being moved.</summary>
-    internal string MoveGroupPrompt =>
-        SelectedGroup is { IsEverything: false } group
-            ? $"Move {EntryNameSanitizer.SanitizePath(group.Path).Text} and everything in it into another group."
-            : string.Empty;
-
-    /// <summary>
-    /// What the group delete confirmation asks, naming how many items go with the group and whether
-    /// they can come back.
-    /// </summary>
-    /// <remarks>
-    /// Read from the vault for the reason <see cref="DeletePrompt"/> gives, and counted from the list,
-    /// which holds every item under the group, its subgroups' included.
-    /// </remarks>
-    internal string GroupDeletePrompt
-    {
-        get
-        {
-            if (SelectedGroup is not { IsEverything: false } group)
-            {
-                return string.Empty;
-            }
-
-            var name = EntryNameSanitizer.SanitizePath(group.Path).Text;
-            var count = _all.Count(row => group.Contains(row.GroupPath));
-            var items = count == 1 ? "1 item" : Invariant($"{count} items");
-
-            return GroupCanBeDeleted
-                ? $"Delete {name}? This vault has no Trash, so there is no undo."
-                : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no Trash, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
-        }
-    }
-
-    /// <summary>Whether the selected group holds nothing, the only group a vault with no Trash can delete.</summary>
-    internal bool GroupCanBeDeleted =>
-        SelectedGroup is { IsEverything: false } group && group.Children.Count == 0 && !_all.Any(row => group.Contains(row.GroupPath));
-
-    /// <summary>Opens the form that moves the selected group into another.</summary>
-    internal RelayCommand BeginMoveGroupCommand { get; }
-
-    /// <summary>Moves the selected group, with everything in it, in one write.</summary>
-    internal RelayCommand ConfirmMoveGroupCommand { get; }
-
-    /// <summary>Deletes the selected group into the recycle bin, or asks first where the vault has none.</summary>
-    internal RelayCommand BeginDeleteGroupCommand { get; }
-
-    /// <summary>Deletes the selected group with everything in it, having been confirmed.</summary>
-    internal RelayCommand ConfirmDeleteGroupCommand { get; }
-
     /// <summary>Copies the selected item beside it, under a new title, and selects the copy.</summary>
     internal RelayCommand DuplicateCommand { get; }
 
@@ -768,7 +598,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem))]
     internal partial string DraftTitle { get; set; } = string.Empty;
 
-    /// <summary>Why the name typed in Rename or move cannot be used, or null.</summary>
+    /// <summary>Why the name typed in Rename cannot be used, or null.</summary>
     internal string? OrganizeTitleProblem =>
         !IsOrganizing ? null
         : DraftTitle.Trim().Length == 0 ? "An item needs a name."
@@ -776,56 +606,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         : null;
 
     internal bool HasOrganizeTitleProblem => OrganizeTitleProblem is not null;
-
-    /// <summary>The name being typed for a group.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(GroupProblem), nameof(HasGroupProblem))]
-    internal partial string DraftGroupName { get; set; } = string.Empty;
-
-    /// <summary>Why the group form's last press changed nothing, or why the name typed cannot be used, or null.</summary>
-    internal string? GroupProblem =>
-        _groupRefusal
-        ?? (DraftGroupName.Trim() is { Length: > 0 } name && EntryNameSanitizer.Sanitize(name) is { WasAltered: true } sanitized
-            ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
-            : null);
-
-    internal bool HasGroupProblem => GroupProblem is not null;
-
-    partial void OnDraftGroupNameChanged(string value) => _groupRefusal = null;
-
-    private void RefuseGroup(string? refusal)
-    {
-        _groupRefusal = refusal;
-        OnPropertyChanged(nameof(GroupProblem));
-        OnPropertyChanged(nameof(HasGroupProblem));
-    }
-
-    /// <summary>The groups an entry can be moved into.</summary>
-    /// <remarks>
-    /// The tree's own list, which comes from <see cref="Vault.ReadGroupPaths"/>: a group holding
-    /// nothing is in it and the recycle bin is not, so every offered destination is one core will
-    /// accept and a move is not a delete. Offering a typed path instead would make
-    /// <see cref="OrganizeOutcome.DestinationMissing"/> the ordinary answer to a typo, where the
-    /// add form would have created the group.
-    /// </remarks>
-    [ObservableProperty]
-    internal partial IReadOnlyList<GroupNode> MoveTargets { get; private set; } = [];
-
-    /// <summary>The group the entry would move into.</summary>
-    [ObservableProperty]
-    internal partial GroupNode? MoveTarget { get; set; }
-
-    /// <summary>Where a new group would go.</summary>
-    internal string CreateGroupPrompt =>
-        SelectedGroup is { IsEverything: false } group
-            ? $"A new group inside {EntryNameSanitizer.SanitizePath(group.Path).Text}."
-            : "A new group at the top level.";
-
-    /// <summary>Which group is being renamed.</summary>
-    internal string RenameGroupPrompt =>
-        SelectedGroup is { IsEverything: false } group
-            ? $"Rename {EntryNameSanitizer.SanitizePath(group.Path).Text}."
-            : string.Empty;
 
     /// <summary>
     /// What organizing can do to an authorization, said wherever organizing happens.
@@ -854,44 +634,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         "What an agent can see by place is matched against paths, so this can take these items " +
         "out of an agent's view or bring them into one.";
 
-    /// <summary>Whether the group being renamed is where keypaste puts a project's new keys.</summary>
-    internal bool ShowsProjectRenameNote =>
-        IsRenamingGroup && SelectedGroup is { IsEverything: false } group && IsProjectHome(group.Path);
-
-    /// <summary>What renaming this group changes about where keypaste puts new keys.</summary>
-    internal string ProjectRenameNote
-    {
-        get
-        {
-            if (!ShowsProjectRenameNote || SelectedGroup is not { } group)
-            {
-                return string.Empty;
-            }
-
-            var project = EntryNameSanitizer.Sanitize(group.Name).Text;
-
-            return $"New keys for {project} go to items in {EnvConvention.RootGroup}/{project}, which keypaste "
-                + "creates again after this rename. Moved items keep their tags, and with them their projects.";
-        }
-    }
-
     /// <summary>Opens the organize form for the selected entry.</summary>
     internal RelayCommand OrganizeCommand { get; }
 
-    /// <summary>Renames and moves in the one write core offers for both.</summary>
+    /// <summary>Renames the selected entry in its own group.</summary>
     internal RelayCommand ConfirmOrganizeCommand { get; }
 
     internal RelayCommand CancelOrganizeCommand { get; }
-
-    internal RelayCommand BeginCreateGroupCommand { get; }
-
-    internal RelayCommand ConfirmCreateGroupCommand { get; }
-
-    internal RelayCommand BeginRenameGroupCommand { get; }
-
-    internal RelayCommand ConfirmRenameGroupCommand { get; }
-
-    internal RelayCommand CancelGroupCommand { get; }
 
     /// <summary>The list's "+" and ⌘N: the form of the kind the place holds, or a login's where it holds every kind.</summary>
     internal RelayCommand BeginAddCommand { get; }
@@ -931,7 +680,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         if (_session.Unlocked is not { } vault)
         {
             _all = [];
-            Groups = [];
             Rows = [];
             Select(null);
             Forget();
@@ -945,36 +693,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         var wanted = _selection;
         var wantedVault = _selectionVault;
 
-        var wantedGroup = _selectedGroup?.Path;
-
         _all = [.. RowsOf(_session, vault), .. _alsoListed.SelectMany(other => other.Unlocked is { } open ? RowsOf(other, open) : [])];
-        Groups = GroupNode.Flatten(vault.ReadGroupPaths());
-        MoveTargets = Groups;
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
-
-        // The tree is rebuilt from the vault, so the node the sidebar had is not in the new list.
-        // Re-pointing at the one with the same path keeps the filter and the highlight where they
-        // were; a first visit, or a group that is gone, highlights everything. Assigned to the field
-        // rather than the property, because Filter runs below either way.
-        _selectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, wantedGroup ?? string.Empty, StringComparison.Ordinal))
-            ?? Groups.FirstOrDefault(node => node.IsEverything);
-
-        OnPropertyChanged(nameof(SelectedGroup));
-        OnPropertyChanged(nameof(CanRenameGroup));
-        OnPropertyChanged(nameof(ListTitle));
         OnPropertyChanged(nameof(ListEmptyNote));
-        OnPropertyChanged(nameof(ListEmptyOffersImport));
-        OnPropertyChanged(nameof(CreateGroupPrompt));
-        OnPropertyChanged(nameof(RenameGroupPrompt));
-        OnPropertyChanged(nameof(MoveGroupPrompt));
-        OnPropertyChanged(nameof(GroupDeletePrompt));
-        OnPropertyChanged(nameof(GroupCanBeDeleted));
-        OnPropertyChanged(nameof(ShowsProjectRenameNote));
-        OnPropertyChanged(nameof(ProjectRenameNote));
-        BeginRenameGroupCommand.NotifyCanExecuteChanged();
-        BeginMoveGroupCommand.NotifyCanExecuteChanged();
-        BeginDeleteGroupCommand.NotifyCanExecuteChanged();
 
         // The vault changed underneath, so an answer about the old one is not an answer about this.
         _matchedQuery = null;
@@ -1107,20 +829,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         _matches = [];
         _pinned = null;
         DraftTitle = string.Empty;
-        DraftGroupName = string.Empty;
-        MoveTarget = null;
-        GroupMoveTarget = null;
-        MoveTargets = [];
         IsOrganizing = false;
-        IsCreatingGroup = false;
-        IsRenamingGroup = false;
-        IsMovingGroup = false;
-        IsConfirmingGroupDelete = false;
 
         OnPropertyChanged(nameof(Search));
         OnPropertyChanged(nameof(ListEmptyNote));
         OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
-        OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
     }
 
@@ -1141,7 +854,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         _all = [];
         Rows = [];
-        Groups = [];
         Select(null);
         Forget();
         Detail = null;
@@ -1198,7 +910,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         ShowHeldChange();
     }
 
-    /// <summary>Selects what the vault still holds, and holds it in the list until the next query or group, because an edit or another program's save is not the person hiding it.</summary>
+    /// <summary>Selects what the vault still holds, and holds it in the list until the next query or place, because an edit or another program's save is not the person hiding it.</summary>
     private void SelectIfListed(EntryName? name, AppVaultSession? vault)
     {
         var row = _all.FirstOrDefault(row => row.Is(name) && SameVault(row, vault));
@@ -1217,16 +929,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         _pinnedVault = vault;
     }
 
-    /// <summary>Narrows the list to the selected group and the current query.</summary>
+    /// <summary>Narrows the list to the place and the current query.</summary>
     /// <remarks>
-    /// Runs on every group change and every reselect as well as every keystroke, so the core search
+    /// Runs on every place change and every reselect as well as every keystroke, so the core search
     /// is cached against the query it answered: only a changed query costs a read of the vault.
     /// </remarks>
     private void Filter() => Rows = Listed();
 
     private List<EntryRow> Listed()
     {
-        var group = SelectedGroup;
         var query = Search.Trim();
 
         Match(query);
@@ -1235,7 +946,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         [
             .. TableSorting.Sorted(
                 _all
-                    .Where(row => Shows(group, row.GroupPath) && (Place == ItemPlace.Favorites ? row.IsFavorite : ItemPlaces.Holds(Place, row.Kind)))
+                    .Where(row => (Place == ItemPlace.Favorites ? row.IsFavorite : ItemPlaces.Holds(Place, row.Kind)))
                     .Where(row => query.Length == 0 || _matches.ContainsKey((SessionOf(row), row.Uuid, row.Name)))
                     .Select(row => query.Length == 0
                         ? row
@@ -1264,7 +975,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         TableStates.Title => new(row.DisplayTitle),
         TableStates.Username => new(row.DisplayUsername),
         TableStates.Url => new(row.DisplayUrl),
-        TableStates.Group => new(row.GroupPath.Length == 0 ? null : row.Where),
         TableStates.Modified => SortValue.At(row.ModifiedTicks),
         _ => SortValue.At(row.LastUsedTicks),
     };
@@ -1278,9 +988,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         compared = compared != 0 ? compared : TableSorting.CompareText(left.DisplayUsername, right.DisplayUsername);
         return compared != 0 ? compared : string.CompareOrdinal(left.Uuid, right.Uuid);
     }
-
-    /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected: a folder lists its children's entries too.</summary>
-    private static bool Shows(GroupNode? group, string groupPath) => group is null || group.Contains(groupPath);
 
     /// <summary>Asks core which entries the query is in, unless it already answered this one.</summary>
     private void Match(string query)
@@ -1388,7 +1095,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Notice = null;
         Error = null;
-        NewItem = new NewItemViewModel(SaveInChoices(), _clipboard, SelectedGroup is { IsEverything: false } group ? group.Path : null, template);
+        NewItem = new NewItemViewModel(SaveInChoices(), _clipboard, template);
     }
 
     private IReadOnlyList<SaveInChoice> SaveInChoices()
@@ -1502,7 +1209,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             ? $" {Strings.ThisVaultIsNowSavedInFormat41}"
             : string.Empty;
 
-    /// <summary>Reverses the last delete, rename, move, duplicate or group change through its inverse write.</summary>
+    /// <summary>Reverses the last delete, rename or duplicate through its inverse write.</summary>
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo()
     {
@@ -1541,8 +1248,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         CloseOtherForms();
         DraftTitle = row.Title;
-        MoveTarget = MoveTargets.FirstOrDefault(
-            node => string.Equals(node.Path, row.GroupPath, StringComparison.Ordinal));
         IsOrganizing = true;
         Error = null;
     }
@@ -1551,22 +1256,17 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         IsOrganizing = false;
         DraftTitle = string.Empty;
-        MoveTarget = null;
         Error = null;
         ShowHeldChange();
     }
 
     /// <summary>
-    /// Renames and moves the selected entry, in the one write core offers for both.
+    /// Renames the selected entry in the group the file holds it in, in one write.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>One core call, never two.</b> <see cref="Vault.Relocate"/> validates the whole target
-    /// before it mutates anything, so a refusal leaves the open vault exactly as it was. Calling
-    /// <see cref="Vault.RenameEntry"/> and then <see cref="Vault.MoveEntry"/> would not: the first
-    /// can succeed and the second be refused, and the rename nobody was told about would then be
-    /// written by the next unrelated <see cref="Vault.Save"/> — an add, a delete, an edit on
-    /// another screen. The form has one Save for that reason.
+    /// <see cref="Vault.Relocate"/> validates the whole target before it mutates anything, so a refusal leaves the
+    /// open vault exactly as it was.
     /// </para>
     /// <para>
     /// The title goes through <see cref="EntryNameSanitizer"/> first, as the add form does, so a
@@ -1589,11 +1289,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Organize(row, TargetOf(row));
     }
 
-    /// <summary>Where the form sends the item: what the person left as it opened stays as a merge since has made it.</summary>
+    /// <summary>The item's new name in its own group: a title the person left as it opened stays as a merge since has made it.</summary>
     private EntryName TargetOf(EntryRow row)
     {
         var title = DraftTitle.Trim();
-        var group = MoveTarget?.Path ?? string.Empty;
         VaultEntry? now;
 
         try
@@ -1606,33 +1305,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         return new EntryName(
-            now is not null && string.Equals(group, row.GroupPath, StringComparison.Ordinal) ? now.GroupPath : group,
+            now?.GroupPath ?? row.GroupPath,
             now is not null && string.Equals(title, row.Title, StringComparison.Ordinal) ? now.Title : title);
     }
 
     /// <summary>Whether no form or draft on this screen would be left behind by a drag taking an item or a file to its item.</summary>
     internal bool HoldsNoForm => UnsavedDraft is null && !IsAdding && !IsOrganizing && Detail is not { IsEditing: true };
-
-    /// <summary>Whether dropping <paramref name="row"/> on the group at <paramref name="group"/> would move it.</summary>
-    internal bool CanMove(EntryRow row, string group)
-    {
-        ArgumentNullException.ThrowIfNull(row);
-
-        return HoldsNoForm && IsHome(row) && _session.Unlocked?.RelocationRefusal(row.Name, new EntryName(group, row.Title)) is null;
-    }
-
-    /// <summary>Moves a dragged item into a group through what Rename or move… does, so it is one write and Undo reverses it.</summary>
-    internal void MoveToGroup(EntryRow row, string group)
-    {
-        ArgumentNullException.ThrowIfNull(row);
-
-        if (CanMove(row, group))
-        {
-            var target = new EntryName(group, row.Title);
-
-            Organize(row, target);
-        }
-    }
 
     private bool Organize(EntryRow row, EntryName target)
     {
@@ -1663,7 +1341,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                     vault => vault.Relocate(moved, row.Name, out _) is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved,
                     () => FollowRelocated(row.Name))
                 : null,
-            Did(write.Value.Outcome, moved));
+            Did(moved));
         FollowRelocated(moved);
         return true;
     }
@@ -1674,87 +1352,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         // the entry does not vanish from under somebody at the moment they renamed it.
         Pin(moved, _session);
         Reselect(moved, _session);
-
-        // A filter the entry has just left would hide what somebody is still looking at, so the
-        // filter follows the entry rather than the other way round.
-        if (SelectedGroup is { IsEverything: false } group && !Shows(group, moved.GroupPath))
-        {
-            SelectedGroup = Groups.FirstOrDefault(
-                node => string.Equals(node.Path, moved.GroupPath, StringComparison.Ordinal))
-                ?? Groups.FirstOrDefault(node => node.IsEverything);
-        }
-    }
-
-    private void BeginCreateGroup()
-    {
-        CloseOtherForms();
-        CloseGroupForms();
-        IsCreatingGroup = true;
-        Error = null;
-    }
-
-    private void BeginRenameGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false } group)
-        {
-            return;
-        }
-
-        CloseOtherForms();
-        CloseGroupForms();
-        DraftGroupName = group.Name;
-        _renamedGroupName = group.Name;
-        IsRenamingGroup = true;
-        Error = null;
-    }
-
-    private void BeginMoveGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false } group)
-        {
-            return;
-        }
-
-        CloseOtherForms();
-        CloseGroupForms();
-        var slash = group.Path.LastIndexOf('/');
-        var parent = slash < 0 ? string.Empty : group.Path[..slash];
-        GroupMoveTarget = MoveTargets.FirstOrDefault(node => string.Equals(node.Path, parent, StringComparison.Ordinal));
-        IsMovingGroup = true;
-        Error = null;
-    }
-
-    private void BeginDeleteGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false })
-        {
-            return;
-        }
-
-        CloseOtherForms();
-        CloseGroupForms();
-        Error = null;
-
-        if (_session.Unlocked?.RecyclesDeletedEntries == true)
-        {
-            ConfirmDeleteGroup();
-        }
-        else
-        {
-            IsConfirmingGroupDelete = true;
-        }
-    }
-
-    private void CloseGroupForms()
-    {
-        IsCreatingGroup = false;
-        IsRenamingGroup = false;
-        IsMovingGroup = false;
-        IsConfirmingGroupDelete = false;
-        DraftGroupName = string.Empty;
-        GroupMoveTarget = null;
-        RefuseGroup(null);
-        ShowHeldChange();
     }
 
     /// <summary>Closes whatever else is open, so one form is on screen at a time.</summary>
@@ -1764,140 +1361,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         NewItem = null;
         IsConfirmingDelete = false;
         IsOrganizing = false;
-    }
-
-    private void ConfirmCreateGroup()
-    {
-        var parent = SelectedGroup is { IsEverything: false } group ? group.Path : string.Empty;
-
-        Organize(
-            (vault, name) =>
-            {
-                var outcome = vault.CreateGroup(parent, name, out var created);
-                return (outcome, created);
-            },
-            GroupOutcome.Created,
-            path => $"Created {EntryNameSanitizer.SanitizePath(path).Text}.",
-            follow: false,
-            path => new Undoable(vault => vault.DeleteGroup(path) is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently));
-    }
-
-    private void ConfirmRenameGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false } selected)
-        {
-            return;
-        }
-
-        var path = selected.Path;
-
-        Organize(
-            (vault, name) =>
-            {
-                var outcome = vault.RenameGroup(path, name, out var renamed);
-                return (outcome, renamed);
-            },
-            GroupOutcome.Renamed,
-            renamed => $"Renamed to {EntryNameSanitizer.SanitizePath(renamed).Text}.",
-            follow: true,
-            renamed => new Undoable(
-                vault => vault.RenameGroup(renamed, selected.Name, out _) == GroupOutcome.Renamed,
-                () => ShowGroup(path)));
-    }
-
-    /// <summary>Moves the selected group into the chosen one, in one core write, and follows it there.</summary>
-    /// <remarks>
-    /// The destinations are the item move's own (<see cref="MoveTargets"/>); one core refuses, such as the
-    /// group itself or a group inside it, says why rather than being hidden from the list.
-    /// </remarks>
-    private void ConfirmMoveGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false } selected)
-        {
-            return;
-        }
-
-        var path = selected.Path;
-        var destination = GroupMoveTarget?.Path ?? string.Empty;
-        var write = _session.Write(
-            vault => (Outcome: vault.MoveGroup(path, destination, out var moved), Path: moved),
-            result => result.Outcome == GroupOutcome.Moved);
-
-        if (write.Problem("make your change again") is { } problem)
-        {
-            RefuseGroup(problem);
-            return;
-        }
-
-        if (write.Outcome == WriteOutcome.NothingToSave)
-        {
-            RefuseGroup(Refusal(write.Value.Outcome));
-            return;
-        }
-
-        var movedPath = write.Value.Path;
-        var from = ParentOf(path);
-        var where = destination.Length == 0 ? "the top level" : EntryNameSanitizer.SanitizePath(destination).Text;
-
-        CloseGroupForms();
-        Reload();
-
-        // The sidebar was pointing at a path that no longer exists, so it follows the group, as a rename does.
-        ShowGroup(movedPath);
-        Error = null;
-        Offer(
-            new Undoable(vault => vault.MoveGroup(movedPath, from, out _) == GroupOutcome.Moved, () => ShowGroup(path)),
-            $"Moved {EntryNameSanitizer.Sanitize(selected.Name).Text} to {where}.");
-    }
-
-    /// <summary>Deletes the selected group with everything in it, in one core write, and shows the group it was in.</summary>
-    /// <remarks>
-    /// Where the vault has a recycle bin the whole group goes there and Trash lists each of its items, which
-    /// is where they come back from; without one only an empty group goes, for good.
-    /// </remarks>
-    private void ConfirmDeleteGroup()
-    {
-        if (SelectedGroup is not { IsEverything: false } selected)
-        {
-            return;
-        }
-
-        var path = selected.Path;
-        var count = _all.Count(row => IsHome(row) && selected.Contains(row.GroupPath));
-        var firstDeleteNote = FirstDeleteNote(_session);
-        var write = _session.Write(
-            vault => vault.DeleteGroup(path),
-            outcome => outcome is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently);
-
-        if (write.Problem("delete it again") is { } problem)
-        {
-            Error = problem;
-            return;
-        }
-
-        if (write.Outcome == WriteOutcome.NothingToSave)
-        {
-            Error = Refusal(write.Value);
-            return;
-        }
-
-        var name = EntryNameSanitizer.SanitizePath(path).Text;
-        var parent = ParentOf(path);
-
-        CloseGroupForms();
-        Reload();
-        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, parent, StringComparison.Ordinal))
-            ?? Groups.FirstOrDefault(node => node.IsEverything);
-        Error = null;
-        Offer(
-            write.Value == GroupOutcome.Recycled
-                ? new Undoable(vault => vault.RestoreRecycledGroup(path) == GroupOutcome.Restored, () => ShowGroup(path), Restores: true)
-                : null,
-            write.Value == GroupOutcome.DeletedPermanently
-                ? $"Deleted {name}. This vault has no Trash, so nothing can put it back."
-                : count == 0
-                    ? $"Moved {name} to the Trash.{firstDeleteNote}"
-                    : $"Moved {name} and the {(count == 1 ? "1 item" : Invariant($"{count} items"))} in it to the Trash. Trash puts each one back.{firstDeleteNote}");
     }
 
     /// <summary>
@@ -1961,78 +1424,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         return $"{made} The copy leaves out {which}, because a project takes one item for each variable. Tag the copy to put it in another environment.";
     }
 
-    /// <summary>The half of a group operation that is the same for creating and renaming.</summary>
-    private void Organize(
-        Func<Vault, string, (GroupOutcome Outcome, string Path)> operation,
-        GroupOutcome success,
-        Func<string, string> said,
-        bool follow,
-        Func<string, Undoable> undo)
-    {
-        var name = DraftGroupName.Trim();
-
-        if (name.Length == 0)
-        {
-            RefuseGroup("A group needs a name. Type one.");
-            return;
-        }
-
-        var sanitized = EntryNameSanitizer.Sanitize(name);
-        if (sanitized.WasAltered)
-        {
-            return;
-        }
-
-        var write = _session.Write(vault => operation(vault, sanitized.Text), result => result.Outcome == success);
-
-        if (write.Problem("make your change again") is { } problem)
-        {
-            RefuseGroup(problem);
-            return;
-        }
-
-        if (write.Outcome == WriteOutcome.NothingToSave)
-        {
-            RefuseGroup(Refusal(write.Value.Outcome));
-            return;
-        }
-
-        var path = write.Value.Path;
-
-        CloseGroupForms();
-        Reload();
-
-        // A rename has to be followed: the sidebar was pointing at a path that no longer exists, and
-        // Reload cannot re-point at it. Creating one must not be — somebody who makes a group in
-        // order to move things into it would be dropped inside it, with an empty list and nothing
-        // left to select.
-        if (follow)
-        {
-            ShowGroup(path);
-        }
-
-        Offer(undo(path), said(path));
-    }
-
-    /// <summary>What the app says happened, for a write that went through.</summary>
-    private static string Did(OrganizeOutcome outcome, EntryName moved)
-    {
-        var where = moved.GroupPath.Length == 0
-            ? "the top level"
-            : EntryNameSanitizer.SanitizePath(moved.GroupPath).Text;
-
-        var title = EntryNameSanitizer.Sanitize(moved.Title).Text;
-
-        return outcome switch
-        {
-            OrganizeOutcome.Renamed => $"Renamed to {title}.",
-            OrganizeOutcome.Moved => $"Moved {title} to {where}.",
-            _ => $"Moved {title} to {where} and renamed it.",
-        };
-    }
+    /// <summary>What the app says a rename did.</summary>
+    private static string Did(EntryName renamed) => $"Renamed to {EntryNameSanitizer.Sanitize(renamed.Title).Text}.";
 
     /// <summary>
-    /// What the app says when core refused an entry a new name or a new group.
+    /// What the app says when core refused an entry a new name.
     /// </summary>
     /// <remarks>
     /// The rejected name is never echoed. Where core refused on a naming rule, the rule is asked
@@ -2046,14 +1442,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             case OrganizeOutcome.NothingMatched:
                 return "That item is not in this vault any more. Choose another.";
 
-            case OrganizeOutcome.DestinationMissing:
-                return "That group is not in this vault any more. Choose another.";
-
             case OrganizeOutcome.DestinationUnchanged:
-                return "That is already its name and its group. Change one, or cancel.";
+                return "That is already its name. Type another, or cancel.";
 
             case OrganizeOutcome.DestinationOccupied:
-                return "That group already has an item with this name. Choose another name or group.";
+                return "Another item beside it already has this name. Choose another name.";
 
             case OrganizeOutcome.DestinationAmbiguous:
                 return "That would leave two items answering to one path, and keypaste could not tell them apart afterwards. Choose another name.";
@@ -2063,64 +1456,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 return $"keypaste will not use that title: {why}. Choose another.";
 
             default:
-                return "That change could not be made. Check the name and the group, then try again.";
+                return "That change could not be made. Check the name, then try again.";
         }
-    }
-
-    /// <summary>What the app says when core refused a group a name, a move or a delete.</summary>
-    private string Refusal(GroupOutcome outcome)
-    {
-        switch (outcome)
-        {
-            case GroupOutcome.NothingMatched:
-            case GroupOutcome.ParentMissing:
-                return "That group is not in this vault any more. Choose another.";
-
-            case GroupOutcome.DestinationUnchanged:
-                return IsMovingGroup ? "The group is already there. Choose another place, or cancel." : "That is already its name. Type another, or cancel.";
-
-            case GroupOutcome.DestinationOccupied:
-                return "Something in there already answers to that name. Nothing was changed. Choose another name.";
-
-            case GroupOutcome.DestinationAmbiguous:
-                return "That change would leave two items answering to one path, and keypaste could not tell them apart afterwards. Choose another name.";
-
-            case GroupOutcome.DestinationInside:
-                return "A group cannot go inside itself or a group within it. Choose another group.";
-
-            case GroupOutcome.NotEmpty:
-                return "This vault has no Trash, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
-
-            case GroupOutcome.NameRefused:
-                VaultNameRules.IsValidGroupName(DraftGroupName.Trim(), out var why);
-                return $"keypaste will not use that group name: {why}. Choose another.";
-
-            case GroupOutcome.NameReserved:
-                return "env at the top level and the Trash are names keypaste assigns. A group cannot be created as one, renamed to one "
-                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the Trash is not deleted. Choose another name or group.";
-
-            default:
-                return "That change could not be made. Check the name and the group, then try again.";
-        }
-    }
-
-    /// <summary>Whether this group is one level under the env root, where keypaste puts a project's new keys.</summary>
-    private static bool IsProjectHome(string groupPath)
-    {
-        var slash = groupPath.IndexOf('/', StringComparison.Ordinal);
-
-        return slash > 0
-            && groupPath.AsSpan(0, slash).SequenceEqual(EnvConvention.RootGroup)
-            && !groupPath.AsSpan(slash + 1).Contains('/');
-    }
-
-    private void ShowGroup(string path) =>
-        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, path, StringComparison.Ordinal)) ?? SelectedGroup;
-
-    private static string ParentOf(string groupPath)
-    {
-        var slash = groupPath.LastIndexOf('/');
-        return slash < 0 ? string.Empty : groupPath[..slash];
     }
 
     /// <summary>Holds the last change's undo, or drops it, with what the notice says.</summary>

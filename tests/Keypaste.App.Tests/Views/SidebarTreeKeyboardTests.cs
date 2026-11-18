@@ -11,47 +11,11 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// The sidebar's tree answers the keyboard as KeePassXC's does: Right unfolds the chosen vault, Groups row or group,
-/// Left folds it, and the account's heading is a label the arrow keys and the pointer pass over.
+/// The sidebar answers the keyboard: Right unfolds the chosen vault, Left folds it, and the account's heading is a label
+/// the arrow keys and the pointer pass over.
 /// </summary>
 public sealed class SidebarTreeKeyboardTests
 {
-    [Fact]
-    public Task Right_unfolds_the_chosen_group_and_Left_folds_it() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-tree-keys-");
-        var nav = shell.Named<ListBox>("Nav");
-
-        Choose(shell, nav, shell.Shell.GroupRowAt("env"));
-        Assert.DoesNotContain(shell.Shell.SidebarRows, row => row is GroupRow { Path: "env/billing" });
-
-        Press(shell, PhysicalKey.ArrowRight);
-        Assert.True(Row(shell.Shell, "env").IsExpanded);
-        Assert.Contains(shell.Shell.SidebarRows, row => row is GroupRow { Path: "env/billing" });
-
-        Press(shell, PhysicalKey.ArrowLeft);
-        Assert.False(Row(shell.Shell, "env").IsExpanded);
-        Assert.DoesNotContain(shell.Shell.SidebarRows, row => row is GroupRow { Path: "env/billing" });
-    });
-
-    [Fact]
-    public Task Right_unfolds_the_groups_row_and_Left_folds_it() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-tree-groups-keys-");
-        var nav = shell.Named<ListBox>("Nav");
-        shell.Shell.SelectedSidebarRow = shell.Shell.SidebarRows.OfType<GroupsRow>().Single();
-        RenderedShell.Drain();
-        Assert.IsType<ListBoxItem>(nav.ContainerFromItem(shell.Shell.SelectedSidebarRow!)).Focus(NavigationMethod.Tab);
-        RenderedShell.Drain();
-        Assert.DoesNotContain(shell.Shell.SidebarRows, row => row is GroupRow);
-
-        Press(shell, PhysicalKey.ArrowRight);
-        Assert.Contains(shell.Shell.SidebarRows, row => row is GroupRow { Path: "env" });
-
-        Press(shell, PhysicalKey.ArrowLeft);
-        Assert.DoesNotContain(shell.Shell.SidebarRows, row => row is GroupRow);
-    });
-
     [Fact]
     public Task Left_folds_the_chosen_vaults_places() => HeadlessSession.On(() =>
     {
@@ -96,17 +60,6 @@ public sealed class SidebarTreeKeyboardTests
     {
         var item = Assert.IsType<ListBoxItem>(nav.ContainerFromItem(shell.Shell.SidebarRows.OfType<PlaceRow>().Single(row => row.Place == place)));
         return item.GetVisualDescendants().OfType<KpIcon>().First().TranslatePoint(default, shell.Window)!.Value.X;
-    }
-
-    private static GroupRow Row(ShellViewModel shell, string path) =>
-        shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == path);
-
-    private static void Choose(RenderedShell shell, ListBox nav, GroupRow row)
-    {
-        shell.Shell.SelectedSidebarRow = row;
-        RenderedShell.Drain();
-        Assert.IsType<ListBoxItem>(nav.ContainerFromItem(shell.Shell.SelectedSidebarRow!)).Focus(NavigationMethod.Tab);
-        RenderedShell.Drain();
     }
 
     private static void Press(RenderedShell shell, PhysicalKey key)

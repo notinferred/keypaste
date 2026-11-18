@@ -101,22 +101,19 @@ public sealed class FourPlacesJourneyTests
             Assert.Equal(["Favorites", "All items"], sidebar[..2]);
             Assert.DoesNotContain(AccountSection.LocalTitle, sidebar);
             Assert.Contains("Environments", sidebar);
-            Assert.Equal(["Trash", "Groups"], sidebar[^2..]);
+            Assert.Equal("Trash", sidebar[^1]);
+            Assert.DoesNotContain("Groups", sidebar);
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
             Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
 
-            // An item found by the one search, then the group it then searches, which the list header names.
+            // An item found by the one search, in the vault's one flat list.
             Chord(main, PhysicalKey.Digit1);
             Chord(main, PhysicalKey.F);
             WindowInput.Type(main, "git");
             var items = Assert.IsType<EntriesViewModel>(shell.Content);
             Press(main, Row(main, "Rows", row => row is EntryRow { Title: "github" }));
             Assert.Equal("github", items.Selected?.Title);
-            shell.ShowGroups();
-            WindowInput.Drain();
-            Press(main, Row(main, "Nav", row => row is GroupRow { Path: "Work" }));
-            Assert.Equal("Work", Named<TextBlock>(main, "ListTitle").Text);
-            AccentElements.AssertOne(main, Named<Button>(main, "CopyPassword"), "Items, an item open in a group");
+            AccentElements.AssertOne(main, Named<Button>(main, "CopyPassword"), "Items, an item open");
 
             // A project's variables, from its row under the vault's Environments; the vault's All items returns to Items.
             Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.Environments }));

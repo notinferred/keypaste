@@ -40,8 +40,8 @@ namespace Keypaste.AppDriver;
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
 /// <c>withdrawn</c>, so <c>LockBoundaryTests</c> can lock the app with a real request
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
-/// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
-/// <c>relocate</c> act on the held vault through the entries screen, so
+/// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c> and <c>delete</c>
+/// act on the held vault through the entries screen, so
 /// <c>CurrentStateTests</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
@@ -75,7 +75,7 @@ internal static class Program
         "       welcome [--keepassxc-config <ini>]\n" +
         "       create <vault> [--new-keyfile <keyfile>]\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
-        "       item-new <vault> <login|apikey|environment|card|note|identity|sshkey|server|database|wifi|blank> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
+        "       item-new <vault> <login|apikey|environment|card|note|identity|sshkey|server|database|wifi|blank> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
         "       tag-add <vault> <entry-path> <tag> [--decline]\n" +
         "       tag-rm <vault> <entry-path> <tag> [--decline]\n" +
@@ -87,7 +87,6 @@ internal static class Program
         "       env-entry-add <vault> <project> <environment> <entry-path> [--decline]\n" +
         "       env-entry-rm <vault> <project> <environment> <entry-path> [--decline]\n" +
         "       projects <vault>\n" +
-        "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --new-keyfile <keyfile> | --remove-keyfile]\n" +
@@ -97,7 +96,7 @@ internal static class Program
         "       tags-again <vault> <entry-path> <tag>\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, status, edit <entry-path> [password], delete <entry-path>,\n" +
-        "             relocate <entry-path> <destination-group-path> <new-title>, restore <title>, notice, reload, merge,\n" +
+        "             restore <title>, notice, reload, merge,\n" +
         "             and with the app's own\n" +
         "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
@@ -145,7 +144,7 @@ internal static class Program
                 ["create", var vault, "--new-keyfile", var keyfile] => await driver.CreateAsync(vault, keyfile).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url, "--username", var username] => await driver.EditAsync(vault, entry, notes, url, username).ConfigureAwait(true),
-                ["item-new", var vault, var template, var folder, var title, .. var options] => await driver.NewItemAsync(vault, template, folder, title, options).ConfigureAwait(true),
+                ["item-new", var vault, var template, var title, .. var options] => await driver.NewItemAsync(vault, template, title, options).ConfigureAwait(true),
                 ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
                 ["tag-add", var vault, var entry, var tag, "--decline"] => await driver.AddTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
@@ -163,7 +162,6 @@ internal static class Program
                 ["env-entry-rm", var vault, var project, var environment, var entry] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: false).ConfigureAwait(true),
                 ["env-entry-rm", var vault, var project, var environment, var entry, "--decline"] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: true).ConfigureAwait(true),
                 ["projects", var vault] => await driver.ListProjectsAsync(vault).ConfigureAwait(true),
-                ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
@@ -354,11 +352,11 @@ internal sealed class Driver(string home)
         });
 
     /// <summary>
-    /// Makes an item from a template through New item (N.4): the template, the title, the folder
-    /// chosen from the picker, the template's plain fields, tags and notes from <paramref name="options"/>,
+    /// Makes an item from a template through New item (N.4), at the vault's top level: the template, the title,
+    /// the template's plain fields, tags and notes from <paramref name="options"/>,
     /// and the one secret, a password or a key's value, typed from <c>KEYPASTE_DRIVER_NEW_PASSWORD</c>.
     /// </summary>
-    internal Task<int> NewItemAsync(string vault, string template, string folder, string title, string[] options) =>
+    internal Task<int> NewItemAsync(string vault, string template, string title, string[] options) =>
         WithEntriesAsync(vault, entries =>
         {
             Press(entries.ChooseTemplateCommand, "New");
@@ -367,8 +365,6 @@ internal sealed class Driver(string home)
                 ?? throw new DriverException($"there is no template '{template}'");
             form.ChooseTemplateCommand.Execute(tile.Template);
             form.Title = title;
-            form.Folder = form.Folders.SingleOrDefault(choice => choice.Path == folder)
-                ?? throw new DriverException($"the folder picker offers no '{folder}'");
 
             for (var i = 0; i + 1 < options.Length; i += 2)
             {
@@ -405,7 +401,7 @@ internal sealed class Driver(string home)
             }
 
             entries.ConfirmAddCommand.Execute(null);
-            return entries.IsAdding ? Refused(form.Error) : Did($"created {folder}/{title}");
+            return entries.IsAdding ? Refused(form.Error) : Did($"created {title}");
         });
 
     internal Task<int> RemoveFieldAsync(string vault, string entry, string name) =>
@@ -643,23 +639,8 @@ internal sealed class Driver(string home)
         return act(screen);
     }
 
-    internal Task<int> RelocateAsync(string vault, string entry, string group, string title) =>
-        WithEntriesAsync(vault, entries => Relocate(entries, entry, group, title));
-
     internal Task<int> DeleteAsync(string vault, string entry) =>
         WithEntriesAsync(vault, entries => Delete(entries, entry));
-
-    private static int Relocate(EntriesViewModel entries, string entry, string group, string title)
-    {
-        Select(entries, entry);
-
-        Press(entries.OrganizeCommand, "Organize");
-        entries.DraftTitle = title;
-        entries.MoveTarget = entries.MoveTargets.SingleOrDefault(node => node.Path == group)
-            ?? throw new DriverException($"no group '{group}' to move to");
-        Press(entries.ConfirmOrganizeCommand, "Move");
-        return entries.IsOrganizing || entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
-    }
 
     private static int Delete(EntriesViewModel entries, string entry)
     {
@@ -1009,10 +990,6 @@ internal sealed class Driver(string home)
 
                 case ["delete", var entry]:
                     OnEntries(session, entries => Delete(entries, entry));
-                    break;
-
-                case ["relocate", var entry, var group, var title]:
-                    OnEntries(session, entries => Relocate(entries, entry, group, title));
                     break;
 
                 case ["notice"]:

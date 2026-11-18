@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app shows each vault as one flat list; new items go to the top level, and groups already in a file are kept untouched. ([J.1](docs/steps/J.1.md))
+
 The desktop app asks for crash reports on their own at first launch; they stay off unless you say yes, and accepting the terms no longer turns them on. ([J.2](docs/steps/J.2.md))
 
 Saving a vault that needs a hardware key now reads the new file back, and backups and saves are flushed to disk. ([Y.3](docs/steps/Y.3.md))

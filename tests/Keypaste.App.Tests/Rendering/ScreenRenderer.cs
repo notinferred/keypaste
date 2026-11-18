@@ -211,7 +211,6 @@ public sealed class ScreenRenderer
         DrawSecrets(demo, output);
         DrawLockAndImport(demo, output);
         DrawPrompts(output);
-        DrawGroupNoTrashCannotDelete(output);
         DrawSameNameItems(output);
         DrawTrashWithRows(demo, output);
         DrawHardwareKey(output);
@@ -348,11 +347,6 @@ public sealed class ScreenRenderer
         window.Width = _width;
         window.Height = _height;
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        entries.BeginCreateGroupCommand.Press();
-        entries.DraftGroupName = "Work";
-        entries.ConfirmCreateGroupCommand.Press();
-        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
-        Save(window, output, "60-empty-group");
 
         session.Write(
             vault =>
@@ -622,16 +616,6 @@ public sealed class ScreenRenderer
             Save(main, output, "d6-items-env-drop");
         }
 
-        var nav = shellView.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav");
-        shell.ShowGroups();
-        WindowInput.Drain();
-        using var item = FileDragData.ItemPayload();
-        shellView.HoldItem(entries.Selected!);
-        var personal = (Control)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == "Personal"))!;
-        WindowDrag.Over(main, WindowDrag.Centre(main, personal), item);
-        Save(main, output, "d7-items-move-to-group");
-        shellView.ReleaseItem();
-
         shell.AskOpenHanded(other, () => { });
         Save(main, output, "d8-handed-ask");
         shell.KeepVaultCommand.Press();
@@ -639,18 +623,6 @@ public sealed class ScreenRenderer
         main.Width = 720 * InterfaceZoom.Factor;
         WindowInput.Drain();
         Save(main, output, "d9-narrow-before");
-        shellView.HoldItem(entries.Selected!);
-        var sidebarButton = shellView.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ShowSidebar");
-        WindowDrag.Over(main, WindowDrag.Centre(main, sidebarButton), item);
-        Save(main, output, "d10-narrow-sidebar-hold");
-        shellView.OpenGroupsForHeldItem();
-        WindowInput.Drain();
-        Save(main, output, "d11-narrow-groups-open");
-        personal = (Control)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == "Personal"))!;
-        WindowDrag.Over(main, WindowDrag.Centre(main, personal), item);
-        Save(main, output, "d12-narrow-move-to-group");
-        shellView.ReleaseItem();
-        shell.CloseSidebarOverlay();
         main.Close();
     }
 
@@ -1103,7 +1075,6 @@ public sealed class ScreenRenderer
         Save(window, output, "10-secrets-login");
         DrawRevealed(window, output, "CurrentPassword", "10b-secrets-login-revealed");
 
-        entries.SelectedGroup = entries.Groups.First(group => group.Path == "env/acme-api");
         entries.Selected = entries.Rows.First(row => row.Name == _apiHome);
         Save(window, output, "11-secrets-home-entry");
         var fieldMenu = window.GetVisualDescendants().OfType<Button>().First(button => button.Name == "FieldMenu" && button.IsEffectivelyVisible);
@@ -1124,20 +1095,10 @@ public sealed class ScreenRenderer
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
 
         // On Logins the "+" opens a login's form at once; its tooltip, "New login in acme", is ItemAddMenuTests', since a headless tooltip draws at the window's corner.
-        var shownGroup = entries.SelectedGroup;
-        entries.ShowEveryItem();
         entries.Place = ItemPlace.Logins;
         Save(window, output, "13j-items-add-in-place");
         entries.Place = ItemPlace.All;
-        entries.SelectedGroup = shownGroup;
 
-        // The vault's Groups row unfolded over the KeePass group tree, its + making a group.
-        shell.ShowGroups();
-        Save(window, output, "16f-sidebar-groups-open");
-        shell.Fold(shell.SidebarRows.OfType<GroupsRow>().Single(), open: false);
-        WindowInput.Drain();
-
-        entries.SelectedGroup = entries.Groups[0];
         entries.ChooseTemplateCommand.Press();
         Save(window, output, "13k-items-new-templates");
         var templatesWidth = window.Width;
@@ -1225,21 +1186,19 @@ public sealed class ScreenRenderer
         Save(window, output, "16d-secrets-sidebar-hidden");
         shell.ToggleSidebar();
 
-        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
         entries.Selected = entries.Rows.First(row => row.Title == "github");
-        Save(window, output, "17-items-group");
+        Save(window, output, "17-items-flat");
 
         shell.Search = "git";
-        Save(window, output, "17b-items-group-filter");
+        Save(window, output, "17b-items-filter");
 
         shell.Search = "aws";
         Save(window, output, "17c-items-filter-hides-the-selected");
 
         shell.Search = "no-such-item";
-        Save(window, output, "17d-items-group-no-match");
+        Save(window, output, "17d-items-no-match");
         shell.Search = string.Empty;
 
-        entries.ShowEveryItem();
         shell.FocusSearch();
         WindowInput.Drain();
         DrawnFrame.Capture(window);
@@ -1249,11 +1208,9 @@ public sealed class ScreenRenderer
         window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Rows").ContainerFromIndex(0)!.Focus();
         WindowInput.Drain();
 
-        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
         entries.Selected = entries.Rows.First(row => row.Title == "github");
         entries.Detail!.EditCommand.Press();
-        entries.ShowEveryItem();
-        Save(window, output, "17f-items-edit-names-its-group");
+        Save(window, output, "17f-items-edit");
         entries.Detail.CancelCommand.Press();
 
         window.Width = _width;
@@ -1570,20 +1527,6 @@ public sealed class ScreenRenderer
     }
 
     /// <summary>The env release and run prompts beside the credential one, each at its own size.</summary>
-    // A group that a vault with no Trash cannot delete, whose form offers only Cancel.
-    private static void DrawGroupNoTrashCannotDelete(string output)
-    {
-        using var noTrash = new RenderedShell(seed: vault =>
-        {
-            vault.AddEntry(new VaultEntry { Title = "box", GroupPath = "servers" });
-            vault.SetRecyclesDeletedEntries(false);
-        });
-        var items = noTrash.Show<EntriesViewModel>(DestinationKind.Entries);
-        items.SelectedGroup = items.Groups.Single(group => group.Path == "servers");
-        items.BeginDeleteGroupCommand.Press();
-        Save(noTrash.Window, output, "12-items-group-not-empty-no-trash");
-    }
-
     private static void DrawSameNameItems(string output)
     {
         using var shell = new RenderedShell(seed: vault =>

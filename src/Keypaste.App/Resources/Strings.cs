@@ -186,7 +186,6 @@ public static class Strings
     public static string Decrypted => Manager.GetString("Decrypted", CultureInfo.CurrentUICulture)!;
     public static string Delete => Manager.GetString("Delete", CultureInfo.CurrentUICulture)!;
     public static string DeleteForGood => Manager.GetString("DeleteForGood", CultureInfo.CurrentUICulture)!;
-    public static string DeleteGroup => Manager.GetString("DeleteGroup", CultureInfo.CurrentUICulture)!;
     public static string DeleteReport => Manager.GetString("DeleteReport", CultureInfo.CurrentUICulture)!;
     public static string DeleteThisReportItWontBeSent => Manager.GetString("DeleteThisReportItWontBeSent", CultureInfo.CurrentUICulture)!;
     public static string DeleteValue => Manager.GetString("DeleteValue", CultureInfo.CurrentUICulture)!;
@@ -269,9 +268,7 @@ public static class Strings
     public static string GeneratedSavePutsItInPlaceOfXefb5c1 => Manager.GetString("GeneratedSavePutsItInPlaceOfXefb5c1", CultureInfo.CurrentUICulture)!;
     public static string GeneratedTypeOrPasteToUseYourX7a2ef9 => Manager.GetString("GeneratedTypeOrPasteToUseYourX7a2ef9", CultureInfo.CurrentUICulture)!;
     public static string Group => Manager.GetString("Group", CultureInfo.CurrentUICulture)!;
-    public static string GroupName => Manager.GetString("GroupName", CultureInfo.CurrentUICulture)!;
     public static string GroupToCopyInto => Manager.GetString("GroupToCopyInto", CultureInfo.CurrentUICulture)!;
-    public static string Groups => Manager.GetString("Groups", CultureInfo.CurrentUICulture)!;
     public static string HelpMenu => Manager.GetString("HelpMenu", CultureInfo.CurrentUICulture)!;
     public static string Hide => Manager.GetString("Hide", CultureInfo.CurrentUICulture)!;
     public static string HideKeypaste => Manager.GetString("HideKeypaste", CultureInfo.CurrentUICulture)!;
@@ -383,9 +380,7 @@ public static class Strings
     public static string MoreOptions => Manager.GetString("MoreOptions", CultureInfo.CurrentUICulture)!;
     public static string MoreTemplatesLabel => Manager.GetString("MoreTemplatesLabel", CultureInfo.CurrentUICulture)!;
     public static string Move => Manager.GetString("Move", CultureInfo.CurrentUICulture)!;
-    public static string MoveGroupLabel => Manager.GetString("MoveGroupLabel", CultureInfo.CurrentUICulture)!;
     public static string MoveSelected => Manager.GetString("MoveSelected", CultureInfo.CurrentUICulture)!;
-    public static string MoveTo => Manager.GetString("MoveTo", CultureInfo.CurrentUICulture)!;
     public static string MoveToAField => Manager.GetString("MoveToAField", CultureInfo.CurrentUICulture)!;
     public static string MoveValueToAField => Manager.GetString("MoveValueToAField", CultureInfo.CurrentUICulture)!;
     public static string N30Days => Manager.GetString("N30Days", CultureInfo.CurrentUICulture)!;
@@ -396,8 +391,6 @@ public static class Strings
     public static string New => Manager.GetString("New", CultureInfo.CurrentUICulture)!;
     public static string NewFieldName => Manager.GetString("NewFieldName", CultureInfo.CurrentUICulture)!;
     public static string NewFieldValue => Manager.GetString("NewFieldValue", CultureInfo.CurrentUICulture)!;
-    public static string NewGroup => Manager.GetString("NewGroup", CultureInfo.CurrentUICulture)!;
-    public static string NewGroupLabel => Manager.GetString("NewGroupLabel", CultureInfo.CurrentUICulture)!;
     public static string NewItem => Manager.GetString("NewItem", CultureInfo.CurrentUICulture)!;
     public static string NewItemAddsOneHere => Manager.GetString("NewItemAddsOneHere", CultureInfo.CurrentUICulture)!;
     public static string NewItemByType => Manager.GetString("NewItemByType", CultureInfo.CurrentUICulture)!;
@@ -506,10 +499,7 @@ public static class Strings
     public static string RemoveValue => Manager.GetString("RemoveValue", CultureInfo.CurrentUICulture)!;
     public static string Rename => Manager.GetString("Rename", CultureInfo.CurrentUICulture)!;
     public static string RenameFieldLabel => Manager.GetString("RenameFieldLabel", CultureInfo.CurrentUICulture)!;
-    public static string RenameGroup => Manager.GetString("RenameGroup", CultureInfo.CurrentUICulture)!;
-    public static string RenameGroupLabel => Manager.GetString("RenameGroupLabel", CultureInfo.CurrentUICulture)!;
-    public static string RenameOrMove => Manager.GetString("RenameOrMove", CultureInfo.CurrentUICulture)!;
-    public static string RenameOrMoveLabel => Manager.GetString("RenameOrMoveLabel", CultureInfo.CurrentUICulture)!;
+    public static string RenameLabel => Manager.GetString("RenameLabel", CultureInfo.CurrentUICulture)!;
     public static string Replace => Manager.GetString("Replace", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAWeakOrReusedPasswordOnX22ee0c => Manager.GetString("ReplaceAWeakOrReusedPasswordOnX22ee0c", CultureInfo.CurrentUICulture)!;
     public static string ReplaceAnItemBeforeItExpires => Manager.GetString("ReplaceAnItemBeforeItExpires", CultureInfo.CurrentUICulture)!;
@@ -566,7 +556,6 @@ public static class Strings
     public static string ScopeOfOneKeyExample => Manager.GetString("ScopeOfOneKeyExample", CultureInfo.CurrentUICulture)!;
     public static string ScopedTokens => Manager.GetString("ScopedTokens", CultureInfo.CurrentUICulture)!;
     public static string Search => Manager.GetString("Search", CultureInfo.CurrentUICulture)!;
-    public static string SearchAllItems => Manager.GetString("SearchAllItems", CultureInfo.CurrentUICulture)!;
     public static string SecondsUntilTheNextCode => Manager.GetString("SecondsUntilTheNextCode", CultureInfo.CurrentUICulture)!;
     public static string Secrets => Manager.GetString("Secrets", CultureInfo.CurrentUICulture)!;
     public static string Security => Manager.GetString("Security", CultureInfo.CurrentUICulture)!;
@@ -576,7 +565,6 @@ public static class Strings
     public static string Separator => Manager.GetString("Separator", CultureInfo.CurrentUICulture)!;
     public static string ServedFromAnEarlierApprovalUnderAXde6ddd => Manager.GetString("ServedFromAnEarlierApprovalUnderAXde6ddd", CultureInfo.CurrentUICulture)!;
     public static string ServerPlace => Manager.GetString("ServerPlace", CultureInfo.CurrentUICulture)!;
-    public static string Servers => Manager.GetString("Servers", CultureInfo.CurrentUICulture)!;
     public static string SetANewMasterPassword => Manager.GetString("SetANewMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string SetAValueForValue => Manager.GetString("SetAValueForValue", CultureInfo.CurrentUICulture)!;
     public static string SetValue => Manager.GetString("SetValue", CultureInfo.CurrentUICulture)!;
@@ -632,7 +620,6 @@ public static class Strings
     public static string ThatBackupsMasterPassword => Manager.GetString("ThatBackupsMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string TheActivityLogShareLinksScopedTokensX927922 => Manager.GetString("TheActivityLogShareLinksScopedTokensX927922", CultureInfo.CurrentUICulture)!;
     public static string TheCheckAsksTheYubiKeyTheUnlockX4a39c1 => Manager.GetString("TheCheckAsksTheYubiKeyTheUnlockX4a39c1", CultureInfo.CurrentUICulture)!;
-    public static string TheGroupsNewName => Manager.GetString("TheGroupsNewName", CultureInfo.CurrentUICulture)!;
     public static string TheNameAProjectReadsItUnderX9a2ebe => Manager.GetString("TheNameAProjectReadsItUnderX9a2ebe", CultureInfo.CurrentUICulture)!;
     public static string TheOldValueStaysInTheItemsX346d21 => Manager.GetString("TheOldValueStaysInTheItemsX346d21", CultureInfo.CurrentUICulture)!;
     public static string ThePassword => Manager.GetString("ThePassword", CultureInfo.CurrentUICulture)!;

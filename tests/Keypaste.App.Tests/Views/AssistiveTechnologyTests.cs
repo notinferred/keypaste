@@ -95,22 +95,12 @@ public sealed class AssistiveTechnologyTests
     });
 
     [Fact]
-    public Task The_sidebars_rows_say_their_level_and_its_fold_says_what_it_will_do() => HeadlessSession.On(() =>
+    public Task A_vaults_fold_says_what_it_will_do() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-sidebar-levels-", secondVault: "acme");
-        var folded = new GroupRow("work", "work", 1, HasChildren: true, IsExpanded: false);
-        var groups = shell.Shell.SidebarRows.OfType<GroupsRow>().First();
         var vault = shell.Shell.SidebarRows.OfType<VaultRow>().First();
 
-        Assert.Equal("work, level 2", folded.ToString());
-        Assert.Equal("Show the groups in work", folded.FoldLabel);
-        Assert.Equal("Groups, level 1", groups.ToString());
-        Assert.Equal("Show the groups", groups.FoldLabel);
         Assert.Equal($"Hide {vault.Title}'s places", vault.FoldLabel);
-
-        shell.Shell.ShowGroups();
-
-        Assert.Equal("Hide the groups", shell.Shell.SidebarRows.OfType<GroupsRow>().First().FoldLabel);
         return Task.CompletedTask;
     });
 

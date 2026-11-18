@@ -6,35 +6,13 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Resources;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
-using Keypaste.Core;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>The sidebar adds what belongs to the navigation: New at its top, a + on a vault's Groups row and Add vault… at its foot, each the menus' own command; Share is the open item's.</summary>
+/// <summary>The sidebar adds what belongs to the navigation: New at its top and Add vault… at its foot, each the menus' own command; Share is the open item's.</summary>
 public sealed class SidebarAddTests
 {
-    [Fact]
-    public Task The_groups_heading_adds_a_group_in_the_one_chosen() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-sidebar-add-group-", vault => vault.AddEntry(new VaultEntry { GroupPath = "Work", Title = "wiki", Password = "w" }));
-        shell.Shell.SelectedSidebarRow = shell.Shell.GroupRowAt("Work");
-        RenderedShell.Drain();
-
-        var add = HeadingAdd(shell);
-        Assert.Equal(Strings.NewGroupLabel, ToolTip.GetTip(add));
-        Assert.Equal(Strings.NewGroupLabel, Avalonia.Automation.AutomationProperties.GetName(add));
-        shell.Tap(add);
-        RenderedShell.Drain();
-
-        var items = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        Assert.True(items.IsCreatingGroup);
-        items.DraftGroupName = "Servers";
-        items.ConfirmCreateGroupCommand.Execute(null);
-
-        Assert.Contains("Work/Servers", shell.Session.Unlocked!.ReadGroupPaths());
-    });
-
     [Fact]
     public Task New_at_the_sidebars_top_opens_new_items_templates_from_any_place() => HeadlessSession.On(() =>
     {
@@ -82,14 +60,14 @@ public sealed class SidebarAddTests
     });
 
     [Fact]
-    public Task The_file_menu_holds_new_group_new_project_and_both_imports() => HeadlessSession.On(() =>
+    public Task The_file_menu_holds_new_project_and_both_imports_and_no_new_group() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-sidebar-import-");
         var file = shell.Commands.Menus.Single(group => group.Header == Strings.FileMenu).Entries.OfType<AppCommand>().ToList();
 
         Assert.Contains(file, command => command.Header == Strings.ImportFromAnotherAppLabel);
         Assert.Contains(file, command => command.Header == Strings.ImportEnvLabel);
-        Assert.Contains(shell.Commands.NewGroup, file);
+        Assert.DoesNotContain(file, command => command.Header == "New group…");
         Assert.Contains(shell.Commands.NewProject, file);
     });
 
@@ -122,7 +100,4 @@ public sealed class SidebarAddTests
 
         Assert.True(shell.Shell.HasShare);
     });
-
-    private static Button HeadingAdd(RenderedShell shell) =>
-        shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "HeadingAdd" && button.DataContext is GroupsRow);
 }

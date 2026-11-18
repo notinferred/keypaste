@@ -262,28 +262,6 @@ public sealed class SameNameItemsTests : IDisposable
     [Theory]
     [InlineData("alice", "bob")]
     [InlineData("bob", "alice")]
-    public void A_drag_moves_the_item_it_picked_up(string username, string other)
-    {
-        using (var context = new Context(_vaultPath))
-        {
-            var row = context.Entries.Rows.Single(candidate => candidate.Username == username);
-
-            Assert.True(context.Entries.CanMove(row, "other"));
-
-            context.Entries.MoveToGroup(row, "other");
-
-            Assert.Null(context.Entries.Error);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, _master);
-
-        Assert.Equal(username + "-password", reopened.Find(new EntryName("other", "Mail"))!.Password);
-        Assert.Equal(other + "-password", reopened.Find(new EntryName("services", "Mail"))!.Password);
-    }
-
-    [Theory]
-    [InlineData("alice", "bob")]
-    [InlineData("bob", "alice")]
     public void A_delete_takes_the_item_it_opened_and_undo_brings_that_one_back(string username, string other)
     {
         using var context = new Context(_vaultPath);
@@ -541,7 +519,7 @@ public sealed class SameNameItemsTests : IDisposable
     }
 
     [Fact]
-    public void A_file_holding_one_uuid_twice_opens_searches_and_moves_each_as_itself()
+    public void A_file_holding_one_uuid_twice_opens_searches_and_renames_each_as_itself()
     {
         ForeignEdit.CloneKeepingItsUuid(_vaultPath, _master, "Forum", "Twin", "twin-password");
 
@@ -562,13 +540,16 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.Equal(["Forum", "Twin"], context.Entries.Rows.Select(row => row.Title).Order());
             context.Entries.Search = string.Empty;
 
-            context.Entries.MoveToGroup(context.Entries.Rows.Single(row => row.Title == "Twin"), "other");
+            context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "Twin");
+            context.Entries.OrganizeCommand.Press();
+            context.Entries.DraftTitle = "Twin2";
+            context.Entries.ConfirmOrganizeCommand.Press();
             Assert.Null(context.Entries.Error);
         }
 
         using var reopened = Vault.Open(_vaultPath, _master);
         Assert.Equal("carol-password", reopened.Find(new EntryName("services", "Forum"))!.Password);
-        Assert.Equal("twin-password", reopened.Find(new EntryName("other", "Twin"))!.Password);
+        Assert.Equal("twin-password", reopened.Find(new EntryName("services", "Twin2"))!.Password);
         Assert.Null(reopened.Find(new EntryName("services", "Twin")));
     }
 

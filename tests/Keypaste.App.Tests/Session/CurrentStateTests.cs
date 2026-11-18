@@ -40,6 +40,7 @@ public sealed class CurrentStateTests : IDisposable
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "v1" });
             vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "KEEP", Password = "k" });
+            vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "SPARE", Password = "k" });
             TempVault.Sees(vault, TempVault.Agent);
             vault.Save();
         }
@@ -86,7 +87,7 @@ public sealed class CurrentStateTests : IDisposable
         Assert.Equal(3, _prompt.Asked);
     }
 
-    public static TheoryData<string> Changes => ["delete", "move", "group-rename"];
+    public static TheoryData<string> Changes => ["delete", "rename"];
 
     /// <summary>
     /// Each change refuses the next request for the name it took the entry from, and undoing it puts
@@ -94,7 +95,7 @@ public sealed class CurrentStateTests : IDisposable
     /// </summary>
     [Theory]
     [MemberData(nameof(Changes))]
-    public async Task A_deleted_moved_or_regrouped_entry_is_refused(string change)
+    public async Task A_deleted_or_renamed_entry_is_refused(string change)
     {
         await using var agent = await Agent.AttachAsync(this);
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
@@ -108,12 +109,8 @@ public sealed class CurrentStateTests : IDisposable
                     entries.DeleteCommand.Press();
                     break;
 
-                case "move":
-                    Relocate(entries, _token, "personal");
-                    break;
-
-                case "group-rename":
-                    RenameGroup(entries, "env/dev", "prod");
+                case "rename":
+                    Rename(entries, _token, "TOKEN_OLD");
                     break;
             }
 
@@ -129,15 +126,11 @@ public sealed class CurrentStateTests : IDisposable
             switch (change)
             {
                 case "delete":
-                    Relocate(entries, "personal/KEEP", "env/dev", "TOKEN");
+                    Rename(entries, "env/dev/SPARE", "TOKEN");
                     break;
 
-                case "move":
-                    Relocate(entries, "personal/TOKEN", "env/dev");
-                    break;
-
-                case "group-rename":
-                    RenameGroup(entries, "env/prod", "dev");
+                case "rename":
+                    Rename(entries, "env/dev/TOKEN_OLD", "TOKEN");
                     break;
             }
 
@@ -358,22 +351,12 @@ public sealed class CurrentStateTests : IDisposable
         return entries.Detail!;
     }
 
-    private static void Relocate(EntriesViewModel entries, string path, string group, string? title = null)
+    private static void Rename(EntriesViewModel entries, string path, string title)
     {
-        var row = entries.Rows.Single(candidate => candidate.Path == path);
-        entries.Selected = row;
+        entries.Selected = entries.Rows.Single(candidate => candidate.Path == path);
         entries.OrganizeCommand.Press();
-        entries.DraftTitle = title ?? row.Title;
-        entries.MoveTarget = entries.MoveTargets.Single(node => node.Path == group);
+        entries.DraftTitle = title;
         entries.ConfirmOrganizeCommand.Press();
-    }
-
-    private static void RenameGroup(EntriesViewModel entries, string group, string name)
-    {
-        entries.SelectedGroup = entries.Groups.Single(node => node.Path == group);
-        entries.BeginRenameGroupCommand.Press();
-        entries.DraftGroupName = name;
-        entries.ConfirmRenameGroupCommand.Press();
     }
 
     /// <summary>An agent attached to the app's session over its real endpoint.</summary>

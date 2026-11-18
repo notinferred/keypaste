@@ -225,21 +225,20 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task A_group_can_still_be_chosen_from_the_sidebar_over_a_narrow_window() => HeadlessSession.On(() =>
+    public Task A_place_can_still_be_chosen_from_the_sidebar_over_a_narrow_window() => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell("keypaste-window-overlay-group-");
+        using var shell = new RenderedShell("keypaste-window-overlay-place-");
         shell.Window.Width = 720;
         shell.Frame();
 
         shell.Shell.OpenSidebarOverlay();
-        shell.Shell.ShowGroups();
         shell.Frame();
         var nav = shell.Named<ListBox>("Nav");
-        var row = nav.Items.OfType<GroupRow>().First();
+        var row = shell.Shell.Place(ItemPlace.Trash);
         WindowInput.Press(shell.Window, nav.ContainerFromItem(row)!);
         WindowInput.Release(shell.Window, nav.ContainerFromItem(row)!);
 
-        Assert.Equal(row.Path, Assert.IsType<GroupRow>(shell.Shell.SelectedSidebarRow).Path);
+        Assert.Equal(row, shell.Shell.SelectedSidebarRow);
     });
 
     [Fact]

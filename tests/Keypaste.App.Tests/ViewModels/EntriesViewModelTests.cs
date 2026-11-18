@@ -75,56 +75,14 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal((string.Empty, string.Empty), (production.DisplayUsername, production.DisplayUrl));
     }
 
-    /// <summary>
-    /// The group tree is built from the flat paths core hands back, parents included, in the order
-    /// the file holds them, as KeePassXC draws its tree.
-    /// </summary>
-    /// <remarks>
-    /// <c>servers</c> was made before <c>env</c>, so it comes first although it sorts after it, and
-    /// <c>billing</c> is drawn inside <c>env</c> rather than as one row called "env/billing".
-    /// </remarks>
+    /// <summary>Every item of the vault is in one flat list, whatever group the file holds it in.</summary>
     [Fact]
-    public void The_group_tree_has_a_row_for_every_level()
+    public void The_list_holds_every_item_whatever_its_group()
     {
         using var context = New();
 
-        var labels = context.Entries.Groups.Select(group => group.Label).ToArray();
-
-        Assert.Equal(["All items", "servers", "env", "billing"], labels);
-        Assert.Equal([0, 1, 1, 2], context.Entries.Groups.Select(group => group.Depth).ToArray());
-    }
-
-    [Fact]
-    public void Selecting_a_group_shows_what_is_inside_it_and_inside_its_children()
-    {
-        using var context = New();
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env");
-
-        Assert.Equal(["STRIPE_KEY"], context.Entries.Rows.Select(row => row.Title));
-    }
-
-    [Fact]
-    public void Selecting_everything_shows_everything_again()
-    {
-        using var context = New();
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "servers");
-        Assert.Equal(2, context.Entries.Rows.Count);
-
-        context.Entries.SelectedGroup = context.Entries.Groups[0];
         Assert.Equal(4, context.Entries.Rows.Count);
-    }
-
-    [Fact]
-    public void Search_narrows_within_the_selected_group()
-    {
-        using var context = New();
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "servers");
-        context.Entries.Search = "github";
-
-        Assert.Empty(context.Entries.Rows);
+        Assert.Contains(context.Entries.Rows, row => row.Path == "env/billing/STRIPE_KEY");
     }
 
     [Fact]
@@ -144,14 +102,14 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         using var context = New();
 
-        var form = NewItemForm.Open(context.Entries, "servers/database");
+        var form = NewItemForm.Open(context.Entries, "database");
         context.Entries.ConfirmAddCommand.Press();
 
         Assert.Null(context.Entries.Error);
-        Assert.Contains(context.Entries.Rows, row => row.Path == "servers/database");
+        Assert.Contains(context.Entries.Rows, row => row.Path == "database");
 
         using var reopened = Vault.Open(_vaultPath, Master);
-        var written = reopened.Find("servers/database");
+        var written = reopened.Find("database");
 
         Assert.NotNull(written);
         Assert.Equal(PasswordGenerator.DefaultLength, written.Password.Length);

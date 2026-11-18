@@ -1,6 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
-using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
@@ -14,8 +12,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// A file dropped on the window goes where a picker's would, an item dropped on a group moves there, and each is drawn as
-/// accepted only when it is. The drags are the headless platform's, hit-tested through the window as a real one is;
+/// A file dropped on the window goes where a picker's would, and is drawn as accepted only when it is. The drags are the headless platform's, hit-tested through the window as a real one is;
 /// the platforms' own drag sources are not reachable from here.
 /// </summary>
 public sealed class FilesByDragTests
@@ -46,14 +43,6 @@ public sealed class FilesByDragTests
 
     private static string Caption(DropCue cue) =>
         cue.GetVisualDescendants().OfType<TextBlock>().Single().Text!;
-
-    private static ListBoxItem GroupRowOf(RenderedShell shell, string path)
-    {
-        shell.Shell.ShowGroups();
-        RenderedShell.Drain();
-        var nav = shell.Named<ListBox>("Nav");
-        return (ListBoxItem)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == path))!;
-    }
 
     private static (UnlockViewModel Model, Window Window, TempVault Vault, AppVaultSession Session) Unlock(bool remembered = true)
     {
@@ -380,24 +369,6 @@ public sealed class FilesByDragTests
     });
 
     [Fact]
-    public Task A_typed_group_name_takes_no_attachment() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drop-group-form-");
-        var detail = shell.OpenPane();
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        entries.BeginCreateGroupCommand.Press();
-        WindowInput.Drain();
-        entries.DraftGroupName = "typed";
-        var photo = FileIn(shell.Home, "photo.png", "not much");
-        var at = WindowDrag.Centre(shell.Window, shell.Named<Border>("ContentArea"));
-
-        WindowDrag.Over(shell.Window, at, WindowDrag.Files(photo));
-        Assert.False(Cue(shell.Window).IsVisible);
-        WindowDrag.Drop(shell.Window, at, WindowDrag.Files(photo));
-        Assert.Empty(detail.Attachments.Rows);
-    });
-
-    [Fact]
     public Task Another_file_with_no_item_open_is_not_lit_and_says_so_if_it_lands() => HeadlessSession.On(() =>
     {
         using var shell = Shell("keypaste-drop-nothing-");
@@ -424,184 +395,6 @@ public sealed class FilesByDragTests
         WindowDrag.Over(shell.Window, at, WindowDrag.Files(photo));
         Assert.False(Cue(shell.Window).IsVisible);
         Assert.Empty(detail.Attachments.Rows);
-    });
-
-    [Fact]
-    public Task An_item_dropped_on_a_group_moves_there_and_undo_takes_it_back() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-item-");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        var github = entries.Rows.Single(row => row.Title == "github");
-        var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
-        view.HoldItem(github);
-        var at = WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers"));
-        using var data = FileDragData.ItemPayload();
-
-        WindowDrag.Over(shell.Window, at, data);
-        Assert.True(Cue(shell.Window).IsVisible);
-        Assert.Equal("Move to servers", Caption(Cue(shell.Window)));
-
-        WindowDrag.Drop(shell.Window, at, data);
-        view.ReleaseItem();
-
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName("servers", "github")));
-        Assert.True(entries.CanUndo);
-
-        entries.UndoCommand.Press();
-        WindowInput.Drain();
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName(string.Empty, "github")));
-    });
-
-    private static EntryExposure Patterns(string pattern) =>
-        EntryExposure.TryCreate([pattern], out var exposure, out var error) ? exposure : throw new InvalidOperationException(error);
-
-    [Fact]
-    public Task An_item_over_its_own_group_or_the_list_is_not_lit() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-own-");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        WindowInput.Drain();
-        var db = entries.Rows.Single(row => row.Title == "db");
-        var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
-        view.HoldItem(db);
-        using var data = FileDragData.ItemPayload();
-
-        WindowDrag.Over(shell.Window, WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers")), data);
-        Assert.False(Cue(shell.Window).IsVisible);
-
-        WindowDrag.Over(shell.Window, WindowDrag.Centre(shell.Window, shell.Named<ListBox>("Rows")), data);
-        Assert.False(Cue(shell.Window).IsVisible);
-        view.ReleaseItem();
-    });
-
-    [Fact]
-    public Task An_item_over_a_group_already_holding_its_title_is_not_lit_and_stays() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-occupied-");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        shell.Session.Unlocked!.AddEntry(new VaultEntry { Title = "github", GroupPath = "servers", Password = "SENTINEL-OTHER" });
-        var github = entries.Rows.First(row => row.Title == "github" && row.GroupPath.Length == 0);
-        var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
-        view.HoldItem(github);
-        var at = WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers"));
-        using var data = FileDragData.ItemPayload();
-
-        WindowDrag.Over(shell.Window, at, data);
-        Assert.False(Cue(shell.Window).IsVisible);
-
-        WindowDrag.Drop(shell.Window, at, data);
-        view.ReleaseItem();
-
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName(string.Empty, "github")));
-        Assert.Null(entries.Error);
-    });
-
-    [Fact]
-    public Task A_drag_nothing_in_this_process_holds_moves_nothing() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-foreign-");
-        var at = WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers"));
-        using var data = FileDragData.ItemPayload();
-
-        WindowDrag.Over(shell.Window, at, data);
-        Assert.False(Cue(shell.Window).IsVisible);
-
-        WindowDrag.Drop(shell.Window, at, data);
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName(string.Empty, "github")));
-    });
-
-    [Fact]
-    public Task Pressing_a_row_and_moving_starts_a_drag_that_holds_the_item_until_it_ends() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-start-");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        var github = entries.Rows.Single(row => row.Title == "github");
-        var rows = shell.Named<ListBox>("Rows");
-        shell.Frame();
-        var row = rows.ContainerFromItem(github)!;
-        var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
-        var at = WindowDrag.Centre(shell.Window, row);
-
-        shell.Window.MouseDown(at, MouseButton.Left);
-        shell.Window.MouseMove(at + new Avalonia.Point(2, 0));
-        WindowInput.Drain();
-        Assert.False(view.IsHoldingItem);
-
-        shell.Window.MouseMove(at + new Avalonia.Point(0, 12));
-        WindowInput.Drain();
-        Assert.True(view.IsHoldingItem);
-
-        shell.Window.MouseUp(at + new Avalonia.Point(0, 12), MouseButton.Left);
-        WindowInput.Drain();
-        Assert.False(view.IsHoldingItem);
-    });
-
-    [Fact]
-    public Task A_whole_drag_from_a_row_to_a_group_moves_the_item() => HeadlessSession.On(() =>
-    {
-        using var shell = Shell("keypaste-drag-whole-");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        var rows = shell.Named<ListBox>("Rows");
-        shell.Frame();
-        var at = WindowDrag.Centre(shell.Window, rows.ContainerFromItem(entries.Rows.Single(row => row.Title == "github"))!);
-        var group = WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers"));
-
-        shell.Window.MouseDown(at, MouseButton.Left, Avalonia.Input.RawInputModifiers.LeftMouseButton);
-        shell.Window.MouseMove(at + new Avalonia.Point(0, 12), Avalonia.Input.RawInputModifiers.LeftMouseButton);
-        WindowInput.Drain();
-        shell.Window.MouseMove(group, Avalonia.Input.RawInputModifiers.LeftMouseButton);
-        WindowInput.Drain();
-        Assert.True(shell.Window.GetVisualDescendants().OfType<ShellView>().Single().IsHoldingItem);
-        Assert.True(Cue(shell.Window).IsVisible);
-        shell.Window.MouseUp(group, MouseButton.Left, Avalonia.Input.RawInputModifiers.LeftMouseButton);
-        WindowInput.Drain();
-
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName("servers", "github")));
-        Assert.True(entries.CanUndo);
-    });
-
-    [Fact]
-    public Task An_items_drag_gives_the_platform_nothing_of_it() => HeadlessSession.On(() =>
-    {
-        using var payload = FileDragData.ItemPayload();
-        var item = Assert.Single(payload.Items);
-        var format = Assert.Single(item.Formats);
-
-        Assert.Equal(new byte[] { 1 }, Assert.IsType<byte[]>(item.TryGetRaw(format)));
-        Assert.DoesNotContain(DataFormat.Text, payload.Formats);
-        Assert.DoesNotContain(DataFormat.File, payload.Formats);
-    });
-
-    [Fact]
-    public Task In_a_narrow_window_holding_the_sidebar_button_opens_the_groups_and_the_drop_closes_them() => HeadlessSession.On(async () =>
-    {
-        using var shell = Shell("keypaste-drag-rail-", width: 720);
-        Assert.False(shell.Shell.ShowsSidebar);
-        var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        var github = entries.Rows.Single(row => row.Title == "github");
-        var view = shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
-        view.HoldItem(github);
-        using var data = FileDragData.ItemPayload();
-
-        WindowDrag.Over(shell.Window, WindowDrag.Centre(shell.Window, shell.Named<Button>("ShowSidebar")), data);
-        Assert.True(Cue(shell.Window).IsVisible);
-        Assert.False(shell.Shell.SidebarOverlays);
-
-        await Task.Delay(TimeSpan.FromMilliseconds(700), TestContext.Current.CancellationToken);
-        WindowInput.Drain();
-        Assert.True(shell.Shell.SidebarOverlays);
-        Assert.False(Cue(shell.Window).IsVisible);
-        shell.Frame();
-
-        var at = WindowDrag.Centre(shell.Window, GroupRowOf(shell, "servers"));
-        WindowDrag.Over(shell.Window, at, data);
-        Assert.Equal("Move to servers", Caption(Cue(shell.Window)));
-        WindowDrag.Drop(shell.Window, at, data);
-        view.ReleaseItem();
-
-        Assert.False(shell.Shell.SidebarOverlays);
-        Assert.NotNull(shell.Session.Unlocked!.Find(new EntryName("servers", "github")));
     });
 
     [Fact]

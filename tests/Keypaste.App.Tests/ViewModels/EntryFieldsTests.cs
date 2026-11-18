@@ -53,21 +53,21 @@ public sealed class EntryFieldsTests : IDisposable
     public void A_card_from_its_template_reads_as_a_card_and_its_number_as_a_card_value()
     {
         using var context = new Context(_vaultPath);
-        var form = NewItemForm.Open(context.Entries, "Banking/Visa", ItemTemplate.Card);
+        var form = NewItemForm.Open(context.Entries, "Visa", ItemTemplate.Card);
         foreach (var c in _secret)
         {
             form.CustomFields.Single(custom => custom.Name == "Number").Secret.Type(c);
         }
 
         context.Entries.ConfirmAddCommand.Press();
-        var detail = context.Open(new EntryName("Banking", "Visa"));
+        var detail = context.Open(new EntryName(string.Empty, "Visa"));
 
         Assert.Equal("Card", detail.KindLabel);
         Assert.Equal(["Number"], detail.Fields.Select(field => field.Name));
         Assert.Equal(["Credit Card"], detail.Tags.Select(chip => chip.Tag));
         Assert.Equal(_secret, detail.Fields[0].Reveal());
         context.Entries.Place = ItemPlace.Cards;
-        Assert.Equal(["Banking/Visa"], context.Entries.Rows.Select(row => $"{row.GroupPath}/{row.Title}"));
+        Assert.Equal(["Visa"], context.Entries.Rows.Select(row => row.Path));
         Assert.Equal(FieldCategory.Card, FieldCategories.Of("Number", [.. detail.Tags.Select(chip => chip.Tag)], isProtected: true));
     }
 

@@ -140,7 +140,7 @@ public sealed class TrashTests : IDisposable
     }
 
     /// <summary>
-    /// A group deleted from Items lists each of its items here with the path it had, and restoring one
+    /// A group another program deleted lists each of its items here with the path it had, and restoring one
     /// puts it back there with its history, making the group again.
     /// </summary>
     [Fact]
@@ -148,11 +148,9 @@ public sealed class TrashTests : IDisposable
     {
         using (var context = new Context(_vaultPath))
         {
-            context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
-            context.Entries.BeginDeleteGroupCommand.Press();
+            var write = context.Session.Write(vault => vault.DeleteGroup("servers"), outcome => outcome == GroupOutcome.Recycled);
 
-            Assert.Null(context.Entries.Error);
-            Assert.DoesNotContain(context.Entries.Groups, node => node.Path == "servers");
+            Assert.Equal(WriteOutcome.Saved, write.Outcome);
 
             var trash = context.NewTrash();
             var row = Assert.Single(trash.Rows);
@@ -711,12 +709,13 @@ public sealed class TrashTests : IDisposable
         }
     }
 
+    // A group's item, as KeePassXC adds one: the app adds items only at a vault's top level.
     private static void Add(Context context, string path)
     {
-        var form = NewItemForm.Open(context.Entries, path);
-        context.Entries.ConfirmAddCommand.Press();
+        var slash = path.LastIndexOf('/');
+        var entry = new VaultEntry { GroupPath = path[..slash], Title = path[(slash + 1)..], Password = "added" };
 
-        Assert.Null(context.Entries.Error);
+        Assert.Equal(WriteOutcome.Saved, context.Session.Write(vault => { vault.AddEntry(entry); return true; }, _ => true).Outcome);
     }
 
     private static void RemoveVariable(Context context, string project, string key)

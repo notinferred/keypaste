@@ -17,7 +17,7 @@ namespace Keypaste.App.Tests.Views;
 /// <remarks>
 /// <para>
 /// A compiled binding to a property that does not exist is already a build error, so this is not
-/// here to check binding paths — with one exception. The pane's "Rename or move" button reaches
+/// here to check binding paths — with one exception. The pane's "Rename" button reaches
 /// across data contexts to the screen's own command, and an ancestor selector resolves at runtime:
 /// it fails as a button that does nothing, which nothing else would notice.
 /// </para>
@@ -84,10 +84,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
 
         Assert.True(title.IsEffectivelyVisible);
         Assert.Equal("production", title.Text, StringComparer.Ordinal);
-
-        var group = Named<ComboBox>(window, "OrganizeGroup");
-        Assert.NotNull(group);
-        Assert.NotEmpty(group!.ItemsSource!.Cast<object>());
+        Assert.Null(Named<ComboBox>(window, "OrganizeGroup"));
     });
 
     /// <summary>
@@ -113,43 +110,6 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         button!.Command!.Press(button.CommandParameter);
 
         Assert.True(context.Entries.IsOrganizing);
-    });
-
-    [Fact]
-    public Task The_group_forms_are_drawn_when_they_open() => HeadlessSession.On(() =>
-    {
-        using var context = New();
-        var window = Shown(context);
-
-        context.Entries.BeginCreateGroupCommand.Press();
-        window.UpdateLayout();
-        Assert.True(Named<TextBox>(window, "NewGroupName")!.IsEffectivelyVisible);
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
-        context.Entries.BeginRenameGroupCommand.Press();
-        window.UpdateLayout();
-
-        Assert.True(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
-
-        // An ordinary group holds no project home, so the line about new keys stays off.
-        Assert.False(Named<TextBlock>(window, "ProjectRenameNote")!.IsEffectivelyVisible);
-
-        context.Entries.BeginMoveGroupCommand.Press();
-        window.UpdateLayout();
-
-        var target = Named<ComboBox>(window, "MoveGroupTarget")!;
-        Assert.True(target.IsEffectivelyVisible);
-        Assert.Same(context.Entries.Groups.Single(node => node.IsEverything), target.SelectedItem);
-        Assert.False(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
-
-        context.Session.Unlocked!.SetRecyclesDeletedEntries(false);
-        context.Entries.BeginDeleteGroupCommand.Press();
-        window.UpdateLayout();
-
-        var prompt = Named<TextBlock>(window, "GroupDeletePrompt")!;
-        Assert.True(prompt.IsEffectivelyVisible);
-        Assert.Contains("1 item", prompt.Text, StringComparison.Ordinal);
-        Assert.False(target.IsEffectivelyVisible);
     });
 
     /// <summary>The pane's Duplicate reaches the screen's command across the same two data contexts, and the copy is selected.</summary>

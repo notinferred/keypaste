@@ -503,14 +503,14 @@ public sealed class SortAndSizeTablesTests
         Assert.Null(shell.Shell.Tables.SortsText);
         Assert.Null(shell.Shell.Tables.WidthsText);
 
-        entries.SortByCommand.Press(TableStates.Group);
+        entries.SortByCommand.Press(TableStates.Username);
         Assert.True(tables.CanRun());
-        Assert.Equal("items:group:asc", shell.Shell.Tables.SortsText);
+        Assert.Equal("items:username:asc", shell.Shell.Tables.SortsText);
 
         tables.Run();
         shell.Frame();
         Assert.Null(shell.Shell.Tables.SortsText);
-        Assert.Equal("Group, not sorted", entries.SortChoices.Single(choice => choice.Column == TableStates.Group).Spoken);
+        Assert.Equal("Username, not sorted", entries.SortChoices.Single(choice => choice.Column == TableStates.Username).Spoken);
     });
 
     [Fact]

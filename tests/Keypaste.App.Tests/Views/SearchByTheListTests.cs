@@ -17,7 +17,6 @@ namespace Keypaste.App.Tests.Views;
 /// <summary>Items' one search, in the title bar, what the list's header names, and a pane that shows only what the list does (Q.18).</summary>
 public sealed class SearchByTheListTests
 {
-    private const string _longGroup = "a group with a very long name indeed that keeps on going/and a subgroup under it";
 
     private static readonly RawInputModifiers _command =
         OperatingSystem.IsMacOS() ? RawInputModifiers.Meta : RawInputModifiers.Control;
@@ -80,11 +79,6 @@ public sealed class SearchByTheListTests
         Assert.False(shell.Named<TextBlock>("VaultSaveState").IsEffectivelyVisible, "a saved vault says nothing of it");
         Assert.Contains(shell.Session.VaultPath!, shell.Shell.VaultStatusDetail, StringComparison.Ordinal);
         Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text?.Contains("vault.kdbx", StringComparison.Ordinal) == true);
-
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        RenderedShell.Drain();
-
-        Assert.Equal("servers", title.Text);
     });
 
     [Theory]
@@ -148,7 +142,7 @@ public sealed class SearchByTheListTests
     });
 
     [Fact]
-    public Task A_search_or_a_group_that_hides_the_selected_item_clears_the_pane() => HeadlessSession.On(() =>
+    public Task A_search_that_hides_the_selected_item_clears_the_pane() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-hides-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -164,13 +158,6 @@ public sealed class SearchByTheListTests
         Assert.Null(entries.Selected);
 
         shell.Shell.Search = string.Empty;
-        Assert.Null(entries.Detail);
-
-        entries.Selected = entries.Rows.Single(row => row.Title == "box");
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        Assert.Equal("box", entries.Selected?.Title);
-
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "other");
         Assert.Null(entries.Detail);
     });
 
@@ -209,12 +196,8 @@ public sealed class SearchByTheListTests
         shell.Shell.Search = "ops";
         AssertListSelects("box", "matching another field");
 
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        AssertListSelects("box", "changing group under a search");
         shell.Shell.Search = string.Empty;
-        AssertListSelects("box", "clearing the search in a group");
-        entries.ShowEveryItem();
-        AssertListSelects("box", "back to every item");
+        AssertListSelects("box", "clearing the search again");
 
         shell.Shell.Search = "ops";
         AssertListSelects("box", "before the keyboard");
@@ -257,7 +240,7 @@ public sealed class SearchByTheListTests
         Assert.Equal(string.Empty, search.Text);
         Assert.Same(entries, shell.Shell.Content);
 
-        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.GroupRowAt("other");
+        shell.Named<ListBox>("Nav").SelectedItem = shell.Shell.Place(ItemPlace.Trash);
         RenderedShell.Drain();
         Assert.True(shell.Shell.HasDiscardPrompt);
         shell.Shell.KeepDraftCommand.Press();
@@ -315,76 +298,6 @@ public sealed class SearchByTheListTests
 
         shell.Shell.Search = "opsx";
         Assert.Null(entries.Detail);
-    });
-
-    [Fact]
-    public Task An_empty_result_in_a_group_offers_Search_all_items_and_it_keeps_the_query() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-search-empty-", Seed);
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-
-        shell.Shell.Search = "box";
-        Assert.False(entries.ListEmptyOffersSearchAll);
-
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "other");
-        Assert.True(entries.ShowsListEmpty);
-        Assert.True(entries.ListEmptyOffersSearchAll);
-
-        entries.SearchAllItemsCommand.Press();
-
-        Assert.Equal("All items", entries.ListTitle);
-        Assert.Equal("box", shell.Shell.Search);
-        Assert.Equal(["box"], entries.Rows.Select(row => row.Title));
-    });
-
-    [Theory]
-    [InlineData(1000)]
-    [InlineData(720)]
-    public Task The_pane_names_the_group_unless_the_header_already_does(double width) => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-search-location-", Seed);
-        shell.Window.Width = width;
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.Selected = entries.Rows.Single(row => row.Title == "box");
-        RenderedShell.Drain();
-        var location = shell.Named<TextBlock>("PaneLocation");
-
-        Assert.True(location.IsEffectivelyVisible);
-        Assert.Equal("servers", location.Text);
-
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "servers");
-        entries.Selected = entries.Rows.Single(row => row.Title == "box");
-        RenderedShell.Drain();
-
-        Assert.False(shell.Named<TextBlock>("PaneLocation").IsEffectivelyVisible, "the header already names the group");
-    });
-
-    [Theory]
-    [InlineData(720)]
-    [InlineData(840)]
-    public Task A_long_group_name_leaves_the_header_whole(double width) => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-search-long-", vault =>
-        {
-            Seed(vault);
-            vault.AddEntry(new VaultEntry { Title = "deep", GroupPath = _longGroup });
-        });
-        shell.Window.Width = width;
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == _longGroup);
-        RenderedShell.Drain();
-        shell.Frame();
-
-        var title = Bounds(shell, shell.Named<TextBlock>("ListTitle"));
-        var rename = Bounds(shell, shell.Named<Button>("RenameGroup"));
-        var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
-        var add = Bounds(shell, shell.Named<ToggleButton>("AddEntry"));
-
-        Assert.True(title.Right <= rename.X, $"the title {title} runs into Rename {rename}");
-        Assert.True(rename.Right <= add.X, $"Rename {rename} runs into New {add}");
-        Assert.True(search.Bottom <= rename.Top, $"the search {search} runs into Rename {rename}");
-        Assert.True(search.Width >= 160, $"the search is {search.Width:0} wide");
-        Assert.True(add.Right <= width, $"New {add} is past the window's {width}");
     });
 
     [Fact]

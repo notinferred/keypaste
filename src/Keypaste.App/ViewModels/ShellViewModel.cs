@@ -731,12 +731,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Builds the current destination's content.</summary>
     private void Show(Destination destination)
     {
-
-        if (Content is EntriesViewModel previous)
-        {
-            previous.PropertyChanged -= OnEntriesChanged;
-        }
-
         if (Content is EnvSetsViewModel previousProjects)
         {
             previousProjects.PropertyChanged -= OnProjectsChanged;
@@ -773,11 +767,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         };
 
         _contentVaults = ContentVaults();
-
-        if (Content is EntriesViewModel entries)
-        {
-            entries.PropertyChanged += OnEntriesChanged;
-        }
 
         if (Content is EnvSetsViewModel projects)
         {
@@ -943,7 +932,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         var entries = new EntriesViewModel(home.Session, Clipboard, inView ? EntryActivity : null, _web, _post, _picker, Tables.Items, others, session => SectionOf(session).Title) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith, Place = _place, VaultTitle = home.Title, ListSubtitle = ListSubtitle(), SaveInPlaces = () => [.. Account.Vaults.Select(vault => new SaveInChoice(vault.Session, Account.Title, vault.Title))] };
 
         entries.ClearSearchBox = () => Search = string.Empty;
-        entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
 
         if (_search.Length > 0)
         {
@@ -989,22 +977,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         _openProject = projects.OpenProject?.Name;
         OnPropertyChanged(nameof(SelectedSidebarRow));
-    }
-
-    private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        // A group made, renamed, moved or deleted on Items is in the tree at once, even one holding no item,
-        // whose change names no entry for Count to hear of.
-        if (e.PropertyName == nameof(EntriesViewModel.Groups) && sender is EntriesViewModel { Groups.Count: > 0 } entries)
-        {
-            _itemsVault.TakeGroups(entries.Groups);
-            RebuildSidebar();
-        }
-
-        if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
-        {
-            OnPropertyChanged(nameof(SelectedSidebarRow));
-        }
     }
 
     /// <summary>How share links reach their server; the shell makes one when none is given.</summary>
@@ -1217,10 +1189,10 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SelectedSidebarRow));
     }
 
-    /// <summary>Items showing <paramref name="name"/>'s group with it selected, the search cleared so the list holds it.</summary>
+    /// <summary>Items listing every item with <paramref name="name"/> selected, the search cleared so the list holds it.</summary>
     internal void OpenEntry(EntryName name) => OpenEntry(name, _session);
 
-    /// <summary>Items showing <paramref name="name"/> of <paramref name="vault"/>'s vault in its group, selected.</summary>
+    /// <summary>Items listing every item of <paramref name="vault"/>'s vault with <paramref name="name"/> selected.</summary>
     private void OpenEntry(EntryName name, AppVaultSession vault)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -1228,7 +1200,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Leave(() =>
         {
             Search = string.Empty;
-            ShowGroupNow(SectionOf(vault), name.GroupPath);
+            ShowEveryItemNow(SectionOf(vault));
 
             if (Content is EntriesViewModel entries)
             {

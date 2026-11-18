@@ -31,7 +31,7 @@ public sealed class DrawnRevealWaysOutTests
 
     private static readonly IReadOnlyDictionary<string, string[]> _waysOut = new Dictionary<string, string[]>
     {
-        ["totp"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "another item", "search", "group", "another place", "edit form", "saved change", "another value", "menu"],
+        ["totp"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "another item", "search", "another place", "edit form", "saved change", "another value", "menu"],
         ["generated"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "cancel", "escape"],
         ["token"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "done", "another place", "menu"],
     };
@@ -241,9 +241,6 @@ public sealed class DrawnRevealWaysOutTests
                 break;
             case "search":
                 Items(shell).Search = "no item is called this";
-                break;
-            case "group":
-                Items(shell).SelectedGroup = Items(shell).Groups.Single(group => group.Path == "work");
                 break;
             case "edit form":
                 Items(shell).Detail!.EditCommand.Press();

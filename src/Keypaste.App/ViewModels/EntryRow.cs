@@ -152,7 +152,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <remarks>
     /// <b>A label and a lookup, not an identity</b> — see <see cref="Name"/>. It carries the title
     /// the vault holds and is never sanitized, because selection matching goes through it. What the
-    /// screen shows is <see cref="DisplayTitle"/> and <see cref="Where"/>.
+    /// screen shows is <see cref="DisplayTitle"/>.
     /// </remarks>
     internal string Path => GroupPath.Length == 0 ? Title : GroupPath + "/" + Title;
 
@@ -162,11 +162,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     /// <returns>The row's columns, as it draws them, which hold no secret.</returns>
     public override string ToString() =>
-        string.Join(", ", new[] { DisplayTitle, Why, DisplayUsername, DisplayUrl, KindLabel, Where, VaultName, ChangedText, LastUsedText }.Where(column => !string.IsNullOrEmpty(column)));
-
-    /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
-    internal string Where { get; } =
-        GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
+        string.Join(", ", new[] { DisplayTitle, Why, DisplayUsername, DisplayUrl, KindLabel, VaultName, ChangedText, LastUsedText }.Where(column => !string.IsNullOrEmpty(column)));
 
     /// <summary>The entry's username, as the vault holds it. Never drawn; see <see cref="DisplayUsername"/>.</summary>
     internal string Username { get; init; } = string.Empty;

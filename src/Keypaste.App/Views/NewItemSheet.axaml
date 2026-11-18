@@ -10,7 +10,6 @@
              IsVisible="{Binding IsAdding, FallbackValue=False}">
 
   <UserControl.Resources>
-    <views:DepthToIndent x:Key="Indent" />
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -161,7 +160,6 @@
                              TextWrapping="Wrap"
                              IsVisible="{Binding HasTitleProblem}"
                              ctl:Announcer.Says="{Binding TitleProblem}" Text="{Binding TitleProblem}" />
-                  <TextBlock Classes="caption" IsVisible="{Binding ShowsGoesIn}" Text="{Binding GoesIn}" />
                 </StackPanel>
               </Grid>
             </StackPanel>
@@ -311,26 +309,6 @@
                                    IsVisible="{Binding OneTimeCode.Note.Length}"
                                    Text="{Binding OneTimeCode.Note}" />
                       </StackPanel>
-                    </ctl:FieldRow>
-
-                    <ctl:FieldRow Classes="adaptive" Label="{x:Static res:Strings.Group}" IsVisible="{Binding ShowsGroup}">
-                      <ctl:FieldRow.Actions>
-                        <Button Classes="icon ghost sm" Command="{Binding RemoveFieldCommand}" CommandParameter="{x:Static vm:NewItemField.Group}" ToolTip.Tip="{Binding Source={x:Static res:Strings.Group}, StringFormat={x:Static res:Strings.RemoveValue}}" AutomationProperties.Name="{Binding Source={x:Static res:Strings.Group}, StringFormat={x:Static res:Strings.RemoveValue}}">
-                          <ctl:KpIcon Icon="x" Size="14" />
-                        </Button>
-                      </ctl:FieldRow.Actions>
-                      <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="{x:Static res:Strings.Group}"
-                                HorizontalAlignment="Stretch"
-                                ItemsSource="{Binding Folders}"
-                                SelectedItem="{Binding Folder}">
-                        <ComboBox.ItemTemplate>
-                          <DataTemplate x:DataType="vm:FolderChoice">
-                            <TextBlock Text="{Binding Label}"
-                                       Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                                       TextTrimming="CharacterEllipsis" />
-                          </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                      </ComboBox>
                     </ctl:FieldRow>
 
                     <ctl:FieldRow Classes="adaptive" Label="{x:Static res:Strings.Notes}" IsVisible="{Binding ShowsNotes}">

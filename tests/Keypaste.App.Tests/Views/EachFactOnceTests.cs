@@ -194,41 +194,6 @@ public sealed class EachFactOnceTests
             block => block.Text == "Copy password");
     });
 
-    /// <summary>The header names a chosen group, so sorting by it goes, and the pane names the subgroup a row is in instead.</summary>
-    [Fact]
-    public Task The_Group_column_gives_way_to_the_header_naming_it() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell(
-            "keypaste-group-column-",
-            seed: vault =>
-            {
-                vault.AddEntry(new VaultEntry { GroupPath = "work", Title = "direct" });
-                vault.AddEntry(new VaultEntry { GroupPath = "work/deep", Title = "nested" });
-            });
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-
-        Assert.Contains(entries.SortChoices, choice => choice.Column == TableStates.Group);
-        entries.Table.Press(TableStates.Group);
-        Assert.Equal(TableStates.Group, entries.Table.Order?.Column);
-
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "work");
-        RenderedShell.Drain();
-
-        Assert.DoesNotContain(entries.SortChoices, choice => choice.Column == TableStates.Group);
-        Assert.NotEqual(TableStates.Group, entries.Table.Order?.Column);
-
-        entries.Selected = entries.Rows.Single(row => row.Title == "direct");
-        Assert.False(entries.PaneNamesGroup, "the pane repeats the header");
-        entries.Selected = entries.Rows.Single(row => row.Title == "nested");
-        Assert.True(entries.PaneNamesGroup, "nothing names the subgroup");
-
-        entries.ShowEveryItem();
-        RenderedShell.Drain();
-
-        Assert.Contains(entries.SortChoices, choice => choice.Column == TableStates.Group);
-        Assert.Equal(TableStates.Group, entries.Table.Order?.Column);
-    });
-
     /// <summary>A row says its kind by its icon, named for a tooltip and a screen reader, and has no Kind column.</summary>
     [Fact]
     public Task A_row_says_its_kind_once() => HeadlessSession.On(() =>

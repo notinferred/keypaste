@@ -6,10 +6,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Track 1 — Everyday vault use and recovery
 
-- [ ] **J.1 — Show each vault as a flat list in the desktop app.** Needs: none.
-  - The desktop app treats groups as [PRODUCT §2](PRODUCT.md#2-scope-boundaries) sets: each vault a flat list organized by vaults and tags, a new item at the vault's top level, the groups already in a file preserved untouched, and the CLI, search and agents keeping group paths. DESIGN changes with it.
-  - Accepted when the app shows no group, a new item is saved at the top level, and a file with groups that the app saved opens in KeePassXC with every group and item where it was.
-
 ## Track 3 — AI requests in the app
 
 - [ ] **8.1g — Publish the extension in the three stores.** Needs: none. Input: H-0029.

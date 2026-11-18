@@ -82,7 +82,6 @@
   <data name="DatabasePlace" xml:space="preserve"><value>Database</value></data>
   <data name="DateModified" xml:space="preserve"><value>Date modified</value></data>
   <data name="Favorites" xml:space="preserve"><value>Favorites</value></data>
-  <data name="Groups" xml:space="preserve"><value>Groups</value></data>
   <data name="HistoryLink" xml:space="preserve"><value>History</value></data>
   <data name="LockedVault" xml:space="preserve"><value>Locked vault</value></data>
   <data name="LockThisVault" xml:space="preserve"><value>Lock this vault</value></data>
@@ -207,7 +206,6 @@
   <data name="GeneratedSavePutsItInPlaceOfXefb5c1" xml:space="preserve"><value>Generated. Save puts it in place of the current password, which stays in this item's history.</value></data>
   <data name="GeneratedTypeOrPasteToUseYourX7a2ef9" xml:space="preserve"><value>Generated. Type or paste to use your own instead.</value></data>
   <data name="Group" xml:space="preserve"><value>Group</value></data>
-  <data name="GroupName" xml:space="preserve"><value>Group name</value></data>
   <data name="GroupToCopyInto" xml:space="preserve"><value>Group to copy into</value></data>
   <data name="Hide" xml:space="preserve"><value>Hide</value></data>
   <data name="HideKeypaste" xml:space="preserve"><value>Hide keypaste</value></data>
@@ -297,7 +295,6 @@
   <data name="MoreOptions" xml:space="preserve"><value>More options</value></data>
   <data name="Move" xml:space="preserve"><value>Move</value></data>
   <data name="MoveSelected" xml:space="preserve"><value>Move selected</value></data>
-  <data name="MoveTo" xml:space="preserve"><value>Move to</value></data>
   <data name="MoveToAField" xml:space="preserve"><value>Move to a field</value></data>
   <data name="MoveValueToAField" xml:space="preserve"><value>Move {0} to a field</value></data>
   <data name="N30Days" xml:space="preserve"><value>30 days</value></data>
@@ -309,7 +306,6 @@
   <data name="NewStage" xml:space="preserve"><value>New stage</value></data>
   <data name="NewFieldName" xml:space="preserve"><value>New field name</value></data>
   <data name="NewFieldValue" xml:space="preserve"><value>New field value</value></data>
-  <data name="NewGroup" xml:space="preserve"><value>New group</value></data>
   <data name="NewItem" xml:space="preserve"><value>New item</value></data>
   <data name="NewItemByType" xml:space="preserve"><value>New item by type</value></data>
   <data name="NewItemFromTemplateLabel" xml:space="preserve"><value>New item from template…</value></data>
@@ -386,8 +382,6 @@
   <data name="RemoveThisKeyFromItsItem" xml:space="preserve"><value>Remove this key from its item</value></data>
   <data name="RemoveValue" xml:space="preserve"><value>Remove {0}</value></data>
   <data name="Rename" xml:space="preserve"><value>Rename</value></data>
-  <data name="RenameGroup" xml:space="preserve"><value>Rename group</value></data>
-  <data name="RenameOrMove" xml:space="preserve"><value>Rename or move</value></data>
   <data name="Replace" xml:space="preserve"><value>Replace</value></data>
   <data name="RemindMeBeforeAnItemExpires" xml:space="preserve"><value>Remind me before an item expires</value></data>
   <data name="RemindMeBeforeAnItemExpiresHelp" xml:space="preserve"><value>Recommendations lists an item whose expiry date is this close, with a link to where you make a new one. keypaste changes nothing at the provider.</value></data>
@@ -426,14 +420,12 @@
   <data name="Scope" xml:space="preserve"><value>Scope</value></data>
   <data name="ScopedTokens" xml:space="preserve"><value>Scoped tokens</value></data>
   <data name="Search" xml:space="preserve"><value>Search</value></data>
-  <data name="SearchAllItems" xml:space="preserve"><value>Search all items</value></data>
   <data name="SecondsUntilTheNextCode" xml:space="preserve"><value>Seconds until the next code</value></data>
   <data name="SelectAll" xml:space="preserve"><value>Select all</value></data>
   <data name="SelectValue" xml:space="preserve"><value>Select {0}</value></data>
   <data name="SendCrashReports" xml:space="preserve"><value>Send crash reports</value></data>
   <data name="Separator" xml:space="preserve"><value>Separator</value></data>
   <data name="ServedFromAnEarlierApprovalUnderAXde6ddd" xml:space="preserve"><value>Served from an earlier approval, under a reason you never saw.</value></data>
-  <data name="Servers" xml:space="preserve"><value>servers</value></data>
   <data name="SetANewMasterPassword" xml:space="preserve"><value>Set a new master password</value></data>
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="SettingsLabel" xml:space="preserve"><value>Settings…</value></data>
@@ -466,7 +458,6 @@
   <data name="ThatBackupsMasterPassword" xml:space="preserve"><value>That backup's master password</value></data>
   <data name="TheActivityLogShareLinksScopedTokensX927922" xml:space="preserve"><value>Share links, scoped tokens and diagnostics.</value></data>
   <data name="TheCheckAsksTheYubiKeyTheUnlockX4a39c1" xml:space="preserve"><value>The check asks the YubiKey the unlock screen chose.</value></data>
-  <data name="TheGroupsNewName" xml:space="preserve"><value>The group's new name</value></data>
   <data name="TheNameAProjectReadsItUnderX9a2ebe" xml:space="preserve"><value>The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's stage.</value></data>
   <data name="TheOldValueStaysInTheItemsX346d21" xml:space="preserve"><value>The old value stays in the item's history.</value></data>
   <data name="ThePassword" xml:space="preserve"><value>The password</value></data>
@@ -528,14 +519,13 @@
   <data name="ZoomIn" xml:space="preserve"><value>Zoom in</value></data>
   <data name="ZoomOut" xml:space="preserve"><value>Zoom out</value></data>
   <data name="NewItemLabel" xml:space="preserve"><value>New item…</value></data>
-  <data name="NewGroupLabel" xml:space="preserve"><value>New group…</value></data>
   <data name="NewProjectLabel" xml:space="preserve"><value>New project…</value></data>
   <data name="NewTokenLabel" xml:space="preserve"><value>New token…</value></data>
   <data name="NewVaultLabel" xml:space="preserve"><value>New vault…</value></data>
   <data name="EditFieldsLabel" xml:space="preserve"><value>Edit fields…</value></data>
-  <data name="SharedNameNothingTells" xml:space="preserve"><value>Another item here has this title, and nothing in the list tells them apart. Rename or move one.</value></data>
+  <data name="SharedNameNothingTells" xml:space="preserve"><value>Another item here has this title, and nothing in the list tells them apart. Rename one.</value></data>
   <data name="SharedNameActivity" xml:space="preserve"><value>Another item has this title, so this shows only what keypaste recorded for this item. When an agent asks for the title, you pick which item it gets.</value></data>
-  <data name="RenameOrMoveLabel" xml:space="preserve"><value>Rename or move…</value></data>
+  <data name="RenameLabel" xml:space="preserve"><value>Rename…</value></data>
   <data name="AddFieldLabel" xml:space="preserve"><value>Add field…</value></data>
   <data name="AddAttachmentLabel" xml:space="preserve"><value>Add attachment…</value></data>
   <data name="ExportEnvKeypasteLabel" xml:space="preserve"><value>Export .env.keypaste…</value></data>
@@ -573,7 +563,6 @@
   <data name="Attachment" xml:space="preserve"><value>Attachment</value></data>
   <data name="CopyUrl" xml:space="preserve"><value>Copy website</value></data>
   <data name="CopyValueMenu" xml:space="preserve"><value>Copy value</value></data>
-  <data name="DeleteGroup" xml:space="preserve"><value>Delete group</value></data>
   <data name="EditMenu" xml:space="preserve"><value>Edit</value></data>
   <data name="FileMenu" xml:space="preserve"><value>File</value></data>
   <data name="FindMenu" xml:space="preserve"><value>Find</value></data>
@@ -581,7 +570,6 @@
   <data name="HelpMenu" xml:space="preserve"><value>Help</value></data>
   <data name="ItemMenu" xml:space="preserve"><value>Item</value></data>
   <data name="KeyMenu" xml:space="preserve"><value>Key</value></data>
-  <data name="MoveGroupLabel" xml:space="preserve"><value>Move group…</value></data>
   <data name="OpenUrl" xml:space="preserve"><value>Open website</value></data>
   <data name="OpenProject" xml:space="preserve"><value>Open project</value></data>
   <data name="OpenRecent" xml:space="preserve"><value>Open recent</value></data>
@@ -590,7 +578,6 @@
   <data name="RemoveField" xml:space="preserve"><value>Remove field</value></data>
   <data name="RemoveKey" xml:space="preserve"><value>Remove key</value></data>
   <data name="RenameFieldLabel" xml:space="preserve"><value>Rename field…</value></data>
-  <data name="RenameGroupLabel" xml:space="preserve"><value>Rename group…</value></data>
   <data name="ReplaceAttachmentLabel" xml:space="preserve"><value>Replace attachment…</value></data>
   <data name="ReplaceValueLabel" xml:space="preserve"><value>Replace value…</value></data>
   <data name="RestoreThisRevision" xml:space="preserve"><value>Restore this revision</value></data>

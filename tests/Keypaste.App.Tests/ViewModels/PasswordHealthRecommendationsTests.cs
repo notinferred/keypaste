@@ -193,7 +193,6 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
 
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal(DestinationKind.Entries, shell.Current.Kind);
-        Assert.Equal("services", entries.SelectedGroup?.Path);
         Assert.Equal(renamed, entries.Selected?.Name);
         Assert.Equal("weak", weak.Finding.Key);
     }

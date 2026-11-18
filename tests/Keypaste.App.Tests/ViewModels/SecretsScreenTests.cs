@@ -47,36 +47,19 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Work", "github", "Login", "Work")]
-    [InlineData("Home", "wifi", "Password", "Home")]
-    [InlineData("Home", "recovery", "Note", "Home")]
-    [InlineData("env/acme-api", "DATABASE_URL", "Password", "env/acme-api")]
-    [InlineData("env/acme-api/prod", "DATABASE_URL", "Password", "env/acme-api/prod")]
-    public void A_row_says_its_kind_and_where_it_lives(string group, string title, string kind, string place)
+    [InlineData("Work", "github", "Login")]
+    [InlineData("Home", "wifi", "Password")]
+    [InlineData("Home", "recovery", "Note")]
+    [InlineData("env/acme-api", "DATABASE_URL", "Password")]
+    [InlineData("env/acme-api/prod", "DATABASE_URL", "Password")]
+    public void A_row_says_its_kind_and_not_its_group(string group, string title, string kind)
     {
         using var context = new Context(_vaultPath);
 
         var row = context.Entries.Rows.Single(row => row.GroupPath == group && row.Title == title);
 
         Assert.Equal(kind, row.KindLabel);
-        Assert.Equal(place, row.Where);
-        Assert.DoesNotContain(_value, row.Where, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_group_under_env_heads_the_list_as_any_group_does()
-    {
-        using var context = new Context(_vaultPath);
-
-        Assert.Equal("All items", context.Entries.ListTitle);
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api/prod");
-
-        Assert.Equal("env/acme-api/prod", context.Entries.ListTitle);
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "Work");
-
-        Assert.Equal("Work", context.Entries.ListTitle);
+        Assert.DoesNotContain(group, row.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -107,26 +90,6 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_group_under_env_lists_its_subgroups_entries_as_a_folder_does()
-    {
-        using var context = new Context(_vaultPath);
-
-        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api");
-
-        Assert.Equal("env/acme-api", context.Entries.ListTitle);
-        Assert.Equal(["env/acme-api", "env/acme-api/prod"], context.Entries.Rows.Select(row => row.GroupPath).Order(StringComparer.Ordinal));
-    }
-
-    [Fact]
-    public void The_list_starts_on_everything_and_highlights_it()
-    {
-        using var context = new Context(_vaultPath);
-
-        Assert.NotNull(context.Entries.SelectedGroup);
-        Assert.True(context.Entries.SelectedGroup!.IsEverything);
-    }
-
-    [Fact]
     public void An_empty_list_says_why()
     {
         using var context = new Context(_vaultPath);
@@ -152,12 +115,12 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_new_login_is_made_whole_in_one_step_and_env_is_a_folder_like_any_other()
+    public void A_new_login_is_made_whole_in_one_step_at_the_top_level()
     {
         using var context = new Context(_vaultPath);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
-        var form = NewItemForm.Open(context.Entries, "Work/gitlab");
+        var form = NewItemForm.Open(context.Entries, "gitlab");
         Assert.Null(context.Entries.Selected);
 
         Assert.True(form.ShowsUsername && form.ShowsUrl);
@@ -165,12 +128,9 @@ public sealed class SecretsScreenTests : IDisposable
         form.Url = "https://gitlab.com";
         context.Entries.ConfirmAddCommand.Press();
 
-        var added = context.Session.Unlocked!.Find(new EntryName("Work", "gitlab"))!;
+        var added = context.Session.Unlocked!.Find(new EntryName(string.Empty, "gitlab"))!;
         Assert.Equal("me", added.Username);
         Assert.Equal("https://gitlab.com", added.Url);
-
-        form = NewItemForm.Open(context.Entries);
-        Assert.Contains(form.Folders, folder => folder.Path == "env/acme-api");
     }
 
     /// <summary>A reference names the entry and holds no value, so it is copied as plain text.</summary>

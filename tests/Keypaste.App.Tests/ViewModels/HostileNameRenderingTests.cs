@@ -88,23 +88,6 @@ public sealed class HostileNameRenderingTests : IDisposable
     }
 
     [Fact]
-    public void The_group_column_does_not_draw_a_name_that_can_misrepresent_itself()
-    {
-        AssertSafe(Row().Where);
-    }
-
-    [Fact]
-    public void The_sidebar_label_does_not_draw_a_name_that_can_misrepresent_itself()
-    {
-        using var vault = Vault.Open(_vaultPath, _master);
-
-        foreach (var node in GroupNode.Flatten(vault.ReadGroupPaths()))
-        {
-            AssertSafe(node.Label);
-        }
-    }
-
-    [Fact]
     public void The_entry_list_column_does_not_draw_a_title_that_can_misrepresent_itself()
     {
         AssertSafe(Row().DisplayTitle);

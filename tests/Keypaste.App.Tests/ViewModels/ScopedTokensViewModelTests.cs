@@ -129,7 +129,6 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         using var entries = new EntriesViewModel(_session, countdown);
 
         Assert.DoesNotContain(entries.Rows, row => ReservedGroups.IsReserved(row.GroupPath));
-        Assert.DoesNotContain(entries.Groups, group => group.Path.StartsWith(ReservedGroups.Root, StringComparison.OrdinalIgnoreCase));
         Assert.Equal(2, entries.TotalCount);
         Assert.Contains(entries.Rows, row => row.Title == "github");
 

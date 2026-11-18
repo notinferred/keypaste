@@ -169,10 +169,9 @@ internal sealed partial class ShellViewModel
 
     /// <summary>
     /// The sidebar in reading order: Favorites, then the one vault's places, or, with several vaults, All Accounts, the local account's
-    /// heading and each vault with its places; the projects under a vault's Environments while they are in view, and its Groups row over
-    /// the group tree.
+    /// heading and each vault with its places; the projects under a vault's Environments while they are in view.
     /// </summary>
-    /// <remarks>One list, so the arrow keys walk the sidebar as a person reads it; Left and Right fold a vault, its Groups and a group.</remarks>
+    /// <remarks>One list, so the arrow keys walk the sidebar as a person reads it; Left and Right fold a vault.</remarks>
     [ObservableProperty]
     internal partial IReadOnlyList<object> SidebarRows { get; private set; } = [];
 
@@ -220,15 +219,6 @@ internal sealed partial class ShellViewModel
                 return SidebarRows.OfType<VaultRow>().FirstOrDefault(row => row.Vault == _itemsVault);
             }
 
-            if ((Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group)
-            {
-                // A group folded away inside another is shown by the nearest row the tree still lists, as KeePassXC selects the parent it folds.
-                return SidebarRows.OfType<GroupRow>()
-                        .Where(row => Owns(row, _itemsVault) && (row.Path == group.Path || group.Path.StartsWith(row.Path + "/", StringComparison.Ordinal)))
-                        .MaxBy(row => row.Path.Length)
-                    ?? (object?)SidebarRows.OfType<GroupsRow>().FirstOrDefault(row => row.Vault == _itemsVault);
-            }
-
             if (_place == ItemPlace.Favorites)
             {
                 return SidebarRows.OfType<PlaceRow>().FirstOrDefault(row => row.IsTop && row.Place == ItemPlace.Favorites);
@@ -267,12 +257,6 @@ internal sealed partial class ShellViewModel
                 case VaultRow vaultRow:
                     ShowPlace(vaultRow.Vault, ItemPlace.All, vaultRow);
                     break;
-                case GroupsRow groups:
-                    ShowPlace(groups.Vault, ItemPlace.All, groups);
-                    break;
-                case GroupRow group:
-                    Leave(() => ShowGroupNow(group.Vault ?? _itemsVault, group.Path));
-                    break;
                 case ProjectRow project:
                     OpenProject(project.Name);
                     break;
@@ -281,7 +265,7 @@ internal sealed partial class ShellViewModel
                     break;
             }
 
-            if (value is not (VaultRow or GroupsRow))
+            if (value is not VaultRow)
             {
                 CloseSidebarOverlay();
             }
@@ -572,15 +556,12 @@ internal sealed partial class ShellViewModel
     private object? StillListed(object? chosen) => chosen switch
     {
         VaultRow vault => SidebarRows.OfType<VaultRow>().FirstOrDefault(row => row.Vault == vault.Vault),
-        GroupsRow groups => SidebarRows.OfType<GroupsRow>().FirstOrDefault(row => row.Vault == groups.Vault),
         PlaceRow place => SidebarRows.OfType<PlaceRow>().FirstOrDefault(row => row.Vault == place.Vault && row.Place == place.Place),
         _ => null,
     };
 
     /// <summary>What the list's header says under its title: the vault in view, or All Accounts.</summary>
     private string ListSubtitle() => _allAccounts ? Strings.AllAccounts : _itemsVault.Title;
-
-    private static bool Owns(GroupRow row, VaultSection vault) => (row.Vault ?? vault) == vault;
 
     private PlaceRow? PlaceRowOf(VaultSection vault, ItemPlace place) =>
         SidebarRows.OfType<PlaceRow>().FirstOrDefault(row => row.Vault == vault && row.Place == place);
@@ -602,7 +583,7 @@ internal sealed partial class ShellViewModel
         return section;
     }
 
-    /// <summary>Lists one of a vault's places on Items, every item of it in its group tree.</summary>
+    /// <summary>Lists one of a vault's places on Items.</summary>
     private void ShowPlace(VaultSection vault, ItemPlace place, object row, bool allAccounts = false) => Leave(() =>
     {
         var switched = vault != _itemsVault || _allAccounts != allAccounts;
@@ -622,7 +603,6 @@ internal sealed partial class ShellViewModel
 
         if (Content is EntriesViewModel entries)
         {
-            entries.ShowEveryItem();
             entries.Place = place;
             entries.ListSubtitle = ListSubtitle();
         }
@@ -631,8 +611,8 @@ internal sealed partial class ShellViewModel
         OnPropertyChanged(nameof(SearchPlaceholder));
     });
 
-    /// <summary>Lists <paramref name="path"/> of <paramref name="vault"/> on Items, or every item when it is empty.</summary>
-    private void ShowGroupNow(VaultSection vault, string path)
+    /// <summary>Lists every item of <paramref name="vault"/> on Items.</summary>
+    private void ShowEveryItemNow(VaultSection vault)
     {
         var switched = vault != _itemsVault || _allAccounts;
         _itemsVault = vault;
@@ -652,11 +632,6 @@ internal sealed partial class ShellViewModel
         {
             entries.Place = ItemPlace.All;
             entries.ListSubtitle = ListSubtitle();
-
-            if (entries.Groups.FirstOrDefault(node => node.Path == path) is { } node)
-            {
-                entries.SelectedGroup = node;
-            }
         }
 
         OnPropertyChanged(nameof(SelectedSidebarRow));
@@ -681,12 +656,11 @@ internal sealed partial class ShellViewModel
         OnPropertyChanged(nameof(SelectedSidebarRow));
     });
 
-    /// <summary>Folds or unfolds a row of the tree: a vault, its Groups, or a group with groups inside it.</summary>
+    /// <summary>Folds or unfolds a vault's row.</summary>
     internal RelayCommand<object> FoldCommand { get; }
 
     /// <summary>
-    /// Opens or closes a row of the tree, or flips it when <paramref name="open"/> is null. Folding away the group Items lists
-    /// lists the folded row instead, as KeePassXC selects the parent it folds.
+    /// Opens or closes a vault's row, or flips it when <paramref name="open"/> is null.
     /// </summary>
     internal void Fold(object? row, bool? open)
     {
@@ -694,35 +668,6 @@ internal sealed partial class ShellViewModel
         {
             case VaultRow { IsExpandable: true } vaultRow:
                 vaultRow.Vault.IsExpanded = open ?? !vaultRow.Vault.IsExpanded;
-                break;
-            case GroupsRow groups:
-                groups.Vault.GroupsExpanded = open ?? !groups.Vault.GroupsExpanded;
-
-                if (!groups.Vault.GroupsExpanded && groups.Vault == _itemsVault
-                    && Content is EntriesViewModel { SelectedGroup.IsEverything: false })
-                {
-                    ShowPlace(groups.Vault, ItemPlace.All, groups);
-                }
-
-                break;
-            case GroupRow { HasChildren: true } group:
-                var vault = group.Vault ?? _itemsVault;
-
-                if (open ?? !vault.ExpandedGroups.Contains(group.Path))
-                {
-                    vault.ExpandedGroups.Add(group.Path);
-                }
-                else
-                {
-                    vault.ExpandedGroups.Remove(group.Path);
-
-                    if (vault == _itemsVault && Content is EntriesViewModel { SelectedGroup: { IsEverything: false } shown }
-                        && shown.Path.StartsWith(group.Path + "/", StringComparison.Ordinal))
-                    {
-                        Leave(() => ShowGroupNow(vault, group.Path));
-                    }
-                }
-
                 break;
             default:
                 return;
@@ -769,35 +714,12 @@ internal sealed partial class ShellViewModel
                     rows.AddRange(_projects);
                 }
             }
-
-            rows.Add(new GroupsRow(vault, vault.GroupsExpanded));
-
-            if (vault.GroupsExpanded)
-            {
-                foreach (var node in vault.Groups.Where(node => !node.IsEverything && ParentsOpen(vault, node.Path)))
-                {
-                    rows.Add(new GroupRow(node.Path, node.Label, node.Depth, node.Children.Count > 0, vault.ExpandedGroups.Contains(node.Path), vault == SectionOf(_session) ? null : vault));
-                }
-            }
         }
 
         return rows;
     }
 
     private static string Shown(int count) => count > 0 ? count.ToString(CultureInfo.InvariantCulture) : string.Empty;
-
-    private static bool ParentsOpen(VaultSection vault, string path)
-    {
-        for (var slash = path.IndexOf('/', StringComparison.Ordinal); slash > 0; slash = path.IndexOf('/', slash + 1))
-        {
-            if (!vault.ExpandedGroups.Contains(path[..slash]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     private void ShowSecurityCount()
     {

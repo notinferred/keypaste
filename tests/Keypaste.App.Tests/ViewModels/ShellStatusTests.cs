@@ -821,7 +821,7 @@ public sealed class ShellStatusTests
         Assert.Contains(file.ReadHistory(new EntryName(string.Empty, "example"))!, revision => revision.Fields.Notes == "theirs");
     }
 
-    /// <summary>Rename or move opened before a merge sends only what the person changed, so a group another device moved the item to stays.</summary>
+    /// <summary>Rename opened before a merge sends only what the person changed, so a group another device moved the item to stays.</summary>
     [Fact]
     public async Task ARenameSavedAcrossAMerge_KeepsTheGroupItDidNotTouch()
     {

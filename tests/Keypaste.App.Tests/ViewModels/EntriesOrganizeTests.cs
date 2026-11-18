@@ -18,8 +18,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// byte-identical</b>, which is checked by a digest taken before it.
 /// </para>
 /// <para>
-/// The second has a sharper form that the digest alone does not reach, and it is the reason the
-/// screen calls <see cref="Vault.Relocate"/> once rather than composing a rename and a move:
+/// The second has a sharper form that the digest alone does not reach:
 /// <see cref="A_refused_organize_is_not_in_the_vault_the_next_save_writes"/> performs an unrelated
 /// save afterwards, so a change left in the open vault by a refusal would be written out and caught.
 /// </para>
@@ -76,184 +75,11 @@ public sealed class EntriesOrganizeTests : IDisposable
         }
     }
 
-    // ---------------------------------------------------------------- groups
-
-    [Fact]
-    public void A_group_is_created_inside_the_one_that_is_selected()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginCreateGroupCommand.Press();
-            entries.DraftGroupName = "retired";
-            entries.ConfirmCreateGroupCommand.Press();
-
-            Assert.Null(entries.Error);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-        Assert.Contains("servers/retired", reopened.ReadGroupPaths());
-    }
-
     /// <summary>
-    /// The root is not a group somebody named, so there is nothing there to rename.
+    /// Renaming can change which places an agent sees cover an entry.
     /// </summary>
     [Fact]
-    public void All_entries_cannot_be_renamed()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, string.Empty);
-
-        Assert.False(entries.BeginRenameGroupCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void A_renamed_group_carries_its_entries_and_their_history()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginRenameGroupCommand.Press();
-            entries.DraftGroupName = "hosts";
-            entries.ConfirmRenameGroupCommand.Press();
-
-            Assert.Null(entries.Error);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-        var name = new EntryName("hosts", "production");
-
-        Assert.Null(reopened.Find(new EntryName("servers", "production")));
-        Assert.Equal("second", reopened.Find(name)!.Password, StringComparer.Ordinal);
-        Assert.Equal(
-            new[] { "first" },
-            reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
-    }
-
-    /// <summary>
-    /// Renaming a group directly under <c>env</c> moves where keypaste puts a project's new keys; an
-    /// ordinary group's rename says nothing of projects.
-    /// </summary>
-    [Fact]
-    public void Renaming_a_projects_home_group_says_where_new_keys_go_and_an_ordinary_group_does_not()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, "servers");
-        entries.BeginRenameGroupCommand.Press();
-        Assert.False(entries.ShowsProjectRenameNote);
-
-        entries.SelectedGroup = Group(entries, "env/billing");
-        entries.BeginRenameGroupCommand.Press();
-
-        Assert.True(entries.ShowsProjectRenameNote);
-        Assert.Contains("New keys for billing go to items in env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
-        Assert.Contains("Moved items keep their tags", entries.ProjectRenameNote, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// A moved group carries its items and their history in one write, and the list follows it to its
-    /// new path, as it follows a renamed one.
-    /// </summary>
-    [Fact]
-    public void A_moved_group_carries_its_items_and_the_list_follows_it()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginMoveGroupCommand.Press();
-
-            Assert.True(entries.IsMovingGroup);
-            Assert.Equal(string.Empty, entries.GroupMoveTarget?.Path);
-            Assert.Same(entries.MoveTargets, entries.Groups);
-
-            entries.GroupMoveTarget = Group(entries, "env");
-            entries.ConfirmMoveGroupCommand.Press();
-
-            Assert.Null(entries.Error);
-            Assert.False(entries.IsMovingGroup);
-            Assert.Equal("env/servers", entries.SelectedGroup?.Path);
-            Assert.Equal("Moved servers to env.", entries.Notice);
-            Assert.Equal(["production", "staging"], entries.Rows.Select(row => row.Title).Order(StringComparer.Ordinal));
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-        var name = new EntryName("env/servers", "production");
-
-        Assert.Null(reopened.Find(new EntryName("servers", "production")));
-        Assert.Equal("second", reopened.Find(name)!.Password, StringComparer.Ordinal);
-        Assert.Equal(new[] { "first" }, reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
-    }
-
-    /// <summary>The move offers the item move's own destinations, and one core refuses says why and writes nothing.</summary>
-    [Theory]
-    [InlineData("env/billing", "env/billing", "inside itself")]
-    [InlineData("servers", "", "already there")]
-    [InlineData("env", "servers", "keypaste assigns")]
-    public void A_refused_group_move_says_why_and_leaves_the_bytes_unchanged(string group, string target, string said)
-    {
-        var before = Digest(_vaultPath);
-
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, group);
-        entries.BeginMoveGroupCommand.Press();
-        entries.GroupMoveTarget = Group(entries, target);
-        entries.ConfirmMoveGroupCommand.Press();
-
-        Assert.Contains(said, entries.GroupProblem, StringComparison.Ordinal);
-        Assert.True(entries.IsMovingGroup);
-        Assert.Equal(before, Digest(_vaultPath));
-    }
-
-    /// <summary>
-    /// Deleting a group asks first, naming how many items go with it; asking writes nothing, and the
-    /// delete puts the group and its items in the recycle bin and shows the group it was in.
-    /// </summary>
-    [Fact]
-    public void Deleting_a_group_recycles_it_at_once_naming_its_items()
-    {
-        var before = Digest(_vaultPath);
-
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginDeleteGroupCommand.Press();
-
-            Assert.False(entries.IsConfirmingGroupDelete);
-            Assert.NotEqual(before, Digest(_vaultPath));
-
-            Assert.Null(entries.Error);
-            Assert.True(entries.SelectedGroup?.IsEverything);
-            Assert.StartsWith("Moved servers and the 2 items in it to the Trash. Trash puts each one back.", entries.Notice, StringComparison.Ordinal);
-            Assert.DoesNotContain(entries.Groups, node => node.Path == "servers");
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-
-        Assert.Null(reopened.Find(new EntryName("servers", "production")));
-        Assert.Equal(
-            [("production", "servers"), ("staging", "servers")],
-            reopened.ReadRecycled().Select(recycled => (recycled.Title, recycled.OriginalGroupPath)).Order());
-    }
-
-    /// <summary>
-    /// Organizing can change which places an agent sees cover an entry, wherever it happens.
-    /// </summary>
-    [Fact]
-    public void Both_organize_forms_say_what_a_path_change_does_to_access()
+    public void The_rename_form_says_what_a_path_change_does_to_access()
     {
         using var context = New();
 
@@ -264,54 +90,50 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- one entry, one write
 
     /// <summary>
-    /// The combined write, which is what one Save on the form performs.
+    /// An item a KeePassXC group holds is in the flat list with every other, and a rename and an edit saved from the app
+    /// leave it, and every group of the file, where they were.
     /// </summary>
     [Fact]
-    public void One_confirm_renames_and_moves_in_a_single_write()
+    public void An_item_in_a_KeePassXC_group_is_listed_flat_and_keeps_its_group_through_an_edit_and_a_save()
     {
+        IReadOnlyList<string> groupsBefore;
+
+        using (var before = Vault.Open(_vaultPath, Master))
+        {
+            groupsBefore = before.ReadGroupPaths();
+        }
+
         using (var context = New())
         {
             var entries = context.Entries;
 
+            Assert.Equal(
+                ["STRIPE_KEY", "github", "production", "staging"],
+                entries.Rows.Select(row => row.Title).Order(StringComparer.Ordinal));
+
             Select(entries, "servers", "production");
             entries.OrganizeCommand.Press();
             entries.DraftTitle = "PROD_DB";
-            entries.MoveTarget = Group(entries, "env/billing");
             entries.ConfirmOrganizeCommand.Press();
 
             Assert.Null(entries.Error);
-            Assert.Equal(new EntryName("env/billing", "PROD_DB"), entries.Selected?.Name);
+            Assert.Equal(new EntryName("servers", "PROD_DB"), entries.Selected?.Name);
+
+            var detail = entries.Detail!;
+            detail.EditCommand.Press();
+            detail.DraftNotes = "rotated";
+            detail.SaveCommand.Press();
+
+            Assert.False(detail.IsEditing, entries.Error);
         }
 
         using var reopened = Vault.Open(_vaultPath, Master);
-        var name = new EntryName("env/billing", "PROD_DB");
+        var name = new EntryName("servers", "PROD_DB");
 
+        Assert.Equal(groupsBefore, reopened.ReadGroupPaths());
         Assert.Null(reopened.Find(new EntryName("servers", "production")));
-        Assert.Equal("second", reopened.Find(name)!.Password, StringComparer.Ordinal);
-        Assert.Equal(
-            new[] { "first" },
-            reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
-    }
-
-    /// <summary>
-    /// A filter the entry has just left would hide what somebody is looking at, so it follows.
-    /// </summary>
-    [Fact]
-    public void The_group_filter_follows_a_moved_entry()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, "servers");
-        Select(entries, "servers", "production");
-
-        entries.OrganizeCommand.Press();
-        entries.MoveTarget = Group(entries, "env/billing");
-        entries.ConfirmOrganizeCommand.Press();
-
-        Assert.Null(entries.Error);
-        Assert.Equal("env/billing", entries.SelectedGroup?.Path);
-        Assert.Contains(entries.Rows, row => row.Name == new EntryName("env/billing", "production"));
+        Assert.Equal(("second", "rotated"), (reopened.Find(name)!.Password, reopened.Find(name)!.Notes));
+        Assert.Contains("first", reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
     }
 
     /// <summary>
@@ -361,10 +183,10 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- refusals
 
     [Theory]
-    [InlineData("staging", "servers")]
-    [InlineData("a/b", "servers")]
-    [InlineData("production", "servers")]
-    public void A_refused_organize_leaves_the_bytes_unchanged(string title, string group)
+    [InlineData("staging")]
+    [InlineData("a/b")]
+    [InlineData("production")]
+    public void A_refused_organize_leaves_the_bytes_unchanged(string title)
     {
         var before = Digest(_vaultPath);
 
@@ -374,7 +196,6 @@ public sealed class EntriesOrganizeTests : IDisposable
         Select(entries, "servers", "production");
         entries.OrganizeCommand.Press();
         entries.DraftTitle = title;
-        entries.MoveTarget = Group(entries, group);
         entries.ConfirmOrganizeCommand.Press();
 
         Assert.NotNull(entries.Error ?? entries.OrganizeTitleProblem);
@@ -399,14 +220,9 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// The regression that holds the one-core-call rule, and the reason the form has one Save.
+    /// A refused rename leaves nothing in the open vault for the next save to write out, so this performs one: an
+    /// ordinary add, through the screen, after the refusal.
     /// </summary>
-    /// <remarks>
-    /// A screen that renamed and then moved would have committed the rename to the open vault
-    /// before the move was refused. Nothing on screen would say so, the digest immediately after
-    /// would still match — and the next save of that same vault would write the rename out. So this
-    /// performs one: an ordinary add, through the screen, after the refusal.
-    /// </remarks>
     [Fact]
     public void A_refused_organize_is_not_in_the_vault_the_next_save_writes()
     {
@@ -417,9 +233,8 @@ public sealed class EntriesOrganizeTests : IDisposable
             Select(entries, "servers", "production");
             entries.OrganizeCommand.Press();
 
-            // The rename is fine on its own; the destination, where the title is taken, is what refuses.
-            entries.DraftTitle = "STRIPE_KEY";
-            entries.MoveTarget = Group(entries, "env/billing");
+            // The title is taken beside it, which is what refuses.
+            entries.DraftTitle = "staging";
             entries.ConfirmOrganizeCommand.Press();
 
             Assert.NotNull(entries.Error);
@@ -435,33 +250,8 @@ public sealed class EntriesOrganizeTests : IDisposable
         // The save happened, so the sweep below is not a sweep of a file nothing wrote.
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "unrelated")));
 
-        Assert.NotNull(reopened.Find(new EntryName("servers", "production")));
-        Assert.Null(reopened.Find(new EntryName("servers", "STRIPE_KEY")));
-        Assert.Equal("sk", reopened.Find(new EntryName("env/billing", "STRIPE_KEY"))!.Password, StringComparer.Ordinal);
-    }
-
-    [Fact]
-    public void A_refused_group_name_leaves_the_bytes_unchanged()
-    {
-        var before = Digest(_vaultPath);
-
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, string.Empty);
-        entries.BeginCreateGroupCommand.Press();
-        entries.DraftGroupName = "servers";
-        entries.ConfirmCreateGroupCommand.Press();
-
-        Assert.NotNull(entries.GroupProblem);
-        Assert.Equal(before, Digest(_vaultPath));
-
-        // The name keypaste assigns meaning to is refused too, and says which.
-        entries.DraftGroupName = "env";
-        entries.ConfirmCreateGroupCommand.Press();
-
-        Assert.Contains("keypaste assigns", entries.GroupProblem, StringComparison.Ordinal);
-        Assert.Equal(before, Digest(_vaultPath));
+        Assert.Equal("second", reopened.Find(new EntryName("servers", "production"))!.Password, StringComparer.Ordinal);
+        Assert.Equal("s", reopened.Find(new EntryName("servers", "staging"))!.Password, StringComparer.Ordinal);
     }
 
     // ---------------------------------------------------------------- finding
@@ -558,19 +348,6 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.Null(entries.Detail);
     }
 
-    [Fact]
-    public void A_group_that_hides_the_selected_row_closes_its_pane()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        Select(entries, "servers", "production");
-        entries.SelectedGroup = Group(entries, "env/billing");
-
-        Assert.DoesNotContain(entries.Rows, row => row.Title == "production");
-        Assert.Null(entries.Detail);
-    }
-
     /// <summary>
     /// A rename can take the entry out of the result that found it, and it stays where it is being
     /// looked at until a different question is asked.
@@ -620,13 +397,9 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.Null(entries.Detail);
         Assert.False(entries.IsOrganizing);
         Assert.Empty(entries.DraftTitle);
-        Assert.Empty(entries.MoveTargets);
     }
 
     // ---------------------------------------------------------------- helpers
-
-    private static GroupNode Group(EntriesViewModel entries, string path) =>
-        entries.Groups.Single(node => string.Equals(node.Path, path, StringComparison.Ordinal));
 
     private static void Select(EntriesViewModel entries, string groupPath, string title) =>
         entries.Selected = entries.Rows.Single(row => row.Name == new EntryName(groupPath, title));

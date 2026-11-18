@@ -56,7 +56,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
         Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
         Assert.False(shell.ShowsAccounts);
-        Assert.Equal(["Favorites", "All items 4", "Logins 4", "Environments 1", "Trash", "Groups"], Titles(shell));
+        Assert.Equal(["Favorites", "All items 4", "Logins 4", "Environments 1", "Trash"], Titles(shell));
     }
 
     [Fact]
@@ -113,51 +113,19 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Empty(Assert.IsType<EntriesViewModel>(shell.Content).Rows);
     }
 
+    /// <summary>The sidebar lists a vault's places and no group, and its All items lists the items of every group together.</summary>
     [Fact]
-    public void A_group_in_the_tree_folds_and_choosing_it_shows_its_items()
-    {
-        using var shell = Shell();
-        Assert.DoesNotContain(shell.SidebarRows, row => row is GroupRow);
-        var env = shell.GroupRowAt("env");
-
-        Assert.True(env.HasChildren);
-        Assert.False(env.IsExpanded);
-
-        shell.FoldCommand.Press(env);
-        Assert.Equal(["Groups", "Work", "env", "billing"], Titles(shell).SkipWhile(title => title != "Groups"));
-
-        shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env/billing");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        Assert.Equal("env/billing", entries.SelectedGroup?.Path);
-        Assert.Equal(["DATABASE_URL", "STRIPE_KEY"], entries.Rows.Select(row => row.Title).Order());
-        Assert.Equal("env/billing", Assert.IsType<GroupRow>(shell.SelectedSidebarRow).Path);
-
-        // Folding away the group Items shows shows the folded group instead, as KeePassXC does.
-        shell.Fold(shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env"), open: false);
-        Assert.Equal("env", entries.SelectedGroup?.Path);
-        Assert.Equal("env", Assert.IsType<GroupRow>(shell.SelectedSidebarRow).Path);
-
-        // Folding Groups folds the whole tree and shows every item.
-        var groups = shell.SidebarRows.OfType<GroupsRow>().Single();
-        shell.Fold(groups, open: false);
-        Assert.Equal("Groups", Titles(shell).Last());
-        Assert.True(Assert.IsType<EntriesViewModel>(shell.Content).SelectedGroup?.IsEverything);
-        Assert.IsType<GroupsRow>(shell.SelectedSidebarRow);
-    }
-
-    /// <summary>A group deleted while the sidebar shows it leaves the sidebar's tree at once.</summary>
-    [Fact]
-    public void A_deleted_group_leaves_the_tree()
+    public void The_sidebar_lists_no_group_and_All_items_lists_every_groups_items()
     {
         using var shell = Shell();
 
-        shell.SelectedSidebarRow = shell.GroupRowAt("Work");
-        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        entries.BeginDeleteGroupCommand.Press();
+        Assert.DoesNotContain("Groups", Titles(shell));
+        Assert.DoesNotContain("?", Titles(shell));
 
-        Assert.Null(entries.Error);
-        Assert.Equal(["Groups", "env"], Titles(shell).SkipWhile(title => title != "Groups"));
-        Assert.Equal(shell.Place(ItemPlace.All), shell.SelectedSidebarRow);
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.All);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Contains(entries.Rows, row => row.GroupPath == "env/billing");
+        Assert.Contains(entries.Rows, row => row.GroupPath == "Work");
     }
 
     private static IEnumerable<string> Titles(ShellViewModel shell) =>
@@ -166,8 +134,6 @@ public sealed class ShellViewModelTests : IDisposable
             PlaceRow place => place.Count.Length > 0 ? $"{place.Title} {place.Count}" : place.Title,
             AccountRow account => account.Title,
             VaultRow vault => vault.Title,
-            GroupsRow groups => groups.Title,
-            GroupRow group => group.Title,
             ProjectRow project => project.Name,
             _ => "?",
         });

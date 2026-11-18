@@ -211,7 +211,6 @@ internal sealed class TableStates
     internal const string Title = "title";
     internal const string Username = "username";
     internal const string Url = "url";
-    internal const string Group = "group";
     internal const string LastUsed = "last-used";
     internal const string Modified = "modified";
     internal const string DeletedFrom = "deleted-from";
@@ -228,7 +227,6 @@ internal sealed class TableStates
         new(Title, () => Strings.Title),
         new(Username, () => Strings.Username),
         new(Url, () => Strings.URL),
-        new(Group, () => Strings.Group),
         new(LastUsed, () => Strings.LastUsed, IsTime: true),
         new(Modified, () => Strings.DateModified, IsTime: true),
     ];

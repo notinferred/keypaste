@@ -230,22 +230,16 @@ public sealed class SayWhatIsHappeningTests
     }
 
     [Fact]
-    public Task A_search_with_no_match_offers_Search_all_items_and_Clear_search() => HeadlessSession.On(() =>
+    public Task A_search_with_no_match_offers_Clear_search() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-empty-search-");
         var entries = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
-        entries.SelectedGroup = entries.Groups.First(group => !group.IsEverything);
         shell.Shell.Search = "nothing is called this";
         RenderedShell.Drain();
         shell.Frame();
 
         var buttons = shell.Window.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible).ToList();
-        var searchAll = buttons.Single(button => button.Name == "SearchAllItems");
         var clear = buttons.Single(button => button.Name == "ClearSearch");
-
-        searchAll.Command!.Execute(null);
-        Assert.True(entries.SelectedGroup!.IsEverything);
-        Assert.False(entries.ListEmptyOffersSearchAll);
 
         clear.Command!.Execute(null);
         Assert.Empty(shell.Shell.Search);

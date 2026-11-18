@@ -1,4 +1,3 @@
-using System.Globalization;
 using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -149,25 +148,12 @@ internal sealed class VaultSection
     /// <summary>Whether its places show under it.</summary>
     internal bool IsExpanded { get; set; } = true;
 
-    /// <summary>Whether its Groups row shows the group tree.</summary>
-    internal bool GroupsExpanded { get; set; }
-
-    /// <summary>The groups whose children show.</summary>
-    internal HashSet<string> ExpandedGroups { get; } = new(StringComparer.Ordinal);
-
-    /// <summary>The vault's group tree, flattened, as last counted.</summary>
-    internal IReadOnlyList<GroupNode> Groups { get; private set; } = [];
-
     internal int CountOf(ItemPlace place) => _counts.GetValueOrDefault(place);
-
-    /// <summary>Takes the group tree Items just read, which holds a group made, renamed, moved or deleted before the next count.</summary>
-    internal void TakeGroups(IReadOnlyList<GroupNode> groups) => Groups = groups;
 
     /// <summary>Counts each place from the vault's entries and projects, dropping each entry once counted; a locked vault counts nothing.</summary>
     internal void Count()
     {
         _counts.Clear();
-        Groups = [];
 
         if (Session.Unlocked is not { } vault)
         {
@@ -190,12 +176,10 @@ internal sealed class VaultSection
 
             _counts[ItemPlace.Environments] = ProjectCatalog.Read(vault).Projects.Count;
             _counts[ItemPlace.Favorites] = vault.ReadTags().Count(tagged => tagged.Tags.Contains(ItemPlaces.FavoriteTag, StringComparer.Ordinal));
-            Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         }
         catch (ObjectDisposedException)
         {
             _counts.Clear();
-            Groups = [];
         }
     }
 }
@@ -245,21 +229,3 @@ internal sealed record VaultRow(VaultSection Vault, bool IsExpanded, bool IsLock
     public override string ToString() => string.Join(", ", new[] { Title, IsLocked ? "locked" : string.Empty, SaveMark }.Where(part => part.Length > 0));
 }
 
-/// <summary>A vault's Groups row, folded until opened, over the KeePass group tree; choosing it lists every item of the vault.</summary>
-/// <param name="Vault">The vault.</param>
-/// <param name="IsExpanded">Whether the tree shows under it.</param>
-internal sealed record GroupsRow(VaultSection Vault, bool IsExpanded)
-{
-#pragma warning disable CA1822
-    internal string Title => Strings.Groups;
-#pragma warning restore CA1822
-
-    internal string Chevron => IsExpanded ? "chevron-down" : "chevron-right";
-
-    internal string FoldLabel => IsExpanded ? "Hide the groups" : "Show the groups";
-
-    /// <summary>The + button's name and tooltip, the menu command it runs.</summary>
-    internal static string AddLabel => Strings.NewGroupLabel;
-
-    public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{Title}, level 1");
-}

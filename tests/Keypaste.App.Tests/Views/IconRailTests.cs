@@ -112,7 +112,7 @@ public sealed class IconRailTests
         Key(shell, PhysicalKey.Home);
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
 
-        // A screen under a place keeps the place selected, and so do a group, Environments and Trash on Items.
+        // A screen under a place keeps the place selected, and so do Environments and Trash on Items.
         shell.Show<AdvancedViewModel>(DestinationKind.Advanced);
         RenderedShell.Drain();
         Assert.True(Row(shell, DestinationKind.Settings).IsSelected);
@@ -121,8 +121,7 @@ public sealed class IconRailTests
         RenderedShell.Drain();
         Assert.True(Row(shell, DestinationKind.Entries).IsSelected);
 
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.First(group => !group.IsEverything);
+        shell.Show<EntriesViewModel>(DestinationKind.Entries);
         RenderedShell.Drain();
         Assert.True(Row(shell, DestinationKind.Entries).IsSelected);
     });
@@ -131,8 +130,7 @@ public sealed class IconRailTests
     public Task A_press_on_a_place_goes_there_and_on_Items_shows_every_item() => HeadlessSession.On(() =>
     {
         using var shell = Narrow("keypaste-rail-press-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.First(group => !group.IsEverything);
+        shell.Show<EntriesViewModel>(DestinationKind.Entries);
         RenderedShell.Drain();
 
         shell.Tap(Row(shell, DestinationKind.AgentActivity));
@@ -142,7 +140,7 @@ public sealed class IconRailTests
         shell.Tap(Row(shell, DestinationKind.Entries));
         RenderedShell.Drain();
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
-        Assert.True(((EntriesViewModel)shell.Shell.Content!).SelectedGroup!.IsEverything);
+        Assert.Equal(ItemPlace.All, ((EntriesViewModel)shell.Shell.Content!).Place);
 
         shell.Tap(Row(shell, DestinationKind.Access));
         RenderedShell.Drain();
@@ -175,20 +173,6 @@ public sealed class IconRailTests
     });
 
     [Fact]
-    public Task A_press_on_the_chosen_Items_leaves_a_group_for_every_item() => HeadlessSession.On(() =>
-    {
-        using var shell = Narrow("keypaste-rail-repress-group-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.First(group => !group.IsEverything);
-        RenderedShell.Drain();
-
-        shell.Tap(Row(shell, DestinationKind.Entries));
-        RenderedShell.Drain();
-
-        Assert.True(((EntriesViewModel)shell.Shell.Content!).SelectedGroup!.IsEverything);
-    });
-
-    [Fact]
     public Task A_press_on_the_chosen_Items_leaves_a_project_for_every_item() => HeadlessSession.On(() =>
     {
         using var shell = Narrow("keypaste-rail-repress-project-");
@@ -200,7 +184,7 @@ public sealed class IconRailTests
         RenderedShell.Drain();
 
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
-        Assert.True(((EntriesViewModel)shell.Shell.Content!).SelectedGroup!.IsEverything);
+        Assert.Equal(ItemPlace.All, ((EntriesViewModel)shell.Shell.Content!).Place);
     });
 
     [Theory]

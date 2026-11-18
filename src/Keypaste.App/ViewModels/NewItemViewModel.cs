@@ -122,7 +122,6 @@ internal enum NewItemField
     Url,
     OneTimeCode,
     Notes,
-    Group,
     Tags,
     CustomField,
     ProtectedField,
@@ -188,15 +187,9 @@ internal sealed partial class NewItemCustomField : ObservableObject, IDisposable
     public void Dispose() => Secret.Dispose();
 }
 
-/// <summary>A group a new item can go in, as the folder picker lists it.</summary>
-internal sealed record FolderChoice(string Path, string Label, int Depth)
-{
-    public override string ToString() => Label;
-}
-
 /// <summary>
 /// New item: first the grid of templates, then the chosen template's form, its preset fields and any other, saved in any open
-/// vault and created in one change with no history item.
+/// vault at its top level and created in one change with no history item.
 /// </summary>
 /// <remarks>
 /// A secret it takes, a password, an API key's value or a one-time code's setup, lives in a <see cref="SecretField"/> and is
@@ -210,7 +203,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     private const string _keyNameRule = "Name the key as a project reads it: capitals, digits and _, such as OPENAI_API_KEY.";
 
-    private readonly string? _currentGroup;
     private IReadOnlyList<string> _projectTags = [];
     private ItemTemplate? _template;
     private string _presetTitle = string.Empty;
@@ -218,7 +210,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private bool _titleRefused;
     private bool _keyNameRefused;
     private SaveInChoice _saveIn;
-    private FolderChoice _folder = new(string.Empty, "Top level", 0);
     private bool _generatePassword = true;
     private readonly ClipboardCountdown _clipboard;
     private readonly HashSet<NewItemField> _added = [];
@@ -233,9 +224,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     /// <param name="places">The open vaults it can be saved in, the one in view first, where it starts.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
-    /// <param name="currentGroup">The group in view, which the folder starts at while the vault in view is chosen.</param>
     /// <param name="template">The template whose form opens, or null to choose one from the grid first.</param>
-    internal NewItemViewModel(IReadOnlyList<SaveInChoice> places, ClipboardCountdown clipboard, string? currentGroup, ItemTemplate? template = null)
+    internal NewItemViewModel(IReadOnlyList<SaveInChoice> places, ClipboardCountdown clipboard, ItemTemplate? template = null)
     {
         ArgumentNullException.ThrowIfNull(places);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -243,7 +233,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
         Places = places;
         _clipboard = clipboard;
-        _currentGroup = currentGroup;
         _saveIn = places[0];
         ReadVault();
 
@@ -277,7 +266,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>The open vaults the Save in pop-up lists, each under its account.</summary>
     internal IReadOnlyList<SaveInChoice> Places { get; }
 
-    /// <summary>Where the item is saved; choosing another vault starts the folder at its top level.</summary>
+    /// <summary>The vault the item is saved in.</summary>
     internal SaveInChoice SaveIn
     {
         get => _saveIn;
@@ -291,20 +280,12 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Reads the chosen vault's groups, project tags and usernames, which the form offers.</summary>
+    /// <summary>Reads the chosen vault's project tags and usernames, which the form offers.</summary>
     private void ReadVault()
     {
         var vault = _saveIn.Session.Unlocked;
         _projectTags = vault is null ? [] : ProjectCatalog.MemberTags(vault);
         _usernames = new UsernameSuggestions(vault);
-        Folders =
-        [
-            .. GroupNode.Flatten(vault?.ReadGroupPaths() ?? [])
-                .Select(node => new FolderChoice(node.Path, node.IsEverything ? "Top level" : node.Label, node.Depth)),
-        ];
-        var start = ReferenceEquals(_saveIn, Places[0]) ? _currentGroup : null;
-        Folder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, start, StringComparison.Ordinal)) ?? (Folders.Count > 0 ? Folders[0] : _folder);
-        OnPropertyChanged(nameof(Folders));
         OnPropertyChanged(nameof(TagSuggestions));
         OnPropertyChanged(nameof(UsedUsernames));
         OnPropertyChanged(nameof(SuggestedUsernames));
@@ -354,7 +335,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private static readonly string[] _fieldProperties =
     [
         nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsOneTimeCode), nameof(ShowsHost), nameof(ShowsKey),
-        nameof(ShowsNotes), nameof(ShowsGroup), nameof(ShowsTags), nameof(ShowsGoesIn), nameof(FillsInBrowser), nameof(HasPresetRows),
+        nameof(ShowsNotes), nameof(ShowsTags), nameof(FillsInBrowser), nameof(HasPresetRows),
         nameof(FieldOptions), nameof(HasFieldOptions),
     ];
 
@@ -365,7 +346,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         new(NewItemField.Url, "Website", "link"),
         new(NewItemField.OneTimeCode, "One-time code", "clock"),
         new(NewItemField.Notes, "Notes", "file-text"),
-        new(NewItemField.Group, "Group", "folder"),
         new(NewItemField.Tags, "Tags and project", "tag"),
         new(NewItemField.CustomField, "Custom field", "plus"),
         new(NewItemField.ProtectedField, "Protected field", "shield-check"),
@@ -386,17 +366,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     internal bool ShowsNotes => _added.Contains(NewItemField.Notes);
 
-    internal bool ShowsGroup => _added.Contains(NewItemField.Group);
-
     internal bool ShowsTags => _added.Contains(NewItemField.Tags);
 
     internal bool HasFieldOptions => FieldOptions.Count > 0;
-
-    /// <summary>Where the item goes while Group is not in the form.</summary>
-    internal string GoesIn => $"In {Folder.Label}";
-
-    /// <summary>Whether the form says where the item goes: while it goes in a group and Group is not in the form.</summary>
-    internal bool ShowsGoesIn => !ShowsGroup && Folder.Path.Length > 0;
 
     private void ApplyTemplate(TemplateChoice choice)
     {
@@ -407,7 +379,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         _hasHost = choice.Template is ItemTemplate.Database or ItemTemplate.Server;
         _hasKey = choice.Template == ItemTemplate.ApiKey;
 
-        foreach (var field in choice.Fields.Where(field => field is NewItemField.Notes or NewItemField.Group or NewItemField.Tags))
+        foreach (var field in choice.Fields.Where(field => field is NewItemField.Notes or NewItemField.Tags))
         {
             _added.Add(field);
         }
@@ -658,22 +630,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             ? "this new item"
             : null;
 
-    /// <summary>The chosen vault's groups a new item may go in, the top level first.</summary>
-    internal IReadOnlyList<FolderChoice> Folders { get; private set; } = [];
-
-    internal FolderChoice Folder
-    {
-        get => _folder;
-        set
-        {
-            if (value is not null && SetProperty(ref _folder, value))
-            {
-                OnPropertyChanged(nameof(GoesIn));
-                OnPropertyChanged(nameof(ShowsGoesIn));
-            }
-        }
-    }
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SuggestedUsernames), nameof(SuggestedUsernamesSpoken))]
     internal partial string Username { get; set; } = string.Empty;
@@ -897,7 +853,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                     new VaultEntry
                     {
                         Title = title,
-                        GroupPath = _folder.Path,
+                        GroupPath = string.Empty,
                         Username = ShowsUsername ? Username.Trim() : string.Empty,
                         Password = password,
                         Url = ShowsUrl ? Url.Trim() : string.Empty,
@@ -918,7 +874,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         }
 
         Error = null;
-        return new EntryName(_folder.Path, title);
+        return new EntryName(string.Empty, title);
     }
 
     /// <summary>Removes a draft tag before the item exists.</summary>

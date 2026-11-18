@@ -30,6 +30,7 @@ public sealed class NewItemTests : IDisposable
         using (var vault = Vault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "github", GroupPath = "Work", Password = "gh" });
+            vault.AddEntry(new VaultEntry { Title = "github", Password = "top" });
             vault.AddEntry(new VaultEntry { Title = "old", GroupPath = "Work/Archive", Password = "o" });
             vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", GroupPath = "env/billing", Password = "sk" });
             vault.Save();
@@ -52,13 +53,16 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void The_folder_is_chosen_from_the_vaults_groups_env_among_them()
+    public void A_new_item_goes_to_the_vaults_top_level_and_offers_no_group()
     {
-        var form = NewItemForm.Open(_entries);
+        var form = NewItemForm.Open(_entries, "gitlab");
 
-        Assert.Equal(["", "Work", "Work/Archive", "env", "env/billing"], form.Folders.Select(folder => folder.Path));
-        Assert.Equal("Top level", form.Folders[0].Label);
         Assert.Equal(ItemTemplate.Login, form.Template);
+        Assert.DoesNotContain(form.FieldOptions, option => option.Label == "Group");
+        _entries.ConfirmAddCommand.Press();
+
+        Assert.False(_entries.IsAdding);
+        Assert.Empty(Reopened(new EntryName(string.Empty, "gitlab")).Entry.GroupPath);
     }
 
     /// <summary>The tag box offers each environment the vault's items are tagged into, less a tag already added, and a tag that puts no item in a project offers nothing.</summary>
@@ -68,7 +72,7 @@ public sealed class NewItemTests : IDisposable
         Assert.True(_session.Unlocked!.AddTag(new EntryName("Work", "github"), "env:billing:prod"));
         Assert.True(_session.Unlocked.AddTag(new EntryName("Work", "github"), "work"));
         Assert.True(_session.Unlocked.AddTag(new EntryName("Work/Archive", "old"), "env:billing"));
-        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        var form = NewItemForm.Open(_entries, "gitlab");
 
         Assert.Equal(["env:billing", "env:billing:prod"], form.TagSuggestions);
 
@@ -82,7 +86,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_login_is_its_username_password_and_web_address()
     {
-        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        var form = NewItemForm.Open(_entries, "gitlab");
         form.Username = "me";
         form.Url = "https://gitlab.com";
         form.Notes = "the work account";
@@ -92,7 +96,7 @@ public sealed class NewItemTests : IDisposable
 
         Assert.False(_entries.IsAdding);
         Assert.Equal("gitlab", _entries.Selected?.Title);
-        var item = Reopened(new EntryName("Work", "gitlab"));
+        var item = Reopened(new EntryName(string.Empty, "gitlab"));
         Assert.Equal(("me", "https://gitlab.com", "the work account"), (item.Entry.Username, item.Entry.Url, item.Entry.Notes));
         Assert.Equal(PasswordGenerator.DefaultLength, item.Entry.Password.Length);
         Assert.Equal(["work"], item.Tags);
@@ -103,14 +107,14 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void An_API_key_is_its_env_named_key_held_as_a_protected_field()
     {
-        var form = NewItemForm.Open(_entries, "Work/OpenAI", ItemTemplate.ApiKey);
+        var form = NewItemForm.Open(_entries, "OpenAI", ItemTemplate.ApiKey);
         form.KeyName = "OPENAI_API_KEY";
         Type(form.KeyValue, "sk-proj-n4");
         form.DraftTag = "env:acme";
         form.AddTagCommand.Press();
         _entries.ConfirmAddCommand.Press();
 
-        var item = Reopened(new EntryName("Work", "OpenAI"));
+        var item = Reopened(new EntryName(string.Empty, "OpenAI"));
         Assert.Equal([new EntryField("OPENAI_API_KEY", true, false)], item.Fields);
         Assert.Equal("sk-proj-n4", item.Read("OPENAI_API_KEY"));
         Assert.Equal((string.Empty, string.Empty), (item.Entry.Username, item.Entry.Password));
@@ -123,14 +127,14 @@ public sealed class NewItemTests : IDisposable
     [InlineData("Server", "build.example.com")]
     public void A_database_or_server_is_its_host_username_and_password(string template, string host)
     {
-        var form = NewItemForm.Open(_entries, "Work/box", Enum.Parse<ItemTemplate>(template));
+        var form = NewItemForm.Open(_entries, "box", Enum.Parse<ItemTemplate>(template));
         form.Host = host;
         form.Username = "admin";
         form.GeneratePassword = false;
         Type(form.Password, "box-pw");
         _entries.ConfirmAddCommand.Press();
 
-        var item = Reopened(new EntryName("Work", "box"));
+        var item = Reopened(new EntryName(string.Empty, "box"));
         Assert.Equal([new EntryField(NewItemViewModel.HostField, false, false)], item.Fields);
         Assert.Equal(host, item.Read(NewItemViewModel.HostField));
         Assert.Equal(("admin", "box-pw", string.Empty), (item.Entry.Username, item.Entry.Password, item.Entry.Url));
@@ -172,7 +176,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_custom_and_a_protected_field_are_written_with_the_item()
     {
-        var form = NewItemForm.Open(_entries, "Work/extras");
+        var form = NewItemForm.Open(_entries, "extras");
         form.AddFieldCommand.Execute(NewItemField.CustomField);
         form.AddFieldCommand.Execute(NewItemField.ProtectedField);
         form.CustomFields[0].Name = "Region";
@@ -181,7 +185,7 @@ public sealed class NewItemTests : IDisposable
         Type(form.CustomFields[1].Secret, "1234");
         _entries.ConfirmAddCommand.Press();
 
-        var item = Reopened(new EntryName("Work", "extras"));
+        var item = Reopened(new EntryName(string.Empty, "extras"));
         Assert.Equal([new EntryField("RECOVERY_CODE", true, false), new EntryField("Region", false, false)], item.Fields);
         Assert.Equal("eu", item.Read("Region"));
         Assert.Equal("1234", item.Read("RECOVERY_CODE"));
@@ -190,14 +194,14 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_field_name_keypaste_will_not_write_refuses_the_item_and_names_the_field()
     {
-        var form = NewItemForm.Open(_entries, "Work/refused");
+        var form = NewItemForm.Open(_entries, "refused");
         form.AddFieldCommand.Execute(NewItemField.CustomField);
         form.CustomFields[0].Name = "Password";
         _entries.ConfirmAddCommand.Press();
 
         Assert.True(form.CustomFields[0].HasNameProblem);
         Assert.NotNull(_entries.NewItem);
-        Assert.Null(_session.Unlocked!.Find(new EntryName("Work", "refused")));
+        Assert.Null(_session.Unlocked!.Find(new EntryName(string.Empty, "refused")));
     }
 
     [Fact]
@@ -340,9 +344,7 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.ShowsHost),
             nameof(NewItemViewModel.ShowsKey),
             nameof(NewItemViewModel.ShowsNotes),
-            nameof(NewItemViewModel.ShowsGroup),
             nameof(NewItemViewModel.ShowsTags),
-            nameof(NewItemViewModel.ShowsGoesIn),
             nameof(NewItemViewModel.FillsInBrowser),
             nameof(NewItemViewModel.HasPresetRows),
             nameof(NewItemViewModel.FieldOptions),
@@ -393,7 +395,7 @@ public sealed class NewItemTests : IDisposable
     [InlineData("Blank", ItemKind.None)]
     public void Each_template_keeps_its_kind_and_takes_custom_fields(string template, ItemKind kind)
     {
-        var form = NewItemForm.Open(_entries, "Work/made", Enum.Parse<ItemTemplate>(template));
+        var form = NewItemForm.Open(_entries, "made", Enum.Parse<ItemTemplate>(template));
         form.KeyName = "MADE_KEY";
         Type(form.KeyValue, "k");
         form.AddFieldCommand.Execute(NewItemField.CustomField);
@@ -402,7 +404,7 @@ public sealed class NewItemTests : IDisposable
         _entries.ConfirmAddCommand.Press();
 
         Assert.False(_entries.IsAdding);
-        var item = Reopened(new EntryName("Work", "made"));
+        var item = Reopened(new EntryName(string.Empty, "made"));
         Assert.Equal(kind, item.Entry.Kind);
         Assert.Equal("eu", item.Read("Region"));
     }
@@ -412,7 +414,7 @@ public sealed class NewItemTests : IDisposable
     [InlineData("Identity", "Identity", "Passport number", FieldCategory.Identity)]
     public void A_card_or_identity_writes_the_tag_that_makes_its_protected_fields_its_agent_category(string template, string tag, string field, FieldCategory category)
     {
-        var form = NewItemForm.Open(_entries, "Work/mine", Enum.Parse<ItemTemplate>(template));
+        var form = NewItemForm.Open(_entries, "mine", Enum.Parse<ItemTemplate>(template));
 
         Assert.Equal([tag], form.Tags.Select(chip => chip.Tag));
         Assert.True(form.ShowsTags);
@@ -420,7 +422,7 @@ public sealed class NewItemTests : IDisposable
         Type(form.CustomFields.Single(custom => custom.Name == field).Secret, "4111");
         _entries.ConfirmAddCommand.Press();
 
-        var item = Reopened(new EntryName("Work", "mine"));
+        var item = Reopened(new EntryName(string.Empty, "mine"));
         Assert.Equal([tag], item.Tags);
         Assert.Equal([new EntryField(field, true, false)], item.Fields);
         Assert.Equal("4111", item.Read(field));
@@ -430,7 +432,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_presets_field_is_removable_and_one_left_empty_is_neither_written_nor_a_draft()
     {
-        var form = NewItemForm.Open(_entries, "Work/card", ItemTemplate.Card);
+        var form = NewItemForm.Open(_entries, "card", ItemTemplate.Card);
 
         Assert.Equal(["Cardholder name", "Number", "Expiration date", "Security code"], form.CustomFields.Select(custom => custom.Name));
         Assert.True(form.CustomFields.Single(custom => custom.Name == "Number").IsProtected);
@@ -440,7 +442,7 @@ public sealed class NewItemTests : IDisposable
         Assert.NotNull(form.UnsavedDraft);
         _entries.ConfirmAddCommand.Press();
 
-        Assert.Equal([new EntryField("Cardholder name", false, false)], Reopened(new EntryName("Work", "card")).Fields);
+        Assert.Equal([new EntryField("Cardholder name", false, false)], Reopened(new EntryName(string.Empty, "card")).Fields);
     }
 
     [Theory]
@@ -496,16 +498,14 @@ public sealed class NewItemTests : IDisposable
         Assert.Same(_session, form.SaveIn.Session);
 
         form.SaveIn = form.Places[1];
-        Assert.Equal(["", "Cloud"], form.Folders.Select(folder => folder.Path));
         form.Title = "gcp";
-        form.Folder = form.Folders[1];
         entries.ConfirmAddCommand.Press();
 
         Assert.False(entries.IsAdding);
         Assert.Equal(["Saved gcp in work."], toasts);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
         using var reopened = Vault.Open(otherPath, _master);
-        Assert.Equal(ItemKind.Login, reopened.Find(new EntryName("Cloud", "gcp"))?.Kind);
+        Assert.Equal(ItemKind.Login, reopened.Find(new EntryName(string.Empty, "gcp"))?.Kind);
     }
 
     [Fact]
@@ -536,7 +536,7 @@ public sealed class NewItemTests : IDisposable
     public void A_refused_item_writes_nothing_and_keeps_the_form_open(string title, string key, string says)
     {
         var before = File.ReadAllBytes(_vaultPath);
-        var form = NewItemForm.Open(_entries, "Work/" + title, title == "github" ? ItemTemplate.Login : ItemTemplate.ApiKey);
+        var form = NewItemForm.Open(_entries, "" + title, title == "github" ? ItemTemplate.Login : ItemTemplate.ApiKey);
         form.KeyName = key;
         Type(form.KeyValue, "sk-refused");
         _entries.ConfirmAddCommand.Press();
@@ -549,12 +549,12 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_login_with_a_one_time_code_keeps_it_as_its_TOTP_in_the_same_write()
     {
-        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        var form = NewItemForm.Open(_entries, "gitlab");
         Type(form.OneTimeCode, "gezd gnbv gy3t qojq gezd gnbv gy3t qojq");
         _entries.ConfirmAddCommand.Press();
 
         Assert.False(_entries.IsAdding);
-        var item = Reopened(new EntryName("Work", "gitlab"));
+        var item = Reopened(new EntryName(string.Empty, "gitlab"));
         Assert.Equal([new EntryField("otp", true, true)], item.Fields);
         Assert.Equal("otpauth://totp/gitlab?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&period=30&digits=6&issuer=gitlab", item.Read("otp"));
         Assert.Equal(0, item.Revisions);
@@ -564,7 +564,7 @@ public sealed class NewItemTests : IDisposable
     public void A_refused_one_time_code_says_why_writes_nothing_and_is_disposed_on_cancel()
     {
         var before = File.ReadAllBytes(_vaultPath);
-        var form = NewItemForm.Open(_entries, "Work/gitlab");
+        var form = NewItemForm.Open(_entries, "gitlab");
         Type(form.OneTimeCode, "otpauth://hotp/gitlab?secret=GEZDGNBVGY3TQOJQ&counter=1");
         Assert.Equal("this new item", form.UnsavedDraft);
 
@@ -583,7 +583,7 @@ public sealed class NewItemTests : IDisposable
     [Fact]
     public void A_one_time_code_is_a_field_any_kind_can_add_and_removing_it_clears_what_was_typed()
     {
-        var form = NewItemForm.Open(_entries, "Work/recovery", ItemTemplate.Note);
+        var form = NewItemForm.Open(_entries, "recovery", ItemTemplate.Note);
         Assert.False(form.ShowsOneTimeCode);
 
         form.AddFieldCommand.Execute(NewItemField.OneTimeCode);
@@ -599,7 +599,7 @@ public sealed class NewItemTests : IDisposable
         _entries.ConfirmAddCommand.Press();
 
         Assert.False(_entries.IsAdding);
-        Assert.Equal([new EntryField("otp", true, true)], Reopened(new EntryName("Work", "recovery")).Fields);
+        Assert.Equal([new EntryField("otp", true, true)], Reopened(new EntryName(string.Empty, "recovery")).Fields);
     }
 
     [Fact]

@@ -47,7 +47,7 @@ unlock_and_save_with_no_icu='
 
   export KEYPASTE_DRIVER_PASSWORD="$MASTER"
   person edit /work/vault.kdbx "$MADE_TITLE" "$EDITED_NOTES" "$EDITED_URL"
-  KEYPASTE_DRIVER_NEW_PASSWORD="$ADDED_PASSWORD" person item-new /work/vault.kdbx login "" "$ADDED_TITLE" --username "$ADDED_USER" --notes "$ADDED_NOTES"
+  KEYPASTE_DRIVER_NEW_PASSWORD="$ADDED_PASSWORD" person item-new /work/vault.kdbx login "$ADDED_TITLE" --username "$ADDED_USER" --notes "$ADDED_NOTES"
 '
 
 unlock_and_save() {
@@ -88,7 +88,7 @@ unlock_and_save() {
   step 'a vault made with ICU, its master password and an item not ASCII'
   KEYPASTE_DRIVER_NEW_PASSWORD="$MASTER" "$DRV" create "$VAULT"
   KEYPASTE_DRIVER_PASSWORD="$MASTER" KEYPASTE_DRIVER_NEW_PASSWORD="$made_password" \
-    "$DRV" item-new "$VAULT" login '' "$MADE_TITLE" --username "$made_user" --url "$made_url" --notes "$made_notes"
+    "$DRV" item-new "$VAULT" login "$MADE_TITLE" --username "$made_user" --url "$made_url" --notes "$made_notes"
 
   step 'with no ICU in the container: unlock, change an item and save, unlock again, add an item and save'
   docker run --rm -v "$driver_dir:/driver:ro" -v "$runtime:/dotnet:ro" -v "$WORK:/work" \

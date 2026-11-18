@@ -15,9 +15,8 @@ public sealed class TargetSizeTests
     [Fact]
     public Task The_sidebars_folds_and_the_button_that_shows_it_are_large_enough() => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell("keypaste-targets-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        entries.SelectedGroup = entries.Groups.First(group => !group.IsEverything);
+        using var shell = new RenderedShell("keypaste-targets-", secondVault: "acme");
+        shell.Show<EntriesViewModel>(DestinationKind.Entries);
         RenderedShell.Drain();
 
         var buttons = shell.Window.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible).ToList();

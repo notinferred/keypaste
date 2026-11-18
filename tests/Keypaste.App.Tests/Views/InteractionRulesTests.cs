@@ -105,7 +105,7 @@ public sealed partial class InteractionRulesTests
         using var shell = new RenderedShell("keypaste-hidden-pane-");
         var entries = OpenGithub(shell);
         AppCommand Command(string header) => Flat(shell.Commands.Menus.SelectMany(menu => menu.Entries)).First(command => command.Header == header);
-        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy website", "Copy the reference", "Rename or move…", "Duplicate", "Share…"];
+        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy website", "Copy the reference", "Rename…", "Duplicate", "Share…"];
 
         Assert.All(pane, header => Assert.True(Command(header).CanRun(), $"{header} is off on an open item"));
 
@@ -128,30 +128,6 @@ public sealed partial class InteractionRulesTests
             AppSubmenu submenu => Flat(submenu.Entries()),
             _ => Enumerable.Empty<AppCommand>(),
         });
-
-    [Fact]
-    public Task A_group_name_says_what_is_wrong_under_its_field_as_it_is_typed() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-group-name-");
-        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-
-        entries.BeginCreateGroupCommand.Press();
-        RenderedShell.Drain();
-        entries.ConfirmCreateGroupCommand.Press();
-        RenderedShell.Drain();
-
-        Assert.Equal("A group needs a name. Type one.", shell.Named<TextBlock>("NewGroupProblem").Text);
-        Assert.Null(entries.Error);
-
-        entries.DraftGroupName = "bad‮name";
-        Assert.Contains("Try", entries.GroupProblem, StringComparison.Ordinal);
-
-        entries.DraftGroupName = "servers";
-        Assert.False(entries.HasGroupProblem);
-
-        entries.CancelGroupCommand.Press();
-        Assert.False(entries.HasGroupProblem);
-    });
 
     [Fact]
     public Task A_new_items_refusals_sit_under_their_fields() => HeadlessSession.On(() =>

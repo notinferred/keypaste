@@ -22,13 +22,10 @@ namespace Keypaste.App.Views;
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
-    private const double _dragDistance = 6d;
-
     private readonly ListDetail _split;
     private readonly ListBox _rows;
     private EntriesViewModel? _entries;
     private EntryDetailViewModel? _detail;
-    private (EntryRow Row, PointerPressedEventArgs Press, Point At)? _dragFrom;
     private EntryRow? _opened;
 
     public EntriesView()
@@ -44,9 +41,6 @@ internal sealed partial class EntriesView : UserControl
         _rows = this.FindControl<ListBox>("Rows")!;
         _rows.ContainerPrepared += OnRowPrepared;
         _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
-        _rows.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
-        _rows.AddHandler(PointerMovedEvent, OnRowDragged, RoutingStrategies.Tunnel, handledEventsToo: true);
-        _rows.AddHandler(PointerReleasedEvent, (_, _) => _dragFrom = null, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     /// <summary>The keyboard goes with the pane it was in: from the list to the open item's Back, but not to a form that takes it itself, and from the detail back to the row it came from.</summary>
@@ -126,37 +120,8 @@ internal sealed partial class EntriesView : UserControl
         }
     }
 
-    /// <summary>A mouse or a pen on a row may become a drag; a finger scrolls.</summary>
-    private void OnRowPressed(object? sender, PointerPressedEventArgs e)
-    {
-        var over = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as EntryRow;
-
-        _dragFrom = over is not null && e.Pointer.Type != PointerType.Touch && e.GetCurrentPoint(_rows).Properties.IsLeftButtonPressed && _entries is { HoldsNoForm: true }
-            ? (over, e, e.GetPosition(_rows))
-            : null;
-    }
-
-    private void OnRowDragged(object? sender, PointerEventArgs e)
-    {
-        if (_dragFrom is not { } from || (e.GetPosition(_rows) - from.At) is var moved && Math.Abs(moved.X) + Math.Abs(moved.Y) < _dragDistance)
-        {
-            return;
-        }
-
-        _dragFrom = null;
-
-        if (_entries is { HoldsNoForm: true } && this.FindAncestorOfType<ShellView>() is { } shell)
-        {
-            _ = shell.DragItemAsync(from.Row, from.Press);
-        }
-    }
-
     /// <summary>Find asks for the search, so it comes into reach first; the shell focuses it after the next layout.</summary>
     internal void MakeSearchReachable() => _entries?.MakeSearchReachable(_split.ShowsBack);
-
-    // The list's header names a chosen group, so a sort by group would only repeat it.
-    private void ApplyGroupSort() =>
-        _entries?.Table.Show(TableStates.Group, _entries.SelectedGroup is null or { IsEverything: true });
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -175,7 +140,6 @@ internal sealed partial class EntriesView : UserControl
         }
 
         WatchDetail();
-        ApplyGroupSort();
     }
 
     private void WatchDetail()
@@ -203,11 +167,6 @@ internal sealed partial class EntriesView : UserControl
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
-        {
-            ApplyGroupSort();
-        }
-
         if (e.PropertyName == nameof(EntriesViewModel.Detail))
         {
             WatchDetail();

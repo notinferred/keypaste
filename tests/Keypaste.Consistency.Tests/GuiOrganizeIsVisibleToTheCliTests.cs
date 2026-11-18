@@ -15,164 +15,60 @@ namespace Keypaste.Consistency.Tests;
 /// V-V.5b says in as many words that "a view model asserting over a fixture list does not establish
 /// the move that produced it", and reopening with <c>Vault.Open</c> would not close that either:
 /// core is the shared path, so a round trip through it proves persistence and assumes agreement.
-/// These tests ask the CLI, which is the consumer whose answer changes when a group is renamed.
+/// These tests ask the CLI, which is the consumer whose answer changes when an entry is renamed.
 /// </para>
 /// <para>
-/// <b>The mutations that must make this file fail:</b> a rename or a move that writes a copy rather
-/// than moving the entry, so its history is left behind; an organize that defers its
-/// <c>vault.Save()</c>, so the CLI's own handle sees the vault as it was; and a group rename that
-/// changes which project <c>keypaste run</c> resolves, which would mean a group had come to name a
-/// project, where only an entry's own tags do.
+/// <b>The mutations that must make this file fail:</b> a rename that writes a copy rather than renaming
+/// the entry, so its history is left behind; a rename that defers its <c>vault.Save()</c>, so the CLI's own
+/// handle sees the vault as it was; and a rename that moves the entry out of the group the file holds it in.
 /// </para>
 /// </remarks>
 public sealed class GuiOrganizeIsVisibleToTheCliTests
 {
     /// <summary>
-    /// V-V.5b's own sequence, in its own order.
-    /// </summary>
-    /// <remarks>
-    /// Rename the group holding a project's home entry, move an entry into it, reopen, and read the
-    /// moved entry at its new path with its history intact — then ask <c>keypaste run</c> whether
-    /// the project kept its name. The history assertion goes through <c>Vault.Open</c> because no
-    /// CLI verb reads a revision; everything else is the CLI's answer.
-    /// </remarks>
-    [Fact]
-    public void A_group_renamed_and_an_entry_moved_into_it_keep_the_project_its_tags_name()
-    {
-        using var fixture = new VaultFixture(("seed", "seed-password"), ("DEPLOY_TOKEN", "first"));
-
-        // The project's home entry env/billing/.env, tagged env:billing, written by the shipped CLI so
-        // the fixture is not the app's own idea of where a variable goes.
-        Assert.Equal(
-            CliApp.ExitSuccess,
-            fixture.RunAnswering(["sk-live-7"], "env", "set", "billing", "STRIPE_KEY"));
-
-        using (var screen = Entries(fixture))
-        {
-            // A revision on the entry that is about to be moved, so "its history intact" is a claim
-            // about something the entry actually has. Fixture setup, not the behaviour under test.
-            fixture.Unlocked.UpdateEntry(new VaultEntry { Title = "DEPLOY_TOKEN", Password = "second" });
-            fixture.Unlocked.Save();
-            screen.Model.Reload();
-
-            var entries = screen.Model;
-
-            // 1. Rename the group holding the project's home entry.
-            entries.SelectedGroup = entries.Groups.Single(node => node.Path == "env/billing");
-            entries.BeginRenameGroupCommand.Execute(null);
-            entries.DraftGroupName = "invoicing";
-            entries.ConfirmRenameGroupCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-
-            // 2. Move an entry into the renamed group, through the one confirm that does both.
-            // The sidebar followed the rename, so step back to everything to reach the entry.
-            entries.SelectedGroup = entries.Groups.Single(node => node.IsEverything);
-            entries.Selected = entries.Rows.Single(row => row.Title == "DEPLOY_TOKEN");
-            entries.OrganizeCommand.Execute(null);
-            entries.MoveTarget = entries.MoveTargets.Single(node => node.Path == "env/invoicing");
-            entries.ConfirmOrganizeCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-        }
-
-        // 3. Reopen and read the moved entry at its new path, with its history.
-        using (var reopened = Vault.Open(fixture.VaultPath, VaultFixture.Master))
-        {
-            var moved = new EntryName("env/invoicing", "DEPLOY_TOKEN");
-
-            Assert.Null(reopened.Find(new EntryName(string.Empty, "DEPLOY_TOKEN")));
-            Assert.Equal("second", reopened.Find(moved)!.Password, StringComparer.Ordinal);
-            Assert.Equal(
-                new[] { "first" },
-                reopened.ReadHistory(moved)!.Select(revision => revision.Fields.Password));
-        }
-
-        // 4. The CLI reads the moved entry at its new path.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/invoicing/DEPLOY_TOKEN", "--reveal"));
-        Assert.Equal("second", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
-
-        // 5. The project is still billing, its tag's name, and holds only its tagged field.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
-
-        // The positive control: a child was started at all.
-        Assert.NotEmpty(fixture.Cli.ProcessLauncher.Started);
-        Assert.Equal("sk-live-7", fixture.Cli.ProcessLauncher.Environment["STRIPE_KEY"]);
-        Assert.False(fixture.Cli.ProcessLauncher.Environment.ContainsKey("DEPLOY_TOKEN"));
-
-        // And the group's new name names no project.
-        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("run", "invoicing", "--", "deploy"));
-    }
-
-    /// <summary>
-    /// The reader half: an entry the app moved is where <c>keypaste get</c> looks for it.
+    /// An entry the app renamed is where <c>keypaste get</c> looks for it, in the group the file held it in,
+    /// with its history.
     /// </summary>
     [Fact]
-    public void An_entry_moved_in_the_gui_is_read_by_keypaste_get_at_its_new_path()
+    public void An_entry_renamed_in_the_gui_is_read_by_keypaste_get_in_its_own_group()
     {
         using var fixture = new VaultFixture(("seed", "seed-password"), ("servers/database", "pg-secret"));
 
         using (var screen = Entries(fixture))
         {
+            fixture.Unlocked.UpdateEntry(new VaultEntry { GroupPath = "servers", Title = "database", Password = "pg-second" });
+            fixture.Unlocked.Save();
+            screen.Model.Reload();
             var entries = screen.Model;
-
-            entries.BeginCreateGroupCommand.Execute(null);
-            entries.DraftGroupName = "archive";
-            entries.ConfirmCreateGroupCommand.Execute(null);
-            Assert.Null(entries.Error);
 
             entries.Selected = entries.Rows.Single(row => row.Title == "database");
             entries.OrganizeCommand.Execute(null);
             entries.DraftTitle = "database-old";
-            entries.MoveTarget = entries.MoveTargets.Single(node => node.Path == "archive");
             entries.ConfirmOrganizeCommand.Execute(null);
 
             Assert.Null(entries.Error);
         }
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "archive/database-old", "--reveal"));
-        Assert.Equal("pg-secret", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
-
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "servers/database-old", "--reveal"));
+        Assert.Equal("pg-second", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
         Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "servers/database", "--reveal"));
+
+        using var reopened = Vault.Open(fixture.VaultPath, VaultFixture.Master);
+        Assert.Equal(
+            new[] { "pg-secret" },
+            reopened.ReadHistory(new EntryName("servers", "database-old"))!.Select(revision => revision.Fields.Password));
     }
 
     /// <summary>
-    /// A group the app created is one the CLI lists, empty though it is.
-    /// </summary>
-    /// <remarks>
-    /// An empty group appears in no entry listing, so this is the one organize act whose result
-    /// <c>keypaste ls</c> has to be asked about separately.
-    /// </remarks>
-    [Fact]
-    public void A_group_created_in_the_gui_is_listed_by_keypaste_ls()
-    {
-        using var fixture = new VaultFixture(("seed", "seed-password"));
-
-        using (var screen = Entries(fixture))
-        {
-            var entries = screen.Model;
-
-            entries.BeginCreateGroupCommand.Execute(null);
-            entries.DraftGroupName = "archive";
-            entries.ConfirmCreateGroupCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-        }
-
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("ls"));
-        Assert.Contains("archive", fixture.Cli.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// A group the app moved is where <c>keypaste get</c> reads what it holds; deleted, the CLI no longer
-    /// reaches it; and an item restored from it is read again at the path it had.
+    /// A group moved through the app's session is where <c>keypaste get</c> reads what it holds; deleted, the CLI no
+    /// longer reaches it; and an item restored from it is read again at the path it had.
     /// </summary>
     /// <remarks>
     /// Each change goes through the session's write, which every screen of the app saves through, so the
     /// CLI's own handle is the first to read what the app wrote.
     /// </remarks>
     [Fact]
-    public void A_group_moved_deleted_and_restored_in_the_app_is_followed_by_keypaste_get()
+    public void A_group_moved_deleted_and_restored_through_the_session_is_followed_by_keypaste_get()
     {
         using var fixture = new VaultFixture(("seed", "seed-password"), ("servers/database", "pg-secret"));
         Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
