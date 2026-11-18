@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The Twofish engine every vault is opened and saved through, held to the answers its authors published for 256-bit
-/// keys, and to the CBC chaining and PKCS#7 padding a Twofish KDBX file is written with (D-0292).
+/// keys, and to the CBC chaining and PKCS#7 padding a Twofish KDBX file is written with.
 /// </summary>
 /// <remarks>
 /// Each known answer is the first block of a CBC encryption under a zero IV, which is the block cipher's own output.

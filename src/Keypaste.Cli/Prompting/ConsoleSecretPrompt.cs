@@ -39,7 +39,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     /// <summary>How often a choice looks for a key, and so how soon it notices a withdrawal.</summary>
     internal static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
-    /// <summary>How long a choice is on screen before a key allows anything: a key pressed for the last prompt must not answer this one (D-0326).</summary>
+    /// <summary>How long a choice is on screen before a key allows anything: a key pressed for the last prompt must not answer this one.</summary>
     internal static readonly TimeSpan ArmingDelay = TimeSpan.FromSeconds(1);
 
     private static readonly TimeSpan _redrawInterval = TimeSpan.FromSeconds(1);

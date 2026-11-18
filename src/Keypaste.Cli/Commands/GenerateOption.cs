@@ -18,7 +18,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// <b>This file used to say there could be no <c>keypaste generate</c> verb at all, and V.6
-/// overturned that for exactly one case (DECISIONS.md D-0237).</b> A passphrase for a share
+/// overturned that for exactly one case.</b> A passphrase for a share
 /// (5.4a) exists to leave by a second channel, and no vault holds it, so there is no store for it
 /// to go into and <c>get --reveal</c>'s discipline has nothing to protect. That verb generates
 /// passphrases only; a character password on stdout still has no argument, because

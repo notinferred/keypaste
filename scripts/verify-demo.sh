@@ -17,8 +17,8 @@
 # It stands in for Claude with the same scripted JSON-RPC client verify-approval-e2e.sh uses. That
 # is a transport, not an agent: it decides nothing and chooses no wording, it sends exactly the
 # calls the page says Claude sends, so that everything keypaste renders is fully determined. What
-# is proved here is keypaste's half. Claude's half is proved by a person running the demo, and
-# DECISIONS.md D-0034 records why it is deliberately not automated.
+# is proved here is keypaste's half. Claude's half is proved by a person running the demo,
+# deliberately not automated.
 #
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its

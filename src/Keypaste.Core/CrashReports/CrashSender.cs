@@ -7,8 +7,7 @@ using Polly;
 namespace Keypaste.Core.CrashReports;
 
 /// <summary>
-/// Posts the outbox's crash reports to keypaste.com's <c>/api/crash</c>, or to a loopback test server, one report a request
-/// (D-0560).
+/// Posts the outbox's crash reports to keypaste.com's <c>/api/crash</c>, or to a loopback test server, one report a request.
 /// </summary>
 /// <remarks>
 /// Nothing in Core starts one: the app does, once the person has chosen to send reports. It sends a report's bytes as the

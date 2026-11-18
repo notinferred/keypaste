@@ -7,7 +7,7 @@
 # So by default this one asks the origin instead of the working tree.
 #
 # NOTHING RUNS THIS AGAINST THE ORIGIN BUT A PERSON. keypaste.com deploys from Cloudflare's Git
-# integration (D-0127), so no workflow here publishes the page or is positioned to check what was
+# integration, so no workflow here publishes the page or is positioned to check what was
 # published - and a workflow that asked the origin would go red for a Cloudflare outage no job in
 # this repository can fix, on main or across a release. Run it by hand after a deploy, and whenever
 # you want to know what the public is actually being told.
@@ -18,9 +18,8 @@
 # The gap this covers is real and stays open between runs. f69c393 disclosed the 0.2.0
 # concurrent-save revert and keypaste.com served a page without it for a day while every gate in
 # the repository was green, because verify-release-matrix.sh judges the checked-out ref and says so.
-# D-0121 answered that with a deploy workflow which never deployed - the credential was never added,
-# all four of its runs failed at the deploy step - and D-0127 answers it with a deploy path that
-# runs, plus this check by hand.
+# A deploy workflow that never deployed came first; a deploy path that runs, plus this check by
+# hand, replaced it.
 #
 # ONE verdict per run, emitted once. Give a deploy time to propagate before asking: an ::error::
 # here is the verdict, and a retry loop around it would turn propagation into a recorded failure.

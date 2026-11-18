@@ -6,7 +6,7 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// A built keypaste verb that saves while the app or keypaste approve holds the vault (N.10, N.11): access and import are refused naming
-/// the holder before any password, and every verb that edits items sends its edit to the holder, which asks and saves it (D-0464).
+/// the holder before any password, and every verb that edits items sends its edit to the holder, which asks and saves it.
 /// </summary>
 /// <remarks>
 /// The CLI's <c>HeldVaultRefusalTests</c> is the fast regression, against a claim the test process itself holds; this is the evidence

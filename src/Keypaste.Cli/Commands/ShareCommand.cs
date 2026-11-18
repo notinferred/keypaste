@@ -15,7 +15,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>
 /// <c>keypaste share</c>: an entry's field as an end-to-end encrypted, expiring, view-limited link,
-/// the list of links made, and their revocation (D-0354).
+/// the list of links made, and their revocation.
 /// </summary>
 /// <remarks>
 /// The link carries the key, so it is a secret: it goes to the clipboard with <c>get</c>'s clear, or

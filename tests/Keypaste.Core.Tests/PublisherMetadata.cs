@@ -22,7 +22,7 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 internal static class PublisherMetadata
 {
-    /// <summary>The project's own identity, recorded in DECISIONS.md D-0097.</summary>
+    /// <summary>The project's own identity.</summary>
     internal const string Project = "keypaste";
 
     /// <summary>The project's copyright line.</summary>

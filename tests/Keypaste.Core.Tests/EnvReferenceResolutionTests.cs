@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>A reference file resolves whole or not at all, each value under the file's name for it, and a refusal holds no value (D-0349).</summary>
+/// <summary>A reference file resolves whole or not at all, each value under the file's name for it, and a refusal holds no value.</summary>
 public sealed class EnvReferenceResolutionTests : IDisposable
 {
     private const string _devDb = "postgres://dev-sentinel@db/app";

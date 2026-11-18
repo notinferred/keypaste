@@ -310,7 +310,7 @@ public sealed class VaultFieldTests : IDisposable
         Assert.Empty(vault.ReadHistory(_stripe)!);
     }
 
-    /// <summary>What a rename would leave naming nothing is said before it is written, and never with a value (D-0415's pattern).</summary>
+    /// <summary>What a rename would leave naming nothing is said before it is written, and never with a value.</summary>
     [Fact]
     public void A_rename_preview_names_the_references_and_placeholders_that_name_the_field()
     {

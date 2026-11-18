@@ -347,7 +347,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         Assert.Equal("env/acme-api/staging", lines[0].GetProperty("args").GetProperty("entry").GetString());
     }
 
-    /// <summary>A set past one ordinary frame is released whole under a token, in the reply only a runner reads (D-0454).</summary>
+    /// <summary>A set past one ordinary frame is released whole under a token, in the reply only a runner reads.</summary>
     [Fact]
     public async Task ASetOf200KiB_IsReleasedWholeOverTheOwnersPipe()
     {
@@ -392,7 +392,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
 
     /// <summary>
     /// A set naming more items than one audit line can record is refused with that reason before anybody is asked, a
-    /// protected one included, and the refusal is recorded naming no item, as a <c>keypaste run --session</c> one is (D-0454).
+    /// protected one included, and the refusal is recorded naming no item, as a <c>keypaste run --session</c> one is.
     /// </summary>
     [Fact]
     public async Task ASetNamingMoreItemsThanOneLineCanRecord_IsRefusedUnasked_AndRecorded()

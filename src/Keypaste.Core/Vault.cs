@@ -29,10 +29,10 @@ public sealed class Vault : IDisposable
     private VaultBackup? _lastKept;
     private Func<Vault, bool>? _beforeEachSave;
 
-    /// <summary>The key this unlock's base digests content with, zeroed on disposal (D-0599).</summary>
+    /// <summary>The key this unlock's base digests content with, zeroed on disposal.</summary>
     private readonly byte[] _baseKey = RandomNumberGenerator.GetBytes(32);
 
-    /// <summary>What this vault keeps of the file as it last read or wrote it, for a merge's lineage (D-0538, D-0599).</summary>
+    /// <summary>What this vault keeps of the file as it last read or wrote it, for a merge's lineage.</summary>
     private KeePassInterop.MergeBase _base;
 
     private Vault(KeePassInterop interop, string path, byte[]? stamp)
@@ -72,7 +72,7 @@ public sealed class Vault : IDisposable
     /// <summary>Raised after a change to this open vault, naming the entries it touched.</summary>
     /// <remarks>
     /// Raised on the thread that made the change, before the method making it returns and so before
-    /// any save of it, so whatever was released from those entries is withdrawn first (D-0318).
+    /// any save of it, so whatever was released from those entries is withdrawn first.
     /// </remarks>
     public event EventHandler<VaultEdit>? Edited;
 
@@ -118,7 +118,7 @@ public sealed class Vault : IDisposable
     /// <summary>Whether this vault holds what its file holds. Called under <see cref="_state"/>.</summary>
     /// <remarks>
     /// The file is compared while a change is pending too, so another program's save is reported over
-    /// a change of this vault's that no save has written, or one was refused for (D-0412). Only while
+    /// a change of this vault's that no save has written, or one was refused for. Only while
     /// this vault is writing is a different file its own save in progress.
     /// </remarks>
     private SavedRead Compare()
@@ -147,7 +147,7 @@ public sealed class Vault : IDisposable
     /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
     /// <exception cref="VaultException">The file could not be read or opened, or this vault's access was changed.</exception>
     /// <remarks>
-    /// For a person reloading after another program saved, as KeePassXC reloads (D-0412). The key is
+    /// For a person reloading after another program saved, as KeePassXC reloads. The key is
     /// the one this vault already holds, so no password is asked again; a hardware key is, because
     /// its answer depends on the file. The digest is taken before the file is read, so a write landing
     /// between the two leaves the new vault changed on disk rather than stamped over what it missed.
@@ -167,7 +167,7 @@ public sealed class Vault : IDisposable
         return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
     }
 
-    /// <summary>Merges this open copy into <paramref name="file"/>, a fresh open of the file another program saved, as D-0537 to D-0541 say, leaving this copy as it was.</summary>
+    /// <summary>Merges this open copy into <paramref name="file"/>, a fresh open of the file another program saved, leaving this copy as it was.</summary>
     /// <param name="file">
     /// The file's copy, opened with this vault's key, which becomes the merged copy: unsaved when the merge took anything from this one,
     /// and saved under the stale-write check against the file it was opened from.
@@ -175,7 +175,7 @@ public sealed class Vault : IDisposable
     /// <param name="report">What the merge did, by name and never by value, when it merged.</param>
     /// <returns>Whether it merged, or why not; a refusal changes neither copy.</returns>
     /// <exception cref="ArgumentException"><paramref name="file"/> is this vault.</exception>
-    /// <remarks>Lineage comes from the base this vault took of its file when it opened it and at each save since (D-0538).</remarks>
+    /// <remarks>Lineage comes from the base this vault took of its file when it opened it and at each save since.</remarks>
     internal VaultMergeOutcome MergeInto(Vault file, out VaultMergeReport? report)
     {
         ArgumentNullException.ThrowIfNull(file);
@@ -286,7 +286,7 @@ public sealed class Vault : IDisposable
     /// <summary>How many times one detection of another program's save starts its merge again for a save that landed before the merged copy's.</summary>
     internal const int MergeAttempts = 3;
 
-    /// <summary>Merges another program's save of this vault's file with this open copy and saves the result, as D-0543 says, leaving this copy as it was.</summary>
+    /// <summary>Merges another program's save of this vault's file with this open copy and saves the result, leaving this copy as it was.</summary>
     /// <returns>
     /// The merged copy and what the merge did, saved over the file unless it took nothing from this copy; or why there is none,
     /// the file and this copy then as they were.
@@ -297,7 +297,7 @@ public sealed class Vault : IDisposable
     /// The caller holds its edit gate across this call, so no edit of this copy is left out of the merge, and puts the merged copy
     /// in this one's place in the same session. The file's bytes are read once per attempt, digested and parsed with this unlock's
     /// key, a hardware key asked again since its answer depends on the file, so the copy merged is the one the save's stale-write
-    /// check holds the file to (D-0119).
+    /// check holds the file to.
     /// </para>
     /// <para>
     /// The merged copy's save keeps the file it replaces whatever the backup floor says. A save landing before it discards the
@@ -342,7 +342,7 @@ public sealed class Vault : IDisposable
                 return new VaultMergeSave(VaultMergeSaveOutcome.Unchanged, "The vault file holds what keypaste last read or wrote.");
             }
 
-            // From the bytes, since a parsed copy keeps no format version (D-0541).
+            // From the bytes, since a parsed copy keeps no format version.
             if (KdbxHeader.Of(bytes) is not { } header)
             {
                 return new VaultMergeSave(VaultMergeSaveOutcome.Unreadable, $"'{Path}' is not a KeePass database.");
@@ -516,7 +516,7 @@ public sealed class Vault : IDisposable
     /// <para>
     /// It is also for fixtures. A test that needs a keyfile-protected vault must build it
     /// through the writer under test rather than beside it, for the reason
-    /// <c>make-compat-fixture.sh</c> drives the shipped binary (D-0012). The compatibility gate has
+    /// <c>make-compat-fixture.sh</c> drives the shipped binary. The compatibility gate has
     /// the stronger version of the same fixture: there, KeePassXC makes them.
     /// </para>
     /// </remarks>
@@ -580,7 +580,7 @@ public sealed class Vault : IDisposable
         return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
     }
 
-    /// <summary>Opens an existing vault with the parts of the key another open of it exported, as the desktop's quick unlock does (D-0550).</summary>
+    /// <summary>Opens an existing vault with the parts of the key another open of it exported, as the desktop's quick unlock does.</summary>
     /// <param name="path">The vault file.</param>
     /// <param name="parts">The parts, which stay the caller's; no keyfile is read.</param>
     /// <param name="hardwareKey">
@@ -695,7 +695,7 @@ public sealed class Vault : IDisposable
 
     /// <summary>
     /// Creates an entry in an existing group with its custom fields and tags, in one change and with
-    /// no history item (D-0379). Call <see cref="Save"/> to persist it.
+    /// no history item. Call <see cref="Save"/> to persist it.
     /// </summary>
     /// <param name="entry">The entry's standard fields and the group it goes in, which must exist.</param>
     /// <param name="fields">Its custom fields, each named once and holding a value; a field is protected unless its write says otherwise.</param>
@@ -742,7 +742,7 @@ public sealed class Vault : IDisposable
     /// <summary>
     /// Creates a project environment's home entry, <c>env/&lt;project&gt;/.env</c> or
     /// <c>.env.&lt;environment&gt;</c>, tagged into the environment and holding its first fields, in one
-    /// change with no history item and creating its group when missing (D-0413). Call
+    /// change with no history item and creating its group when missing. Call
     /// <see cref="Save"/> to persist it.
     /// </summary>
     /// <param name="name">The home entry (<see cref="EnvStore.HomeEntry"/>).</param>
@@ -808,7 +808,7 @@ public sealed class Vault : IDisposable
     /// The name identifies the entry, so this cannot rename one, and the entry is edited in place
     /// rather than replaced — its UUID, timestamps, attachments and any custom KeePassXC fields
     /// survive. The previous values are kept as a KeePass history item, so overwriting a secret does
-    /// not erase the old one (DECISIONS.md D-0014); only <see cref="RemoveEntry(EntryName)"/> does.
+    /// not erase the old one; only <see cref="RemoveEntry(EntryName)"/> does.
     /// </remarks>
     /// <returns><see langword="true"/> if an entry was updated.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -867,7 +867,7 @@ public sealed class Vault : IDisposable
         return _interop.ReadCustomField(name, field);
     }
 
-    /// <summary>The item's TOTP, read in KeePassXC's order from its <c>TOTP Settings</c> and <c>TOTP Seed</c>, its <c>otp</c> field or KeePass 2's <c>TimeOtp-*</c> fields (D-0477).</summary>
+    /// <summary>The item's TOTP, read in KeePassXC's order from its <c>TOTP Settings</c> and <c>TOTP Seed</c>, its <c>otp</c> field or KeePass 2's <c>TimeOtp-*</c> fields.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="refusal">Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</param>
     /// <returns>
@@ -890,7 +890,7 @@ public sealed class Vault : IDisposable
     /// <summary>
     /// What an Auto-Type of one item into a window with this title would type, resolved whole from the vault as it is
     /// now: the sequence KeePass's and KeePassXC's settings choose for the title, every field it names filled in as
-    /// D-0465 fills a value, or why it types nothing (D-0604 to D-0607).
+    /// placeholders fill a value, or why it types nothing.
     /// </summary>
     /// <param name="name">The item.</param>
     /// <param name="windowTitle">The title of the window it would type into, as the platform reports it.</param>
@@ -899,7 +899,7 @@ public sealed class Vault : IDisposable
     /// The plan, which the caller disposes when typing ends; null when no item answers to that name or the item is
     /// in one of keypaste's own groups, which Auto-Type never offers. A recycled item answers to no name.
     /// </returns>
-    /// <remarks>Nothing is typed here; only the person, in the unlocked app, types a plan (D-0547).</remarks>
+    /// <remarks>Nothing is typed here; only the person, in the unlocked app, types a plan.</remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public AutoTypePlan? PlanAutoType(EntryName name, string windowTitle, TimeProvider clock)
     {
@@ -1000,7 +1000,7 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.SetKind(name, kind) > 0, changed => changed ? VaultEdit.Of(name) : null);
     }
 
-    /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>
+    /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not.</summary>
     /// <param name="name">The item the value belongs to.</param>
     /// <param name="value">The value as the vault holds it.</param>
     /// <returns>
@@ -1053,7 +1053,7 @@ public sealed class Vault : IDisposable
     /// <returns><see langword="true"/> if the entry was found and written.</returns>
     /// <remarks>
     /// The whole set makes one history revision, as KeePassXC's own edit does, and the edit names the
-    /// entry (D-0318). A new field is protected unless its write says otherwise; an existing one keeps
+    /// entry. A new field is protected unless its write says otherwise; an existing one keeps
     /// its flag unless its write names one. Standard fields and the entry's other data are untouched.
     /// </remarks>
     /// <exception cref="VaultException">
@@ -1137,7 +1137,7 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// The value and its protection go with it, and the old name stays in the revision. Both names are
     /// refused as <see cref="FieldNameRules.IsWritable"/> refuses them, and so is a name a TOTP is read
-    /// from (D-0477), since either rename would make or unmake the item's TOTP.
+    /// from, since either rename would make or unmake the item's TOTP.
     /// </remarks>
     /// <exception cref="VaultException">
     /// A name is refused, the two are the same, another field of the entry has the new name in any case,
@@ -1193,11 +1193,11 @@ public sealed class Vault : IDisposable
     /// <param name="name">The entry.</param>
     /// <param name="attachment">The new attachment's name, which <see cref="VaultNameRules.IsValidAttachmentName"/> must accept.</param>
     /// <param name="content">What it holds, read from its position to its end, at most <see cref="EntryAttachment.MaximumSize"/> bytes.</param>
-    /// <param name="keptInHistory">Whether the item's history keeps the item as it was, false when the vault's history limits drop that revision (D-0533).</param>
+    /// <param name="keptInHistory">Whether the item's history keeps the item as it was, false when the vault's history limits drop that revision.</param>
     /// <returns><see langword="true"/> if the entry was found and the attachment added.</returns>
     /// <remarks>
     /// The content is read into one buffer that is zeroed once KeePassLib holds its own copy, encrypted in memory, and reaches
-    /// disk only inside the vault (D-0533). The edit names the entry (D-0318); its other attachments are kept as they are.
+    /// disk only inside the vault. The edit names the entry; its other attachments are kept as they are.
     /// </remarks>
     /// <exception cref="VaultException">
     /// The name is refused, the item already has an attachment by that name, the content is larger than the cap, or more
@@ -1266,14 +1266,14 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary>Writes one attachment's bytes once to a new file where the person chose, readable by its owner alone outside Windows (D-0534).</summary>
+    /// <summary>Writes one attachment's bytes once to a new file where the person chose, readable by its owner alone outside Windows.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="attachment">The attachment's name, matched exactly.</param>
     /// <param name="destination">Where it goes. Its directory must exist, and nothing may be at the path.</param>
     /// <param name="failure">What the filesystem said, when the outcome is <see cref="AttachmentSaveOutcome.Failed"/>; empty otherwise.</param>
     /// <returns>What happened.</returns>
     /// <remarks>
-    /// PRODUCT §3.4's exception for an attachment the person asks keypaste to save (D-0532), written as
+    /// PRODUCT §3.4's exception for an attachment the person asks keypaste to save, written as
     /// <see cref="VaultKeyfile.Create"/> writes a key file: staged beside the path and moved into place without replacing
     /// anything, so a file that arrives meanwhile is kept and the stage is deleted. The bytes are this vault's as it holds
     /// them, saved or not, and the copy they are read into is zeroed.
@@ -1345,7 +1345,7 @@ public sealed class Vault : IDisposable
 
     /// <summary>
     /// For each variable of the item, or of one of its revisions, whose value holds a KeePass placeholder, what fills in
-    /// from the item when it leaves or the first placeholder that refuses it, by keyword and never by value (D-0465).
+    /// from the item when it leaves or the first placeholder that refuses it, by keyword and never by value.
     /// </summary>
     /// <param name="name">The entry.</param>
     /// <param name="revision">A position in <see cref="ReadHistory"/>'s order to judge that revision's variables, or null for the item's own.</param>
@@ -1365,7 +1365,7 @@ public sealed class Vault : IDisposable
     /// <returns>What was moved, or why nothing was.</returns>
     /// <remarks>
     /// <para>
-    /// Each entry changes as one edit with one history revision (D-0373): every value becomes a
+    /// Each entry changes as one edit with one history revision: every value becomes a
     /// protected field named by its key, and exactly its line leaves the notes. A field that already
     /// holds the same value keeps its flag and is not written, and its line still leaves. The
     /// previous notes stay in the entry's history.
@@ -1501,12 +1501,12 @@ public sealed class Vault : IDisposable
     /// <summary>Makes the revision at <paramref name="index"/> in <see cref="ReadHistory"/>'s order
     /// the entry's current values. Call <see cref="Save"/> to persist it.</summary>
     /// <remarks>
-    /// The value it replaces becomes a history item rather than being lost (DECISIONS.md D-0014),
+    /// The value it replaces becomes a history item rather than being lost,
     /// and the entry keeps its UUID, so a restore is an edit like any other: one more revision, not
-    /// a new entry. The entry's modification time becomes the moment of the restore (D-0227).
+    /// a new entry. The entry's modification time becomes the moment of the restore.
     /// <paramref name="index"/> is only meaningful against a reading of this same vault taken since
     /// its last change. The entry becomes the revision whole, its tags included, so a front end asks
-    /// first what <see cref="ProjectTagChange.Restoring"/> says whenever the revision's project tags differ (D-0510).
+    /// first what <see cref="ProjectTagChange.Restoring"/> says whenever the revision's project tags differ.
     /// </remarks>
     /// <returns>
     /// <see langword="true"/> if an entry was restored. Restoring nothing is not an error here; the
@@ -1556,7 +1556,7 @@ public sealed class Vault : IDisposable
     /// <returns>Whether the vault matches its file, and if not, why.</returns>
     /// <remarks>
     /// <para>
-    /// What another process is served from (D-0317). A change made here and not yet saved, a write in
+    /// What another process is served from. A change made here and not yet saved, a write in
     /// progress, and a file somebody else has written since this vault last read or wrote it are each
     /// refused rather than answered from memory. The check and the read happen under the lock every
     /// change takes, so neither can see a change half made.
@@ -1619,7 +1619,7 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>The name of each entry <see cref="ReadEntries"/> returns whose UUID the vault also holds a tombstone for, as this vault holds it now, saved or not.</summary>
-    /// <remarks>KeePassXC's default merge applies no deletion, so a file it merged can hold an object beside its own tombstone (D-0544).</remarks>
+    /// <remarks>KeePassXC's default merge applies no deletion, so a file it merged can hold an object beside its own tombstone.</remarks>
     internal IReadOnlySet<EntryName> ReadTombstoned()
     {
         lock (_state)
@@ -2082,7 +2082,7 @@ public sealed class Vault : IDisposable
     /// </para>
     /// <para>
     /// A recycled entry is not found: the bin is skipped by the same traversal that skips it for
-    /// <see cref="ReadEntries"/> (D-0248).
+    /// <see cref="ReadEntries"/>.
     /// </para>
     /// </remarks>
     /// <param name="includeReserved">Whether entries in <see cref="ReservedGroups"/> are found too.</param>
@@ -2195,7 +2195,7 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary>The root group's UUID, its 16 bytes as the file stores them, in lowercase hex, which a browser's database hash is made from (D-0636).</summary>
+    /// <summary>The root group's UUID, its 16 bytes as the file stores them, in lowercase hex, which a browser's database hash is made from.</summary>
     internal string RootGroupHex
     {
         get
@@ -2364,7 +2364,7 @@ public sealed class Vault : IDisposable
     /// the same thing: the first can succeed and the second be refused, leaving the open vault
     /// holding a change the caller was told did not happen, which the next unrelated
     /// <see cref="Save"/> then writes out. Every check here happens before the one mutation, so a
-    /// refusal leaves the vault exactly as it found it, in memory as well as on disk (D-0272).
+    /// refusal leaves the vault exactly as it found it, in memory as well as on disk.
     /// </para>
     /// <para>
     /// The entry is mutated in place, so its UUID, its timestamps, its attachments, its custom
@@ -2421,10 +2421,10 @@ public sealed class Vault : IDisposable
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <remarks>
-    /// The copy is titled <c>&lt;title&gt; (copy)</c>, or <c>(copy 2)</c> and onwards when that is taken
-    /// (D-0091). It keeps every field, attachment and setting, with a new identity, no history and its times
+    /// The copy is titled <c>&lt;title&gt; (copy)</c>, or <c>(copy 2)</c> and onwards when that is taken.
+    /// It keeps every field, attachment and setting, with a new identity, no history and its times
     /// set to now, and it leaves out the entry's project tags, because a project refuses two entries giving
-    /// one variable (D-0337); <paramref name="droppedTags"/> names them so the caller can say so.
+    /// one variable; <paramref name="droppedTags"/> names them so the caller can say so.
     /// </remarks>
     public OrganizeOutcome CloneEntry(EntryName name, out EntryName? copy, out IReadOnlyList<string> droppedTags)
     {
@@ -2541,7 +2541,7 @@ public sealed class Vault : IDisposable
     /// </para>
     /// <para>
     /// The group is mutated in place and keeps its UUID, and nothing records where it came from, so an
-    /// organized vault stays KDBX 4.0 (D-0271).
+    /// organized vault stays KDBX 4.0.
     /// </para>
     /// </remarks>
     public GroupOutcome MoveGroup(string groupPath, string destinationParentPath, out string movedPath)
@@ -2578,7 +2578,7 @@ public sealed class Vault : IDisposable
     /// Where the vault has a recycle bin the whole group goes into it, as KeePassXC deletes one: every entry
     /// keeps its identity, fields and history, <see cref="ReadRecycled"/> lists each, and
     /// <see cref="RestoreRecycled"/> puts one back at the path it had, making again any group on the way the
-    /// vault no longer has. Like recycling an entry, this writes the file as KDBX 4.1 (D-0247).
+    /// vault no longer has. Like recycling an entry, this writes the file as KDBX 4.1.
     /// </para>
     /// <para>
     /// Without a recycle bin only an empty group is deleted, for good; one holding an item or a group is
@@ -2698,11 +2698,11 @@ public sealed class Vault : IDisposable
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
         Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));
 
-    /// <summary>Sets an entry's Auto-Type settings. A test seam; keypaste writes none (D-0605), and KeePass and KeePassXC are what write them.</summary>
+    /// <summary>Sets an entry's Auto-Type settings. A test seam; keypaste writes none, and KeePass and KeePassXC are what write them.</summary>
     internal void SetAutoTypeUnchecked(EntryName name, bool enabled, bool obfuscated, string sequence, IReadOnlyList<(string Window, string Sequence)> associations) =>
         Change(() => _interop.SetAutoTypeUnchecked(name, enabled, obfuscated, sequence, associations), VaultEdit.Of(name));
 
-    /// <summary>Sets a group's Auto-Type settings. A test seam; keypaste writes none (D-0605), and KeePass and KeePassXC are what write them.</summary>
+    /// <summary>Sets a group's Auto-Type settings. A test seam; keypaste writes none, and KeePass and KeePassXC are what write them.</summary>
     internal void SetGroupAutoTypeUnchecked(string groupPath, bool? enabled, string sequence) =>
         Change(() => _interop.SetGroupAutoTypeUnchecked(groupPath, enabled, sequence));
 
@@ -2713,8 +2713,8 @@ public sealed class Vault : IDisposable
     /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
     /// <remarks>
     /// Two sibling groups of one name is a shape KDBX permits, KeePassXC makes and keypaste refuses
-    /// to create, and keypaste still has to have an answer for a vault that holds one. Internal for
-    /// the reason D-0255 gives about <see cref="SetRecyclesDeletedEntries"/>.
+    /// to create, and keypaste still has to have an answer for a vault that holds one. Internal so a test can
+    /// build one, as with <see cref="SetRecyclesDeletedEntries"/>.
     /// </remarks>
     internal void AddGroupUnchecked(string parentGroupPath, string name) =>
         Change(() => _interop.AddGroupUnchecked(parentGroupPath, name));
@@ -2776,14 +2776,14 @@ public sealed class Vault : IDisposable
     /// A detector, not a lock: a write landing between this call and the one that follows it is still
     /// lost, and closing that window needs a file lock KDBX does not define.
     /// <see langword="false"/> for a vault from <see cref="Create"/> that has never been saved and for
-    /// a file that could not be read at all — see <see cref="SourceSnapshot.Digest"/>, and D-0017 for
+    /// a file that could not be read at all — see <see cref="SourceSnapshot.Digest"/>, and KeePassInterop.Save for
     /// the transient-failure absorption that depends on it.
     /// On Windows a file another process holds open for writing cannot be read, so a save racing a
     /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case —
     /// it used to be what lost it.</b> The replace fails, and a retry that merely outlasted the
     /// other writer would then revert it; what makes the race survivable is that
-    /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait
-    /// (D-0119), leaving only a writer whose hold outlasts a wait and commits inside the attempt
+    /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait,
+    /// leaving only a writer whose hold outlasts a wait and commits inside the attempt
     /// that follows.
     /// </remarks>
     public bool HasFileChangedSinceOpen()
@@ -2811,7 +2811,7 @@ public sealed class Vault : IDisposable
 
         // The check is handed to the retry loop, not just made before it. The name a save contends
         // for is most often held by another process saving this same vault, so a retry that waits
-        // that out and then writes reverts it — see KeePassInterop.Save and D-0119.
+        // that out and then writes reverts it — see KeePassInterop.Save.
         Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: !_backedUp);
     }
 
@@ -2865,12 +2865,12 @@ public sealed class Vault : IDisposable
     /// <para>
     /// <b>A password is never taken away.</b> A vault that has one keeps one, and a vault a keyfile
     /// alone protects may change its keyfile but loses it only for a password. Only a keyfile that
-    /// already exists is attached, and never one keyed by its hash (D-0287, D-0288). A hardware key
+    /// already exists is attached, and never one keyed by its hash. A hardware key
     /// is attached only while a key with that slot is connected, and is asked once, by the save.
     /// </para>
     /// <para>
     /// The save always keeps the file it replaces, like <see cref="SaveOverwriting"/>, but refuses a
-    /// changed file like <see cref="Save"/> (D-0289). Once the vault has been replaced this object is
+    /// changed file like <see cref="Save"/>. Once the vault has been replaced this object is
     /// sealed: every later write throws, and the vault is opened again with the new credentials.
     /// </para>
     /// </remarks>
@@ -2925,7 +2925,7 @@ public sealed class Vault : IDisposable
             _ => _interop.HardwareKey,
         };
 
-        // Nothing released under the old factors is reused under the new ones (D-0318), and nothing
+        // Nothing released under the old factors is reused under the new ones, and nothing
         // is read from this vault while its file is being replaced.
         bool wasPending;
         lock (_state)
@@ -3047,7 +3047,7 @@ public sealed class Vault : IDisposable
     /// <summary>Why <paramref name="keyfilePath"/> may not become a factor of the vault at <paramref name="vaultPath"/>, or null when it may.</summary>
     /// <remarks>
     /// One rule for attaching a keyfile to an existing vault and for creating one with it: only a file
-    /// that exists, is not the vault or one of its copies, and is not keyed by its hash (D-0287).
+    /// that exists, is not the vault or one of its copies, and is not keyed by its hash.
     /// </remarks>
     internal static VaultAccessResult? RefuseAttaching(string vaultPath, string? keyfilePath)
     {
@@ -3170,7 +3170,7 @@ public sealed class Vault : IDisposable
     /// <summary>
     /// The whole of what a typed path means, in one place. Reading and removing ask this same question
     /// so they cannot reach different answers about the same file — three resolvers that disagreed is
-    /// the defect D-0091 found, and a fourth would be the same mistake again.
+    /// the duplicate-name defect, and a fourth would be the same mistake again.
     /// </summary>
     private VaultEntry? ResolveByPath(string entryPath)
     {

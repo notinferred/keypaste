@@ -12,7 +12,7 @@ namespace Keypaste.Core.Clients;
 /// A tool's command is found only in <c>PATH</c>'s absolute entries and, for the macOS app, the tool's documented install
 /// folders after them: never in the working directory or keypaste's own, which <c>Process.Start</c> and
 /// <c>CreateProcess</c> would try first for a bare name. That is <see cref="RunProgram"/>'s rule for T-35, and a tool
-/// not found there is not installed and never started (D-0436).
+/// not found there is not installed and never started.
 /// </para>
 /// <para>
 /// On Windows an npm launcher is started as the program it names, so no argument passes through <c>cmd.exe</c>. Any

@@ -41,7 +41,7 @@ on:
         type: boolean
         default: false
       only_tools:
-        description: Run only the tools jobs, for a step whose push already ran the rest; never counts toward a release (D-0468)
+        description: Run only the tools jobs, for a step whose push already ran the rest; never counts toward a release
         type: boolean
         default: false
   # Weekly, so a runner image or upstream change shows without a commit.
@@ -52,7 +52,7 @@ permissions:
   contents: read
 
 # On main and tags each commit and event has its own group, so a dispatch never waits behind its commit's push run and no
-# pending run is replaced by a later one (D-0468).
+# pending run is replaced by a later one.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && format('-{0}-{1}', github.sha, github.event_name) || '' }}
   # Release tags require a completed verdict for each commit on main; a branch's newer run supersedes its last.
@@ -66,7 +66,7 @@ env:
 
 jobs:
   # Every run but a push runs every job on every runner but tools, which runs on the schedule and on a dispatch that asks
-  # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0438).
+  # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs.
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
   checks:
     name: scripts + workflows
@@ -294,17 +294,17 @@ jobs:
       - name: Install the native toolchain
         run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
-      # As release.yml builds it; Linux carries none and finds the system's (D-0522).
+      # As release.yml builds it; Linux carries none and finds the system's.
       - name: Build the libargon2 the CLI carries
         shell: bash
         run: bash scripts/build-argon2.sh linux-x64
 
-      # Linked into keypaste, which a publish without it refuses (D-0612).
+      # Linked into keypaste, which a publish without it refuses.
       - name: Build the libsodium keypaste links
         shell: bash
         run: bash scripts/build-libsodium.sh linux-x64
 
-      # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
+      # Adding -r here narrows the RID set and invalidates the multi-RID lock file.
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
@@ -332,7 +332,7 @@ jobs:
           done
           "$KEYPASTE_BIN" --version
           file "$KEYPASTE_BIN"
-          # The NaCl box gives its known answers with the libsodium linked into it (D-0613).
+          # The NaCl box gives its known answers with the libsodium linked into it.
           "$KEYPASTE_BIN" --selftest
 
       - name: Verify run injects a variable and writes nothing to disk

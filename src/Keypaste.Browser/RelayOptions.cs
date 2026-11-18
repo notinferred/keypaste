@@ -11,7 +11,7 @@ namespace Keypaste.Browser;
 /// <summary>One vault whose owner the relay may reach: the vault, its owner's pipe and where the app locked on it listens.</summary>
 /// <param name="Path">The vault, which every attach names.</param>
 /// <param name="PipeName">Its owner's pipe.</param>
-/// <param name="LockedAppName">Where the app listens while it is open and locked on the vault (D-0466).</param>
+/// <param name="LockedAppName">Where the app listens while it is open and locked on the vault.</param>
 internal sealed record RelayVault(string Path, string PipeName, string LockedAppName);
 
 /// <summary>Who started the relay, and the vaults whose owners it may reach, as <c>keypaste mcp</c> with no arguments finds the first.</summary>
@@ -29,7 +29,7 @@ internal sealed record RelayOptions(BrowserIdentity Identity, IReadOnlyList<Rela
 {
     /// <summary>
     /// Finds the vault from <c>KEYPASTE_VAULT</c>, then the vault chosen in <c>app.toml</c>, then the local account's others, and their
-    /// pipes (D-0389); a browser passes no flags. A set <c>KEYPASTE_APPROVER</c> names one owner's pipe, so it is the first vault's alone.
+    /// pipes; a browser passes no flags. A set <c>KEYPASTE_APPROVER</c> names one owner's pipe, so it is the first vault's alone.
     /// </summary>
     /// <param name="identity">The build the browser named.</param>
     /// <param name="environment">Reads an environment variable.</param>

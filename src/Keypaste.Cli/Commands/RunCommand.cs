@@ -21,8 +21,8 @@ namespace Keypaste.Cli.Commands;
 /// <see cref="VaultSession.OpenThen{T}"/> for why that ordering is a function rather than a habit.
 /// </para>
 /// <para>
-/// The set is a project's profile, named or inferred from <c>projects.json</c>, or a reference file
-/// (D-0349). A <c>.env.keypaste</c> found in the directory is used only when it names env
+/// The set is a project's profile, named or inferred from <c>projects.json</c>, or a reference file.
+/// A <c>.env.keypaste</c> found in the directory is used only when it names env
 /// references to the project <c>projects.json</c> maps the directory to, and reference mode always
 /// says which file, project and profile it resolved and lists every literal, because a cloned
 /// repository's file is not the person's (THREATS.md T-31).
@@ -35,14 +35,14 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// With <c>--session</c> the first phase is a question instead: the set comes from the process
 /// holding the vault unlocked, over its endpoint, after the person there approves this command, and
-/// nothing here opens the vault or reads a password, then or as a fallback (D-0341). A run that
+/// nothing here opens the vault or reads a password, then or as a fallback. A run that
 /// Terminal starts for the app's own Run confirmation on macOS carries that confirmation in
-/// <c>KEYPASTE_LAUNCH</c>, which is sent in place of a second question and handed to no child (D-0452).
+/// <c>KEYPASTE_LAUNCH</c>, which is sent in place of a second question and handed to no child.
 /// </para>
 /// </remarks>
 internal static class RunCommand
 {
-    /// <summary>The project's name, even one starting with <c>-</c>, which an operand cannot carry (D-0453).</summary>
+    /// <summary>The project's name, even one starting with <c>-</c>, which an operand cannot carry.</summary>
     internal static Option<string> Project { get; } = Syntax.Value("--project", "name", "the project, even one whose name starts with -");
 
     internal static Option<string> EnvFile { get; } = Syntax.Value("--env-file", "file", "run with the variables a reference file names");
@@ -176,7 +176,7 @@ internal static class RunCommand
             resolved => Start(command, resolved, set, context));
     }
 
-    /// <summary>Every project the line names: its operands and <c>--project</c>'s value, which is taken whole even when it starts with <c>-</c> (D-0453).</summary>
+    /// <summary>Every project the line names: its operands and <c>--project</c>'s value, which is taken whole even when it starts with <c>-</c>.</summary>
     internal static IReadOnlyList<string> Projects(ParseResult line)
     {
         var operands = line.GetValue(_operands) ?? [];
@@ -609,7 +609,7 @@ internal static class RunCommand
         }
     }
 
-    /// <summary>The environment a child inherits: this process's, less a launch pass, which belongs to the one run it was issued for (D-0452).</summary>
+    /// <summary>The environment a child inherits: this process's, less a launch pass, which belongs to the one run it was issued for.</summary>
     internal static Dictionary<string, string> Inherited(CliContext context)
     {
         var parent = new Dictionary<string, string>(EnvironmentMerge.Comparer);

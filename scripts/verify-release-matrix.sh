@@ -41,7 +41,7 @@
 #     repository after. Checking the public origin is publication evidence - docs/RELEASE.md
 #     requirements 4 and 7, owned by R.0b/R.0c.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
-#     the bytes this project produced. That is O-0010 and 3.8.
+#     the bytes this project produced. That is 3.8.
 #   - ORDERING. docs/STEPS.md 3.9a-d own adding targets and each ships after R.1. A definition edit that
 #     adds one early contradicts the plan, and review catches that, not a script.
 #
@@ -56,7 +56,7 @@
 #
 # NEGATIVE CONTROL: phase F runs the validator with its length check removed and requires it to
 # ACCEPT a definition whose target list is null. If the weakened one refuses too, this gate fails: a
-# fixture that cannot reproduce the condition proves nothing about the check (D-0043).
+# fixture that cannot reproduce the condition proves nothing about the check.
 set -euo pipefail
 
 # The expected number is counted here rather than written down: a floor somebody raises by hand
@@ -105,7 +105,7 @@ jqr() { command jq -r "$@" | tr -d "$CR"; }
 # Repository files are read the same way: .editorconfig does not promise LF for every one of them.
 noc() { tr -d "$CR"; }
 
-# A jq read that must produce a NUMBER. D-0106: jq 1.6 exits 0 on no output, so a check resting on
+# A jq read that must produce a NUMBER. jq 1.6 exits 0 on no output, so a check resting on
 # `jq -e` failing is a check that passes on the emptiest possible answer. Require digits instead.
 count_of() {
   local file="$1" filter="$2" n
@@ -199,7 +199,7 @@ validate_definition() {
 
     # One jq call for the whole component rather than one per field. Nine spawns per target across
     # nineteen fixtures is about fifteen hundred processes, which costs a minute on Windows and made
-    # the gate something a person would rather not run - and a gate nobody runs is D-0105 again.
+    # the gate something a person would rather not run - and a gate nobody runs catches nothing.
     #
     # Indexed rather than selected by rid: two targets sharing one rid is a case this has to name,
     # and `select(.rid == ...)` would answer about both of them at once and report the collision as
@@ -209,7 +209,7 @@ validate_definition() {
 
     # A component says which of its artifacts it publishes rather than this inferring it from
     # whether a target happens to declare a package: the two numbers require-release-assets.sh holds
-    # a release to have to come from independent reads of the definition (D-0108).
+    # a release to have to come from independent reads of the definition.
     local publishes declared_packages
     publishes="$(jqr ".components.\"$c\".publishes // empty" "$def")"
     case "$publishes" in
@@ -340,14 +340,14 @@ TARGETS
         [ "$internal" = "true" ] || note "$c/$rid: $kind package is not recorded internal and $c has no origin to publish it"
       fi
       # An AppImage is built by a downloaded tool around a downloaded runtime, so both are held by
-      # content hash rather than by a release name that can move (D-0142, D-0203).
+      # content hash rather than by a release name that can move.
       if [ "$kind" = "appimage" ]; then
         [ -n "$tool_version" ] && [ -n "$runtime_version" ] \
           || note "$c/$rid: appimage package does not name the appimagetool and runtime releases it uses"
         is_sha256 "$tool_sha" || note "$c/$rid: appimage package's appimagetool is not pinned by SHA-256"
         is_sha256 "$runtime_sha" || note "$c/$rid: appimage package's runtime is not pinned by SHA-256"
       fi
-      # WixToolset.Sdk restores outside packages.lock.json, so its package is held by content hash (D-0139, D-0206).
+      # WixToolset.Sdk restores outside packages.lock.json, so its package is held by content hash.
       if [ "$kind" = "msi" ]; then
         case "$tool_sha512" in *[!A-Za-z0-9+/=]*) tool_sha512="" ;; esac
         [ "${#tool_sha512}" -eq 88 ] || note "$c/$rid: msi package's WixToolset.Sdk is not pinned by SHA-512"
@@ -361,7 +361,7 @@ $(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] 
 PACKAGES
   done
 
-  # The Artifact Signing dlib is restored by NuGet and held to both digests, for x64 signtool (D-0204).
+  # The Artifact Signing dlib is restored by NuGet and held to both digests, for x64 signtool.
   local dlib_package dlib_version dlib_project dlib_sha512 dlib_path dlib_sha256
   IFS=$'\037' read -r dlib_package dlib_version dlib_project dlib_sha512 dlib_path dlib_sha256 <<DLIB || true
 $(jqr '.signing.dlib // {} | [.package, .version, .project, .sha512, .path, .path_sha256] | map(. // "") | join("\u001f")' "$def" 2>/dev/null || true)
@@ -813,7 +813,7 @@ validate_prerelease_path() {
 
   # The changelog lookup the release runs, held to a whole-line match for the reason above.
   #
-  # It follows the decision into the script (D-0109). Scoped to the line that actually reads
+  # It follows the decision into the script. Scoped to the line that actually reads
   # CHANGELOG.md rather than to the file, for the reason it was scoped that way before: asking
   # whether "grep -qxF" appears anywhere in release.yml passed for the wrong reason the moment the
   # publish allowlist grew one of its own, so the lookup could be weakened back and this stayed
@@ -839,7 +839,7 @@ validate_prerelease_path() {
 
 # A workflow that builds an installer builds only one the definition declares, names it from the
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
-# nothing else in this file can see (4.7a1, D-0139). A build may live in a script the workflow runs,
+# nothing else in this file can see (4.7a1). A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
 # sign-windows.sh names installers it signs and builds none, verify-desktop-candidate.sh names
 # the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) - and
@@ -859,7 +859,7 @@ validate_packages() {
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
     code="$(package_code "$root" "$workflow")"
-    # The zipped keypaste.app the DMG is built from is a build intermediate, not a package (D-0513).
+    # The zipped keypaste.app the DMG is built from is a build intermediate, not a package.
     for kind in msi appimage dmg; do
       case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; dmg) ext=".dmg" ;; esac
       case "$code" in *"$ext"*) ;; *) continue ;; esac
@@ -928,7 +928,7 @@ workflow_steps() {
 }
 
 # A Windows build signs only through sign-windows.sh, which reads the policy from the definition;
-# a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b, D-0204).
+# a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b).
 validate_signing() {
   local def="$1" root="$2" c workflow code step project version pin pins
   pins="$(jqr '.signing.dlib.sha512 // empty, .signing.dlib.path_sha256 // empty' "$def")"
@@ -1613,7 +1613,7 @@ else
   echo "::error::the weakened validator ALSO refused a definition whose only fault is null targets:"
   for problem in "${PROBLEMS[@]}"; do echo "::error::    $problem"; done
   echo "::error::The length check is then not what refuses it, and this fixture is not reproducing"
-  echo "::error::the condition the gate exists to catch (D-0043)."
+  echo "::error::the condition the gate exists to catch."
   exit 1
 fi
 
@@ -1627,7 +1627,7 @@ fi
 #    string reads as absent. Which answer a run gets depends on who lost the race, so the fixture
 #    forces the losing side: the needle is on line 1 and the remainder is far past any pipe buffer.
 #    If the old shape FINDS it here, this control is not reproducing the condition and proves
-#    nothing (D-0043).
+#    nothing.
 # ---------------------------------------------------------------------------
 RACE="$WORK/race.yml"
 {

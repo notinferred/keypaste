@@ -1,7 +1,7 @@
 namespace Keypaste.Browser;
 
 /// <summary>
-/// The nonces a relay has used: each request's, and the one its reply is sealed under, the request's incremented (D-0625).
+/// The nonces a relay has used: each request's, and the one its reply is sealed under, the request's incremented.
 /// </summary>
 /// <remarks>
 /// A box key is the same both ways, the host's secret with the extension's public key and the extension's secret with the

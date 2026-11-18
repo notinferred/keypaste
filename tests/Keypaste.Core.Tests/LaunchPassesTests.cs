@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The owner's launch passes: each is the app's Run confirmation for one request, spent the first time
-/// anything presents it, gone after two minutes or a lock, and holding no value (D-0452).
+/// anything presents it, gone after two minutes or a lock, and holding no value.
 /// </summary>
 public sealed class LaunchPassesTests
 {

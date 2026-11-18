@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// 4.11a: the sender posts each waiting report's exact bytes to keypaste.com or a loopback server and nowhere else, keeps
-/// what was not accepted, waits when told to, and never throws or holds anyone up (PRODUCT §4.1, D-0560).
+/// what was not accepted, waits when told to, and never throws or holds anyone up (PRODUCT §4.1).
 /// </summary>
 /// <remarks>
 /// The mutation each must fail: a header, a cookie or another host; a report dropped on a failure or kept after a 204, 400

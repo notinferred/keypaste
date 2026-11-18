@@ -11,11 +11,11 @@ namespace Keypaste.Cli.Clipboard;
 /// <remarks>
 /// <para>
 /// Shelling out rather than P/Invoke, on macOS and Linux: there is no clipboard in the BCL, native
-/// APIs mean surfaces for the trim and AOT analyzers to argue with (DECISIONS.md D-0005), and a
+/// APIs mean surfaces for the trim and AOT analyzers to argue with, and a
 /// user debugging a problem can reproduce a subprocess by hand.
 /// </para>
 /// <para>
-/// <b>Windows writing is the exception, and D-0056 is why.</b> <c>clip.exe</c> cannot express the
+/// <b>Windows writing is the exception.</b> <c>clip.exe</c> cannot express the
 /// formats that opt a value out of Clipboard History and Cloud Clipboard, so on Windows the
 /// trade was never subprocess-versus-P/Invoke — it was P/Invoke versus leaving the password in
 /// Win+V after the twenty seconds are up. Writing and clearing go through
@@ -127,7 +127,7 @@ internal sealed class SystemClipboard : IClipboard
 
         // Writing goes native. clip.exe cannot set the opt-out formats at all, so a value it
         // copied stays in Clipboard History and in Cloud Clipboard after the auto-clear has
-        // run — the clear looks like it worked and the password is still in Win+V (D-0056).
+        // run — the clear looks like it worked and the password is still in Win+V.
         if (_windows is null)
         {
             error = "no Windows clipboard writer";

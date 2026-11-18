@@ -25,7 +25,7 @@ namespace Keypaste.Mcp.Tests;
 /// person is not automatable.
 /// </para>
 /// <para>
-/// <b>Why four sentinels and not one.</b> DECISIONS.md D-0022 and THREATS.md T-8 are explicit that
+/// <b>Why four sentinels and not one.</b> THREATS.md T-8 is explicit that
 /// this repository has already rejected a "no secret leaked" test whose sentinel was never present
 /// anywhere it could leak — that test proved the type system and nothing else. Here every one of
 /// the entry's four fields carries a different, searchable value. The requested one has to come
@@ -163,7 +163,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
         Assert.True(_vault.AddTag(new EntryName("env/dev", "STRIPE_KEY"), "env:billing"));
 
-        // What an agent is answered from is the vault as saved (D-0317).
+        // What an agent is answered from is the vault as saved.
         _vault.Save();
 
         _settings.Rules = Sees;
@@ -339,7 +339,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     /// <summary>
     /// <c>totp</c> brings the item's current code, computed by the owner after a person allowed it, for
     /// the seconds it has left; the seed, the <c>otp</c> URI holding it and every other field appear
-    /// nowhere, the code reaches neither log, and the owner's line records a <c>totp</c> release (D-0480).
+    /// nowhere, the code reaches neither log, and the owner's line records a <c>totp</c> release.
     /// </summary>
     [Fact]
     public async Task OnApproval_TheCurrentTotpCodeComesBack_AndNeverItsSeed()
@@ -440,7 +440,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     /// <summary>
     /// A value naming its own item's fields brings exactly those, filled in, and no other field of the
-    /// item or the vault, whether a person allowed it or Automatic did; neither log records any of it (D-0465).
+    /// item or the vault, whether a person allowed it or Automatic did; neither log records any of it.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -477,7 +477,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     /// A value keypaste cannot fill in leaves nothing, not even what filled in before the placeholder that
     /// refused it, whether a person allowed it or Automatic did. The agent is told to have the item edited,
     /// the owner's log names the field and the placeholder and never a value, and asking again is refused
-    /// without asking the person (D-0465).
+    /// without asking the person.
     /// </summary>
     [Theory]
     [InlineData(false)]

@@ -9,10 +9,10 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>
 /// <c>keypaste</c> alone on a terminal: this keypaste's version, the vault it would use and who holds it, the AI tools
-/// connected, and one next step (D-0471).
+/// connected, and one next step.
 /// </summary>
 /// <remarks>
-/// It reads what <c>doctor</c> reads and starts no process (D-0467): the vault's header, each AI tool's file, and the
+/// It reads what <c>doctor</c> reads and starts no process: the vault's header, each AI tool's file, and the
 /// holder's answer to an attach naming no AI tool. The vault's path is made safe for the terminal as doctor's lines are.
 /// </remarks>
 internal static class StatusCommand

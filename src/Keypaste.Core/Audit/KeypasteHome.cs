@@ -1,7 +1,7 @@
 namespace Keypaste.Core.Audit;
 
 /// <summary>Where keypaste keeps the state that belongs to a machine rather than to a vault.</summary>
-/// <remarks>Deliberately not beside the vault, and why: DECISIONS.md D-0020.</remarks>
+/// <remarks>Deliberately not beside the vault.</remarks>
 public static class KeypasteHome
 {
     /// <summary>The variable that overrides the location, mostly so tests need no home directory.</summary>
@@ -63,13 +63,13 @@ public static class KeypasteHome
     /// <summary>Resolves the desktop app's settings file. The file is not created.</summary>
     /// <remarks>
     /// Nothing in it is an authorization: the idle timeout is a convenience over a default that
-    /// already locks, and the chosen vault only says which vault's owner to ask (D-0389).
+    /// already locks, and the chosen vault only says which vault's owner to ask.
     /// </remarks>
     public static string SettingsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), SettingsFileName);
 
     /// <summary>Resolves the desktop app's project mappings. The file is not created.</summary>
-    /// <remarks>It names directories and commands on this machine and never holds a value (D-0339).</remarks>
+    /// <remarks>It names directories and commands on this machine and never holds a value.</remarks>
     public static string ProjectsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ProjectsFileName);
 
@@ -77,7 +77,7 @@ public static class KeypasteHome
     public const string RecommendationsFileName = "recommendations.json";
 
     /// <summary>Resolves the dismissed recommendations. The file is not created.</summary>
-    /// <remarks>It names vaults, entries and keys by identifier and never holds a title or a value (D-0372).</remarks>
+    /// <remarks>It names vaults, entries and keys by identifier and never holds a title or a value.</remarks>
     public static string RecommendationsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), RecommendationsFileName);
 
@@ -87,7 +87,7 @@ public static class KeypasteHome
     /// <summary>Resolves the folder of crash reports waiting to be sent. The folder is not created.</summary>
     /// <remarks>
     /// It holds only what <see cref="CrashReports.CrashScrubber"/> wrote and the run marker, which names the version and
-    /// when the run started, never a name, path or value (D-0559, D-0595).
+    /// when the run started, never a name, path or value.
     /// </remarks>
     public static string CrashReportsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), CrashReportsDirectoryName);

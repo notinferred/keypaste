@@ -24,7 +24,7 @@ public enum TerminalPlatform
 
 /// <summary>
 /// How the app opens Terminal on macOS for one Run or Open terminal, and the request the window's
-/// <c>keypaste run --session</c> then sends (D-0451).
+/// <c>keypaste run --session</c> then sends.
 /// </summary>
 /// <param name="Opener">The program that opens Terminal.</param>
 /// <param name="OpenerArguments">Its arguments, which name the bundle's launcher and no command, directory, project or value.</param>
@@ -46,7 +46,7 @@ public sealed record TerminalOpen(
 
 /// <summary>
 /// Plans the platform's terminal in a project's directory, either at a prompt or running the
-/// project's command and staying open after it (D-0340, D-0451).
+/// project's command and staying open after it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -248,7 +248,7 @@ public sealed class TerminalLaunch
     /// <remarks>
     /// <para>
     /// The request carries any path, so a directory is refused here only as on Linux; the command is
-    /// held to what a mapping holds where its claim is made (<see cref="ClaimProblem"/>, D-0451).
+    /// held to what a mapping holds where its claim is made (<see cref="ClaimProblem"/>).
     /// </para>
     /// <para>
     /// A Terminal that <c>open</c> starts keeps <c>open</c>'s environment for every window until it
@@ -303,7 +303,7 @@ public sealed class TerminalLaunch
         return true;
     }
 
-    /// <summary>Why the owner issues no pass for a claim, or null when it issues one (D-0452).</summary>
+    /// <summary>Why the owner issues no pass for a claim, or null when it issues one.</summary>
     /// <param name="claim">The request the app's card named.</param>
     /// <returns>keypaste's own words, or null.</returns>
     /// <remarks>

@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>
 /// <c>keypaste use [&lt;vault.kdbx&gt;]</c>: shows or changes the vault agents and the CLI use when no
-/// <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one (D-0389). It opens nothing and asks for no password.
+/// <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one. It opens nothing and asks for no password.
 /// </summary>
 internal static class UseCommand
 {

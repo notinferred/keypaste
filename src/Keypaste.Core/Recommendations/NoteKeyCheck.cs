@@ -1,6 +1,6 @@
 namespace Keypaste.Core.Recommendations;
 
-/// <summary>Finds keys left in entry notes, in the process holding the vault (C.2, D-0372).</summary>
+/// <summary>Finds keys left in entry notes, in the process holding the vault (C.2).</summary>
 /// <remarks>
 /// <para>
 /// It reads the notes of every entry outside the recycle bin and keypaste's own groups, and finds

@@ -1064,8 +1064,8 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// <para>
     /// A recycled group keeps its UUID, its entries and their history, and records the group it was in as
-    /// <c>PreviousParentGroup</c>, as KeePassXC does; like a recycled entry, that raises the file to KDBX 4.1
-    ///. It gets no tombstone, for the reason <see cref="RemoveEntry"/> gives. Each item in it is
+    /// <c>PreviousParentGroup</c>, as KeePassXC does; like a recycled entry, that raises the file to KDBX 4.1.
+    /// It gets no tombstone, for the reason <see cref="RemoveEntry"/> gives. Each item in it is
     /// listed and restored one at a time, back to the path it had (<see cref="RestoreRecycled"/>).
     /// </para>
     /// <para>
@@ -2252,8 +2252,8 @@ internal sealed class KeePassInterop : IDisposable
     /// and keypaste refuses to.
     /// </summary>
     /// <remarks>
-    /// A test seam, visible only through <c>InternalsVisibleTo</c>, for the reason D-0255 gives
-    /// about a vault with its recycle bin switched off: two sibling groups of one name is a vault
+    /// A test seam, visible only through <c>InternalsVisibleTo</c>, so a fixture can build
+    /// a vault with its recycle bin switched off: two sibling groups of one name is a vault
     /// keypaste has to have an answer for and has no supported way to write.
     /// </remarks>
     internal void AddGroupUnchecked(string parentGroupPath, string name)
@@ -2435,7 +2435,7 @@ internal sealed class KeePassInterop : IDisposable
     /// The counterpart <see cref="EnsureGroup"/> is not: that one creates, and takes the first
     /// child of a matching name. This walks the tree and joins names the way <see cref="Collect"/>
     /// does, so it cannot disagree with the paths a listing reports — the shape of the defect
-    /// D-0091 found, at group level.
+    /// that duplicate names cause, at group level.
     /// </remarks>
     private (PwGroup? Parent, PwGroup Group)? LocateGroup(string groupPath)
     {
@@ -3060,7 +3060,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// <para>
     /// The one ordering rule, so a read and a restore cannot reach different answers about the same
-    /// index — the shape of the defect D-0091 found in entry identity.
+    /// index — the shape of the duplicate-name defect in entry identity.
     /// </para>
     /// <para>
     /// <b>The tiebreak is the rule, not a detail.</b> KDBX4 stores a timestamp to the second, so
@@ -3168,7 +3168,7 @@ internal sealed class KeePassInterop : IDisposable
     /// holding the vault's name is another process saving this same vault, so a retry that simply
     /// outlasts it writes a stale copy over the save it was waiting for — and that revert leaves no
     /// history item, because the entry it discarded never existed in this process's tree. That is
-    /// the loss <see cref="VaultChangedOnDiskException"/> exists to refuse, and until D-0119 the
+    /// the loss <see cref="VaultChangedOnDiskException"/> exists to refuse, and until that was fixed the
     /// only check for it ran once, before the first attempt.
     /// </para>
     /// <para>
@@ -3439,12 +3439,12 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// Each code here is a recorded observation, named with the platform whose probe produced it.
     /// <b>A code seen only in a CI failure gets its own observation rather than joining this
-    /// list</b>: the retry budget grew once on a number nobody had reproduced, and D-0107 is still
+    /// list</b>: the retry budget grew once on a number nobody had reproduced, and that is still
     /// carrying it.
     /// </remarks>
     private static bool IsATransientMoveCode(int code) => code switch
     {
-        // Windows 10 Pro 19045, D-0119.
+        // Windows 10 Pro 19045.
         _errorTransactionalConflict => true,
         _ => false,
     };
@@ -4454,7 +4454,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// Split out of <see cref="Locate"/> rather than written twice, for the reason that method's
     /// own documentation gives: two traversals that could disagree about what a name means is the
-    /// shape of the defect D-0091 found. <see cref="RestoreRecycled"/> needs the count without the
+    /// shape of the duplicate-name defect. <see cref="RestoreRecycled"/> needs the count without the
     /// refusal, because it is asking whether putting an entry back would create the ambiguity
     /// rather than whether one is already there.
     /// </remarks>
@@ -4618,7 +4618,7 @@ internal sealed class KeePassInterop : IDisposable
         return new MergeBase(key, groups, entries, Deletions(_database));
     }
 
-    /// <summary>Merges the open copy into this fresh parse of its file, which becomes the result, as D-0537 to D-0541 say.</summary>
+    /// <summary>Merges the open copy into this fresh parse of its file, which becomes the result.</summary>
     /// <param name="open">The open copy, which nothing here changes.</param>
     /// <param name="lineage">What the open copy keeps of the file it last read or wrote.</param>
     /// <param name="report">What the merge did, by name and never by value, when it merged.</param>

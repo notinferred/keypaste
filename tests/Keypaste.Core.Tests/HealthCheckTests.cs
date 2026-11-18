@@ -15,7 +15,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// What <c>keypaste doctor</c>'s checks say: which registrations upgrades keep on each platform, which copies differ in
 /// version, which Argon2 derives vault keys, how each settings file is fixed and which <c>keypaste</c> a terminal runs;
-/// nothing but a registered <c>keypaste</c> started as <c>mcp</c> is ever started (D-0467, D-0525).
+/// nothing but a registered <c>keypaste</c> started as <c>mcp</c> is ever started.
 /// </summary>
 /// <remarks>Every registration is Cursor's, written under a temporary home, and every command is answered by a fake runner.</remarks>
 public sealed class HealthCheckTests : IDisposable

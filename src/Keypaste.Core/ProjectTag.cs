@@ -22,7 +22,7 @@ public enum ProjectTagKind
 /// <param name="Project">The project, for a member.</param>
 /// <param name="Environment">The environment, for a member.</param>
 /// <param name="Protects">
-/// Whether the entry must be asked about live every time because of this tag (D-0348). A malformed
+/// Whether the entry must be asked about live every time because of this tag. A malformed
 /// tag protects when a segment after its project names a protected environment in any case, so
 /// <c>env:billing:Prod</c> protects although it adds the entry to nothing.
 /// </param>

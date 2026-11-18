@@ -17,7 +17,7 @@ namespace Keypaste.Core.Tests;
 /// connection the user already approved on. That is what
 /// <see cref="WhatTheProtocolEncodes_IsAlwaysWritable"/> exists to prevent, and it is the invariant
 /// the bound in <see cref="ApproverProtocol"/> is there to keep. A call may name its own bound, which
-/// only an env set's reply does (D-0454); every other call keeps one frame.
+/// only an env set's reply does; every other call keeps one frame.
 /// </remarks>
 public sealed class MessageFramerTests
 {

@@ -3,7 +3,7 @@
 #
 # app.yml attests the MSI, AppImage and DMG it builds on a tag and uploads them with a .sha256 beside each,
 # but publishes no Sigstore bundle, so `gh attestation verify` asks GitHub's attestation store and needs
-# a token (D-0138). The .sha256 comes from the same job and proves only an intact transfer; the
+# a token. The .sha256 comes from the same job and proves only an intact transfer; the
 # attestation is what binds the bytes to this repository's app workflow at that tag.
 #
 # What it refuses, before anything is installed:
@@ -78,7 +78,7 @@ verify() {
     --source-ref "refs/tags/v$version" \
     --deny-self-hosted-runners \
     --format json 2>/dev/null)" || die "$name is not attested by $repo's $workflow for v$version"
-  # Compared as text: jq 1.6's -e exits 0 on empty input, which would believe a silent verifier (D-0106).
+  # Compared as text: jq 1.6's -e exits 0 on empty input, which would believe a silent verifier.
   [ "$(printf '%s' "$out" | jq -r --arg d "$digest" \
     'type == "array" and length > 0 and any(.[]; any(.verificationResult.statement.subject[]?; .digest.sha256 == $d))' \
     2>/dev/null)" = "true" ] || die "$name is not attested by $repo's $workflow for v$version"

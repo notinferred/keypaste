@@ -14,7 +14,7 @@ public sealed record EnvProfileInfo(string Name, bool IsProtected);
 
 /// <summary>
 /// Writes and removes a project's keys as fields of the entries tagged into its environments, and
-/// creates an environment's home entry (D-0413).
+/// creates an environment's home entry.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -37,7 +37,7 @@ public sealed class EnvStore(Vault vault)
 
     /// <summary>
     /// Where an environment's new keys go when no entry is named: <c>env/&lt;project&gt;/.env</c> for
-    /// <c>dev</c> and <c>env/&lt;project&gt;/.env.&lt;environment&gt;</c> for another, tagged into it (D-0413).
+    /// <c>dev</c> and <c>env/&lt;project&gt;/.env.&lt;environment&gt;</c> for another, tagged into it.
     /// </summary>
     /// <param name="project">The project name.</param>
     /// <param name="environment">The environment's name.</param>
@@ -174,8 +174,7 @@ public sealed class EnvStore(Vault vault)
     /// <returns>Whether every key was written. When false, the caller must not save.</returns>
     /// <remarks>
     /// The fields an entry gains or changes are written together, so the entry's history gains one
-    /// item for the whole plan, and a created home entry gains none. Every value is written protected
-    /// (D-0413).
+    /// item for the whole plan, and a created home entry gains none. Every value is written protected.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
     public bool TryApply(EnvWritePlan plan, out string rejection)
@@ -278,7 +277,7 @@ public sealed class EnvStore(Vault vault)
     /// <summary>Whether a key may become a new field of a project, and if not, why.</summary>
     /// <param name="key">The variable's name.</param>
     /// <param name="error">Why not, otherwise empty.</param>
-    /// <returns>Whether a project would release a field of that name (D-0388).</returns>
+    /// <returns>Whether a project would release a field of that name.</returns>
     public static bool IsNewFieldName(string key, out string error)
     {
         ArgumentNullException.ThrowIfNull(key);

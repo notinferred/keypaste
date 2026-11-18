@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Which bridges are attached to the live session, as they describe their clients (D-0361): display
+/// Which bridges are attached to the live session, as they describe their clients: display
 /// and counting only, never a decision (THREATS.md T-3).
 /// </summary>
 public sealed class SessionAuthorityClientsTests : IDisposable

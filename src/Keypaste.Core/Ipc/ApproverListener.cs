@@ -28,7 +28,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// Every request is read, and every reply written, under <see cref="MessageFramer.MaximumFrameBytes"/>,
 /// except a reply carrying an env set to its runner, which is written under
-/// <see cref="ApproverProtocol.MaximumEnvReplyFrameBytes"/> (D-0454).
+/// <see cref="ApproverProtocol.MaximumEnvReplyFrameBytes"/>.
 /// </para>
 /// <para>
 /// <b>At most <see cref="MaxConnections"/> are served at once</b>, and one more is closed as soon as
@@ -42,8 +42,7 @@ namespace Keypaste.Core.Ipc;
 /// </para>
 /// <para>
 /// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
-/// connection sending any other kind unanswered, as it ends one sending a kind this version does not know
-/// (D-0451).
+/// connection sending any other kind unanswered, as it ends one sending a kind this version does not know.
 /// </para>
 /// </remarks>
 public sealed class ApproverListener : IDisposable
@@ -277,7 +276,7 @@ public sealed class ApproverListener : IDisposable
     /// <para>
     /// A prompt raised for a peer that has gone comes down rather than waiting out its window for an
     /// answer nobody will receive. A stopping listener is not a peer that went: its withdrawn requests
-    /// still have their denials to deliver (D-0313).
+    /// still have their denials to deliver.
     /// </para>
     /// <para>
     /// A peer that withdraws its request is still waiting, for what became of it: the reply says whether

@@ -22,7 +22,7 @@ namespace Keypaste.Consistency.Tests;
 /// than moving the entry, so its history is left behind; an organize that defers its
 /// <c>vault.Save()</c>, so the CLI's own handle sees the vault as it was; and a group rename that
 /// changes which project <c>keypaste run</c> resolves, which would mean a group had come to name a
-/// project, where only an entry's own tags do (D-0416).
+/// project, where only an entry's own tags do.
 /// </para>
 /// </remarks>
 public sealed class GuiOrganizeIsVisibleToTheCliTests

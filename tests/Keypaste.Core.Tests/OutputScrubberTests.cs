@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// What a run returns has every known form of every injected value replaced (D-0359): literal and
+/// What a run returns has every known form of every injected value replaced: literal and
 /// escaped as common dumps of an environment print them, in the encodings a child may print in, and
 /// with no tail of a value left where the kept output was cut.
 /// </summary>

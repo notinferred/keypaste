@@ -22,7 +22,7 @@ public enum McpWiring
     /// </summary>
     /// <remarks>
     /// keypaste edits only its own entry, keeps the first original beside the file, and checks every other byte before
-    /// and after (D-0435).
+    /// and after.
     /// </remarks>
     ConfigFile,
 }
@@ -172,7 +172,7 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// <summary>What a registration fixes with the bridge's own flags rather than leaving to the environment it starts in.</summary>
 /// <param name="VaultPaths">
 /// The vaults for <c>--vault</c>, one flag each, which the tool may reach through one bridge; none so the bridge uses the
-/// vault the person chose (D-0389).
+/// vault the person chose.
 /// </param>
 /// <param name="AuditLogPath">The log for <c>--audit-log</c>, or null for the one under the bridge's own home.</param>
 /// <param name="ApproverName">The pipe for <c>--approver</c>, or null for the one the bridge derives; only with one vault.</param>

@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The CLI cannot ask a YubiKey (D-0366), so a verb or <c>keypaste approve</c> refused a vault the app last opened
+/// The CLI cannot ask a YubiKey, so a verb or <c>keypaste approve</c> refused a vault the app last opened
 /// with one names the app and what reaches the vault through it, and a wrong password elsewhere says nothing of keys.
 /// </summary>
 public sealed class HardwareKeyVaultRefusalTests : IDisposable

@@ -21,10 +21,10 @@ public static class AuditTools
     /// <summary>A change to an agent's settings, from whichever surface asked for it.</summary>
     public const string AccessChange = "access_change";
 
-    /// <summary>A terminal's edit to the vault's items, which the vault's holder asked about and saved (D-0464).</summary>
+    /// <summary>A terminal's edit to the vault's items, which the vault's holder asked about and saved.</summary>
     public const string Edit = "terminal_edit";
 
-    /// <summary>Another program's save merged with the vault's holder's copy and saved by that holder (D-0545).</summary>
+    /// <summary>Another program's save merged with the vault's holder's copy and saved by that holder.</summary>
     public const string Merge = "vault_merge";
 
     /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused.</summary>

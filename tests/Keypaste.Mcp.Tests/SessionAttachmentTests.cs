@@ -10,7 +10,7 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// The bridge names its vault and the session it reached on every operation, and a line it records
-/// for a reply names the session that answered (D-0310).
+/// for a reply names the session that answered.
 /// </summary>
 public sealed class SessionAttachmentTests
 {

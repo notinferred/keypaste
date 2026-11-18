@@ -2,7 +2,7 @@
 #
 # crash-reports.sh
 #
-# Reads keypaste.com's crash reports from D1, by hand on the founder's machine (D-0587). Every query is a fixed select,
+# Reads keypaste.com's crash reports from D1, by hand on the founder's machine. Every query is a fixed select,
 # run through the site's pinned Wrangler with `d1 execute --remote` under the account `npx wrangler login` signed in;
 # the repository holds no credential. No workflow runs it: CI never asks the live origin or its database.
 #

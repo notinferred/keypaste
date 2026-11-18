@@ -3,7 +3,7 @@
 #
 # require-changelog-section.sh, require-tag-matches-source.sh and require-release-assets.sh were
 # step bodies in release.yml's guard and publish job, behind ref_type == tag and behind publish's
-# own gate. D-0109: a decision only a tag can reach belongs in a script a fixture can drive. This
+# own gate. A decision only a tag can reach belongs in a script a fixture can drive. This
 # is that fixture, and it runs on every push.
 #
 # The assets phase builds a whole fake release in a scratch directory - real files, real checksums -
@@ -17,7 +17,7 @@
 #   - the changelog lookup weakened back to an unanchored match must ACCEPT 0.2.0 against a file
 #     that only has a 0.2.0-rc.1 heading, which is the defect R.0a found;
 #   - the asset count with its published floor deleted must ACCEPT a release that dropped a target,
-#     which is the edit equality alone agrees with (D-0108).
+#     which is the edit equality alone agrees with.
 # If either weakened copy refuses, this gate fails.
 set -euo pipefail
 

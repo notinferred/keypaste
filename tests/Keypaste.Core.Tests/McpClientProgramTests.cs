@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A tool's command is found only in <c>PATH</c>'s absolute entries and, for the macOS app, its install folders, and is
 /// started without a shell: an npm launcher on Windows as the program it names, and a Node script from an install folder
-/// with a <c>node</c> found the same way (D-0436).
+/// with a <c>node</c> found the same way.
 /// </summary>
 public sealed class McpClientProgramTests : IDisposable
 {

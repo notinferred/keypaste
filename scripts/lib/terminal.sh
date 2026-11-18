@@ -73,7 +73,7 @@ terminal_mismatch() {
   fi
 }
 
-# macOS keeps the stock bash 3.2 (D-0398), which has no case conversion in parameter expansion.
+# macOS keeps the stock bash 3.2, which has no case conversion in parameter expansion.
 lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 mac_cli_link() {

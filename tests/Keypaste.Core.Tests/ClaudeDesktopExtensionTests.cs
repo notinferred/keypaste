@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The Claude Desktop extension's launcher carries the bridge's arguments itself, so it must start the bridge exactly as
-/// setup registers Claude Desktop, never offering an agent more than setup does (D-0446).
+/// setup registers Claude Desktop, never offering an agent more than setup does.
 /// </summary>
 public sealed class ClaudeDesktopExtensionTests
 {

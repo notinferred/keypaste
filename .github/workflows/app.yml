@@ -97,7 +97,7 @@ env:
 
 jobs:
   # main's push runs every job on Linux and Windows and every other run adds macOS; a dispatch or a tag's own run counts
-  # toward a release (D-0403).
+  # toward a release.
   # Only NuGet restores are cached, by every lock file's hash with no fallback key; package restores fresh (B.5).
   targets:
     runs-on: ubuntu-24.04
@@ -290,7 +290,7 @@ jobs:
         run: bash scripts/verify-browser-fill.sh
 
   # Hosted macOS runners are scarce and a job left queued is cancelled, so the desktop's macOS checks share one job.
-  # The gates' scripts run under macOS's stock bash 3.2 (D-0398).
+  # The gates' scripts run under macOS's stock bash 3.2.
   macos:
     name: desktop tests, gates and clipboard markers (macos-15)
     if: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
@@ -379,7 +379,7 @@ jobs:
           echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
           echo "prerelease suffix: ${suffix:-<none>}"
 
-      # Keypaste.Core's project puts it in the payload beside the app and its keypaste (D-0523).
+      # Keypaste.Core's project puts it in the payload beside the app and its keypaste.
       - name: Build the libargon2 the payload carries
         shell: bash
         run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
@@ -388,10 +388,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The Windows package is the app's Windows target, which reaches Windows Hello (D-0549).
+          # The Windows package is the app's Windows target, which reaches Windows Hello.
           framework=net10.0
           if [ '${{ matrix.rid }}' = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
-          # Only these packages name where crash reports go; a source build sends none (D-0598).
+          # Only these packages name where crash reports go; a source build sends none.
           args=(-c Release -r '${{ matrix.rid }}' -f "$framework" --self-contained
             --no-restore -o 'artifacts/app/${{ matrix.rid }}' -p:KeypasteCrashEndpoint=https://keypaste.com)
           if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
@@ -427,7 +427,7 @@ jobs:
         run: bash scripts/verify-no-icu.sh 'artifacts/app/${{ matrix.rid }}'
 
       # The headless selftest cannot exercise native libraries that load on first render. It does derive a vault's key,
-      # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux (D-0523).
+      # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux.
       - name: Start the published binary and run its selftest
         shell: bash
         run: |
@@ -449,7 +449,7 @@ jobs:
             [ -n "$library" ] || { echo "::error::the payload derived Argon2 in managed code: no system libargon2 loaded"; exit 1; }
           fi
 
-      # The NativeAOT keypaste beside it must derive as the app does, which its doctor names (D-0525).
+      # The NativeAOT keypaste beside it must derive as the app does, which its doctor names.
       - name: Require the bridge's doctor to name the libargon2 it derives with
         shell: bash
         run: |
@@ -631,7 +631,7 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && sha256sum -c "$name.sha256")
 
-      # The zipped bundle is the DMG's input and no release package, so it stays out of artifacts/dist (D-0513).
+      # The zipped bundle is the DMG's input and no release package, so it stays out of artifacts/dist.
       - name: Build and check the app bundle the DMG wraps
         id: bundle
         if: matrix.dmg

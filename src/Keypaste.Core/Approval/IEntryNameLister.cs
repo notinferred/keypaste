@@ -9,7 +9,7 @@ namespace Keypaste.Core.Approval;
 /// <remarks>
 /// <para>
 /// A separate interface from <see cref="ICredentialSource"/>, and that separation is the whole
-/// point (DECISIONS.md D-0022). Everything reachable through here is a group path, a title, field
+/// point. Everything reachable through here is a group path, a title, field
 /// names and project tags, so no implementation — including this one — can return a password
 /// through the listing path even by mistake. Fusing the two into a single "vault access" abstraction would give the listing path the
 /// ability to return a secret, which is the single change most likely to turn

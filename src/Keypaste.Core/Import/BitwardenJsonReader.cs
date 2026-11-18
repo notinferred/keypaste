@@ -4,11 +4,11 @@ using System.Text.Json;
 
 namespace Keypaste.Core.Import;
 
-/// <summary>Reads Bitwarden's <c>.json</c> export, of a person's vault or an organization's, and refuses an encrypted one (D-0568).</summary>
+/// <summary>Reads Bitwarden's <c>.json</c> export, of a person's vault or an organization's, and refuses an encrypted one.</summary>
 /// <remarks>
 /// A login's username, password, web addresses and TOTP land in their own places, and every other item type's details
-/// as custom fields under Bitwarden's labels, protected where Bitwarden masks them (D-0569). What a vault has no place
-/// for is named with why (D-0570).
+/// as custom fields under Bitwarden's labels, protected where Bitwarden masks them. What a vault has no place
+/// for is named with why.
 /// </remarks>
 internal sealed class BitwardenJsonReader : IExportReader
 {
@@ -21,7 +21,7 @@ internal sealed class BitwardenJsonReader : IExportReader
     private const int _repromptPassword = 1;
     private const string _favoriteTag = "Favorite";
 
-    /// <summary>The tag every reader gives an archived item, as KeePassXC's 1Password import tags one (D-0569).</summary>
+    /// <summary>The tag every reader gives an archived item, as KeePassXC's 1Password import tags one.</summary>
     private const string _archivedTag = "Archived";
 
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
@@ -398,7 +398,7 @@ internal sealed class BitwardenJsonReader : IExportReader
 
     /// <summary>
     /// Each passkey as KeePassXC's own Bitwarden import converts it: the credential id, a GUID or Bitwarden's <c>b64.</c> form, as its
-    /// bytes in base64url, and the base64url PKCS #8 key as base64 between KeePassXC's PEM markers on one line (D-0571).
+    /// bytes in base64url, and the base64url PKCS #8 key as base64 between KeePassXC's PEM markers on one line.
     /// </summary>
     private static List<ExportPasskey> Passkeys(JsonElement login, string where, List<ExportOmission> omitted)
     {

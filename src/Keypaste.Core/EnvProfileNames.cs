@@ -1,7 +1,7 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// A project's profiles, which its entries' tags name (D-0370): which names keypaste resolves, which
+/// A project's profiles, which its entries' tags name: which names keypaste resolves, which
 /// are protected, and how a set is named in audit lines.
 /// </summary>
 public static class EnvProfileNames
@@ -48,7 +48,7 @@ public static class EnvProfileNames
             || name.StartsWith("production-", StringComparison.Ordinal);
     }
 
-    /// <summary>How audit lines name one profile's set: <c>env/&lt;project&gt;</c> for <c>dev</c>, else <c>env/&lt;project&gt;/&lt;profile&gt;</c>; it names no group (D-0416).</summary>
+    /// <summary>How audit lines name one profile's set: <c>env/&lt;project&gt;</c> for <c>dev</c>, else <c>env/&lt;project&gt;/&lt;profile&gt;</c>; it names no group.</summary>
     public static string SetName(string project, string profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
@@ -58,7 +58,7 @@ public static class EnvProfileNames
             : EnvConvention.GroupPath(project) + "/" + profile;
     }
 
-    /// <summary>Whether releasing an entry must be asked about live every time, by any of its own tags (D-0371, D-0416).</summary>
+    /// <summary>Whether releasing an entry must be asked about live every time, by any of its own tags.</summary>
     /// <param name="tags">The entry's own tags; a group's are never passed.</param>
     /// <returns><see langword="true"/> when a tag names a protected environment (<see cref="ProjectTag.Protects"/>).</returns>
     public static bool RequiresLiveApproval(IEnumerable<string> tags)

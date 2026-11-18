@@ -87,7 +87,7 @@ public enum AuditMethod
     Undeliverable = 16,
 
     /// <summary>The request did not come from a connection attached to the session now holding the
-    /// vault it named, so it was not considered (D-0310).</summary>
+    /// vault it named, so it was not considered.</summary>
     /// <remarks>
     /// Distinct from <see cref="VaultLocked"/>: the vault may be unlocked, but not in the session
     /// this request belonged to, or not by the process it reached.
@@ -95,11 +95,11 @@ public enum AuditMethod
     NoSession = 17,
 
     /// <summary>The vault's owner holds a copy that no longer matches its file, so it answered
-    /// nothing from it (D-0317).</summary>
+    /// nothing from it.</summary>
     /// <remarks>
     /// Somebody else wrote the file, which lasts until a person reloads it, or a change made in the
     /// owner has not been saved yet, or a reload or a merge replaced the copy a request was waiting on, which
-    /// withdrew it (D-0412, D-0542). The reason says which.
+    /// withdrew it. The reason says which.
     /// </remarks>
     VaultChanged = 18,
 
@@ -128,24 +128,24 @@ public enum AuditMethod
     /// <summary>A terminal's edit asked for what the vault already held, so nothing was written and nobody was asked.</summary>
     Unchanged = 26,
 
-    /// <summary>The request was authorized and the value asked for holds a KeePass placeholder keypaste does not fill in, so nothing was released (D-0465).</summary>
+    /// <summary>The request was authorized and the value asked for holds a KeePass placeholder keypaste does not fill in, so nothing was released.</summary>
     /// <remarks>
     /// Not <see cref="Failed"/>: nothing went wrong, and asking again ends the same way until a person edits the
     /// item, so the field cools down as a refusal's does. The reason names the placeholder, never a value.
     /// </remarks>
     Unfillable = 27,
 
-    /// <summary>The vault's holder merged another program's save with the changes its copy held and saved the result (D-0545).</summary>
+    /// <summary>The vault's holder merged another program's save with the changes its copy held and saved the result.</summary>
     /// <remarks>Released nothing and was asked of nobody: the line names the items the merge decided between, never a value.</remarks>
     Merged = 28,
 
-    /// <summary>A browser asked to pair while the person had not armed pairing, so it was refused before anybody was asked (D-0634).</summary>
+    /// <summary>A browser asked to pair while the person had not armed pairing, so it was refused before anybody was asked.</summary>
     NotArmed = 29,
 
-    /// <summary>A browser presented a pairing the vault does not hold for its build and key, so its check was refused (D-0635).</summary>
+    /// <summary>A browser presented a pairing the vault does not hold for its build and key, so its check was refused.</summary>
     NotPaired = 30,
 
-    /// <summary>The person removed a browser's pairing, which released nothing and took its access away (D-0633).</summary>
+    /// <summary>The person removed a browser's pairing, which released nothing and took its access away.</summary>
     Removed = 31,
 
     /// <summary>Released, or a command started, without asking because the agent's mode is Automatic with commands, a setting the person confirmed.</summary>
@@ -424,7 +424,7 @@ public sealed record AuditRecord
     /// <remarks>
     /// Version 2 adds <c>prev</c> and <c>hash</c> and redefines <c>seq</c> as a line's position in the
     /// chain rather than a count of what one process wrote. Every release of keypaste wrote version 2,
-    /// so a version 1 line is reported as written by something else (D-0416).
+    /// so a version 1 line is reported as written by something else.
     /// </remarks>
     public const int SchemaVersion = 2;
 

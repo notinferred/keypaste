@@ -14,8 +14,8 @@ public enum RotateOutcome
 }
 
 /// <summary>
-/// Replaces an entry's password with a generated one, keeping the old value as a history revision
-/// (D-0014), and says when the current password was set. Never returns or prints a value.
+/// Replaces an entry's password with a generated one, keeping the old value as a history revision,
+/// and says when the current password was set. Never returns or prints a value.
 /// </summary>
 /// <remarks>
 /// It writes a new value into the vault only: a key a provider issued still has to be rotated at the

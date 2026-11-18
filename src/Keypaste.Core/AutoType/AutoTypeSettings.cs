@@ -2,7 +2,7 @@ namespace Keypaste.Core.AutoType;
 
 /// <summary>
 /// An item's Auto-Type settings and its groups', as KeePass 2 and KeePassXC keep them in a KDBX file, which keypaste
-/// reads and never writes (D-0605).
+/// reads and never writes.
 /// </summary>
 /// <param name="Enabled">The item's <c>AutoType/Enabled</c>, on when absent.</param>
 /// <param name="Obfuscated">Whether the item's <c>AutoType/DataTransferObfuscation</c> asks for KeePass 2's two-channel obfuscation.</param>
@@ -67,7 +67,7 @@ internal sealed record AutoTypeSettings(
     /// title, else <see cref="Effective"/>; and why each pattern that could not be matched matched nothing.
     /// </summary>
     /// <param name="title">The window's title; an empty one takes <see cref="Effective"/>, as KeePassXC does.</param>
-    /// <param name="fill">Fills in a pattern's placeholders from the item, as D-0465 fills a value.</param>
+    /// <param name="fill">Fills in a pattern's placeholders from the item, as a placeholder fills a value.</param>
     /// <param name="timeout">How long one pattern may take to match.</param>
     /// <returns>The choice.</returns>
     internal AutoTypeChoice Choose(string title, Func<string, PlaceholderFill> fill, TimeSpan timeout)

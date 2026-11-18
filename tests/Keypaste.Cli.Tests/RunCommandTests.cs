@@ -511,7 +511,7 @@ public sealed class RunCommandTests
         Assert.Empty(harness.Prompt.PromptsSeen);
     }
 
-    /// <summary><c>--project</c> takes its value whole, so a project whose name starts with <c>-</c> runs like any other, and a name of exactly <c>--</c> survives the split written with <c>=</c> (D-0453).</summary>
+    /// <summary><c>--project</c> takes its value whole, so a project whose name starts with <c>-</c> runs like any other, and a name of exactly <c>--</c> survives the split written with <c>=</c>.</summary>
     [Theory]
     [InlineData("-web", false)]
     [InlineData("acme-api", false)]

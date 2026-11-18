@@ -11,7 +11,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// Each kind of agent request has one line shape, whichever process records it: the fields every
 /// builder fills, the client as a line keeps it, nothing a reply released, and a run line's vault,
-/// entries and command (D-0361), which still fit after a person approved the largest run (R14).
+/// entries and command, which still fit after a person approved the largest run (R14).
 /// </summary>
 public sealed class RequestRecordsTests : IDisposable
 {

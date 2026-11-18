@@ -4,7 +4,7 @@
 # The decision lives here rather than in release.yml's guard for the reason F.4a paid for: a step
 # body is only reachable by the event that runs it, and this one runs on `if: ref_type == 'tag'`.
 # A check that only a real tag can execute is a check nobody has watched fail. F.4a's destination
-# guard fell open for two releases exactly that way (D-0104), and the repair was to move the
+# guard fell open for two releases exactly that way, and the repair was to move the
 # decision into a script and drive it with a fake `aws`. This is the same move with a fake `gh`.
 #
 # WHAT IT DECIDES. release-targets.json advertises seven targets across two components, and three
@@ -24,10 +24,10 @@
 # of its paths, so the commit has no app run at all. That fails the tag on purpose - dispatch
 # app.yml at the commit, let it go green, then tag.
 #
-# ONLY A DISPATCH, THE WEEKLY SCHEDULE OR A TAG'S OWN PUSH COUNTS (D-0403). Those are the runs this
+# ONLY A DISPATCH, THE WEEKLY SCHEDULE OR A TAG'S OWN PUSH COUNTS. Those are the runs this
 # accepts, and cutting a release starts with dispatching ci.yml at the commit.
 #
-# A CI RUN COUNTS ONLY WITH ITS REAL-TOOLS JOBS GREEN (D-0438). ci.yml's tools jobs run on the schedule and
+# A CI RUN COUNTS ONLY WITH ITS REAL-TOOLS JOBS GREEN. ci.yml's tools jobs run on the schedule and
 # on a dispatch whose tools input is true, so a plain dispatch is green without them. Each counted ci run's
 # jobs are read, and one counts only when it lists a `tools (...)` job and every such job succeeded. A matrix
 # job its condition skipped is listed once, with its name unexpanded and its conclusion skipped, so it never
@@ -37,7 +37,7 @@
 # tag does, and asked at once the guard found that run still going and refused, so every tag needed a release
 # re-run (G.5). --wait polls the workflow's push runs at the ref until each has finished, and refuses when none
 # of them succeeded, when none appeared, or when one is still going after the last poll; the guard calls it
-# before either question below (D-0521).
+# before either question below.
 #
 # Usage:
 #   require-green-gates.sh <sha>
@@ -163,13 +163,13 @@ if [ "$MODE" = run-id ]; then
 fi
 
 # The runs of workflow $1 that count, passed through jq filter $2. Only a dispatch, the schedule, or a
-# tag's own push counts (D-0403).
+# tag's own push counts.
 counted() {
   printf '%s' "$runs" | jq --arg wf "$1" "[.workflow_runs[]? | select(.name == \$wf and (.event == \"workflow_dispatch\" or .event == \"schedule\" or (.event == \"push\" and .head_branch != \"main\")))] | $2" 2>/dev/null | tr -d "$CR" || true
 }
 
 # How many of the ci runs whose IDs are $1 ran tools jobs, passed every one of them and skipped no other
-# job, which a tools-only dispatch does (D-0438).
+# job, which a tools-only dispatch does.
 green_tools_runs() {
   local id jobs count green=0
   for id in $1; do
@@ -187,14 +187,14 @@ green_tools_runs() {
 
 missing=0
 for wf in $required; do
-  # D-0106: the count is required to be digits. An empty or malformed reply must refuse rather than
+  # The count is required to be digits. An empty or malformed reply must refuse rather than
   # arrive as "" and compare its way past -ge 1, which is how jq 1.6 let an empty answer reach an
   # upload. A refusal rests on what came back, never on how a tool chose to exit.
   n="$(counted "$wf" length)"
   case "$n" in
     '' | *[!0-9]*) die "could not count $wf runs for $SHA; refusing without a verified answer" ;;
   esac
-  # One line, so the second negative control in verify-green-gates.sh can delete it and get the shape before D-0438.
+  # One line, so the second negative control in verify-green-gates.sh can delete it and get the shape before ci's tools jobs were required.
   if [ "$wf" = ci ]; then n="$(green_tools_runs "$(counted ci '.[].id')")" || exit 1; fi
   dispatch="dispatch $wf at this commit"
   [ "$wf" != ci ] || dispatch='dispatch ci.yml at this commit with -f tools=true'

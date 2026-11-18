@@ -134,7 +134,7 @@ restore
 
 # A forged record in the schema from before the chain, spliced into the middle. It breaks no link -
 # nothing before or after it changed - so what stands between it and a rewritten history is that no
-# release of keypaste wrote that schema, which makes it a line something else wrote (D-0416).
+# release of keypaste wrote that schema, which makes it a line something else wrote.
 {
   head -n 1 "$GOOD"
   printf '%s\n' '{"v":1,"ts":"2026-07-26T14:10:00.000Z","seq":9,"pid":1,"client":{"label":"ci-probe"},"tool":"request_credential","args":{"entry":"env/prod/PAYROLL_DB"},"decision":"granted","method":"prompt"}'

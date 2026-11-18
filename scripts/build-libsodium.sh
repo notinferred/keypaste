@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the libsodium Keypaste.Browser seals and opens NaCl boxes with (D-0611, D-0612) from upstream's release, kept only
+# Builds the libsodium Keypaste.Browser seals and opens NaCl boxes with from upstream's release, kept only
 # when the archive matches its SHA-256 pin and upstream's Minisign key signed it.
 #
 # Each target builds on its own runner with upstream's release settings, never for the build machine's own CPU: configure

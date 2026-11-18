@@ -14,7 +14,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The owner merging another program's save, over a real pipe to a real vault (1.4b2, D-0542, D-0545): agents refused from the
+/// The owner merging another program's save, over a real pipe to a real vault (1.4b2): agents refused from the
 /// other program's save until the merged copy is saved, every grant ended and every request waiting on a person withdrawn as
 /// merged, the next request answered from the merged copy and asked again, and one line naming items and never a value.
 /// </summary>
@@ -127,7 +127,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
 
     /// <summary>
     /// A merge the owner saved writes one line, naming the item changed in both copies and the one kept against a deletion, and no
-    /// value from either copy (D-0545).
+    /// value from either copy.
     /// </summary>
     [Fact]
     public async Task ASavedMerge_IsRecordedOnOneLine_NamingItemsAndNeverAValue()

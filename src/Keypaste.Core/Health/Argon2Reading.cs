@@ -4,7 +4,7 @@ namespace Keypaste.Core.Health;
 
 /// <summary>
 /// Which Argon2 derives this keypaste's vault keys: the library it carries beside it on Windows and macOS, the system's on
-/// Linux, or KeePassLib's slower managed code (D-0522, D-0525).
+/// Linux, or KeePassLib's slower managed code.
 /// </summary>
 internal static class Argon2Reading
 {

@@ -97,10 +97,10 @@ public sealed record HealthScope(
 /// registration, who holds the vault, the settings files and PATH, each saying what to fix.
 /// </summary>
 /// <remarks>
-/// It only reads (D-0467). No vault is opened and no password asked for; nothing is written, created or started but
+/// It only reads. No vault is opened and no password asked for; nothing is written, created or started but
 /// the <c>keypaste</c> each tool registers and the one PATH finds, with <c>--version</c>, and <c>mcp --help</c> with the
 /// registration's arguments; the owner is attached to only to learn whether it answers and its version. One small key
-/// is derived from constant bytes in this process, to learn which Argon2 KeePassLib uses (D-0525).
+/// is derived from constant bytes in this process, to learn which Argon2 KeePassLib uses.
 /// </remarks>
 public static class HealthCheck
 {

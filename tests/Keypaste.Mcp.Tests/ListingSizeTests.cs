@@ -117,7 +117,7 @@ public sealed class ListingSizeTests
         // thread it fails here with the no-approver refusal against a listener that stayed bound,
         // and the sub-string failure alone says nothing about why. Reported on the failing path so
         // the pool reading arrives with it rather than being thrown away by the assertion that
-        // tripped over it - the same mistake ListingCall itself was built to stop (D-0124).
+        // tripped over it - the same mistake ListingCall itself was built to stop.
         if (!header.Contains("not all of them", StringComparison.Ordinal))
         {
             Assert.Fail($"the header did not say the listing was cut off.{Environment.NewLine}{call.Report()}");

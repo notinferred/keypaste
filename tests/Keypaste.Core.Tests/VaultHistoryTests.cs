@@ -14,7 +14,7 @@ namespace Keypaste.Core.Tests;
 /// Reading and restoring entry history (docs/STEPS.md V.2a).
 /// </summary>
 /// <remarks>
-/// Retaining a replaced value has been the promise since D-0014; until now nothing could read one
+/// Retaining a replaced value has long been the promise; until now nothing could read one
 /// back, so the promise rested on a counter. These tests are what make the value itself, its age
 /// and its order assertable, and what stop a restore from being an edit that loses the thing it
 /// replaced.
@@ -149,7 +149,7 @@ public sealed class VaultHistoryTests : IDisposable
 
     /// <summary>
     /// The restore itself: the oldest value becomes current, what it displaced becomes the newest
-    /// history item rather than being lost (D-0014), and the entry is the same entry throughout.
+    /// history item rather than being lost, and the entry is the same entry throughout.
     /// </summary>
     [Fact]
     public void RestoreRevision_PutsTheOldestRevisionBack_AndKeepsTheUuid()
@@ -179,7 +179,7 @@ public sealed class VaultHistoryTests : IDisposable
     }
 
     /// <summary>
-    /// A restore records when it happened (D-0227). <c>RestoreFromBackup</c> assigns the old
+    /// A restore records when it happened. <c>RestoreFromBackup</c> assigns the old
     /// revision's timestamps back, which would leave the entry older than the value it replaced —
     /// so a merge would revert it and eviction, which drops the oldest, would take it first. The
     /// next edit is where that time becomes visible: it backs the restored value up carrying it,
@@ -308,7 +308,7 @@ public sealed class VaultHistoryTests : IDisposable
 
     /// <summary>
     /// Two entries in one group can share a title, and KeePassXC will make them. Neither reading
-    /// history nor restoring it may guess which was meant (docs/PRODUCT.md law 3.7, D-0091).
+    /// history nor restoring it may guess which was meant (docs/PRODUCT.md law 3.7).
     /// </summary>
     [Fact]
     public void ReadHistoryAndRestoreRevision_RefuseANameTwoEntriesAnswerTo()
@@ -379,7 +379,7 @@ public sealed class VaultHistoryTests : IDisposable
     /// A revision is values, never identity. History items carry the title the entry had when the
     /// revision was taken, and <c>RestoreFromBackup</c> assigns every string back — so without a
     /// guard, restoring an old revision would silently undo a rename nobody asked about, and could
-    /// move the entry onto a name something else already answers to (D-0091).
+    /// move the entry onto a name something else already answers to.
     /// </summary>
     [Fact]
     public void RestoringARevisionTakenBeforeARename_LeavesTheEntryAtItsCurrentName()

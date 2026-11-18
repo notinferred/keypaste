@@ -6,7 +6,7 @@
     <AssemblyName>keypaste</AssemblyName>
     <!--
       Both of these are restore-time inputs, so both must be committed or a locked-mode restore
-      cannot hold (D-0040). PublishAot adds Microsoft.DotNet.ILCompiler as a package reference the
+      cannot hold. PublishAot adds Microsoft.DotNet.ILCompiler as a package reference the
       lock file records; RuntimeIdentifiers is the set of targets that reference is resolved for.
 
       The corollary is a rule the release workflow must obey: NEVER pass `-r` to restore. It
@@ -22,12 +22,12 @@
       ILC analyses IL app-wide from this project, so the quarantine in third_party does not reach
       it: vendored KeePassLib's eleven reflection sites are reported here, and TreatWarningsAsErrors
       would fail every publish. Blanket suppression was rejected - SuppressTrimAnalysisWarnings also
-      sets EnableTrimAnalyzer=false, which would disarm D-0005's gate for our own code too.
+      sets EnableTrimAnalyzer=false, which would disarm the trim gate for our own code too.
 
       Instead the diagnostics stay visible and scripts/verify-aot-trim.sh diffs them against
       scripts/aot-trim-baseline.txt, so a new one is a red build rather than a silence. That gate
       also rejects any diagnostic naming src/, which is the rule these two properties would
-      otherwise relax. See D-0040.
+      otherwise relax.
     -->
     <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
@@ -47,7 +47,7 @@
 
   <!--
     The libsodium Keypaste.Browser calls, which scripts/build-libsodium.sh builds from its signed release, is linked into the
-    NativeAOT keypaste: its calls are bound at link time and no copy of it is ever loaded (D-0612). A publish without the
+    NativeAOT keypaste: its calls are bound at link time and no copy of it is ever loaded. A publish without the
     archive stops before compiling rather than linking a box that cannot open.
   -->
   <PropertyGroup>

@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Another program's save of the open vault's own file merged with the open copy and saved over it atomically (1.4b2, D-0543):
+/// Another program's save of the open vault's own file merged with the open copy and saved over it atomically (1.4b2):
 /// the file read once, parsed with the unlock's key and refused from its bytes below KDBX 4, a save landing meanwhile merged on the
 /// next attempt, and every refusal or failure leaving the open copy and the file as they were. The other program's saves are made
 /// through KeePassLib directly, a revision of the entry before each change as KeePass saves one.
@@ -30,7 +30,7 @@ public sealed class VaultMergeSaveTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
-    /// <summary>The save replaces the other program's file and keeps it, though this unlock's own backup is minutes old (D-0543).</summary>
+    /// <summary>The save replaces the other program's file and keeps it, though this unlock's own backup is minutes old.</summary>
     [Fact]
     public void AnotherProgramsSave_IsMergedWithTheChangeThisCopyHeld_AndTheFileItReplacedIsKept()
     {
@@ -60,7 +60,7 @@ public sealed class VaultMergeSaveTests : IDisposable
 
     /// <summary>
     /// The other program saves again while the merged copy's save waits to retry a write it could not make, as a writer holding the
-    /// file refuses one; the retry finds the file changed, and the merge starts again from what both saves wrote (D-0119, D-0543).
+    /// file refuses one; the retry finds the file changed, and the merge starts again from what both saves wrote.
     /// </summary>
     [Fact]
     public void ASaveLandingBeforeTheMergedCopysSave_IsMergedOnTheNextAttempt()
@@ -98,7 +98,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         Assert.Equal(VaultSaveStatus.Saved, copy!.SaveState().Status);
     }
 
-    /// <summary>One detection starts the merge again at most three times; then it waits for the next change, both copies as they were (D-0543).</summary>
+    /// <summary>One detection starts the merge again at most three times; then it waits for the next change, both copies as they were.</summary>
     [Fact]
     public void ASaveLandingBeforeEveryAttempt_LeavesTheMergeToTheNextChange()
     {
@@ -182,7 +182,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         AssertNothingChanged(open, merged, before);
     }
 
-    /// <summary>A file whose root group is not the open vault's is another vault, opened by the same password or not (D-0543).</summary>
+    /// <summary>A file whose root group is not the open vault's is another vault, opened by the same password or not.</summary>
     [Fact]
     public void AnotherVaultsFile_IsRefused()
     {
@@ -205,7 +205,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         AssertNothingChanged(open, merged, before);
     }
 
-    /// <summary>The same vault saved as KDBX 3.1 under the same key, which opens as any vault does, is refused from its header before it is parsed (D-0541).</summary>
+    /// <summary>The same vault saved as KDBX 3.1 under the same key, which opens as any vault does, is refused from its header before it is parsed.</summary>
     [Fact]
     public void TheSameVaultSavedAsKdbx31_IsRefusedFromItsBytes()
     {
@@ -224,7 +224,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         AssertNothingChanged(open, merged, before);
     }
 
-    /// <summary>A file caught while the other program writes it is refused, and merged at the next change, once it is whole (D-0543).</summary>
+    /// <summary>A file caught while the other program writes it is refused, and merged at the next change, once it is whole.</summary>
     [Fact]
     public void ATruncatedFile_IsRefused_AndMergedOnceComplete()
     {
@@ -249,7 +249,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         Assert.Equal(("mine", "theirs"), Passwords(VaultPath));
     }
 
-    /// <summary>With nothing of its own to carry, the merged copy is the file's, and nothing is written (D-0543).</summary>
+    /// <summary>With nothing of its own to carry, the merged copy is the file's, and nothing is written.</summary>
     [Fact]
     public void AFileThatHoldsEverythingThisCopyDoes_IsTakenAsItIs_AndNothingIsWritten()
     {

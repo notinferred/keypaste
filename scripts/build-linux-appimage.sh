@@ -3,7 +3,7 @@
 #
 # appimagetool and the type2 runtime are both fetched against the definition's SHA-256 pins, and the
 # runtime is always passed with --runtime-file: without it appimagetool downloads the unpinned
-# `continuous` runtime (D-0203). The tool is itself an AppImage, so it is extracted and its AppRun
+# `continuous` runtime. The tool is itself an AppImage, so it is extracted and its AppRun
 # started, which needs no FUSE; the package it builds is never run here.
 #
 # Build logs go to stderr; the path of the AppImage is the only line on stdout.

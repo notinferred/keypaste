@@ -222,7 +222,7 @@ public sealed class ApprovalPromptTests
     {
         // Sixty seconds is the MCP SDK's default request timeout, which Claude Desktop and Claude
         // Code both inherit. A window that reached it would let an approval land in a request the
-        // client had already abandoned (DECISIONS.md D-0027).
+        // client had already abandoned.
         Assert.True(ApprovalLimits.DefaultWindowSeconds < 60);
         Assert.True(ApprovalLimits.MaximumWindowSeconds < 60);
         Assert.True(ApprovalLimits.MinimumWindowSeconds <= ApprovalLimits.DefaultWindowSeconds);

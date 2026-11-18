@@ -96,31 +96,31 @@ Copyright (c) 2015-2025, App vNext. Licensed under the BSD 3-Clause License, who
 >
 > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-`Keypaste.Core` references `Polly.Core` 8.9.0 from NuGet for its retries and timeouts ([Directory.Packages.props](Directory.Packages.props), D-0677), so the desktop app, the CLI and the MCP bridge contain it. It is not vendored or modified. The BSD 3-Clause License permits combining it into this AGPL-3.0-only distribution, and the library remains available under it.
+`Keypaste.Core` references `Polly.Core` 8.9.0 from NuGet for its retries and timeouts ([Directory.Packages.props](Directory.Packages.props)), so the desktop app, the CLI and the MCP bridge contain it. It is not vendored or modified. The BSD 3-Clause License permits combining it into this AGPL-3.0-only distribution, and the library remains available under it.
 
 ## System.CommandLine
 
 Copyright (c) .NET Foundation and Contributors. Licensed under the MIT License; the text is at <https://github.com/dotnet/command-line-api/blob/main/LICENSE.md>.
 
-`keypaste` parses the arguments of its verbs and of the MCP bridge with `System.CommandLine` 2.0.14 (D-0678), which reaches the desktop app through Keypaste.Infrastructure without being called there. It is not vendored or modified.
+`keypaste` parses the arguments of its verbs and of the MCP bridge with `System.CommandLine` 2.0.14, which reaches the desktop app through Keypaste.Infrastructure without being called there. It is not vendored or modified.
 
 ## CommunityToolkit.Mvvm
 
 Copyright (c) .NET Foundation and Contributors. Licensed under the MIT License; the text is at <https://github.com/CommunityToolkit/dotnet/blob/main/License.md>.
 
-The desktop app references `CommunityToolkit.Mvvm` 8.4.2 from NuGet for its view models' properties and commands (D-0680). It is not vendored or modified, and the CLI and the MCP bridge do not contain it.
+The desktop app references `CommunityToolkit.Mvvm` 8.4.2 from NuGet for its view models' properties and commands. It is not vendored or modified, and the CLI and the MCP bridge do not contain it.
 
 ## Yubico .NET SDK
 
 Copyright (c) Yubico AB. Licensed under the Apache License, Version 2.0; the full text is at <https://www.apache.org/licenses/LICENSE-2.0> and in each package as `LICENSE.txt`.
 
-The desktop app references `Yubico.YubiKey` 1.18.0 from NuGet, with its `Yubico.Core` and `Yubico.NativeShims` packages, to ask a YubiKey for HMAC-SHA1 challenge-response ([Directory.Packages.props](Directory.Packages.props), D-0366). They are not vendored or modified, and the CLI and the MCP bridge do not contain them. `Yubico.NativeShims` is a native library that statically contains OpenSSL's libcrypto, which is also Apache-2.0. Apache-2.0 code may be combined into a GPLv3 work, and so into this AGPL-3.0-only distribution; the SDK remains under Apache-2.0.
+The desktop app references `Yubico.YubiKey` 1.18.0 from NuGet, with its `Yubico.Core` and `Yubico.NativeShims` packages, to ask a YubiKey for HMAC-SHA1 challenge-response ([Directory.Packages.props](Directory.Packages.props)). They are not vendored or modified, and the CLI and the MCP bridge do not contain them. `Yubico.NativeShims` is a native library that statically contains OpenSSL's libcrypto, which is also Apache-2.0. Apache-2.0 code may be combined into a GPLv3 work, and so into this AGPL-3.0-only distribution; the SDK remains under Apache-2.0.
 
 ## Windows SDK projection for .NET
 
 Copyright (c) Microsoft Corporation. Licensed under the MIT License; the text is at <https://github.com/microsoft/CsWinRT/blob/master/LICENSE>.
 
-The desktop app's Windows target, which only its Windows package carries, references the targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 that the .NET SDK supplies, and so ships `Microsoft.Windows.SDK.NET.dll` and C#/WinRT's `WinRT.Runtime.dll`, to reach Windows Hello (D-0549). They are not vendored or modified, and the CLI, the MCP bridge and the Linux and macOS packages do not contain them.
+The desktop app's Windows target, which only its Windows package carries, references the targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 that the .NET SDK supplies, and so ships `Microsoft.Windows.SDK.NET.dll` and C#/WinRT's `WinRT.Runtime.dll`, to reach Windows Hello. They are not vendored or modified, and the CLI, the MCP bridge and the Linux and macOS packages do not contain them.
 
 ## keypaste's browser extension
 

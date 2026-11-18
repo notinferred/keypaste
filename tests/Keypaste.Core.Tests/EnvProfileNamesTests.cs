@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Which names are profiles, which of them are protected, and how a set is named (D-0348, D-0416).</summary>
+/// <summary>Which names are profiles, which of them are protected, and how a set is named.</summary>
 public sealed class EnvProfileNamesTests
 {
     [Theory]

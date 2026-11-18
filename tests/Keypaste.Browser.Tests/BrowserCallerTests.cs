@@ -6,7 +6,7 @@ namespace Keypaste.Browser.Tests;
 
 /// <summary>
 /// Which arguments are a browser starting its native messaging host, which callers keypaste answers, and that any other
-/// exits before standard input is read (D-0624).
+/// exits before standard input is read.
 /// </summary>
 public sealed class BrowserCallerTests : IDisposable
 {

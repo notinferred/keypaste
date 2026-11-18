@@ -28,7 +28,7 @@ public sealed record ProjectMembership(string Project, string Environment)
 }
 
 /// <summary>
-/// Every project in a vault, from its entries' own project tags (D-0370); no group makes a project (D-0416).
+/// Every project in a vault, from its entries' own project tags; no group makes a project.
 /// </summary>
 /// <remarks>
 /// Only an entry's own tags count; a group's tags are never read. Entries in the recycle bin and in

@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An item made from a template: its standard fields, custom fields and tags in one change with no
-/// history item, in a group that exists, under the field-name and tag rules; a refusal writes nothing (D-0379).
+/// history item, in a group that exists, under the field-name and tag rules; a refusal writes nothing.
 /// </summary>
 public sealed class VaultCreateEntryTests : IDisposable
 {
@@ -61,7 +61,7 @@ public sealed class VaultCreateEntryTests : IDisposable
         Assert.Empty(reopened.ReadHistory(new EntryName("Work", "github"))!);
     }
 
-    /// <summary>A group under <c>env</c> is an ordinary group, and an item made there joins no project by being there (D-0416).</summary>
+    /// <summary>A group under <c>env</c> is an ordinary group, and an item made there joins no project by being there.</summary>
     [Fact]
     public void An_item_is_created_in_a_group_under_env_like_any_other()
     {

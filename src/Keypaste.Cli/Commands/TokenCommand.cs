@@ -23,7 +23,7 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <c>create</c> and <c>revoke</c> save, so they take the vault's claim first and are refused while
 /// the app or <c>keypaste approve</c> holds it: a token written under a running owner would be
-/// invisible to it and leave its copy changed on disk (D-0317). <c>ls</c> and <c>bundle</c> only read.
+/// invisible to it and leave its copy changed on disk. <c>ls</c> and <c>bundle</c> only read.
 /// </para>
 /// </remarks>
 internal static class TokenCommand
@@ -240,7 +240,7 @@ internal static class TokenCommand
     /// <summary>Seals every set the named token's scope covers into a file a machine with no vault can open.</summary>
     /// <remarks>
     /// Whole or nothing, and never a protected profile: a bundle opens without asking anybody and
-    /// cannot be revoked once written (D-0348). The file is written beside its destination, the
+    /// cannot be revoked once written. The file is written beside its destination, the
     /// audit line is appended, and only then is it moved into place, so an unwritable log leaves no
     /// bundle behind.
     /// </remarks>

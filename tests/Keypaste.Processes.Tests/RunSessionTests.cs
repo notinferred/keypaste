@@ -70,7 +70,7 @@ public sealed class RunSessionTests
 
         Assert.Single(app.Driver.Output, line => line.StartsWith("env-prompt project=", StringComparison.Ordinal));
 
-        // A refusal cools that request down (D-0425), so the next asks with a command of its own.
+        // A refusal cools that request down, so the next asks with a command of its own.
         using (var run = Run(workspace, "ci", "case-lock"))
         {
             app.WaitFor("^env-prompt project=", 2);

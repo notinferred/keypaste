@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
-/// <summary>What <c>keypaste run</c>'s traps do with a signal that arrives before its child exists (D-0394).</summary>
+/// <summary>What <c>keypaste run</c>'s traps do with a signal that arrives before its child exists.</summary>
 public sealed class SignalRelayTests
 {
     [Fact]

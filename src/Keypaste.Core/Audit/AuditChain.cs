@@ -150,7 +150,7 @@ internal static class AuditChain
             return Plain(AuditLineKind.Torn);
         }
 
-        // Schema 1 predates the chain and no release of keypaste wrote it (D-0416), so a line that
+        // Schema 1 predates the chain and no release of keypaste wrote it, so a line that
         // claims it was written by something else.
         if (version == 1)
         {

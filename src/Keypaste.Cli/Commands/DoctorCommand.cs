@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>
 /// <c>keypaste doctor</c>: says whether this keypaste and its Argon2, the vault, the process holding it, each AI tool's
-/// registration, keypaste's settings files and PATH work together, and what to fix (D-0467, D-0525).
+/// registration, keypaste's settings files and PATH work together, and what to fix.
 /// </summary>
 /// <remarks>
 /// It only reads, through <see cref="HealthCheck"/>. A finding can quote another program or a path from an AI tool's

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Holds a built Linux AppImage to what release-targets.json declares about it (4.7a3, D-0142).
+# Holds a built Linux AppImage to what release-targets.json declares about it (4.7a3).
 #
 # What it refuses:
 #   - a file name other than the declared appimage pattern expanded for this version;

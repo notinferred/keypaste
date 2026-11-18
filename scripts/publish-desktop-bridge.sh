@@ -3,7 +3,7 @@
 # to start from the installed package (2.6a). It is the same project release.yml publishes for the CLI/MCP
 # archives, built from this commit into a directory of its own and copied in alone, so no symbol file or
 # second runtime lands beside the app. The copy must then answer mcp --help, and its NaCl box, whose libsodium it links,
-# must give its known answers (D-0613).
+# must give its known answers.
 #
 # Extra arguments are passed to `dotnet publish`, such as the version properties the app was built with.
 #
@@ -27,7 +27,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 "$ROOT/scripts/build-libsodium.sh" "$rid" >&2
-# Restored for every RID, then published for one: narrowing the restore invalidates the lock file (D-0040).
+# Restored for every RID, then published for one: narrowing the restore invalidates the lock file.
 dotnet restore "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" --locked-mode >&2
 dotnet publish "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" -c Release -r "$rid" --no-restore -o "$work" "$@" >&2
 

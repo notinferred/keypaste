@@ -6,13 +6,13 @@ namespace Keypaste.Core.Import;
 
 /// <summary>
 /// Reads 1Password's 1PUX export: a ZIP archive holding <c>export.data</c>, its accounts' vaults and items in JSON, and
-/// under <c>files/</c> the files its items hold (D-0582).
+/// under <c>files/</c> the files its items hold.
 /// </summary>
 /// <remarks>
 /// The archive is read in memory from the buffer <see cref="ExportImport"/> hands over, and refused before anything is
 /// unpacked when it lists more entries than keypaste reads, an entry's path leaves the archive or two entries share one,
-/// or it would unpack to more than keypaste reads (D-0583). Each vault becomes a group, each section's fields custom
-/// fields named as KeePassXC's own 1PUX import names them (D-0584), and what lands nowhere is named with why (D-0585).
+/// or it would unpack to more than keypaste reads. Each vault becomes a group, each section's fields custom
+/// fields named as KeePassXC's own 1PUX import names them, and what lands nowhere is named with why.
 /// </remarks>
 internal sealed class OnePassword1PuxReader : IExportReader
 {
@@ -147,7 +147,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
     /// <summary>
     /// The most entries any reading of the archive's end records gives it: the count each declares, and the central
     /// directory headers that follow one another from where each says the directory starts, counted without allocating
-    /// any, so ZipArchive never reads a directory larger than <see cref="MaximumEntries"/> (D-0583).
+    /// any, so ZipArchive never reads a directory larger than <see cref="MaximumEntries"/>.
     /// </summary>
     private static long Listed(ReadOnlySpan<byte> zip)
     {
@@ -216,7 +216,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
         }
     }
 
-    /// <summary>Every entry by its path, in the archive's order, refusing a path that leaves the archive and one two entries share (D-0583).</summary>
+    /// <summary>Every entry by its path, in the archive's order, refusing a path that leaves the archive and one two entries share.</summary>
     private static List<ZipArchiveEntry> Entries(ZipArchive archive)
     {
         List<ZipArchiveEntry> listed;
@@ -300,7 +300,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
         }
     }
 
-    /// <summary>A field's name as KeePassXC's own 1PUX import names it: its section's title, when it has one, joined with <c>_</c> to its own title, else its id (D-0584).</summary>
+    /// <summary>A field's name as KeePassXC's own 1PUX import names it: its section's title, when it has one, joined with <c>_</c> to its own title, else its id.</summary>
     private static string FieldName(string section, string title, string id)
     {
         var own = title.Trim() is { Length: > 0 } trimmed ? trimmed : id.Trim() is { Length: > 0 } named ? named : "field";
@@ -742,7 +742,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
             }
         }
 
-        /// <summary>One section field, by the kind its value names: text plain, a concealed value or card number protected, a TOTP for the item's <c>otp</c>, a file an attachment (D-0584).</summary>
+        /// <summary>One section field, by the kind its value names: text plain, a concealed value or card number protected, a TOTP for the item's <c>otp</c>, a file an attachment.</summary>
         private void Field(Landing landing, JsonElement field, string where, string section)
         {
             landing.Omitted.AddRange(Unknown(field, _fieldMembers, "field."));
@@ -894,7 +894,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
             landing.Put(FieldName(section, "key type", string.Empty), Text(metadata, "keyType", metadataWhere), protect: false);
         }
 
-        /// <summary>A file an item holds, found at <c>files/&lt;documentId&gt;__&lt;fileName&gt;</c> as 1Password writes it, unpacked later when no larger than D-0533's cap.</summary>
+        /// <summary>A file an item holds, found at <c>files/&lt;documentId&gt;__&lt;fileName&gt;</c> as 1Password writes it, unpacked later when no larger than the attachment cap.</summary>
         private void Attach(Landing landing, JsonElement file, string where, string prefix)
         {
             landing.Omitted.AddRange(Unknown(file, _fileMembers, prefix));
@@ -973,7 +973,7 @@ internal sealed class OnePassword1PuxReader : IExportReader
         /// <summary>
         /// Lands a value: as the item's user name, password or web address when it is named as one and that is still
         /// empty, else as a custom field, whose name, when it is a standard field's, KeePassXC's or another of the item's,
-        /// is kept beside the other as <c>name (2)</c>, as a taken title is (D-0584). A value its standard field already
+        /// is kept beside the other as <c>name (2)</c>, as a taken title is. A value its standard field already
         /// holds is there already.
         /// </summary>
         internal void Put(string name, string value, bool protect)

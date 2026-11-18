@@ -4,7 +4,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>Program.cs</c> hands <c>keypaste mcp</c> to the bridge and a browser's start to the relay before any other CLI code runs,
-/// so neither opens a vault, reads a password or writes an audit line first (D-0418, D-0548).
+/// so neither opens a vault, reads a password or writes an audit line first.
 /// </summary>
 /// <remarks>
 /// The bridge's and the relay's <c>BannedSymbols</c> lists hold what their own code names. Which statement runs first is an

@@ -4,7 +4,7 @@
 #
 # release.yml attests every asset of a release and its manifest in one Sigstore bundle, and publishes
 # the bundle and the manifest beside them. This script needs no GitHub login: with a bundle on disk,
-# `gh attestation verify` checks the signature against Sigstore's public trust root (D-0138).
+# `gh attestation verify` checks the signature against Sigstore's public trust root.
 #
 # What it refuses:
 #   - a manifest the bundle does not attest for this repository, workflow and tag;
@@ -12,7 +12,7 @@
 #   - an asset whose bytes are not the ones the manifest records, or that the bundle does not attest;
 #   - a verifier that exits 0 without saying which digest it verified, or names another one.
 #
-# What it does not prove: that the source is correct, that the build is reproducible (O-0012), or who
+# What it does not prove: that the source is correct, that the build is reproducible, or who
 # may run the release workflow. A compromised workflow run attests whatever it built (THREATS T-21).
 #
 # Usage:
@@ -71,7 +71,7 @@ attested() {
   [ -z "${KEYPASTE_TRUSTED_ROOT:-}" ] || args+=(--custom-trusted-root "$KEYPASTE_TRUSTED_ROOT")
   out="$(gh "${args[@]}" 2>/dev/null)" || return 1
   digest="$(sha256_of "$file")"
-  # Compared as text: jq 1.6's -e exits 0 on empty input, which would believe a silent verifier (D-0106).
+  # Compared as text: jq 1.6's -e exits 0 on empty input, which would believe a silent verifier.
   [ "$(printf '%s' "$out" | jq -r --arg d "$digest" \
     'type == "array" and length > 0 and any(.[]; any(.verificationResult.statement.subject[]?; .digest.sha256 == $d))' \
     2>/dev/null)" = "true" ]

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Refreshes the vendored Public Suffix List, its tests and its licence, which a person runs before each release and
-# commits like any other change (D-0615); release.yml refuses a tag whose copy is more than 60 days old (D-0616).
+# commits like any other change; release.yml refuses a tag whose copy is more than 60 days old.
 #
 # The list comes only from publicsuffix.org, as upstream asks, and is kept only when it is the file at the commit its
 # COMMIT line names with its VERSION and COMMIT lines added. Each internationalised rule, and each argument of

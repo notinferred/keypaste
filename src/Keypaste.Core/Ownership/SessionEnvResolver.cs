@@ -4,7 +4,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Resolves a project's env set from the vault a session's owner holds, released only while the
-/// lifetime that asked is live (D-0313) and only from the vault as its file holds it (D-0317).
+/// lifetime that asked is live and only from the vault as its file holds it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,7 +15,7 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// A lock while the person is being asked withdraws the question, and a lock after it commits
-/// nothing: either way no value leaves. A reload or a merge does the same while keeping the lifetime (D-0412, D-0542).
+/// nothing: either way no value leaves. A reload or a merge does the same while keeping the lifetime.
 /// </para>
 /// </remarks>
 public sealed class SessionEnvResolver

@@ -95,7 +95,7 @@ public sealed class RestoredBackupIsVisibleToTheCliTests
         fixture.Session.Lock(VaultLockReason.Manual);
     }
 
-    /// <summary>Moves every backup's stamp back an hour; the floor has no knob to turn instead (D-0263).</summary>
+    /// <summary>Moves every backup's stamp back an hour; the floor has no knob to turn instead.</summary>
     private static void AgeBackups(string vaultPath)
     {
         foreach (var backup in VaultBackups.List(vaultPath).Reverse())

@@ -4,7 +4,7 @@ using Keypaste.Core.Editing;
 
 namespace Keypaste.Core.Ipc;
 
-/// <summary>Writes the approver frames below without reflection, so the trim and AOT analyzers accept it (D-0019).</summary>
+/// <summary>Writes the approver frames below without reflection, so the trim and AOT analyzers accept it.</summary>
 /// <remarks>
 /// Each frame is a view of its message that names the wire members in wire order: the generator
 /// writes properties in declaration order, and a member that is null is left out unless it says
@@ -284,7 +284,7 @@ internal sealed class VariableRow(EnvVariable variable)
     public static IEnumerable<VariableRow>? Of(EnvResolved set) =>
         set.Outcome == EnvOutcome.Resolved ? set.Variables.Select(variable => new VariableRow(variable)) : null;
 
-    /// <summary>The texts filled into a released set's values (D-0465), or null when none were or the set was not released, so a frame without one is written as before.</summary>
+    /// <summary>The texts filled into a released set's values, or null when none were or the set was not released, so a frame without one is written as before.</summary>
     public static IEnumerable<VariableRow>? FillsOf(EnvResolved set) =>
         set.Outcome == EnvOutcome.Resolved && set.Fills.Count > 0 ? set.Fills.Select(fill => new VariableRow(fill)) : null;
 }

@@ -552,7 +552,7 @@ public sealed class VaultRestoreTests : IDisposable
     }
 
     /// <remarks>
-    /// What holds a vault's name in the wild is another process saving it (D-0119). This confirms or
+    /// What holds a vault's name in the wild is another process saving it. This confirms or
     /// refutes that the refusal a save meets there reaches a restore's plain rename as something it
     /// retries, and that a writer who then commits is left alone rather than restored over.
     /// </remarks>

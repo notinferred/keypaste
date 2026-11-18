@@ -123,7 +123,7 @@ public sealed class RunTokenTests : IDisposable
         Assert.Single(_harness.ProcessLauncher.Started);
     }
 
-    /// <summary><c>--project</c> picks a bundle's set as the operand does, including one whose project starts with <c>-</c> (D-0453).</summary>
+    /// <summary><c>--project</c> picks a bundle's set as the operand does, including one whose project starts with <c>-</c>.</summary>
     [Fact]
     public void Bundle_ProjectOption_PicksThatSet_EvenOneStartingWithADash()
     {
@@ -170,7 +170,7 @@ public sealed class RunTokenTests : IDisposable
         Assert.False(File.Exists(KeypasteHome.AuditPath(RunnerHome)));
     }
 
-    /// <summary>A set past one ordinary frame reaches the child whole under a token, in the reply only a runner reads (D-0454).</summary>
+    /// <summary>A set past one ordinary frame reaches the child whole under a token, in the reply only a runner reads.</summary>
     [Fact]
     public async Task Session_ASetOf200KiB_ReachesTheChildWhole()
     {

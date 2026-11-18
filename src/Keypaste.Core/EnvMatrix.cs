@@ -33,7 +33,7 @@ public sealed record EnvMatrixRow(string Key, IReadOnlyList<EnvCell> Cells);
 /// A project's keys against its profiles, for the Env profiles screen and <c>keypaste env diff</c>.
 /// </summary>
 /// <remarks>
-/// Values are compared as they leave keypaste, their placeholders filled in (D-0465), while it is built and
+/// Values are compared as they leave keypaste, their placeholders filled in, while it is built and
 /// then dropped: no record here has a member that could hold one, so a matrix can be bound, logged or
 /// printed without that question arising.
 /// </remarks>

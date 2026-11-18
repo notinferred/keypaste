@@ -6,7 +6,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// The endpoint the desktop app listens on for a vault while it is locked, which a bridge about to refuse
-/// its agent for want of an owner connects to, so the app can tell the person an agent asked (D-0466).
+/// its agent for want of an owner connects to, so the app can tell the person an agent asked.
 /// </summary>
 /// <remarks>
 /// <para>

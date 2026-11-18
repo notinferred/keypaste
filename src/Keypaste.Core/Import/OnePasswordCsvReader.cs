@@ -2,7 +2,7 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Import;
 
-/// <summary>1Password's CSV export: 1Password 8's, of its Login and Password items, and the common fields earlier versions write with their labels (D-0576).</summary>
+/// <summary>1Password's CSV export: 1Password 8's, of its Login and Password items, and the common fields earlier versions write with their labels.</summary>
 /// <remarks>
 /// 1Password 8 names its columns <c>Title,Url,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes</c>, and earlier
 /// versions' common fields are <c>notes,password,title,type,url,username</c>. A header naming title, url, username,
@@ -12,7 +12,7 @@ namespace Keypaste.Core.Import;
 /// </remarks>
 internal sealed class OnePasswordCsvReader : IExportReader
 {
-    /// <summary>KeePassXC's tag for a favorite (D-0574).</summary>
+    /// <summary>KeePassXC's tag for a favorite.</summary>
     private const string _favoriteTag = "Favorite";
 
     /// <summary>KeePassXC's tag for an archived item, which its 1Password importer gives one.</summary>

@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A project's directory and command are kept on this machine, one per vault and project, with no
-/// field a value could be written to, and a file keypaste cannot read is never replaced (D-0339).
+/// field a value could be written to, and a file keypaste cannot read is never replaced.
 /// </summary>
 public sealed class ProjectMappingsTests : IDisposable
 {
@@ -91,7 +91,7 @@ public sealed class ProjectMappingsTests : IDisposable
         Assert.Equal("ops", Assert.Single(loaded).Project);
     }
 
-    /// <summary>What a newer version wrote and this one does not read survives a save of another mapping (D-0520).</summary>
+    /// <summary>What a newer version wrote and this one does not read survives a save of another mapping.</summary>
     [Fact]
     public void A_mapping_it_cannot_read_and_properties_it_does_not_know_survive_a_save()
     {

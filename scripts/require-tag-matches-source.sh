@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Refuses a tag that names a version the source does not declare.
 #
-# D-0041: the version lives in Directory.Build.props and the tag only names it. Nothing is passed
+# The version lives in Directory.Build.props and the tag only names it. Nothing is passed
 # with -p:Version=, so a local publish at the tagged commit produces the inputs the release did, and
 # a tag that disagrees with the source is a mistake rather than an override.
 #
-# Extracted from release.yml's guard for D-0109's reason: the comparison was reachable only on a
+# Extracted from release.yml's guard so a fixture can drive it: the comparison was reachable only on a
 # tag, because on a dispatch `publish=false` short-circuits it - so the check that decides whether a
 # release is named correctly had never once been run in its refusing direction.
 #
@@ -37,7 +37,7 @@ if [ -z "$prefix" ]; then
   prefix="$(dotnet msbuild "$PROJECT" -getProperty:VersionPrefix -nologo | tr -d '[:space:]')"
 fi
 
-# An empty answer is refused rather than compared. D-0106: a check must rest on what came back, and
+# An empty answer is refused rather than compared: a check must rest on what came back, and
 # an unset property reads as "" which would equal a "" base and pass on the emptiest possible input.
 [ -n "$prefix" ] || die "could not read VersionPrefix; refusing without a verified answer"
 

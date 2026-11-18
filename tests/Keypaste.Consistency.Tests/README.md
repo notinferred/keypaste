@@ -4,7 +4,7 @@ This project references both front ends. Tests edit a vault through desktop view
 
 ## Why it is in neither solution
 
-Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restores. Putting it in `keypaste.app.slnx` would bring the CLI's AOT compiler packs into ordinary desktop restores: `PublishAot` and four `RuntimeIdentifiers` are restore-time inputs (D-0040).
+Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restores. Putting it in `keypaste.app.slnx` would bring the CLI's AOT compiler packs into ordinary desktop restores: `PublishAot` and four `RuntimeIdentifiers` are restore-time inputs.
 
 A measurement on 2026-07-28 found desktop restore size increased from 2091 MB to 2580 MB when the CLI joined the solution. That historical measurement explains the separation; it is not a current benchmark.
 

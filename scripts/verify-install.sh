@@ -5,7 +5,7 @@
 # between sentinel comments, and executed verbatim - so what is tested is the text on the page and
 # not a second copy of it that can drift. Same principle as verify-demo.sh holding the documented
 # transcripts to what the binaries actually print, applied to the one instruction a stranger runs
-# before anything else. D-0036: a page may claim only what a gate or a citation can hold.
+# before anything else. A page may claim only what a gate or a citation can hold.
 #
 # Usage:
 #   verify-install.sh <linux|macos|windows>

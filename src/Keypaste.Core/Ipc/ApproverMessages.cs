@@ -19,7 +19,7 @@ public enum ApproverMessageKind
     /// <summary>Binds a connection to the session holding a named vault.</summary>
     Attach = 3,
 
-    /// <summary>The reply carrying a project's env set; no request has this kind (D-0416).</summary>
+    /// <summary>The reply carrying a project's env set; no request has this kind.</summary>
     Env = 4,
 
     /// <summary>Asks the owner to lock now.</summary>
@@ -32,7 +32,7 @@ public enum ApproverMessageKind
     Run = 10,
     /// <summary>Withdraws the request a connection is waiting on: the owner still sends its reply, then ends the connection.</summary>
     Withdraw = 11,
-    /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves (D-0464).</summary>
+    /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves.</summary>
     Edit = 14,
     /// <summary>A browser's request to pair, made only on a browser's attachment.</summary>
     BrowserPair = 15,
@@ -378,7 +378,7 @@ public sealed record EnvRequest(string Project, IReadOnlyList<string> Command, s
     /// <summary>What a reference file makes of the set, as the runner claims it: <c>NAME ← KEY</c> and literal <c>NAME=value</c> lines; null outside reference-file mode.</summary>
     public IReadOnlyList<string>? FileLines { get; init; }
 
-    /// <summary>The launch pass the app's Run confirmation issued for exactly this request, or null to ask the person (D-0452).</summary>
+    /// <summary>The launch pass the app's Run confirmation issued for exactly this request, or null to ask the person.</summary>
     public string? Launch { get; init; }
 
     /// <summary>A description with the launch pass left out.</summary>
@@ -457,7 +457,7 @@ public sealed record RulesChangeReply(bool Changed, string Reason)
 
 /// <summary>
 /// Asks the owner to make a terminal's edit to its vault's items, which it checks again itself, puts
-/// to the person and saves under its claim (D-0464).
+/// to the person and saves under its claim.
 /// </summary>
 /// <param name="Edit">The edit, carrying the new values it writes and never a master password.</param>
 /// <remarks><see cref="ToString"/> names the verb only, so no interpolated request can print a value.</remarks>

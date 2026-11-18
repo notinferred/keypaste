@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An item's attachments: listed by name and size, added and replaced under the cap, removed, each as one revision,
-/// and saved once to a new file (V.8a, D-0533, D-0534).
+/// and saved once to a new file (V.8a).
 /// </summary>
 public sealed class VaultAttachmentTests : IDisposable
 {
@@ -228,7 +228,7 @@ public sealed class VaultAttachmentTests : IDisposable
 
     /// <summary>
     /// KeePassLib drops a revision larger than the vault's history size limit, 6 MiB by default, as KeePassXC does, and the
-    /// edit says so rather than claiming the item's history holds what it replaced (D-0533).
+    /// edit says so rather than claiming the item's history holds what it replaced.
     /// </summary>
     [Fact]
     public void An_edit_whose_revision_is_over_the_history_limit_says_history_could_not_keep_it()

@@ -3,8 +3,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Rotate replaces a password with a generated one, keeps the old one in history (D-0014) and ends
-/// what was released from it (D-0318); "rotated" is when the current password was set.
+/// Rotate replaces a password with a generated one, keeps the old one in history and ends
+/// what was released from it; "rotated" is when the current password was set.
 /// </summary>
 public sealed class EntryRotationTests : IDisposable
 {

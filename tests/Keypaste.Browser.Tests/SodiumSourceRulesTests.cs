@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Browser.Tests;
 
-/// <summary>Only <c>Keypaste.Browser</c>'s <c>Sodium.cs</c> calls libsodium, so Keypaste.Core, the bridge and the app carry none of it (D-0611).</summary>
+/// <summary>Only <c>Keypaste.Browser</c>'s <c>Sodium.cs</c> calls libsodium, so Keypaste.Core, the bridge and the app carry none of it.</summary>
 /// <remarks>
 /// <c>Directory.Build.targets</c> holds who links libsodium and who references <c>Keypaste.Browser</c>. A <c>DllImport</c>'s
 /// library is a string the compiler does not check, so the import is read from the source, in which a name in a comment counts too.

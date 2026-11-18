@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// No package the bridge brings into <c>keypaste</c> has a module initializer, so none of its code runs in
 /// a process that does not start the bridge, such as <c>keypaste approve</c> holding the unlocked vault
-/// (PRODUCT §3.9, D-0419).
+/// (PRODUCT §3.9).
 /// </summary>
 /// <remarks>
 /// A module initializer runs when its module loads, at startup under NativeAOT, whether or not anything

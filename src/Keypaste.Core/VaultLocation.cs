@@ -4,7 +4,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// <para>
 /// There is deliberately <b>no default path</b>: <c>--vault</c>, then <c>KEYPASTE_VAULT</c>, then the
-/// vault the person chose in <c>app.toml</c>, and otherwise nothing (D-0389). Nothing falls back to
+/// vault the person chose in <c>app.toml</c>, and otherwise nothing. Nothing falls back to
 /// whichever vault happens to be unlocked, because a tool that guesses writes a secret into the
 /// wrong file.
 /// </para>

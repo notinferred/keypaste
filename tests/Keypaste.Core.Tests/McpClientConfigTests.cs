@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// keypaste reads whether a tool's own configuration holds its entry from the file that tool reads, changes nothing in
-/// doing so, and says Unknown rather than Absent whenever it cannot be sure (D-0437).
+/// doing so, and says Unknown rather than Absent whenever it cannot be sure.
 /// </summary>
 public sealed class McpClientConfigTests : IDisposable
 {

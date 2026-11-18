@@ -11,7 +11,7 @@ namespace Keypaste.Core.Projects;
 public sealed record ProjectMapping(string Vault, string Project, string Directory, string Command);
 
 /// <summary>
-/// The desktop app's project mappings, in <c>projects.json</c> under keypaste's home (D-0339).
+/// The desktop app's project mappings, in <c>projects.json</c> under keypaste's home.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -122,8 +122,8 @@ public static class ProjectMappings
     /// <para>
     /// A mapping keeps the other properties the file gave the mapping for its vault and project, a mapping
     /// <see cref="TryLoad"/> skipped stays as it was unless one written names its vault and project, and the
-    /// file's other top-level properties stay, so a version older than the one that wrote them drops none
-    /// (D-0520). A mapping <see cref="TryLoad"/> read and the caller left out is gone.
+    /// file's other top-level properties stay, so a version older than the one that wrote them drops none.
+    /// A mapping <see cref="TryLoad"/> read and the caller left out is gone.
     /// </para>
     /// <para>Owner-only on Unix; on Windows the file inherits the profile's ACL, as <c>app.toml</c> does.</para>
     /// </remarks>

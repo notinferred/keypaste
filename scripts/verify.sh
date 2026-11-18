@@ -27,11 +27,11 @@ compat         Prepare the backend and the app driver, and verify what the built
                KeePassXC: the fixture vault, write-back, keyfiles and XML attachments, and Core.Tests' KeePassXC
                namespace. Never run without being named.
 compile        Locked restore and Release build of both solutions and the consistency project, and dotnet format;
-               no tests, and the build servers stop when it ends. A development machine runs it before each push
-               (D-0468). Never run without being named.
+               no tests, and the build servers stop when it ends. A development machine runs it before each push.
+               Never run without being named.
 test           Build the projects of the fully qualified test classes named, a class's project being its namespace up
                to .Tests, or of each tests/<project> named, run those classes or the whole project, and stop the build
-               servers. A development machine runs it for the classes a change touches (D-0671).
+               servers. A development machine runs it for the classes a change touches.
 tools          Prepare the backend, and connect keypaste to the real AI tools installed on this machine, read each
                registration back with the tool's own command where it has one, else at the file level, and remove
                it again. It writes those tools' own configuration, so it runs only on a GitHub runner, after
@@ -137,7 +137,7 @@ prepare() {
 }
 
 # The libargon2 the app and the CLI carry on Windows and macOS, built before them so every build that runs or tests them
-# derives with the shipped file (D-0523). The compile check runs nothing, so it builds without it.
+# derives with the shipped file. The compile check runs nothing, so it builds without it.
 argon2=true
 build_argon2() {
   if [ "$argon2" = true ]; then run bash scripts/build-argon2.sh; fi
@@ -163,7 +163,7 @@ run_tests() {
   return "$code"
 }
 
-# The shared libsodium Keypaste.Browser's tests load (D-0612), built only where they run.
+# The shared libsodium Keypaste.Browser's tests load, built only where they run.
 build_libsodium() {
   run bash scripts/build-libsodium.sh
 }
@@ -255,7 +255,7 @@ check_desktop_gates() {
   run_tests dotnet test tests/Keypaste.Processes.Tests/Keypaste.Processes.Tests.csproj --no-build -c Release
   # A machine with no ICU is a Linux machine; .NET on Windows and macOS uses the system's own.
   if [ "$(uname -s)" = Linux ]; then integration_script scripts/verify-no-icu.sh --unlock-and-save; fi
-  # The macOS install and upgrade legs run under the stock bash 3.2 (D-0398).
+  # The macOS install and upgrade legs run under the stock bash 3.2.
   if [ "$(uname -s)" = Darwin ]; then
     run /bin/bash scripts/exercise-desktop-install.sh --selftest
     run /bin/bash scripts/exercise-desktop-upgrade.sh --selftest

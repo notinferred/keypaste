@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Replaces an MSI's cabinet stream with a cabinet header and nothing else, so the package still opens and
-# still costs and sequences, and the file installation inside the transaction is what fails (F.14, D-0213).
+# still costs and sequences, and the file installation inside the transaction is what fails (F.14).
 #
 # This is how an interrupted upgrade is produced on a runner: no power cut, no killed process - five other
-# ways were measured and none interrupted anything (D-0210, D-0212). Only ever run against a copy.
+# ways were measured and none interrupted anything. Only ever run against a copy.
 #
 # Usage: break-msi-cabinet.sh <msi-copy>
 set -euo pipefail

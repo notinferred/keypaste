@@ -184,8 +184,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
     /// </summary>
     /// <remarks>
     /// No wall-clock ceiling anywhere: the floor proves the attempts happened, and a ceiling would
-    /// only assert how busy the machine is — which is what grew this budget in the first place
-    /// (D-0107).
+    /// only assert how busy the machine is — which is what grew this budget in the first place.
     /// </remarks>
     [Fact]
     [SupportedOSPlatform("windows")]

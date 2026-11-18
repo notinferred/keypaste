@@ -22,7 +22,7 @@ public sealed class ServerOptionsTests
         Assert.NotNull(Assert.Single(allowed.Vaults).Key);
     }
 
-    /// <summary>D-0422: a bridge nobody widened reaches the variables of tagged entries, and nothing by place.</summary>
+    /// <summary>a bridge nobody widened reaches the variables of tagged entries, and nothing by place.</summary>
     [Fact]
     public void WithNoExpose_TheExposureIsEveryProjectsVariables()
     {
@@ -71,7 +71,7 @@ public sealed class ServerOptionsTests
         Assert.Empty(none!.Vaults);
     }
 
-    /// <summary>D-0466: a bridge looks for the locked app under its vault's own name, whatever <c>--approver</c> or <c>KEYPASTE_APPROVER</c> pins.</summary>
+    /// <summary>a bridge looks for the locked app under its vault's own name, whatever <c>--approver</c> or <c>KEYPASTE_APPROVER</c> pins.</summary>
     [Fact]
     public void TheLockedApp_IsLookedForUnderItsVaultsName_WhicheverApproverIsPinned()
     {
@@ -128,7 +128,7 @@ public sealed class ServerOptionsTests
         Assert.StartsWith("--approver:", fromEnvironment, StringComparison.Ordinal);
     }
 
-    /// <summary>D-0466: a bridge never looks for its approver on a locked app's pipe, however the name is cased.</summary>
+    /// <summary>a bridge never looks for its approver on a locked app's pipe, however the name is cased.</summary>
     [Theory]
     [InlineData("keypaste-locked-0123")]
     [InlineData("KEYPASTE-LOCKED-0123")]
@@ -154,7 +154,7 @@ public sealed class ServerOptionsTests
     }
 
     /// <summary>
-    /// D-0467: <c>keypaste doctor</c> starts a registration as <c>mcp --help</c> and then its own flags, so help put first
+    /// <c>keypaste doctor</c> starts a registration as <c>mcp --help</c> and then its own flags, so help put first
     /// is help whatever follows and names no audit log to open, and a flag left without its value fails rather than taking it.
     /// </summary>
     [Fact]
@@ -183,7 +183,7 @@ public sealed class ServerOptionsTests
         Assert.Contains("'serve'", error, StringComparison.Ordinal);
     }
 
-    /// <summary>D-0470: the usage names the verbs that replaced <c>mcp serve</c>, <c>setup</c> and <c>policy</c>, and none of the three.</summary>
+    /// <summary>the usage names the verbs that replaced <c>mcp serve</c>, <c>setup</c> and <c>policy</c>, and none of the three.</summary>
     [Fact]
     public void TheUsage_KeepsTheOptionNamesTheDemoChecks_AndNamesTheVerbsThatReplacedItsOwn()
     {

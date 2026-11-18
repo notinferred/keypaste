@@ -21,7 +21,7 @@ namespace Keypaste.Consistency.Tests;
 /// <para>
 /// <b>The mutations that must make this file fail:</b> a restore that never saves, which every
 /// in-memory assertion elsewhere would still pass, and one that restores a different index than the
-/// row it was pressed for. The displaced value kept in history (D-0014) and the entry's UUID are
+/// row it was pressed for. The displaced value kept in history and the entry's UUID are
 /// asserted on the reopened file by <c>EntryHistoryTests</c> and <c>VaultHistoryTests</c>.
 /// </para>
 /// </remarks>

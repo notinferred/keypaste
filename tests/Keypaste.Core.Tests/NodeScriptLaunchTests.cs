@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A <c>#!/usr/bin/env node</c> tool in an install folder the macOS app searches off <c>PATH</c> is started with the
-/// runner's real <c>node</c> beside it and receives every argument byte for byte (D-0436).
+/// runner's real <c>node</c> beside it and receives every argument byte for byte.
 /// </summary>
 public sealed class NodeScriptLaunchTests : IDisposable
 {

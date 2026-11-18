@@ -41,7 +41,7 @@ public enum VaultCreationOutcome
     /// <summary>The keyfile is missing, unreadable, empty, a vault or one this build cannot read.</summary>
     KeyfileUnusable = 5,
 
-    /// <summary>The keyfile would be keyed by its hash, which one edit to it destroys (D-0287).</summary>
+    /// <summary>The keyfile would be keyed by its hash, which one edit to it destroys.</summary>
     KeyfileIsFragile = 6,
 
     /// <summary>The keyfile is the new vault's own path or lies in its backup directory.</summary>

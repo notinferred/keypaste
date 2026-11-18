@@ -32,7 +32,7 @@ public enum SourceCleanup
 /// deletion confirmation — four windows in which a person can add a variable in another window, an
 /// editor can save, or a <c>git checkout</c> can replace the file. Deleting whatever is at that
 /// path afterwards loses bytes that were never imported, and there is nowhere to recover them
-/// from: D-0015 already said this command's offer is a trap unless it is bound to what was read,
+/// from: this command's offer is a trap unless it is bound to what was read,
 /// and it was bound only to the path (docs/STEPS.md F.1c).
 /// </para>
 /// <para>
@@ -88,7 +88,7 @@ public sealed class SourceSnapshot
     /// <b>A file that cannot be read is not a change.</b> "This holds something else now" is a
     /// claim about a file that exists and can be inspected. A file that is missing, locked, or on a
     /// directory that momentarily went away is a different answer, and callers separate the two:
-    /// <see cref="Vault.HasFileChangedSinceOpen"/> absorbs it as a transient write problem (D-0017)
+    /// <see cref="Vault.HasFileChangedSinceOpen"/> absorbs it as a transient write problem
     /// and <see cref="DeleteIfUnchanged"/> keeps the file.
     /// </para>
     /// </remarks>
@@ -145,7 +145,7 @@ public sealed class SourceSnapshot
     /// beside itself first. A rename within one directory is atomic, and afterwards nothing else
     /// names that file, so the digest is taken and the deletion performed on something no other
     /// writer can reach. There is no seam here for a test to widen and none for a race to fit
-    /// through, and <c>File.Delete</c> is still the real thing, which is what D-0015 asked for.
+    /// through, and <c>File.Delete</c> is still the real thing.
     /// </para>
     /// <para>
     /// If the bytes turn out to be someone else's, the file goes back. It never goes back

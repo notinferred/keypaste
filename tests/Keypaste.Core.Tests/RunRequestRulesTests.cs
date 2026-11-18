@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// What an agent's run must satisfy before anybody is asked (D-0358): the bridge and the owner both
+/// What an agent's run must satisfy before anybody is asked: the bridge and the owner both
 /// apply it, so a malformed run, a hidden line or a hijacking name never reaches a person.
 /// </summary>
 public sealed class RunRequestRulesTests

@@ -25,7 +25,7 @@ public sealed class ExportSource : IDisposable
     /// <summary>The tag KeePassXC gives an item it adds a passkey to.</summary>
     private const string _passkeyTag = "Passkey";
 
-    /// <summary>Why an attachment over D-0533's cap does not land, which a reader that does not unpack one also says.</summary>
+    /// <summary>Why an attachment over the attachment cap does not land, which a reader that does not unpack one also says.</summary>
     internal static readonly string AttachmentTooLarge = $"it is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste attaches";
 
     private readonly ExportContents _contents;

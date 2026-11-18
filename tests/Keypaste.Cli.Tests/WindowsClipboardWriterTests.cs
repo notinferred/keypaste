@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The Windows clipboard write, and the ordering that makes it worth anything (D-0056).
+/// The Windows clipboard write, and the ordering that makes it worth anything.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -23,7 +23,7 @@ public enum ChooseOutcome
 
 /// <summary>
 /// The vault agents and the CLI use when neither <c>--vault</c> nor <c>KEYPASTE_VAULT</c> names one,
-/// kept as <c>vault</c> in <c>app.toml</c> (D-0389).
+/// kept as <c>vault</c> in <c>app.toml</c>.
 /// </summary>
 public static class ChosenVault
 {

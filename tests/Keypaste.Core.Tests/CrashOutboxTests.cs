@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// 4.11a: the crash-report outbox keeps only what the scrubber wrote, owner-only, merged, within its limits, and nothing once
-/// cleared (D-0559).
+/// cleared.
 /// </summary>
 /// <remarks>
 /// The mutation each must fail: a file kept that is not exactly a scrubbed report, a limit or the age rule not applied, the
@@ -179,7 +179,7 @@ public sealed class CrashOutboxTests : IDisposable
         Assert.Empty(outbox.Waiting());
     }
 
-    /// <summary>The run marker names only the version and when the run started, owner-only, and a tidy of the reports leaves it (D-0595).</summary>
+    /// <summary>The run marker names only the version and when the run started, owner-only, and a tidy of the reports leaves it.</summary>
     [Fact]
     public void The_run_marker_holds_the_version_and_the_start_and_outlives_a_tidy()
     {

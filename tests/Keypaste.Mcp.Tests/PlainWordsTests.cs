@@ -10,7 +10,7 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// What an agent is told says item, what it can see, environment and allowance, never the words
-/// those replaced (D-0457).
+/// those replaced.
 /// </summary>
 /// <remarks>
 /// Tool, argument and structured-result names, flags, file names, environment variables and backticked

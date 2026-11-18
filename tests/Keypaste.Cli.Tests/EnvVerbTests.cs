@@ -10,7 +10,7 @@ namespace Keypaste.Cli.Tests;
 /// <remarks>
 /// Each vault-touching test derives a key to create the vault and again per command that opens it, so
 /// assertions are grouped by behaviour rather than split one per fact. The vaults take the token cost of
-/// D-0469; <c>KeyDerivationCostTests</c> holds the production one.
+/// cost; <c>KeyDerivationCostTests</c> holds the production one.
 /// </remarks>
 public sealed class EnvVerbTests
 {
@@ -119,7 +119,7 @@ public sealed class EnvVerbTests
         harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
 
         // The retention is stated where it happens, not only in SECURITY.md — a user rotating a
-        // leaked credential needs to know the old one is still in the file (DECISIONS.md D-0014).
+        // leaked credential needs to know the old one is still in the file.
         Assert.Contains("Updated TOKEN on env/billing/.env (previous value kept in item history)", harness.Err, StringComparison.Ordinal);
 
         harness.Stderr.GetStringBuilder().Clear();

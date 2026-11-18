@@ -73,7 +73,7 @@ public sealed record EnvReleasePrompt
     /// <param name="project">The project named.</param>
     /// <param name="command">The command, one argument per item.</param>
     /// <param name="directory">The directory.</param>
-    /// <param name="boundCommandLine">Whether the command must fit the prompt as one line; false only for a request held to a claim whose command was bounded when its pass was issued (D-0452).</param>
+    /// <param name="boundCommandLine">Whether the command must fit the prompt as one line; false only for a request held to a claim whose command was bounded when its pass was issued.</param>
     /// <returns>keypaste's own words, or null.</returns>
     public static string? Problem(string project, IReadOnlyList<string> command, string directory, bool boundCommandLine = true)
     {

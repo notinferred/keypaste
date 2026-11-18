@@ -17,8 +17,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste doctor</c> end to end: what it prints and exits for each finding, that only a registered keypaste and
-/// PATH's are started, and only with <c>--version</c> or <c>mcp --help</c>, and that it changes nothing and asks nothing
-/// (D-0467).
+/// PATH's are started, and only with <c>--version</c> or <c>mcp --help</c>, and that it changes nothing and asks nothing.
 /// </summary>
 /// <remarks>
 /// Each case builds its machine under the harness's directory: this keypaste on a PATH of its own, a vault that is only
@@ -559,8 +558,8 @@ public sealed class DoctorVerbTests : IDisposable
             .Order(StringComparer.Ordinal)];
 
     /// <summary>
-    /// The argon2 row for the library this process derived with: the file a test build carries beside it on Windows and macOS
-    /// (D-0523), or on Linux the system's, or the note where there is none.
+    /// The argon2 row for the library this process derived with: the file a test build carries beside it on Windows and macOS,
+    /// or on Linux the system's, or the note where there is none.
     /// </summary>
     private static string[] Argon2Rows() => (NativeArgon2.BundledFileName, CoreInfo.NativeArgon2) switch
     {

@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Which of an entry's URLs keypaste opens in a browser: http and https, and a bare address as https (D-0378).</summary>
+/// <summary>Which of an entry's URLs keypaste opens in a browser: http and https, and a bare address as https.</summary>
 public sealed class WebAddressTests
 {
     [Theory]

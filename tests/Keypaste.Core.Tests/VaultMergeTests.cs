@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Merging another program's save with the open copy of a vault (1.4b1, D-0537 to D-0541, D-0545), on real files the vendored
+/// Merging another program's save with the open copy of a vault (1.4b1), on real files the vendored
 /// library writes: the open copy's changes are keypaste's own, made through <see cref="Vault"/>, and the other program's are made
 /// through KeePassLib directly, a revision of the entry as it was before each change, as KeePass and KeePassXC save one.
 /// </summary>
@@ -66,7 +66,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal(new EntryName("billing", "stripe-live"), Assert.Single(report.Combined));
     }
 
-    /// <summary>The file holds the base's version in the entry's history, so its change is taken though its clock stamped it earlier (D-0538).</summary>
+    /// <summary>The file holds the base's version in the entry's history, so its change is taken though its clock stamped it earlier.</summary>
     [Fact]
     public void AnEntryOnlyTheFileChanged_IsTheFilesVersion_EvenWhenStampedEarlier()
     {
@@ -122,7 +122,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal(new MergeConflict(_stripe, OpenCopyCurrent: !fileNewer), Assert.Single(report.Conflicts));
     }
 
-    /// <summary>Neither copy's change is dropped: the open copy's is current a second later and the file's in history at its own second (D-0539).</summary>
+    /// <summary>Neither copy's change is dropped: the open copy's is current a second later and the file's in history at its own second.</summary>
     [Fact]
     public void AnEntryBothChangedInOneSecond_KeepsBoth_EachInASecondOfItsOwn()
     {
@@ -144,7 +144,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.True(Assert.Single(report.Conflicts).OpenCopyCurrent);
     }
 
-    /// <summary>A sync service putting back a copy from before this copy's save loses neither the change nor the item that save wrote (D-0538).</summary>
+    /// <summary>A sync service putting back a copy from before this copy's save loses neither the change nor the item that save wrote.</summary>
     [Fact]
     public void AFileFromAnOlderFork_KeepsAChangeThisCopySaved()
     {
@@ -165,7 +165,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Empty(report.Conflicts);
     }
 
-    /// <summary>With nothing unsaved and a file that descends, the result is the file as Reload would give it, though the file trimmed a version this copy still holds (D-0538).</summary>
+    /// <summary>With nothing unsaved and a file that descends, the result is the file as Reload would give it, though the file trimmed a version this copy still holds.</summary>
     [Fact]
     public void NothingUnsaved_AndAFileThatDescends_MergesToExactlyTheFile()
     {
@@ -215,7 +215,7 @@ public sealed class VaultMergeTests : IDisposable
 
     /// <summary>
     /// With the vault keeping no history, the version the merge displaced survives the save and a reopen, though KeePassLib trims every
-    /// entry to the vault's limits each time it writes or reads a file, and the entry's next edit hands it back to that trimming (D-0601).
+    /// entry to the vault's limits each time it writes or reads a file, and the entry's next edit hands it back to that trimming.
     /// </summary>
     [Fact]
     public void TheDisplacedVersion_IsKeptPastTheHistoryLimit_ThroughASaveAndAReopen()
@@ -347,7 +347,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Empty(report.Kept);
     }
 
-    /// <summary>A purge that never saw this copy's change keeps it in the bin, stamped after the deletion so another program's merge keeps it too (D-0540).</summary>
+    /// <summary>A purge that never saw this copy's change keeps it in the bin, stamped after the deletion so another program's merge keeps it too.</summary>
     [Fact]
     public void APurgeInTheFile_OfAnEntryChangedHere_KeepsItInTheBin_StampedAfterTheDeletion()
     {
@@ -396,7 +396,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal(new MergeKeptItem(_stripe, DeletedInFile: false, Recycled: true), Assert.Single(report.Kept));
     }
 
-    /// <summary>A deletion this copy saved removes again an item an older copy brings back, unless that copy changed it after the deletion, as KeePass decides (D-0540).</summary>
+    /// <summary>A deletion this copy saved removes again an item an older copy brings back, unless that copy changed it after the deletion, as KeePass decides.</summary>
     [Fact]
     public void ADeletionAlreadyWritten_RemovesAgainACopyNoNewerThanIt()
     {
@@ -421,7 +421,7 @@ public sealed class VaultMergeTests : IDisposable
 
     /// <summary>
     /// An item this copy did not change is the file's whole when the file's is stamped later, though the file kept no version of it, as
-    /// KeePassXC stamps an item it recycles: no conflict, nothing added to its history and nothing taken from this copy (D-0674).
+    /// KeePassXC stamps an item it recycles: no conflict, nothing added to its history and nothing taken from this copy.
     /// </summary>
     [Fact]
     public void AnItemOnlyTheFileChanged_WithoutKeepingAVersion_IsTheFilesWhole()
@@ -587,7 +587,7 @@ public sealed class VaultMergeTests : IDisposable
 
     /// <summary>
     /// A later save from a copy forked before this copy saved its change keeps that change in history, though this copy holds nothing
-    /// unsaved: its content differs from the file's, so the file's version does not stand for it (D-0538, D-0674).
+    /// unsaved: its content differs from the file's, so the file's version does not stand for it.
     /// </summary>
     [Fact]
     public void ALaterSaveFromAForkTakenBeforeThisCopysSave_KeepsThisCopysChangeInHistory()
@@ -612,7 +612,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Single(report.Conflicts);
     }
 
-    /// <summary>Recycling is a move, so the item ends in the bin with the other copy's edit (D-0540).</summary>
+    /// <summary>Recycling is a move, so the item ends in the bin with the other copy's edit.</summary>
     [Fact]
     public void ARecycledEntry_KeepsTheOtherCopysEdit()
     {
@@ -633,7 +633,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal(new MergeKeptItem(new EntryName("Recycle Bin", "stripe"), DeletedInFile: false, Recycled: true), Assert.Single(report.Kept));
     }
 
-    /// <summary>A restore is a change the purge never saw, so the item stays where the restore put it (D-0540).</summary>
+    /// <summary>A restore is a change the purge never saw, so the item stays where the restore put it.</summary>
     [Fact]
     public void ARestore_SurvivesAPurgeThatDidNotSeeIt()
     {
@@ -677,7 +677,7 @@ public sealed class VaultMergeTests : IDisposable
         });
     }
 
-    /// <summary>Each copy made its own bin: the file's is the result's, and what the open copy's held moves into it with where it came from (D-0541).</summary>
+    /// <summary>Each copy made its own bin: the file's is the result's, and what the open copy's held moves into it with where it came from.</summary>
     [Fact]
     public void TwoRecycleBins_BecomeTheFilesBin_AndNothingInEitherIsListed()
     {
@@ -709,7 +709,7 @@ public sealed class VaultMergeTests : IDisposable
         });
     }
 
-    /// <summary>Attachments travel inside the versions that hold them, never re-encoded (D-0541, V.8a).</summary>
+    /// <summary>Attachments travel inside the versions that hold them, never re-encoded (V.8a).</summary>
     [Fact]
     public void AnAttachmentNeitherSideEdited_IsKeptByteForByte_CurrentAndInHistory()
     {
@@ -764,7 +764,7 @@ public sealed class VaultMergeTests : IDisposable
         });
     }
 
-    /// <summary>The result is built inside the file's parse, so its meta, cipher and key derivation are the file's (D-0541).</summary>
+    /// <summary>The result is built inside the file's parse, so its meta, cipher and key derivation are the file's.</summary>
     [Fact]
     public void TheFilesMetaAndHeader_AreKept()
     {
@@ -807,7 +807,7 @@ public sealed class VaultMergeTests : IDisposable
 
         Assert.Equal("KeePass database 4.0", KeePassInterop.Probe(FilePath, out _)!.Version);
 
-        // An item kept in the bin carries where it came from, which only KDBX 4.1 writes (D-0247).
+        // An item kept in the bin carries where it came from, which only KDBX 4.1 writes.
         using (var open = Vault.Open(VaultPath, _password))
         {
             Update(open, "github", "mine");
@@ -863,7 +863,7 @@ public sealed class VaultMergeTests : IDisposable
 
     /// <summary>
     /// A group both copies changed is the newer whole, its Auto-Type setting, default sequence, tags and custom data with it, and KDBX
-    /// keeps no group history, so the report names the name the other version gave it (D-0537).
+    /// keeps no group history, so the report names the name the other version gave it.
     /// </summary>
     [Theory]
     [InlineData(true)]
@@ -995,7 +995,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal(VaultSaveStatus.Saved, file.SaveState().Status);
     }
 
-    /// <summary>The result is built inside the file's copy, and the open copy is only read (D-0537).</summary>
+    /// <summary>The result is built inside the file's copy, and the open copy is only read.</summary>
     [Fact]
     public void TheOpenCopy_IsLeftAsItWas()
     {
@@ -1077,7 +1077,7 @@ public sealed class VaultMergeTests : IDisposable
 
     /// <summary>
     /// The merge stamps only what keeps its choices stable under time-based merges, so KeePassLib's synchronize of the result with either
-    /// input changes nothing, ties and deletions against unseen changes included (D-0539).
+    /// input changes nothing, ties and deletions against unseen changes included.
     /// </summary>
     [Fact]
     public void SynchronizingTheResultWithEitherInput_ChangesNothing()

@@ -3,8 +3,8 @@
 # verify-site-endpoint.sh
 #
 # The half of site/README.md's pre-deploy checklist (H-0011) that writes nothing, run by hand
-# against the live site. No workflow runs it: keypaste.com deploys from Cloudflare's Git integration
-# (D-0127), and a job here asking the live origin would go red for a Cloudflare outage it cannot fix.
+# against the live site. No workflow runs it: keypaste.com deploys from Cloudflare's Git integration,
+# and a job here asking the live origin would go red for a Cloudflare outage it cannot fix.
 #
 # EVERY request here is one the Worker refuses or redirects BEFORE it reaches the database. That is
 # the whole admission rule for this file, and it is checked against src/worker.js rather than

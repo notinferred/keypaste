@@ -2,7 +2,7 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.Core;
 
-/// <summary>A value with its own item's placeholders filled in, or why it cannot leave keypaste (D-0465).</summary>
+/// <summary>A value with its own item's placeholders filled in, or why it cannot leave keypaste.</summary>
 /// <remarks><see cref="ToString"/> never shows the value or anything filled into it.</remarks>
 public sealed class PlaceholderFill
 {
@@ -48,7 +48,7 @@ internal sealed record PlaceholderRefusal(string Placeholder, string Ending)
 /// <param name="Refused">The first one that refuses the value wherever it would leave, or null when none does.</param>
 internal sealed record PlantedPlaceholders(IReadOnlyList<string> Fills, PlaceholderRefusal? Refused);
 
-/// <summary>What a placeholder in one item's value may fill in from: its standard fields, and its custom fields keypaste releases by name (D-0388).</summary>
+/// <summary>What a placeholder in one item's value may fill in from: its standard fields, and its custom fields keypaste releases by name.</summary>
 /// <remarks>Every custom field's name is kept, so a refusal can tell a field keypaste never releases from one the item lacks.</remarks>
 internal sealed class PlaceholderFields
 {

@@ -1,8 +1,7 @@
 namespace Keypaste.Core.Ownership;
 
 /// <summary>
-/// One unlocked lifetime of a vault's owner, ended by the one transition every kind of lock takes
-/// (D-0313).
+/// One unlocked lifetime of a vault's owner, ended by the one transition every kind of lock takes.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -11,8 +10,8 @@ namespace Keypaste.Core.Ownership;
 /// same lock that ends the lifetime, so a release either committed before the lock or is refused by it.
 /// </para>
 /// <para>
-/// <see cref="Withdraw(SessionWithdrawal)"/> withdraws what is waiting without ending it, as a reload does (D-0412) and a
-/// merge with another program's save (D-0542): a request that read <see cref="Waiting"/> before it then never commits,
+/// <see cref="Withdraw(SessionWithdrawal)"/> withdraws what is waiting without ending it, as a reload does and a
+/// merge with another program's save: a request that read <see cref="Waiting"/> before it then never commits,
 /// and one that begins after it waits anew.
 /// </para>
 /// <para>
@@ -211,9 +210,9 @@ public sealed class SessionLifetime : IDisposable
 /// <summary>What withdraws the requests waiting on a lifetime that goes on.</summary>
 public enum SessionWithdrawal
 {
-    /// <summary>A reload put what the file holds in place of the open copy (D-0412).</summary>
+    /// <summary>A reload put what the file holds in place of the open copy.</summary>
     Reload = 0,
 
-    /// <summary>A merge with another program's save is putting the merged copy in place of the open copy (D-0542).</summary>
+    /// <summary>A merge with another program's save is putting the merged copy in place of the open copy.</summary>
     Merge = 1,
 }

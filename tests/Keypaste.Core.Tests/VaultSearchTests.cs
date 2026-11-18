@@ -175,7 +175,7 @@ public sealed class VaultSearchTests : IDisposable
 
     /// <summary>
     /// A recycled entry is not in the vault as far as every other reader is concerned, and a search
-    /// that found one would put a deleted name back on screen (D-0248).
+    /// that found one would put a deleted name back on screen.
     /// </summary>
     [Fact]
     public void ARecycledEntryIsNotFound()

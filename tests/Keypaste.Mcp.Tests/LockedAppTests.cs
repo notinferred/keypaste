@@ -12,7 +12,7 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// A bridge about to refuse its agent because nothing holds the vault tells the app open and locked on that
-/// vault, and the agent is told to unlock it there; the call is refused and recorded as it was before (D-0466).
+/// vault, and the agent is told to unlock it there; the call is refused and recorded as it was before.
 /// </summary>
 public sealed class LockedAppTests
 {

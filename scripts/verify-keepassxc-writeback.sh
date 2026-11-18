@@ -13,11 +13,11 @@
 #   B. KeePassXC modifies a value -> keypaste must read what KeePassXC wrote, and the
 #      variable keypaste wrote on that entry must survive KeePassXC's save.
 #   C. KeePassXC adds an entry under env/<project> -> keypaste must read it as an ordinary
-#      entry and list it as no variable of the project (D-0416).
+#      entry and list it as no variable of the project.
 #   D. KeePassXC titles an entry with a SEPARATOR in it -> while it shares a path with another
 #      entry, keypaste get must refuse that path rather than release either secret, keypaste
 #      add must refuse to put a third entry on it (docs/STEPS.md F.1e), and keypaste rm must
-#      remove neither (D-0094).
+#      remove neither.
 #
 # B, C and D are law 4.6 in the direction compat cannot see: what KeePassXC writes into a vault
 # keypaste uses is read as KeePassXC means it. Do NOT relax an assertion, add a skip, mark the

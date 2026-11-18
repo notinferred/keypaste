@@ -10,7 +10,7 @@ namespace Keypaste.Cli.Commands;
 /// <summary>Shows one item's fields and tags: <c>keypaste show &lt;item&gt; [--reveal]</c>.</summary>
 /// <remarks>
 /// Without <c>--reveal</c> every value is masked, the username and URL included, and no custom field
-/// is read (D-0463). Revealed text is drawn through <see cref="DisplayTextSanitizer"/>, so a value
+/// is read. Revealed text is drawn through <see cref="DisplayTextSanitizer"/>, so a value
 /// that could misrepresent itself on a terminal is cleaned there and told on stderr; only
 /// <c>--json</c> carries the values as the vault holds them. An item with a TOTP lists <c>totp</c> with
 /// no value even then, since its code is computed only when <c>keypaste get &lt;item&gt; totp</c> asks.

@@ -3,8 +3,8 @@ using Keypaste.Core.Approval;
 namespace Keypaste.Core;
 
 /// <summary>
-/// What renaming one custom field leaves naming nothing, shown to the person before it is written, as
-/// D-0415 shows a tag change: the <c>kp://</c> references that name the field, and the item's own fields
+/// What renaming one custom field leaves naming nothing, shown to the person before it is written, as a tag change is
+/// shown: the <c>kp://</c> references that name the field, and the item's own fields
 /// whose <c>{S:…}</c> names it. Names only, never a value.
 /// </summary>
 /// <param name="Entry">The entry.</param>

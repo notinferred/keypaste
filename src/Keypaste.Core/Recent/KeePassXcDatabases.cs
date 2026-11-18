@@ -17,7 +17,7 @@ internal enum KeePassXcPlatform
 /// <remarks>
 /// Read from KeePassXC's local settings, the installed copy's <c>keepassxc.ini</c> and each running
 /// portable copy's <c>config/keepassxc_local.ini</c>, and only their <c>LastActiveDatabase</c>,
-/// <c>LastOpenedDatabases</c> and <c>LastDatabases</c>; the files are never written (D-0377, T-24).
+/// <c>LastOpenedDatabases</c> and <c>LastDatabases</c>; the files are never written (T-24).
 /// </remarks>
 public static class KeePassXcDatabases
 {

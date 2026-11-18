@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The private temporary directory D-0123 puts every save's transacted temporary into.
+/// The private temporary directory that holds every save's transacted temporary into.
 /// </summary>
 /// <remarks>
 /// These run in the test process, which redirects once like any other. That is deliberate: the

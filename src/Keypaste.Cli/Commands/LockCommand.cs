@@ -5,7 +5,7 @@ using Keypaste.Core.Ipc;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary><c>keypaste lock</c>: asks the process holding the vault unlocked to lock now (D-0351).</summary>
+/// <summary><c>keypaste lock</c>: asks the process holding the vault unlocked to lock now.</summary>
 /// <remarks>
 /// The owner answers once its lock has ended the session the verb attached to, so "locked" is never
 /// printed about a vault that is still being served, and the verb asks nothing more on a connection the

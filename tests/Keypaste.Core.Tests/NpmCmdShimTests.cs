@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// Only the launcher text npm's cmd-shim writes is read as one, so keypaste starts on Windows what that launcher would,
-/// without <c>cmd.exe</c> (D-0436).
+/// without <c>cmd.exe</c>.
 /// </summary>
 /// <remarks>The fixtures are cmd-shim's output, from its <c>writeShim_</c> at 7.0.0 and 9.0.2, with the CRLF it writes.</remarks>
 public sealed class NpmCmdShimTests

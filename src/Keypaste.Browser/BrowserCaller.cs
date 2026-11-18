@@ -5,11 +5,11 @@ namespace Keypaste.Browser;
 
 /// <summary>
 /// The arguments a browser starts its native messaging host with, and nothing else: a Chrome-family browser's caller origin,
-/// followed on Windows by the window it was called from, or Firefox's manifest path and the calling add-on's ID (D-0624).
+/// followed on Windows by the window it was called from, or Firefox's manifest path and the calling add-on's ID.
 /// </summary>
 /// <remarks>
 /// Read from the arguments alone, so <c>keypaste</c> decides it is a relay before any vault code runs, as it decides
-/// <c>keypaste mcp</c> is the bridge (D-0418).
+/// <c>keypaste mcp</c> is the bridge.
 /// </remarks>
 internal static class BrowserCaller
 {

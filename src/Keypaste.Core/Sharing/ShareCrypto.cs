@@ -38,7 +38,7 @@ public sealed record SealedShare(string Envelope, string Key, bool HasPassphrase
 /// <summary>
 /// Seals a share for the browser to open: AES-256-GCM under a key derived from the link's key and,
 /// when one is given, a passphrase. <c>site/public/s/share-crypto.js</c> is the other half and
-/// must agree byte for byte (D-0354).
+/// must agree byte for byte.
 /// </summary>
 /// <remarks>
 /// PBKDF2 rather than Argon2 because the recipient derives the key with WebCrypto, which has no

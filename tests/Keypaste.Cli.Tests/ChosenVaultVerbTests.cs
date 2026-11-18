@@ -6,7 +6,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// The CLI uses <c>--vault</c>, then <c>KEYPASTE_VAULT</c>, then the vault chosen in <c>app.toml</c>,
-/// and <c>keypaste use</c> shows and changes that choice (D-0389).
+/// and <c>keypaste use</c> shows and changes that choice.
 /// </summary>
 public sealed class ChosenVaultVerbTests
 {

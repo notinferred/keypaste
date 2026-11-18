@@ -268,7 +268,7 @@ public sealed class ApproverHandlerTests
         Assert.Equal([new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password", "STRIPE_SECRET_KEY"], [])], reply.Names);
     }
 
-    /// <summary>D-0422: a tag lists its entry with only the variables it reaches, and an untagged entry not at all.</summary>
+    /// <summary>a tag lists its entry with only the variables it reaches, and an untagged entry not at all.</summary>
     [Fact]
     public async Task ListingThroughATag_YieldsTheTaggedEntryWithItsVariablesOnly()
     {
@@ -281,7 +281,7 @@ public sealed class ApproverHandlerTests
     }
 
     /// <summary>
-    /// D-0422: an entry a tag reaches releases a project variable after a person says yes, and its
+    /// an entry a tag reaches releases a project variable after a person says yes, and its
     /// password is refused before anybody is asked.
     /// </summary>
     [Fact]
@@ -304,7 +304,7 @@ public sealed class ApproverHandlerTests
         Assert.Equal(1, fixture.Channel.Asked);
     }
 
-    /// <summary>An untagged entry under <c>env/</c> is an ordinary entry (D-0416), so the default reaches none of it.</summary>
+    /// <summary>An untagged entry under <c>env/</c> is an ordinary entry, so the default reaches none of it.</summary>
     [Fact]
     public async Task AnUntaggedEntryUnderEnv_IsOutsideTheDefault()
     {
@@ -643,7 +643,7 @@ public sealed class ApproverHandlerTests
     /// <summary>
     /// A value holding a placeholder keypaste cannot fill in is refused after the allow under a method of its
     /// own, told to the operator's terminal, and cools its field down as a refusal does, so a retry from any
-    /// connection troubles nobody while another field is still asked about (D-0465).
+    /// connection troubles nobody while another field is still asked about.
     /// </summary>
     [Fact]
     public async Task AnAllowedValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
@@ -670,7 +670,7 @@ public sealed class ApproverHandlerTests
         Assert.Equal(2, fixture.Channel.Asked);
     }
 
-    /// <summary>An Automatic release of a value keypaste cannot fill in is refused, told and cooled down the same way, with nobody asked (D-0465).</summary>
+    /// <summary>An Automatic release of a value keypaste cannot fill in is refused, told and cooled down the same way, with nobody asked.</summary>
     [Fact]
     public async Task AnAutomaticValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
     {

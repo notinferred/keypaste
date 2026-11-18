@@ -12,7 +12,7 @@ namespace Keypaste.Cli.Commands;
 /// Names and protection only; a value is read with <c>get --field</c> and written with
 /// <c>set --field</c>. Renaming and removing each make a history revision, as KeePassXC's own edit
 /// does, so the value is recoverable and nothing is asked first. Renaming is not one of the edits
-/// sent to the app or <c>keypaste approve</c>, so it is refused while either holds the vault (D-0382).
+/// sent to the app or <c>keypaste approve</c>, so it is refused while either holds the vault.
 /// </remarks>
 internal static class FieldCommand
 {

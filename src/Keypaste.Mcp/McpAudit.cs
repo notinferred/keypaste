@@ -21,7 +21,7 @@ internal readonly record struct Caller(bool Initialized, AuditClient Client);
 /// the <c>initialize</c> handshake, reachable as <see cref="McpServer.ClientInfo"/>; version 2
 /// removes that handshake and moves identity to per-request <c>_meta</c>, where clients only
 /// <em>should</em> send it. Keeping the read in one function is what makes that a contained edit
-/// instead of a hunt (D-0019).
+/// instead of a hunt.
 /// </para>
 /// <para>
 /// It also means law 3.3's "every access is logged with who" survives identity becoming optional:

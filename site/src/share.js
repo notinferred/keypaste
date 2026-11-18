@@ -1,4 +1,4 @@
-// Share links (D-0355): the server keeps an envelope it cannot open, a view count, an expiry and the
+// Share links: the server keeps an envelope it cannot open, a view count, an expiry and the
 // SHA-256 of a revoke token. The key is in the link's fragment, which no browser sends here.
 //
 // With SHARE_ENABLED other than "1" the API answers 503 and the viewer 404, so one variable in

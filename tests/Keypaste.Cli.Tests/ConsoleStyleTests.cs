@@ -5,7 +5,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// Colour reaches a terminal and nothing else: a pipe, a file, a build log and an opted-out terminal
-/// all get exactly the plain text (D-0350).
+/// all get exactly the plain text.
 /// </summary>
 /// <remarks>
 /// Asserted against the real <see cref="SystemConsoleStyle"/> with a fake terminal, rather than the

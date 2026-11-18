@@ -206,17 +206,17 @@ jobs:
         if: runner.os == 'macOS'
         run: xcode-select -p
 
-      # The Windows and macOS archives carry it beside keypaste; Linux finds the system's (D-0522).
+      # The Windows and macOS archives carry it beside keypaste; Linux finds the system's.
       - name: Build the libargon2 the CLI carries
         shell: bash
         run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
 
-      # Linked into keypaste, which a publish without it refuses (D-0612).
+      # Linked into keypaste, which a publish without it refuses.
       - name: Build the libsodium keypaste links
         shell: bash
         run: bash scripts/build-libsodium.sh '${{ matrix.rid }}'
 
-      # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
+      # Adding -r here narrows the RID set and invalidates the multi-RID lock file.
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
@@ -251,7 +251,7 @@ jobs:
           [ "$printed" = "$VERSION" ] \
             || { echo "::error::binary reports '$printed', tag says '$VERSION'"; exit 1; }
 
-      # With the libargon2 beside it on Windows and macOS, the system's on Linux, which its doctor names (D-0525).
+      # With the libargon2 beside it on Windows and macOS, the system's on Linux, which its doctor names.
       - name: Require doctor to name the libargon2 keypaste derives with
         shell: bash
         run: |
@@ -274,7 +274,7 @@ jobs:
             esac
           fi
 
-      # The NaCl box gives its known answers with the libsodium linked into it (D-0613).
+      # The NaCl box gives its known answers with the libsodium linked into it.
       - name: Require keypaste's NaCl box to give its known answers
         shell: bash
         run: |
@@ -354,7 +354,7 @@ jobs:
             echo "::error::it ran on Alpine, which contradicts the documented musl gap - re-check the claim"
             exit 1
           fi
-          echo "glibc floor confirmed: Debian 12 yes, Alpine no (musl needs linux-musl-x64, O-0013)"
+          echo "glibc floor confirmed: Debian 12 yes, Alpine no (musl needs linux-musl-x64)"
 
       - name: Restore the pinned signing dlib (Windows)
         if: runner.os == 'Windows'
@@ -684,7 +684,7 @@ jobs:
             echo ''
             echo "components published: ${COMPONENTS}"
             echo ''
-            echo 'Binaries are unsigned and un-notarized (O-0010). Every asset is attested; see SECURITY.md.'
+            echo 'Binaries are unsigned and un-notarized. Every asset is attested; see SECURITY.md.'
             case "$COMPONENTS" in
               *app*) echo "Desktop packages came from app.yml run ${APP_RUN}, whose attestation was checked before staging." ;;
             esac

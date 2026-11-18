@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// Without <c>--reveal</c> the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
-/// Either way the value leaves with its own item's placeholders filled in, or not at all (D-0465).
+/// Either way the value leaves with its own item's placeholders filled in, or not at all.
 /// A TOTP code is computed from the opened vault at the call and its seed zeroed before it leaves;
 /// the seed itself never does.
 /// </remarks>

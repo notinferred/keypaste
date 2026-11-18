@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads a build tool and keeps it only if its SHA-256 is the pin (D-0142, D-0203).
+# Downloads a build tool and keeps it only if its SHA-256 is the pin.
 #
 # The file is written to <out> only after its digest matches; a mismatch leaves nothing behind for a
 # later step to pick up by name.

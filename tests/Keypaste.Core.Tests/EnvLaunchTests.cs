@@ -8,8 +8,8 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// Only a released set reaches a launcher, its values go into the child's environment over the
 /// parent's and nowhere else, and the terminal the app opens takes the command as an argument
-/// rather than as script text (E.1b, D-0340); on macOS Terminal is opened on the bundle's launcher
-/// with nothing of the run in its arguments (E.1d, D-0451).
+/// rather than as script text (E.1b); on macOS Terminal is opened on the bundle's launcher
+/// with nothing of the run in its arguments (E.1d).
 /// </summary>
 public sealed class EnvLaunchTests : IDisposable
 {
@@ -203,7 +203,7 @@ public sealed class EnvLaunchTests : IDisposable
         Assert.Throws<ArgumentException>(() => new TerminalLaunch(TerminalPlatform.MacOS, "unused", _ => null));
     }
 
-    /// <summary>A mapping holds a command of up to 4096 characters, and Terminal's run carries it whole, though that run's command line is longer than the owner's prompt shows (D-0452).</summary>
+    /// <summary>A mapping holds a command of up to 4096 characters, and Terminal's run carries it whole, though that run's command line is longer than the owner's prompt shows.</summary>
     [Fact]
     public void On_macOS_the_longest_command_a_mapping_holds_is_planned_whole_as_the_runs_last_argument()
     {
@@ -217,7 +217,7 @@ public sealed class EnvLaunchTests : IDisposable
         Assert.Null(TerminalLaunch.ClaimProblem(Claim(plan.Arguments)));
     }
 
-    /// <summary>The owner issues a pass only for Terminal's run or open script around one command a mapping could hold, in a request its prompt could have asked about (D-0452).</summary>
+    /// <summary>The owner issues a pass only for Terminal's run or open script around one command a mapping could hold, in a request its prompt could have asked about.</summary>
     [Fact]
     public void A_pass_is_claimed_only_for_Terminals_run_or_open_around_one_command_a_mapping_holds()
     {
@@ -264,7 +264,7 @@ public sealed class EnvLaunchTests : IDisposable
         Assert.False(terminal.TryPlanThroughSession(_directory, "  ", _noParent, out _, out _));
     }
 
-    /// <summary>The request carries any path, so a directory holding a line break or another control character is planned on macOS as on Linux, and the owner issues its pass (D-0451).</summary>
+    /// <summary>The request carries any path, so a directory holding a line break or another control character is planned on macOS as on Linux, and the owner issues its pass.</summary>
     [Fact]
     public void On_macOS_a_directory_holding_a_line_break_or_another_control_character_is_planned_as_on_Linux()
     {

@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The key-derivation cost a vault is created with: <see cref="KdbxFormat"/>'s for every vault keypaste ships, and a token
-/// one only for vaults a test assembly creates (D-0469).
+/// one only for vaults a test assembly creates.
 /// </summary>
 public sealed class KeyDerivationCostTests : IDisposable
 {

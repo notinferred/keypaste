@@ -8,7 +8,7 @@ namespace Keypaste.Core;
 /// <para>
 /// Windows build 10.0.26100 refuses to create a file whose 8.3 alias another transaction has
 /// reserved, and every KeePass-family program names its transacted temporary
-/// <c>KeePass_TxF_*.tmp</c> — so all of them want <c>KEEPAS~1.TMP</c> in one <c>%TEMP%</c>. D-0122
+/// <c>KeePass_TxF_*.tmp</c> — so all of them want <c>KEEPAS~1.TMP</c> in one <c>%TEMP%</c>. That
 /// measured 1387 of 1600 concurrent saves refused there, and none at all once each saver had a
 /// directory of its own.
 /// </para>

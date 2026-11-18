@@ -234,7 +234,7 @@ public sealed class AuditChainTests : IDisposable
     /// <remarks>
     /// It breaks no link — nothing before or after it changes — which makes it the one insertion the
     /// chain cannot catch arithmetically. What catches it is that no release of keypaste wrote schema
-    /// 1 (D-0416), so the line was written by something else. Without this, "insert a record nobody
+    /// 1, so the line was written by something else. Without this, "insert a record nobody
     /// can check" is a way to write history into an audit trail while every link still verifies.
     /// </remarks>
     [Fact]
@@ -372,7 +372,7 @@ public sealed class AuditChainTests : IDisposable
         Assert.False(AuditChainVerifier.Verify(LogPath, anchor).Anchored);
     }
 
-    /// <summary>A record of the writer's full size is read whole and verifies, its line well inside the verifier's bound (D-0454).</summary>
+    /// <summary>A record of the writer's full size is read whole and verifies, its line well inside the verifier's bound.</summary>
     [Fact]
     public void ARecordOfTheWritersFullSize_Verifies()
     {

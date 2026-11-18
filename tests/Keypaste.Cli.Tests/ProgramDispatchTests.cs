@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
-/// <summary>Which arguments <c>keypaste</c> hands to the MCP bridge or the browser relay rather than to its verbs (D-0418, D-0624).</summary>
+/// <summary>Which arguments <c>keypaste</c> hands to the MCP bridge or the browser relay rather than to its verbs.</summary>
 public sealed class ProgramDispatchTests
 {
     [Theory]
@@ -23,7 +23,7 @@ public sealed class ProgramDispatchTests
     [InlineData("policy", "mcp")]
     public void These_reach_the_verbs(params string[] args) => Assert.False(Program.StartsBridge(args));
 
-    /// <summary>The removed <c>mcp serve</c>, <c>setup</c> and <c>policy</c> reach the verbs, which refuse them, and never start the bridge (D-0470).</summary>
+    /// <summary>The removed <c>mcp serve</c>, <c>setup</c> and <c>policy</c> reach the verbs, which refuse them, and never start the bridge.</summary>
     [Theory]
     [InlineData("mcp", "serve")]
     [InlineData("mcp", "serve", "--help")]
@@ -41,7 +41,7 @@ public sealed class ProgramDispatchTests
         Assert.False(BrowserEntry.StartsRelay([]));
     }
 
-    /// <summary>A browser starting its native messaging host starts the relay, never the bridge or a verb (D-0624).</summary>
+    /// <summary>A browser starting its native messaging host starts the relay, never the bridge or a verb.</summary>
     [Fact]
     public void A_browser_starting_its_host_starts_the_relay()
     {

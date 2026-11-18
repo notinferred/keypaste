@@ -4,7 +4,7 @@ namespace Keypaste.Mcp;
 
 /// <summary>
 /// Tells the desktop app, while it is open and locked on a vault this bridge serves, that an agent asked, so it can
-/// tell the person (D-0466).
+/// tell the person.
 /// </summary>
 /// <remarks>
 /// Called only where a call is about to be refused because nothing holds the vault, and it changes only what

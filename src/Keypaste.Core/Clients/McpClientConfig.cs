@@ -52,7 +52,7 @@ public sealed record McpEntryLaunch(string Command, IReadOnlyList<string> Argume
 /// The file is opened read-only and is never written, backed up or copied. Only the presence and keypaste's own command
 /// and arguments are kept: the bytes are cleared once read and never shown, because <c>~/.claude.json</c> also holds
 /// Claude Code's sign-in. A reading that cannot be sure says Unknown, never Absent, so a tool is called not connected only
-/// when its own file says so (D-0437).
+/// when its own file says so.
 /// </remarks>
 public static class McpClientConfig
 {

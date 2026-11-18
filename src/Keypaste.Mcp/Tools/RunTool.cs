@@ -12,7 +12,7 @@ namespace Keypaste.Mcp.Tools;
 
 /// <summary>
 /// The tool an agent uses to run one command with approved secrets in its environment. A person
-/// approves the exact program, command line, directory and variable names (D-0358).
+/// approves the exact program, command line, directory and variable names.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -31,7 +31,7 @@ namespace Keypaste.Mcp.Tools;
 /// </para>
 /// <para>
 /// <b>What comes back holds no value this tool knows how to find</b>: each literal and escaped form of
-/// every value, and of every text a placeholder filled into one (D-0465), is scrubbed from the output.
+/// every value, and of every text a placeholder filled into one, is scrubbed from the output.
 /// The command itself can still reveal one in another form, to a file or over the network, which the
 /// result and T-35 say.
 /// </para>

@@ -18,7 +18,7 @@ namespace Keypaste.Core.Approval;
 /// Claude Code inherit. A 60-second window therefore sits exactly on the client's own wall: an
 /// approval given at second 55 arrives into a request that has already been abandoned, and the
 /// agent's retry raises a second prompt for something the human has already approved. 45 leaves
-/// room for the answer to get home. DECISIONS.md D-0027.
+/// room for the answer to get home.
 /// </para>
 /// </remarks>
 public sealed record ApprovalLimits

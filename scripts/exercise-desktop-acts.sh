@@ -260,9 +260,9 @@ evidence_lock_refused() {
   if [ "$(fact_of "$1" lock-refused value)" != none ]; then contradict 'a request after the lock received a value'
   elif [ "$(fact_of "$1" lock-refused error)" != true ]; then contradict 'a request after the lock was not refused'
   elif [ "${answer%%/*}" != denied ]; then contradict "the audit log records the request after the lock as ${answer:-nothing}, not a denial"
-  elif [ "${answer#*/}" != no-approver ]; then contradict "the audit log records the request after the lock as denied by ${answer#*/}, not no-approver (D-0466)"
+  elif [ "${answer#*/}" != no-approver ]; then contradict "the audit log records the request after the lock as denied by ${answer#*/}, not no-approver"
   elif [[ $refusal != *'this vault is locked in it'* ]]; then contradict "the agent was not told the app holds the vault locked: ${refusal:-nothing}"
-  else pass "after Lock a request was refused, the audit log records it as no-approver and the agent was told the vault is locked in the app (D-0466); the app's windows: $(fact_of "$1" lock-refused windows)"
+  else pass "after Lock a request was refused, the audit log records it as no-approver and the agent was told the vault is locked in the app; the app's windows: $(fact_of "$1" lock-refused windows)"
   fi
 }
 

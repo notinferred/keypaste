@@ -43,7 +43,7 @@ public sealed record CapturedResult(
 
 /// <summary>
 /// Starts an agent's command with an exact environment, captures what it prints, and stops it and
-/// everything it started (D-0358).
+/// everything it started.
 /// </summary>
 /// <remarks>
 /// <para>

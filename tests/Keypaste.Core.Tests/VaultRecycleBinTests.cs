@@ -160,7 +160,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
     /// <summary>
     /// The identity has to be the entry's, not its place in a list. A reopened vault is free to
-    /// return the trash in another order, and D-0229 already settled that an index addresses one
+    /// return the trash in another order, and it is already settled that an index addresses one
     /// reading rather than a thing.
     /// </summary>
     [Fact]

@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// The program and directory a person approves are the ones that start: a bare name is looked up on
 /// <c>PATH</c> only, a relative one against the directory shown, and a link in the directory is
-/// resolved before anybody is asked (D-0358).
+/// resolved before anybody is asked.
 /// </summary>
 public sealed class RunProgramTests : IDisposable
 {

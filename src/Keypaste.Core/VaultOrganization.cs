@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// <para>
 /// Renaming and moving share this vocabulary because they are one write. An entry's identity is
-/// its group path and its title (DECISIONS.md D-0091); a rename varies one half and a move varies
+/// its group path and its title; a rename varies one half and a move varies
 /// the other, and every way either can be refused is a way the other can be refused too. The three
 /// success members say which halves actually changed, so a caller that varied both is not told a
 /// half-truth by a result that can only say <see cref="Renamed"/> or <see cref="Moved"/>.

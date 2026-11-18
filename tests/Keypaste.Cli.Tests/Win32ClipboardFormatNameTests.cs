@@ -15,7 +15,7 @@ namespace Keypaste.Cli.Tests;
 /// regression guard rather than a live upstream bug, and there is nothing to contribute upstream.
 /// Verified against the raw source at each tag rather than a summary. Nothing about that literal looks wrong
 /// in a diff, and no test that merely checks the format "was set" would catch it, because a
-/// format genuinely was — just not the one that does anything (O-0008).
+/// format genuinely was — just not the one that does anything.
 /// </para>
 /// <para>
 /// So the name is round-tripped through <c>GetClipboardFormatName</c> instead of trusted. That
@@ -32,7 +32,7 @@ public sealed class Win32ClipboardFormatNameTests
         {
             // Not a silent pass: there is no clipboard here to ask, and asserting anything about
             // one would be inventing a result. Reported as a skip rather than a green, because a
-            // test that cannot fail off Windows is the assertion D-0043 refuses to count.
+            // test that cannot fail off Windows is an assertion that does not count.
             Assert.Skip("Registering a clipboard format needs the real Win32 API. Step 1.5a in docs/STEPS.md is the observation this cannot make, and it calls itself BLOCKED rather than green.");
             return;
         }

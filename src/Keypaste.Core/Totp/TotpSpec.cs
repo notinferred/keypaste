@@ -9,7 +9,7 @@ namespace Keypaste.Core.Totp;
 /// <see cref="Vault.ReadTotp"/> reads one as KeePassXC 2.7 does: from its older <c>TOTP Settings</c> and
 /// <c>TOTP Seed</c> pair, from its <c>otp</c> field, an <c>otpauth://totp/</c> URI or KeeOTP's <c>key=</c> form, or
 /// else from KeePass 2's <c>TimeOtp-*</c> fields. It computes the code KeePassXC shows or refuses one it cannot
-/// compute as written, naming a field and never a value (D-0477).
+/// compute as written, naming a field and never a value.
 /// </para>
 /// <para>
 /// The seed is held decoded only here, and <see cref="Dispose"/> zeroes it. No member, refusal or

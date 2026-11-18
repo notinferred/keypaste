@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The CLI reaches a vault that also needs a YubiKey only through the app holding it (D-0514): a routed edit and
+/// The CLI reaches a vault that also needs a YubiKey only through the app holding it: a routed edit and
 /// <c>keypaste run --session</c> go to the holder before any password is read, the holder's save asks the key, and
 /// nothing says the vault opens only in the app.
 /// </summary>

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// What `keypaste setup` registers for Claude Desktop under the default home, which follows the chosen vault (D-0389, D-0446).
+// What `keypaste setup` registers for Claude Desktop under the default home, which follows the chosen vault.
 const bridgeArguments = ['mcp', '--client-label', 'claude-desktop', '--allow-run', '--expose', '**'];
 
 // Path.IsPathFullyQualified's rule (T-40): on Windows a rooted entry such as \tools still depends on the current drive.

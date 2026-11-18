@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The app leaves Terminal's launcher each run as one owner-only file in an owner-only folder, one field per line in
-/// printable ASCII and never a value, so a path holding a line break is carried like any other (E.1d, D-0451).
+/// printable ASCII and never a value, so a path holding a line break is carried like any other (E.1d).
 /// </summary>
 [UnsupportedOSPlatform("windows")]
 public sealed class TerminalRequestsTests : IDisposable
@@ -76,7 +76,7 @@ public sealed class TerminalRequestsTests : IDisposable
         Assert.Equal("not a folder", File.ReadAllText(Folder));
     }
 
-    /// <summary>Every byte outside printable ASCII, and every backslash, is written as <c>\0</c> and three octal digits, which the launcher's <c>printf '%b'</c> turns back into it (D-0451).</summary>
+    /// <summary>Every byte outside printable ASCII, and every backslash, is written as <c>\0</c> and three octal digits, which the launcher's <c>printf '%b'</c> turns back into it.</summary>
     [Theory]
     [InlineData(2, "/Users/me/.keypaste\n", @"/Users/me/.keypaste\0012")]
     [InlineData(3, "/Users/me/a\rb\\c.kdbx", @"/Users/me/a\0015b\0134c.kdbx")]
@@ -121,7 +121,7 @@ public sealed class TerminalRequestsTests : IDisposable
         Assert.False(Directory.Exists(Folder));
     }
 
-    /// <summary>A project whose name starts with <c>-</c> is a line like any other, which the launcher hands over as <c>--project=</c>'s value (D-0453).</summary>
+    /// <summary>A project whose name starts with <c>-</c> is a line like any other, which the launcher hands over as <c>--project=</c>'s value.</summary>
     [Theory]
     [InlineData("--help")]
     [InlineData("-p")]

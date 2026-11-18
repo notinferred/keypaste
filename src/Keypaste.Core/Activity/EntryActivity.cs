@@ -43,7 +43,7 @@ public sealed record AgentReach(string Agent, Func<EntryName, IReadOnlyList<stri
 
 /// <summary>
 /// Which entries agents use, from what is already recorded: this vault's granted audit lines, the
-/// owner's release ledger for this session and its waiting prompts (D-0361).
+/// owner's release ledger for this session and its waiting prompts.
 /// </summary>
 /// <remarks>
 /// A line written before lines named their vault counts for whichever vault is open, a stated limit.

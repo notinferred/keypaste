@@ -9,7 +9,7 @@ namespace Keypaste.Cli;
 
 internal static class Program
 {
-    /// <summary>The argument that runs the NaCl box's known answers in this binary and exits (D-0613).</summary>
+    /// <summary>The argument that runs the NaCl box's known answers in this binary and exits.</summary>
     internal const string SelfTestFlag = "--selftest";
 
     private static async Task<int> Main(string[] args)
@@ -43,8 +43,8 @@ internal static class Program
     }
 
     /// <summary>
-    /// Whether <paramref name="args"/> start the MCP bridge, decided from the arguments alone so no vault code runs first
-    /// (D-0418). The removed <c>mcp serve</c>, <c>setup</c> and <c>policy</c> never do, so the CLI refuses them (D-0470).
+    /// Whether <paramref name="args"/> start the MCP bridge, decided from the arguments alone so no vault code runs first.
+    /// The removed <c>mcp serve</c>, <c>setup</c> and <c>policy</c> never do, so the CLI refuses them.
     /// </summary>
     internal static bool StartsBridge(string[] args) =>
         args is [McpServerLocator.BridgeArgument, ..] && args is not [_, "serve" or "setup" or "policy", ..];

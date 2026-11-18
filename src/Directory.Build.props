@@ -2,7 +2,7 @@
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
-  <!-- The architecture rules the compiler holds (D-0675): each project's BannedSymbols.txt and the shared lists named here. -->
+  <!-- The architecture rules the compiler holds: each project's BannedSymbols.txt and the shared lists named here. -->
   <PropertyGroup>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">NoNetwork;OneUpperCase</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">OneUpperCase</KeypasteBans>

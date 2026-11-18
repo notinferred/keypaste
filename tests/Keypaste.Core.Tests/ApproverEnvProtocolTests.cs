@@ -59,7 +59,7 @@ public sealed class ApproverEnvProtocolTests
         Assert.Equal("cannot be used", decoded.Reason);
     }
 
-    /// <summary>A set travels in a reply of its own bound, so one far past a listing's or a credential's frame arrives whole (D-0454).</summary>
+    /// <summary>A set travels in a reply of its own bound, so one far past a listing's or a credential's frame arrives whole.</summary>
     [Fact]
     public void A_set_of_a_mebibyte_round_trips_whole()
     {
@@ -183,7 +183,7 @@ public sealed class ApproverEnvProtocolTests
         Assert.Equal(["DB ← B", "PROXY=http://p"], request.FileLines);
     }
 
-    /// <summary>The reply's kind is no request: an owner answers a request only as <c>env-profile</c> (D-0416).</summary>
+    /// <summary>The reply's kind is no request: an owner answers a request only as <c>env-profile</c>.</summary>
     [Theory]
     [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
     [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]

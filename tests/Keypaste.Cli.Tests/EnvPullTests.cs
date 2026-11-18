@@ -88,7 +88,7 @@ public sealed class EnvPullTests
     /// <summary>
     /// Re-running a pull after editing one line is the normal case, so the plan has to
     /// distinguish the three outcomes and leave the untouched ones alone. Rewriting an identical
-    /// value would spend a KDBX history slot (D-0014 caps them at ten) for no change.
+    /// value would spend a KDBX history slot (KDBX caps them at ten) for no change.
     /// </summary>
     [Fact]
     public void Pull_OverExistingVariables_PrintsThePlan_AndSkipsUnchanged()
@@ -336,7 +336,7 @@ public sealed class EnvPullTests
     /// <summary>
     /// The boundary the other tests cannot reach: the check passed, the person said yes, and the
     /// file changed in between. Here the deletion <em>was</em> asked for and did not happen, so the
-    /// run exits nonzero — D-0015's rule that the half which failed is the half that left plaintext
+    /// run exits nonzero — the rule that the half which failed is the half that left plaintext
     /// on disk.
     /// </summary>
     [Fact]

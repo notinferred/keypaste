@@ -503,7 +503,7 @@ public sealed class EnvExportTests
         Assert.DoesNotContain("sk_live_secret", harness.Out + harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>A plaintext export refuses an item that has expired, as <c>run</c> does, naming it and writing nothing (D-0337).</summary>
+    /// <summary>A plaintext export refuses an item that has expired, as <c>run</c> does, naming it and writing nothing.</summary>
     [Fact]
     public void Dotenv_RefusesAnExpiredItem_NamingIt_AndWritesNothing()
     {

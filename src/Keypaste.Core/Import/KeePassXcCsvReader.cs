@@ -3,7 +3,7 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Import;
 
-/// <summary>KeePassXC's CSV export, as its <c>CsvExporter</c> writes one from 2.6 through 2.8 (D-0577).</summary>
+/// <summary>KeePassXC's CSV export, as its <c>CsvExporter</c> writes one from 2.6 through 2.8.</summary>
 /// <remarks>
 /// The header is <c>"Group","Title","Username","Password","URL","Notes","TOTP","Icon","Last Modified","Created"</c>, every field
 /// quoted, one row per item. <c>Group</c> is the item's group path, <c>/</c> between the names and the database's root group

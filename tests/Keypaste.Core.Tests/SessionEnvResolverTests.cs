@@ -90,7 +90,7 @@ public sealed class SessionEnvResolverTests : IDisposable
         Assert.Empty(resolved.Variables);
     }
 
-    /// <summary>A reload withdraws the question as a lock does, keeping the session (D-0412).</summary>
+    /// <summary>A reload withdraws the question as a lock does, keeping the session.</summary>
     [Fact]
     public async Task A_reload_while_the_person_is_asked_releases_nothing()
     {

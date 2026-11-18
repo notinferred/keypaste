@@ -186,7 +186,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
         Assert.Equal(2, calls);
     }
 
-    /// <summary>A value naming its own item's fields is released filled in, and a timed grant serves the filled value (D-0465).</summary>
+    /// <summary>A value naming its own item's fields is released filled in, and a timed grant serves the filled value.</summary>
     [Fact]
     public async Task AnApprovedRequest_ReleasesTheValueFilledIn()
     {
@@ -221,7 +221,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
     /// <summary>
     /// A value naming a field that never leaves is refused after the person allowed it, whatever filled in
     /// before it, as unfillable, and the reason names the field asked for and the placeholder, never a value;
-    /// asking again is refused without asking the person (D-0465).
+    /// asking again is refused without asking the person.
     /// </summary>
     [Fact]
     public async Task AValueNamingAFieldThatNeverLeaves_IsRefusedAfterTheAllow_NamingThePlaceholder()
@@ -320,7 +320,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
         }
     }
 
-    /// <summary>A shared custom field is sealed with its own item's placeholders filled in (D-0465).</summary>
+    /// <summary>A shared custom field is sealed with its own item's placeholders filled in.</summary>
     [Fact]
     public async Task AShare_SealsTheCustomFieldFilledIn()
     {

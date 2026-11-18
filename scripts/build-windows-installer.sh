@@ -2,7 +2,7 @@
 # Wraps a staged win-x64 desktop payload in the internal per-user MSI release-targets.json declares (4.7a1).
 #
 # WixToolset.Sdk resolves outside packages.lock.json, so its restored package is held to the definition's
-# SHA-512 before anything is built (D-0139, D-0206). The built MSI is then held to the definition by
+# SHA-512 before anything is built. The built MSI is then held to the definition by
 # verify-windows-installer.sh. Signing stays with the caller.
 #
 # Build logs go to stderr; the path of the MSI is the only line on stdout.

@@ -634,7 +634,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
     /// <summary>
     /// A failure while the owner decides is answered as a failure and recorded, rather than dropping the connection unrecorded
-    /// (law 3.7), and the exception is told to the owner's <see cref="SessionAuthority.Unexpected"/>, which the app reports (D-0596).
+    /// (law 3.7), and the exception is told to the owner's <see cref="SessionAuthority.Unexpected"/>, which the app reports.
     /// </summary>
     [Fact]
     public async Task AFailureWhileDeciding_IsRecordedAsFailed_AndToldAsUnexpected()

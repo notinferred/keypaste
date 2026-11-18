@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Styling;
 /// <b>Whether to colour is decided once per stream, at construction.</b> A stream is coloured only
 /// when it is not redirected, <c>NO_COLOR</c> is unset or empty, <c>TERM</c> is not <c>dumb</c>,
 /// and its console accepts escapes, so a pipe, a file, a build log and every test see exactly the
-/// plain text (D-0350).
+/// plain text.
 /// </para>
 /// <para>
 /// <b>Escapes are written into the text itself</b>, never through <see cref="Console.ForegroundColor"/>,

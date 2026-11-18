@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Holds a built Windows installer to what release-targets.json declares about it (4.7a1, D-0139).
+# Holds a built Windows installer to what release-targets.json declares about it (4.7a1).
 #
 # What it refuses:
 #   - a file name other than the declared msi pattern expanded for this version;

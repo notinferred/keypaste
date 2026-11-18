@@ -31,7 +31,7 @@ public class Verb(string name, string description, string? tail = null) : Comman
     public IEnumerator<Symbol> GetEnumerator() => Children.GetEnumerator();
 }
 
-/// <summary>keypaste's command-line syntax over System.CommandLine, one for every verb and the bridge (D-0678).</summary>
+/// <summary>keypaste's command-line syntax over System.CommandLine, one for every verb and the bridge.</summary>
 /// <remarks>
 /// Response files and POSIX bundling are off, so an argument starting with <c>@</c> and one like <c>-abc</c> stay
 /// arguments. <see cref="Problem"/> refuses what the library would otherwise accept: a first argument in brackets, which
@@ -111,7 +111,7 @@ public static partial class Syntax
 
     /// <summary>
     /// What is wrong with <paramref name="line"/>, in the words the CLI prints after <c>keypaste &lt;verb&gt;:</c>, or null.
-    /// Once its options parse, a line asking for help has nothing wrong with its operands (D-0467), and a group named
+    /// Once its options parse, a line asking for help has nothing wrong with its operands, and a group named
     /// without one of its commands is its caller's to answer, by showing the group's help or running it.
     /// </summary>
     /// <param name="line">The parsed line.</param>

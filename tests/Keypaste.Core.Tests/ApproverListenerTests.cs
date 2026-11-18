@@ -270,7 +270,7 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
-    /// A reply nobody reads cannot hold a stopping listener: its delivery ends a second after the stop (D-0420).
+    /// A reply nobody reads cannot hold a stopping listener: its delivery ends a second after the stop.
     /// </summary>
     [Fact]
     public async Task AReplyNobodyReads_EndsOneSecondAfterTheListenerStops()
@@ -408,7 +408,7 @@ public sealed class ApproverListenerTests
 
     /// <summary>
     /// A request is read under one frame, however large an env set's reply may be, so a peer's bytes
-    /// past it cost that connection and nothing else (D-0454). The request is one the owner would
+    /// past it cost that connection and nothing else. The request is one the owner would
     /// answer if it read it whole.
     /// </summary>
     [Fact]
@@ -444,7 +444,7 @@ public sealed class ApproverListenerTests
         Assert.NotNull(await polite.ListAsync(new NamesRequest(["env/**"]), Token));
     }
 
-    /// <summary>An env set past one frame reaches its runner whole, in the reply only a runner reads, and the connection keeps serving (D-0454).</summary>
+    /// <summary>An env set past one frame reaches its runner whole, in the reply only a runner reads, and the connection keeps serving.</summary>
     [Fact]
     public async Task AnEnvSetPastOneFrame_ReachesItsRunnerWhole_AndTheConnectionSurvives()
     {

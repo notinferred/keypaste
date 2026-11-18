@@ -2,7 +2,7 @@ namespace Keypaste.Core.Internal;
 
 /// <summary>
 /// Lets a test assembly create vaults whose Argon2 costs one pass over 1 MiB rather than <see cref="KdbxFormat"/>'s, so
-/// thousands of derivations do not saturate the runner (D-0469).
+/// thousands of derivations do not saturate the runner.
 /// </summary>
 /// <remarks>
 /// A vault keeps the cost it was created with, so this reaches only creation. Only the assemblies Core's internals are

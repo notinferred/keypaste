@@ -4,12 +4,12 @@ namespace Keypaste.Core.AutoType;
 
 /// <summary>
 /// What one Auto-Type of one item into one window types, key by key, resolved whole before the first key, or why
-/// it types nothing (D-0604 to D-0607).
+/// it types nothing.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The sequence is chosen for the window's title (D-0606) and read with KeePassXC 2.8's grammar
-/// (<see cref="AutoTypeSequence"/>). Each field it names is filled in as D-0465 fills a value, so it types what a
+/// The sequence is chosen for the window's title and read with KeePassXC 2.8's grammar
+/// (<see cref="AutoTypeSequence"/>). Each field it names is filled in as a placeholder fills a value, so it types what a
 /// copy copies, and each <see cref="AutoTypeCode"/> computes the item's TOTP code only when typing reaches it. A
 /// refusal anywhere refuses the whole sequence, naming the token as written and never a value, and leaves no step.
 /// </para>
@@ -147,10 +147,10 @@ public sealed class AutoTypePlan : IDisposable
         return null;
     }
 
-    /// <summary>A field's stored value filled in as D-0465 fills it, typed when it holds anything; or why the sequence is refused.</summary>
+    /// <summary>A field's stored value filled in as its placeholders fill it, typed when it holds anything; or why the sequence is refused.</summary>
     /// <remarks>
-    /// A <c>{S:…}</c> reaches a standard field or any custom field, as a copy does (D-0547), but neither a name
-    /// holding a brace (D-0531) nor a field a TOTP is read from, whose code only <c>{TOTP}</c> types.
+    /// A <c>{S:…}</c> reaches a standard field or any custom field, as a copy does, but neither a name
+    /// holding a brace nor a field a TOTP is read from, whose code only <c>{TOTP}</c> types.
     /// </remarks>
     private string? AddField(FieldToken token, AutoTypeItem item)
     {
@@ -215,7 +215,7 @@ public sealed class AutoTypePlan : IDisposable
 /// <summary>Reads one item for its Auto-Type plan, under whatever holds the vault still.</summary>
 /// <param name="has">Whether the item has a field of this name, standard or custom, matched exactly.</param>
 /// <param name="read">A field's stored value, standard or custom, matched exactly; null when the item has none of that name.</param>
-/// <param name="fill">Fills a value of the item in as D-0465 fills one.</param>
+/// <param name="fill">Fills a value of the item in as a placeholder fills one.</param>
 /// <param name="totp">Reads the item's TOTP.</param>
 internal sealed class AutoTypeItem(
     Func<string, bool> has,
@@ -418,7 +418,7 @@ public sealed class AutoTypeCharacter : AutoTypeStep
     public override string ToString() => "a character";
 }
 
-/// <summary>Types a field's text as D-0465 fills it in, character by character, with no modifier.</summary>
+/// <summary>Types a field's text as its placeholders fill it in, character by character, with no modifier.</summary>
 /// <remarks>The text holds no control character: Tab and Enter come only from the sequence.</remarks>
 public sealed class AutoTypeText : AutoTypeStep
 {
@@ -432,7 +432,7 @@ public sealed class AutoTypeText : AutoTypeStep
     public override string ToString() => "a field's text";
 }
 
-/// <summary>Types the item's TOTP code as it is when typing reaches this step (D-0477).</summary>
+/// <summary>Types the item's TOTP code as it is when typing reaches this step.</summary>
 public sealed class AutoTypeCode : AutoTypeStep
 {
     private readonly TotpSpec _totp;

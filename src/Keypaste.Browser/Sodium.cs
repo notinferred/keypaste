@@ -4,13 +4,13 @@ using System.Runtime.InteropServices;
 namespace Keypaste.Browser;
 
 /// <summary>
-/// The libsodium functions keypaste calls, and no others (D-0611): its NaCl box, and <c>sodium_init</c> before it.
+/// The libsodium functions keypaste calls, and no others: its NaCl box, and <c>sodium_init</c> before it.
 /// </summary>
 /// <remarks>
 /// The NativeAOT <c>keypaste</c> links libsodium into itself, so these calls are bound when it is linked and load no library.
 /// A build that runs in the .NET runtime, such as the tests', loads the shared library <c>scripts/build-libsodium.sh</c> builds
 /// from the same release, by its full path beside the binary: it is never searched for, so no other libsodium answers in its
-/// place (D-0612).
+/// place.
 /// </remarks>
 internal static class Sodium
 {

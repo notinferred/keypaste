@@ -192,7 +192,7 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     /// confirmations are where a person is standing still: <c>env pull</c> asks whether to import
     /// and then whether to delete the file it read, and the seconds spent answering either one are
     /// seconds in which that file can be edited (docs/STEPS.md F.1c). This is a prompt seam and not
-    /// a filesystem one — <c>File.Delete</c> is still the real thing, which is the half of D-0015
+    /// a filesystem one — <c>File.Delete</c> is still the real thing, which is the half of the delete-source rule
     /// that matters.
     /// </para>
     /// </remarks>

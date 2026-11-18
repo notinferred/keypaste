@@ -22,7 +22,7 @@ namespace Keypaste.Cli.Commands;
 /// The process that makes docs/PRODUCT.md law 3.2 real. It is started by a human, in a terminal a human
 /// opened, and the master password is typed there in response to a command they typed — so nothing
 /// an agent does can raise a password prompt. That property is the whole reason the approval flow
-/// is not built into the bridge (DECISIONS.md D-0023).
+/// is not built into the bridge.
 /// </para>
 /// <para>
 /// <b>Deliberately not a daemon.</b> No service, no launch agent, no PID file, no starting itself
@@ -32,7 +32,7 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <b>It holds the vault's claim for as long as it runs</b>, taken before the password is asked
 /// for, so a vault the desktop app or another <c>keypaste approve</c> already holds is refused by
-/// name and never opened (D-0309). Under that claim it applies each agent's settings from the vault
+/// name and never opened. Under that claim it applies each agent's settings from the vault
 /// and saves a change to them that the person confirms in this terminal.
 /// </para>
 /// <para>
@@ -47,8 +47,7 @@ namespace Keypaste.Cli.Commands;
 /// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
 /// to discover. Ctrl+C, SIGTERM, closing the terminal and <c>keypaste lock</c> end the unlock's
 /// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
-/// take, so a request waiting at the prompt is withdrawn and denied
-/// (D-0313).
+/// take, so a request waiting at the prompt is withdrawn and denied.
 /// </para>
 /// </remarks>
 internal static class ApproveCommand
@@ -148,7 +147,7 @@ internal static class ApproveCommand
         using var stop = new CancellationTokenSource();
 
         // The approver saves only what a person confirmed under the claim it holds, so no save here can
-        // land under another owner (D-0317).
+        // land under another owner.
         AgentSave Save(Func<Vault, bool> edit)
         {
             try
@@ -206,7 +205,7 @@ internal static class ApproveCommand
                 LockNow = () => Stop(lifetime, stop),
                 Narrate = Narrate,
 
-                // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
+                // A terminal's edit, once the person allows it here, is saved under the same claim.
                 WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
 
                 // A browser pairs once the person here confirms the code it shows, for this computer.

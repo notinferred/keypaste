@@ -9,7 +9,7 @@ namespace Keypaste.Consistency.Tests;
 
 /// <summary>
 /// A variable added to a stage in Environments is what <c>keypaste run -p</c> injects, and
-/// a stage the CLI writes is the one the screen shows (D-0413, D-0416).
+/// a stage the CLI writes is the one the screen shows.
 /// </summary>
 /// <remarks>
 /// The mutations this must catch: the screen writing a stage's key on an entry not tagged into

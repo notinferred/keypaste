@@ -23,7 +23,7 @@ namespace Keypaste.Consistency.Tests;
 /// <b>The mutations that must make this file fail:</b> a field that stores the mask instead of the
 /// characters; a buffer read after it was cleared, giving an empty password with no error; a
 /// replacement written with <c>AddEntry</c> or a delete-and-re-add, which loses the old value
-/// instead of keeping it in history (D-0014); and a paste that strips what it cannot accept rather
+/// instead of keeping it in history; and a paste that strips what it cannot accept rather
 /// than refusing it, which stores a secret that differs from the one on the clipboard.
 /// </para>
 /// </remarks>
@@ -72,7 +72,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
 
     /// <summary>
     /// A password replaced in the GUI is what the CLI reads back, and the old one is still in the
-    /// entry's KeePass history rather than gone (D-0014).
+    /// entry's KeePass history rather than gone.
     /// </summary>
     [Fact]
     public void A_replaced_password_is_the_value_the_cli_returns_and_costs_one_history_item()

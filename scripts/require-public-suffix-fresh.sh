@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refuses a release whose vendored Public Suffix List is more than 60 days old (D-0616).
+# Refuses a release whose vendored Public Suffix List is more than 60 days old.
 #
 # The age is the list's own VERSION line, the time publicsuffix.org built it, to today's date in UTC. A list too old
 # counts a hosting platform added since as one site with its tenants, so browser fill would match across them;

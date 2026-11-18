@@ -4,8 +4,7 @@ using Xunit;
 namespace Keypaste.Browser.Tests;
 
 /// <summary>
-/// The box gives libsodium's known answers and opens and seals what TweetNaCl.js, KeePassXC-Browser's NaCl, sealed (D-0611,
-/// D-0613), here through the shared library <c>scripts/build-libsodium.sh</c> builds beside these tests; the NativeAOT
+/// The box gives libsodium's known answers and opens and seals what TweetNaCl.js, KeePassXC-Browser's NaCl, sealed, here through the shared library <c>scripts/build-libsodium.sh</c> builds beside these tests; the NativeAOT
 /// <c>keypaste</c> runs the same answers with the archive linked into it.
 /// </summary>
 public sealed class NaclBoxTests

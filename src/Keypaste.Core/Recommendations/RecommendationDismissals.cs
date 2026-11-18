@@ -11,7 +11,7 @@ namespace Keypaste.Core.Recommendations;
 public sealed record Dismissal(string Vault, string Entry, string Kind, string Key);
 
 /// <summary>
-/// Recommendations dismissed on this machine, in <c>recommendations.json</c> under keypaste's home (D-0372).
+/// Recommendations dismissed on this machine, in <c>recommendations.json</c> under keypaste's home.
 /// </summary>
 /// <remarks>
 /// It holds identifiers and key names only: no entry title, no value and no digest of one. An

@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// Which entries agents use, from this vault's granted audit lines, the session's release ledger and
-/// what the owner holds now (D-0361). Names and times, never a value.
+/// what the owner holds now. Names and times, never a value.
 /// </summary>
 public sealed class EntryActivityTests
 {

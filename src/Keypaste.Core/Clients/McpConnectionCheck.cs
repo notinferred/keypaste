@@ -7,7 +7,7 @@ namespace Keypaste.Core.Clients;
 /// <summary>An entry the bridge listed, as the check can ask for it.</summary>
 /// <param name="Handle">The bridge's opaque handle, which is what the request names.</param>
 /// <param name="Name">The group path and title as the bridge sanitized them, for a person to read.</param>
-/// <param name="Field">The field the check asks for: <c>password</c> when the listing names it, otherwise the first field it names (D-0422).</param>
+/// <param name="Field">The field the check asks for: <c>password</c> when the listing names it, otherwise the first field it names.</param>
 public sealed record McpListedEntry(string Handle, string Name, string Field);
 
 /// <summary>What the bridge's listing returned.</summary>
@@ -46,7 +46,7 @@ public sealed record McpCheckAnswer(McpCheckOutcome Outcome, string Said);
 /// </para>
 /// <para>
 /// Hand-written over <see cref="System.Text.Json"/> rather than the MCP SDK's client, so the
-/// desktop takes no dependency the bridge alone was allowed (D-0019). It speaks the three messages
+/// desktop takes no dependency the bridge alone was allowed. It speaks the three messages
 /// a client needs and nothing else.
 /// </para>
 /// <para>

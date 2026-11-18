@@ -127,7 +127,7 @@ public sealed class KdfFirstUseTests(ITestOutputHelper output)
             e is null ? "null" : (string)e.GetType().GetProperty("Name")!.GetValue(e)!));
     }
 
-    // Types and frames only: messages can carry values (D-0124).
+    // Types and frames only: messages can carry values.
     private static string Shape(Exception ex)
     {
         var frames = new StackTrace(ex, fNeedFileInfo: true).GetFrames()

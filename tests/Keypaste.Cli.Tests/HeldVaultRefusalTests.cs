@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// A verb that saves is refused, before any password is read, while the desktop app or <c>keypaste approve</c>
 /// holds the vault and nothing answers on its pipe, and the refusal names the holder and what to do next
-/// (N.10); with the holder answering, a verb that edits items sends it the edit instead (D-0464).
+/// (N.10); with the holder answering, a verb that edits items sends it the edit instead.
 /// </summary>
 /// <remarks>
 /// The claim here is this test process's own, standing in for the holder, so this is the fast

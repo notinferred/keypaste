@@ -5,7 +5,7 @@ namespace Keypaste.Cli.Clipboard;
 /// </summary>
 /// <remarks>
 /// This interface exists so the blocking-versus-detached choice lives in exactly one place.
-/// keypaste blocks today (DECISIONS.md D-0011); when holding the terminal for twenty seconds
+/// keypaste blocks today; when holding the terminal for twenty seconds
 /// becomes the top complaint, a detached implementation drops in here and no command code
 /// changes.
 /// </remarks>

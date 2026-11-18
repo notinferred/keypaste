@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>A Twofish vault, as KeePass's Twofish plugin and KeePassXC write one, opens and saves keeping its cipher (D-0292).</summary>
+/// <summary>A Twofish vault, as KeePass's Twofish plugin and KeePassXC write one, opens and saves keeping its cipher.</summary>
 /// <remarks>keypaste never chooses Twofish, so each vault here is written by the vendored library with the cipher set by hand.</remarks>
 public sealed class TwofishVaultTests : IDisposable
 {

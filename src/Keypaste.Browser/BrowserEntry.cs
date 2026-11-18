@@ -8,7 +8,7 @@ public static class BrowserEntry
 {
     /// <summary>
     /// Whether <paramref name="args"/> are a browser starting keypaste as its native messaging host, decided from the arguments
-    /// alone so no vault code runs first (D-0418, D-0624).
+    /// alone so no vault code runs first.
     /// </summary>
     /// <param name="args">The arguments, without the program.</param>
     /// <returns>True for a Chrome-family caller's origin, with the window it was called from on Windows, or Firefox's manifest path and add-on ID.</returns>
@@ -21,7 +21,7 @@ public static class BrowserEntry
 
     /// <summary>
     /// The relay a browser started: KeePassXC-Browser's host over standard input and output until the browser closes standard
-    /// input or sends SIGTERM, or ends its job object on Windows (D-0625).
+    /// input or sends SIGTERM, or ends its job object on Windows.
     /// </summary>
     /// <param name="args">The arguments the browser passed.</param>
     /// <returns>0 once the browser is done; 1, before standard input is read, for a caller keypaste does not answer or a malformed setting, and for a message too large to read.</returns>
@@ -95,7 +95,7 @@ public static class BrowserEntry
 
     /// <summary>
     /// <c>keypaste --selftest</c>: the box's known answers, in this process. CI requires them of each NativeAOT <c>keypaste</c>
-    /// it builds, the one binary libsodium is linked into (D-0613).
+    /// it builds, the one binary libsodium is linked into.
     /// </summary>
     /// <returns>0 when the box gave every answer, or 1 when it gave a wrong one or libsodium could not be reached.</returns>
     public static int SelfTest(TextWriter stdout, TextWriter stderr)

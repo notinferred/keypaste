@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck shell=sh
-# Terminal runs this for a Run or Open terminal confirmed in the keypaste app (D-0451): it claims the oldest request the
+# Terminal runs this for a Run or Open terminal confirmed in the keypaste app: it claims the oldest request the
 # app wrote and starts this bundle's keypaste with the request's fields as arguments and variables, evaluating none of them.
 
 # A Terminal profile may close the window as soon as this exits, so a refusal waits for Return when someone can type in it.

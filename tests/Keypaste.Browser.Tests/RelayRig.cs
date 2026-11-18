@@ -173,7 +173,7 @@ internal sealed class FakeOwner(string pipeName) : IApproverHandler, IAsyncDispo
         _running = _listener.RunAsync(_stop.Token);
     }
 
-    /// <summary>Stops answering and ends every connection, as an owner's lock does (D-0392).</summary>
+    /// <summary>Stops answering and ends every connection, as an owner's lock does.</summary>
     internal async Task StopAsync()
     {
         if (_stop is null || _running is null || _listener is null)

@@ -15,7 +15,7 @@ namespace Keypaste.Core.Approval;
 /// </para>
 /// <para>
 /// Every read is of the vault as its file holds it (<see cref="Vault.ReadSaved(out IReadOnlyList{VaultEntry}?)"/>), so an edit not yet
-/// saved and a file somebody else has written are refused rather than answered from memory (D-0317).
+/// saved and a file somebody else has written are refused rather than answered from memory.
 /// </para>
 /// <para>
 /// Every failure path returns <see langword="false"/>. Nothing here throws for a request it cannot
@@ -342,7 +342,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         _ => CredentialFailure.Failed,
     };
 
-    /// <summary>The item's current TOTP code, computed from the saved file only now; the seed goes no further than the spec, which is zeroed here (D-0480).</summary>
+    /// <summary>The item's current TOTP code, computed from the saved file only now; the seed goes no further than the spec, which is zeroed here.</summary>
     private bool TryCompute(EntryName name, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
     {
         value = null;
@@ -422,7 +422,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
         return failure == CredentialFailure.None;
     }
 
-    /// <summary>The field's text with its own entry's placeholders filled in from the saved file, read only when it holds one (D-0465).</summary>
+    /// <summary>The field's text with its own entry's placeholders filled in from the saved file, read only when it holds one.</summary>
     private bool TryFill(EntryName name, string stored, out string text, out CredentialFailure failure, out string unfilled)
     {
         text = stored;

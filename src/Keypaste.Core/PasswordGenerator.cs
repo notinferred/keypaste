@@ -52,7 +52,7 @@ public readonly record struct PasswordRecipe
     /// <remarks>
     /// Counted from the alphabet this recipe actually draws from, not from a number written down
     /// beside it, for the same reason <see cref="WordList.BitsPerWord"/> is derived: the default
-    /// alphabet is 85 characters and 20 of them is about 128 bits (DECISIONS.md D-0036), and a
+    /// alphabet is 85 characters and 20 of them is about 128 bits, and a
     /// widened symbol set has to move the figure rather than leave it stale. Zero for a recipe
     /// with no alphabet, which <see cref="TryValidate"/> refuses anyway.
     /// </remarks>
@@ -163,7 +163,7 @@ public static class PasswordGenerator
     /// <summary>How many characters a password has when nobody says otherwise.</summary>
     /// <remarks>
     /// Twenty characters over the 85-character default alphabet is log2(85) × 20, or about 128
-    /// bits — a number a reader can check rather than take on trust (DECISIONS.md D-0036).
+    /// bits — a number a reader can check rather than take on trust.
     /// </remarks>
     public const int DefaultLength = 20;
 
@@ -194,7 +194,7 @@ public static class PasswordGenerator
     /// generator cannot hand out anything weaker than the figure the threat model already rests
     /// on. Six words over a 7,776-word list is log2(7776) × 6, about 78 bits — lower than the
     /// character default's 128, which is why the KDF matters and why every statement of the
-    /// number says what it is (DECISIONS.md D-0236).
+    /// number says what it is.
     /// </remarks>
     public const int MinimumWords = 6;
 
@@ -212,7 +212,7 @@ public static class PasswordGenerator
     /// <remarks>
     /// Not a hyphen, which is the conventional choice: the word list holds <c>drop-down</c>,
     /// <c>felt-tip</c>, <c>t-shirt</c> and <c>yo-yo</c>, so a hyphen-separated passphrase cannot
-    /// be split back into the words it was counted in (D-0239). A full stop appears in no word,
+    /// be split back into the words it was counted in. A full stop appears in no word,
     /// and is already inside <see cref="Symbols"/>.
     /// </remarks>
     public const char DefaultSeparator = '.';

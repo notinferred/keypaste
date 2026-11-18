@@ -2,7 +2,7 @@
 
   <!--
     Vendored KeePassLib. See UPSTREAM.md for provenance and the full list of local
-    modifications, and DECISIONS.md D-0007 for why this is vendored rather than
+    modifications, and why this is vendored rather than
     referenced as a NuGet package.
 
     Source files are kept VERBATIM wherever possible. Code that keypaste does not use

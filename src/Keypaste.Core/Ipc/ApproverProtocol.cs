@@ -15,7 +15,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <see cref="ApproverJsonContext"/>'s generated serializer to write and <see cref="JsonDocument"/>
 /// to read, never reflection-based serialization, which trips IL2026 and IL3050 under the trim and
-/// AOT analyzers this repository builds with (DECISIONS.md D-0019). Reading stays on the document
+/// AOT analyzers this repository builds with. Reading stays on the document
 /// because a frame is read by rules the serializer does not express: a member sent as null is
 /// refused where its absence is accepted, a mistyped optional member reads as absent, a null array
 /// element is refused, and a property named twice anywhere in the frame refuses it.
@@ -26,11 +26,11 @@ namespace Keypaste.Core.Ipc;
 /// parse failure must cost that connection and nothing more (docs/PRODUCT.md law 3.7).
 /// </para>
 /// <para>
-/// <b>One transport is not one seam.</b> DECISIONS.md D-0022 forbids fusing the listing path and
+/// <b>One transport is not one seam.</b> Nothing may fuse the listing path and
 /// the credential path. That still holds: they are different message kinds with different handlers,
 /// and among the replies only <see cref="CredentialReply"/> and the env replies have anywhere to put a
 /// secret. Among the requests only <see cref="EditRequest"/> carries one, the new value a terminal
-/// writes, inbound to the holder (D-0464). Sharing a pipe does not fuse them; sharing an interface
+/// writes, inbound to the holder. Sharing a pipe does not fuse them; sharing an interface
 /// would have.
 /// </para>
 /// </remarks>
@@ -38,7 +38,7 @@ public static partial class ApproverProtocol
 {
     /// <summary>The wire version, so a later change to the shape is unambiguous.</summary>
     /// <remarks>
-    /// Version 2 makes every request name its vault and session (D-0310). An optional field does not
+    /// Version 2 makes every request name its vault and session. An optional field does not
     /// bump this, because a bump fails every mixed-version pair at the framing layer; that failure
     /// is the point here, since a bridge that names no vault must not be answered by one.
     /// </remarks>
@@ -364,7 +364,7 @@ public static partial class ApproverProtocol
     private static byte[] WriteCredential(CredentialReply reply) =>
         JsonSerializer.SerializeToUtf8Bytes(new CredentialReplyFrame(reply), Wire.CredentialReplyFrame);
 
-    /// <summary>The largest frame carrying a set to <c>keypaste run --session</c> or <c>--token</c>, the one reply over <see cref="MessageFramer.MaximumFrameBytes"/> (D-0454).</summary>
+    /// <summary>The largest frame carrying a set to <c>keypaste run --session</c> or <c>--token</c>, the one reply over <see cref="MessageFramer.MaximumFrameBytes"/>.</summary>
     /// <remarks>
     /// <para>
     /// Only the runner reads one, and every frame the owner reads stays at
@@ -405,7 +405,7 @@ public static partial class ApproverProtocol
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     /// <remarks>
     /// A set that will not fit is refused whole as <see cref="EnvOutcome.TooLarge"/>, never trimmed:
-    /// a child started with part of its set runs with the wrong credentials (D-0337).
+    /// a child started with part of its set runs with the wrong credentials.
     /// </remarks>
     public static byte[] Encode(EnvReply reply)
     {
@@ -1113,7 +1113,7 @@ public static partial class ApproverProtocol
         return JsonSerializer.SerializeToUtf8Bytes(new EditRequestFrame(request), Wire.EditRequestFrame);
     }
 
-    /// <summary>Whether an edit fits the one frame a request may take (D-0454), so the CLI can refuse a larger one before sending.</summary>
+    /// <summary>Whether an edit fits the one frame a request may take, so the CLI can refuse a larger one before sending.</summary>
     /// <param name="request">The edit.</param>
     /// <returns><see langword="true"/> when its frame is at most <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
     public static bool Fits(EditRequest request) => Encode(request).Length <= MessageFramer.MaximumPayloadBytes;
@@ -1747,7 +1747,7 @@ public static partial class ApproverProtocol
     /// <remarks>
     /// Values are accepted only on a released set, and an undefined method is refused rather than
     /// guessed at, so a reply that says no never delivers a value alongside. The texts filled into a
-    /// released set's values are optional, and each must be under one of its variables (D-0465).
+    /// released set's values are optional, and each must be under one of its variables.
     /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RunReply? reply)
     {
@@ -1864,7 +1864,7 @@ public static partial class ApproverProtocol
 
     private static ApproverJsonContext Wire => ApproverJsonContext.Default;
 
-    // A property named twice would leave the reader to pick one, and the sender may have meant the other (D-0325).
+    // A property named twice would leave the reader to pick one, and the sender may have meant the other.
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
 
     private static bool TryParse(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out JsonDocument? document)

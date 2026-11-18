@@ -28,8 +28,7 @@ public sealed record TerminalRequest(
     string? Command);
 
 /// <summary>
-/// The requests the app leaves for Terminal's launcher, one private file per run in a private folder
-/// (D-0451).
+/// The requests the app leaves for Terminal's launcher, one private file per run in a private folder.
 /// </summary>
 /// <remarks>
 /// <para>

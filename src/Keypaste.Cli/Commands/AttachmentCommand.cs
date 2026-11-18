@@ -10,11 +10,11 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// Names and sizes only; no content reaches the terminal. Adding, replacing and removing each make a history revision, as
 /// KeePassXC's own edit does. None of them is one of the edits sent to the app or <c>keypaste approve</c>, whose request
-/// holds 64 KiB, so each is refused while either holds the vault (D-0535); listing and saving read the file and work then too.
+/// holds 64 KiB, so each is refused while either holds the vault; listing and saving read the file and work then too.
 /// </remarks>
 internal static class AttachmentCommand
 {
-    /// <summary>What an edit says when the vault's history limits dropped the revision it made (D-0533).</summary>
+    /// <summary>What an edit says when the vault's history limits dropped the revision it made.</summary>
     private const string _notKept = "too large for this vault's history to keep the item as it was";
 
     private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");

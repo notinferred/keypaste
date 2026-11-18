@@ -30,7 +30,7 @@ public enum EnvOutcome
     /// <summary>The person asked did not confirm.</summary>
     Declined = 7,
 
-    /// <summary>The set's names changed while the person was being asked about them, or a reload withdrew the question (D-0412).</summary>
+    /// <summary>The set's names changed while the person was being asked about them, or a reload withdrew the question.</summary>
     ChangedWhileAsked = 8,
 
     /// <summary>The request did not come from a connection attached to the session holding the vault.</summary>
@@ -71,7 +71,7 @@ public sealed record EnvPreview(string Project, IReadOnlyList<string> Keys)
     /// <summary>Where each variable's value lives, in <see cref="Keys"/> order, a literal having none; empty for a preview made without a vault.</summary>
     public IReadOnlyList<EnvSource> Sources { get; init; } = [];
 
-    /// <summary>Whether an entry of the set belongs to a protected environment by any of its own tags, so its release is asked live with Allow once only (D-0348, D-0371).</summary>
+    /// <summary>Whether an entry of the set belongs to a protected environment by any of its own tags, so its release is asked live with Allow once only.</summary>
     public bool RequiresLiveApproval { get; init; }
 
     /// <summary>Whether another preview names the same keys, from the same entries, under the same protection.</summary>
@@ -132,12 +132,12 @@ public sealed class EnvResolved
     /// <summary>Where each variable released from the vault lives, in <see cref="Variables"/> order, a literal having none; empty for a set that came over the owner's endpoint or out of a bundle.</summary>
     public IReadOnlyList<EnvSource> Sources { get; }
 
-    /// <summary>Whether a source entry belongs to a protected environment by any of its own tags (D-0348, D-0371).</summary>
+    /// <summary>Whether a source entry belongs to a protected environment by any of its own tags.</summary>
     public bool RequiresLiveApproval { get; }
 
     /// <summary>
     /// Each text a placeholder filled into a value of <see cref="Variables"/>, under that variable's name, so what a
-    /// run prints can be scrubbed of it (D-0465); empty when nothing was filled in or the set was not released.
+    /// run prints can be scrubbed of it; empty when nothing was filled in or the set was not released.
     /// </summary>
     public IReadOnlyList<EnvVariable> Fills { get; }
 
@@ -219,19 +219,19 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 
 /// <summary>
 /// Resolves a project's environment for release, whole or not at all. The set is the variable
-/// fields of every entry whose own tag puts it in the environment (D-0370); no entry belongs to a
-/// project by its group (D-0416).
+/// fields of every entry whose own tag puts it in the environment; no entry belongs to a
+/// project by its group.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Reading stays permissive elsewhere (<see cref="List"/>) so KeePassXC's view of the file
 /// is never hidden; this is the moment a value leaves the vault, where a silently incomplete set
 /// becomes a program running with the wrong credentials. A deleted entry is not in the set at all:
-/// the recycle bin is outside every traversal (D-0248), and keypaste's own groups hold no project.
+/// the recycle bin is outside every traversal, and keypaste's own groups hold no project.
 /// </para>
 /// <para>
 /// Each value leaves with the KeePass placeholders naming its own entry's fields filled in
-/// (<see cref="KeePassPlaceholders"/>, D-0465). A refusal names each variable, why and the entries
+/// (<see cref="KeePassPlaceholders"/>). A refusal names each variable, why and the entries
 /// concerned, never a value: a key on two entries, an expired entry, a custom field named like a
 /// standard one in another case, and a value holding a placeholder keypaste cannot fill in. Two keys
 /// cannot differ only in case, since a variable's field is named in capitals
@@ -242,7 +242,7 @@ public static class EnvResolution
 {
     private const string _notInSet = "is not in this stage's set";
 
-    /// <summary>Resolves a project's default profile from the vault as its file holds it (D-0317).</summary>
+    /// <summary>Resolves a project's default profile from the vault as its file holds it.</summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="project">The project name.</param>
     /// <param name="clock">What expiry is judged against.</param>
@@ -250,7 +250,7 @@ public static class EnvResolution
     public static EnvResolved Resolve(Vault vault, string project, TimeProvider clock) =>
         Resolve(vault, project, EnvProfileNames.Default, clock);
 
-    /// <summary>Resolves one profile of a project from the vault as its file holds it (D-0317).</summary>
+    /// <summary>Resolves one profile of a project from the vault as its file holds it.</summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="project">The project name.</param>
     /// <param name="profile">The profile name.</param>
@@ -259,7 +259,7 @@ public static class EnvResolution
     public static EnvResolved Resolve(Vault vault, string project, string profile, TimeProvider clock) =>
         Resolve(vault, project, profile, keys: null, clock);
 
-    /// <summary>Resolves one profile of a project, or only some of its keys, from the vault as its file holds it (D-0317).</summary>
+    /// <summary>Resolves one profile of a project, or only some of its keys, from the vault as its file holds it.</summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="project">The project name.</param>
     /// <param name="profile">The profile name.</param>
@@ -379,7 +379,7 @@ public static class EnvResolution
 
     /// <summary>
     /// <see cref="List"/> with each value as it leaves keypaste, its own entry's placeholders filled in
-    /// (D-0465): what a plaintext export writes, which refuses an expired entry as a run does (D-0337).
+    ///: what a plaintext export writes, which refuses an expired entry as a run does.
     /// </summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="project">The project name.</param>
@@ -426,7 +426,7 @@ public static class EnvResolution
         return Listing(filled, outcome);
     }
 
-    /// <summary>A member's value as it leaves keypaste, or null when it holds a placeholder keypaste cannot fill in (D-0465).</summary>
+    /// <summary>A member's value as it leaves keypaste, or null when it holds a placeholder keypaste cannot fill in.</summary>
     internal static string? Filled(EnvMember member) => Fill(member).Value;
 
     /// <summary>Every variable one environment holds, unjudged, and whether the environment exists at all.</summary>
@@ -450,7 +450,7 @@ public static class EnvResolution
         snapshot.Entries.Any(entry => !ReservedGroups.IsReserved(entry.Entry.GroupPath)
             && entry.Tags.Select(ProjectTag.Read).Any(tag => tag.Kind == ProjectTagKind.Member && string.Equals(tag.Project, project, StringComparison.Ordinal)));
 
-    /// <summary>Whether a variable is a custom field named like a standard one in another case, which keypaste never releases (D-0388).</summary>
+    /// <summary>Whether a variable is a custom field named like a standard one in another case, which keypaste never releases.</summary>
     /// <param name="source">Where the variable lives.</param>
     /// <returns><see langword="true"/> for such a field.</returns>
     public static bool IsNamedLikeStandard(EnvSource source)
@@ -493,7 +493,7 @@ public static class EnvResolution
     /// <summary>Why a member's value cannot leave, naming its entry and never a value.</summary>
     private static EnvProblem Unfilled(EnvMember member, PlaceholderFill fill) => new(member.Key, $"{fill.Refusal} ({Where([member])})");
 
-    /// <summary>That a member's entry expired at or before now, naming it, or null when it has not (D-0337).</summary>
+    /// <summary>That a member's entry expired at or before now, naming it, or null when it has not.</summary>
     private static EnvProblem? Expired(EnvMember member, DateTimeOffset now) =>
         member.Entry.Entry.Expires is { } expires && expires <= now
             ? new EnvProblem(member.Key, $"expired {expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)} ({Where([member])})")

@@ -13,11 +13,11 @@ namespace Keypaste.Core;
 /// <para>
 /// <b>The digest is written once, here.</b> third_party/eff-large-wordlist/UPSTREAM.md names this
 /// symbol instead of restating the hex, because a pin written twice is a pin that can disagree
-/// with itself (DECISIONS.md D-0203, D-0207) — and because the check has to hold inside a shipped
-/// binary, which has no repository to read (D-0235).
+/// with itself — and because the check has to hold inside a shipped
+/// binary, which has no repository to read.
 /// </para>
 /// <para>
-/// <b><see cref="BitsPerWord"/> is computed, never typed.</b> D-0036 asks that a published claim
+/// <b><see cref="BitsPerWord"/> is computed, never typed.</b> A published claim must
 /// have something that can hold it. Deriving the figure from <see cref="Count"/> means the
 /// documentation, the CLI's stderr line and the desktop's label cannot drift from the list; a
 /// re-vendored list of a different size moves all three at once.
@@ -60,7 +60,7 @@ public static class WordList
     /// Asked by <see cref="PassphraseRecipe.TryValidate"/> rather than answered by a written-down
     /// character set: this list holds four hyphenated words, so <c>-</c> would make a six-word
     /// passphrase unsplittable, and a list re-vendored with different punctuation in it must
-    /// narrow the separator rule by itself (D-0239).
+    /// narrow the separator rule by itself.
     /// </remarks>
     public static bool Contains(char candidate)
     {

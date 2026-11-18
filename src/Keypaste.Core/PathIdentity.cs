@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// One rule, in the core, because more than one surface asks the question and the answers have to
 /// agree: <c>env export</c> refuses to write plaintext over the vault it is reading from, the
 /// desktop decides whether the vault you just picked is the one already remembered, and the recent
-/// list decides whether it has seen a file before. D-0091 is what three private answers to one
+/// list decides whether it has seen a file before. Three private answers to one
 /// question cost the last time.
 /// </para>
 /// <para>

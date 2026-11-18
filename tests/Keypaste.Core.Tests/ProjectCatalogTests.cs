@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Projects come from their entries' own tags alone; no group makes one (D-0416).</summary>
+/// <summary>Projects come from their entries' own tags alone; no group makes one.</summary>
 public sealed class ProjectCatalogTests : IDisposable
 {
     private const string _master = "correct horse battery staple";

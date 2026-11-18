@@ -5,8 +5,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste show</c>: one item's fields and tags, every value masked unless <c>--reveal</c>
-/// (D-0463).
+/// <c>keypaste show</c>: one item's fields and tags, every value masked unless <c>--reveal</c>.
 /// </summary>
 public sealed class ShowVerbTests : IDisposable
 {
@@ -160,7 +159,7 @@ public sealed class ShowVerbTests : IDisposable
         Assert.Equal(_secret, values["STRIPE_SECRET_KEY"]);
     }
 
-    /// <summary>What is revealed is the stored text: a placeholder is shown as written, never filled in (D-0463, D-0465).</summary>
+    /// <summary>What is revealed is the stored text: a placeholder is shown as written, never filled in.</summary>
     [Fact]
     public void A_placeholder_is_revealed_as_the_vault_holds_it()
     {

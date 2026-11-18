@@ -16,11 +16,10 @@ namespace Keypaste.Cli.Approval;
 /// cannot live there — and reaching for the controlling terminal instead would mean
 /// <c>/dev/tty</c>, two incompatible <c>termios</c> layouts, and a <c>stty -echo</c> that leaves
 /// somebody's shell typing invisibly if the process dies mid-prompt. Putting the prompt in a
-/// process whose stdin already <em>is</em> a terminal does not solve that problem; it deletes it
-/// (DECISIONS.md D-0023).
+/// process whose stdin already <em>is</em> a terminal does not solve that problem; it deletes it.
 /// </para>
 /// <para>
-/// Everything goes to stderr, like every other prompt in keypaste (D-0009), so stdout stays
+/// Everything goes to stderr, like every other prompt in keypaste, so stdout stays
 /// data-only, and all of it through the agent's one <see cref="AgentConsole"/>, so no other line
 /// can splice into the dialog or its choice line.
 /// </para>
@@ -30,7 +29,7 @@ namespace Keypaste.Cli.Approval;
 /// newlines, no bidirectional overrides — so it cannot draw a second dialog inside this one or move
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
 /// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once, and
-/// every other answer, Enter and silence included, is a denial (D-0326). Where the prompt offers it,
+/// every other answer, Enter and silence included, is a denial. Where the prompt offers it,
 /// <c>a</c> asks to confirm an Always allow with <c>y</c>, and any other answer to that is a denial too. Blocking is
 /// set on the agent's page in the app, never at a prompt.
 /// </para>

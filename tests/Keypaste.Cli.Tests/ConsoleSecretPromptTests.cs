@@ -229,7 +229,7 @@ public sealed class ConsoleSecretPromptTests
             TestContext.Current.CancellationToken));
     }
 
-    /// <summary>An allowing key counts only after the choice has been on screen for the arming delay (D-0326).</summary>
+    /// <summary>An allowing key counts only after the choice has been on screen for the arming delay.</summary>
     [Fact]
     public void ReadChoice_IgnoresAnAllowingKey_UntilArmed()
     {

@@ -13,8 +13,8 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// What a vault's owner answers its endpoint with: a request is considered only when it comes from
-/// a connection attached to the session now holding the vault it names (D-0310), and is released
-/// only while that session's lifetime is live (D-0313).
+/// a connection attached to the session now holding the vault it names, and is released
+/// only while that session's lifetime is live.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,17 +27,17 @@ namespace Keypaste.Core.Ownership;
 /// and answered as a lock denial. Its answer commits under the lock that ends the lifetime, so a
 /// value either left before the lock or does not leave at all. A reload withdraws what is waiting the
 /// same way while keeping the lifetime, and the request is answered as the vault having changed, so
-/// nothing a person approved of the copy it replaced leaves from the copy it read in (D-0412).
+/// nothing a person approved of the copy it replaced leaves from the copy it read in.
 /// </para>
 /// <para>
 /// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
 /// lifetime the runner attached to, never a later one, with the person asked through the owner's
-/// own gate (D-0341) and nothing else answers it
+/// own gate and nothing else answers it
 /// (THREATS.md T-34). A request carrying the launch pass the app's own Run confirmation issued is
 /// that person's answer: it is released unasked only when it is exactly the request the confirmation
-/// named and the set still has the names, items and protection it showed (D-0452). The app's launch
+/// named and the set still has the names, items and protection it showed. The app's launch
 /// endpoint hands this authority nothing else, and a request it reads without a pass is refused
-/// unasked (D-0451).
+/// unasked.
 /// </para>
 /// <para>
 /// An agent's <c>run</c> is refused unasked unless this computer's rules turn run on for the agent, and is
@@ -138,7 +138,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <summary>Told of an exception no rule expected, which the request it ended is refused for; it must not throw.</summary>
-    /// <remarks>The desktop app reports it as a crash report's catch site (D-0596); <c>keypaste approve</c> sets none.</remarks>
+    /// <remarks>The desktop app reports it as a crash report's catch site; <c>keypaste approve</c> sets none.</remarks>
     public Action<Exception>? Unexpected { get; init; }
 
     /// <summary>The session a request attaching now would be answered under, or null while the vault is locked.</summary>
@@ -197,7 +197,7 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it (D-0452).</summary>
+    /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>The pass, or null when that session is no longer the live one or this owner takes no passes.</returns>
@@ -220,7 +220,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <summary>
     /// Records a Run the app starts itself, on Windows and Linux, before its terminal starts, in the line a macOS
     /// Run's pass is recorded with when its window asks: the set's items, <c>prompt</c>, and the reason
-    /// <c>&lt;N&gt; variable(s), confirmed in the app</c> (D-0496).
+    /// <c>&lt;N&gt; variable(s), confirmed in the app</c>.
     /// </summary>
     /// <param name="set">The set the app's confirmation released, read again after the person answered.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
@@ -762,7 +762,7 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <summary>
-    /// Merges another program's save with the open vault for this owner, as D-0542 and D-0543 say: withdraws every
+    /// Merges another program's save with the open vault for this owner: withdraws every
     /// request waiting on a person, merges and saves, puts the merged copy in place in the same session, and records a merge it saved.
     /// </summary>
     /// <param name="open">The vault the live session serves, whose file another program saved.</param>
@@ -771,12 +771,12 @@ public sealed class SessionAuthority : IApproverHandler
     /// on meanwhile; the caller holds its edit gate across this call and owns a copy it puts in place.
     /// </param>
     /// <param name="surface">The owner, as the merge's line records it, such as <c>keypaste app</c>.</param>
-    /// <returns>What became of the merge; after a refusal agents stay refused, the open copy still differing from its file (D-0317).</returns>
+    /// <returns>What became of the merge; after a refusal agents stay refused, the open copy still differing from its file.</returns>
     /// <remarks>
     /// Agents are refused from the detection to the merged copy's save, because the open copy no longer matches its file. The
     /// withdrawal at the start answers each request waiting on a person as
     /// the vault having been merged; afterwards a request is answered from the merged copy and asked again unless its rule is Allow. A merge
-    /// the owner saved is recorded on one line naming items and agents, never a value (D-0545); one that took nothing writes none.
+    /// the owner saved is recorded on one line naming items and agents, never a value; one that took nothing writes none.
     /// </remarks>
     public VaultMergeSave Merge(Vault open, Func<Vault, bool> swap, string surface) =>
         Merge(open, swap, surface, vault => vault.MergeAnotherSave());
@@ -826,7 +826,7 @@ public sealed class SessionAuthority : IApproverHandler
     public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
         ReleaseSetAsync(request, connectionId, launchOnly: false, cancellationToken);
 
-    /// <summary>Decides one env request read on the app's launch endpoint, which only a run carrying a launch pass uses (D-0451).</summary>
+    /// <summary>Decides one env request read on the app's launch endpoint, which only a run carrying a launch pass uses.</summary>
     /// <param name="request">The project, and the command and directory the runner will start it in.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
@@ -1324,7 +1324,7 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>What a request the owner withdrew is refused as: the lock that ended its lifetime, or a reload or a merge that kept it (D-0412, D-0542).</summary>
+    /// <summary>What a request the owner withdrew is refused as: the lock that ended its lifetime, or a reload or a merge that kept it.</summary>
     /// <param name="lifetime">The lifetime it was admitted to.</param>
     /// <param name="before">What the withdrawal came before, such as "anybody answered".</param>
     /// <returns>The method and reason its line records.</returns>
@@ -1854,7 +1854,7 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <summary>Has the owner lock, and waits for the lock to end <paramref name="lifetime"/>.</summary>
     /// <remarks>
-    /// The lock runs on its own, since an owner's lock waits for its connections to end (D-0392), and the reply waits for it to
+    /// The lock runs on its own, since an owner's lock waits for its connections to end, and the reply waits for it to
     /// end the session it was asked under. The reply is then the confirmation, and nothing more is asked on a connection the
     /// lock is closing (F.62).
     /// </remarks>

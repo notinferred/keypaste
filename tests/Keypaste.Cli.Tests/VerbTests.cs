@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// Each vault operation derives a key, so these lean on a handful of seeded vaults rather than one per
-/// assertion. The vaults take the token cost of D-0469; <c>KeyDerivationCostTests</c> holds the production one.
+/// assertion. The vaults take the token cost; <c>KeyDerivationCostTests</c> holds the production one.
 /// </remarks>
 public sealed class VerbTests
 {
@@ -245,7 +245,7 @@ public sealed class VerbTests
     }
 
     /// <summary>
-    /// The read half of D-0091. Two entries answer to <c>a/b/c</c>, so serving either would be a
+    /// The read half of the duplicate-name rule. Two entries answer to <c>a/b/c</c>, so serving either would be a
     /// guess — and unlike a guessed removal, a guessed read hands the wrong secret over and says
     /// nothing about having done it. Both ways out of the verb are checked: <c>--reveal</c> must
     /// print no password, and the default must put none on the clipboard.

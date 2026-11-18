@@ -26,7 +26,7 @@ A normalised line ending would change the digest and fail the check below on Win
 **The SHA-256 pin lives in exactly one place, `Keypaste.Core.WordList.Digest`, and is not
 restated here.** `WordList` hashes the embedded resource at first use and throws when it does
 not match, so a shipped binary that has no repository to read still refuses a list it cannot
-vouch for (D-0235). A pin written twice is a pin that can disagree with itself (D-0203, D-0207).
+vouch for. A pin written twice is a pin that can disagree with itself.
 
 ## Licence
 
@@ -50,7 +50,7 @@ on disk rather than against the shipped resource:
 
 That last one is why the separator rule is derived from the list instead of written down: `-`
 would make a six-word passphrase unsplittable, so any character the list itself contains is
-refused as a separator (D-0239). Nothing else is claimed of the list. EFF documents
+refused as a separator. Nothing else is claimed of the list. EFF documents
 prefix-freedom for its *short* list #2, not for this one, and keypaste does not need it, a
 separator always sitting between words.
 

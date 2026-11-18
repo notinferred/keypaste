@@ -12,7 +12,7 @@ namespace Keypaste.Core.Launch;
 public sealed record ScrubbedText(string Text, int Replacements, bool Truncated);
 
 /// <summary>
-/// Removes injected values from what a run printed before any of it is returned (D-0359).
+/// Removes injected values from what a run printed before any of it is returned.
 /// </summary>
 /// <remarks>
 /// <para>

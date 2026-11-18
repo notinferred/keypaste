@@ -44,8 +44,7 @@ public enum TokenCheck
 /// Creating and revoking change the open vault and do not save it. Revoking writes a newer version
 /// of the record with no verifier and the time it was revoked, which KeePassXC's default merge
 /// carries over an older copy where it would drop a deletion, and the record is purged once the
-/// token has expired; a record whose UUID the vault also holds a tombstone for reads as revoked
-/// (D-0544, D-0629, D-0630).
+/// token has expired; a record whose UUID the vault also holds a tombstone for reads as revoked.
 /// </para>
 /// </remarks>
 /// <param name="vault">The open vault.</param>
@@ -64,7 +63,7 @@ public sealed class TokenStore(Vault vault)
 
     private const string _revokedProperty = "revoked";
 
-    // A property named twice would leave the reader to pick one, and the writer may have meant the other (D-0325).
+    // A property named twice would leave the reader to pick one, and the writer may have meant the other.
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
 
     private readonly Vault _vault = vault ?? throw new ArgumentNullException(nameof(vault));
@@ -116,7 +115,7 @@ public sealed class TokenStore(Vault vault)
     /// <param name="token">The token, to be shown once and never stored.</param>
     /// <param name="error">Why nothing was minted, or empty.</param>
     /// <returns>Whether a token was minted.</returns>
-    /// <remarks>Minting also purges each revoked record whose token has expired (D-0630).</remarks>
+    /// <remarks>Minting also purges each revoked record whose token has expired.</remarks>
     public bool TryCreate(
         string name,
         IReadOnlyList<TokenScope> scopes,
@@ -203,7 +202,7 @@ public sealed class TokenStore(Vault vault)
     /// <returns>Whether a token was revoked.</returns>
     /// <remarks>
     /// An unexpired token's record becomes a newer version with no verifier and an expired one's is
-    /// purged, and each revoked record whose token has expired is purged with it (D-0629, D-0630).
+    /// purged, and each revoked record whose token has expired is purged with it.
     /// </remarks>
     public bool Revoke(string nameOrId, DateTimeOffset now)
     {
@@ -233,7 +232,7 @@ public sealed class TokenStore(Vault vault)
     /// <returns>Whether a record was taken back.</returns>
     /// <remarks>
     /// Only for a creation the caller's save failed to write: no copy of the vault holds that record,
-    /// so no merge can bring it back and nothing needs to stay revoked (D-0630).
+    /// so no merge can bring it back and nothing needs to stay revoked.
     /// </remarks>
     public bool TakeBack(string id)
     {
@@ -263,7 +262,7 @@ public sealed class TokenStore(Vault vault)
 
         foreach (var record in doomed)
         {
-            // An emptied verifier also makes a keypaste that predates the revoked mark refuse the version (D-0629).
+            // An emptied verifier also makes a keypaste that predates the revoked mark refuse the version.
             if (record.Info is { } info && now < record.Lasts)
             {
                 _vault.UpdateEntry(record.Entry with
@@ -281,7 +280,7 @@ public sealed class TokenStore(Vault vault)
         return true;
     }
 
-    /// <summary>Purges each revoked record whose token has expired by its notes, the expiry every copy of the record holds (D-0630).</summary>
+    /// <summary>Purges each revoked record whose token has expired by its notes, the expiry every copy of the record holds.</summary>
     private void PurgeExpired(List<TokenRecord> records, DateTimeOffset now)
     {
         foreach (var record in records)
@@ -502,6 +501,6 @@ public sealed class TokenStore(Vault vault)
     /// <param name="Entry">The entry.</param>
     /// <param name="Info">What it records, or null when it does not read back whole.</param>
     /// <param name="Lasts">The expiry its notes record, when <paramref name="Info"/> is set.</param>
-    /// <param name="Revoked">Whether its notes say it was revoked or the vault holds a tombstone for its UUID (D-0544).</param>
+    /// <param name="Revoked">Whether its notes say it was revoked or the vault holds a tombstone for its UUID.</param>
     private sealed record TokenRecord(VaultEntry Entry, TokenInfo? Info, DateTimeOffset Lasts, bool Revoked);
 }

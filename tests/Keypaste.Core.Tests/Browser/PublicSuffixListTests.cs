@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.Browser;
 
-/// <summary>The embedded Public Suffix List gives every case of upstream's <c>test_psl.txt</c>, over both its sections (D-0615).</summary>
+/// <summary>The embedded Public Suffix List gives every case of upstream's <c>test_psl.txt</c>, over both its sections.</summary>
 /// <remarks>
 /// The cases are read from the vendored file, whose cases upstream wrote in Unicode were converted to A-labels as the list's
 /// rules were, so each is then the same as one of upstream's own Punycode cases and is run once.

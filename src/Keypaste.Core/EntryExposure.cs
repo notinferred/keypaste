@@ -9,7 +9,7 @@ public enum ExposureReach
     /// <summary>Nothing: the entry cannot be named.</summary>
     None = 0,
 
-    /// <summary>Its custom fields named like environment variables, through a project tag alone (D-0422).</summary>
+    /// <summary>Its custom fields named like environment variables, through a project tag alone.</summary>
     ProjectFields = 1,
 
     /// <summary>The whole entry, through a pattern naming its place.</summary>
@@ -31,7 +31,7 @@ public enum ExposureReach
 /// <para>
 /// <b>A pattern starting <c>tag:</c> selects entries by project membership</b>, read from their own
 /// tags as <see cref="ProjectTag"/> reads them, and reaches only their custom fields named like
-/// environment variables; any other pattern names a place and reaches the whole entry (D-0422).
+/// environment variables; any other pattern names a place and reaches the whole entry.
 /// Reach is decided per entry, so an entry tagged into two environments is reached through either
 /// (THREATS.md T-38).
 /// </para>

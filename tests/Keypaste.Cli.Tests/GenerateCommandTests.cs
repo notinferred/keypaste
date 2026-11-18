@@ -17,7 +17,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// The other half is that this verb cannot be made to emit a secret by accident: no argument
 /// list shorter than the intended one produces a passphrase, which is why <c>--words</c> is
-/// required rather than defaulted (DECISIONS.md D-0237).
+/// required rather than defaulted.
 /// </para>
 /// </remarks>
 public sealed class GenerateCommandTests

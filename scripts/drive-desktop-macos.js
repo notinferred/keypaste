@@ -1,5 +1,5 @@
 // 4.7e, R.1a: drives an installed keypaste desktop app from outside its process through the macOS accessibility API,
-// System Events' keystrokes, CGEvent's pointer and screencapture (D-0199).
+// System Events' keystrokes, CGEvent's pointer and screencapture.
 //
 // One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb could
 // not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in. When a verb

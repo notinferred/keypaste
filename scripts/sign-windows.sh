@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Authenticode-signs and timestamps the Windows files keypaste compiles, as the definition's signing
-# policy says (docs/STEPS.md 3.6b, D-0143, D-0144, D-0204).
+# policy says (docs/STEPS.md 3.6b).
 #
 # Usage:
 #   sign-windows.sh --component <cli|app> [--rehearsal <thumbprint>] <file-or-directory>...
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 readonly TIMESTAMP_URL='http://timestamp.acs.microsoft.com'
-# argon2.dll is the reference libargon2, which build-argon2.sh compiles from its pinned source (D-0522).
+# argon2.dll is the reference libargon2, which build-argon2.sh compiles from its pinned source.
 readonly FIRST_PARTY='keypaste.exe keypaste-app.exe keypaste-app.dll Keypaste.Core.dll Keypaste.Infrastructure.dll KeePassLib.dll argon2.dll'
 readonly IDENTITY_VARS='KEYPASTE_SIGNING_ENDPOINT KEYPASTE_SIGNING_ACCOUNT KEYPASTE_SIGNING_PROFILE KEYPASTE_SIGNING_CLIENT_ID KEYPASTE_SIGNING_TENANT_ID'
 DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
@@ -53,7 +53,7 @@ check_dlib() {
   echo "$dlib"
 }
 
-# NuGet resolves a PackageDownload outside packages.lock.json, so the package is held to its digest here (D-0204).
+# NuGet resolves a PackageDownload outside packages.lock.json, so the package is held to its digest here.
 restore_dlib() {
   local project id version want nupkg observed dlib
   project="$(dlib_record project)"; id="$(dlib_record package)"; version="$(dlib_record version)"; want="$(dlib_record sha512)"

@@ -6,7 +6,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste search</c>: items found by title, group, username, URL or tag, named by path, the
-/// fields that matched and the tags that matched, never by a value (D-0278).
+/// fields that matched and the tags that matched, never by a value.
 /// </summary>
 public sealed class SearchVerbTests : IDisposable
 {

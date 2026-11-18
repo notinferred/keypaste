@@ -722,7 +722,7 @@ public sealed class AuditLogTests : IDisposable
         Assert.DoesNotContain("\"caller\"", line, StringComparison.Ordinal);
     }
 
-    /// <summary>A record of exactly the cap lands whole, and the next one links to it (D-0454).</summary>
+    /// <summary>A record of exactly the cap lands whole, and the next one links to it.</summary>
     [Fact]
     public void ARecordOfTheFullSize_LandsWhole_AndTheNextLinksToIt()
     {

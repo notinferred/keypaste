@@ -14,7 +14,7 @@
 
 ## Licence
 
-KeePass 2.x permits GNU GPL version 2 or later, as stated in its [licence](https://keepass.info/help/v2/license.html) and source headers. Keypaste takes the GPLv3 option, which AGPL-3.0 §13 permits combining into an AGPL-3.0-only distribution. The historical O-0001 claim that KeePassLib was GPL-2.0-only was incorrect.
+KeePass 2.x permits GNU GPL version 2 or later, as stated in its [licence](https://keepass.info/help/v2/license.html) and source headers. Keypaste takes the GPLv3 option, which AGPL-3.0 §13 permits combining into an AGPL-3.0-only distribution. An earlier claim that KeePassLib was GPL-2.0-only was incorrect.
 
 ## Local modifications
 
@@ -79,7 +79,7 @@ On Windows a rename can return while it is only in the cache, so a power loss ju
 
 ### `KEYPASTE_TWOFISH`
 
-KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstream's `CipherPool` holds AES and ChaCha20 alone and a Twofish vault KeePassXC wrote failed to open with "unknown cipher". This guard registers Twofish under the UUID the plugin and KeePassXC write, `ad68f29f-576f-4bb9-a36a-d47af965346c`: a 256-bit key and a 128-bit IV, in CBC mode with PKCS#7 padding. The block cipher, the mode and the padding are BouncyCastle C#'s, vendored at [../bouncycastle-twofish](../bouncycastle-twofish/UPSTREAM.md) and compiled into this assembly as internal types; the engine only moves whole blocks through them and zeroes its key copies when its stream closes. Every reader and writer of a KDBX file takes its cipher from `CipherPool.GlobalPool`, so the CLI and the desktop both open and save Twofish vaults with no registration of their own and no reflection. keypaste never chooses Twofish: a vault keeps the cipher it was opened with (D-0292).
+KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstream's `CipherPool` holds AES and ChaCha20 alone and a Twofish vault KeePassXC wrote failed to open with "unknown cipher". This guard registers Twofish under the UUID the plugin and KeePassXC write, `ad68f29f-576f-4bb9-a36a-d47af965346c`: a 256-bit key and a 128-bit IV, in CBC mode with PKCS#7 padding. The block cipher, the mode and the padding are BouncyCastle C#'s, vendored at [../bouncycastle-twofish](../bouncycastle-twofish/UPSTREAM.md) and compiled into this assembly as internal types; the engine only moves whole blocks through them and zeroes its key copies when its stream closes. Every reader and writer of a KDBX file takes its cipher from `CipherPool.GlobalPool`, so the CLI and the desktop both open and save Twofish vaults with no registration of their own and no reflection. keypaste never chooses Twofish: a vault keeps the cipher it was opened with.
 
 | File | Change |
 |---|---|
@@ -89,7 +89,7 @@ KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstr
 
 ### `KEYPASTE_KEPT_VERSIONS`
 
-`KdbxFile` trims every entry's history to the vault's `HistoryMaxItems` and `HistoryMaxSize` each time it reads or writes a file (`MaintainBackups` in `KdbxFile.Read.cs` and `KdbxFile.Write.cs`), so a version keypaste's merge moves into an entry's history would be dropped by the merged copy's own save whenever that version alone exceeds the limits, as with history off or a version larger than the size limit. keypaste keeps it (D-0601): its merge marks each such version with the entry custom data item `KEYPASTE_KEPT_BY_MERGE`, and this guard makes history maintenance remove the oldest unmarked version and stop when only marked ones are left over the limits. The next backup of the entry, which every edit makes first, removes the marks, so the vault's own trimming meets those versions at the entry's next edit. Without a marked version the trimming is upstream's.
+`KdbxFile` trims every entry's history to the vault's `HistoryMaxItems` and `HistoryMaxSize` each time it reads or writes a file (`MaintainBackups` in `KdbxFile.Read.cs` and `KdbxFile.Write.cs`), so a version keypaste's merge moves into an entry's history would be dropped by the merged copy's own save whenever that version alone exceeds the limits, as with history off or a version larger than the size limit. keypaste keeps it: its merge marks each such version with the entry custom data item `KEYPASTE_KEPT_BY_MERGE`, and this guard makes history maintenance remove the oldest unmarked version and stop when only marked ones are left over the limits. The next backup of the entry, which every edit makes first, removes the marks, so the vault's own trimming meets those versions at the entry's next edit. Without a marked version the trimming is upstream's.
 
 | File | Change |
 |---|---|
@@ -129,13 +129,13 @@ KeePassLib sorts an entry's tags with `string.Compare` under the current culture
 | `Utility/GfxUtil.cs` | System.Drawing image decoding, used only by `PwCustomIcon` |
 | `Keys/KcpUserAccount.cs` | Machine-bound Windows account key; incompatible with the portable-vault scope and the last consumer of `CryptoUtil.ProtectData` |
 
-The project has zero `PackageReference` entries and an empty `net10.0` dependency set in `packages.lock.json` (D-0004). The BouncyCastle sources it compiles are vendored files, not a package.
+The project has zero `PackageReference` entries and an empty `net10.0` dependency set in `packages.lock.json`. The BouncyCastle sources it compiles are vendored files, not a package.
 
 ## Re-merging an upstream security patch
 
 1. Clone `https://github.com/TimothyByrd/KeePassNetStandard` and check out the selected tag. If the port lacks an upstream patch, compare against `dlech/KeePass2.x`'s `KeePassLib/` and apply it manually.
 2. Compare that tree with this directory, excluding `KeePassLib.csproj`, `UPSTREAM.md`, `LICENSE` and `packages.lock.json`. Review every difference outside the documented guards.
 3. Copy the updated source, reapply the guards and update the provenance table. `rg KEYPASTE_ third_party/KeePassLib` finds modification sites.
-4. Run D-0007's verification chain, including real KeePassXC compatibility.
+4. Run the verification chain, including real KeePassXC compatibility.
 
 Review new package references. The upstream commit after `v2.61` added `System.Security.Cryptography.ProtectedData` and NuGet packaging metadata, which informed the original tag selection.

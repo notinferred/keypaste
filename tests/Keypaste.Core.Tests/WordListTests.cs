@@ -35,7 +35,7 @@ public sealed class WordListTests
     /// <remarks>
     /// The character set is asserted rather than assumed because the separator rule is derived
     /// from it: four of these words carry an internal hyphen, which is why a hyphen cannot be a
-    /// separator (D-0239). Prefix-freedom is deliberately <em>not</em> asserted — EFF documents
+    /// separator. Prefix-freedom is deliberately <em>not</em> asserted — EFF documents
     /// that for its short list #2, not for this one, and nothing here needs it.
     /// </remarks>
     [Fact]
@@ -73,7 +73,7 @@ public sealed class WordListTests
     /// The published per-word entropy figure is derived from the list, not typed beside it.
     /// </summary>
     /// <remarks>
-    /// D-0036: a claim needs something that can hold it. The band alone would pass against a
+    /// A claim needs something that can hold it. The band alone would pass against a
     /// hard-coded 12.925, so the equality against the file's own count is the half that matters;
     /// the band is what fails if somebody decides <c>BitsPerWord</c> should mean something else.
     /// </remarks>

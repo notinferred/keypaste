@@ -1,7 +1,7 @@
 name: dev
 
 # F.66: runs one verify.sh profile on one runner on a pushed branch, to retry a failure only that runner showed; scripts/dev.sh
-# dispatches it. It is never a release gate or integration evidence, so no dev run stands in for a full ci or app run (D-0383).
+# dispatches it. It is never a release gate or integration evidence, so no dev run stands in for a full ci or app run.
 #
 # R.1a: acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
 # the install exercise and R.1a's acts with this branch's scripts, to iterate on them without a new package build.
@@ -53,7 +53,7 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  # One verify.sh profile on one runner, to retry a failure that only that runner showed (D-0468).
+  # One verify.sh profile on one runner, to retry a failure that only that runner showed.
   profile:
     name: ${{ inputs.profile }} (${{ matrix.os }})
     if: inputs.mode == 'profile'

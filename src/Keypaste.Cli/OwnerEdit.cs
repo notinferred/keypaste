@@ -16,7 +16,7 @@ internal sealed record OwnerRoute(string Verb, Func<CliContext, TerminalEdit?> R
 
 /// <summary>
 /// Sends a verb's edit to the app or <c>keypaste approve</c> holding the vault, which asks the person and
-/// saves it under its own claim, instead of refusing it (D-0464).
+/// saves it under its own claim, instead of refusing it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,7 +25,7 @@ internal sealed record OwnerRoute(string Verb, Func<CliContext, TerminalEdit?> R
 /// on a vault it opened itself, so a refusal reads as the verb's own.
 /// </para>
 /// <para>
-/// With nothing answering on the pipe, the verb is refused as a held vault always was (D-0382).
+/// With nothing answering on the pipe, the verb is refused as a held vault always was.
 /// </para>
 /// </remarks>
 internal static class OwnerEdit

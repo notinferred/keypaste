@@ -322,7 +322,7 @@ public sealed class DotEnvTests
 
     /// <summary>
     /// dotenv's key pattern allows <c>-</c> and <c>.</c>. A variable named that way cannot be
-    /// exported to a child process, which is the only reason to store it (D-0014).
+    /// exported to a child process, which is the only reason to store it.
     /// </summary>
     [Theory]
     [InlineData("FOO-BAR=v")]

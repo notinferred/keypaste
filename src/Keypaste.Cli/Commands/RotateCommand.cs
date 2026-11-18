@@ -9,13 +9,13 @@ namespace Keypaste.Cli.Commands;
 /// <summary>Replaces a secret with a new generated one: <c>keypaste rotate &lt;entry&gt;</c>.</summary>
 /// <remarks>
 /// <para>
-/// The old value stays in the entry's history (D-0014) and the new one is never printed. It writes
+/// The old value stays in the entry's history and the new one is never printed. It writes
 /// the vault only: a key a provider issued still has to be rotated there and stored with
 /// <c>keypaste set</c>.
 /// </para>
 /// <para>
 /// It holds the vault's claim while it runs, so it is refused while the app or an agent holds the
-/// vault instead of saving under it (D-0317).
+/// vault instead of saving under it.
 /// </para>
 /// </remarks>
 internal static class RotateCommand

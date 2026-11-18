@@ -31,7 +31,7 @@
 # NEGATIVE CONTROL: phase G writes F.4a's defect back out verbatim - `aws s3 ls ... 2>/dev/null ||
 # true` and an unguarded `cp` - and requires it to reach an upload on the denied-quiet and
 # always-empty scenarios. If the old code refuses, this gate fails: a fixture that cannot reproduce
-# the fail-open condition proves nothing about the fix (D-0043).
+# the fail-open condition proves nothing about the fix.
 #
 # The real-awscli phase must never be skipped or soft-passed: it dies where it cannot run, and the
 # closing lines say how many of its cases were reached rather than implying a number.

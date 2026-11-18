@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// On Windows a tool behind npm's launcher is started with the runner's real <c>node.exe</c> and receives every argument
-/// byte for byte, because none passes through <c>cmd.exe</c> (D-0436).
+/// byte for byte, because none passes through <c>cmd.exe</c>.
 /// </summary>
 public sealed class NpmShimLaunchTests : IDisposable
 {

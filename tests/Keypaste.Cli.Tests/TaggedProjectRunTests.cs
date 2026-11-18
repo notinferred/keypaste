@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// <c>run</c>, <c>env export</c> and <c>env diff</c> on a project whose variables are tagged entries'
 /// fields (C.1b), beside an untagged <c>env/&lt;project&gt;/OLD_KEY</c> as 0.3.0 wrote a variable, which
-/// is no variable (D-0416). Against KeePassXC by <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>.
+/// is no variable. Against KeePassXC by <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>.
 /// </summary>
 public sealed class TaggedProjectRunTests : IDisposable
 {
@@ -238,7 +238,7 @@ public sealed class TaggedProjectRunTests : IDisposable
         Assert.DoesNotContain("warning", _harness.Err, StringComparison.Ordinal);
     }
 
-    // keypaste never writes a custom field named like a standard one (D-0369), but KeePassXC can.
+    // keypaste never writes a custom field named like a standard one, but KeePassXC can.
     private void AddCustomString(string title, string field, string value)
     {
         CompositeKey key = new();

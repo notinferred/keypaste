@@ -2,22 +2,21 @@ namespace Keypaste.Core;
 
 /// <summary>
 /// The placeholders KeePass and KeePassXC replace in a value where they use it, such as <c>{PASSWORD}</c>,
-/// and keypaste's filling of the ones naming the value's own item wherever the value leaves keypaste (D-0465).
+/// and keypaste's filling of the ones naming the value's own item wherever the value leaves keypaste.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Keywords and prefixes match in any case, as in KeePass 2; a <c>{S:…}</c> field's name matches exactly.
 /// Any other text in braces, such as a JSON value or <c>${HOME}</c>, is text, and so is an unclosed brace.
 /// A <c>{S:</c> whose braces KeePassXC's pattern matches names one field by all of its inside, braces included,
-/// as KeePassXC reads it: <c>{S:a{PASSWORD}b}</c> names <c>a{PASSWORD}b</c>, and nothing in the name fills in
-/// (D-0531).
+/// as KeePassXC reads it: <c>{S:a{PASSWORD}b}</c> names <c>a{PASSWORD}b</c>, and nothing in the name fills in.
 /// </para>
 /// <para>
-/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-0519): a value
+/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it: a value
 /// or a field filled into one, wholly wrapped in <c>\{</c> and <c>\}</c>, fills in as itself with those two made
 /// braces, and nothing in it is filled in or refused. A placeholder or escape inside braces that name no
 /// placeholder, such as <c>{x{PASSWORD}y}</c> or <c>{\{PASSWORD\}}</c>, refuses the value, because KeePassXC 2.7.11
-/// fills in that inside and 2.8 leaves it as written or drops the braces (D-0529).
+/// fills in that inside and 2.8 leaves it as written or drops the braces.
 /// </para>
 /// <para>
 /// <c>{TITLE}</c>, <c>{USERNAME}</c>, <c>{PASSWORD}</c>, <c>{URL}</c>, <c>{NOTES}</c> and <c>{S:…}</c> fill in

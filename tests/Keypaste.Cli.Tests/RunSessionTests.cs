@@ -79,7 +79,7 @@ public sealed class RunSessionTests : IDisposable
     }
 
     /// <summary>
-    /// A set past one ordinary frame reaches the child whole, in the reply only a runner reads (D-0454).
+    /// A set past one ordinary frame reaches the child whole, in the reply only a runner reads.
     /// Its values are each under the 32,767 characters Windows lets a variable hold and the 128 KiB
     /// Linux lets one string of <c>execve</c> hold, so the set would start anywhere.
     /// </summary>
@@ -312,7 +312,7 @@ public sealed class RunSessionTests : IDisposable
         Assert.False(_harness.ProcessLauncher.Environment.ContainsKey("UNUSED"));
     }
 
-    /// <summary>The run Terminal starts for the app's Run confirmation: the owner releases it unasked, and nothing the child starts inherits the pass (D-0452).</summary>
+    /// <summary>The run Terminal starts for the app's Run confirmation: the owner releases it unasked, and nothing the child starts inherits the pass.</summary>
     [Fact]
     public async Task A_run_confirmed_in_the_app_is_released_unasked_and_its_child_gets_no_pass()
     {
@@ -338,7 +338,7 @@ public sealed class RunSessionTests : IDisposable
         Assert.DoesNotContain(pass, line, StringComparison.Ordinal);
     }
 
-    /// <summary><c>--project</c> names a project whose name starts with <c>-</c>, which is the one asked for and released, at the prompt and under the app's pass alike (D-0453).</summary>
+    /// <summary><c>--project</c> names a project whose name starts with <c>-</c>, which is the one asked for and released, at the prompt and under the app's pass alike.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>What a project tag change reaches, said before it is written (D-0415).</summary>
+/// <summary>What a project tag change reaches, said before it is written.</summary>
 public sealed class ProjectTagChangeTests : IDisposable
 {
     private static readonly EntryName _stripe = new("services", "Stripe");
@@ -81,7 +81,7 @@ public sealed class ProjectTagChangeTests : IDisposable
 
     /// <summary>
     /// A variable joining an environment whose value holds a KeePass placeholder is named with each keyword it fills in
-    /// from the entry, or with the one that refuses it, as a new value's prompt names them (D-0465); a change that puts
+    /// from the entry, or with the one that refuses it, as a new value's prompt names them; a change that puts
     /// the entry nowhere new names none, and no line holds a value.
     /// </summary>
     [Fact]
@@ -106,8 +106,8 @@ public sealed class ProjectTagChangeTests : IDisposable
     }
 
     /// <summary>
-    /// A restore puts back the revision's tags, so restoring one whose project tags differ from the entry's is the tag
-    /// change D-0415 asks about: what joins goes first, naming the revision's variables and their placeholders, and
+    /// A restore puts back the revision's tags, so restoring one whose project tags differ from the entry's is a tag
+    /// change: what joins goes first, naming the revision's variables and their placeholders, and
     /// what leaves names the entry's own. A revision whose project tags are the entry's changes no project.
     /// </summary>
     [Fact]

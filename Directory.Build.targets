@@ -1,7 +1,7 @@
 <Project InitialTargets="KeypasteReferenceRules">
 
-  <!-- Which source project may reference which, who may reference the browser relay, and that only the CLI links libsodium
-       (D-0611, D-0675). It runs before any other target, so it sees only the references a project declares. -->
+  <!-- Which source project may reference which, who may reference the browser relay, and that only the CLI links libsodium.
+       It runs before any other target, so it sees only the references a project declares. -->
   <PropertyGroup>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">-</KeypasteReferences>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">KeePassLib;Keypaste.Infrastructure</KeypasteReferences>

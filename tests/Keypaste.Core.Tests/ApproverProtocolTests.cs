@@ -513,8 +513,7 @@ public sealed class ApproverProtocolTests
     }
 
     /// <summary>
-    /// A reply naming its value twice is not read at all, rather than read as whichever came last
-    /// (D-0325).
+    /// A reply naming its value twice is not read at all, rather than read as whichever came last.
     /// </summary>
     [Fact]
     public void AReplyNamingItsValueTwice_IsRefused()
@@ -715,7 +714,7 @@ public sealed class ApproverProtocolTests
         Assert.Empty(refused.Set.Variables);
     }
 
-    /// <summary>Only an env set's reply is bounded past one frame: a credential or an agent's run of the same value is not (D-0454).</summary>
+    /// <summary>Only an env set's reply is bounded past one frame: a credential or an agent's run of the same value is not.</summary>
     [Fact]
     public void OnlyAnEnvSetsReply_IsBoundedPastOneFrame()
     {
@@ -941,7 +940,7 @@ public sealed class ApproverProtocolTests
         Assert.Equal(recorded, run.Recorded);
     }
 
-    /// <summary>A reply saying twice whether it was recorded is not read at all (D-0325).</summary>
+    /// <summary>A reply saying twice whether it was recorded is not read at all.</summary>
     [Theory]
     [InlineData("true", "true")]
     [InlineData("false", "true")]

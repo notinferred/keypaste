@@ -18,7 +18,7 @@ namespace Keypaste.Mcp.Tools;
 /// </para>
 /// <para>
 /// One file, so that if the result shape changes in a future SDK version there is one place to
-/// change (D-0019).
+/// change.
 /// </para>
 /// </remarks>
 internal static class ToolResults

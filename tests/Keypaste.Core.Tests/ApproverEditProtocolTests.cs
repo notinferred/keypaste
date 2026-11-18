@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The <c>edit</c> frame (D-0464): every action round-trips, a recipe goes as the recipe so no generated
+/// The <c>edit</c> frame: every action round-trips, a recipe goes as the recipe so no generated
 /// value crosses, a value and a recipe together or neither is refused, and nothing prints a value.
 /// </summary>
 public sealed class ApproverEditProtocolTests

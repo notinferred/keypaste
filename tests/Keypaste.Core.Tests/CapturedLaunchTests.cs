@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An agent's command runs with exactly the environment it is given, reads nothing, has its output
-/// captured and bounded, and never outlives the run (D-0358, THREATS.md T-35).
+/// captured and bounded, and never outlives the run (THREATS.md T-35).
 /// </summary>
 public sealed class CapturedLaunchTests : IDisposable
 {

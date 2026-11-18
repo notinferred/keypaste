@@ -243,7 +243,7 @@ public sealed class GenerateFlagTests
     /// A hyphen cannot separate words this list spells with hyphens in them.
     /// </summary>
     /// <remarks>
-    /// D-0239. Accepting it would produce a value whose word count cannot be read back, which is
+    /// Accepting it would produce a value whose word count cannot be read back, which is
     /// the number the entropy claim is made in.
     /// </remarks>
     [Theory]

@@ -9,7 +9,7 @@ using System.Text.Json;
 namespace Keypaste.Core.CrashReports;
 
 /// <summary>
-/// The only code that reads an exception for a crash report and the only code that writes a report's text (D-0558).
+/// The only code that reads an exception for a crash report and the only code that writes a report's text.
 /// </summary>
 /// <remarks>
 /// A report keeps an exception's type, HResult and frames, each frame as its assembly, type and method names and its IL

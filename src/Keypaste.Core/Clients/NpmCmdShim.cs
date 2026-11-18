@@ -4,8 +4,8 @@ namespace Keypaste.Core.Clients;
 /// <remarks>
 /// <para>
 /// A batch file can only be started through <c>cmd.exe</c>, which re-reads every argument. keypaste instead starts what
-/// the launcher would: <c>node.exe</c> with the script it names, or the <c>.exe</c> it names, with no shell between
-/// (D-0436). Only the exact text npm writes is recognised, so a launcher that does anything else is never
+/// the launcher would: <c>node.exe</c> with the script it names, or the <c>.exe</c> it names, with no shell between.
+/// Only the exact text npm writes is recognised, so a launcher that does anything else is never
 /// reinterpreted as one that does not.
 /// </para>
 /// <para>

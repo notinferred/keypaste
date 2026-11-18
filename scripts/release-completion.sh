@@ -15,7 +15,7 @@
 #
 # What it does NOT do:
 #   - It does not authenticate origin. A hash fetched from the same origin as the bytes proves
-#     transport, not provenance; the attestation bundle published beside it does that (D-0116, D-0138).
+#     transport, not provenance; the attestation bundle published beside it does that.
 #   - It does not move the advertised version. That is one hand-made `published` entry in
 #     release-targets.json, kept separate on purpose so a green run is not self-promoting.
 #

@@ -2,7 +2,7 @@ namespace Keypaste.Core.Approval;
 
 /// <summary>
 /// The tokens whose cancellation withdraws the request the calling flow is answering, kept for
-/// whatever is about to put that request in front of a person (D-0396).
+/// whatever is about to put that request in front of a person.
 /// </summary>
 /// <remarks>
 /// <para>

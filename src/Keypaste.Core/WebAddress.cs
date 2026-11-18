@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Keypaste.Core;
 
-/// <summary>Which web addresses an entry's URL field opens in a browser, and as what (D-0378).</summary>
+/// <summary>Which web addresses an entry's URL field opens in a browser, and as what.</summary>
 /// <remarks>
 /// Only <c>http</c> and <c>https</c> open. An address with no scheme, such as <c>github.com/login</c>,
 /// opens as <c>https://</c>, as KeePassXC opens it; any other scheme, such as <c>javascript:</c>,

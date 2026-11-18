@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// 4.11a: nothing an exception carries but its type, HResult and code frames reaches a crash report, the outbox's file or
-/// the request that sends it (D-0556, D-0558).
+/// the request that sends it.
 /// </summary>
 /// <remarks>
 /// Each test plants sentinels where a value can hide, shows that the exception really carries them, then looks for them

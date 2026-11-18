@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The one keyfile keypaste writes: a KeePass XML keyfile, version 2.0, around a random key, written once where the
-/// person chose and never over anything (D-0287).
+/// person chose and never over anything.
 /// </summary>
 public sealed class KeyfileCreationTests : IDisposable
 {

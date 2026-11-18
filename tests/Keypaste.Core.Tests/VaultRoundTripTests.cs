@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// Each open and save derives a key, so these tests create and open vaults sparingly. The vaults take the
-/// token cost of D-0469; <see cref="KeyDerivationCostTests"/> holds the production parameters.
+/// token cost; <see cref="KeyDerivationCostTests"/> holds the production parameters.
 /// </remarks>
 public sealed class VaultRoundTripTests : IDisposable
 {

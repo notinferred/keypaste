@@ -2,7 +2,7 @@ namespace Keypaste.Browser;
 
 /// <summary>
 /// NaCl's box, X25519 with XSalsa20 and Poly1305, as KeePassXC-Browser's TweetNaCl.js seals and opens each message after its
-/// key exchange: a key pair, a seal and an open, through libsodium and nothing else (D-0611).
+/// key exchange: a key pair, a seal and an open, through libsodium and nothing else.
 /// </summary>
 internal static class NaclBox
 {

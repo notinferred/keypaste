@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// An Auto-Type sequence reads as KeePassXC 2.8's <c>parseSequence</c> reads it, against the cases and errors of its
 /// <c>TestAutoType</c>; what keypaste does not type and every reading KeePass 2 gives differently refuse it whole,
-/// naming the token and never a value; fields type what D-0465 fills in; <c>{TOTP}</c> types the code current when
+/// naming the token and never a value; fields type what placeholders fill in; <c>{TOTP}</c> types the code current when
 /// typing reaches it; and a window pattern matches as KeePassXC matches it, under a timeout (P.4a1).
 /// </summary>
 public sealed class AutoTypeSequenceTests
@@ -232,7 +232,7 @@ public sealed class AutoTypeSequenceTests
         Assert.Empty(plan.Steps);
     }
 
-    // ------------------------------------------------------------ fields, as D-0465 fills them
+    // ------------------------------------------------------------ fields, as placeholders fill them
 
     [Fact]
     public void A_field_types_what_D_0465_fills_in_with_its_nested_placeholders_and_braces_inside_it_as_text()

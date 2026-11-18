@@ -8,8 +8,7 @@
 # This drives the SHIPPED keypaste binary. Until Stage 0.3 the fixture came from a throwaway
 # project that called Keypaste.Core directly; driving the CLI instead means the permanent gate
 # now also covers argument parsing, group-path splitting, the non-echoing prompt's
-# redirected-stdin path, init's confirm-twice loop, and add's open-modify-save cycle — see
-# DECISIONS.md D-0012.
+# redirected-stdin path, init's confirm-twice loop, and add's open-modify-save cycle.
 #
 # The binary is invoked DIRECTLY rather than through `dotnet run`, which would put the SDK's
 # stdin forwarding between the pipe and the process under test.

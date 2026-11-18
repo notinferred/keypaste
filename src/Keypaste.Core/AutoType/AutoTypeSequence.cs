@@ -4,7 +4,7 @@ namespace Keypaste.Core.AutoType;
 
 /// <summary>
 /// Reads an Auto-Type sequence as KeePassXC 2.8's <c>AutoType::parseSequence</c> reads it, and refuses whole what
-/// keypaste does not type and what KeePass 2 reads differently (D-0604).
+/// keypaste does not type and what KeePass 2 reads differently.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -12,7 +12,7 @@ namespace Keypaste.Core.AutoType;
 /// <c>+</c>, <c>^</c> and <c>%</c>, held for the next key only, then either one placeholder in braces, whose inside
 /// may hold balanced braces of its own, none empty, and may end in a count after white space, or one character.
 /// Named keys, escaped characters and <c>{DELAY …}</c> match in any case, as KeePassXC lowers them; a <c>{S:…}</c>
-/// names a field by all of its inside, in capitals as KeePassXC reads it (D-0531).
+/// names a field by all of its inside, in capitals as KeePassXC reads it.
 /// </para>
 /// <para>
 /// Refused, naming the token as written: a key that acts beyond the window or leaves a lock key changed, a token

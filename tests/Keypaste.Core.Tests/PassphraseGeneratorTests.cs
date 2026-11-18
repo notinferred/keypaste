@@ -127,7 +127,7 @@ public sealed class PassphraseGeneratorTests
     /// A hyphen is the conventional diceware separator and this list makes it wrong: it holds
     /// <c>drop-down</c>, <c>felt-tip</c>, <c>t-shirt</c> and <c>yo-yo</c>, so a hyphen-joined
     /// passphrase does not split into the words it was counted in. The rule asks the list rather
-    /// than a written-down set, so a re-vendored list narrows it by itself (D-0239).
+    /// than a written-down set, so a re-vendored list narrows it by itself.
     /// </remarks>
     [Theory]
     [InlineData('-')]
@@ -174,7 +174,7 @@ public sealed class PassphraseGeneratorTests
     /// The entropy figure is the word count times the list's bits, and nothing else.
     /// </summary>
     /// <remarks>
-    /// D-0036 again: PRODUCT §1 and THREATS T-26 rest on six words being about 78 bits, so the
+    /// PRODUCT §1 and THREATS T-26 rest on six words being about 78 bits, so the
     /// arithmetic is asserted rather than described. The band is what fails if the minimum moves
     /// without the documents that quote it moving too.
     /// </remarks>

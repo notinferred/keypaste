@@ -4,8 +4,6 @@
 # None of them is a bug, and none was suppressed blindly - each was traced to a caller and cleared
 # on the same principle: the vendored code wraps every one of these probes in a try/catch and
 # treats failure as "feature unavailable", which is the state NativeAOT puts it in permanently.
-# DECISIONS.md D-0040 records the reasoning and the six gates that were run against real AOT
-# binaries to confirm it, including a KDBX written by the AOT binary opening in real KeePassXC.
 #
 #   SimpleStat.cs      Mono.Posix probing, to preserve Unix owner and mode across a vault save.
 #                      GetTypes() returns false under AOT, Get() then returns null, and
@@ -14,7 +12,7 @@
 #                      what happens on any machine without Mono.Posix installed - that is, all
 #                      of them, since .NET Core.
 #   NativeLib.cs       ProcessArchitecture probing. It picks KeePassLib's Windows Argon2 import, which
-#                      keypaste binds to the argon2.dll it carries (D-0523). A type not found falls
+#                      keypaste binds to the argon2.dll it carries. A type not found falls
 #                      back to IntPtr.Size at :124, x64; a type found without its property at :118
 #                      reads no architecture, and the NativeAOT keypaste then derives Argon2 in managed
 #                      code: the same key, more slowly. The NativeAOT win-x64 keypaste reads x64 and
@@ -24,10 +22,10 @@
 #   XmlUtilEx.cs       XmlSerializer reading a KeePass XML keyfile for KcpKeyFile. It runs in
 #                      reflection mode under NativeAOT and needs the Kfx* types' constructors and
 #                      properties, which src/Keypaste.Cli/KeyfileTrimRoots.xml keeps. Trimmed, it
-#                      threw and KcpKeyFile keyed with the file's hash (D-0294). Proved by
+#                      threw and KcpKeyFile keyed with the file's hash. Proved by
 #                      verify-keepassxc-xml-attach.sh and verify-keepassxc-keyfile.sh on the AOT
 #                      binary. Serialize is unreachable from the CLI, which never writes a keyfile;
-#                      only the desktop makes one (D-0287).
+#                      only the desktop makes one.
 #
 # No entry may name src/. The script fails on that separately and unconditionally.
 # Regenerate after a deliberate change with a CLEAN publish - an incremental one emits nothing,

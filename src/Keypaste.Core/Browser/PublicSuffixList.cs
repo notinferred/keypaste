@@ -1,6 +1,6 @@
 namespace Keypaste.Core.Browser;
 
-/// <summary>A domain name's registrable domain, by Mozilla's Public Suffix List (D-0615).</summary>
+/// <summary>A domain name's registrable domain, by Mozilla's Public Suffix List.</summary>
 /// <remarks>
 /// Both sections are read: the ICANN suffixes such as <c>co.uk</c> and the private ones such as <c>github.io</c>, which keep
 /// one platform's tenants apart. The list is embedded in this assembly, its internationalised rules written as A-labels when

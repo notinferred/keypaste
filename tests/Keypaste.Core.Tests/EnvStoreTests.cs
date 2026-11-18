@@ -3,8 +3,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Where a project's keys are written and removed (D-0413): on the entries tagged into the
-/// environment, never on an untagged entry under <c>env/&lt;project&gt;</c> (D-0416).
+/// Where a project's keys are written and removed: on the entries tagged into the
+/// environment, never on an untagged entry under <c>env/&lt;project&gt;</c>.
 /// </summary>
 /// <remarks>
 /// The tests that matter most here are the ones covering input keypaste would never produce
@@ -112,7 +112,7 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     /// <summary>
-    /// An untagged entry under <c>env/&lt;project&gt;</c> titled like the key is no variable (D-0416),
+    /// An untagged entry under <c>env/&lt;project&gt;</c> titled like the key is no variable,
     /// so the key is new to the environment and the entry is left as it was.
     /// </summary>
     [Fact]
@@ -212,7 +212,7 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     /// <summary>
-    /// A new key must be a field a project releases (D-0388), and the project and environment
+    /// A new key must be a field a project releases, and the project and environment
     /// names a tag can hold. Each of these would otherwise be written and then never reach a child.
     /// </summary>
     [Theory]

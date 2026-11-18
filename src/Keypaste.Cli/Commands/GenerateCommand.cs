@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// <b>This is the one verb whose output is a fresh secret on stdout, and the exception is
-/// argued rather than assumed (DECISIONS.md D-0237).</b> Everywhere else keypaste refuses to
+/// argued rather than assumed.</b> Everywhere else keypaste refuses to
 /// print a secret without <c>--reveal</c>, because stdout is shell history, scrollback and CI logs.
 /// A share passphrase (STEPS 5.4a) is the case that rule does not fit: it exists to travel to
 /// another person by a second channel, and no vault holds it, so there is nothing for the

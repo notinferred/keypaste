@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds, from this commit, one unpublished desktop candidate per numeric version, for installing over one
-# another (4.7d, D-0147). Nothing here is signed, attested or published.
+# another (4.7d). Nothing here is signed, attested or published.
 #
 # Each candidate carries the `upgrade` prerelease suffix, so no real release can be confused with it, and its
 # binary must report the version it was asked for before the package is built.
@@ -20,12 +20,12 @@ die() { echo "::error::$*" >&2; exit 1; }
 rid="$1" out="$2"
 shift 2
 case "$rid" in win-x64 | linux-x64 | osx-arm64) ;; *) die "$rid has no desktop package to upgrade" ;; esac
-# The Windows package is the app's Windows target, as app.yml publishes it (D-0549).
+# The Windows package is the app's Windows target, as app.yml publishes it.
 framework=net10.0
 if [ "$rid" = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
 
 mkdir -p "$out"
-# Each candidate carries the libargon2 its release package does (D-0522).
+# Each candidate carries the libargon2 its release package does.
 "$ROOT/scripts/build-argon2.sh" "$rid" >&2
 for prefix in "$@"; do
   case "$prefix" in

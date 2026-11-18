@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The rule for clearing a clipboard keypaste wrote to (DECISIONS.md D-0011).
+/// The rule for clearing a clipboard keypaste wrote to.
 /// </summary>
 /// <remarks>
 /// <para>

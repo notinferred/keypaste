@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>One owner per vault: a second claim is refused and names the first (D-0309).</summary>
+/// <summary>One owner per vault: a second claim is refused and names the first.</summary>
 public sealed class VaultClaimTests : IDisposable
 {
     private readonly string _home = Directory.CreateTempSubdirectory("keypaste-claim-tests-").FullName;
@@ -30,7 +30,7 @@ public sealed class VaultClaimTests : IDisposable
     }
 
     /// <summary>
-    /// <c>keypaste approve</c> names itself on disk by the kind every keypaste reads, which D-0470 left as it was, and a
+    /// <c>keypaste approve</c> names itself on disk by the kind every keypaste reads, and a
     /// refusal names it by its command.
     /// </summary>
     [Fact]

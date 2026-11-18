@@ -56,7 +56,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     }
 
     /// <summary>
-    /// A recycled entry is not in the vault as far as every reader is concerned (D-0248), so it is
+    /// A recycled entry is not in the vault as far as every reader is concerned, so it is
     /// not found rather than specially refused. Putting one back is <see cref="Vault.RestoreRecycled"/>;
     /// reorganizing the bin is not a feature.
     /// </summary>
@@ -130,7 +130,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
 
     /// <summary>
     /// Two sibling groups of one name produce one path. keypaste refuses to create the pair, so
-    /// the fixture is built through the unchecked seam for the reason D-0255 gives about a vault
+    /// the fixture is built through the unchecked seam, as a vault
     /// with its recycle bin switched off: the shape is KeePassXC's to make, and keypaste still has
     /// to have an answer for it.
     /// </summary>
@@ -335,7 +335,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     // ---------------------------------------------------------------- under env
 
     /// <summary>
-    /// A group under <c>env</c> makes no project and its entries are no variables (D-0416), so the
+    /// A group under <c>env</c> makes no project and its entries are no variables, so the
     /// names an environment could not export, and two titles differing only in case, are as
     /// ordinary there as anywhere.
     /// </summary>
@@ -370,7 +370,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     // ---------------------------------------------------------------- reserved names
 
     /// <summary>
-    /// <c>env</c> at the root is where keypaste puts projects' home entries (D-0413). Renaming a group
+    /// <c>env</c> at the root is where keypaste puts projects' home entries. Renaming a group
     /// to it would mix that group's entries into theirs, and renaming it away would strand them.
     /// </summary>
     [Fact]
@@ -469,7 +469,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
 
     /// <summary>
     /// <c>env</c> at the root is where projects' home entries go and <c>.keypaste</c> where keypaste keeps
-    /// its own records (D-0273): neither moves or goes, and no group moves into keypaste's own.
+    /// its own records: neither moves or goes, and no group moves into keypaste's own.
     /// </summary>
     [Fact]
     public void TheEnvRootAndKeypastesOwnGroups_AreNeitherMovedNorDeletedNorMovedInto()

@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The share envelope (D-0354): what it opens with, what it refuses, and that the browser's code
+/// The share envelope: what it opens with, what it refuses, and that the browser's code
 /// opens what this code seals.
 /// </summary>
 public sealed class ShareCryptoTests

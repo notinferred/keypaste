@@ -14,8 +14,8 @@ namespace Keypaste.Cli.Execution;
 /// </para>
 /// <para>
 /// This adds no dependency in the sense docs/PRODUCT.md law 3.9 means: no package, nothing to pin, nothing
-/// new on the supply chain. <c>src/</c> still carries zero <c>PackageReference</c> entries
-/// (DECISIONS.md D-0004). <see cref="LibraryImportAttribute"/> is source-generated over a fully
+/// new on the supply chain. <c>src/</c> still carries zero <c>PackageReference</c> entries.
+/// <see cref="LibraryImportAttribute"/> is source-generated over a fully
 /// blittable signature, so there is no reflection and no marshalling stub, and it stays
 /// AOT-compatible. The four signal numbers are identical on Linux, macOS and the BSDs; only
 /// <c>SIGUSR*</c> and the realtime signals diverge, and none of those are relayed.

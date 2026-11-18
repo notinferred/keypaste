@@ -5,7 +5,7 @@ namespace Keypaste.Core.Approval;
 /// <summary>What a credential request's arguments must satisfy before anything is decided.</summary>
 /// <remarks>
 /// The vault's owner applies this to every request it is sent, and the bridge applies it too so it can
-/// name the argument to the agent (D-0324). A process that speaks the approver protocol without the
+/// name the argument to the agent. A process that speaks the approver protocol without the
 /// bridge meets the same limits.
 /// </remarks>
 public static class CredentialRequestRules

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>The pipe a locked app listens on for a vault, which a bridge about to refuse its agent for want of an owner connects to (D-0466).</summary>
+/// <summary>The pipe a locked app listens on for a vault, which a bridge about to refuse its agent for want of an owner connects to.</summary>
 public sealed class LockedAppEndpointTests : IDisposable
 {
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);

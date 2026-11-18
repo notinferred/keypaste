@@ -33,7 +33,7 @@ public sealed record ShareOutcome(bool Ok, string? Link, ShareInfo? Info, ShareF
 public sealed record ExpiredShares(int Forgotten, string? Failure);
 
 /// <summary>
-/// Shares one entry's fields as an encrypted, expiring, view-limited link, and revokes it (D-0354).
+/// Shares one entry's fields as an encrypted, expiring, view-limited link, and revokes it.
 /// </summary>
 /// <remarks>
 /// Fail closed at every step after the upload: a record that cannot be saved, or an audit line that
@@ -368,7 +368,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
     }
 
     /// <summary>
-    /// The fields to seal, each under its name with its own entry's placeholders filled in (D-0465), or null
+    /// The fields to seal, each under its name with its own entry's placeholders filled in, or null
     /// when a saved read found the vault changed or a field could not be filled in, which <paramref name="unfilled"/> then names.
     /// </summary>
     private static List<ShareField>? Select(Vault vault, EntryName name, VaultEntry entry, string field, out (string Field, string Reason)? unfilled)

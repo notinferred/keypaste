@@ -13,12 +13,12 @@ public sealed record LaunchClaim(string Project, string Profile, string Director
 
 /// <summary>
 /// The owner's single-use launch passes: each authorises exactly the one <c>keypaste run --session</c>
-/// request the app's Run confirmation named on macOS (D-0452).
+/// request the app's Run confirmation named on macOS.
 /// </summary>
 /// <remarks>
 /// A pass is the confirmation itself, carried to the run that Terminal starts, so it is spent the first
 /// time anything presents it, lasts <see cref="Lifetime"/>, and is forgotten with every other pass when
-/// the unlock that holds the store ends (D-0313). Nothing lists it and no later run
+/// the unlock that holds the store ends. Nothing lists it and no later run
 /// can use it.
 /// </remarks>
 public sealed class LaunchPasses : IDisposable

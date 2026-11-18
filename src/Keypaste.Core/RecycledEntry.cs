@@ -49,15 +49,15 @@ public enum RestoreOutcome
 /// </summary>
 /// <remarks>
 /// <para>
-/// keypaste addresses entries by name (DECISIONS.md D-0091), and a recycled entry cannot be:
+/// keypaste addresses entries by name, and a recycled entry cannot be:
 /// deleting two entries called <c>TOKEN</c> from two projects puts two entries called
-/// <c>TOKEN</c> in one bin. A position in the trash listing cannot serve either — D-0229 settled
+/// <c>TOKEN</c> in one bin. A position in the trash listing cannot serve either — it was settled
 /// that an index addresses one reading and is never a persistent identifier.
 /// </para>
 /// <para>
 /// So this is the one durable address, and it is deliberately opaque: what is inside it is the
 /// KDBX UUID, and no caller is told that. A second general-purpose address form beside the name
-/// and the handle is exactly what D-0091 warned against, and this one reaches only the trash.
+/// and the handle is exactly what name addressing avoids, and this one reaches only the trash.
 /// </para>
 /// </remarks>
 public readonly record struct RecycledEntryId

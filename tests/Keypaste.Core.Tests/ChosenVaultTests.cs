@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>The vault agents and the CLI use without <c>--vault</c>, as <c>app.toml</c> keeps it (D-0389).</summary>
+/// <summary>The vault agents and the CLI use without <c>--vault</c>, as <c>app.toml</c> keeps it.</summary>
 public sealed class ChosenVaultTests : IDisposable
 {
     private readonly string _home =

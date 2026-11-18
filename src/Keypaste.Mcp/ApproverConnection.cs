@@ -72,7 +72,7 @@ internal readonly record struct Exchange<T>(T? Reply, ApproverOutcome Outcome, A
 /// <b>Attaching precedes every request</b>, so a connection left idle across a lock learns of the
 /// new session before it sends anything. A listing whose reply was lost is retried with the session
 /// it was first sent under, never a later one: the owner refuses it rather than answer it from an
-/// unlock that happened after it was asked (D-0310). Nothing that can ask a person is sent twice.
+/// unlock that happened after it was asked. Nothing that can ask a person is sent twice.
 /// </para>
 /// <para>
 /// <b>Every exchange is bounded.</b> It is withdrawn when the client gives up, when the client closes
@@ -95,7 +95,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// state of a bridge an MCP client spawned at its own convenience.
     /// </para>
     /// <para>
-    /// <b>Half a second is a measurement, not a guess (DECISIONS.md D-0035).</b> A whole round trip
+    /// <b>Half a second is a measurement, not a guess.</b> A whole round trip
     /// against a running approver — process start, connect, prompt, release — measured 248 ms, while
     /// the same call with nothing listening measured 2306 ms against the two seconds this used to
     /// be. Almost none of the budget is spent when somebody is there, because

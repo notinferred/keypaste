@@ -2,7 +2,7 @@ namespace Keypaste.Browser;
 
 /// <summary>
 /// What the box must answer before keypaste trusts it with a browser's messages: libsodium's own known answers, and a box
-/// TweetNaCl.js sealed as KeePassXC-Browser seals each request (D-0613).
+/// TweetNaCl.js sealed as KeePassXC-Browser seals each request.
 /// </summary>
 internal static class KnownAnswers
 {

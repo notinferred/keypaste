@@ -4,8 +4,8 @@ namespace Keypaste.Core;
 
 /// <summary>
 /// What adding or removing project tags on one entry does, shown to the person before it is written
-/// (D-0415): the environment it reaches, the fields that join or leave it and, for each field that joins
-/// holding a KeePass placeholder, what the placeholder fills in (D-0509), never a value.
+///: the environment it reaches, the fields that join or leave it and, for each field that joins
+/// holding a KeePass placeholder, what the placeholder fills in, never a value.
 /// </summary>
 /// <param name="Entry">The entry.</param>
 /// <param name="Tags">The tags added or removed, which all read alike (<see cref="ProjectTag.Read"/>).</param>
@@ -20,7 +20,7 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
 {
     /// <summary>
     /// For each of <see cref="Fields"/> whose value holds a KeePass placeholder, what it fills in from the entry
-    /// when it leaves or the first placeholder that refuses it, by keyword and never by value (D-0465); judged only
+    /// when it leaves or the first placeholder that refuses it, by keyword and never by value; judged only
     /// for a change that puts the entry in an environment, and empty for any other.
     /// </summary>
     internal IReadOnlyList<KeyValuePair<string, PlantedPlaceholders>> Placeholders { get; init; } = [];
@@ -53,9 +53,9 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
 
     /// <summary>
     /// What restoring one of an entry's revisions does to the projects it is in, since the restore puts back the
-    /// revision's tags: the change D-0415 asks about for each environment the revision's tags starting <c>env:</c>
+    /// revision's tags: the change asked about for each environment the revision's tags starting <c>env:</c>
     /// put the entry in, then for each they take it out of, each judged after the ones before it, so an environment
-    /// a tag the restore drops and a tag it puts back both reach is said to stay as it is (D-0510).
+    /// a tag the restore drops and a tag it puts back both reach is said to stay as it is.
     /// </summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="entry">The entry.</param>
@@ -206,7 +206,7 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
 
     /// <summary>
     /// The sentence for a variable joining an environment whose value holds placeholders: what they fill in from the
-    /// entry when it leaves, or the one that refuses it wherever it would, as a terminal edit says of a new value (D-0465).
+    /// entry when it leaves, or the one that refuses it wherever it would, as a terminal edit says of a new value.
     /// </summary>
     private static string Planting(string field, PlantedPlaceholders planted, string entry)
     {

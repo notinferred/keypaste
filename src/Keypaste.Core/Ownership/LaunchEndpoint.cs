@@ -4,14 +4,14 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// The app's own endpoint for the runs Terminal starts on macOS, bound for each unlock and ended by its
-/// lock, answering an attachment and an env request carrying a launch pass, and nothing else (D-0451).
+/// lock, answering an attachment and an env request carrying a launch pass, and nothing else.
 /// </summary>
 /// <remarks>
 /// <para>
 /// It is apart from the vault's endpoint, so a Run confirmed in the app starts while agents cannot reach
 /// the vault: a <c>KEYPASTE_APPROVER</c> that names no usable pipe, or a vault's endpoint that cannot be
 /// bound. Its listener refuses a peer running as another user as the vault's does (THREATS.md T-10), and
-/// the unlock's own authority admits, records and releases what it reads (D-0452).
+/// the unlock's own authority admits, records and releases what it reads.
 /// </para>
 /// <para>
 /// The app picks its name at random once, from <see cref="NewName"/>, and binds it again at each unlock,

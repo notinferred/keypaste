@@ -411,7 +411,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     }
 
     // ---------------------------------------------------------------------------------------
-    // A build whose XML keyfile loader falls back to hashing the file (D-0294)
+    // A build whose XML keyfile loader falls back to hashing the file
     // ---------------------------------------------------------------------------------------
 
     [Fact]
@@ -450,7 +450,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     public void A_malformed_xml_keyfile_still_keys_by_its_hash_in_a_working_build()
     {
         // KeePassXC keys a document it cannot parse as an XML keyfile by the file's hash, and so does
-        // a working build of keypaste; only a build whose XML branch cannot run refuses (D-0292).
+        // a working build of keypaste; only a build whose XML branch cannot run refuses.
         var malformed = Text("malformed.keyx", "<KeyFile><Meta>cut off before it closes");
         Assert.Equal(new KeyfileInspection(KeyfileOutcome.Accepted, KeyfileForm.Xml), VaultKeyfile.Inspect(malformed));
 

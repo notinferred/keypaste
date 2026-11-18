@@ -3,7 +3,7 @@
 #
 # This is the last thing between a directory and a public bucket. It was three step bodies in
 # release.yml's publish job, which runs only when guard says publish=true - so it ran only on a tag
-# and only against the one directory a real release built. D-0109's rule applied to the steps with
+# and only against the one directory a real release built. A decision only a tag reaches belongs in a script a fixture can drive, applied to the steps with
 # the most to lose: the decision is here, a fixture drives it, and the workflow calls it.
 #
 # What it refuses, and why each is not covered by the others:
@@ -12,7 +12,7 @@
 #   - the wrong NUMBER of assets, against TWO numbers, per component. Equality with what
 #     release-targets.json advertises catches a target that failed to build. A floor taken from the
 #     largest set that component has already published catches the edit that drops a target from the
-#     definition, which equality alone would happily agree with (D-0108).
+#     definition, which equality alone would happily agree with.
 #   - a file that is not a release asset. The upload is recursive, so a stray vault fixture, a build
 #     log or an .env picked up by a future edit to packaging would be published silently. The
 #     expected names come from the definition, not from a list written out here.
@@ -175,7 +175,7 @@ bad=0
 while IFS="$US" read -r c rid kind policy signed; do
   [ -n "$c" ] || continue
   # One line each, so a fixture can delete either and get a working script that fails open, rather
-  # than a syntax error. A control that cannot reproduce the old answer proves nothing (D-0043).
+  # than a syntax error. A control that cannot reproduce the old answer proves nothing.
   [ "$signed" = "true" ] || { echo "::error::$c/$rid: the $kind package is offered for publication and is not recorded signed" >&2; bad=1; }
   [ "$policy" != none ] || { echo "::error::$c/$rid: the $kind package is offered for publication while the $c signing policy is none" >&2; bad=1; }
 done < <(offered_packages)
@@ -263,7 +263,7 @@ for c in "${COMPONENTS[@]}"; do
 
   # Both on one line each, so verify-release-preflight.sh can delete the floor and get the shape
   # equality alone agrees with, rather than a syntax error. A control that cannot reproduce the old
-  # answer proves nothing about the new one (D-0043).
+  # answer proves nothing about the new one.
   [ "$present" -eq "${WANT[$c]}" ] || { echo "::error::$present built $c assets, $DEFINITION advertises ${WANT[$c]}" >&2; bad=1; }
   [ "$rids" -ge "${FLOOR[$c]}" ] || { echo "::error::$rids $c rids built; ${FLOOR[$c]} were already published and a release cannot shrink" >&2; bad=1; }
 done

@@ -16,7 +16,7 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// The second claim is about the file rather than the vault. Recycling raises a written file to
-/// KDBX 4.1 because a recycled entry carries <c>PreviousParentGroup</c> (DECISIONS.md D-0247), and
+/// KDBX 4.1 because a recycled entry carries <c>PreviousParentGroup</c>, and
 /// tidying a folder must not cost the same reader floor — so an ordinary move records nothing about
 /// where the entry came from, and the file stays 4.0 until something is actually deleted.
 /// </para>
@@ -350,7 +350,7 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.Equal("other", vault.Find(new EntryName("shipping", "TOKEN"))!.Password, StringComparer.Ordinal);
     }
 
-    /// <summary>A grant is held under a name, so a move reports both names of every entry it carried (D-0318).</summary>
+    /// <summary>A grant is held under a name, so a move reports both names of every entry it carried.</summary>
     [Fact]
     public void MoveGroup_IsOneEdit_NamingEveryEntryUnderItAtBothPaths()
     {
@@ -367,7 +367,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
     // ---------------------------------------------------------------- deleting a group
 
-    /// <summary>A group deleted where the vault has a bin goes into it whole, as KeePassXC deletes one, and a delete raises the file to 4.1 (D-0247).</summary>
+    /// <summary>A group deleted where the vault has a bin goes into it whole, as KeePassXC deletes one, and a delete raises the file to 4.1.</summary>
     [Fact]
     public void DeleteGroup_PutsTheWholeGroupInTheBin_AndEveryItemInItIsRecoverable()
     {
@@ -440,7 +440,7 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.Equal(5, reopened.ReadHistory(_token)!.Count);
     }
 
-    /// <summary>A title is taken once per group (D-0091), so a second copy is numbered.</summary>
+    /// <summary>A title is taken once per group, so a second copy is numbered.</summary>
     [Fact]
     public void CloneEntry_NumbersACopy_WhenTheFirstCopysTitleIsTaken()
     {
@@ -454,7 +454,7 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.Equal(new EntryName("env/billing", "TOKEN (copy 3)"), third);
     }
 
-    /// <summary>A project refuses two entries giving one variable (D-0337), so the copy leaves its project tags behind and says which.</summary>
+    /// <summary>A project refuses two entries giving one variable, so the copy leaves its project tags behind and says which.</summary>
     [Fact]
     public void CloneEntry_LeavesItsProjectTagsBehind_AndSaysWhich()
     {
@@ -479,7 +479,7 @@ public sealed class VaultOrganizeTests : IDisposable
     // ---------------------------------------------------------------- the file the writer leaves
 
     /// <summary>
-    /// The load-bearing format claim. Recycling costs a reader below KeePassXC 2.7 (D-0247);
+    /// The load-bearing format claim. Recycling costs a reader below KeePassXC 2.7;
     /// tidying a folder must not, so no organize operation records where anything came from.
     /// </summary>
     [Fact]
@@ -514,7 +514,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
     // ---------------------------------------------------------------- what resolves afterwards
 
-    /// <summary>A group under <c>env</c> names no project: its entries stay in the projects their own tags name (D-0416).</summary>
+    /// <summary>A group under <c>env</c> names no project: its entries stay in the projects their own tags name.</summary>
     [Fact]
     public void RenamingAGroupUnderEnv_LeavesItsEntriesInTheProjectsTheirTagsName()
     {

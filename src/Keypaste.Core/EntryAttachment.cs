@@ -7,7 +7,7 @@ namespace Keypaste.Core;
 /// <param name="Size">Its length in bytes.</param>
 public sealed record EntryAttachment(string Name, long Size)
 {
-    /// <summary>The most bytes keypaste attaches: 5 MiB, the size above which KeePassXC asks before attaching a file (D-0533).</summary>
+    /// <summary>The most bytes keypaste attaches: 5 MiB, the size above which KeePassXC asks before attaching a file.</summary>
     /// <remarks>Only adding and replacing are held to it; a larger attachment another program made is listed, kept, removed and saved.</remarks>
     public const int MaximumSize = 5 * 1024 * 1024;
 

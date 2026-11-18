@@ -37,4 +37,4 @@ MPL-2.0 is a file-level licence. The vendored list, with its change, remains und
 1. Run `bash scripts/update-public-suffix.sh`, which needs `curl` and `python3`, before each release.
 2. Review the diff of the three files and this one, and commit it as an ordinary change.
 
-[require-public-suffix-fresh.sh](../../scripts/require-public-suffix-fresh.sh) refuses a release whose list's `VERSION` is more than 60 days old (D-0616).
+[require-public-suffix-fresh.sh](../../scripts/require-public-suffix-fresh.sh) refuses a release whose list's `VERSION` is more than 60 days old.

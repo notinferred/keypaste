@@ -288,14 +288,14 @@ internal static class EnvPullCommand
     /// The offer is bound to what was imported, not to the path it came from. Between the read and
     /// this point sit a master-password prompt, a key derivation and two confirmations, and a
     /// person answering them is a person with an editor open — so the file is checked twice, the
-    /// same shape <c>env export</c>'s vault guard has (D-0092): once here, so nobody is asked
+    /// same shape <c>env export</c>'s vault guard has: once here, so nobody is asked
     /// whether to delete bytes keypaste never imported, and once inside
     /// <see cref="SourceSnapshot.DeleteIfUnchanged"/>, where the answer cannot go stale between the
     /// check and the removal.
     /// </para>
     /// <para>
     /// A refusal exits nonzero only when the deletion was actually asked for — by
-    /// <c>--delete-source</c>, or by a <c>y</c> at the prompt. D-0015's rule: the user asked for
+    /// <c>--delete-source</c>, or by a <c>y</c> at the prompt. The rule: the user asked for
     /// two things and got one, and the half that failed is the half that left plaintext on disk. A
     /// file that changed before anyone was asked cost nothing and says so on the way past.
     /// </para>

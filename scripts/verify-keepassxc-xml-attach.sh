@@ -8,7 +8,7 @@
 # then opens the vault with that keyfile and refuses it without. A build whose XML keyfile loader
 # falls back to hashing the file keys the vault to the wrong material, which the NativeAOT binary
 # did while trimming removed the types that loader reads; keypaste refuses the keyfile in such a
-# build (D-0294), and this gate counts that as a failure too, because a refusal is not support. It
+# build, and this gate counts that as a failure too, because a refusal is not support. It
 # runs first in the AOT job so the attach is checked even when the fuller keyfile gate cannot start.
 #
 # Usage:  scripts/verify-keepassxc-xml-attach.sh <work-dir>
@@ -43,7 +43,7 @@ grep -q '<KeyFile>' "$keyfile" || die "what KeePassXC wrote at '$keyfile' is not
 step "keypaste creates a password vault and attaches the keyfile"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$vault" >/dev/null 2>&1 || die "keypaste init failed"
 said=$(printf '%s\n' "$pw" | "$kp" access --new-keyfile "$keyfile" --vault "$vault" 2>&1) \
-  || die "keypaste refused to attach the XML keyfile KeePassXC wrote (this build cannot read XML keyfiles; see D-0294). It said: ${said}"
+  || die "keypaste refused to attach the XML keyfile KeePassXC wrote (this build cannot read XML keyfiles). It said: ${said}"
 
 step "KeePassXC opens the vault with the keyfile, and refuses it without"
 printf '%s\n' "$pw" | "$cli" db-info -q --key-file "$(native "$keyfile")" "$(native "$vault")" >/dev/null 2>&1 \

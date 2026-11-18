@@ -253,7 +253,7 @@ public sealed class SecretHygieneTests
 
     /// <summary>
     /// The master password must never be echoed, and the buffer the CLI was handed must be
-    /// zeroed by the time the command returns. That is what keeps D-0007's zeroing promise
+    /// zeroed by the time the command returns. That is what keeps the zeroing promise
     /// honest one layer up, and it is only assertable because the prompt returns a
     /// <c>SecretBuffer</c> rather than a <see cref="string"/>.
     /// </summary>

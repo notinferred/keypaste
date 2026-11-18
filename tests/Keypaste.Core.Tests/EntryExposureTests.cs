@@ -257,7 +257,7 @@ public sealed class EntryExposureTests
     }
 
     /// <summary>
-    /// D-0422 on a real vault: the lister names the fields that hold something and may be asked for,
+    /// On a real vault: the lister names the fields that hold something and may be asked for,
     /// and the project tags, and a tag's reach drops the standard fields.
     /// </summary>
     [Fact]
@@ -329,7 +329,7 @@ public sealed class EntryExposureTests
     }
 
     /// <summary>
-    /// D-0422: a selector reads project membership as a tag says it, so <c>env:billing</c> is
+    /// a selector reads project membership as a tag says it, so <c>env:billing</c> is
     /// billing's <c>dev</c>, and an omitted environment in the selector means every one.
     /// </summary>
     [Fact]

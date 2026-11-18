@@ -425,7 +425,7 @@ public sealed class ShareServiceTests : IDisposable
         Assert.Empty(_fixture.Server.Requests);
     }
 
-    /// <summary>Each field of a login is sealed with its own item's placeholders filled in, and the audit line carries none of them (D-0465).</summary>
+    /// <summary>Each field of a login is sealed with its own item's placeholders filled in, and the audit line carries none of them.</summary>
     [Fact]
     public async Task Create_FillsInEachFieldsPlaceholders()
     {

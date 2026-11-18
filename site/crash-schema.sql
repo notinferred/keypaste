@@ -1,4 +1,4 @@
--- keypaste.com's crash reports in Cloudflare D1 (D-0587), applied once by H-0028; site/README.md's Crash reports
+-- keypaste.com's crash reports in Cloudflare D1, applied once by H-0028; site/README.md's Crash reports
 -- section says what each column holds.
 create table if not exists crash (
   fingerprint text not null,

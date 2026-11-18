@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.signup (
 -- these grants use. Getting this backwards is the most likely reason a correct-looking
 -- `wrangler hyperdrive update` fails to authenticate.
 
--- The database provisioned on 2026-09-25 (D-0364) has no pscale CLI behind it, so its role was
+-- The database provisioned on 2026-09-25 has no pscale CLI behind it, so its role was
 -- created with SQL instead, NOINHERIT and with no memberships; <ROLE> is keypaste_signup_writer:
 --
 --     CREATE ROLE keypaste_signup_writer LOGIN NOINHERIT NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD '…';
@@ -74,7 +74,7 @@ GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
 REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
 
 
--- ---------------------------------------------------------------- share links (D-0355)
+-- ---------------------------------------------------------------- share links
 --
 -- One row per share link: an envelope the server cannot open, the views left, the expiry and the
 -- SHA-256 of the revoke token. The link's key never reaches the server. A row is deleted when its

@@ -1,4 +1,4 @@
-# 4.7b, R.1a: drives an installed keypaste desktop app from outside its process through UI Automation (D-0199).
+# 4.7b, R.1a: drives an installed keypaste desktop app from outside its process through UI Automation.
 # One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb
 # could not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in, and
 # DRIVE_TREE_DIR, when set, receives the window's automation tree each time a locator finds nothing.

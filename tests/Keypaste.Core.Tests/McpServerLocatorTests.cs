@@ -13,7 +13,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A client is registered at a path that outlives this run: the installed <c>keypaste</c>, the bundle a macOS link names,
 /// or inside an AppImage G.5's link, made first when it must be; and it is pinned to the vault, log and owner a bridge
-/// started without keypaste's variables would miss (D-0334, D-0389).
+/// started without keypaste's variables would miss.
 /// </summary>
 public sealed class McpServerLocatorTests : IDisposable
 {

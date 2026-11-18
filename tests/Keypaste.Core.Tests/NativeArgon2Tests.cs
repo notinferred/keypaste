@@ -13,8 +13,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// KeePassLib derives with the libargon2 keypaste carries beside its binary on Windows and macOS, or with the system's on
-/// Linux, and that derivation is the managed one byte for byte and gives the reference's known answers (D-0522,
-/// D-0523).
+/// Linux, and that derivation is the managed one byte for byte and gives the reference's known answers.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -85,7 +84,7 @@ public sealed class NativeArgon2Tests
         Assert.Equal(Managed(Argon2Type.D, _message, parameters), Native(Argon2Type.D, _message, parameters));
     }
 
-    /// <summary>The small derivation <c>keypaste doctor</c> runs binds what an unlock binds, which it then names (D-0525).</summary>
+    /// <summary>The small derivation <c>keypaste doctor</c> runs binds what an unlock binds, which it then names.</summary>
     [Fact]
     public void Doctor_s_derivation_names_the_library_KeePassLib_derives_with()
     {
@@ -175,7 +174,7 @@ public sealed class NativeArgon2Alone;
 
 /// <summary>
 /// Registers keypaste's resolver before any test reaches KeePassLib other than through <c>KeePassInterop</c>, which nothing
-/// shipped does, so no test binds KeePassLib's native Argon2 without it (D-0523).
+/// shipped does, so no test binds KeePassLib's native Argon2 without it.
 /// </summary>
 internal static class NativeArgon2First
 {

@@ -13,7 +13,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// The app's own endpoint for the runs Terminal starts on macOS, over a real pipe on every runner: one
 /// unlock's authority answers the run carrying its pass there whether or not the vault's endpoint is
-/// bound, and answers nothing else (D-0451).
+/// bound, and answers nothing else.
 /// </summary>
 public sealed class LaunchEndpointTests : IDisposable
 {

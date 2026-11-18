@@ -42,7 +42,7 @@ public enum McpConfigOutcomeKind
 /// <param name="Problem">Why it was refused, for the person.</param>
 public sealed record McpConfigOutcome(McpConfigOutcomeKind Kind, string? Backup, string? Problem);
 
-/// <summary>Changes keypaste's member of a tool's JSON configuration file and nothing else (D-0435).</summary>
+/// <summary>Changes keypaste's member of a tool's JSON configuration file and nothing else.</summary>
 /// <remarks>
 /// <para>
 /// Only keypaste's member changes, with one comma and the space it stood in, so the other servers, comments, the order

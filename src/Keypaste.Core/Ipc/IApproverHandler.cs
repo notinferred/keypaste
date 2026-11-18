@@ -8,7 +8,7 @@ namespace Keypaste.Core.Ipc;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Listing and releasing stay separate methods, and that is DECISIONS.md D-0022's separation surviving the
+/// Listing and releasing stay separate methods, and that is the listing-release separation surviving the
 /// move onto a socket. Listing yields <see cref="EntryName"/>, which has nowhere to put a secret;
 /// releasing yields a <see cref="CredentialReply"/>, or an <see cref="EnvReply"/> for a runner, the
 /// only types here that have. Collapsing
@@ -113,7 +113,7 @@ public interface IApproverHandler
     ValueTask<RulesChangeReply> ChangeRulesAsync(RulesChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new RulesChangeReply(false, "this keypaste process keeps no agent rules"));
 
-    /// <summary>Makes a terminal's edit to the vault's items, once the person allows it (D-0464).</summary>
+    /// <summary>Makes a terminal's edit to the vault's items, once the person allows it.</summary>
     /// <param name="request">The edit, and the attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>

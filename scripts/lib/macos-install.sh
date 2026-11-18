@@ -2,7 +2,7 @@
 # The macOS steps of the desktop exercises (4.7e): a DMG quarantined as a browser download, attached and its
 # keypaste.app copied to /Applications, what Gatekeeper shows for that copy, the installed app started and quit
 # through LaunchServices, and a bundle moved to the Trash by Finder. Sourced after lib/desktop-drive.sh and once the exercise defines ROOT, OUT and fact;
-# written for the stock bash 3.2 (D-0398).
+# written for the stock bash 3.2.
 #
 #   mac_quarantine <file>       stamps a browser download's quarantine through NSURLQuarantinePropertiesKey
 #   mac_mountpoint              a fresh mount point in a private temporary folder, outside any records folder, so a

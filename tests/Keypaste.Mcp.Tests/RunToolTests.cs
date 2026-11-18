@@ -18,7 +18,7 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// The shipped <c>run</c> tool against a real vault's owner and a real child (D-0358): a person's
+/// The shipped <c>run</c> tool against a real vault's owner and a real child: a person's
 /// answer decides whether anything starts, the owner's audit line is written first, the child gets the
 /// values and nothing of the protocol, and what comes back holds no value in any form the scrubber knows.
 /// </summary>
@@ -95,7 +95,7 @@ public sealed class RunToolTests : IDisposable
         Assert.True(Structured(result).GetProperty("replacements").GetInt32() >= 10);
     }
 
-    /// <summary>A text a placeholder filled into a value is scrubbed wherever it is printed on its own, under that value's name (D-0465).</summary>
+    /// <summary>A text a placeholder filled into a value is scrubbed wherever it is printed on its own, under that value's name.</summary>
     [Fact]
     public async Task ATextFilledIntoAValue_ComesBackAsThatValuesMarker()
     {

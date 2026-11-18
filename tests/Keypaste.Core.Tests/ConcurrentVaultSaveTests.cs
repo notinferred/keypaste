@@ -14,7 +14,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
 
     private const string _noRefusal =
         "This Windows build hands out the next 8.3 alias instead of refusing the create, so the " +
-        "contention D-0122 measured on 10.0.26100 does not happen here and there is nothing to survive.";
+        "contention measured on 10.0.26100 does not happen here and there is nothing to survive.";
 
     private readonly string _directory =
         Directory.CreateTempSubdirectory("keypaste-vf6-").FullName;

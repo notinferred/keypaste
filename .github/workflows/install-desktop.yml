@@ -2,7 +2,7 @@ name: install-desktop
 run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {0} (not release evidence)', inputs.app_run_id) || format('install-desktop {0}', inputs.tag) }}
 
 # 4.7b, 4.7e: installs a tag's attested desktop candidates on fresh runners and exercises the installed app from
-# outside its process (D-0199), then checks that a new terminal runs the keypaste the MSI put on the user PATH
+# outside its process, then checks that a new terminal runs the keypaste the MSI put on the user PATH
 # or Settings linked (G.5). On macOS the DMG is quarantined as a browser download, and Gatekeeper must refuse
 # the copy in /Applications before the documented override clears it. The candidates are app.yml's workflow
 # artifacts from that tag's run, and the CLI/MCP is the same tag's published release; both are verified before
@@ -10,13 +10,13 @@ run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {
 #
 # A rehearsal installs instead the -dryrun packages of a successful app.yml run at this run's own commit, with
 # the CLI/MCP from that run's archive beside them. Nothing in it is attested, so it is never release evidence;
-# a candidate is tagged only after its rehearsal passes (D-0433).
+# a candidate is tagged only after its rehearsal passes.
 #
 # R.1a: in the same installed app, exercise-desktop-acts.sh then performs R.1a's acts, with KeePassXC, Claude Code
 # at install-real-tools.sh's pin and, on Linux, xterm for the app's Run, none of which the app needs, and the job
 # summary carries each act's verdict. dev.yml's acts mode calls this with dev: any successful app run's packages,
 # installed as a rehearsal installs them and acted on with the calling ref's scripts, on one runner or all; it is
-# never evidence of anything (D-0383).
+# never evidence of anything.
 
 on:
   workflow_dispatch:
@@ -151,7 +151,7 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
-          # macOS runs this under its stock bash 3.2, which has no mapfile (D-0398).
+          # macOS runs this under its stock bash 3.2, which has no mapfile.
           found="$(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "keypaste-app-*-dryrun-$RID-internal-unsigned.$PACKAGE")"
           count="$(printf '%s' "$found" | grep -c . || true)"
           [ "$count" = 1 ] || { echo "::error::app-$RID holds $count -dryrun $PACKAGE packages, not one"; exit 1; }
@@ -270,7 +270,7 @@ jobs:
           set -euo pipefail
           bash scripts/install-real-tools.sh --claude-code-only "$HOME/.local" >> "$GITHUB_PATH"
 
-      # The scripts job checks it under Linux's bash; macOS classifies the acts with its stock 3.2 (D-0398).
+      # The scripts job checks it under Linux's bash; macOS classifies the acts with its stock 3.2.
       - name: Self-test the acts' classifier under macOS's bash
         if: ${{ !cancelled() && runner.os == 'macOS' }}
         shell: bash

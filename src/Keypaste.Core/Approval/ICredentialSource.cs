@@ -7,7 +7,7 @@ namespace Keypaste.Core.Approval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the second seam DECISIONS.md D-0022 required. It is deliberately not
+/// This is the second seam, kept apart from listing. It is deliberately not
 /// <c>IEntryNameSource</c>: fusing the listing path and the credential path into one "vault access"
 /// abstraction would give the listing path the ability to return a secret, which is the single
 /// change most likely to turn <c>list_entry_names</c> into an exfiltration tool.
@@ -70,11 +70,11 @@ public interface ICredentialSource
         return false;
     }
 
-    /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465), or computes its current TOTP code.</summary>
+    /// <summary>Reads one field of one entry, with the entry's own placeholders filled in, or computes its current TOTP code.</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>, or one of <see cref="TryChoose"/>'s, which is read only while its UUID and its name still agree.</param>
     /// <param name="field">
     /// Which field, exactly as the tool schema spells it, or <see cref="CredentialFields.Totp"/> for the code, which is
-    /// released with how long it stays current and never with its seed (D-0480).
+    /// released with how long it stays current and never with its seed.
     /// </param>
     /// <param name="value">The released field, when one could be read.</param>
     /// <param name="failure">Why not, when none could.</param>
@@ -96,10 +96,10 @@ public interface ICredentialSource
         out CredentialFailure failure,
         out string unfilled);
 
-    /// <summary>Whether the entry is in a protected environment, which no scoped token may release (D-0348).</summary>
+    /// <summary>Whether the entry is in a protected environment, which no scoped token may release.</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
-    /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>
+    /// <remarks>The entry's own tags decide; its path never does.</remarks>
     bool RequiresLiveApproval(EntryName name);
 
     /// <summary>Reads one attachment of one entry as base64, for a release a person or a rule allowed.</summary>
@@ -116,7 +116,7 @@ public interface ICredentialSource
         return false;
     }
 
-    /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches (D-0422).</summary>
+    /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches.</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <returns>Its tags, or none when they cannot be read, so a tag reaches nothing it cannot be shown to carry.</returns>
     IReadOnlyList<string> Tags(EntryName name);

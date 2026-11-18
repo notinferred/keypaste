@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The built run tool end to end, across real processes (D-0358, D-0359): keypaste approve holds the vault and asks a person, and
+/// The built run tool end to end, across real processes: keypaste approve holds the vault and asks a person, and
 /// keypaste mcp --allow-run starts the command with the approved value in its environment and returns its output scrubbed. An agent's
 /// commands are off until keypaste clients turns them on through the owner, which seals the change, and every run is then asked.
 /// </summary>

@@ -8,15 +8,14 @@
 #
 # docs/PRODUCT.md cannot change, so neither can the existence of this gate. If it is failing,
 # keypaste's vault writer is wrong. Do NOT relax an assertion, add a skip, mark the job
-# continue-on-error, or drop an operating system to make it green. DECISIONS.md D-0008
-# records why, and what the three non-negotiable properties are.
+# continue-on-error, or drop an operating system to make it green.
 #
 # Usage:  scripts/verify-keepassxc-compat.sh <vault.kdbx>
 # Env:    KP_COMPAT_PASSWORD  master password of the fixture   (required)
 #         KPXC_CLI            path to keepassxc-cli            (default: PATH lookup)
 #
 # Every expected value below is duplicated from scripts/make-compat-fixture.sh, which builds the
-# fixture with the shipped binary (D-0012). That duplication is
+# fixture with the shipped binary. That duplication is
 # the change detector: expectations generated from the writer under test would agree with it forever
 # and assert nothing.
 
@@ -130,7 +129,7 @@ diff -u <(printf '%s\n' "$expected_deep") <(printf '%s\n' "$actual_deep") \
 # console code page to the system ANSI page, which can transcode non-ASCII on the way out —
 # but under `shell: bash` with printf, this was verified to round-trip byte-for-byte. If it
 # ever fails on windows-latest only, that is a harness property and not a defect in our
-# file: narrow this one assertion to non-Windows and record it in DECISIONS.md rather than
+# file: narrow this one assertion to non-Windows and record why rather than
 # weakening anything above.
 step "field integrity: unicode"
 actual_uni=$(kpxc show -a Title -a UserName -a Password "$db" 'compat/unicode') \

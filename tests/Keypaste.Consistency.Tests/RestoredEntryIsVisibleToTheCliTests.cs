@@ -62,7 +62,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     /// </summary>
     /// <remarks>
     /// The UUID is read through <c>Vault.EntryUuid</c> because no CLI verb prints one, with a
-    /// second entry to compare against so a regressed constant cannot satisfy it (D-0233).
+    /// second entry to compare against so a regressed constant cannot satisfy it.
     /// </remarks>
     [Fact]
     public void A_restored_entry_keeps_its_history_and_its_identity()

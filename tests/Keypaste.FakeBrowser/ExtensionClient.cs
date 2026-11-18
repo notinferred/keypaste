@@ -11,7 +11,7 @@ namespace Keypaste.FakeBrowser;
 /// </summary>
 /// <remarks>
 /// It seals and opens with the libsodium box <c>Keypaste.Browser</c> calls, so it shares the relay's NaCl; that the box is the
-/// one TweetNaCl.js seals, as the extension's is, is held by 8.1b's known answers (D-0613).
+/// one TweetNaCl.js seals, as the extension's is, is held by 8.1b's known answers.
 /// </remarks>
 public sealed class ExtensionClient : IDisposable
 {

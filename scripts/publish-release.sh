@@ -47,11 +47,11 @@
 #   KEYPASTE_R2_PROBE_PREFIX   the positive control's prefix (default v0.1.0/)
 #
 # It never deletes, never overwrites deliberately, and takes no --force: a bypass cannot be added
-# without a diff that says so (D-0092).
+# without a diff that says so.
 #
 # NEGATIVE CONTROL: scripts/verify-release-destination.sh runs the pre-fix one-liner against the
 # same fake and requires it to upload where this refuses. If it does not, that gate fails: a
-# fixture that cannot reproduce the fail-open condition proves nothing about the fix (D-0043).
+# fixture that cannot reproduce the fail-open condition proves nothing about the fix.
 set -euo pipefail
 
 readonly PROBE_PREFIX="${KEYPASTE_R2_PROBE_PREFIX:-v0.1.0/}"

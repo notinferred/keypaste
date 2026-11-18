@@ -4,7 +4,7 @@ namespace Keypaste.Browser;
 
 /// <summary>
 /// Native messaging's framing: each message is UTF-8 JSON after its length as an unsigned 32-bit number in native byte order,
-/// little-endian on every target keypaste builds (D-0625).
+/// little-endian on every target keypaste builds.
 /// </summary>
 internal static class NativeMessages
 {

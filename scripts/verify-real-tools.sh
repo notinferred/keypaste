@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# keypaste setup and doctor against the real AI tools (G.2, G.3, D-0438), as install-real-tools.sh puts them on a
+# keypaste setup and doctor against the real AI tools (G.2, G.3), as install-real-tools.sh puts them on a
 # runner at their pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and
 # Claude Desktop on macOS and Windows. It writes those tools' own configuration in the runner account's home, so it
 # refuses to run anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen
-# with keypaste use, so setup pins --vault, --audit-log and --approver (D-0389), and the bridge is the
+# with keypaste use, so setup pins --vault, --audit-log and --approver, and the bridge is the
 # built keypaste.
 #
 # Seeded first: VS Code's, Cursor's and Claude Desktop's files each hold another server and another top-level key,
@@ -20,7 +20,7 @@
 # Every tool's entry starts the bridge with the pinned vault, audit log, ceilings and approver, the tool's id as its label, run
 # offered and every item in reach, which each agent's settings narrow, and each seeded file keeps everything else.
 # Before any tool has started the bridge, keypaste doctor finds every tool's registration working and nothing to
-# fix, and changes no tool's configuration, the pinned audit log or the default home's (D-0467).
+# fix, and changes no tool's configuration, the pinned audit log or the default home's.
 # VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. On Linux and macOS, codex
 # sandbox runs a shell from the project folder as docs/safe-agents.md sets Codex: its write inside that folder lands,
 # its appends to ~/.keypaste/agents.toml and to Codex's config.toml are refused and change neither (L.3).

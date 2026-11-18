@@ -49,7 +49,7 @@ public static class ApproverEndpoint
     /// </returns>
     /// <exception cref="ArgumentException">An explicit name is not one <see cref="IsValidName"/> accepts.</exception>
     /// <remarks>
-    /// Derived per vault, so owners of two vaults never contend for one name (D-0309). An explicit
+    /// Derived per vault, so owners of two vaults never contend for one name. An explicit
     /// name can still reach an owner of another vault; the attachment names the vault, and that owner
     /// refuses it.
     /// </remarks>
@@ -75,7 +75,7 @@ public static class ApproverEndpoint
     /// Whether it is 1 to <see cref="MaximumLength"/> characters with no path separator or control character, and does
     /// not start with <see cref="LockedAppEndpoint.Prefix"/> in any case, as Windows and macOS match pipe names.
     /// </returns>
-    /// <remarks>A locked app tells the person an agent asked on a connection alone, so no approver is looked for there (D-0466).</remarks>
+    /// <remarks>A locked app tells the person an agent asked on a connection alone, so no approver is looked for there.</remarks>
     public static bool IsValidName(string name, out string error)
     {
         ArgumentNullException.ThrowIfNull(name);

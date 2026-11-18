@@ -12,7 +12,7 @@ public sealed record ReleaseSeen(string Entry, string Client, string How, DateTi
 }
 
 /// <summary>
-/// The releases one unlocked lifetime committed, newest first, held in memory only (D-0361).
+/// The releases one unlocked lifetime committed, newest first, held in memory only.
 /// </summary>
 /// <remarks>
 /// What a screen lists of this lifetime's releases without reading the audit log back. It ends with

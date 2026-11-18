@@ -13,7 +13,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A vault's owner over a real pipe: only a connection attached to the session now holding the vault
-/// it names is answered (D-0310), and nothing is released across the lock that ends it (D-0313).
+/// it names is answered, and nothing is released across the lock that ends it.
 /// </summary>
 public sealed class SessionAuthorityTests : IDisposable
 {
@@ -304,7 +304,7 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Null(reply.Value);
     }
 
-    /// <summary>A reload withdraws what is waiting as a lock does while the session stays (D-0412).</summary>
+    /// <summary>A reload withdraws what is waiting as a lock does while the session stays.</summary>
     [Fact]
     public async Task ARequestWaitingForAPerson_IsWithdrawnAndDeniedAsReloadedWhenAReloadWithdrawsIt()
     {
@@ -482,7 +482,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
     /// <summary>
     /// A request sent to the owner without the bridge meets the limits the bridge would have applied,
-    /// with a person ready to say yes, so a missing check would release (D-0324).
+    /// with a person ready to say yes, so a missing check would release.
     /// </summary>
     [Theory]
     [MemberData(nameof(OutsideTheLimits))]
@@ -529,7 +529,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
     /// <summary>
     /// A frame that names a second field, or leaves one out, is not a request: the owner hangs up
-    /// without answering, and nobody is asked (D-0325).
+    /// without answering, and nobody is asked.
     /// </summary>
     [Theory]
     [InlineData("field named twice")]

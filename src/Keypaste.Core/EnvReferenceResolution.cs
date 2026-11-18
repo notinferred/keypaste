@@ -10,7 +10,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// Each profile is judged on the keys the file references from it, as the session path judges
 /// them, so an unusable key the file never names refuses nothing. An entry reference is read from the vault as its file
-/// holds it (D-0317), never from a reserved group, with its own item's placeholders filled in (D-0465), and its field
+/// holds it, never from a reserved group, with its own item's placeholders filled in, and its field
 /// must hold something. A literal is never filled in. A refusal names each variable and its reference, never a value.
 /// </remarks>
 public static class EnvReferenceResolution

@@ -2,13 +2,13 @@ using System.IO.Compression;
 
 namespace Keypaste.Core.Recommendations;
 
-/// <summary>The vendored list of the most common passwords, which KeePass's estimate rates each password against so one on it is weak (D-0499).</summary>
+/// <summary>The vendored list of the most common passwords, which KeePass's estimate rates each password against so one on it is weak.</summary>
 /// <remarks>
 /// <para>
 /// SecLists' <c>10k-most-common.txt</c>, embedded gzipped and pinned by the SHA-256 of the bytes it
 /// decompresses to, which are upstream's file byte for byte. The pin is checked when the list is first
 /// read and a mismatch throws, so no password is rated against a list nobody can vouch for, as the word
-/// list is pinned (D-0235); third_party/seclists-common-passwords/UPSTREAM.md names this symbol and does
+/// list is pinned; third_party/seclists-common-passwords/UPSTREAM.md names this symbol and does
 /// not restate the hex.
 /// </para>
 /// <para>

@@ -11,7 +11,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// Tokens in a vault: stored only as a verifier, checked against the file as saved, and revoked for
-/// good, through keypaste's merge and KeePassXC's (D-0544).
+/// good, through keypaste's merge and KeePassXC's.
 /// </summary>
 public sealed class TokenStoreTests : IDisposable
 {
@@ -214,7 +214,7 @@ public sealed class TokenStoreTests : IDisposable
         Assert.Null(verified);
     }
 
-    /// <summary>KeePassXC's default merge carries the newer version and drops deletions, so a revocation is a version (D-0544, D-0629).</summary>
+    /// <summary>KeePassXC's default merge carries the newer version and drops deletions, so a revocation is a version.</summary>
     [Fact]
     public void Revoke_WritesANewerVersionWithNoVerifier_KeepingTheTokensOneInHistory()
     {
@@ -241,7 +241,7 @@ public sealed class TokenStoreTests : IDisposable
 
     /// <summary>
     /// A record is purged only once its notes' expiry has passed, which an expiry set on the entry in one copy does not change in
-    /// another, at the next create or revoke (D-0630).
+    /// another, at the next create or revoke.
     /// </summary>
     [Fact]
     public void ARevokedRecord_IsPurgedByTheNextCreateOrRevoke_OnceItsNotesSayTheTokenHasExpired()
@@ -314,7 +314,7 @@ public sealed class TokenStoreTests : IDisposable
         Assert.False(new TokenStore(_vault).TakeBack(info.Id));
     }
 
-    /// <summary>KeePassXC's default merge applies no deletion, so a file it merged can hold a token's record beside its tombstone (D-0544).</summary>
+    /// <summary>KeePassXC's default merge applies no deletion, so a file it merged can hold a token's record beside its tombstone.</summary>
     [Fact]
     public void ARecordBesideItsTombstone_ReadsAsRevoked()
     {
@@ -375,7 +375,7 @@ public sealed class TokenStoreTests : IDisposable
 
     /// <summary>
     /// A tombstone wins over a token's record whatever the times or changes: one copy deleted the record, as keypaste before 1.4b5
-    /// revoked and KeePassXC deletes, and the other changed it afterwards, which would keep an ordinary item in the bin (D-0540, D-0631).
+    /// revoked and KeePassXC deletes, and the other changed it afterwards, which would keep an ordinary item in the bin.
     /// </summary>
     [Theory]
     [InlineData(true)]
@@ -443,7 +443,7 @@ public sealed class TokenStoreTests : IDisposable
 
     /// <summary>
     /// A token deleted with only a tombstone, as keypaste before 1.4b5 revoked one, comes back when KeePassXC merges in an older copy,
-    /// beside its tombstone; it reads as revoked, and keypaste's merge then removes it (D-0544, D-0631).
+    /// beside its tombstone; it reads as revoked, and keypaste's merge then removes it.
     /// </summary>
     [Fact]
     public void ATokenKeePassXcMergesBackBesideItsTombstone_ReadsAsRevoked_AndKeypastesMergeRemovesIt()

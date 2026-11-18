@@ -11,7 +11,7 @@ namespace Keypaste.Core.Approval;
 /// </remarks>
 public static class CredentialFields
 {
-    /// <summary>What a credential request names to be given the item's current TOTP code, never its seed (D-0480).</summary>
+    /// <summary>What a credential request names to be given the item's current TOTP code, never its seed.</summary>
     /// <remarks>Lower-case, so no custom field that leaves by name can be called this.</remarks>
     public const string Totp = "totp";
 

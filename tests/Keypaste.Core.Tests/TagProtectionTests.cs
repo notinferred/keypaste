@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// D-0348's protection follows an entry's own tag and never its path (D-0416): through a real vault,
+/// Tag protection follows an entry's own tag and never its path: through a real vault,
 /// a tagged entry is asked about live every time, and anything the source cannot answer counts as
 /// protected.
 /// </summary>

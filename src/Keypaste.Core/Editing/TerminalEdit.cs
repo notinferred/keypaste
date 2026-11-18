@@ -88,7 +88,7 @@ public sealed record NewSecret
 
 /// <summary>
 /// One change a terminal makes to a vault, as the CLI runs it on a vault it opened and as the vault's
-/// holder runs it when the CLI hands it over (D-0464).
+/// holder runs it when the CLI hands it over.
 /// </summary>
 /// <remarks>
 /// A value is optional so the same edit can be checked before anything is typed; it is applied only

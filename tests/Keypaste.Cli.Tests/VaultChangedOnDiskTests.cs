@@ -10,7 +10,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// The branch is unreachable in ordinary use — a command opens, edits and saves in milliseconds —
 /// which is exactly why it is worth executing here. A <c>catch</c> nobody has ever run is an
-/// assertion about the world rather than a check on it (DECISIONS.md D-0043), and this one carries
+/// assertion about the world rather than a check on it, and this one carries
 /// the sentence a user sees when their data was about to be lost.
 /// </para>
 /// <para>

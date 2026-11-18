@@ -12,9 +12,9 @@ namespace Keypaste.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// The tag is <c>env:&lt;project&gt;</c> for <c>dev</c> and <c>env:&lt;project&gt;:&lt;environment&gt;</c>
-/// otherwise (D-0370), which KeePassXC shows and edits as an ordinary tag. Each change is one edit
+/// otherwise, which KeePassXC shows and edits as an ordinary tag. Each change is one edit
 /// with one revision. Before it is written the verb names the environment it reaches and the fields
-/// that join or leave, never a value, and asks (D-0415).
+/// that join or leave, never a value, and asks.
 /// </remarks>
 internal static class EnvTagCommand
 {

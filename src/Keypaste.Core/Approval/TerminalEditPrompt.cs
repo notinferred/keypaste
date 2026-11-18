@@ -4,7 +4,7 @@ namespace Keypaste.Core.Approval;
 
 /// <summary>
 /// What a person is shown before a terminal's edit is saved in the vault: the command, the item and
-/// what changes, by name only, already sanitized (D-0464).
+/// what changes, by name only, already sanitized.
 /// </summary>
 /// <remarks>
 /// It has no member for a value, a default button or a layout (THREATS.md T-2). A terminal command can

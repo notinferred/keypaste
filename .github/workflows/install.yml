@@ -5,7 +5,7 @@ name: install
 # calls: scripts/verify-install.sh extracts them from between sentinel comments in the document and
 # executes them, so what is tested is the text a stranger reads and not a second copy of it.
 #
-# This is the gate D-0036 requires before an install one-liner may appear on a page at all: "a curl
+# This is the gate required before an install one-liner may appear on a page at all: "a curl
 # line on a launch page is the single instruction a stranger runs first, and one that 404s is worse
 # than an honest dotnet build."
 #

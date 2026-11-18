@@ -1,5 +1,5 @@
-// The desktop app's crash reports (D-0586 to D-0588). A report is taken only byte for byte as CrashScrubber writes it
-// (D-0558), so no field, name or text that grammar does not allow is ever stored, and repeats of one failure on one
+// The desktop app's crash reports. A report is taken only byte for byte as CrashScrubber writes it,
+// so no field, name or text that grammar does not allow is ever stored, and repeats of one failure on one
 // version and platform add to one row's count. No address, header or time of day is kept, and nothing here reads a
 // report back.
 //

@@ -6,7 +6,7 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// The app asks in its own prompt window (4.4), across real processes: a built keypaste mcp's request raises the prompt
-/// tests/Keypaste.AppDriver draws on a headless display and clicks, and a terminal's keypaste set or rm is asked about there (D-0464).
+/// tests/Keypaste.AppDriver draws on a headless display and clicks, and a terminal's keypaste set or rm is asked about there.
 /// </summary>
 /// <remarks>
 /// Deny, closing, a lock, the timeout, arming, focus and the prompt's words are App.Tests' <c>DesktopApprovalTests</c> and

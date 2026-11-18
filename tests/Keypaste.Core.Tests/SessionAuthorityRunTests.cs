@@ -9,7 +9,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// An agent's run over a real pipe (D-0358): the owner releases the variables only to a connection of
+/// An agent's run over a real pipe: the owner releases the variables only to a connection of
 /// its current session, only when this computer turns run on for the agent, only within what its bridge
 /// can see and with no field in a Blocked category, after the person approves the exact program, command,
 /// directory and names, every time.
@@ -262,7 +262,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     /// <summary>
-    /// D-0422: under the default, a project runs whatever group its tagged entries sit in, and a
+    /// under the default, a project runs whatever group its tagged entries sit in, and a
     /// reference to a tagged entry's password is refused unasked, as C.1b's limit left it.
     /// </summary>
     [Fact]

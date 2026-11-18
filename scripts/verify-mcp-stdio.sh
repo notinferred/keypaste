@@ -160,7 +160,7 @@ printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run" and .name != "
   || die "a tool other than run lost its false hints"
 
 # 9. keypaste hands `keypaste mcp` to the bridge and refuses the removed `mcp serve`, `setup` and `policy`,
-#    naming what replaced each, without starting the bridge (D-0418, D-0470). Every help form prints the
+#    naming what replaced each, without starting the bridge. Every help form prints the
 #    bridge's one usage on stdout. A dispatch that sent every `mcp` to the bridge fails here; one that sent
 #    none fails every step above.
 readonly HOME_DIR="$WORK/home"

@@ -49,9 +49,9 @@ internal interface IWin32Clipboard
 /// <summary>The real Win32 clipboard.</summary>
 /// <remarks>
 /// <para>
-/// <b>This narrows D-0005 rather than contradicting it.</b> That decision chose subprocesses over
+/// <b>This narrows the subprocess rule rather than contradicting it.</b> That rule chose subprocesses over
 /// P/Invoke to keep three native surfaces away from the trim and AOT analyzers, and it still holds
-/// for macOS and Linux, which keep their tools. Windows is the exception D-0056 carved out for one
+/// for macOS and Linux, which keep their tools. Windows is the exception carved out for one
 /// reason: <c>clip.exe</c> cannot express the opt-out formats at all, so on Windows the choice was
 /// never subprocess-versus-P/Invoke, it was P/Invoke-versus-leaving-the-password-in-Win+V.
 /// </para>

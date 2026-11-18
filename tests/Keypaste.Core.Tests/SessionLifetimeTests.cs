@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>One unlocked lifetime, and the transition every lock ends it with (D-0313).</summary>
+/// <summary>One unlocked lifetime, and the transition every lock ends it with.</summary>
 public sealed class SessionLifetimeTests
 {
     [Fact]

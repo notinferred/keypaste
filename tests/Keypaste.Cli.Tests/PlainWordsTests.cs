@@ -5,8 +5,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// The CLI's help, and what <c>keypaste</c> alone prints on a terminal, say item, environment,
-/// allowance, what an agent can see, KeePass database and AI tool, never the words those replaced
-/// (D-0457).
+/// allowance, what an agent can see, KeePass database and AI tool, never the words those replaced.
 /// </summary>
 /// <remarks>
 /// Command and subcommand names, flags, file names, environment variables, <c>kp://</c> references

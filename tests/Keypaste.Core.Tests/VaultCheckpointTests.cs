@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Restoring a checkpoint takes back an edit whose save failed (D-0464): items and groups it made go,
+/// Restoring a checkpoint takes back an edit whose save failed: items and groups it made go,
 /// items it changed, moved or deleted come back as they were, and a vault that matched its file does again.
 /// </summary>
 public sealed class VaultCheckpointTests : IDisposable

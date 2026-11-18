@@ -1,5 +1,5 @@
 // The browser half of a share link. src/Keypaste.Core/Sharing/ShareCrypto.cs seals what this opens,
-// and site/test/share-vector.json holds both to the same bytes (D-0354).
+// and site/test/share-vector.json holds both to the same bytes.
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });

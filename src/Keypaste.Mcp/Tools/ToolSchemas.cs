@@ -8,7 +8,7 @@ namespace Keypaste.Mcp.Tools;
 /// <remarks>
 /// <para>
 /// The SDK can build a schema by reflecting over a C# method signature, and it compiles perfectly
-/// well under this repository's trim and AOT analysers — that was checked, not assumed (D-0019).
+/// well under this repository's trim and AOT analysers — that was checked, not assumed.
 /// It is still not used here, because of what it generates: no <c>additionalProperties: false</c>,
 /// no enum on <c>field</c>, no bounds on <c>reason</c>, no behaviour hints at all, and names taken
 /// from whatever the parameter was

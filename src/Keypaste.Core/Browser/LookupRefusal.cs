@@ -1,6 +1,6 @@
 namespace Keypaste.Core.Browser;
 
-/// <summary>Why a request for logins gets none, whatever the vault holds (D-0617).</summary>
+/// <summary>Why a request for logins gets none, whatever the vault holds.</summary>
 public enum LookupRefusal
 {
     /// <summary>Not refused.</summary>

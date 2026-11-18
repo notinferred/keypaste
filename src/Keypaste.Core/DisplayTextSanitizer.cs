@@ -12,7 +12,7 @@ namespace Keypaste.Core;
 /// a title containing a slash can impersonate a group path, and a name reaching a model's context
 /// window carries no fence, no tag and no pipe. Neither argument reaches a URL, a username or a
 /// notes body drawn in a detail pane. Those are read by a person, address nothing — an entry is
-/// addressed by <see cref="EntryName"/> (D-0091) — and are never sent to a model. A mode on
+/// addressed by <see cref="EntryName"/> — and are never sent to a model. A mode on
 /// <c>EntryNameSanitizer</c> that kept all ten would make that file argue against itself, so the
 /// rules live apart and <c>DisplayTextSanitizerTests</c> drives the difference from both sides.
 /// </para>

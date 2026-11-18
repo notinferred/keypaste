@@ -2,9 +2,9 @@
 # Holds the AOT publish to a known set of trim diagnostics.
 #
 # third_party/Directory.Build.props turns the trim and AOT analyzers off for vendored source. That
-# is deliberate (D-0005 installed them to choose dependencies, not to lint 2007-era code), but it
+# is deliberate (they are installed to choose dependencies, not to lint 2007-era code), but it
 # also disarms the gate for the one assembly most likely to break under NativeAOT - which is
-# exactly what O-0006 complained about. This script re-arms it somewhere else: the publish reports
+# exactly where it matters. This script re-arms it somewhere else: the publish reports
 # its diagnostics, and they are diffed character for character against a committed baseline.
 #
 # The effect is that an upstream re-merge which introduces a new AOT-hostile construct turns the
@@ -79,7 +79,7 @@ if ! diff -u "$EXPECTED" "$ACTUAL"; then
   echo "A line only in the baseline means a diagnostic was fixed - delete that line." >&2
   echo "A line only in the publish means new AOT-hostile code arrived. Read it before" >&2
   echo "adding it: a construct that fails at runtime under NativeAOT is a shipped bug," >&2
-  echo "not a lint. See DECISIONS.md D-0040 for how each existing line was cleared." >&2
+  echo "not a lint." >&2
   exit 1
 fi
 

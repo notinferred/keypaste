@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Drives an installed keypaste app from outside its process for the desktop exercises (D-0199): UI Automation
+# Drives an installed keypaste app from outside its process for the desktop exercises: UI Automation
 # on Windows (drive-desktop-windows.ps1), AT-SPI and xdotool on Linux (drive-desktop-linux.py), the accessibility
 # API and System Events on macOS (drive-desktop-macos.js). Sourced after the exercise defines ROOT and platform;
 # on Windows and macOS, APP_PID names the app to drive.

@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// D-0467's read-only rule: <c>keypaste doctor</c>, <c>keypaste</c> alone on a terminal and the checks they run open no
+/// The read-only rule: <c>keypaste doctor</c>, <c>keypaste</c> alone on a terminal and the checks they run open no
 /// vault, read no password, take no claim, ask the vault's holder nothing but to connect and attach, never reach the locked
 /// app's notice, write no file and set up no AI tool.
 /// </summary>

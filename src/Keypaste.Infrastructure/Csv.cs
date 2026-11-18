@@ -12,7 +12,7 @@ public sealed record CsvRecord(int Line, IReadOnlyList<string> Fields)
     public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"line {Line}");
 }
 
-/// <summary>A strict reader of comma-separated values as RFC 4180 defines them, for the files other programs export (D-0573).</summary>
+/// <summary>A strict reader of comma-separated values as RFC 4180 defines them, for the files other programs export.</summary>
 /// <remarks>
 /// The bytes are UTF-8, after an optional byte order mark. A record ends at CRLF or LF, the last one optionally; a field
 /// is bare, holding no quote, CR or LF, or quoted, where <c>""</c> is a quote and a comma or line break is text; and

@@ -17,7 +17,7 @@ namespace Keypaste.Mcp.Tests;
 /// <para>
 /// <b>What changed in Stage 2.2, and what it means for these tests.</b> Until this stage
 /// <c>request_credential</c> was hard-coded to deny, so every denial test here would have passed
-/// whether or not validation, scoping and audit logging existed — DECISIONS.md D-0022 said so
+/// whether or not validation, scoping and audit logging existed — the separation says so
 /// outright and said they would earn their keep in 2.2. They have: a real approver now answers over
 /// a real pipe, so a denial is one outcome among several rather than the only one the code can
 /// produce, and a test that asserts one is distinguishing it from the others.
@@ -229,7 +229,7 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// D-0422 at the bridge: under the default a tagged entry is listed with its project variables
+    /// At the bridge: under the default a tagged entry is listed with its project variables
     /// and tags, never its password, and an untagged one under <c>env/</c> is not listed at all.
     /// </summary>
     [Fact]
@@ -668,7 +668,7 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The bounds an agent is told about are the ones the vault's owner refuses outside of (D-0324).
+    /// The bounds an agent is told about are the ones the vault's owner refuses outside of.
     /// </summary>
     [Fact]
     public void TheSchemaAndTheCoreAgreeAboutLimits()

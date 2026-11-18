@@ -2,7 +2,7 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Import;
 
-/// <summary>What the CSV export readers share: the file's records through <see cref="Csv"/> (D-0573), its header's columns, the rows and columns that are no part of an item, and a TOTP as the <c>otp</c> field holds one (D-0574).</summary>
+/// <summary>What the CSV export readers share: the file's records through <see cref="Csv"/>, its header's columns, the rows and columns that are no part of an item, and a TOTP as the <c>otp</c> field holds one.</summary>
 internal static class CsvExport
 {
     /// <summary>Every record of the file, its header first.</summary>
@@ -56,7 +56,7 @@ internal static class CsvExport
             .Select(column => new ExportOmission(Named("column", column.Key), $"keypaste does not read this column of a {source} export")),
     ];
 
-    /// <summary>The TOTP as the <c>otp</c> field holds one: a link as written, and a bare secret in the link KeePassXC's importers make of it (D-0574).</summary>
+    /// <summary>The TOTP as the <c>otp</c> field holds one: a link as written, and a bare secret in the link KeePassXC's importers make of it.</summary>
     internal static string Totp(string totp, string title, string username) =>
         string.IsNullOrWhiteSpace(totp) ? string.Empty
         : totp.StartsWith("otpauth://", StringComparison.Ordinal) ? totp

@@ -57,7 +57,7 @@ public enum KeyfileOutcome
 
     /// <summary>
     /// It is a KeePass XML keyfile and this build cannot read one, so using it would key with the
-    /// file's hash instead of the key it holds (D-0294).
+    /// file's hash instead of the key it holds.
     /// </summary>
     XmlUnreadable = 5,
 }
@@ -71,7 +71,7 @@ public enum KeyfileCreationOutcome
     /// <summary>Something is already at that path, and it was not touched.</summary>
     PathAlreadyExists = 1,
 
-    /// <summary>This build cannot read the key in a KeePass XML keyfile, so it writes none (D-0294).</summary>
+    /// <summary>This build cannot read the key in a KeePass XML keyfile, so it writes none.</summary>
     Unsupported = 2,
 
     /// <summary>The path was reachable and the write still failed; nothing was left at it.</summary>
@@ -168,7 +168,7 @@ public static class VaultKeyfile
     /// <param name="failure">What the filesystem said, when the outcome is <see cref="KeyfileCreationOutcome.Failed"/>; empty otherwise.</param>
     /// <returns>What happened.</returns>
     /// <remarks>
-    /// The one keyfile keypaste writes, and only when a person asks for it (D-0287). The document is KeePassLib's own
+    /// The one keyfile keypaste writes, and only when a person asks for it. The document is KeePassLib's own
     /// and its key comes from KeePassLib's random source, so KeePass and KeePassXC read it as theirs. It is staged
     /// beside the path, readable by its owner alone outside Windows, and moved into place without replacing anything,
     /// so a file that arrives meanwhile is kept and the stage is deleted.

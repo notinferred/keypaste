@@ -10,9 +10,9 @@
 # What it holds:
 #   - a commit with every required gate green is accepted, and it is the ONLY shape that is;
 #   - a missing app run, a red app run and a commit with neither run each refuse;
-#   - a green run triggered by a pull request or a push to main does not count (D-0403);
+#   - a green run triggered by a pull request or a push to main does not count;
 #   - a ci run counts only when its real-tools jobs ran and all passed, whether a dispatch or the schedule
-#     ran them; one whose tools jobs were skipped does not (D-0438);
+#     ran them; one whose tools jobs were skipped does not;
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
 #   - --wait waits for the tag's own run: one still going that then succeeds is accepted, and one still going
@@ -30,8 +30,8 @@
 #
 # NEGATIVE CONTROL: the last phase runs a copy of the script with `app` removed from the required
 # set - the shape the guard had before R.0a - and requires it to ACCEPT the commit whose app run is
-# missing. If the weakened one refuses too, this gate proves nothing about the fix (D-0043). A second
-# copy without the tools requirement - the shape before D-0438 - must accept the ci run whose tools
+# missing. If the weakened one refuses too, this gate proves nothing about the fix. A second
+# copy without the tools requirement - the shape before ci's tools jobs were required - must accept the ci run whose tools
 # jobs were skipped.
 set -euo pipefail
 
@@ -170,7 +170,7 @@ run_case "api-fails"   api-fails   "$BOTH_GREEN" "$SUBJECT" 1 "could not ask"
 run_case "api-empty"   api-empty   "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 run_case "api-garbage" api-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 
-echo "== ci counts only with its real-tools jobs green (D-0438)"
+echo "== ci counts only with its real-tools jobs green"
 run_case "ci-scheduled-with-tools" ok "$SCHEDULED_GREEN" "$SUBJECT" 0 "every required gate is green"
 JOBS="$TOOLS_SKIPPED"
 run_case "ci-tools-skipped" ok "$BOTH_GREEN" "$SUBJECT" 1 "dispatch ci.yml at this commit with -f tools=true"
@@ -207,7 +207,7 @@ grep -q 'jq -r --arg self' "$WEAK" \
 run_case "weakened-accepts-app-absent" ok "$APP_ABSENT" "$WEAK" 0 "every required gate is green"
 echo "  the weakened copy accepts a commit with no app run, so requiring app is what refuses it"
 WITHOUT_TOOLS="$WORK/without-tools.sh"
-# Deleting the one line that reads ci's jobs gives back the guard before D-0438; asserted as above.
+# Deleting the one line that reads ci's jobs gives back the guard before ci's tools jobs were required; asserted as above.
 sed '/green_tools_runs "/d' "$SUBJECT" > "$WITHOUT_TOOLS"
 grep -qF 'green_tools_runs "' "$WITHOUT_TOOLS" \
   && die "the copy without the tools requirement still reads ci's jobs; the control would be vacuous"
@@ -232,7 +232,7 @@ ok: $cases_run cases. One shape was accepted by the real script - every required
     when two green runs would have to be chosen between. It waits for the tag's own run until it finishes
     green, and refuses one still going at the last poll, one that failed, one that never appeared and an
     unparseable reply. The pre-R.0a shape, same fixture and same
-    fake, accepts the commit whose desktop gate never ran, and the shape before D-0438 accepts the ci
+    fake, accepts the commit whose desktop gate never ran, and the shape before ci's tools jobs were required accepts the ci
     run whose tools jobs were skipped.
 not proved here: that the guard step is reached on a tag, which only a tag shows; and that GitHub
     returns runs in the shape this fake does, which R.0c's first real tag observes.

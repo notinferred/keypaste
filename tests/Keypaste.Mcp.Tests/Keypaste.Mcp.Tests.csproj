@@ -26,7 +26,7 @@
     <!-- The core's hand-moved clock and time zones a test names on any runner, for an agent's end to Automatic. -->
     <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
     <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
-    <!-- Every vault these tests create takes a token Argon2 cost (D-0469). -->
+    <!-- Every vault these tests create takes a token Argon2 cost. -->
     <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
   </ItemGroup>
 

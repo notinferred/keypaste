@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A <c>.env</c> is planned by name before anything is written: a key the environment has is
 /// replaced where it lives, a new one goes on the home entry or the entry named, and applying the
-/// plan writes each entry once and nothing else (E.1b, D-0413).
+/// plan writes each entry once and nothing else (E.1b).
 /// </summary>
 public sealed class EnvImportTests : IDisposable
 {

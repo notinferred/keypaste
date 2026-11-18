@@ -2,7 +2,7 @@ using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Import;
 
-/// <summary>LastPass's CSV export, as its vault and its command line, <c>lpass export</c>, write it (D-0572).</summary>
+/// <summary>LastPass's CSV export, as its vault and its command line, <c>lpass export</c>, write it.</summary>
 /// <remarks>
 /// <para>
 /// The header names the columns: <c>url,username,password,totp,extra,name,grouping,fav</c> from the vault, and the same
@@ -25,7 +25,7 @@ internal sealed class LastPassCsvReader : IExportReader
     private const string _notes = "Notes";
     private const string _privateKey = "Private Key";
 
-    /// <summary>KeePassXC's tag for a favorite, which its Bitwarden and 1Password importers give one (D-0574).</summary>
+    /// <summary>KeePassXC's tag for a favorite, which its Bitwarden and 1Password importers give one.</summary>
     private const string _favoriteTag = "Favorite";
 
     private static readonly string[] _required = ["url", "username", "password", "extra", "name", "grouping"];

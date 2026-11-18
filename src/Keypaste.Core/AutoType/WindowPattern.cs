@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Keypaste.Core.AutoType;
 
-/// <summary>Whether an association's window pattern, its placeholders already filled in, fits a window's title (D-0606).</summary>
+/// <summary>Whether an association's window pattern, its placeholders already filled in, fits a window's title.</summary>
 /// <remarks>
 /// <para>
 /// As KeePassXC 2.8's <c>Entry::autoTypeSequences</c> matches: a pattern that starts and ends with <c>//</c>, four

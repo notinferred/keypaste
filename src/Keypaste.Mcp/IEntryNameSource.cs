@@ -115,7 +115,7 @@ internal interface IEntryNameSource
 /// sanitization code that used to be unreachable in the shipped binary is on the live path now.
 /// </para>
 /// <para>
-/// <b>The separation D-0022 asked for survives the move onto a socket.</b> What comes back over the
+/// <b>The separation of listing from release survives the move onto a socket.</b> What comes back over the
 /// wire is a group path and a title per entry and nothing else, decoded into <see cref="EntryName"/>
 /// — a type with two members and nowhere to put a secret. Sharing one pipe with the credential
 /// path does not fuse them; sharing an interface would have.

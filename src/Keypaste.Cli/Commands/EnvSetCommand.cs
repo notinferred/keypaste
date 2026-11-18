@@ -10,8 +10,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// An existing key is written where it lives; a new one becomes a protected field of the entry
-/// <c>--entry</c> names or of the environment's home entry, which is created tagged on first use
-/// (D-0413).
+/// <c>--entry</c> names or of the environment's home entry, which is created tagged on first use.
 /// </para>
 /// <para>
 /// With a bare <c>KEY</c> the value is read the way every other secret is — hidden, or one line of

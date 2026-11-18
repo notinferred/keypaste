@@ -1,8 +1,8 @@
 namespace Keypaste.Core;
 
-/// <summary>An entry as a listing names it to an agent: where it is, which fields may be asked for and its project tags (D-0422).</summary>
+/// <summary>An entry as a listing names it to an agent: where it is, which fields may be asked for and its project tags.</summary>
 /// <remarks>
-/// Every member is a name, so like <see cref="EntryName"/> it has nowhere to put a value (D-0022).
+/// Every member is a name, so like <see cref="EntryName"/> it has nowhere to put a value.
 /// </remarks>
 /// <param name="Name">The entry, unsanitized.</param>
 /// <param name="Fields">The fields that hold something and may be asked for: the standard ones first, in <see cref="Approval.CredentialFields.All"/> order, then <c>totp</c> when a field a TOTP is read from holds anything, then custom ones, ordinally.</param>

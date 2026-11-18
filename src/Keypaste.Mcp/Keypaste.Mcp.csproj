@@ -16,8 +16,8 @@
     <!--
       ModelContextProtocol.Core rather than the main ModelContextProtocol package: the stdio transport,
       the server and the tool types all live here, and the main package adds a generic host this
-      server does not want. It shares the keypaste binary under D-0419; its AOT compatibility was
-      verified against the real assembly with a negative control (D-0019).
+      server does not want. It shares the keypaste binary; its AOT compatibility was
+      verified against the real assembly with a negative control.
     -->
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>

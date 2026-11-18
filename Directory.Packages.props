@@ -16,34 +16,32 @@
     <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="1.9.1" />
   </ItemGroup>
 
-  <!-- Keypaste.Core.Tests' properties over the parsers and the merge (D-0679). -->
+  <!-- Keypaste.Core.Tests' properties over the parsers and the merge. -->
   <ItemGroup Label="Property tests">
     <PackageVersion Include="FsCheck" Version="3.6.0" />
     <PackageVersion Include="FSharp.Core" Version="11.0.100" />
   </ItemGroup>
 
-  <!-- Keypaste.Core's retries, deadlines and polls (D-0677). -->
+  <!-- Keypaste.Core's retries, deadlines and polls. -->
   <ItemGroup Label="Resilience">
     <PackageVersion Include="Polly.Core" Version="8.9.0" />
   </ItemGroup>
 
-  <!-- The CLI's and the bridge's arguments and help (D-0678). -->
+  <!-- The CLI's and the bridge's arguments and help. -->
   <ItemGroup Label="Command line">
     <PackageVersion Include="System.CommandLine" Version="2.0.14" />
   </ItemGroup>
 
   <!-- The MCP bridge's one package, in its narrowest form: ModelContextProtocol.Core rather than
        ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
-       and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
-       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. -->
+       and brings no generic host. -->
   <ItemGroup Label="MCP bridge">
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>
 
   <!-- The desktop shell (Stage 4.1). This is the largest single change to this repository's
        supply chain — four direct packages and roughly twenty transitive ones, in the process that
-       holds the unlocked vault — so docs/PRODUCT.md law 3.9 governs it and DECISIONS.md D-0044 carries the
-       written justification.
+       holds the unlocked vault — so docs/PRODUCT.md law 3.9 governs it.
 
        What Avalonia is trusted with: rendering the window and delivering the keystrokes of the
        master password. What it is NOT trusted with: it never touches the KDBX file, never derives
@@ -55,7 +53,7 @@
        ship even in Debug.
 
        CommunityToolkit.Mvvm, a .NET Foundation package with no dependencies of its own, generates
-       the view models' properties and commands at build time (D-0680). -->
+       the view models' properties and commands at build time. -->
   <ItemGroup Label="Desktop app">
     <PackageVersion Include="Avalonia" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
@@ -67,8 +65,7 @@
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
   </ItemGroup>
 
-  <!-- Hardware-key unlocking in the desktop app (P.1), justified in DECISIONS.md D-0366 as
-       docs/PRODUCT.md law 3.9 requires, because a YubiKey's response is key material.
+  <!-- Hardware-key unlocking in the desktop app (P.1), under docs/PRODUCT.md law 3.9 because a YubiKey's response is key material.
 
        Yubico's own .NET SDK (Apache-2.0) is the one maintained driver for YubiKey OTP HMAC-SHA1
        challenge-response over USB HID on Windows, macOS and Linux; the alternative is three
@@ -98,7 +95,7 @@
   </ItemGroup>
 
   <!-- Build-time only, in packaging/windows: harvests the staged payload into the MSI and ships
-       nothing of its own. Held at WiX v5 with the SDK by DECISIONS.md D-0139. -->
+       nothing of its own. Held at WiX v5 with the SDK. -->
   <ItemGroup Label="Windows installer">
     <PackageVersion Include="WixToolset.Heat" Version="5.0.2" />
   </ItemGroup>

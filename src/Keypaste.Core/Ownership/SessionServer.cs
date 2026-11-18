@@ -12,10 +12,10 @@ public sealed record SessionServerOptions
     /// <summary>The vault served.</summary>
     public required VaultIdentity Vault { get; init; }
 
-    /// <summary>The unlock this serves, which owns the launch passes and forgets them when it ends (D-0313).</summary>
+    /// <summary>The unlock this serves, which owns the launch passes and forgets them when it ends.</summary>
     public required SessionLifetime Lifetime { get; init; }
 
-    /// <summary>The owner's live lifetime now, which a request must belong to (D-0310).</summary>
+    /// <summary>The owner's live lifetime now, which a request must belong to.</summary>
     public required Func<SessionLifetime?> CurrentLifetime { get; init; }
 
     /// <summary>The vault while a lifetime is live, otherwise null.</summary>
@@ -59,7 +59,7 @@ public sealed record SessionServerOptions
 
     /// <summary>
     /// Runs a terminal's edit, or a browser's pairing the person confirmed, on the vault of the lifetime it was asked under and
-    /// saves it under the owner's claim, or null to refuse every edit and pairing (D-0464, D-0634).
+    /// saves it under the owner's claim, or null to refuse every edit and pairing.
     /// </summary>
     public Func<SessionLifetime, Func<Vault, bool>, AgentSave>? WriteEdit { get; init; }
 
@@ -82,7 +82,7 @@ public sealed record SessionServerOptions
 /// </summary>
 /// <remarks>
 /// The authority is built before the vault's endpoint is bound, so the app answers its own Runs on its
-/// launch endpoint even when the vault's cannot be bound (D-0451).
+/// launch endpoint even when the vault's cannot be bound.
 /// </remarks>
 public sealed class SessionServer : IDisposable
 {

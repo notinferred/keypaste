@@ -6,7 +6,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// V-N.10's rule: a verb that saves opens the vault through <c>VaultSession.OpenHeld</c>, which takes the
 /// vault's claim before its password is read, so <c>VaultSession.Open</c> and <c>OpenThen</c> are called
-/// only by verbs that never save. And D-0464's: what a verb hands the vault's holder in place of opening
+/// only by verbs that never save. And what a verb hands the vault's holder in place of opening
 /// the vault reaches no master password.
 /// </summary>
 /// <remarks>

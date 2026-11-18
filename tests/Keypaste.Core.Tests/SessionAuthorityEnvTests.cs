@@ -15,7 +15,7 @@ namespace Keypaste.Core.Tests;
 /// A <c>keypaste run --session</c> request over a real pipe: the owner releases a project's set only
 /// to a connection attached to its current session, only after the person approves the command it
 /// was shown, in the owner's prompt or in the app's Run confirmation whose launch pass the request
-/// carries, and only while that session lasts (E.1c, D-0341, D-0452).
+/// carries, and only while that session lasts (E.1c).
 /// </summary>
 public sealed class SessionAuthorityEnvTests : IDisposable
 {
@@ -175,7 +175,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
     }
 
-    /// <summary>A set drawn from 300 items, whose names take far more than 2 KiB, is released and its one line names every item (D-0454).</summary>
+    /// <summary>A set drawn from 300 items, whose names take far more than 2 KiB, is released and its one line names every item.</summary>
     [Fact]
     public async Task A_run_whose_set_comes_from_300_items_is_released_and_its_line_names_every_one()
     {
@@ -239,7 +239,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token1, reply.ToString(), StringComparison.Ordinal);
     }
 
-    /// <summary>A set past one ordinary frame is released whole over the owner's pipe, in the reply only a runner reads, and its line names its items (D-0454).</summary>
+    /// <summary>A set past one ordinary frame is released whole over the owner's pipe, in the reply only a runner reads, and its line names its items.</summary>
     [Fact]
     public async Task A_set_of_200_KiB_is_released_whole_and_recorded_with_its_items()
     {
@@ -677,7 +677,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     /// <summary>
     /// The app's Run confirmation on macOS is the person's answer to the one request its pass names:
     /// the owner releases the whole set without asking again, and records it as that answer, naming
-    /// the items and never a value (D-0452).
+    /// the items and never a value.
     /// </summary>
     [Fact]
     public async Task A_launch_pass_releases_the_whole_set_unasked_and_is_recorded_as_confirmed_in_the_app()
@@ -772,7 +772,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(_launchSpent, line.GetProperty("reason").GetString());
     }
 
-    /// <summary>A Run the app starts itself on Windows and Linux is recorded in the line a macOS Run's pass writes, unasked and only under the live session (D-0496).</summary>
+    /// <summary>A Run the app starts itself on Windows and Linux is recorded in the line a macOS Run's pass writes, unasked and only under the live session.</summary>
     [Fact]
     public async Task A_run_the_app_starts_itself_is_recorded_as_a_macOS_runs_pass_is()
     {
@@ -851,7 +851,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     /// <summary>
     /// The card shows a mapped command whole up to 4096 characters, so a pass releases Terminal's run of
     /// one, whose command line is longer than the owner's prompt shows; the same request without the pass
-    /// is still refused before anyone is asked (D-0452, T-30).
+    /// is still refused before anyone is asked (T-30).
     /// </summary>
     [Fact]
     public async Task A_pass_releases_the_longest_command_a_mapping_holds_and_without_it_the_request_is_refused_unasked()
@@ -881,7 +881,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(["prompt", "invalid-request"], lines.Select(line => line.GetProperty("method").GetString()));
     }
 
-    /// <summary>A pass is issued only for what the card can show and Terminal's run sends: one command a mapping can hold, in Terminal's script (D-0452).</summary>
+    /// <summary>A pass is issued only for what the card can show and Terminal's run sends: one command a mapping can hold, in Terminal's script.</summary>
     [Fact]
     public async Task No_pass_is_issued_for_a_command_longer_than_a_mapping_holds_or_one_Terminal_does_not_start()
     {
@@ -992,7 +992,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain("sentinel", AuditText(), StringComparison.Ordinal);
     }
 
-    /// <summary>A protected environment needs a live answer every time (D-0348, D-0391); the card is one, so its pass releases the set once.</summary>
+    /// <summary>A protected environment needs a live answer every time; the card is one, so its pass releases the set once.</summary>
     [Fact]
     public async Task A_protected_environment_is_released_once_under_its_pass()
     {

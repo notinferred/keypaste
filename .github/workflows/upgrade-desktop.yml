@@ -10,12 +10,11 @@ run-name: ${{ inputs.rehearsal && 'upgrade-desktop rehearsal (not release eviden
 # and on macOS through the /usr/local/bin link, which names the bundle's fixed path that an upgrade replaces.
 #
 # Distinct numeric versions because an MSI ProductVersion and a bundle version are numeric and two candidates of
-# one version cannot be ordered (D-0139, D-0147). Nothing here is attested, published or signed: these candidates exist only to
+# one version cannot be ordered. Nothing here is attested, published or signed: these candidates exist only to
 # be installed over one another. Public downloads and their upgrade evidence are 4.7c.
 #
 # A rehearsal makes the data with a CLI/MCP the build job publishes from this run's own commit instead of a
-# published release. It is never release evidence; a candidate is tagged only after its rehearsal passes
-# (D-0433).
+# published release. It is never release evidence; a candidate is tagged only after its rehearsal passes.
 
 on:
   workflow_dispatch:
@@ -184,7 +183,7 @@ jobs:
         run: |
           set -euo pipefail
           [ -z "$CLI_VERSION" ] || { echo "::error::a rehearsal builds its CLI/MCP from this commit and takes no cli_version, not $CLI_VERSION"; exit 1; }
-          # macOS runs this under its stock bash 3.2, which has no mapfile (D-0398).
+          # macOS runs this under its stock bash 3.2, which has no mapfile.
           found="$(find "$RUNNER_TEMP/cli" -maxdepth 1 -type f \( -name keypaste -o -name keypaste.exe \))"
           count="$(printf '%s' "$found" | grep -c . || true)"
           [ "$count" = 1 ] || { echo "::error::fixture-cli holds $count keypaste programs, not one"; exit 1; }
@@ -202,7 +201,7 @@ jobs:
           bash scripts/apt-install.sh --no-install-recommends xvfb openbox xdotool dbus-daemon dbus-x11 \
             at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin
 
-      # docs/desktop.md's Linux prerequisites; the AppImage needs FUSE to run at all (D-0205).
+      # docs/desktop.md's Linux prerequisites; the AppImage needs FUSE to run at all.
       - name: Install the Linux app prerequisites
         if: runner.os == 'Linux'
         shell: bash

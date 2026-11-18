@@ -10,7 +10,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// An existing entry keeps everything but its password, and the old password stays in its KeePass
-/// history (D-0014). The value is never an argument, for the reason <c>add</c> gives: it is prompted
+/// history. The value is never an argument, for the reason <c>add</c> gives: it is prompted
 /// for, read as one line from stdin, or generated, and it is never printed.
 /// </para>
 /// <para>
@@ -20,7 +20,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// It holds the vault's claim while it runs, so it is refused while the app or an agent holds the
-/// vault instead of saving under it (D-0317).
+/// vault instead of saving under it.
 /// </para>
 /// </remarks>
 internal static class SetCommand

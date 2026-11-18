@@ -196,7 +196,7 @@ public sealed class PasswordGeneratorTests
     /// The default alphabet is the 85 characters the entropy claim in the remarks is counted from.
     /// </summary>
     /// <remarks>
-    /// A documented "about 128 bits" is a claim, and D-0036 says a claim needs something that can
+    /// A documented "about 128 bits" is a claim, and a claim needs something that can
     /// hold it. Widening the symbol set later without revisiting that sentence fails here.
     /// </remarks>
     [Fact]
@@ -211,7 +211,7 @@ public sealed class PasswordGeneratorTests
     /// <remarks>
     /// Paired with <see cref="The_default_alphabet_is_eighty_five_characters"/>: that one holds the
     /// alphabet to 85 characters, this one holds the figure to the alphabet, so widening the symbol
-    /// set moves the number instead of leaving a stale sentence behind (D-0036).
+    /// set moves the number instead of leaving a stale sentence behind.
     /// </remarks>
     [Fact]
     public void The_default_recipe_is_about_a_hundred_and_twenty_eight_bits()

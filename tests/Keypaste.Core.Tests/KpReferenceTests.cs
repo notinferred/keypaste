@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary><c>kp://</c> references: one canonical spelling each, and nothing malformed read as one (D-0349).</summary>
+/// <summary><c>kp://</c> references: one canonical spelling each, and nothing malformed read as one.</summary>
 public sealed class KpReferenceTests
 {
     [Fact]

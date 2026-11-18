@@ -47,12 +47,12 @@ public sealed record McpBridgeTarget(McpServerCommand Server, McpBridgeLink? Lin
 /// <para>
 /// Windows and macOS install keypaste at a fixed path. Inside a Linux AppImage, whose mount moves on every launch and
 /// whose file an upgrade replaces, a client is registered through G.5's <c>~/.local/bin/keypaste</c>, which a newer image
-/// re-points when it starts (D-0334).
+/// re-points when it starts.
 /// </para>
 /// <para>
 /// The bridge reads its vault, its audit log and its approver from <c>KEYPASTE_HOME</c> and <c>KEYPASTE_APPROVER</c>,
 /// which a client need not pass on and Gemini CLI strips. <see cref="TryPin(McpClientMachine, string?, string?, IReadOnlyList{string}, string?, out McpServerPins?)"/> writes them as flags when they differ
-/// from what a bridge started without them would find (D-0389).
+/// from what a bridge started without them would find.
 /// </para>
 /// </remarks>
 public static class McpServerLocator

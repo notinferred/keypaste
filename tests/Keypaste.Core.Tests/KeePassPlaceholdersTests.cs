@@ -242,7 +242,7 @@ public sealed class KeePassPlaceholdersTests
     /// <summary>
     /// A placeholder or escape inside braces that name no placeholder refuses the value, which is read no further:
     /// KeePassXC 2.7.11 fills in the inside, and 2.8 leaves such braces as written or, around one placeholder,
-    /// drops them (D-0529). Braces holding neither, and a <c>{S:…}</c>, which both read as a field's name, are not;
+    /// drops them. Braces holding neither, and a <c>{S:…}</c>, which both read as a field's name, are not;
     /// a <c>{s:…}</c>, which KeePassXC reads as no placeholder, is.
     /// </summary>
     [Theory]
@@ -273,8 +273,7 @@ public sealed class KeePassPlaceholdersTests
 
     /// <summary>
     /// A <c>{S:…}</c> names one field by all of its inside, up to the brace KeePassXC's pattern pairs with its own, as
-    /// KeePassXC 2.7.11 and 2.8 read it, so nothing in the name fills in, and a field the item lacks refuses the value
-    /// (D-0531).
+    /// KeePassXC 2.7.11 and 2.8 read it, so nothing in the name fills in, and a field the item lacks refuses the value.
     /// </summary>
     [Theory]
     [InlineData("{S:a{PASSWORD}b}")]
@@ -309,7 +308,7 @@ public sealed class KeePassPlaceholdersTests
 
     /// <summary>
     /// A <c>{S:</c> ends at the brace KeePassXC's pattern pairs with its own, and one it pairs with none, or only around
-    /// an empty pair, is text up to the next brace, from which KeePassXC 2.7.11 and 2.8 read on (D-0531).
+    /// an empty pair, is text up to the next brace, from which KeePassXC 2.7.11 and 2.8 read on.
     /// </summary>
     [Theory]
     [InlineData("{S:API_KEY}b}", _apiKey + "b}")]

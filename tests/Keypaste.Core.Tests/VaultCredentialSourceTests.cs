@@ -62,7 +62,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
         // fall back to a path match rather than stopping when no handle matches.
         _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "k1_0123456789abcdef", Password = "titled-like-a-handle" });
 
-        // What an agent is answered from is the vault as saved (D-0317).
+        // What an agent is answered from is the vault as saved.
         _vault.Save();
     }
 
@@ -141,7 +141,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     /// <summary>
     /// Stated as an invariant rather than as four equality checks, because it is the claim
     /// THREATS.md T-8 makes: the other three fields are not merely unselected, they are not
-    /// present in the released object at all, when the value names none of them (D-0465).
+    /// present in the released object at all, when the value names none of them.
     /// </summary>
     [Fact]
     public void TheOtherThreeFields_AreNowhereInAValueThatNamesNone()
@@ -293,7 +293,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
 
     /// <summary>
     /// A value naming its own item's fields leaves with them filled in, from a standard field, through
-    /// one that names another, and from a custom field, in any case; a field it does not name stays out (D-0465).
+    /// one that names another, and from a custom field, in any case; a field it does not name stays out.
     /// </summary>
     [Theory]
     [InlineData("password")]
@@ -315,7 +315,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
 
     /// <summary>
     /// Anything keypaste cannot fill in refuses the value whole, after whatever filled in before it, and
-    /// the refusal names the placeholder and never a value (D-0465).
+    /// the refusal names the placeholder and never a value.
     /// </summary>
     [Theory]
     [InlineData("{USERNAME}:{REF:P@I:0123}", "holds the KeePass placeholder {REF:…}, which keypaste does not fill in")]

@@ -3,12 +3,12 @@ namespace Keypaste.Core;
 /// <summary>
 /// The names of keypaste's projects: the project-name rule, which custom fields a project releases,
 /// which names a child process can receive, and the <c>env</c> group where keypaste creates an
-/// environment's home entry (D-0413).
+/// environment's home entry.
 /// </summary>
 /// <remarks>
 /// Deliberately free of any dependency on <see cref="Vault"/>: it answers questions about names,
 /// which the MCP bridge needs without opening a vault. Which entries are in a project is their own
-/// tags' answer (D-0370), never their group's (D-0416).
+/// tags' answer, never their group's.
 /// </remarks>
 public static class EnvConvention
 {

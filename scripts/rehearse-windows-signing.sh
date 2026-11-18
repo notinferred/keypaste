@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The runner-only identity 3.6b rehearses with until 3.6a supplies a real one (D-0144, D-0204).
+# The runner-only identity 3.6b rehearses with until 3.6a supplies a real one.
 #
 # Usage:
 #   rehearse-windows-signing.sh identity                       prints trusted=<thumb> and untrusted=<thumb>

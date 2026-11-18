@@ -4,7 +4,7 @@ using Keypaste.Core.Processes;
 
 namespace Keypaste.Core.Health;
 
-/// <summary>The <c>keypaste</c> a terminal runs, found on PATH as a tool's command is found (D-0436).</summary>
+/// <summary>The <c>keypaste</c> a terminal runs, found on PATH as a tool's command is found.</summary>
 /// <param name="Found">The first <c>keypaste</c> on PATH's full-path entries, or null when there is none.</param>
 /// <param name="ThisCopy">Whether it starts this keypaste, itself or through the Linux link.</param>
 /// <param name="Version">What its <c>--version</c> printed, this keypaste's version for this copy, or null when nothing was started.</param>

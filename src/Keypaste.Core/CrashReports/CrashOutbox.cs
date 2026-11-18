@@ -4,7 +4,7 @@ using Keypaste.Infrastructure;
 namespace Keypaste.Core.CrashReports;
 
 /// <summary>
-/// Crash reports waiting to be sent, one file per distinct report in a folder of keypaste's home (D-0559).
+/// Crash reports waiting to be sent, one file per distinct report in a folder of keypaste's home.
 /// </summary>
 /// <remarks>
 /// It takes only a <see cref="CrashReport"/>, which only <see cref="CrashScrubber"/> makes, and keeps a file only while it
@@ -14,7 +14,7 @@ namespace Keypaste.Core.CrashReports;
 /// Windows. Nothing here throws for want of a disk: a report that cannot be kept is lost.
 /// <para>
 /// The folder also holds the run marker, which names only the version and when the run started: a start that finds it
-/// knows the run before ended with nothing able to report it, and makes it an <c>ended-unexpectedly</c> report (D-0595).
+/// knows the run before ended with nothing able to report it, and makes it an <c>ended-unexpectedly</c> report.
 /// </para>
 /// </remarks>
 public sealed class CrashOutbox

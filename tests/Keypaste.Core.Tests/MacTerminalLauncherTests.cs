@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The launcher Terminal runs claims one request, deletes it, and starts the bundle's own <c>keypaste run --session</c>
-/// with exactly that request, evaluating none of it; a request it cannot use starts nothing (E.1d, D-0451).
+/// with exactly that request, evaluating none of it; a request it cannot use starts nothing (E.1d).
 /// </summary>
 /// <remarks>
 /// The launcher reads the real per-user folder, as Terminal's window does, so these share one collection that runs alone.
@@ -73,7 +73,7 @@ public sealed class MacTerminalLauncherTests : IDisposable
         Assert.False(File.Exists(Path.Combine(ProjectDirectory, "evaluated")));
     }
 
-    /// <summary>A project whose name starts with <c>-</c> reaches the bundle's <c>keypaste</c> as <c>--project=</c>'s value before the separator, never as script text (D-0453).</summary>
+    /// <summary>A project whose name starts with <c>-</c> reaches the bundle's <c>keypaste</c> as <c>--project=</c>'s value before the separator, never as script text.</summary>
     [Theory]
     [InlineData("--help")]
     [InlineData("-p")]
@@ -99,7 +99,7 @@ public sealed class MacTerminalLauncherTests : IDisposable
     /// <summary>
     /// A project directory, vault path, keypaste home or temporary folder holding a line break, another control character, a
     /// backslash or a character outside ASCII reaches the bundle's <c>keypaste</c> byte for byte, as a launch on Linux does,
-    /// and nothing in it is evaluated (D-0451).
+    /// and nothing in it is evaluated.
     /// </summary>
     [Theory]
     [InlineData("\n")]
@@ -130,7 +130,7 @@ public sealed class MacTerminalLauncherTests : IDisposable
         Assert.False(File.Exists(Path.Combine(directory, "evaluated")));
     }
 
-    /// <summary>The longest command a mapping holds reaches the bundle's <c>keypaste</c> whole as the run's last argument, and nothing in it is evaluated (D-0452).</summary>
+    /// <summary>The longest command a mapping holds reaches the bundle's <c>keypaste</c> whole as the run's last argument, and nothing in it is evaluated.</summary>
     [Fact]
     public void The_longest_command_a_mapping_holds_reaches_the_bundles_keypaste_byte_for_byte()
     {

@@ -15,7 +15,7 @@ namespace Keypaste.Core.Tests;
 /// and the search indexer open a newly written file in order to scan it, and for a few
 /// milliseconds the replace cannot land, reporting <c>Access is denied</c>. It showed up as
 /// intermittent "Could not save" failures across unrelated tests on CI, and
-/// <see cref="KeePassInterop.SaveAttempts"/> is what absorbs it (DECISIONS.md D-0017).
+/// <see cref="KeePassInterop.SaveAttempts"/> is what absorbs it.
 /// </para>
 /// <para>
 /// The failure is simulated by removing the directory the vault lives in, rather than by locking
@@ -341,7 +341,7 @@ public sealed class VaultSaveTests : IDisposable
     /// A pipe at the temporary file's name stands in for a disk that fills during the save: each
     /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails.
     /// KeePassLib writes a vault under a megabyte while closing its streams and discards what that
-    /// throws, so a save through it reported success and moved the pipe over the vault (D-0428).
+    /// throws, so a save through it reported success and moved the pipe over the vault.
     /// </remarks>
     [Fact]
     public void A_write_that_fails_partway_is_reported_and_leaves_the_vault_as_it_was()

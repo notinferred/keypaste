@@ -10,7 +10,7 @@ internal sealed class SystemProcessLauncher : IProcessLauncher
     /// <inheritdoc/>
     public ChildResult Run(ChildStart start)
     {
-        // Set before the start, so that no signal arriving as the child starts finds keypaste untrapped (D-0394).
+        // Set before the start, so that no signal arriving as the child starts finds keypaste untrapped.
         using var relay = new SignalRelay(Console.IsInputRedirected);
         return Run(start, relay, Process.Start);
     }

@@ -100,7 +100,7 @@ public sealed class ApproveCommandTests : IDisposable
 
     /// <summary>
     /// A terminal's edit to the vault <c>keypaste approve</c> holds is asked about in the approver's own terminal
-    /// by name only, saved there under its claim once allowed, and recorded on its own line (D-0464).
+    /// by name only, saved there under its claim once allowed, and recorded on its own line.
     /// </summary>
     [Fact]
     public async Task ATerminalEditConfirmedInItsTerminal_IsSavedInTheVault()

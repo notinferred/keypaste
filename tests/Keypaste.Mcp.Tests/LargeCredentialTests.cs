@@ -74,7 +74,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
             Password = _passwordSentinel,
         });
 
-        // What an agent is answered from is the vault as saved (D-0317).
+        // What an agent is answered from is the vault as saved.
         _vault.Save();
 
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);

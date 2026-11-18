@@ -20,7 +20,7 @@ namespace Keypaste.Cli.Clipboard;
 /// space, which silently registers a different and meaningless format. It is fixed on their
 /// develop branch and in no release. A string literal handed to <c>RegisterClipboardFormat</c>
 /// cannot be checked by reading it, which is why the test round-trips it through
-/// <c>GetClipboardFormatName</c> instead (O-0008).
+/// <c>GetClipboardFormatName</c> instead.
 /// </para>
 /// <para>
 /// <b>What this closes, and what it does not.</b> These formats are a request to well-behaved

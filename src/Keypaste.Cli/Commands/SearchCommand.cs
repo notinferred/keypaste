@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Commands;
 /// <summary>Finds items by name: <c>keypaste search &lt;text&gt;</c>.</summary>
 /// <remarks>
 /// Core matches titles, group paths, usernames, URLs and an item's own tags and reads no password,
-/// note or protected field (D-0278). A row names which of the username and URL matched, in the app's
+/// note or protected field. A row names which of the username and URL matched, in the app's
 /// fixed words, and never the value it matched in, and names each tag that matched, since a tag is a
 /// label; nothing echoes the query back.
 /// </remarks>

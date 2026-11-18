@@ -41,7 +41,7 @@ public enum CredentialFailure
 
     /// <summary>
     /// Something else wrote the vault's file since the open vault last read or wrote it, so the open
-    /// vault is a stale copy until a person reloads it (D-0317).
+    /// vault is a stale copy until a person reloads it.
     /// </summary>
     ChangedOnDisk = 7,
 
@@ -50,11 +50,11 @@ public enum CredentialFailure
 
     /// <summary>
     /// The field holds a KeePass placeholder keypaste does not fill in, or one naming a field it cannot
-    /// read, so the value cannot leave whole (D-0465).
+    /// read, so the value cannot leave whole.
     /// </summary>
     Unfilled = 9,
 
-    /// <summary>The item has no TOTP keypaste can compute, so there is no code to release (D-0480).</summary>
+    /// <summary>The item has no TOTP keypaste can compute, so there is no code to release.</summary>
     NoCode = 10,
 
     /// <summary>The attachment is larger than <see cref="EntryAttachment.MaximumSize"/>, the most keypaste releases.</summary>

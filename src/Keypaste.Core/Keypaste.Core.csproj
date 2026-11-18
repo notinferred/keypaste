@@ -17,7 +17,7 @@
   <ItemGroup>
     <!--
       Vendored KDBX4 implementation. Not a NuGet package: no maintained, adopted KDBX4
-      package for .NET exists (DECISIONS.md D-0007). Provenance, licence, and the complete
+      package for .NET exists. Provenance, licence, and the complete
       list of local modifications: third_party/KeePassLib/UPSTREAM.md.
 
       Only Internal/KeePassInterop.cs, which declares the alias, may reference it. Everything else in
@@ -33,7 +33,7 @@
       The word list a passphrase is drawn from, vendored verbatim. Provenance and licence:
       third_party/eff-large-wordlist/UPSTREAM.md. Its SHA-256 is pinned in WordList.Digest and
       checked against these bytes at first use, so the file ships with the assembly rather than
-      being read from disk - a published binary has no repository to compare against (D-0235).
+      being read from disk - a published binary has no repository to compare against.
 
       LogicalName is required, not decorative: the file lives outside this project directory, so
       the name MSBuild would derive holds the `..` of the relative path.
@@ -43,20 +43,20 @@
     <!--
       The common passwords a password is rated against, gzipped from upstream's bytes. Provenance and
       licence: third_party/seclists-common-passwords/UPSTREAM.md. The SHA-256 of what it decompresses
-      to is pinned in Recommendations.CommonPasswords.Digest and checked at first use (D-0499).
+      to is pinned in Recommendations.CommonPasswords.Digest and checked at first use.
     -->
     <EmbeddedResource Include="../../third_party/seclists-common-passwords/10k-most-common.txt.gz"
                       LogicalName="Keypaste.Core.10k-most-common.txt.gz" />
     <!--
       Mozilla's Public Suffix List, its internationalised rules written as A-labels, from which browser fill takes a host's
-      registrable domain (D-0615). Provenance and licence: third_party/publicsuffix/UPSTREAM.md.
+      registrable domain. Provenance and licence: third_party/publicsuffix/UPSTREAM.md.
     -->
     <EmbeddedResource Include="../../third_party/publicsuffix/public_suffix_list.dat"
                       LogicalName="Keypaste.Core.public_suffix_list.dat" />
   </ItemGroup>
 
   <!--
-    The reference libargon2 that Internal/NativeArgon2.cs hands KeePassLib on Windows and macOS (D-0522), which
+    The reference libargon2 that Internal/NativeArgon2.cs hands KeePassLib on Windows and macOS, which
     scripts/build-argon2.sh builds from its pinned source into artifacts/native/<rid>/. It flows into the output and
     publish directory of every project that references Core: the app, the CLI and the tests. A build without it derives
     the same keys with KeePassLib's managed Argon2.
@@ -90,18 +90,18 @@
          project, in neither solution, that nothing shipped references. -->
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
     <!-- 1.4b3's merge gate has KeePassXC merge the copy the app holds open, and no front end writes an
-         open copy anywhere but its own file, so Vault.WriteCopyTo is that one seam (D-0641); a tests/ helper. -->
+         open copy anywhere but its own file, so Vault.WriteCopyTo is that one seam; a tests/ helper. -->
     <InternalsVisibleTo Include="Keypaste.AppDriver" />
     <!-- V-V.3b asks what the Trash screen says about a vault whose owner turned the recycle bin
          off in KeePassXC, and SetRecyclesDeletedEntries is the only way to build one without a
-         KeePassXC installation. That one seam; a tests/ project. D-0255 owns why it is a seam
+         KeePassXC installation. That one seam; a tests/ project. A fixture needs it to be a seam
          rather than public API. -->
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
     <!-- V-V.1a2 asks what the CLI says when its XML keyfile loader falls back to hashing the file,
          which only a NativeAOT build does and no test runs as. VaultKeyfile.SimulateXmlFallback is
-         that one seam (D-0294). -->
+         that one seam. -->
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
-    <!-- Their vaults take TestKeyDerivation's token cost like every other test project's (D-0469). -->
+    <!-- Their vaults take TestKeyDerivation's token cost like every other test project's. -->
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
     <InternalsVisibleTo Include="Keypaste.App.Windows.Tests" />
   </ItemGroup>

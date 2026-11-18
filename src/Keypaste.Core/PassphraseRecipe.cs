@@ -17,8 +17,7 @@ public enum SecretRecipeKind
 /// <c>Length</c>, <c>Alphabet</c>, <c>ExcludeLookalikes</c>, a word count and a separator admits
 /// states with no meaning — words with an alphabet, characters with a word count — so its
 /// validator would have to either ignore three fields or refuse
-/// <c>PasswordRecipe.Default with { … }</c>, which is how every call site here builds a recipe
-/// (DECISIONS.md D-0234).
+/// <c>PasswordRecipe.Default with { … }</c>, which is how every call site here builds a recipe.
 /// </para>
 /// <para>
 /// <see cref="Separator"/> is a <see cref="char"/> and not a <see cref="string"/> so that a
@@ -39,7 +38,7 @@ public readonly record struct PassphraseRecipe
     /// Six because that is the share passphrase docs/PRODUCT.md §1 ratifies, so nothing can be
     /// generated weaker than what THREATS.md T-26 assumes. A full stop rather than a hyphen
     /// because the word list holds four hyphenated words, so a hyphen would make the passphrase
-    /// unsplittable and its word count unreadable (D-0239).
+    /// unsplittable and its word count unreadable.
     /// </remarks>
     public static PassphraseRecipe Default { get; } = new()
     {
@@ -93,7 +92,7 @@ public readonly record struct PassphraseRecipe
 /// </para>
 /// <para>
 /// The two payloads are private on purpose, and only the approver protocol reads them back, to carry
-/// a recipe to the vault's holder so a generated value never crosses the pipe (D-0464). Keeping them
+/// a recipe to the vault's holder so a generated value never crosses the pipe. Keeping them
 /// out of public reach is what makes "a words recipe carrying an alphabet" unrepresentable rather
 /// than merely unread.
 /// </para>

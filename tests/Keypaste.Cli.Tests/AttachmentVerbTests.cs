@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// Attachments from the terminal: <c>attachment ls</c>, <c>add</c>, <c>replace</c>, <c>rm</c> and <c>save</c> (V.8a, D-0535).
+/// Attachments from the terminal: <c>attachment ls</c>, <c>add</c>, <c>replace</c>, <c>rm</c> and <c>save</c> (V.8a).
 /// Names and sizes are printed, never content, and a file that cannot be attached is refused before the master password.
 /// </summary>
 public sealed class AttachmentVerbTests : IDisposable

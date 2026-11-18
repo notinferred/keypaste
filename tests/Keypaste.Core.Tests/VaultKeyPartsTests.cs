@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// A vault's key parts, as the desktop's quick unlock keeps them (D-0550): exported after a password unlock, they open
+/// A vault's key parts, as the desktop's quick unlock keeps them: exported after a password unlock, they open
 /// the vault as that unlock did, hold the password only as its SHA-256 and a hardware key only as its slot, and stop
 /// opening it once its key is changed.
 /// </summary>

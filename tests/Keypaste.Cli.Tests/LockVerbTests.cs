@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste lock</c> against a real owner on a real pipe: it reports a lock once the owner answers that
-/// the session has ended, and asks for no password (D-0351).
+/// the session has ended, and asks for no password.
 /// </summary>
 public sealed class LockVerbTests : IDisposable
 {

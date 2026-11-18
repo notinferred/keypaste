@@ -56,7 +56,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         Assert.Equal("external", Assert.Single(reloaded.ReadEntries()).Password);
     }
 
-    /// <summary>A merge parses the file another writer saved with this unlock's key, asking the key again about that file, and asks it once more to save (D-0543).</summary>
+    /// <summary>A merge parses the file another writer saved with this unlock's key, asking the key again about that file, and asks it once more to save.</summary>
     [Fact]
     public void A_merge_asks_the_key_about_the_file_another_writer_saved()
     {
@@ -88,7 +88,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
             reopened.ReadEntries().Select(entry => (entry.Title, entry.Password)).Order());
     }
 
-    /// <summary>A key that is not there when the merge reads the file merges nothing, and the merge is tried again at the next change (D-0543).</summary>
+    /// <summary>A key that is not there when the merge reads the file merges nothing, and the merge is tried again at the next change.</summary>
     [Fact]
     public void A_merge_the_key_does_not_answer_changes_nothing()
     {
@@ -512,7 +512,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     /// <remarks>
     /// Off Windows a write's temporary file is <c>&lt;vault&gt;.tmp</c>, and a directory there refuses it. On Windows the
     /// write goes through Transactional NTFS, whose temporary name is random, so another transaction holds the vault's
-    /// own name instead, the refusal F.7 measured (D-0119), which a volume without transactions cannot stage.
+    /// own name instead, the refusal F.7 measured, which a volume without transactions cannot stage.
     /// </remarks>
     private sealed class RefusedWrite : IDisposable
     {

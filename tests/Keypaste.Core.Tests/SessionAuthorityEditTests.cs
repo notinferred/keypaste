@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// A terminal's edit, sent over a real pipe to the vault's owner (D-0464): checked before anybody is
+/// A terminal's edit, sent over a real pipe to the vault's owner: checked before anybody is
 /// asked, put to the person by name only, written and saved only once they allow it and only within the
 /// live unlock, taken back when its save fails, refused while the vault differs from its file, cooled
 /// with every request for more from a terminal or an agent, and recorded on a line of its own.
@@ -267,7 +267,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
         Assert.Equal("old-password", Password(_github));
     }
 
-    /// <summary>A reload withdraws the question as a lock does, keeping the session (D-0412).</summary>
+    /// <summary>A reload withdraws the question as a lock does, keeping the session.</summary>
     [Fact]
     public async Task AReloadWhileThePersonIsAsked_WritesNothing()
     {

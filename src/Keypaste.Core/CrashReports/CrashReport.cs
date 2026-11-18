@@ -2,7 +2,7 @@ namespace Keypaste.Core.CrashReports;
 
 /// <summary>
 /// A crash report as <see cref="CrashScrubber"/> wrote it: the exact bytes the outbox keeps and the sender posts, with nothing
-/// added later (D-0558).
+/// added later.
 /// </summary>
 public sealed class CrashReport
 {

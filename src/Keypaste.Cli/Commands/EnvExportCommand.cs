@@ -13,7 +13,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// By default no value is read into the output: a reference file names where each variable lives,
-/// is safe to commit, and <c>keypaste run</c> resolves it (D-0349).
+/// is safe to commit, and <c>keypaste run</c> resolves it.
 /// </para>
 /// <para>
 /// <b><c>--dotenv</c> is the one command that puts plaintext on disk.</b> SECURITY.md's law 4 allows
@@ -24,7 +24,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// Each value is written as it leaves keypaste, its own item's placeholders filled in, and one keypaste
-/// cannot fill in refuses the whole export (D-0465), as an item that has expired does (D-0337).
+/// cannot fill in refuses the whole export, as an item that has expired does.
 /// </para>
 /// </remarks>
 internal static class EnvExportCommand
@@ -235,8 +235,8 @@ internal static class EnvExportCommand
     }
 
     /// <summary>
-    /// Refuses the export when a variable's entry has expired, as <c>run</c> does (D-0337), or its value holds a
-    /// placeholder keypaste cannot fill in (D-0465), naming each variable and its entry; null when every value may leave.
+    /// Refuses the export when a variable's entry has expired, as <c>run</c> does, or its value holds a
+    /// placeholder keypaste cannot fill in, naming each variable and its entry; null when every value may leave.
     /// </summary>
     private static int? Unusable(IReadOnlyList<EnvProblem> refused, CliContext context)
     {
