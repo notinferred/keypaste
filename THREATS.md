@@ -512,7 +512,7 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 **Status.** Implemented (unreleased); not in v0.3.0.
 
-**Tests.** `ShareCryptoTests`, `ShareServiceTests`, `ShareClientTests`, `ShareVerbTests`, `site/test`.
+**Tests.** `ShareCryptoTests`, `ShareServiceTests`, `ShareClientTests`, `ShareVerbTests`, and the share route's tests in keypaste.com's own repository.
 
 ### T-34 — A run's request is the runner's claim
 

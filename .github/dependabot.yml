@@ -29,9 +29,6 @@ updates:
 
   - package-ecosystem: npm
     directories:
-      - /site
-      - /site/web
-      - /extension
       - /scripts/real-tools
       - /scripts/mcpb-cli
     schedule:
@@ -40,6 +37,20 @@ updates:
       default-days: 7
     groups:
       npm:
+        patterns: ['*']
+    commit-message:
+      prefix: ''
+    labels:
+      - dependencies
+
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      submodules:
         patterns: ['*']
     commit-message:
       prefix: ''

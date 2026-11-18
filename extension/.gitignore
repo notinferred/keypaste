@@ -1,3 +1,0 @@
-test-results/
-# Playwright's global setup copies tests/ here while the tests run
-src/tests/

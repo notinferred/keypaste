@@ -14,13 +14,13 @@ The GPL-2.0-or-later grant permits the GPLv3 option, and AGPL-3.0 §13 permits t
 
 ## BouncyCastle Twofish
 
-Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org). Licensed under the MIT License, whose notice follows as upstream's `LICENSE.md` gives it, which `third_party/bouncycastle-twofish/LICENSE` holds:
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org). Licensed under the MIT License, whose notice follows as upstream's `LICENSE.md` gives it, which `third_party/KeePassLib/bouncycastle-twofish/LICENSE` holds:
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sub license, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 >
 > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-The [upstream library](https://github.com/bcgit/bc-csharp) is BouncyCastle C#, tag `release-2.7.0`. Its Twofish block cipher, CBC mode and PKCS#7 padding, with the interfaces and helpers they reach, are vendored at `third_party/bouncycastle-twofish/` and compiled into KeePassLib, every type internal; [UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records each file's upstream SHA-256 and every change. They encrypt and decrypt a vault whose cipher is Twofish. The combined distribution is AGPL-3.0-only; the code remains available under the MIT License.
+The [upstream library](https://github.com/bcgit/bc-csharp) is BouncyCastle C#, tag `release-2.7.0`. Its Twofish block cipher, CBC mode and PKCS#7 padding, with the interfaces and helpers they reach, are vendored at `third_party/KeePassLib/bouncycastle-twofish/` and compiled into KeePassLib, every type internal; [UPSTREAM.md](third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md) records each file's upstream SHA-256 and every change. They encrypt and decrypt a vault whose cipher is Twofish. The combined distribution is AGPL-3.0-only; the code remains available under the MIT License.
 
 ## Argon2 reference implementation
 

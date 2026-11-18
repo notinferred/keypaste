@@ -55,7 +55,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     /// <summary>The largest response body read.</summary>
     internal const int MaximumResponseBytes = 64 * 1024;
 
-    // site/src/share.js sets this on the 404 of a lookup that found no live share, and on no other answer.
+    // keypaste.com's src/share.js sets this on the 404 of a lookup that found no live share, and on no other answer.
     private const string _goneHeader = "x-keypaste-share";
     private const string _goneMark = "gone";
 

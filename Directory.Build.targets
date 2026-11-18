@@ -26,4 +26,20 @@
     <Error Condition="'@(_KeypasteSodium)' != ''" Text="only the CLI links libsodium, not $(MSBuildProjectName)" />
   </Target>
 
+  <!-- A project inside a submodule finds the submodule as its repository, which deterministic builds map to /_/;
+       mapping it beneath the product's /_/ keeps every emitted source path product-relative. -->
+  <Target Name="KeypasteSubmoduleSourceRoots"
+          AfterTargets="InitializeSourceRootMappedPaths"
+          BeforeTargets="_SetPathMapFromSourceRoots"
+          Condition="'$(DeterministicSourcePaths)' == 'true'">
+    <PropertyGroup>
+      <_KeypasteRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</_KeypasteRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <SourceRoot Condition="'%(SourceRoot.NestedRoot)' == '' and $([MSBuild]::NormalizeDirectory('%(SourceRoot.Identity)').StartsWith('$(_KeypasteRoot)')) and $([MSBuild]::NormalizeDirectory('%(SourceRoot.Identity)')) != '$(_KeypasteRoot)'">
+        <MappedPath>/_/$([MSBuild]::MakeRelative('$(_KeypasteRoot)', '%(SourceRoot.Identity)').Replace('\', '/'))</MappedPath>
+      </SourceRoot>
+    </ItemGroup>
+  </Target>
+
 </Project>

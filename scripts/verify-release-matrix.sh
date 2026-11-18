@@ -36,9 +36,8 @@
 #
 # WHAT IT CANNOT HOLD, said here rather than left to be assumed:
 #
-#   - KEYPASTE.COM. The product builds and releases without site/, so this reads only the product's
-#     own pages; the download page is checked by site.yml while site/ is here, and by the site's own
-#     repository after. Checking the public origin is publication evidence - docs/RELEASE.md
+#   - KEYPASTE.COM. The product builds and releases without the site, so this reads only the
+#     product's own pages; the site's own repository checks its download page. Checking the public origin is publication evidence - docs/RELEASE.md
 #     requirements 4 and 7, owned by R.0b/R.0c.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
 #     the bytes this project produced. That is 3.8.

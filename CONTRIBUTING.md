@@ -12,6 +12,8 @@ Consult [RELEASE](docs/RELEASE.md) before changing published installation claims
 
 ## Verification
 
+KeePassLib with Twofish, `Keypaste.Infrastructure` and the extension are submodules pinned to a commit ([ARCHITECTURE](docs/ARCHITECTURE.md#projects)), so clone with `git clone --recurse-submodules`, run `git submodule update --init` in a clone made without it, and again after a pull that moves a pin. A change to one of them is made and merged in its own repository, then its new commit is pinned here.
+
 Building and testing locally needs the SDK `global.json` pins, in `~/.dotnet`. Work in short bursts that leave nothing running; long suites run in CI.
 
 - `bash scripts/verify.sh compile`, before each push, restores and builds both solutions and the consistency project with warnings as errors and checks formatting.

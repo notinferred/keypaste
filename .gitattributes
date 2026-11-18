@@ -6,23 +6,6 @@
 *.ps1    text eol=crlf
 *.sh     text eol=lf
 
-# Vendored source is stored byte-for-byte as upstream ships it — KeePassLib uses CRLF.
-# Normalising it to LF would make `diff -r` against a fresh upstream checkout report every
-# line of every file as changed, which is precisely the re-merge procedure documented in
-# third_party/KeePassLib/UPSTREAM.md. The files we author in that directory are excepted
-# below and follow the repository convention.
-third_party/KeePassLib/**            -text
-third_party/KeePassLib/KeePassLib.csproj   text eol=lf
-third_party/KeePassLib/UPSTREAM.md         text eol=lf
-third_party/KeePassLib/packages.lock.json  text eol=lf
-third_party/KeePassLib/Keys/IChallengeResponseUserKey.cs  text eol=lf
-third_party/KeePassLib/Cryptography/Cipher/TwofishCipherEngine.cs  text eol=lf
-
-# BouncyCastle's Twofish, CBC and PKCS#7 sources are stored as upstream ships them, so `diff -r`
-# against its tag shows only the adaptations third_party/bouncycastle-twofish/UPSTREAM.md lists.
-third_party/bouncycastle-twofish/**            -text
-third_party/bouncycastle-twofish/UPSTREAM.md   text eol=lf
-
 # The vendored word list is pinned by SHA-256 in Keypaste.Core.WordList, so it has to be checked
 # out as the bytes EFF published; normalising a line ending would break the pin on Windows. The
 # licence text beside it is upstream's too. UPSTREAM.md is ours and follows the convention.

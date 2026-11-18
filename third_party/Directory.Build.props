@@ -77,6 +77,8 @@
 
     <IsPackable>false</IsPackable>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- KeePassLib is a submodule; the product owns its lock file. -->
+    <NuGetLockFilePath>$(MSBuildThisFileDirectory)../locks/$(MSBuildProjectName)/packages.lock.json</NuGetLockFilePath>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>

@@ -268,7 +268,6 @@ selftests=(
   'scripts/require-public-suffix-fresh.sh --selftest'
   'scripts/verify-green-gates.sh'
   'scripts/verify-release-matrix.sh'
-  'scripts/verify-site-disclosure.sh --selftest'
   'scripts/verify-release-completion.sh'
   'scripts/verify-provenance.sh --selftest'
   'scripts/verify-desktop-candidate.sh --selftest'
@@ -353,7 +352,7 @@ profile_workflows() {
     scripts/verify.sh scripts/verify-clipboard-markers.sh scripts/verify-extension-load.sh scripts/verify-browser-fill.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh scripts/exercise-desktop-acts.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh scripts/build-libsodium.sh \
-    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh scripts/crash-reports.sh \
+    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh \
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
 

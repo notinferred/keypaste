@@ -3,15 +3,9 @@ artifacts/
 [Bb]in/
 [Oo]bj/
 TestResults/
-# Playwright's output for the extension's tests
-extension/test-results/
 
 # Tooling
-.wrangler/
 node_modules/
-# keypaste.com's content build (site/web builds into site/dist)
-site/dist/
-site/web/.astro/
 .vs/
 .idea/
 *.user
@@ -50,6 +44,3 @@ secrets.json
 # which is how this rule gets broken by accident rather than by decision.
 keypastebusinessnotes.md
 *businessnotes*.md
-
-# `wrangler dev` settings for the share routes (SHARE_ENABLED, SHARE_DEV_MEMORY); local only.
-site/.dev.vars

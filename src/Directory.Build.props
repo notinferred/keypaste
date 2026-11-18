@@ -12,6 +12,11 @@
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">NoKeePassLib;NoNetwork;NoCrashReports;NoVault;NoFileWrites</KeypasteBans>
   </PropertyGroup>
 
+  <!-- Infrastructure is a submodule; the product owns its lock file. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">
+    <NuGetLockFilePath>$(MSBuildThisFileDirectory)../locks/$(MSBuildProjectName)/packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+
   <!-- The desktop process has a real culture, and Core and Infrastructure run in it; .editorconfig turns on the culture rules this package adds to the SDK's. -->
   <PropertyGroup>
     <MeziantouAnalysisMode>None</MeziantouAnalysisMode>

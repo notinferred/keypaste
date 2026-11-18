@@ -1,0 +1,9 @@
+[submodule "extension"]
+	path = extension
+	url = https://github.com/notinferred/keypaste-extension.git
+[submodule "third_party/KeePassLib"]
+	path = third_party/KeePassLib
+	url = https://github.com/notinferred/keypaste-keepasslib.git
+[submodule "src/Keypaste.Infrastructure"]
+	path = src/Keypaste.Infrastructure
+	url = https://github.com/notinferred/keypaste-infrastructure.git

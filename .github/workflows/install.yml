@@ -53,6 +53,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          submodules: true
           fetch-depth: 0
 
       - name: Verify the published releases are still on the origin
@@ -90,6 +91,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          submodules: true
 
       # No setup-dotnet, and that absence is the point. A published binary is self-contained; if any
       # step here needed a .NET SDK the claim on the page would be wrong. KEYPASTE_EXPECT_VERSION is

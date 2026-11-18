@@ -41,6 +41,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          submodules: true
           fetch-depth: 0
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -193,6 +194,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          submodules: true
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -465,6 +467,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          submodules: true
           fetch-depth: 0
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -540,8 +543,15 @@ jobs:
       - name: Build the corresponding-source tarball
         shell: bash
         run: |
-          git archive --format=tar.gz --prefix="keypaste-${VERSION}/" \
-            -o "dist/keypaste-${VERSION}-source.tar.gz" "$GITHUB_SHA"
+          set -euo pipefail
+          source_tar="$RUNNER_TEMP/keypaste-${VERSION}-source.tar"
+          git archive --format=tar --prefix="keypaste-${VERSION}/" -o "$source_tar" "$GITHUB_SHA"
+          # git archive leaves submodules out, so each pinned commit's tree is appended at its path.
+          export source_tar VERSION
+          # shellcheck disable=SC2016
+          git submodule foreach --quiet --recursive \
+            'git archive --format=tar --prefix="keypaste-$VERSION/$displaypath/" -o "$source_tar.part" "$sha1" && tar --concatenate --file="$source_tar" "$source_tar.part" && rm "$source_tar.part"'
+          gzip -n -9 < "$source_tar" > "dist/keypaste-${VERSION}-source.tar.gz"
           (cd dist && sha256sum "keypaste-${VERSION}-source.tar.gz" > "keypaste-${VERSION}-source.tar.gz.sha256")
 
       # The subject list comes from the definition, not from a glob. A glob wide enough to catch the

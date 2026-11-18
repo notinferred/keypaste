@@ -13,7 +13,7 @@ Email `security@keypaste.com` with the affected version or commit, a description
 
 Security reports receive the highest priority. Credit in advisories and the changelog is optional; there is no bug bounty. Breaches and serious shipped bugs receive prompt, full disclosure covering the incident, exposure and changes, as [law 10](#security-laws) requires. All security-relevant fixes are disclosed.
 
-Reports cover this repository, its build and release pipeline, and dependencies on the secret path. The signup endpoint at `site/src/worker.js` is also in scope because it stores email addresses. Static site content and third-party deployments are outside this reporting scope. Report upstream dependency vulnerabilities upstream and here; vendored patches must be merged manually.
+Reports cover this repository, its build and release pipeline, and dependencies on the secret path. keypaste.com's signup endpoint, whose source is in the site's own repository, is also in scope because it stores email addresses. Static site content and third-party deployments are outside this reporting scope. Report upstream dependency vulnerabilities upstream and here; vendored patches must be merged manually.
 
 ## Supported versions
 
@@ -193,7 +193,7 @@ The [security laws](#security-laws) govern these guarantees, and [THREATS.md](TH
 
 ## Maintainer note
 
-The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md), and those of the BouncyCastle Twofish code it compiles in, which encrypts a Twofish vault, in [its own](third_party/bouncycastle-twofish/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.
+The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md), and those of the BouncyCastle Twofish code it compiles in, which encrypts a Twofish vault, in [its own](third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.
 
 [T-1]: THREATS.md#t-1--prompt-injection-through-entry-names
 [T-2]: THREATS.md#t-2--prompt-injection-through-the-agents-stated-reason

@@ -10,9 +10,7 @@ after the last letter's ink. Outlines are the source of truth, so no font is ven
     assets/brand/                           keypaste-glyph-{dark,light,mono}.svg,
                                              keypaste-wordmark-{dark,light,mono}.svg,
                                              keypaste-app-icon.svg, keypaste-favicon.svg
-    site/public/favicon.svg                  the favicon cut
     src/Keypaste.App/Theme/BrandOutlines.axaml  the geometry BrandMark and BrandWordmark draw
-    the site's pages and share worker         the wordmark each carries inline
 
 and scripts/render-app-icon.py rasterizes the two tiles. It reads the variable font from
 google/fonts, ofl/heptaslab/HeptaSlab[wght].ttf (SIL Open Font License 1.1), and refuses any other
@@ -23,7 +21,6 @@ bytes, so the same file always gives the same outlines. Needs fontTools, uharfbu
 
 import hashlib
 import io
-import re
 import sys
 from pathlib import Path
 
@@ -48,13 +45,6 @@ INK_DARK, INK_LIGHT, AMBER, TILE = "#F2F2F0", "#111214", "#F2B544", "#1D1E22"
 APP_ICON = {"height": 0.46, "radius": 15}
 FAVICON = {"height": 0.66, "radius": 12}
 MAX_WIDTH = 0.62
-
-SITE_WORDMARKS = ["site/public/index.html", "site/public/s/index.html", "site/public/thanks/index.html", "site/src/worker.js"]
-SITE_WORDMARK_WIDTH = 112
-INLINE_WORDMARK = re.compile(
-    r'<svg width="\d+" height="[\d.]+" viewBox="[^"]*" aria-hidden="true">'
-    r'<path class="mark-ink" d="[^"]*"/><path class="mark-dot" d="[^"]*"/></svg>'
-)
 
 
 def number(value):
@@ -224,15 +214,6 @@ def axaml(glyph, wordmark):
     )
 
 
-def inline_wordmark(wordmark):
-    height = SITE_WORDMARK_WIDTH * wordmark["height"] / wordmark["width"]
-    return (
-        f'<svg width="{SITE_WORDMARK_WIDTH}" height="{number(height)}" '
-        f'viewBox="0 0 {number(wordmark["width"])} {number(wordmark["height"])}" aria-hidden="true">'
-        f'<path class="mark-ink" d="{wordmark["ink"]}"/><path class="mark-dot" d="{wordmark["dot"]}"/></svg>'
-    )
-
-
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
@@ -241,16 +222,8 @@ def main():
     files = marks(glyph, wordmark)
     for name, text in files.items():
         (ROOT / "assets" / "brand" / name).write_text(text, encoding="utf-8", newline="\n")
-    (ROOT / "site" / "public" / "favicon.svg").write_text(files["keypaste-favicon.svg"], encoding="utf-8", newline="\n")
     (ROOT / "src" / "Keypaste.App" / "Theme" / "BrandOutlines.axaml").write_text(axaml(glyph, wordmark), encoding="utf-8", newline="\n")
-    for name in SITE_WORDMARKS:
-        page = ROOT / name
-        text, count = INLINE_WORDMARK.subn(lambda _: inline_wordmark(wordmark), page.read_text(encoding="utf-8"))
-        if count == 0:
-            sys.exit(f"{name} carries no inline wordmark to replace")
-        page.write_text(text, encoding="utf-8", newline="\n")
-    print(f"wrote {len(files)} marks to assets/brand, the site favicon, BrandOutlines.axaml "
-          f"and the inline wordmark in {len(SITE_WORDMARKS)} site files")
+    print(f"wrote {len(files)} marks to assets/brand and BrandOutlines.axaml")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ using System.Text.Json;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// <c>/api/share</c> in memory, answering as <c>site/src/share.js</c> does, and recording every
+/// <c>/api/share</c> in memory, answering as keypaste.com's <c>src/share.js</c> does, and recording every
 /// request whole so a test can search them for a key or a value.
 /// </summary>
 internal sealed class FakeShareServer : HttpMessageHandler

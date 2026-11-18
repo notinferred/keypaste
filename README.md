@@ -191,7 +191,7 @@ The guides describe the 1.0 build, and each says what `v0.3.0` lacks.
 Building from source lets you inspect the code you run, and it is the only route on Intel Macs, musl distributions such as Alpine, and Windows on ARM. With the .NET SDK pinned in [`global.json`](global.json):
 
 ```sh
-git clone https://github.com/notinferred/keypaste
+git clone --recurse-submodules https://github.com/notinferred/keypaste
 cd keypaste
 dotnet build keypaste.slnx -c Release
 ```
