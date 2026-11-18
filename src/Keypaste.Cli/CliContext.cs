@@ -76,7 +76,9 @@ internal sealed class CliContext
     internal IReadOnlyList<IExportReader> ExportReaders { get; init; } = ExportImport.Readers;
 
     /// <summary>What carries <c>share</c>'s requests; null for a transport of its own each run.</summary>
+#pragma warning disable RS0030 // share's transport, which tests replace.
     internal HttpMessageHandler? ShareTransport { get; init; }
+#pragma warning restore RS0030
 
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>

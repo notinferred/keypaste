@@ -25,14 +25,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Track 3 — AI requests in the app
 
-- [ ] **A.3 — Ban the network at compile time in the bridge, the browser relay and the CLI.** Needs: none.
-  - `BannedSymbols.NoNetwork.txt`, which Core and the app carry, also binds `Keypaste.Mcp`, `Keypaste.Browser` and `Keypaste.Cli`, with `keypaste share`'s upload the one exemption.
-  - Accepted when a network call added to any of the three fails the build and share's upload still builds.
-
-## Track 6 — Daily driver
-
-A row is detailed further when it is selected. A task split into children keeps its ID as their prefix and closes when all of them have. Auto-Type's typing, P.4a2 to P.4a5 and P.4b, is a BACKLOG idea.
-
 - [ ] **8.1g — Publish the extension in the three stores.** Needs: none. Input: H-0029.
   - The founder submits the builds to the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons; each passes its store's review, and the IDs the stores show are the ones `BrowserIdentity.cs` names.
   - Accepted when, by the founder's direction of 2026-11-16, a login is filled from each store's install in branded Chrome, Edge and Firefox on Windows, macOS and Linux, and the Chromium copy `verify-browser-fill.sh` loads carries the Web Store item's public key as its manifest key ([8.3a3](steps/8.3a3.md)).

@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // share's upload: the CLI's one route to the network.
 using System.CommandLine;
 using System.Globalization;
 using Keypaste.Cli.Clipboard;

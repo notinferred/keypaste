@@ -32,6 +32,8 @@ public sealed class BanExemptionsTests
         ["src/Keypaste.App/ViewModels/ShellViewModel.cs"] = 3,
         ["src/Keypaste.App/Views/OpenerProcess.cs"] = 1,
         ["src/Keypaste.App/Views/PlatformWebLauncher.cs"] = 1,
+        ["src/Keypaste.Cli/CliContext.cs"] = 1,
+        ["src/Keypaste.Cli/Commands/ShareCommand.cs"] = 1,
         ["src/Keypaste.Cli/Program.cs"] = 1,
         ["src/Keypaste.Core/CrashReports/CrashSender.cs"] = 1,
         ["src/Keypaste.Core/Internal/TestKeyDerivation.cs"] = 1,
