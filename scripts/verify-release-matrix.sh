@@ -843,7 +843,7 @@ validate_prerelease_path() {
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
 # sign-windows.sh names installers it signs and builds none, verify-desktop-candidate.sh names
 # the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) - and
-# install-keepassxc.sh installs KeePassXC's own disk image for the gates (D-0526).
+# install-keepassxc.sh installs KeePassXC's own disk image and AppImage for the gates.
 package_code() {
   local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh install-keepassxc.sh}" script
   code_of "$root/$workflow"
