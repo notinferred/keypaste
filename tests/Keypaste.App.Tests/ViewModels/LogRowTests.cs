@@ -138,7 +138,7 @@ public sealed class LogRowTests
     public void A_share_names_its_recipient_and_lifetime()
     {
         var at = _now.AddMinutes(-8);
-        var info = new ShareInfo("3a11", "env/acme-api/dev/STRIPE_SECRET_KEY", "password", "maya@acme.dev", at, at.AddHours(24), 1, Passphrase: true, "https://keypaste.com");
+        var info = new ShareInfo("3a11", "env/acme-api/dev/STRIPE_SECRET_KEY", "password", "maya@acme.dev", at, at.AddHours(24), 1, Passphrase: true, "https://api.keypaste.com");
         var row = Row(Entry("share", "granted", "share-created") with { Entry = info.What, Field = "password", Reason = ShareAuditReason.Created(info) });
 
         Assert.Equal("maya@acme.dev", row.Where);

@@ -249,7 +249,7 @@ public sealed class CrashReportScrubbingTests : IDisposable
         var kept = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
 
         using var server = new FakeCrashServer();
-        Assert.Equal(1, await new CrashSender(server, CrashSender.KeypasteCom, outbox).SendWaitingAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(1, await new CrashSender(server, CrashSender.KeypasteApi, outbox).SendWaitingAsync(TestContext.Current.CancellationToken));
 
         List<string> places = [];
 

@@ -463,9 +463,9 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         return buffer;
     }
 
-    // The wordmark stays lowercase even at the start of a sentence.
+    // The wordmark and the share service's host stay lowercase even at the start of a sentence.
     private static string Sentence(string message) =>
         message.Length == 0 ? message
-        : message.StartsWith("keypaste", StringComparison.Ordinal) ? message + "."
+        : message.StartsWith("keypaste", StringComparison.Ordinal) || message.StartsWith(ShareEndpoint.Default.Host, StringComparison.Ordinal) ? message + "."
         : char.ToUpperInvariant(message[0]) + message[1..] + ".";
 }

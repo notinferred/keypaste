@@ -404,7 +404,7 @@ jobs:
           if [ '${{ matrix.rid }}' = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
           # Only these packages name where crash reports go; a source build sends none.
           args=(-c Release -r '${{ matrix.rid }}' -f "$framework" --self-contained
-            --no-restore -o 'artifacts/app/${{ matrix.rid }}' -p:KeypasteCrashEndpoint=https://keypaste.com)
+            --no-restore -o 'artifacts/app/${{ matrix.rid }}' -p:KeypasteCrashEndpoint=https://api.keypaste.com)
           if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
             args+=('-p:VersionSuffix=${{ steps.suffix.outputs.suffix }}')
           fi

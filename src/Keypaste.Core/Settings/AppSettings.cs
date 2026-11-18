@@ -384,7 +384,7 @@ public sealed record AppSettings
 
         if (settings.SendCrashReports is { } crashReports)
         {
-            writer.Number(CrashReportsKey, crashReports ? 1 : 0, "1 sends the app's crash reports to keypaste.com");
+            writer.Number(CrashReportsKey, crashReports ? 1 : 0, "1 sends the app's crash reports to api.keypaste.com");
         }
 
         if (settings.TermsAgreed is { } terms && writer.CanWrite(TermsKey, terms))

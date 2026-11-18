@@ -12,8 +12,8 @@ public sealed class ShareLinkTests
     [Fact]
     public void Format_PutsTheIdAndKeyInTheFragment()
     {
-        Assert.Equal($"https://keypaste.com/s/#{_id}.{_key}", ShareLink.Format(ShareEndpoint.Default, _id, _key));
-        Assert.Equal($"http://127.0.0.1:8787/s/#{_id}.{_key}", ShareLink.Format(new Uri("http://127.0.0.1:8787/"), _id, _key));
+        Assert.Equal($"https://share.keypaste.com/#{_id}.{_key}", ShareLink.Format(ShareEndpoint.Default, _id, _key));
+        Assert.Equal($"http://127.0.0.1:8787/#{_id}.{_key}", ShareLink.Format(new Uri("http://127.0.0.1:8787/"), _id, _key));
     }
 
     [Fact]
@@ -24,14 +24,22 @@ public sealed class ShareLinkTests
         Assert.Equal(_key, key);
     }
 
+    [Fact]
+    public void TryParse_ReadsALinkMadeBeforeTheServicesLeftKeypasteCom()
+    {
+        Assert.True(ShareLink.TryParse($"https://keypaste.com/s/#{_id}.{_key}", out var id, out var key));
+        Assert.Equal(_id, id);
+        Assert.Equal(_key, key);
+    }
+
     [Theory]
-    [InlineData("https://keypaste.com/s/")]
-    [InlineData("https://keypaste.com/s/#" + _id)]
-    [InlineData("https://keypaste.com/s/#" + _id + "." + "AQID")]
-    [InlineData("https://keypaste.com/s/#" + _id + "x." + _key)]
-    [InlineData("https://keypaste.com/s/#" + _id + "." + _key + "=")]
-    [InlineData("https://keypaste.com/s/#" + _id + ".+QIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA")]
-    [InlineData("https://keypaste.com/" + _id + "." + _key)]
+    [InlineData("https://share.keypaste.com/")]
+    [InlineData("https://share.keypaste.com/#" + _id)]
+    [InlineData("https://share.keypaste.com/#" + _id + "." + "AQID")]
+    [InlineData("https://share.keypaste.com/#" + _id + "x." + _key)]
+    [InlineData("https://share.keypaste.com/#" + _id + "." + _key + "=")]
+    [InlineData("https://share.keypaste.com/#" + _id + ".+QIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA")]
+    [InlineData("https://share.keypaste.com/" + _id + "." + _key)]
     public void TryParse_RefusesAnythingElse(string link)
     {
         Assert.False(ShareLink.TryParse(link, out _, out _));

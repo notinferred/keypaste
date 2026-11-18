@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 public sealed class ShareEndpointTests
 {
     [Fact]
-    public void Nothing_IsKeypasteCom()
+    public void Nothing_IsTheDefault()
     {
         Assert.True(ShareEndpoint.TryResolve(null, null, out var endpoint, out _));
         Assert.Equal(ShareEndpoint.Default, endpoint);
@@ -82,5 +82,19 @@ public sealed class ShareEndpointTests
     public void Recorded_AcceptsOnlyWhatCouldHaveMadeAShare(string recorded, bool accepted)
     {
         Assert.Equal(accepted, ShareEndpoint.TryParseRecorded(recorded, out _));
+    }
+
+    [Fact]
+    public void Recorded_FormerKeypasteCom_IsTheDefault()
+    {
+        Assert.True(ShareEndpoint.TryParseRecorded("https://keypaste.com", out var endpoint));
+        Assert.Equal(ShareEndpoint.Default, endpoint);
+    }
+
+    [Fact]
+    public void Page_IsShareKeypasteCom_ForTheDefault_AndTheOriginItself_Otherwise()
+    {
+        Assert.Equal(new Uri("https://share.keypaste.com"), ShareEndpoint.PageFor(ShareEndpoint.Default));
+        Assert.Equal(new Uri("http://127.0.0.1:8787"), ShareEndpoint.PageFor(new Uri("http://127.0.0.1:8787")));
     }
 }

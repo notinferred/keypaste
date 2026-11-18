@@ -4,6 +4,10 @@ namespace Keypaste.Core.Sharing;
 
 /// <summary>Where shares are uploaded, and so which host serves the page that reads a link's key.</summary>
 /// <remarks>
+/// An endpoint is one origin serving the API at <c>/v1/share</c> and the viewer at <c>/</c>, except the default, whose
+/// viewer is <see cref="DefaultPage"/>.
+/// </remarks>
+/// <remarks>
 /// The environment can name only a loopback development server. It is where an agent-influenced
 /// shell (direnv, a repository's <c>.envrc</c>) can point, and a hostile host would serve a viewer
 /// that sends the key elsewhere. Another host takes a deliberate <c>--endpoint</c>, and is named on
@@ -14,8 +18,14 @@ public static class ShareEndpoint
     /// <summary>The variable naming a local development server.</summary>
     public const string EnvironmentVariable = "KEYPASTE_SHARE_URL";
 
-    /// <summary>keypaste.com.</summary>
-    public static readonly Uri Default = new("https://keypaste.com");
+    /// <summary>keypaste's share service.</summary>
+    public static readonly Uri Default = new("https://api.keypaste.com");
+
+    /// <summary>The origin serving the default endpoint's viewer.</summary>
+    public static readonly Uri DefaultPage = new("https://share.keypaste.com");
+
+    // Records made before the services left keypaste.com name it; those shares belong to the default endpoint.
+    private static readonly Uri _formerDefault = new("https://keypaste.com");
 
     /// <summary>Picks the endpoint: the option, else the environment, else <see cref="Default"/>.</summary>
     /// <param name="fromOption"><c>--endpoint</c>: any <c>https</c> origin.</param>
@@ -63,6 +73,11 @@ public static class ShareEndpoint
 
         if (TryOrigin(recorded, out endpoint) && (endpoint.Scheme == Uri.UriSchemeHttps || IsLoopback(endpoint)))
         {
+            if (SameOrigin(endpoint, _formerDefault))
+            {
+                endpoint = Default;
+            }
+
             return true;
         }
 
@@ -70,13 +85,19 @@ public static class ShareEndpoint
         return false;
     }
 
-    /// <summary>Whether this is keypaste.com.</summary>
+    /// <summary>Whether this is keypaste's share service.</summary>
     public static bool IsDefault(Uri endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
 
-        return string.Equals(endpoint.GetLeftPart(UriPartial.Authority), Default.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+        return SameOrigin(endpoint, Default);
     }
+
+    /// <summary>The origin serving the viewer for shares made on <paramref name="endpoint"/>.</summary>
+    public static Uri PageFor(Uri endpoint) => IsDefault(endpoint) ? DefaultPage : endpoint;
+
+    private static bool SameOrigin(Uri one, Uri other) =>
+        string.Equals(one.GetLeftPart(UriPartial.Authority), other.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
 
     private static bool TryOrigin(string text, [NotNullWhen(true)] out Uri? origin)
     {

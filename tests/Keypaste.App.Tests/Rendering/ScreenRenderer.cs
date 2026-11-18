@@ -2258,7 +2258,7 @@ public sealed class ScreenRenderer
         {
             var id = System.Buffers.Text.Base64Url.EncodeToString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
             var created = now - age;
-            store.Add(new Core.Sharing.ShareInfo(id, what, field, to, created, created + ttl, views, passphrase, "https://keypaste.com"), "demo-revoke-" + id);
+            store.Add(new Core.Sharing.ShareInfo(id, what, field, to, created, created + ttl, views, passphrase, "https://api.keypaste.com"), "demo-revoke-" + id);
 
             if (viewsLeft is { } left)
             {

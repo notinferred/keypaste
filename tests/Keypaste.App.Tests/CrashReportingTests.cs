@@ -72,7 +72,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public async Task Agreeing_to_the_terms_alone_keeps_and_sends_nothing_and_says_no_to_reports()
     {
         using var server = new FakeCrashServer();
-        using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), CrashSender.KeypasteCom, _clock, () => new Forwarding(server));
+        using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), CrashSender.KeypasteApi, _clock, () => new Forwarding(server));
         crashes.Start();
 
         crashes.Agree(send: false);
@@ -377,7 +377,7 @@ public sealed partial class CrashReportingTests : IDisposable
     public async Task While_on_the_sender_posts_the_waiting_report_after_thirty_seconds_and_stops_when_switched_off()
     {
         using var server = new FakeCrashServer();
-        using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), CrashSender.KeypasteCom, _clock, () => new Forwarding(server));
+        using var crashes = new CrashReporting(_home.Path, new DesktopPreferences(_home.Path), CrashSender.KeypasteApi, _clock, () => new Forwarding(server));
 
         crashes.Agree(send: true);
         crashes.Crash(Thrown("SENTINEL-SENT"));
@@ -390,7 +390,7 @@ public sealed partial class CrashReportingTests : IDisposable
         await server.NextRequestAsync();
 
         var sent = Assert.Single(server.Requests);
-        Assert.Equal(new Uri("https://keypaste.com/api/crash"), sent.Uri);
+        Assert.Equal(new Uri("https://api.keypaste.com/v1/crash"), sent.Uri);
         Assert.Equal(waiting.Json.ToArray(), sent.Body);
 
         for (var i = 0; i < 100 && crashes.Waiting().Count > 0; i++)
@@ -426,10 +426,10 @@ public sealed partial class CrashReportingTests : IDisposable
     public void Reports_go_to_a_loopback_server_the_variable_names_else_where_the_package_says_and_a_source_build_says_nowhere()
     {
         Assert.Equal(new Uri("http://127.0.0.1:5123"), CrashReporting.EndpointFor("http://127.0.0.1:5123", packaged: null));
-        Assert.Equal(new Uri("http://127.0.0.1:5123"), CrashReporting.EndpointFor("http://127.0.0.1:5123", CrashSender.KeypasteCom));
-        Assert.Equal(CrashSender.KeypasteCom, CrashReporting.EndpointFor(null, CrashSender.KeypasteCom));
-        Assert.Equal(CrashSender.KeypasteCom, CrashReporting.EndpointFor(string.Empty, CrashSender.KeypasteCom));
-        Assert.Null(CrashReporting.EndpointFor("https://example.com", CrashSender.KeypasteCom));
+        Assert.Equal(new Uri("http://127.0.0.1:5123"), CrashReporting.EndpointFor("http://127.0.0.1:5123", CrashSender.KeypasteApi));
+        Assert.Equal(CrashSender.KeypasteApi, CrashReporting.EndpointFor(null, CrashSender.KeypasteApi));
+        Assert.Equal(CrashSender.KeypasteApi, CrashReporting.EndpointFor(string.Empty, CrashSender.KeypasteApi));
+        Assert.Null(CrashReporting.EndpointFor("https://example.com", CrashSender.KeypasteApi));
         Assert.Null(CrashReporting.EndpointFor(null, packaged: null));
         Assert.Null(CrashReporting.PackagedEndpoint(typeof(CrashReporting).Assembly));
     }

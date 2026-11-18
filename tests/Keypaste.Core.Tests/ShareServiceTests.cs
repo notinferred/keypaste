@@ -83,10 +83,10 @@ public sealed class ShareServiceTests : IDisposable
         var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(views: 3, to: "sam@acme.dev"), CancellationToken.None);
 
         Assert.True(outcome.Ok, outcome.Message);
-        Assert.Equal(["POST /api/share", "audit with 1 record(s) saved"], order);
+        Assert.Equal(["POST /v1/share", "audit with 1 record(s) saved"], order);
 
         Assert.True(ShareLink.TryParse(outcome.Link!, out var id, out var key));
-        Assert.StartsWith("https://keypaste.com/s/#", outcome.Link, StringComparison.Ordinal);
+        Assert.StartsWith("https://share.keypaste.com/#", outcome.Link, StringComparison.Ordinal);
         Assert.Equal(id, outcome.Info!.Id);
         Assert.Equal("3 views · 24h", outcome.Info.Rule);
         Assert.Equal(_fixture.Server.Now.AddHours(24), outcome.Info.Expires);
@@ -292,7 +292,7 @@ public sealed class ShareServiceTests : IDisposable
         Assert.False(outcome.Ok);
         Assert.Null(outcome.Link);
         Assert.Equal(ShareFailure.Unavailable, outcome.Failure);
-        Assert.Equal("keypaste.com is not accepting shares right now", outcome.Message);
+        Assert.Equal("api.keypaste.com is not accepting shares right now", outcome.Message);
         Assert.Empty(new ShareStore(vault).List());
         Assert.Equal(0, ShareRecordsOnDisk());
         Assert.Equal(string.Empty, _fixture.AuditText());
@@ -470,9 +470,9 @@ public sealed class ShareServiceTests : IDisposable
         var outcome = await _fixture.Service(new Uri("https://share.example.org")).CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
 
         Assert.True(outcome.Ok, outcome.Message);
-        Assert.StartsWith("https://share.example.org/s/#", outcome.Link, StringComparison.Ordinal);
+        Assert.StartsWith("https://share.example.org/#", outcome.Link, StringComparison.Ordinal);
         Assert.Equal("https://share.example.org", outcome.Info!.Endpoint);
-        Assert.Equal("https://share.example.org/api/share", _fixture.Server.Requests[0].Uri.ToString());
+        Assert.Equal("https://share.example.org/v1/share", _fixture.Server.Requests[0].Uri.ToString());
     }
 
     [Fact]
@@ -484,7 +484,7 @@ public sealed class ShareServiceTests : IDisposable
         var outcome = await _fixture.Service().RevokeAsync(vault, created.Info!.Id[..8], CancellationToken.None);
 
         Assert.True(outcome.Ok, outcome.Message);
-        Assert.Equal($"https://share.example.org/api/share/{created.Info.Id}", _fixture.Server.Requests[^1].Uri.ToString());
+        Assert.Equal($"https://share.example.org/v1/share/{created.Info.Id}", _fixture.Server.Requests[^1].Uri.ToString());
         Assert.Empty(_fixture.Server.Shares);
         Assert.Equal(0, ShareRecordsOnDisk());
         Assert.Contains($"share {created.Info.Id} revoked", _fixture.AuditText(), StringComparison.Ordinal);

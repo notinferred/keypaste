@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// 4.11a: a crash report holds exactly the fields the crash report names, in one order, and <c>tests/vectors/crash-vector.json</c>, which
-/// keypaste.com's route is to accept, is byte for byte what the scrubber writes and reads back.
+/// api.keypaste.com's route is to accept, is byte for byte what the scrubber writes and reads back.
 /// </summary>
 /// <remarks>
 /// A field added to the report fails the comparison with the vector until the vector, the documents and the route change

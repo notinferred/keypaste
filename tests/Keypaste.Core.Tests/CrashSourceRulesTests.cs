@@ -16,7 +16,7 @@ public sealed class CrashSourceRulesTests
 {
     private const string _scrubber = "CrashScrubber.cs";
     private const string _sender = "CrashSender.cs";
-    private const string _route = "/api/crash";
+    private const string _route = "/v1/crash";
 
     // What could carry a message, a path, a name, a value, the environment or an identifier into a report.
     private static readonly string[] _unscrubbed =

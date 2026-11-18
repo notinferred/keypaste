@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: the sender posts each waiting report's exact bytes to keypaste.com or a loopback server and nowhere else, keeps
+/// 4.11a: the sender posts each waiting report's exact bytes to api.keypaste.com or a loopback server and nowhere else, keeps
 /// what was not accepted, waits when told to, and never throws or holds anyone up, since local use works without a network.
 /// </summary>
 /// <remarks>
@@ -31,7 +31,7 @@ public sealed class CrashSenderTests : IDisposable
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private CrashSender Sender => new(_server, CrashSender.KeypasteCom, _outbox, _clock);
+    private CrashSender Sender => new(_server, CrashSender.KeypasteApi, _outbox, _clock);
 
     [Fact]
     public async Task A_report_is_posted_as_its_exact_bytes_with_only_a_content_type()
@@ -42,7 +42,7 @@ public sealed class CrashSenderTests : IDisposable
 
         var request = Assert.Single(_server.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.Equal("https://keypaste.com/api/crash", request.Uri.ToString());
+        Assert.Equal("https://api.keypaste.com/v1/crash", request.Uri.ToString());
         Assert.Equal(string.Empty, request.RequestHeaders);
         Assert.Equal("application/json", request.ContentType);
         Assert.Equal(report.Json.ToArray(), request.Body);
@@ -161,7 +161,7 @@ public sealed class CrashSenderTests : IDisposable
     public async Task The_first_pass_waits_thirty_seconds_and_the_next_an_hour()
     {
         var clock = new HourWatchingClock(_clock);
-        var sender = new CrashSender(_server, CrashSender.KeypasteCom, _outbox, clock);
+        var sender = new CrashSender(_server, CrashSender.KeypasteApi, _outbox, clock);
         Queued("agents");
 
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
@@ -188,8 +188,8 @@ public sealed class CrashSenderTests : IDisposable
     }
 
     [Theory]
-    [InlineData(null, "https://keypaste.com/")]
-    [InlineData("", "https://keypaste.com/")]
+    [InlineData(null, "https://api.keypaste.com/")]
+    [InlineData("", "https://api.keypaste.com/")]
     [InlineData("http://127.0.0.1:8787", "http://127.0.0.1:8787/")]
     [InlineData("http://localhost:8787/", "http://localhost:8787/")]
     [InlineData("https://[::1]:8443", "https://[::1]:8443/")]
@@ -206,13 +206,14 @@ public sealed class CrashSenderTests : IDisposable
     }
 
     [Theory]
-    [InlineData("https://keypaste.com", true)]
+    [InlineData("https://api.keypaste.com", true)]
     [InlineData("http://127.0.0.1:8787", true)]
     [InlineData("https://example.com", false)]
-    [InlineData("http://keypaste.com", false)]
-    [InlineData("https://keypaste.com:8443", false)]
-    [InlineData("https://keypaste.com/elsewhere", false)]
-    public void A_sender_is_made_only_for_keypaste_com_or_a_loopback_server(string endpoint, bool made)
+    [InlineData("https://keypaste.com", false)]
+    [InlineData("http://api.keypaste.com", false)]
+    [InlineData("https://api.keypaste.com:8443", false)]
+    [InlineData("https://api.keypaste.com/elsewhere", false)]
+    public void A_sender_is_made_only_for_api_keypaste_com_or_a_loopback_server(string endpoint, bool made)
     {
         var uri = new Uri(endpoint);
 

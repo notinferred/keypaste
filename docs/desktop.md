@@ -72,7 +72,7 @@ Run… saves a directory and command on this machine the first time, as Edit ›
 
 ### Share links
 
-Share… on an item makes a link: pick a field, an expiry (1 hour, 24 hours or 7 days), a number of views (1, 3 or 10) and optionally a passphrase of at least 20 characters. The field is encrypted on this machine and only ciphertext goes to keypaste.com; the key is in the link. Settings › Advanced › Share links lists, checks and revokes the links made from this vault. Whoever holds a link can open it until its views or time run out ([THREATS](../THREATS.md)).
+Share… on an item makes a link: pick a field, an expiry (1 hour, 24 hours or 7 days), a number of views (1, 3 or 10) and optionally a passphrase of at least 20 characters. The field is encrypted on this machine and only ciphertext goes to api.keypaste.com; the key is in the link. Settings › Advanced › Share links lists, checks and revokes the links made from this vault. Whoever holds a link can open it until its views or time run out ([THREATS](../THREATS.md)).
 
 ### Import from another app
 

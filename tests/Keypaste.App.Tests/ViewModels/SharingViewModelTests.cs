@@ -16,7 +16,7 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// The Sharing screen's form and list, against a fake keypaste.com: the link leaves only through the
+/// The Sharing screen's form and list, against a fake share service: the link leaves only through the
 /// clipboard's countdown, the list shows limits and statuses, never a key or a value, and a server
 /// that does not take shares is shown as such rather than as a success.
 /// </summary>
@@ -198,7 +198,7 @@ public sealed class SharingViewModelTests : IDisposable
         await screen.CreateCommand.PressAsync();
 
         Assert.True(screen.IsUnavailable);
-        Assert.Equal("keypaste.com is not accepting shares right now.", screen.Unavailable);
+        Assert.Equal("api.keypaste.com is not accepting shares right now.", screen.Unavailable);
         Assert.Null(screen.Error);
         Assert.False(screen.CreateCommand.CanExecute(null));
         Assert.True(screen.CanRetry);
@@ -224,7 +224,7 @@ public sealed class SharingViewModelTests : IDisposable
 
         await screen.CreateCommand.PressAsync();
 
-        Assert.Equal("keypaste.com could not be reached.", screen.Unavailable);
+        Assert.Equal("api.keypaste.com could not be reached.", screen.Unavailable);
         Assert.False(screen.CreateCommand.CanExecute(null));
         Assert.Null(_clipboard.Content);
         Assert.Empty(_toasts);
@@ -343,7 +343,7 @@ public sealed class SharingViewModelTests : IDisposable
         screen.Selected = Assert.Single(screen.Rows);
         await screen.RevokeCommand.PressAsync();
 
-        Assert.Equal("keypaste.com could not be reached. The link still opens.", screen.Error);
+        Assert.Equal("api.keypaste.com could not be reached. The link still opens.", screen.Error);
         Assert.Single(screen.Rows);
         Assert.Single(_server.Shares);
     }

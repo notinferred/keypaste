@@ -62,7 +62,7 @@ namespace Keypaste.AppDriver;
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
 /// </para>
 /// <para>
-/// <c>crash-endpoint</c> is no act of the app's: it stands in for keypaste.com's crash route on loopback, as
+/// <c>crash-endpoint</c> is no act of the app's: it stands in for api.keypaste.com's crash route on loopback, as
 /// <see cref="CrashEndpoint"/> says.
 /// </para>
 /// </remarks>

@@ -19,7 +19,7 @@ namespace Keypaste.App;
 /// </remarks>
 internal sealed class CrashReporting : IDisposable
 {
-    /// <summary>The assembly metadata only app.yml's packages carry, naming keypaste.com.</summary>
+    /// <summary>The assembly metadata only app.yml's packages carry, naming api.keypaste.com.</summary>
     internal const string EndpointMetadata = "KeypasteCrashEndpoint";
 
     /// <summary>The locked notice an agent's request raises could not be shown.</summary>
@@ -115,15 +115,15 @@ internal sealed class CrashReporting : IDisposable
         : CrashSender.TryResolveEndpoint(fromEnvironment, out var loopback) ? loopback
         : null;
 
-    /// <summary>keypaste.com when the assembly is one app.yml packaged, which names it in <see cref="EndpointMetadata"/>; otherwise null.</summary>
+    /// <summary>api.keypaste.com when the assembly is one app.yml packaged, which names it in <see cref="EndpointMetadata"/>; otherwise null.</summary>
     internal static Uri? PackagedEndpoint(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
         var named = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(metadata => metadata.Key == EndpointMetadata)?.Value;
 
-        return Uri.TryCreate(named, UriKind.Absolute, out var uri) && uri.AbsoluteUri == CrashSender.KeypasteCom.AbsoluteUri
-            ? CrashSender.KeypasteCom
+        return Uri.TryCreate(named, UriKind.Absolute, out var uri) && uri.AbsoluteUri == CrashSender.KeypasteApi.AbsoluteUri
+            ? CrashSender.KeypasteApi
             : null;
     }
 

@@ -6,7 +6,7 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// The desktop app's crash reports across real processes (4.11c): tests/Keypaste.AppDriver runs keypaste-app's own start on a headless
-/// display, crash reports composed as that start composes them, and stands in on loopback for keypaste.com's /api/crash.
+/// display, crash reports composed as that start composes them, and stands in on loopback for api.keypaste.com's /v1/crash.
 /// </summary>
 /// <remarks>The first-launch screen and what a UI-thread exception does inside the app are App.Tests' <c>CrashJourneyTests</c>.</remarks>
 public sealed class CrashReportTests
@@ -45,7 +45,7 @@ public sealed class CrashReportTests
         endpoint.Process.WaitForOutput("^received 1", within: _firstPass + RunningProcess.Wait);
         Assert.Equal(sent, File.ReadAllBytes(Path.Combine(endpoint.Folder, "1.json")));
         var head = File.ReadAllLines(Path.Combine(endpoint.Folder, "1.head"));
-        Assert.Equal("POST /api/crash HTTP/1.1", head[0].TrimEnd('\r'));
+        Assert.Equal("POST /v1/crash HTTP/1.1", head[0].TrimEnd('\r'));
         Assert.Contains(head, line => line.StartsWith("content-type: application/json", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(head, line => System.Text.RegularExpressions.Regex.IsMatch(line, "^(cookie|user-agent|traceparent|tracestate|request-id|authorization):", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
         Until(() => Waiting(home).Count == 0, "the sent report is still waiting");
@@ -306,7 +306,7 @@ public sealed class CrashReportTests
         public void Dispose() => _workspace.Dispose();
     }
 
-    /// <summary>tests/Keypaste.AppDriver standing in for /api/crash on loopback, answering 204 or, silent, never answering.</summary>
+    /// <summary>tests/Keypaste.AppDriver standing in for /v1/crash on loopback, answering 204 or, silent, never answering.</summary>
     private sealed class Endpoint : IDisposable
     {
         private Endpoint(string folder, bool silent)

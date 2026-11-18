@@ -183,7 +183,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void Diagnostics_names_reports_a_sending_build_has_waiting_with_nothing_more()
     {
-        using var sending = new CrashReporting(_fixture.Home, _preferences, CrashSender.KeypasteCom, _clock, () => new HttpClientHandler());
+        using var sending = new CrashReporting(_fixture.Home, _preferences, CrashSender.KeypasteApi, _clock, () => new HttpClientHandler());
         sending.Agree(send: true);
         sending.Crash(Thrown());
 

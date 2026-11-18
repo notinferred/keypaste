@@ -8,7 +8,7 @@ using System.Text.Json;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// <c>/api/share</c> in memory, answering as keypaste.com's <c>src/share.js</c> does, and recording every
+/// <c>/v1/share</c> in memory, answering as the share service does, and recording every
 /// request whole so a test can search them for a key or a value.
 /// </summary>
 internal sealed class FakeShareServer : HttpMessageHandler
@@ -63,12 +63,12 @@ internal sealed class FakeShareServer : HttpMessageHandler
         }
 
         var path = request.RequestUri!.AbsolutePath;
-        if (path == "/api/share" && request.Method == HttpMethod.Post)
+        if (path == "/v1/share" && request.Method == HttpMethod.Post)
         {
             return Create(body);
         }
 
-        var parts = path["/api/share/".Length..].Split('/');
+        var parts = path["/v1/share/".Length..].Split('/');
         var id = parts[0];
         var live = Shares.TryGetValue(id, out var share) && share.ViewsLeft > 0 && share.ExpiresAt > Now;
 

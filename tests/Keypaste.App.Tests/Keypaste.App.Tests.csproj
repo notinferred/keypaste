@@ -37,10 +37,10 @@
     <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
     <!-- The same software YubiKey the core's hardware-key tests prove against KeePassXC's vectors. -->
     <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
-    <!-- The core's hand-moved clock and /api/share fake, so the app is tested against the same ones. -->
+    <!-- The core's hand-moved clock and /v1/share fake, so the app is tested against the same ones. -->
     <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
     <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
-    <!-- The core's /api/crash fake, which the app's sender is tested against too. -->
+    <!-- The core's /v1/crash fake, which the app's sender is tested against too. -->
     <Compile Include="../Keypaste.Core.Tests/FakeCrashServer.cs" Link="FakeCrashServer.cs" />
     <!-- The channels the core's scripted bridge speaks over, which need no thread-pool worker (F.41). -->
     <Compile Include="../Keypaste.Core.Tests/ScriptedBridgeChannels.cs" Link="ScriptedBridgeChannels.cs" />

@@ -42,7 +42,7 @@ public sealed record ShareCreated(string Id, DateTimeOffset ExpiresAt);
 /// <param name="ExpiresAt">When it expires, when it exists.</param>
 public sealed record ShareStatus(bool Exists, int ViewsLeft, DateTimeOffset? ExpiresAt);
 
-/// <summary>Speaks <c>/api/share</c> on one endpoint. It never sends a key or a plaintext byte.</summary>
+/// <summary>Speaks <c>/v1/share</c> on one endpoint. It never sends a key or a plaintext byte.</summary>
 /// <remarks>
 /// The handler is the caller's, with redirects off: a redirect is answered as
 /// <see cref="ShareFailure.Protocol"/> rather than followed, so an envelope and a revoke token
@@ -55,7 +55,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     /// <summary>The largest response body read.</summary>
     internal const int MaximumResponseBytes = 64 * 1024;
 
-    // keypaste.com's src/share.js sets this on the 404 of a lookup that found no live share, and on no other answer.
+    // The share service sets this on the 404 of a lookup that found no live share, and on no other answer.
     private const string _goneHeader = "x-keypaste-share";
     private const string _goneMark = "gone";
 
@@ -104,7 +104,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
             json.WriteEndObject();
         }
 
-        using var request = Request(HttpMethod.Post, "/api/share");
+        using var request = Request(HttpMethod.Post, "/v1/share");
         request.Content = new ByteArrayContent(buffer.ToArray());
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
@@ -140,7 +140,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
             return (null, ShareFailure.Refused);
         }
 
-        using var request = Request(HttpMethod.Get, "/api/share/" + id);
+        using var request = Request(HttpMethod.Get, "/v1/share/" + id);
         var (status, body, failure, gone) = await SendAsync(request, ct).ConfigureAwait(false);
 
         if (failure != ShareFailure.None)
@@ -182,7 +182,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
             return ShareFailure.Refused;
         }
 
-        using var request = Request(HttpMethod.Delete, "/api/share/" + id);
+        using var request = Request(HttpMethod.Delete, "/v1/share/" + id);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", revokeToken);
 
         var (status, _, failure, gone) = await SendAsync(request, ct).ConfigureAwait(false);

@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>What <c>/api/share</c> is sent, and what each answer means.</summary>
+/// <summary>What <c>/v1/share</c> is sent, and what each answer means.</summary>
 public sealed class ShareClientTests : IDisposable
 {
     private const string _id = "Qm9vYmFyQm9vYmFyQm9vYg";
@@ -23,7 +23,7 @@ public sealed class ShareClientTests : IDisposable
     [Fact]
     public void Describe_NamesTheHostAsked()
     {
-        Assert.Equal("keypaste.com could not be reached", Client.WithEndpoint(ShareEndpoint.Default).Describe(ShareFailure.Network));
+        Assert.Equal("api.keypaste.com could not be reached", Client.WithEndpoint(ShareEndpoint.Default).Describe(ShareFailure.Network));
         Assert.Equal("share.example.org could not be reached", Client.WithEndpoint(new Uri("https://share.example.org")).Describe(ShareFailure.Network));
     }
 
@@ -41,7 +41,7 @@ public sealed class ShareClientTests : IDisposable
 
         var request = Assert.Single(_server.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.Equal("https://keypaste.com/api/share", request.Uri.ToString());
+        Assert.Equal("https://api.keypaste.com/v1/share", request.Uri.ToString());
         Assert.Contains("Content-Type: application/json", request.Headers, StringComparison.Ordinal);
         Assert.Contains("User-Agent: keypaste/", request.Headers, StringComparison.Ordinal);
         Assert.Contains("\"envelope\":" + envelope, request.Body, StringComparison.Ordinal);
@@ -89,7 +89,7 @@ public sealed class ShareClientTests : IDisposable
         Assert.False(string.IsNullOrEmpty(message));
         if (expected == ShareFailure.Unavailable)
         {
-            Assert.Equal("keypaste.com is not accepting shares right now", message);
+            Assert.Equal("api.keypaste.com is not accepting shares right now", message);
         }
 
         if (status == HttpStatusCode.BadRequest)
@@ -115,7 +115,7 @@ public sealed class ShareClientTests : IDisposable
         _server.Answer = _ =>
         {
             var redirect = new HttpResponseMessage(HttpStatusCode.TemporaryRedirect);
-            redirect.Headers.Location = new Uri("https://evil.example/api/share");
+            redirect.Headers.Location = new Uri("https://evil.example/v1/share");
             return redirect;
         };
 
@@ -174,7 +174,7 @@ public sealed class ShareClientTests : IDisposable
         Assert.True(status!.Exists);
         Assert.Equal(3, status.ViewsLeft);
         Assert.Equal(HttpMethod.Get, _server.Requests[^1].Method);
-        Assert.Equal($"https://keypaste.com/api/share/{created.Id}", _server.Requests[^1].Uri.ToString());
+        Assert.Equal($"https://api.keypaste.com/v1/share/{created.Id}", _server.Requests[^1].Uri.ToString());
 
         _server.OpenAll(created.Id);
         (status, failure) = await Client.StatusAsync(created.Id, CancellationToken.None);

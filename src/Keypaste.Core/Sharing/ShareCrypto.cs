@@ -37,7 +37,7 @@ public sealed record SealedShare(string Envelope, string Key, bool HasPassphrase
 
 /// <summary>
 /// Seals a share for the browser to open: AES-256-GCM under a key derived from the link's key and,
-/// when one is given, a passphrase. keypaste.com's <c>public/s/share-crypto.js</c> is the other half and
+/// when one is given, a passphrase. The viewer at share.keypaste.com is the other half and
 /// must agree byte for byte.
 /// </summary>
 /// <remarks>

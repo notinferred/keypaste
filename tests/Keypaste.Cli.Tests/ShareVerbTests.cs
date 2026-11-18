@@ -12,7 +12,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste share</c> against a fake keypaste.com: where the link goes, what is said about it,
+/// <c>keypaste share</c> against a fake share service: where the link goes, what is said about it,
 /// and every refusal that has to happen before a vault is unlocked or anything is uploaded.
 /// </summary>
 public sealed class ShareVerbTests : IDisposable
@@ -118,7 +118,7 @@ public sealed class ShareVerbTests : IDisposable
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.NotNull(copied);
         Assert.True(ShareLink.TryParse(copied, out var id, out var key));
-        Assert.StartsWith("https://keypaste.com/s/#", copied, StringComparison.Ordinal);
+        Assert.StartsWith("https://share.keypaste.com/#", copied, StringComparison.Ordinal);
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
         Assert.Equal(_stripeValue, Assert.Single(payload.Fields).Value);
 
@@ -422,12 +422,12 @@ public sealed class ShareVerbTests : IDisposable
     {
         var link = CreatePrinted("--endpoint", "https://share.example.org");
 
-        Assert.StartsWith("https://share.example.org/s/#", link, StringComparison.Ordinal);
-        Assert.Equal("https://share.example.org/api/share", _server.Requests[0].Uri.ToString());
+        Assert.StartsWith("https://share.example.org/#", link, StringComparison.Ordinal);
+        Assert.Equal("https://share.example.org/v1/share", _server.Requests[0].Uri.ToString());
 
         _cli.Environment[ShareEndpoint.EnvironmentVariable] = "http://127.0.0.1:8787";
         _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY", "--print"));
-        Assert.StartsWith("http://127.0.0.1:8787/s/#", _cli.Out, StringComparison.Ordinal);
+        Assert.StartsWith("http://127.0.0.1:8787/#", _cli.Out, StringComparison.Ordinal);
         Assert.Contains(" · via 127.0.0.1:8787", _cli.Err, StringComparison.Ordinal);
 
         Clear();

@@ -19,7 +19,7 @@ public sealed class ShareStoreTests : IDisposable
         expires ?? new DateTimeOffset(2026, 9, 25, 14, 40, 0, TimeSpan.Zero),
         1,
         true,
-        "https://keypaste.com");
+        "https://api.keypaste.com");
 
     [Fact]
     public async Task Add_StoresRevokeTokenAndMetadata_NeverTheKeyOrValue()
@@ -38,7 +38,7 @@ public sealed class ShareStoreTests : IDisposable
         var record = Assert.Single(reopened.ReadEntries(includeReserved: true), e => e.GroupPath == ReservedGroups.Shares);
         Assert.Equal(id, record.Title);
         Assert.Equal("sam@acme.dev", record.Username);
-        Assert.Equal("https://keypaste.com", record.Url);
+        Assert.Equal("https://api.keypaste.com", record.Url);
         Assert.Equal(_fixture.Server.Shares[id].RevokeSha256, FakeShareServer.Sha256(record.Password));
         Assert.Contains("\"what\":\"env/acme-api/STRIPE_SECRET_KEY\"", record.Notes, StringComparison.Ordinal);
         Assert.Contains("\"passphrase\":true", record.Notes, StringComparison.Ordinal);
@@ -146,7 +146,7 @@ public sealed class ShareStoreTests : IDisposable
             GroupPath = ReservedGroups.Shares,
             Title = id,
             Password = "t",
-            Url = "https://keypaste.com",
+            Url = "https://api.keypaste.com",
             Notes = "{\"v\":1,\"what\":\"Banking/Chase\",\"field\":\"password\",\"created\":\"2026-09-24T14:40:00Z\",\"expires\":\"2026-09-25T14:40:00Z\",\"views\":1,\"passphrase\":false" + item + "}",
         });
 
@@ -164,7 +164,7 @@ public sealed class ShareStoreTests : IDisposable
     public void Rule_NamesViewsAndTtl(int views, int minutes, string expected)
     {
         var created = DateTimeOffset.UnixEpoch;
-        var info = new ShareInfo("id", "what", "password", null, created, created.AddMinutes(minutes), views, false, "https://keypaste.com");
+        var info = new ShareInfo("id", "what", "password", null, created, created.AddMinutes(minutes), views, false, "https://api.keypaste.com");
 
         Assert.Equal(expected, info.Rule);
     }

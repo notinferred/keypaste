@@ -28,7 +28,7 @@ A source feature is not in a downloaded binary until a release publishes it.
 | Scoped tokens: `token create` for CI, `run --token`, runs without a prompt except for a protected stage | Implemented (unreleased) | A token's run asks nobody, by design ([THREATS](../THREATS.md) T-32) |
 | Edits while the vault is held: `add`, `set`, `rm`, `rotate`, `field rm` and the `env` writes go to the app or `keypaste approve`, which asks you and saves | Implemented (unreleased) | One request of at most 64 KiB, so a larger `.env` is refused while the vault is held |
 | Import: `keypaste import` of another KDBX file or another password manager's export | Implemented (unreleased) | Cannot open a file that needs a YubiKey; the desktop's import can |
-| Share links: `keypaste share` encrypts one field or a login on this machine and uploads only ciphertext to keypaste.com; links expire, open a set number of times and can be revoked | Implemented (unreleased) | |
+| Share links: `keypaste share` encrypts one field or a login on this machine and uploads only ciphertext to api.keypaste.com; links expire, open a set number of times and can be revoked | Implemented (unreleased) | |
 | `keypaste lock`, `status`, `doctor` | Implemented (unreleased) | |
 | Audit log: `log` with `--since`, `--denied`, `--client`; `log verify` | Published `v0.3.0` | |
 | `log --json`, `log verify --expect <hash>`, `log verify --checkpoints` | Implemented (unreleased) | A recomputed log is caught only before the last checkpoint, and a removed tail only against a hash you kept |

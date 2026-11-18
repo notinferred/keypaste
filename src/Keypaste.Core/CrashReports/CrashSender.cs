@@ -7,7 +7,7 @@ using Polly;
 namespace Keypaste.Core.CrashReports;
 
 /// <summary>
-/// Posts the outbox's crash reports to keypaste.com's <c>/api/crash</c>, or to a loopback test server, one report a request.
+/// Posts the outbox's crash reports to api.keypaste.com's <c>/v1/crash</c>, or to a loopback test server, one report a request.
 /// </summary>
 /// <remarks>
 /// Nothing in Core starts one: the app does, once the person has chosen to send reports. It sends a report's bytes as the
@@ -17,13 +17,13 @@ namespace Keypaste.Core.CrashReports;
 /// </remarks>
 public sealed class CrashSender
 {
-    /// <summary>The variable naming a loopback test server in place of keypaste.com.</summary>
+    /// <summary>The variable naming a loopback test server in place of api.keypaste.com.</summary>
     public const string EnvironmentVariable = "KEYPASTE_CRASH_URL";
 
     /// <summary>The most reports one pass sends.</summary>
     internal const int ReportsPerPass = 10;
 
-    private const string _path = "/api/crash";
+    private const string _path = "/v1/crash";
 
     private readonly HttpMessageHandler _handler;
     private readonly Uri _endpoint;
@@ -34,7 +34,7 @@ public sealed class CrashSender
 
     /// <summary>Sends one outbox's reports.</summary>
     /// <param name="handler">The transport, owned by the caller: <see cref="CreateTransport"/>, or a test's fake.</param>
-    /// <param name="endpoint">keypaste.com or a loopback origin, from <see cref="TryResolveEndpoint"/>.</param>
+    /// <param name="endpoint">api.keypaste.com or a loopback origin, from <see cref="TryResolveEndpoint"/>.</param>
     /// <param name="outbox">The reports to send.</param>
     /// <param name="clock">The clock the passes, each request's time and a Retry-After are measured on.</param>
     /// <exception cref="ArgumentException">The endpoint is another host.</exception>
@@ -44,9 +44,9 @@ public sealed class CrashSender
         ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentNullException.ThrowIfNull(outbox);
 
-        if (!IsKeypasteCom(endpoint) && !IsLoopbackOrigin(endpoint))
+        if (!IsKeypasteApi(endpoint) && !IsLoopbackOrigin(endpoint))
         {
-            throw new ArgumentException("crash reports go only to keypaste.com or a loopback server", nameof(endpoint));
+            throw new ArgumentException("crash reports go only to api.keypaste.com or a loopback server", nameof(endpoint));
         }
 
         _handler = handler;
@@ -56,8 +56,8 @@ public sealed class CrashSender
         _requestTime = new ResiliencePipelineBuilder { TimeProvider = _clock }.AddTimeout(RequestTime).Build();
     }
 
-    /// <summary>keypaste.com.</summary>
-    public static Uri KeypasteCom { get; } = new("https://keypaste.com");
+    /// <summary>keypaste's services.</summary>
+    public static Uri KeypasteApi { get; } = new("https://api.keypaste.com");
 
     /// <summary>How long after the app starts the first pass waits.</summary>
     internal static TimeSpan FirstPass { get; } = TimeSpan.FromSeconds(30);
@@ -71,7 +71,7 @@ public sealed class CrashSender
     /// <summary>The longest Retry-After honoured.</summary>
     internal static TimeSpan LongestRetryAfter { get; } = TimeSpan.FromHours(24);
 
-    /// <summary>Picks where reports go: keypaste.com, or the loopback origin <see cref="EnvironmentVariable"/> names.</summary>
+    /// <summary>Picks where reports go: api.keypaste.com, or the loopback origin <see cref="EnvironmentVariable"/> names.</summary>
     /// <param name="fromEnvironment">The variable's value.</param>
     /// <param name="endpoint">The origin, when this returns true.</param>
     /// <returns>False when the variable names anything but a loopback origin, and then nothing is to be sent.</returns>
@@ -79,7 +79,7 @@ public sealed class CrashSender
     {
         if (string.IsNullOrEmpty(fromEnvironment))
         {
-            endpoint = KeypasteCom;
+            endpoint = KeypasteApi;
             return true;
         }
 
@@ -116,7 +116,7 @@ public sealed class CrashSender
 
     /// <summary>Sends up to <see cref="ReportsPerPass"/> waiting reports, oldest first, stopping at the first kept.</summary>
     /// <param name="ct">Ends the pass, keeping what was not answered.</param>
-    /// <returns>How many keypaste.com accepted.</returns>
+    /// <returns>How many the endpoint accepted.</returns>
     public async Task<int> SendWaitingAsync(CancellationToken ct)
     {
         if (_clock.GetUtcNow() < _notBefore)
@@ -204,8 +204,8 @@ public sealed class CrashSender
     private static bool IsOrigin(Uri uri) =>
         uri.IsAbsoluteUri && uri.UserInfo.Length == 0 && uri.AbsolutePath == "/" && uri.Query.Length == 0 && uri.Fragment.Length == 0;
 
-    private static bool IsKeypasteCom(Uri uri) =>
-        IsOrigin(uri) && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && string.Equals(uri.Host, KeypasteCom.Host, StringComparison.OrdinalIgnoreCase);
+    private static bool IsKeypasteApi(Uri uri) =>
+        IsOrigin(uri) && uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && string.Equals(uri.Host, KeypasteApi.Host, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsLoopbackOrigin(Uri uri) =>
         IsOrigin(uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && uri.IsLoopback;

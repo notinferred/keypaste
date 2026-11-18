@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary><c>/api/crash</c> in memory, recording every request whole and answering as the test says.</summary>
+/// <summary><c>/v1/crash</c> in memory, recording every request whole and answering as the test says.</summary>
 internal sealed class FakeCrashServer : HttpMessageHandler
 {
     private readonly Lock _gate = new();
