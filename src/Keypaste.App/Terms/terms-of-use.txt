@@ -1,29 +1,51 @@
 // The terms of use the first-launch screen agrees to and links, the one copy of them. A line starting // is not shown, a line
 // starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
 // new date shows that screen once more and stops crash reports until it is agreed to, unless they are switched off.
-// DRAFT pending H-0027: not legal advice and not reviewed. The founder or a lawyer approves it before 1.0.0, filling in
-// each bracketed item: the legal entity, the limitation of liability and the governing law.
+// DRAFT pending H-0027: not legal advice and not reviewed. Counsel approves it before 1.0.0, deciding:
+// whether disclaimers and the liability cap need capital letters to be conspicuous under Florida law; whether to add
+// arbitration and a class-action waiver; whether agreeing before the app opens sits with AGPL-3.0 §10; and whether an LLC
+// should replace the individual as the party.
 keypaste terms of use
-Draft version 2026-11-18
-## What these terms cover
-keypaste is a password manager for KeePass files. [legal name] ("keypaste", "we") publishes it. These terms cover the services we run at api.keypaste.com, which are share links and crash reports, and what the keypaste app sends us.
+Draft version 2026-11-19
+## Who we are and what these terms cover
+keypaste is a password manager for KeePass files. Dan I Ochoa Barrios, an individual doing business as keypaste ("keypaste", "we", "us"), publishes it. These terms are an agreement between you and us. They cover your use of the keypaste app, its command line, MCP bridge and browser extension, the services we run at api.keypaste.com and share.keypaste.com (share links and crash reports), and the website keypaste.com. By continuing past the app's first screen or by using our services, you agree to these terms. If you don't agree, don't use them.
 ## The software and its licence
-keypaste is free software under the GNU Affero General Public License, version 3 (AGPL-3.0). The licence lets you run, study, change and share it, and nothing here limits the rights the licence gives you. Where these terms and the licence differ about the software, the licence applies.
-## Your vault stays yours
-Your vault is a file stored where you choose. We never receive your vault, your master password or your key file. Because we never have them, we can't recover them. Keep backups.
+keypaste is free software under the GNU Affero General Public License, version 3 (AGPL-3.0). The licence lets you run, study, change and share it, and nothing here limits the rights the licence gives you. Where these terms and the licence differ about the software, the licence applies. These terms add to the licence only for our services, the keypaste name, and matters the licence leaves open.
+## Your vault and your responsibility
+Your vault is a file stored where you choose. We never receive your vault, your master password or your key file, so we can't recover them, restore a lost or damaged vault, or undo a change. You are responsible for keeping your master password and key file safe, keeping backups of your vault, and keeping your devices secure.
+You decide which apps, agents and AI tools may use your secrets, through keypaste's approvals and policies. You are responsible for what you allow them to do with those secrets and for what they do with them, including actions an agent takes on your behalf. keypaste limits and records access; it can't control what an app or agent does with a secret once you let it have one.
+You are responsible for using keypaste lawfully and for having the right to store and share what you put in it.
+## Acceptable use
+You may not use keypaste's services to:
+- send, store or share malware, phishing, stolen credentials or content you have no right to share;
+- break the law or infringe anyone's rights;
+- attack, overload, probe or interfere with our services or other people's use of them, or get around their rate limits, except security research reported to security@keypaste.com in line with SECURITY.md;
+- scrape the services, or use them in an automated way beyond what the keypaste app and its published interfaces do;
+- resell, rent or offer our services to others as your own service.
+We may delete content, refuse requests, or suspend or end anyone's access to our services when we reasonably believe these terms were broken, or to protect the services or other people. This doesn't limit what the AGPL-3.0 lets you do with the software itself.
 ## Crash reports
-If the keypaste desktop app stops working or hits an error it didn't expect, it sends us a crash report so we can find and fix the bug. It does this from when you continue past the first screen the app shows, which agrees to these terms, until you turn it off in Settings, and again if you turn it back on. Reports are sent automatically, with no further question.
-A report holds: keypaste's version and build; your operating system, its version number and your processor type; the .NET version; roughly how long the app had been running; which part of the app was open; the date; the type of error; and the names of keypaste's code functions involved, with their positions in the code.
-A report never holds: anything from your vault, including passwords, notes, fields and item or group names; your master password or key file; error messages; file names or paths; environment variables; agent or app names; your activity log; your user or computer name; or any identifier for you or your installation.
-Reports from the CLI and the MCP bridge are never sent. A report waits on your computer until it can be sent, and you can see it under Settings › Advanced › Diagnostics. To stop reports, turn off Send crash reports in Settings. While it's off, nothing is collected or sent, and reports waiting to be sent are deleted.
-Reports travel over HTTPS to keypaste's services at api.keypaste.com, which run on Cloudflare. Cloudflare sees your IP address to deliver the request. We don't store your IP address. We keep reports for 90 days. Cloudflare's backups can hold them for up to 30 more. Only keypaste's maintainers read them, and we don't sell or share them. A report holds no identifier, so we can't find your particular report. If you ask, we can delete every report for a given version.
+Crash reports are off unless you turn them on, with Send crash reports on the first screen or in Settings. While they're on, the desktop app sends a report when it stops working or hits an error it didn't expect, with no further question. A report holds no data from your vault and no identifier for you. Turning reports off stops them and deletes reports waiting to be sent. Our privacy policy at keypaste.com/privacy lists what a report holds and how long we keep it.
 ## Share links
-keypaste share encrypts a value on your computer before uploading it to keypaste's services at api.keypaste.com, which store only the encrypted value, which they can't open, along with how many views are left, when the link expires, and a fingerprint of the code that cancels it. A link opens 1 to 10 times within 5 minutes to 7 days. It is deleted after the last view, about 30 minutes after it expires, or when you cancel it. Anyone who has a link can open it, so send links privately and use a passphrase for anything sensitive. We may switch sharing off at any time, and a live link can't be opened while it's off. Don't use share links for malware or for anything you have no right to share. We can't see what a link contains, but we may delete a link that is reported to us.
+keypaste share encrypts a value on your computer before uploading it, so our services store only an encrypted value they can't open. Anyone who has a link can open it, so send links privately and use a passphrase for anything sensitive. A link expires and is deleted as our privacy policy describes. We may switch sharing off at any time, and a live link can't be opened while it's off. We can't see what a link contains, but we may delete a link that is reported to us.
+## The keypaste name
+"keypaste" and the keypaste logo are the name and logo we go by, and they belong to Dan I Ochoa Barrios whether or not they are registered. The AGPL-3.0 covers keypaste's code, not its name or logo (AGPL-3.0 §7(e)).
+You may mention keypaste truthfully, for example to say your work is compatible with it or to review it. Otherwise you may not use the name or logo, or anything confusingly similar, for any product, service, company, domain name or account, including a changed copy of keypaste, and you may not suggest that we made or endorse anything we didn't.
+You will not register or apply for "keypaste", the logo or anything confusingly similar as a trademark, domain name or account name anywhere, and you will not challenge our ownership of them. If you acquire any rights in them, you assign those rights to Dan I Ochoa Barrios and will sign what is needed to complete that.
 ## No warranty
-keypaste and its services are provided as they are, without warranty of any kind, to the extent the law allows. The licence's own disclaimer (AGPL-3.0 §§15–16) covers the software. Services can change or stop.
+keypaste and its services are provided "as is" and "as available", without warranty of any kind, express or implied, including warranties of merchantability, fitness for a particular purpose, title and non-infringement, to the fullest extent the law allows. We don't promise that keypaste or its services will be uninterrupted, error-free or secure, or that they will keep any secret from loss or disclosure. The licence's own disclaimer (AGPL-3.0 §§15–16) also covers the software. Services can change or stop at any time.
 ## Limitation of liability
-[To be written by counsel.]
+To the fullest extent the law allows, we will not be liable for any indirect, incidental, special, consequential, exemplary or punitive damages, or for any loss of data, secrets, passwords, profits, revenue, business or goodwill, arising from or related to keypaste, its services or these terms, even if we were told such damages were possible, and whatever the legal theory, whether contract, tort (including negligence), strict liability or otherwise.
+To the fullest extent the law allows, our total liability for all claims arising from or related to keypaste, its services or these terms is limited to the greater of the amount you paid us for them in the 12 months before the claim arose and fifty US dollars (US$50).
+These limits apply even if a remedy fails of its essential purpose. They don't limit liability that the law doesn't allow to be limited, such as for fraud or for harm we caused intentionally. Some places don't allow some of these exclusions, so some may not apply to you.
+## Indemnity
+To the extent the law allows, you will defend, indemnify and hold harmless keypaste and Dan I Ochoa Barrios from any claims, damages, losses and costs, including reasonable legal fees, brought by someone else and arising from your misuse of keypaste or its services, your breach of these terms, your content, or what apps and agents you allowed to do with your secrets.
+## Ending
+You can stop using keypaste at any time. We may end or suspend your access to our services under Acceptable use, or stop offering a service. The sections on your responsibility, the keypaste name, no warranty, limitation of liability, indemnity and governing law continue after these terms end.
+## Governing law and disputes
+These terms are governed by the laws of the State of Florida, United States, without regard to its conflict-of-law rules. Any dispute arising from them or from keypaste's services will be heard only in the state courts of Osceola County, Florida, or the United States District Court for the Middle District of Florida, and you and we agree to their jurisdiction. If you live where the law gives you the right to bring a claim in your own courts or under your own laws, these terms don't take that right away.
+## General
+If a court finds part of these terms unenforceable, that part is enforced as far as possible and the rest stays in effect. Our not enforcing a part of these terms isn't a waiver of it. These terms, the licence and our privacy policy are the whole agreement between you and us about keypaste's services. You may not transfer these terms; we may transfer them to someone who takes over keypaste, such as a company we form.
 ## Changes to these terms
-We post changes at keypaste.com/terms with a new date. If a change affects crash reports, the app shows it to you before sending anything under the new terms.
+We post changes at keypaste.com/terms with a new date. If a change affects crash reports, the app stops sending them until you agree to the new terms. Using our services after a change means you accept it.
 ## Contact
-Questions: contact@keypaste.com. Security vulnerabilities: security@keypaste.com. Governing law: [to be decided].
+Questions: contact@keypaste.com. Security vulnerabilities: security@keypaste.com.
