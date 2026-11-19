@@ -74,7 +74,7 @@ public sealed partial class BrowserPairingTests
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync(2));
 
-        Assert.Equal("keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", Text(window, "IdentityText"));
+        Assert.Equal("keypaste's extension from Firefox Add-ons (browser@keypaste.com)", Text(window, "IdentityText"));
         window.FindControl<TextBox>("NameBox")!.Text = "work laptop";
         app.Clock.Advance(PromptViewModel.ArmingDelay);
         await PromptedApp.UntilAsync(() => Text(window, "NameProblemText") == "Another pairing has this name.");

@@ -33,7 +33,7 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(false)]
     [InlineData(true)]
     public void Firefox_s_manifest_path_and_add_on_ID_are_a_browser_start(bool windows) =>
-        Assert.Equal("browser@keypaste.invalid", BrowserCaller.Of([_manifest, "browser@keypaste.invalid"], windows));
+        Assert.Equal("browser@keypaste.com", BrowserCaller.Of([_manifest, "browser@keypaste.com"], windows));
 
     [Theory]
     [InlineData(false)]
@@ -46,14 +46,14 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(true, _chrome, "--parent-window=12a")]
     [InlineData(true, _chrome, "--parent-window=0", "--extra")]
     [InlineData(false, "chrome-extension:/fipabobollckgdobkjfkkchimlphcicg/")]
-    [InlineData(false, "com.keypaste.browser.json", "browser@keypaste.invalid")]
+    [InlineData(false, "com.keypaste.browser.json", "browser@keypaste.com")]
     public void Anything_else_is_not(bool windows, params string[] args) => Assert.Null(BrowserCaller.Of(args, windows));
 
     [Fact]
     public void A_manifest_path_followed_by_an_option_is_not()
     {
         Assert.Null(BrowserCaller.Of([_manifest, "--help"], windows: false));
-        Assert.Null(BrowserCaller.Of([Path.ChangeExtension(_manifest, ".txt"), "browser@keypaste.invalid"], windows: false));
+        Assert.Null(BrowserCaller.Of([Path.ChangeExtension(_manifest, ".txt"), "browser@keypaste.com"], windows: false));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class BrowserCallerTests : IDisposable
     {
         Assert.True(BrowserCaller.TryRead([_chrome], windows: false, out var chrome, out _));
         Assert.True(BrowserCaller.TryRead(["chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "--parent-window=7"], windows: true, out var edge, out _));
-        Assert.True(BrowserCaller.TryRead([_manifest, "browser@keypaste.invalid"], windows: false, out var firefox, out _));
+        Assert.True(BrowserCaller.TryRead([_manifest, "browser@keypaste.com"], windows: false, out var firefox, out _));
 
         Assert.Equal(BrowserIdentity.ChromeWebStore, chrome);
         Assert.Equal(BrowserIdentity.EdgeAddOns, edge);

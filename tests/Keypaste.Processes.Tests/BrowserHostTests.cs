@@ -68,7 +68,7 @@ public sealed class BrowserHostTests
             // Deny pairs nothing, and holds the next request back unasked.
             using (var denied = StartBrowser(workspace, "firefox", key, "associate"))
             {
-                Assert.Contains("identity=keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", app.WaitFor("^pair-prompt identity=", ++prompts), StringComparison.Ordinal);
+                Assert.Contains("identity=keypaste's extension from Firefox Add-ons (browser@keypaste.com)", app.WaitFor("^pair-prompt identity=", ++prompts), StringComparison.Ordinal);
                 app.Send("deny");
                 Assert.Equal("6", Assert.Single(Answers(denied)).GetProperty("errorCode").GetString());
             }

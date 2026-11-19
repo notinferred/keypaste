@@ -17,7 +17,7 @@ public sealed record BrowserIdentity(string Caller, string Store)
 
     private const string _chromeOrigin = "chrome-extension://";
 
-    // Test IDs, from extension/test-keys' public keys, until the stores assign keypaste's extension its own (H-0029).
+    // Chrome and Edge carry test IDs, from extension/test-keys' public keys, until those stores assign keypaste's extension its own (H-0029).
 
     /// <summary>keypaste's extension from the Chrome Web Store.</summary>
     public static BrowserIdentity ChromeWebStore { get; } = new("chrome-extension://fipabobollckgdobkjfkkchimlphcicg/", "the Chrome Web Store");
@@ -26,7 +26,7 @@ public sealed record BrowserIdentity(string Caller, string Store)
     public static BrowserIdentity EdgeAddOns { get; } = new("chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "Microsoft Edge Add-ons");
 
     /// <summary>keypaste's extension from Firefox Add-ons.</summary>
-    public static BrowserIdentity FirefoxAddOns { get; } = new("browser@keypaste.invalid", "Firefox Add-ons");
+    public static BrowserIdentity FirefoxAddOns { get; } = new("browser@keypaste.com", "Firefox Add-ons");
 
     /// <summary>The three, in that order.</summary>
     public static IReadOnlyList<BrowserIdentity> All { get; } = [ChromeWebStore, EdgeAddOns, FirefoxAddOns];
